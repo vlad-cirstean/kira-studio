@@ -13,7 +13,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed, onMounted, onUnmounted, reactive, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, useTemplateRef, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
@@ -309,8 +309,10 @@ const panelSearch = computed<string>({
 });
 const panelEmpty = computed(() => codeReposStore.records.length === 0);
 const panelSearchable = computed(() => tab.value !== 'review');
-const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   searchable: () => panelSearchable.value,
+  getSearch: () => panelSearch.value,
   setSearch: (v) => {
     panelSearch.value = v;
   },
@@ -338,7 +340,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, panelSearch)">
+  <div ref="rootEl" class="flex h-full flex-col">
     <div class="p-panel-head h-bar">
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
@@ -420,14 +422,19 @@ onUnmounted(() => {
       <div class="min-h-0 flex-1">
         <div class="git-panel-body">
         <section v-if="tab === 'repos'" class="repo-section" data-testid="repo-section">
-          <div class="repo-list">
+          <div class="repo-list" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
                 class="repo-row"
                 :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
+                role="option"
+                tabindex="0"
+                :aria-selected="isActive(repo.id)"
                 @click="onRowClick(repo.id)"
+                @keydown.enter.prevent="onRowClick(repo.id)"
+                @keydown.space.prevent="onRowClick(repo.id)"
                 @contextmenu.prevent="onRepoContextMenu($event, repo)"
               >
                 <button
@@ -473,10 +480,11 @@ onUnmounted(() => {
                   }}</TooltipContent>
                 </Tooltip>
               </div>
-              <div
+              <section
                 v-if="worktreesStore.isWorktreesExpanded(repo.id)"
                 class="worktree-list"
                 data-testid="repo-worktrees"
+                aria-label="Worktrees"
               >
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
@@ -489,7 +497,12 @@ onUnmounted(() => {
                   }"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="isActive(worktreeRecordId(wt.path))"
                   @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
+                  @keydown.enter.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
+                  @keydown.space.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
@@ -541,7 +554,7 @@ onUnmounted(() => {
                 <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note">
                   No worktrees
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </section>

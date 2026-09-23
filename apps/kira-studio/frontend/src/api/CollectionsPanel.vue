@@ -6,7 +6,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
@@ -54,8 +54,10 @@ function onSearch(value: string): void {
 
 // P104 §3, P107 T1-17: PanelShell's own header/search-reveal/type-ahead-redirect logic, via the
 // shared usePanelHeaderSearch composable rather than an inline copy.
-const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   searchable: () => true,
+  getSearch: () => collectionsStore.search,
   setSearch: onSearch,
 });
 
@@ -125,7 +127,7 @@ onUnmounted(() => {
 
 <template>
   <!-- P104 §3: PanelShell inlined (no library counterpart). -->
-  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, collectionsStore.search)">
+  <div ref="rootEl" class="flex h-full flex-col">
     <div class="p-panel-head h-bar">
       <span>Collections</span>
       <Tooltip>

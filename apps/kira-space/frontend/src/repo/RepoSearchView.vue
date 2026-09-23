@@ -3,8 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
 import { useVirtualRows } from '@workbench/util/virtualRows';
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
 import RepoSearchRow from './RepoSearchRow.vue';
@@ -73,6 +74,11 @@ function onQueryKeydown(e: KeyboardEvent): void {
   }
 }
 
+// P105 §5.1: the toolbar div itself is not interactive -- binds via VueUse instead of a raw
+// template @keydown on it.
+const toolbarEl = useTemplateRef<HTMLElement>('toolbarEl');
+useEventListener(toolbarEl, 'keydown', onQueryKeydown);
+
 function onSelect(row: RepoSearchRowVm): void {
   selected.value = row.key;
 }
@@ -95,7 +101,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 
 <template>
   <div class="repo-search-view">
-    <div class="repo-search-toolbar" @keydown="onQueryKeydown">
+    <div ref="toolbarEl" class="repo-search-toolbar">
       <div class="repo-search-input">
         <Input
           :model-value="query"
@@ -195,7 +201,14 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     >
       {{ statusLine }}
     </div>
-    <div ref="scrollEl" class="repo-search-list overflow-auto" data-testid="virtual-list" @scroll="onScroll">
+    <div
+      ref="scrollEl"
+      class="repo-search-list overflow-auto"
+      data-testid="virtual-list"
+      role="listbox"
+      aria-label="Search results"
+      @scroll="onScroll"
+    >
       <div :style="{ height: `${totalSize}px`, position: 'relative' }">
         <template v-for="item in virtualItems" :key="String(item.key)">
           <RepoSearchRow

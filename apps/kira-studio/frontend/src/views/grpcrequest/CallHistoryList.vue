@@ -67,6 +67,14 @@ function onRowClick(id: string): void {
   void grpcCallHistoryStore.viewGrpcHistoryEntry(props.tab.id, id);
 }
 
+// P105 §5.2(c): Enter/Space mirror a single click — the Delete button nested inside stays its own
+// tab stop, so this handler never claims either key from it.
+function onRowKeydown(e: KeyboardEvent, id: string): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  onRowClick(id);
+}
+
 function onDelete(id: string): void {
   void grpcCallHistoryStore.deleteGrpcHistoryEntry(props.tab.id, id);
 }
@@ -128,14 +136,23 @@ async function onClear(): Promise<void> {
       </Alert>
     </template>
 
-    <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
+    <div
+      v-if="entries.length > 0 && filteredEntries.length > 0"
+      class="history-rows"
+      role="listbox"
+      aria-label="Call history"
+    >
       <div
         v-for="entry in filteredEntries"
         :key="entry.id"
         class="history-row"
         :class="{ 'is-viewing': entry.id === viewingId }"
         data-testid="grpc-history-row"
+        role="option"
+        tabindex="0"
+        :aria-selected="entry.id === viewingId"
         @click="onRowClick(entry.id)"
+        @keydown="onRowKeydown($event, entry.id)"
       >
         <Tooltip>
           <TooltipTrigger as-child>

@@ -2,7 +2,12 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
@@ -68,7 +73,7 @@ function onJump(e: Event): void {
   <div class="group pager" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -79,13 +84,13 @@ function onJump(e: Event): void {
           >
             <CodiconIcon name="chevron-left" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>First page</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -96,7 +101,7 @@ function onJump(e: Event): void {
           >
             <CodiconIcon name="arrow-left" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Previous page</TooltipContent>
     </Tooltip>
@@ -116,7 +121,7 @@ function onJump(e: Event): void {
     </span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -127,13 +132,13 @@ function onJump(e: Event): void {
           >
             <CodiconIcon name="arrow-right" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Next page</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -144,7 +149,7 @@ function onJump(e: Event): void {
           >
             <CodiconIcon name="chevron-right" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ pageCount ? 'Last page' : lastTooltip }}</TooltipContent>
     </Tooltip>

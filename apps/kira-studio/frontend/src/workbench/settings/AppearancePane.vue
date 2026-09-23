@@ -4,7 +4,12 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref } from 'vue';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../../fonts';
@@ -96,7 +101,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         <span>Data font</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontFamily') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontFamily') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -107,7 +112,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -161,7 +166,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         <span>Data font size</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontSize') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontSize') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -172,7 +177,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -230,7 +235,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         <span>Row height</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowDensity') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowDensity') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -241,7 +246,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -300,7 +305,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       </Label>
       <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">
+        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -312,7 +317,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
           >
             <CodiconIcon name="discard" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
@@ -336,7 +341,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       </Label>
       <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowColoring') }">
+        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowColoring') }">
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -348,7 +353,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
           >
             <CodiconIcon name="discard" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
@@ -372,7 +377,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       </Label>
       <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">
+        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -384,7 +389,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
           >
             <CodiconIcon name="discard" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
@@ -395,7 +400,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         <span>Commit date</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'dateFormat') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'dateFormat') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -406,7 +411,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>

@@ -4,10 +4,15 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
-import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { ref, watch } from 'vue';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
+import { ref, useTemplateRef, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
@@ -91,7 +96,9 @@ function onDescriptionInput(v: string): void {
 }
 
 const showHistory = ref(false);
-const historyAnchorRef = ref<HTMLElement | null>(null);
+// P105: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
+// established `.$el` idiom, e.g. GitPanel.vue's promptInput / ConsoleView.vue's savedMenuTriggerEl).
+const historyAnchorRef = ref<{ $el: HTMLElement } | null>(null);
 function onHistoryClick(): void {
   showHistory.value = true;
   emit('history');
@@ -114,19 +121,27 @@ function onKeydown(e: KeyboardEvent): void {
     emit('move', 'down');
   }
 }
+
+// P105 §5.1: the row root has no interactive role of its own -- all four listeners bind here via
+// VueUse instead of as raw template attributes.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useEventListener(rootEl, 'keydown', onKeydown);
+useEventListener(rootEl, 'dragstart', () => emit('dragstart', props.index));
+useEventListener(rootEl, 'dragover', (e) => {
+  e.preventDefault();
+  emit('dragover', props.index);
+});
+useEventListener(rootEl, 'dragend', () => emit('dragend'));
 </script>
 
 <template>
   <div
+    ref="rootEl"
     class="variable-row"
     :class="{ 'is-dragging': dragging }"
     data-testid="variable-row"
     :data-id="row.id"
     :draggable="!trailing && !filtered"
-    @keydown="onKeydown"
-    @dragstart="emit('dragstart', index)"
-    @dragover.prevent="emit('dragover', index)"
-    @dragend="emit('dragend')"
   >
     <Tooltip v-if="filtered && !trailing">
       <TooltipTrigger as-child>
@@ -187,7 +202,7 @@ function onKeydown(e: KeyboardEvent): void {
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Label class="secret-toggle" tabindex="0" :aria-describedby="undefined">
+        <TooltipDisabledTrigger class="secret-toggle">
           <Checkbox
             :model-value="row.isSecret"
             :disabled="secretsUnavailable && !row.isSecret"
@@ -196,7 +211,7 @@ function onKeydown(e: KeyboardEvent): void {
           >
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
-        </Label>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ secretsUnavailable ? 'Secret storage is unavailable' : 'Secret' }}</TooltipContent>
     </Tooltip>
@@ -207,7 +222,7 @@ function onKeydown(e: KeyboardEvent): void {
       <div class="history-anchor">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span ref="historyAnchorRef" tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger ref="historyAnchorRef">
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -218,17 +233,17 @@ function onKeydown(e: KeyboardEvent): void {
               >
                 <CodiconIcon name="history" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>History</TooltipContent>
         </Tooltip>
-        <PopoverAnchor :reference="historyAnchorRef ?? undefined" />
+        <PopoverAnchor :reference="(historyAnchorRef?.$el as HTMLElement) ?? undefined" />
       </div>
       <VariableHistoryMenu v-if="variableSetStore.variableId === row.id" />
     </Popover>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -239,7 +254,7 @@ function onKeydown(e: KeyboardEvent): void {
           >
             <CodiconIcon name="trash" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>Remove</TooltipContent>
     </Tooltip>

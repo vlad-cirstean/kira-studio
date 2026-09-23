@@ -4,7 +4,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -222,6 +227,17 @@ function onRowOpen(node: TreeNode): void {
   tabsStore.openKeyValueTab(props.tab.connectionId, node.path);
 }
 
+// P105 §5.2(c): Enter opens (matching double-click); Space mirrors a single click.
+function onRowKeydown(e: KeyboardEvent, node: TreeNode): void {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    onRowOpen(node);
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    onRowClick(node);
+  }
+}
+
 // D10: the moved keyMenu/objectMenu/namespaceMenu/prefixMenu bodies, now addressed by node
 // instead of by tree row.
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
@@ -437,7 +453,7 @@ onMounted(() => {
           <div class="p-toolbar list-head" data-testid="browse-list-head">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex">
+                <TooltipDisabledTrigger>
                   <Button
                     variant="toolbar"
                     size="kira-icon"
@@ -448,7 +464,7 @@ onMounted(() => {
                   >
                     <CodiconIcon name="chevron-left" :size="13" />
                   </Button>
-                </span>
+                </TooltipDisabledTrigger>
               </TooltipTrigger>
               <TooltipContent>Back</TooltipContent>
             </Tooltip>
@@ -485,6 +501,8 @@ onMounted(() => {
               ref="scrollEl"
               class="body overflow-auto"
               data-testid="virtual-list"
+              role="listbox"
+              aria-label="Keys"
               @scroll="onScroll"
             >
               <div :style="{ height: `${totalSize}px`, position: 'relative' }">
@@ -497,8 +515,12 @@ onMounted(() => {
                   :data-kind="filteredNodes[vi.index]?.kind"
                   :class="{ selected: rt?.selected === filteredNodes[vi.index]?.path }"
                   :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selected === filteredNodes[vi.index]?.path"
                   @click="onRowClick(filteredNodes[vi.index]!)"
                   @dblclick="onRowOpen(filteredNodes[vi.index]!)"
+                  @keydown="onRowKeydown($event, filteredNodes[vi.index]!)"
                   @contextmenu.prevent="onRowContextMenu($event, filteredNodes[vi.index]!)"
                 >
                   <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE

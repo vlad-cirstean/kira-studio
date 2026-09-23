@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { EditBuffer } from './useEditBuffer';
 
@@ -58,7 +63,7 @@ const resetTitle = computed<string>(
     }}</span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -70,13 +75,13 @@ const resetTitle = computed<string>(
           >
             <CodiconIcon name="expand-all" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ beautifyIndentedTitle }}</TooltipContent>
     </Tooltip>
     <Tooltip v-if="showCompact">
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -88,13 +93,13 @@ const resetTitle = computed<string>(
           >
             <CodiconIcon name="collapse-all" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ beautifyCompactTitle }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -105,7 +110,7 @@ const resetTitle = computed<string>(
           >
             <CodiconIcon name="discard" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ resetTitle }}</TooltipContent>
     </Tooltip>

@@ -123,14 +123,12 @@ function editEnvironmentVariables(): void {
         >
           <Tooltip>
             <TooltipTrigger as-child>
-              <code
+              <button
+                type="button"
                 class="reference"
-                role="button"
-                tabindex="0"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
-                @keydown.enter="onCopy(row.name)"
-                >{{ reference(row.name) }}</code
+                >{{ reference(row.name) }}</button
               >
             </TooltipTrigger>
             <TooltipContent>Copy</TooltipContent>
@@ -224,7 +222,7 @@ function editEnvironmentVariables(): void {
 }
 
 .reference {
-  @apply min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-data;
 }
 
 .overview-value {

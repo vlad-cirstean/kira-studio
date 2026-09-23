@@ -23,7 +23,7 @@ const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
 </script>
 
 <template>
-  <div class="kui-segmented" role="group" :aria-label="ariaLabel">
+  <fieldset class="kui-segmented" :aria-label="ariaLabel">
     <button
       v-for="option in options"
       :key="option.id"
@@ -39,5 +39,5 @@ const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
       <span class="codicon" :class="option.icon" aria-hidden="true"></span>
       <span v-if="option.badge !== undefined" class="kui-segmented-badge">{{ option.badge }}</span>
     </button>
-  </div>
+  </fieldset>
 </template>

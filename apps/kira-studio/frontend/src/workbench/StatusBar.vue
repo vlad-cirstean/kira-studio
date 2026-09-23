@@ -110,6 +110,7 @@ const agentTooltip = computed(() =>
       <Tooltip v-if="appUpdateStore.available">
         <TooltipTrigger as-child>
           <button
+            type="button"
             class="p-status update"
             data-testid="update-available"
             @click="onOpenReleasePage"

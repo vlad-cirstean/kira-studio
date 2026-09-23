@@ -7,18 +7,28 @@ import type { DocumentRowView } from './rows';
 // between DocumentView.vue and ConsoleResultGrid.vue's own read-only copy. The expansion *state*
 // behind `expanded` stays genuinely different per caller (documents: persisted, default-expanded,
 // P27 D2; console: runtime-only, default-collapsed, P42 D11) — this component only renders the
-// row that reads it. `scope` names the tab id or console result key the caller resolved `view`
+// row that reads it. `rowScope` names the tab id or console result key the caller resolved `view`
 // against (rows.ts's own registered-source key), for a caller that needs it alongside `view.id`.
+// P105 §13: named `rowScope`, not `scope` — the HTML global `scope` attribute name collides with
+// Biome's `noHeaderScope`, which reads the attribute name off every call site that binds it.
 defineProps<{
   view: DocumentRowView;
-  scope: string;
+  rowScope: string;
   expanded: boolean;
   selected: boolean;
   searchMatch: boolean;
   searchMatchCurrent: boolean;
 }>();
 
-defineEmits<{ toggle: []; select: [] }>();
+const emit = defineEmits<{ toggle: []; select: [] }>();
+
+// P105 §5.2(c): Enter/Space mirror a single click — the expand-toggle button and the #actions
+// slot's own controls stay their own tab stops, so this handler never claims either key from them.
+function onHeadKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  emit('select');
+}
 </script>
 
 <template>
@@ -32,7 +42,14 @@ defineEmits<{ toggle: []; select: [] }>();
     }"
     :data-id="view.id"
   >
-    <div class="doc-head" @click="$emit('select')">
+    <div
+      class="doc-head"
+      role="option"
+      tabindex="0"
+      :aria-selected="selected"
+      @click="$emit('select')"
+      @keydown="onHeadKeydown"
+    >
       <button
         type="button"
         class="expand-toggle"

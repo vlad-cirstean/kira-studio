@@ -12,9 +12,10 @@ import {
 } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useEventListener } from '@vueuse/core';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useDragReorder } from '@workbench/util/useDragReorder';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { EnvironmentsTabRecord } from '../state/tabDomain';
@@ -155,6 +156,35 @@ function onKeydown(e: KeyboardEvent, id: string): void {
     void onMove(id, 'down');
   }
 }
+
+// P105 §5.1: the row divs carry no interactive role of their own, so the keydown/drag listeners
+// bind once on the list container and resolve back to a row via its own data-id, rather than each
+// row wiring the four handlers itself.
+const listEl = useTemplateRef<HTMLElement>('listEl');
+function rowIdFromEvent(e: Event): string | null {
+  return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="environment-row"]')
+    ?.dataset.id ?? null;
+}
+function rowIndexFromEvent(e: Event): number | null {
+  const id = rowIdFromEvent(e);
+  if (id === null) return null;
+  const i = displayEnvironments.value.findIndex((env) => env.id === id);
+  return i === -1 ? null : i;
+}
+useEventListener(listEl, 'keydown', (e) => {
+  const id = rowIdFromEvent(e);
+  if (id !== null) onKeydown(e as KeyboardEvent, id);
+});
+useEventListener(listEl, 'dragstart', (e) => {
+  const i = rowIndexFromEvent(e);
+  if (i !== null) onDragStart(i);
+});
+useEventListener(listEl, 'dragover', (e) => {
+  e.preventDefault();
+  const i = rowIndexFromEvent(e);
+  if (i !== null) onDragOver(i);
+});
+useEventListener(listEl, 'dragend', onDragEnd);
 </script>
 
 <template>
@@ -203,7 +233,7 @@ function onKeydown(e: KeyboardEvent, id: string): void {
       </div>
     </div>
 
-    <div class="p-dialog-body list">
+    <div ref="listEl" class="p-dialog-body list">
         <div
           v-for="(env, i) in displayEnvironments"
           :key="env.id"
@@ -212,10 +242,6 @@ function onKeydown(e: KeyboardEvent, id: string): void {
           :draggable="!isFiltered"
           data-testid="environment-row"
           :data-id="env.id"
-          @keydown="onKeydown($event, env.id)"
-          @dragstart="onDragStart(i)"
-          @dragover.prevent="onDragOver(i)"
-          @dragend="onDragEnd"
         >
           <span
             class="p-conn-dot"

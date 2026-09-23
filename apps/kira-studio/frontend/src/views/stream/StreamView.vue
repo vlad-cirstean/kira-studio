@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -9,8 +10,14 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useEventListener } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -197,8 +204,21 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onRowClick(i);
 }
-function onRowContextMenuFromEvent(e: MouseEvent): void {
+// P105 §5.2(c): Enter/Space on the gutter cell mirror clicking it — role="grid"/"row"/"gridcell"
+// all want real <table>/<tr>/<td> per Biome's useSemanticElements, so each column (gutter
+// included) is its own role="option" instead, verified clean; the row div itself carries no
+// role or keyboard handler of its own now.
+function onRowKeydownFromEvent(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
   const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onRowClick(i);
+}
+// P105 §5.2(c): delegated off the container rather than each row — a keyboard equivalent for
+// "open context menu" already exists (the OS/browser's own Shift+F10 on whichever cell is
+// focused), so this is a pointer-only convenience, not an element needing its own role/tabindex.
+function onRowContextMenuFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.target, 'rowIndex');
   if (i === null) return;
   onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '');
 }
@@ -221,6 +241,16 @@ function onAttrsCellClickFromEvent(e: MouseEvent): void {
 function onBodyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
+}
+// P105 §5.2(c): Enter/Space on a cell mirror clicking it.
+function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 'headers' | 'attrs' | 'body'): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  e.stopPropagation();
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i === null) return;
+  if (column === 'body') onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
+  else onCellClick(i, column, rowAt(i)?.[column] ?? null);
 }
 
 // P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
@@ -485,6 +515,7 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
 });
+useEventListener(scrollEl, 'contextmenu', onRowContextMenuFromEvent);
 
 function onGoToMatch(row: number): void {
   const index = rowIndices.value.indexOf(row);
@@ -539,30 +570,18 @@ function widthFor(column: string): number {
   return props.tab.state.columnWidths[column] ?? DEFAULT_COLUMN_WIDTHS[column] ?? 96;
 }
 
-let resizing: { column: string; startX: number; startWidth: number } | null = null;
-
-function onResizeStart(e: PointerEvent, column: string): void {
-  e.stopPropagation();
-  resizing = { column, startX: e.clientX, startWidth: widthFor(column) };
-  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+// P105 §5.2(a): KuiColumnResizeHandle owns the pointer/keyboard drag mechanics now — this view
+// keeps only its own live-preview-then-single-commit split (P21 round 2 finding 10c's own reason,
+// still the point: patchStreamTabState's own skipUnchanged: false makes a per-pixel-move commit
+// allocate + re-render + re-arm the debounced save on every pixel).
+function onResizeLive(column: string, width: number): void {
+  liveResizeWidth.value = { column, width };
 }
-function onResizeMove(e: PointerEvent): void {
-  if (!resizing) return;
-  const width = Math.max(40, resizing.startWidth + (e.clientX - resizing.startX));
-  liveResizeWidth.value = { column: resizing.column, width };
-}
-function onResizeEnd(e: PointerEvent): void {
-  if (resizing && liveResizeWidth.value) {
-    tabsStore.patchStreamTabState(props.tab.id, {
-      columnWidths: {
-        ...props.tab.state.columnWidths,
-        [resizing.column]: liveResizeWidth.value.width,
-      },
-    });
-  }
-  resizing = null;
+function onResizeCommit(column: string, width: number): void {
+  tabsStore.patchStreamTabState(props.tab.id, {
+    columnWidths: { ...props.tab.state.columnWidths, [column]: width },
+  });
   liveResizeWidth.value = null;
-  (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
 }
 
 let unregisterCommand: (() => void) | null = null;
@@ -699,7 +718,7 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip v-else>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -710,7 +729,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="arrow-right" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Next page</TooltipContent>
         </Tooltip>
@@ -769,7 +788,7 @@ onUnmounted(() => {
         </div>
         <Tooltip v-if="canDelete">
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -780,7 +799,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="trash" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{
             hasSelectedRow ? 'Delete the selected message' : 'Select a message first'
@@ -1067,55 +1086,70 @@ onUnmounted(() => {
             <div class="p-th gutter" style="width: 40px" />
             <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
               <span class="name">key</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-key"
-                @pointerdown="onResizeStart($event, 'key')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize key column"
+                :value="widthFor('key')"
+                :min="40"
+                @update:value="(w) => onResizeLive('key', w)"
+                @change="(w) => onResizeCommit('key', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('timestamp')}px` }">
               <span class="name">timestamp</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
-                @pointerdown="onResizeStart($event, 'timestamp')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize timestamp column"
+                :value="widthFor('timestamp')"
+                :min="40"
+                @update:value="(w) => onResizeLive('timestamp', w)"
+                @change="(w) => onResizeCommit('timestamp', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('headers')}px` }">
               <span class="name">headers</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
-                @pointerdown="onResizeStart($event, 'headers')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize headers column"
+                :value="widthFor('headers')"
+                :min="40"
+                @update:value="(w) => onResizeLive('headers', w)"
+                @change="(w) => onResizeCommit('headers', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('attrs')}px` }">
               <span class="name">attrs</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
-                @pointerdown="onResizeStart($event, 'attrs')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize attrs column"
+                :value="widthFor('attrs')"
+                :min="40"
+                @update:value="(w) => onResizeLive('attrs', w)"
+                @change="(w) => onResizeCommit('attrs', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
-          <div ref="scrollEl" class="tbody-scroll" data-testid="virtual-list" @scroll="onScroll">
+          <div
+            ref="scrollEl"
+            class="tbody-scroll"
+            data-testid="virtual-list"
+            role="listbox"
+            aria-label="Stream rows"
+            @scroll="onScroll"
+          >
             <div :style="{ height: `${totalSize}px`, position: 'relative' }">
               <div
                 v-for="vi in virtualItems"
@@ -1129,16 +1163,28 @@ onUnmounted(() => {
                   'search-match': matchSet.has(rowIndices[vi.index]),
                   'search-match-current': currentMatchRow === rowIndices[vi.index],
                 }"
-                @click="onRowClickFromEvent"
-                @contextmenu="onRowContextMenuFromEvent"
               >
-                <div class="p-td gutter" style="width: 40px">{{ rowIndices[vi.index] + 1 }}</div>
+                <div
+                  class="p-td gutter"
+                  style="width: 40px"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onRowClickFromEvent"
+                  @keydown="onRowKeydownFromEvent"
+                >
+                  {{ rowIndices[vi.index] + 1 }}
+                </div>
                 <div
                   class="p-td"
                   :class="cellClass({ isNull: rowAt(rowIndices[vi.index])?.key === null })"
                   :style="{ width: `${widthFor('key')}px` }"
                   data-testid="stream-key"
-                  @click.stop="onKeyCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onKeyCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
@@ -1146,7 +1192,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('timestamp')}px` }"
                   data-testid="stream-timestamp"
-                  @click.stop="onTimestampCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onTimestampCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'timestamp')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
                 </div>
@@ -1154,7 +1204,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('headers')}px` }"
                   data-testid="stream-headers"
-                  @click.stop="onHeadersCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onHeadersCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'headers')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.headers }}
                 </div>
@@ -1162,7 +1216,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('attrs')}px` }"
                   data-testid="stream-attrs"
-                  @click.stop="onAttrsCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onAttrsCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'attrs')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
@@ -1170,7 +1228,11 @@ onUnmounted(() => {
                   class="p-td msg-body"
                   style="flex: 1"
                   data-testid="stream-body"
-                  @click.stop="onBodyCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onBodyCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'body')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.body }}
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">

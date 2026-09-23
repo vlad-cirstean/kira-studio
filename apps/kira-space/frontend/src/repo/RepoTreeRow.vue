@@ -45,6 +45,20 @@ function onDblClick(): void {
 function onContextMenu(e: MouseEvent): void {
   emit('contextmenu', props.row, e);
 }
+
+// P105 §5.2(c): Enter opens (permanent, matching double-click); Space mirrors a single click
+// (select + toggle-or-preview-open) — the two keys the roving tabindex above already implies.
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    emit('select', props.row);
+    if (props.row.isDir) emit('toggle', props.row);
+    else emit('open', props.row, false);
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    onClick();
+  }
+}
 </script>
 
 <template>
@@ -55,9 +69,13 @@ function onContextMenu(e: MouseEvent): void {
     :data-testid="sticky ? 'repo-tree-sticky-row' : 'repo-tree-row'"
     :data-path="row.path"
     :data-status="statusAttr"
+    role="treeitem"
+    :aria-expanded="row.isDir ? row.expanded : undefined"
+    :aria-selected="selected"
     :tabindex="sticky ? -1 : selected ? 0 : -1"
     @click="onClick"
     @dblclick="onDblClick"
+    @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
     <button

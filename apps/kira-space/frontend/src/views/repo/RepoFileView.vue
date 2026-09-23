@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { useEventListener } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -116,6 +117,11 @@ function onReadingClick(event: MouseEvent): void {
   if (!id) return;
   readingPane.value?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView({ block: 'start' });
 }
+
+// P105 §5.1: the pane itself is not interactive — it only delegates to real, already-keyboard-
+// operable <a> anchors inside the rendered markdown (v-html), so the listener binds via VueUse
+// rather than as a raw template @click on the pane.
+useEventListener(readingPane, 'click', onReadingClick);
 
 let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
@@ -295,7 +301,6 @@ onUnmounted(() => {
         class="md-reading"
         data-testid="repo-file-markdown"
         v-html="renderedHtml"
-        @click="onReadingClick"
       />
     </div>
     <div v-else ref="container" class="monaco-host" data-testid="repo-file-editor" />

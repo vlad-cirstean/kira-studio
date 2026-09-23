@@ -334,13 +334,14 @@ test('typing in the engine search filters the tile grid without moving the dialo
   const reference = await dialogBox(page);
   expect(await dialogBodyFits(page)).toBe(true);
 
-  // Narrows the 10-tile/3-column grid from four rows to one.
+  // Narrows the 10-tile/3-column grid from four rows to one. Each tile is a radio
+  // input (P105: native <input type="radio"> in a <label>, not a role="radio" button).
   await page.fill('[data-testid="connection-engine-search"]', 'postgres');
-  await expect(page.locator('[data-testid="connection-kind"] button')).toHaveCount(1);
+  await expect(page.locator('[data-testid="connection-kind"] input[type="radio"]')).toHaveCount(1);
   expect(await dialogBox(page)).toEqual(reference);
   expect(await dialogBodyFits(page)).toBe(true);
 
   await page.fill('[data-testid="connection-engine-search"]', '');
-  await expect(page.locator('[data-testid="connection-kind"] button')).toHaveCount(10);
+  await expect(page.locator('[data-testid="connection-kind"] input[type="radio"]')).toHaveCount(10);
   expect(await dialogBox(page)).toEqual(reference);
 });

@@ -82,6 +82,14 @@ function onRowClick(id: string): void {
   patchHttpRequestTabState(props.tab.id, { responsePane: 'body' });
 }
 
+// P105 §5.2(c): Enter/Space mirror a single click — the checkbox nested inside stays its own tab
+// stop, so this handler never claims either key from it.
+function onRowKeydown(e: KeyboardEvent, id: string): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  onRowClick(id);
+}
+
 function onToggle(id: string): void {
   httpHistoryStore.toggleSelected(props.tab.id, id);
 }
@@ -164,14 +172,23 @@ async function onClear(): Promise<void> {
       </Alert>
     </template>
 
-    <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
+    <div
+      v-if="entries.length > 0 && filteredEntries.length > 0"
+      class="history-rows"
+      role="listbox"
+      aria-label="Response history"
+    >
       <div
         v-for="(entry, i) in filteredEntries"
         :key="entry.id"
         class="history-row"
         :class="{ 'is-viewing': entry.id === viewingId }"
         data-testid="http-history-row"
+        role="option"
+        tabindex="0"
+        :aria-selected="entry.id === viewingId"
         @click="onRowClick(entry.id)"
+        @keydown="onRowKeydown($event, entry.id)"
       >
         <Checkbox
           data-testid="http-history-checkbox"

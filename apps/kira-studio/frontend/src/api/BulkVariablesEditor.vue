@@ -19,9 +19,11 @@ const variableSetStore = useVariableSetStore();
 // the diff on every keystroke, and hand the parsed entries to ApplyBulk (R9) on Apply. There is no
 // second parser here and no second reconcile rule — every branch below is either "call api-core" or
 // "render what it returned".
+// P105 §13: `scope` collides with the HTML global `scope` attribute name — Biome's `noHeaderScope`
+// reads the attribute, not the Vue prop, at every call site that binds it. Renamed.
 const props = defineProps<{
   tabId: string;
-  scope: VariableScope;
+  variableScope: VariableScope;
   ownerId: string;
   rows: ApiVariable[];
 }>();
@@ -93,7 +95,7 @@ async function onApply(): Promise<void> {
   try {
     await variableSetStore.applyBulkVariables(
       props.tabId,
-      props.scope,
+      props.variableScope,
       props.ownerId,
       toBulkEntries(parsed.value.entries),
     );

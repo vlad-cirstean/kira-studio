@@ -247,17 +247,17 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         placeholder="Search"
         ariaLabel="Search"
         role="combobox"
-        ariaHaspopup="listbox"
+        aria-haspopup="listbox"
         data-testid="search-input"
-        :ariaExpanded="dropdownVisible && resultsModel.sections.length > 0"
-        :ariaControls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
+        :aria-expanded="dropdownVisible && resultsModel.sections.length > 0"
+        :aria-controls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
         :ariaActivedescendant="highlightedOption?.id"
-        :ariaDescribedby="search.error.value ? ERROR_ID : undefined"
-        :ariaInvalid="!!search.error.value"
+        :aria-describedby="search.error.value ? ERROR_ID : undefined"
+        :aria-invalid="!!search.error.value"
         @update:model-value="onInput"
         @keydown="onKeydown"
       />
-      <div class="kv-search-toggles" role="group" aria-label="Search options">
+      <section class="kv-search-toggles" aria-label="Search options">
         <KuiButton
           icon="codicon-case-sensitive"
           class="kv-search-toggle"
@@ -288,7 +288,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
           data-testid="search-toggle-regex"
           @click="search.regex.value = !search.regex.value"
         />
-      </div>
+      </section>
       <KuiSelect
         class="kv-search-scope"
         ariaLabel="Search scope"

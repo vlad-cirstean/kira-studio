@@ -85,7 +85,7 @@ async function removeFromStack(branch: string): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-branch-section" aria-label="Stacks">
+  <section class="kv-branch-section" aria-label="Stacks">
     <div class="kv-branch-section-title">Stacks</div>
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="kv-stack-group">
@@ -205,7 +205,7 @@ async function removeFromStack(branch: string): Promise<void> {
     >
       No stacked branches
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>

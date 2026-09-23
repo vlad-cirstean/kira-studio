@@ -235,7 +235,9 @@ function onKindChange(kind: ConnectionKind): void {
 
 // Engine tiles pick and, since the engine is all step 1 exists for, immediately advance —
 // the same radio-button "click selects" interaction this picker already had, just now
-// followed by a step change instead of nothing.
+// followed by a step change instead of nothing. Bound to both click and change on the radio
+// input (below): change alone never fires for re-clicking the already-checked default kind,
+// which would otherwise strand the dialog on step 1.
 function pickKind(kind: ConnectionKind): void {
   if (!SUPPORTED_KINDS.has(kind)) return;
   onKindChange(kind);
@@ -627,19 +629,24 @@ const preconnectText = computed({
           />
         </div>
 
-        <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
+        <fieldset class="kind-grid m-0 border-0 p-0" aria-label="Connection kind" data-testid="connection-kind">
           <Tooltip v-for="kind in filteredKinds" :key="kind">
             <TooltipTrigger as-child>
-              <button
-                type="button"
+              <label
                 class="kind"
                 :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
-                :disabled="!SUPPORTED_KINDS.has(kind)"
-                role="radio"
-                :aria-checked="draft.kind === kind"
-                :data-testid="`connection-kind-${kind}`"
-                @click="pickKind(kind)"
               >
+                <input
+                  type="radio"
+                  name="connection-kind"
+                  class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  :value="kind"
+                  :checked="draft.kind === kind"
+                  :disabled="!SUPPORTED_KINDS.has(kind)"
+                  :data-testid="`connection-kind-${kind}`"
+                  @click="pickKind(kind)"
+                  @change="pickKind(kind)"
+                />
                 <span
                   class="kind-ic"
                   :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
@@ -647,16 +654,16 @@ const preconnectText = computed({
                   <EngineIcon :kind="kind" :size="22" />
                 </span>
                 <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
-              </button>
+              </label>
             </TooltipTrigger>
             <TooltipContent>{{ KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported') }}</TooltipContent>
           </Tooltip>
-        </div>
+        </fieldset>
       </div>
     </template>
     <template v-else>
       <div class="p-dialog-body">
-          <nav class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
+          <div class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
             <button
               type="button"
               class="p-tab"
@@ -712,7 +719,7 @@ const preconnectText = computed({
             >
               Privacy
             </button>
-          </nav>
+          </div>
 
           <div v-if="activeTab === 'General'" class="tab-pane" role="tabpanel">
           <div class="field-row">
@@ -722,28 +729,37 @@ const preconnectText = computed({
             </div>
             <div class="field color-field">
               <Label>Color</Label>
-              <div
-                class="color-picker flex h-6.5 flex-wrap items-center gap-1"
-                role="radiogroup"
+              <fieldset
+                class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
                 aria-label="Connection color"
               >
                 <Tooltip v-for="color in connectionColors" :key="color">
                   <TooltipTrigger as-child>
-                    <Button
-                      variant="ghost"
-                      class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
-                      :class="{ 'outline outline-2 outline-offset-2 outline-fg': draft.color === color, none: color === 'none' }"
-                      :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                      :aria-label="color === 'none' ? 'No colour' : color"
-                      role="radio"
-                      :aria-checked="draft.color === color"
-                      :data-testid="`color-${color}`"
-                      @click="draft.color = color"
-                    />
+                    <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="connection-color"
+                        class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        :value="color"
+                        :checked="draft.color === color"
+                        :aria-label="color === 'none' ? 'No colour' : color"
+                        :data-testid="`color-${color}`"
+                        @change="draft.color = color"
+                      />
+                      <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
+                           an *empty* sibling element — &nbsp; keeps this decorative span non-empty
+                           (verified in VariableSetView.vue's own identical swatch pattern). -->
+                      <span
+                        aria-hidden="true"
+                        class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                        :class="{ 'outline outline-2 outline-offset-2 outline-fg': draft.color === color, none: color === 'none' }"
+                        :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                        >&nbsp;</span>
+                    </label>
                   </TooltipTrigger>
                   <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
                 </Tooltip>
-              </div>
+              </fieldset>
             </div>
           </div>
           <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
@@ -1556,6 +1572,7 @@ const preconnectText = computed({
 }
 
 .kind {
+  position: relative;
   padding: var(--kira-s-5) var(--kira-s-4);
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
@@ -1575,7 +1592,8 @@ const preconnectText = computed({
   border-color: var(--kira-border-strong);
 }
 
-.kind.is-selected {
+.kind.is-selected,
+.kind:focus-within {
   border-color: var(--kira-focus);
 }
 

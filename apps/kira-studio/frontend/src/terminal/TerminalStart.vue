@@ -2,7 +2,12 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 
@@ -26,7 +31,7 @@ function onNewTerminal(): void {
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Tooltip :disabled="terminalsStore.terminalDefaults.cwd !== ''">
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': terminalsStore.terminalDefaults.cwd === '' }">
+              <TooltipDisabledTrigger :class="{ 'pointer-events-none': terminalsStore.terminalDefaults.cwd === '' }">
                 <Button
                   variant="dialog-primary"
                   size="kira-lg"
@@ -37,7 +42,7 @@ function onNewTerminal(): void {
                   <CodiconIcon name="terminal-bash" :size="13" />
                   New terminal
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Home directory unavailable</TooltipContent>
           </Tooltip>

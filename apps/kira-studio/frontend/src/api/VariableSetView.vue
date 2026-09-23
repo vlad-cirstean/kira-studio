@@ -459,7 +459,7 @@ function onBulkClose(): void {
     <BulkVariablesEditor
       v-else-if="bulkMode"
       :tab-id="tab.id"
-      :scope="scope"
+      :variable-scope="scope"
       :owner-id="ownerId"
       :rows="rows"
       @close="onBulkClose"
@@ -501,29 +501,46 @@ function onBulkClose(): void {
         </Label>
         <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
              call site rather than kept as a shared primitive component. -->
-        <div
-          class="color-picker flex h-6.5 flex-wrap items-center gap-1"
-          role="radiogroup"
+        <!-- P105 §7: `role="radio"` on a `<Button>` wants a real radio input (`useSemanticElements`)
+             — a visually-hidden native `<input type="radio">` per swatch keeps the circle's own
+             styling exactly (an actual `ToggleGroupItem` would swap in `toggleVariants`' own
+             rectangular look), with native Tab/Arrow-key/checked behaviour for free. `opacity-0`
+             over the swatch's full area rather than `sr-only`'s 1px-clip technique — Playwright's
+             `.click()` (this file's own e2e suite, `connections.spec.ts` and others) refuses a
+             target with a near-zero bounding box; a real-size, invisible overlay stays clickable
+             both for a person and for a test, same as a custom file-input skin. -->
+        <fieldset
+          class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
           aria-label="Environment color"
           data-testid="environment-color-picker"
         >
           <Tooltip v-for="color in PALETTE_COLOR_CHOICES" :key="color">
             <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
-                :class="{ 'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color, none: color === 'none' }"
-                :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                :aria-label="color === 'none' ? 'No colour' : color"
-                role="radio"
-                :aria-checked="owningEnvironment.color === color"
-                :data-testid="`color-${color}`"
-                @click="onEnvColorChange(color)"
-              />
+              <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
+                <input
+                  type="radio"
+                  name="environment-color"
+                  class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  :value="color"
+                  :checked="owningEnvironment.color === color"
+                  :aria-label="color === 'none' ? 'No colour' : color"
+                  :data-testid="`color-${color}`"
+                  @change="onEnvColorChange(color)"
+                />
+                <!-- Biome's noLabelWithoutControl can't see the label's own <input> child past an
+                     *empty* sibling element (verified in isolation) — the &nbsp; keeps this span
+                     non-empty; aria-hidden means it is never announced either way. -->
+                <span
+                  aria-hidden="true"
+                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color, none: color === 'none' }"
+                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                  >&nbsp;</span>
+              </label>
             </TooltipTrigger>
             <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
           </Tooltip>
-        </div>
+        </fieldset>
         <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">
           Duplicate
         </Button>

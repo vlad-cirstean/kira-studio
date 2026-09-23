@@ -5,7 +5,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -329,7 +334,7 @@ function onDeleteRow(): void {
   <div class="group">
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -340,7 +345,7 @@ function onDeleteRow(): void {
           >
             <CodiconIcon name="add" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>
         {{
@@ -354,7 +359,7 @@ function onDeleteRow(): void {
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -365,13 +370,13 @@ function onDeleteRow(): void {
           >
             <CodiconIcon name="wand" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ generateDataTooltip }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -382,7 +387,7 @@ function onDeleteRow(): void {
           >
             <CodiconIcon name="trash" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ deleteRowTooltip }}</TooltipContent>
     </Tooltip>
@@ -403,7 +408,7 @@ function onDeleteRow(): void {
     </Tooltip>
     <Tooltip v-if="hasMaskRules">
       <TooltipTrigger as-child>
-        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+        <TooltipDisabledTrigger>
           <Button
             variant="toolbar"
             size="kira-icon"
@@ -415,7 +420,7 @@ function onDeleteRow(): void {
           >
             <CodiconIcon name="eye-closed" :size="13" />
           </Button>
-        </span>
+        </TooltipDisabledTrigger>
       </TooltipTrigger>
       <TooltipContent>{{ maskPreviewTooltip }}</TooltipContent>
     </Tooltip>

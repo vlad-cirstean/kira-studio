@@ -123,7 +123,7 @@ defineExpose({
   >
     <div v-if="title" class="kui-menu-heading" aria-hidden="true">{{ title }}</div>
     <template v-for="(section, sectionIndex) in sections" :key="sectionIndex">
-      <div v-if="sectionIndex > 0" class="kui-menu-separator" role="separator"></div>
+      <hr v-if="sectionIndex > 0" class="kui-menu-separator" />
       <div
         v-for="item in section.items"
         :id="itemId(item.id)"
@@ -137,6 +137,7 @@ defineExpose({
         :data-testid="item.id"
         @click="activate(item.id)"
         @mouseenter="focusedId = item.id"
+        @keydown.enter.space.stop="activate(item.id)"
       >
         <!-- G34 D9: the icon box is unconditional (Kira's own shape) so every row's label starts
              at the same x position whether or not that particular item carries an icon. -->

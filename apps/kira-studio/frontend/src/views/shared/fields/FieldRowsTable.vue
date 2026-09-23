@@ -7,7 +7,13 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
 import type { Completion } from '../../../theme/completion';
@@ -258,6 +264,9 @@ function onContainerKeydown(e: KeyboardEvent): void {
     target.setSelectionRange(target.value.length, target.value.length);
   }
 }
+
+// P105 §5.1: the table container is not interactive -- binds via VueUse instead of a raw @keydown.
+useEventListener(containerRef, 'keydown', onContainerKeydown);
 </script>
 
 <template>
@@ -265,7 +274,6 @@ function onContainerKeydown(e: KeyboardEvent): void {
     ref="containerRef"
     class="field-rows-table"
     :data-testid="containerTestid"
-    @keydown="onContainerKeydown"
   >
     <div
       v-for="entry in displayRows"
@@ -367,7 +375,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <TooltipDisabledTrigger>
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -378,7 +386,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
             >
               <CodiconIcon name="close" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Remove</TooltipContent>
       </Tooltip>

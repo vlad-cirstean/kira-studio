@@ -91,7 +91,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       <AlertTitle class="text-kira-md text-muted font-normal">
         The cookie jar is off for this request
       </AlertTitle>
-      <button class="hint-link" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
+      <button type="button" class="hint-link" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
         Edit global defaults…
       </button>
     </Alert>
@@ -152,7 +152,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       <Alert v-else class="empty-state" data-testid="http-cookies-empty">
         <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md text-muted font-normal">No cookies for this request's URL</AlertTitle>
-        <button class="hint-link" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
+        <button type="button" class="hint-link" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
       </Alert>
     </template>
   </div>

@@ -97,7 +97,7 @@ async function onMenuSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-branch-section" aria-label="Global stash">
+  <section class="kv-branch-section" aria-label="Global stash">
     <div class="kv-branch-section-title kv-global-stash-title">
       <span>Global stash</span>
       <KuiButton
@@ -154,7 +154,7 @@ async function onMenuSelect(id: string): Promise<void> {
       @select="onMenuSelect"
       @close="stashMenu = undefined"
     />
-  </div>
+  </section>
 </template>
 
 <style>

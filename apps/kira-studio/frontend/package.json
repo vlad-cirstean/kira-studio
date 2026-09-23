@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@kira/api-core": "workspace:*",
+    "@kira/kira-ui": "workspace:*",
     "zod": "4.6.5"
   }
 }

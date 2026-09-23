@@ -5,7 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Textarea } from '@theme/components/ui/textarea';
 import { refDebounced } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import { useImportCurlStore } from './state/curl';
 
 const importCurlStore = useImportCurlStore();
@@ -36,6 +36,15 @@ function onImport(): void {
 function close(): void {
   importCurlStore.closeImportCurlDialog();
 }
+
+// P105 §8: reka-ui's Dialog, unlike KuiDialog, auto-focuses nothing on its own — focus the textarea
+// explicitly once it renders.
+const bodyEl = useTemplateRef<HTMLElement>('bodyEl');
+onMounted(() => {
+  void nextTick(() => {
+    bodyEl.value?.querySelector<HTMLTextAreaElement>('.curl-textarea')?.focus();
+  });
+});
 </script>
 
 <template>
@@ -62,14 +71,13 @@ function close(): void {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="p-dialog-body">
+    <div ref="bodyEl" class="p-dialog-body">
       <Textarea
         v-model="text"
         class="font-data curl-textarea"
         rows="6"
         placeholder="curl -X POST https://api.example.com/orders -H 'Content-Type: application/json' -d '{&quot;id&quot;: 1}'"
         data-testid="import-curl-textarea"
-        autofocus
       />
 
       <Alert v-if="preview.error" variant="destructive" data-testid="import-curl-error">

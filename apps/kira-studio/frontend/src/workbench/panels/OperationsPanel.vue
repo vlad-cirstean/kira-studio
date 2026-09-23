@@ -106,6 +106,13 @@ function revealTab(record: OpRecord): void {
 function onRowClick(record: OpRecord): void {
   toggleExpanded(record);
 }
+// P105 §5.2(c): Enter/Space mirror a single click — the Cancel button nested inside stays its own
+// tab stop, so this handler never claims either key from it.
+function onRowKeydown(e: KeyboardEvent, record: OpRecord): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  onRowClick(record);
+}
 
 function opSqlDialect(record: OpRecord) {
   return sqlDialectFor(connectionFor(record)?.kind);
@@ -225,7 +232,14 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
         <span>Rows</span>
         <span>Command</span>
       </div>
-      <div ref="scrollEl" class="ops-body overflow-auto" data-testid="virtual-list" @scroll="onScroll">
+      <div
+        ref="scrollEl"
+        class="ops-body overflow-auto"
+        data-testid="virtual-list"
+        role="listbox"
+        aria-label="Operations"
+        @scroll="onScroll"
+      >
         <!--
           The expanded command/error detail rows embed a MonacoHost (D18/D19, P60a) inside a fixed
           virtual row rather than the list itself being variable-height (P2 §0 note 14 leaves it
@@ -244,7 +258,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               :class="{ error: listItems[vi.index].record.status === 'error' }"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
+              role="option"
+              tabindex="0"
               @click="onRowClick(listItems[vi.index].record)"
+              @keydown="onRowKeydown($event, listItems[vi.index].record)"
               @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
             >
               <span class="mono">{{ formatTime(listItems[vi.index].record.startedAt) }}</span>

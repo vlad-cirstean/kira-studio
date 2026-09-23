@@ -106,14 +106,15 @@ function anchorTitle(c: ReviewComment): string | undefined {
     </p>
 
     <template v-else>
-      <div v-if="groups.length > 0" class="kv-review-comments-list">
+      <div v-if="groups.length > 0" class="kv-review-comments-list" role="listbox" aria-label="Comments">
         <div v-for="group in groups" :key="group.path" class="kv-review-comments-group">
           <div class="kv-review-comments-path">{{ group.path }}</div>
           <div
             v-for="c in group.comments"
             :key="c.id"
             class="kv-review-comments-row"
-            role="button"
+            role="option"
+            :aria-selected="false"
             tabindex="0"
             @click="emit('select-comment', group.path)"
             @keydown.enter="emit('select-comment', group.path)"

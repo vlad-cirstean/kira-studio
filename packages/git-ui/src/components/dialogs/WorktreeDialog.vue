@@ -260,7 +260,7 @@ function onClose(): void {
     <template v-if="phase === 'create'">
       <label class="kv-dialog-field">
         Path
-        <input type="text" v-model="path" autofocus placeholder="../my-repo-feature-x" />
+        <input type="text" v-model="path" placeholder="../my-repo-feature-x" />
       </label>
       <fieldset class="kv-dialog-field">
         <legend>Start from</legend>

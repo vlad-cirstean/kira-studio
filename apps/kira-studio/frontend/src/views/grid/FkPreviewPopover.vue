@@ -3,7 +3,7 @@ import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { useEventListener } from '@vueuse/core';
+import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -90,9 +90,10 @@ async function load(): Promise<void> {
 // first landed.
 watch(state, () => void position());
 
-function onBackdropClick(): void {
-  emit('close');
-}
+// P105 §5.2(b): the backdrop itself has no interactive role — VueUse's onClickOutside on the
+// panel replaces both the backdrop's own click handler and the panel's @click.stop that used to
+// keep an inside click from reaching it.
+onClickOutside(panelEl, () => emit('close'));
 
 function onKeydown(e: KeyboardEvent): void {
   // Capture phase, not bubble — PopoverPanel.vue's own onKeydown carries the identical reasoning:
@@ -128,14 +129,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop" @click="onBackdropClick">
-    <div
-      ref="panelEl"
-      class="fk-preview p-float"
-      data-testid="fk-preview"
-      :style="style"
-      @click.stop
-    >
+  <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop" aria-hidden="true">
+    <div ref="panelEl" class="fk-preview p-float" data-testid="fk-preview" :style="style">
       <div class="fk-preview-header">
         <span class="fk-preview-title">{{ tableLabel }}</span>
         <span

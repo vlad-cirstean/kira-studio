@@ -45,7 +45,7 @@ import {
   KuiTextInput,
   KuiTooltip,
 } from '@kira/kira-ui';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
@@ -216,6 +216,15 @@ function onSwapBaseAndBranch(): void {
 // `filterVisible` gates rendering; the button itself carries an "active" state whenever a filter
 // is applied *or* revealed, so an applied-but-collapsed filter still visibly signals itself.
 const filterVisible = ref(false);
+// P105 §8: not inside any dialog — `autofocus` only fires once, on first render, so it can't
+// catch the input being revealed later by this toggle. Focus it explicitly instead.
+const toolbarEl = useTemplateRef<HTMLElement>('toolbarEl');
+watch(filterVisible, (visible) => {
+  if (!visible) return;
+  void nextTick(() => {
+    toolbarEl.value?.querySelector<HTMLInputElement>('.kv-review-toolbar-filter')?.focus();
+  });
+});
 function toggleFilterVisible(): void {
   filterVisible.value = !filterVisible.value;
 }
@@ -811,7 +820,7 @@ watch(
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
-      <div v-if="review.phase.value === 'listing'" class="kv-review-toolbar">
+      <div v-if="review.phase.value === 'listing'" ref="toolbarEl" class="kv-review-toolbar">
         <KuiSegmented
           :options="panelOptions"
           :model-value="review.pane.value"
@@ -836,7 +845,6 @@ watch(
           class="kv-review-toolbar-filter"
           placeholder="Filter files"
           aria-label="Filter files"
-          autofocus
           :model-value="filter"
           @update:model-value="filter = $event"
         />

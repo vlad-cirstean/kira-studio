@@ -3,7 +3,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref } from 'vue';
 import {
@@ -66,7 +71,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         <span>Operation log retention (days)</span>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'opLogRetentionDays') }">
+            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'opLogRetentionDays') }">
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -77,7 +82,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
               >
                 <CodiconIcon name="discard" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -135,7 +140,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         <span>Expensive query threshold (rows)</span>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'expensiveQueryRows') }">
+            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'expensiveQueryRows') }">
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -146,7 +151,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
               >
                 <CodiconIcon name="discard" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -212,7 +217,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         <span>Git log level</span>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
+            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -223,7 +228,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
               >
                 <CodiconIcon name="discard" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>

@@ -3,8 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useDebounceFn } from '@vueuse/core';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useDebounceFn, useEventListener } from '@vueuse/core';
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
@@ -226,6 +226,10 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useEventListener(rootEl, 'keydown', onKeydown);
+
 onMounted(() => {
   // This component is mounted fresh each time its host toolbar opens (both from the toolbar
   // button and from Cmd+F), so onMounted fires exactly then — the right place to autofocus so
@@ -248,9 +252,9 @@ onUnmounted(() => {
   <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
   <div
+    ref="rootEl"
     class="search-toolbar p-toolbar"
     :data-testid="`${testidPrefix}search-toolbar`"
-    @keydown="onKeydown"
   >
     <span
       class="icon-box"

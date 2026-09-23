@@ -7,7 +7,12 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/compone
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -824,7 +829,7 @@ onUnmounted(() => {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -835,7 +840,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="add" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ insertTitle }}</TooltipContent>
         </Tooltip>
@@ -1045,6 +1050,8 @@ onUnmounted(() => {
         ref="scrollEl"
         class="document-virtual-list overflow-y-auto"
         data-testid="virtual-list"
+        role="listbox"
+        aria-label="Documents"
         @scroll="onScroll"
       >
         <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
@@ -1069,7 +1076,7 @@ onUnmounted(() => {
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
               @contextmenu="onRowContextMenu($event, rows[vi.index])"
               :view="rowAt(rows[vi.index])!.view"
-              :scope="tab.id"
+              :row-scope="tab.id"
               :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
               :selected="rt?.selectedRow === vi.index"
               :search-match="isSearchMatch(rows[vi.index])"
@@ -1083,7 +1090,7 @@ onUnmounted(() => {
                   <span v-if="editingRow === rows[vi.index]" class="p-chip warn">editing</span>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <span tabindex="0" class="inline-flex">
+                      <TooltipDisabledTrigger>
                         <Button
                           variant="toolbar"
                           size="kira-icon"
@@ -1095,13 +1102,13 @@ onUnmounted(() => {
                         >
                           <CodiconIcon name="edit" :size="13" />
                         </Button>
-                      </span>
+                      </TooltipDisabledTrigger>
                     </TooltipTrigger>
                     <TooltipContent>{{ editGate.editable ? 'Edit' : editGate.label }}</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <span tabindex="0" class="inline-flex">
+                      <TooltipDisabledTrigger>
                         <Button
                           variant="toolbar"
                           size="kira-icon"
@@ -1112,7 +1119,7 @@ onUnmounted(() => {
                         >
                           <CodiconIcon name="trash" :size="13" />
                         </Button>
-                      </span>
+                      </TooltipDisabledTrigger>
                     </TooltipTrigger>
                     <TooltipContent>{{ deleteTitle }}</TooltipContent>
                   </Tooltip>

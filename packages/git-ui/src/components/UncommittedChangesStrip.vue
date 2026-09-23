@@ -136,6 +136,7 @@ const tooltipText = computed(() => {
       <svg
         v-if="nodeCx !== undefined"
         class="kv-uncommitted-strip-node"
+        aria-hidden="true"
         :width="gutterWidth"
         height="18"
       >

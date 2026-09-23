@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@theme/components/ui/command';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { onClickOutside } from '@vueuse/core';
+import { useTemplateRef } from 'vue';
 import { usePaletteStore } from './state';
 
 // P104 §3: list chrome, filtering and keyboard model now come from ui/command (reka's Listbox) —
@@ -9,6 +11,11 @@ import { usePaletteStore } from './state';
 // item's visibility, it never reorders, so rendering `paletteCommands` straight into the v-for
 // keeps the same ranking the old computed produced.
 const paletteStore = usePaletteStore();
+
+// P105 §5.2(b): the backdrop itself has no interactive role — VueUse's onClickOutside on the
+// panel replaces both the backdrop's own click handler and the panel's own @click.stop.
+const panelEl = useTemplateRef<HTMLElement>('panelEl');
+onClickOutside(panelEl, () => paletteStore.closePalette());
 
 function runCommand(id: string): void {
   const command = paletteStore.paletteCommands.find((c) => c.id === id);
@@ -31,9 +38,9 @@ function onKeydown(e: KeyboardEvent): void {
     v-if="paletteStore.open"
     class="palette-backdrop"
     data-testid="command-palette-backdrop"
-    @click="paletteStore.closePalette"
+    aria-hidden="true"
   >
-    <div class="palette p-float" data-testid="command-palette" @click.stop>
+    <div ref="panelEl" class="palette p-float" data-testid="command-palette">
       <Command class="rounded-none! p-0!" @keydown="onKeydown">
         <CommandInput data-testid="command-palette-input" placeholder="Type a command…" />
         <CommandList class="max-h-72">

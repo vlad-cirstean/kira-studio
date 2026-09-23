@@ -97,6 +97,15 @@ function onTwistyClick(e: MouseEvent): void {
   e.stopPropagation();
   if (props.row.hasChildren) emit('toggle', props.row);
 }
+
+// P105 §5.2(c): the container's own onTreeKeydown (CollectionsTree.vue) already claims Enter for
+// the row's primary action (the same one dblclick fires) — Space mirrors a single click instead.
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === ' ') {
+    e.preventDefault();
+    emit('select', props.row);
+  }
+}
 </script>
 
 <template>
@@ -108,9 +117,14 @@ function onTwistyClick(e: MouseEvent): void {
     :data-kind="row.kind"
     :data-id="row.id"
     :data-depth="row.depth"
+    role="treeitem"
+    :aria-level="row.depth + 1"
+    :aria-expanded="row.hasChildren ? row.expanded : undefined"
+    :aria-selected="selected"
     :tabindex="sticky ? -1 : selected ? 0 : -1"
     @click="emit('select', row)"
     @dblclick="emit('open', row)"
+    @keydown="onKeydown"
     @contextmenu.prevent.stop="emit('contextmenu', row, $event)"
   >
     <!-- Same reasoning as project/TreeRow.vue's twisty: its entire meaning is drawn by the

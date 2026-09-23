@@ -86,7 +86,6 @@
       "includes": ["**/*.vue"],
       "linter": {
         "rules": {
-          "a11y": "off",
           "style": {
             "useVueHyphenatedAttributes": "off",
             "noNonNullAssertion": "off"

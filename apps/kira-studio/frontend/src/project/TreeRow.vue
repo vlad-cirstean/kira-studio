@@ -94,6 +94,16 @@ function onTwistyClick(e: MouseEvent): void {
 function onContextMenu(e: MouseEvent): void {
   emit('contextmenu', props.row, e);
 }
+
+// P105 §5.2(c): the container's own onTreeKeydown (ProjectPanel.vue) already claims Enter for
+// the row's primary action (the same one dblclick fires) — Space mirrors a single click instead,
+// a genuine non-conflicting keyboard equivalent, not a no-op stand-in.
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === ' ') {
+    e.preventDefault();
+    onClick();
+  }
+}
 </script>
 
 <template>
@@ -106,9 +116,14 @@ function onContextMenu(e: MouseEvent): void {
     :data-kind="row.kind"
     :data-status="row.kind === 'connection' ? row.status : undefined"
     :data-depth="sticky ? row.depth : undefined"
+    role="treeitem"
+    :aria-level="row.depth + 1"
+    :aria-expanded="row.hasChildren ? row.expanded : undefined"
+    :aria-selected="selected"
     :tabindex="sticky ? -1 : selected ? 0 : -1"
     @click="onClick"
     @dblclick="onDblClick"
+    @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
     <div class="p-tree-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />

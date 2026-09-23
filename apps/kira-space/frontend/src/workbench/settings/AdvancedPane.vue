@@ -2,7 +2,12 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import type { GitLogLevel } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
@@ -24,7 +29,7 @@ function onGitLogLevelChange(e: Event): void {
         <span>Git log level</span>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
+            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -35,7 +40,7 @@ function onGitLogLevelChange(e: Event): void {
               >
                 <CodiconIcon name="discard" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>

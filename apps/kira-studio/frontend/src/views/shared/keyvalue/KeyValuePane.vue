@@ -43,7 +43,12 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -594,6 +599,13 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
   if (i !== null) onRowClick(i);
 }
+// P105 §5.2(c): Enter/Space mirror a single click.
+function onRowKeydownFromEvent(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  const i = datasetNumber(e.currentTarget, 'row');
+  if (i !== null) onRowClick(i);
+}
 function onRowContextMenuFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
   if (i === null) return;
@@ -740,7 +752,7 @@ onUnmounted(() => {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -752,7 +764,7 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="debug-stop" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
@@ -812,7 +824,7 @@ onUnmounted(() => {
                only place the Count button's result (below) ever gets shown, for every engine. -->
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -823,14 +835,14 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="arrow-left" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Previous page</TooltipContent>
           </Tooltip>
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -841,7 +853,7 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="arrow-right" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Next page</TooltipContent>
           </Tooltip>
@@ -888,11 +900,11 @@ onUnmounted(() => {
             <div ref="addAnchorRef" class="add-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
                       <CodiconIcon name="add" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>{{ addTitle }}</TooltipContent>
               </Tooltip>
@@ -931,11 +943,11 @@ onUnmounted(() => {
             <div ref="editAnchorRef" class="edit-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
                       <CodiconIcon name="edit" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>{{ editTitle }}</TooltipContent>
               </Tooltip>
@@ -970,11 +982,11 @@ onUnmounted(() => {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
                   <CodiconIcon name="trash" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>{{ deleteTitle }}</TooltipContent>
           </Tooltip>
@@ -1096,7 +1108,14 @@ onUnmounted(() => {
               Show all rows
             </Button>
           </Alert>
-          <div v-else ref="scrollRef" class="kv-virtual-scroll" data-testid="virtual-list">
+          <div
+            v-else
+            ref="scrollRef"
+            class="kv-virtual-scroll"
+            data-testid="virtual-list"
+            role="listbox"
+            aria-label="Rows"
+          >
             <div class="kv-virtual-inner" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
                 <div
@@ -1104,7 +1123,10 @@ onUnmounted(() => {
                   data-testid="keyvalue-row"
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
+                  role="option"
+                  tabindex="0"
                   @click="onRowClickFromEvent"
+                  @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
                   <div class="p-td gutter kv-col-gutter">{{ entry.i + 1 }}</div>

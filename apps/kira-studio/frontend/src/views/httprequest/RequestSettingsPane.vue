@@ -275,7 +275,7 @@ function onEditGlobalDefaults(): void {
     </div>
     <span class="helper-text">Global: {{ global.disableCookieJar ? 'off' : 'on' }}</span>
 
-    <button class="hint-link" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
+    <button type="button" class="hint-link" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
       Edit global defaults…
     </button>
   </div>

@@ -47,6 +47,20 @@ function onDblClick(): void {
   if (props.row.kind === 'file') return;
   emit('open', props.row, false);
 }
+
+// P105 §5.2(c): Enter activates (toggle for a file row, permanent open for a match — matching
+// double-click); Space mirrors a single click.
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    emit('select', props.row);
+    if (props.row.kind === 'file') emit('toggleCollapse', props.row);
+    else emit('open', props.row, false);
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    onClick();
+  }
+}
 </script>
 
 <template>
@@ -56,7 +70,11 @@ function onDblClick(): void {
     :class="{ selected }"
     data-testid="repo-search-file-row"
     :data-path="row.path"
+    role="option"
+    tabindex="0"
+    :aria-selected="selected"
     @click="onClick"
+    @keydown="onKeydown"
   >
     <button
       type="button"
@@ -90,8 +108,12 @@ function onDblClick(): void {
     data-testid="repo-search-match-row"
     :data-path="row.path"
     :data-line="row.line"
+    role="option"
+    tabindex="0"
+    :aria-selected="selected"
     @click="onClick"
     @dblclick="onDblClick"
+    @keydown="onKeydown"
   >
     <span class="p-xs dim match-line">{{ row.line }}:{{ row.column }}</span>
     <span class="preview"
