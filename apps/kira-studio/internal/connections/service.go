@@ -110,11 +110,14 @@ type Deps struct {
 }
 
 // attempt is one in-flight Connect(id) call, shared by every caller that asks for the same id
-// while it is running (D11: at most one in-flight connect per connection).
+// while it is running (D11: at most one in-flight connect per connection). cancel is F4's own
+// addition (P108 Part 3): Disconnect/Remove call it to abort an attempt racing ahead of them,
+// rather than letting it finish unobserved and resurrect what they just asked to go away.
 type attempt struct {
-	done  chan struct{}
-	state model.ConnectionState
-	err   error
+	done   chan struct{}
+	state  model.ConnectionState
+	err    error
+	cancel context.CancelFunc
 }
 
 // Service is the Go analogue of connections.ts's ConnectionsService.
@@ -435,6 +438,9 @@ func (s *Service) copyMaskRules(fromID, toID string) error {
 }
 
 func (s *Service) Remove(id string) error {
+	// F4 (P108 Part 3): abort a racing in-flight Connect before it can finish and re-register a
+	// live adapter/states entry/sidecar for an id this call is about to delete outright.
+	s.cancelInFlight(id)
 	current := s.StateOf(id)
 	if current.Status == "connected" || current.Status == "connecting" {
 		_ = s.deps.Backend.Disconnect(context.Background(), id)
@@ -575,7 +581,9 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 	defer s.deps.Preconnect.Stop(r.config.ID)
 
 	if r.preconnect != nil {
-		if _, err := s.deps.Preconnect.Start(r.config.ID, *r.preconnect); err != nil {
+		// Test has no in-flight-attempt tracking of its own to race against (F4 is Connect's own
+		// dedupe/abort machinery) — context.Background() here is unchanged from before.
+		if _, err := s.deps.Preconnect.Start(context.Background(), r.config.ID, *r.preconnect); err != nil {
 			msg := errorMessage(err)
 			return TestResult{OK: false, Error: &msg}
 		}
@@ -590,6 +598,8 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 
 // Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an
 // attempt is already running gets that same attempt's result instead of starting a second one.
+// F4 (P108 Part 3): the attempt's own ctx is cancelled by Disconnect/Remove (cancelInFlight) if
+// either races ahead of it — threaded through to attemptConnect below.
 func (s *Service) Connect(id string) (model.ConnectionState, error) {
 	s.mu.Lock()
 	if a, ok := s.inFlight[id]; ok {
@@ -597,12 +607,14 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 		<-a.done
 		return a.state, a.err
 	}
-	a := &attempt{done: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	a := &attempt{done: make(chan struct{}), cancel: cancel}
 	s.inFlight[id] = a
 	s.mu.Unlock()
 
-	a.state, a.err = s.doConnect(id)
+	a.state, a.err = s.doConnect(id, ctx)
 	close(a.done)
+	cancel() // releases ctx's own resources regardless of outcome; a no-op if already cancelled
 
 	s.mu.Lock()
 	if s.inFlight[id] == a {
@@ -613,10 +625,25 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 	return a.state, a.err
 }
 
+// cancelInFlight cancels id's in-flight Connect attempt, if any — F4 (P108 Part 3): Disconnect and
+// Remove both call this before doing their own work. Cancelling only *asks* the attempt to stop,
+// promptly if it is currently inside a cancellation-aware wait (Backend.Connect,
+// Preconnect.Start's settle window) and otherwise at its next check; attemptConnect's own
+// finalizeAbortedAttempt is what actually undoes anything the attempt had already registered by
+// the time it notices.
+func (s *Service) cancelInFlight(id string) {
+	s.mu.Lock()
+	a, ok := s.inFlight[id]
+	s.mu.Unlock()
+	if ok {
+		a.cancel()
+	}
+}
+
 // doConnect is connections.ts:170-231's port. Only the pre-checks below (the row not existing, or
 // a real read failure) return a Go error; everything attemptConnect can fail on becomes this
 // connection's error *state* instead, exactly as the TS's catch block does.
-func (s *Service) doConnect(id string) (model.ConnectionState, error) {
+func (s *Service) doConnect(id string, ctx context.Context) (model.ConnectionState, error) {
 	summary, err := s.deps.Conns.Get(id)
 	if err != nil {
 		return model.ConnectionState{}, ipcerr.Wrap(err)
@@ -627,7 +654,7 @@ func (s *Service) doConnect(id string) (model.ConnectionState, error) {
 
 	s.emitState(model.ConnectionState{ConnectionID: id, Status: "connecting", Since: nowMillis()})
 
-	state, connErr := s.attemptConnect(id)
+	state, connErr := s.attemptConnect(id, ctx)
 	if connErr == nil {
 		return state, nil
 	}
@@ -644,7 +671,13 @@ func (s *Service) doConnect(id string) (model.ConnectionState, error) {
 // Since carries is what internal/tree.Service's freshness rule treats every existing row as stale
 // against, so each path re-fetches lazily, once, the first time a user actually opens it, rather
 // than every row being deleted upfront and re-read whether or not anything ever asks for it again).
-func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
+//
+// F4 (P108 Part 3): ctx is cancelled when Disconnect/Remove races ahead of this attempt
+// (cancelInFlight). Checked after every step that could have raced against one of them —
+// Preconnect.Start, Backend.Connect, and right before finalizing "connected" — routing to
+// finalizeAbortedAttempt instead of the normal error/success path whenever it fires, so a
+// Disconnect/Remove that arrived mid-connect is never silently undone once this attempt finishes.
+func (s *Service) attemptConnect(id string, ctx context.Context) (model.ConnectionState, error) {
 	r, err := resolve(s.deps.Conns, s.deps.Secrets, id)
 	if err != nil {
 		return model.ConnectionState{}, err
@@ -652,7 +685,10 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 
 	started := false
 	if r.preconnect != nil {
-		if _, err := s.deps.Preconnect.Start(id, *r.preconnect); err != nil {
+		if _, err := s.deps.Preconnect.Start(ctx, id, *r.preconnect); err != nil {
+			if ctx.Err() != nil {
+				return s.finalizeAbortedAttempt(id)
+			}
 			return model.ConnectionState{}, err
 		}
 		started = true
@@ -660,10 +696,13 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 
 	// P28 §5.5: installed just before Connect, from the summary already read above.
 	s.deps.Backend.SetThrottle(id, r.throttlePerSec)
-	result, err := s.deps.Backend.Connect(context.Background(), r.config)
+	result, err := s.deps.Backend.Connect(ctx, r.config)
 	if err != nil {
 		if started {
 			s.deps.Preconnect.Stop(id)
+		}
+		if ctx.Err() != nil {
+			return s.finalizeAbortedAttempt(id)
 		}
 		return model.ConnectionState{}, err
 	}
@@ -676,6 +715,9 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 	}
 	if afterArm := s.StateOf(id); afterArm.Status == "error" {
 		return afterArm, nil
+	}
+	if ctx.Err() != nil {
+		return s.finalizeAbortedAttempt(id)
 	}
 
 	state := model.ConnectionState{
@@ -690,7 +732,36 @@ func (s *Service) attemptConnect(id string) (model.ConnectionState, error) {
 	return state, nil
 }
 
+// finalizeAbortedAttempt is attemptConnect's own unwind for F4 (P108 Part 3): ctx was cancelled by
+// a Disconnect/Remove that raced ahead of this attempt — undo whatever it had already registered
+// (a live adapter, an armed sidecar) rather than letting it finalize as "connected" and resurrect
+// a connection the caller already asked to go away. Backend.Disconnect/Preconnect.Stop are each
+// idempotent no-ops when there is nothing to undo (Router.Disconnect's own "no live adapter"
+// no-op; F1's own already-dead-entry guard in killEntry), so both run unconditionally rather than
+// tracking exactly how far this attempt got before it was cancelled.
+func (s *Service) finalizeAbortedAttempt(id string) (model.ConnectionState, error) {
+	_ = s.deps.Backend.Disconnect(context.Background(), id)
+	s.deps.Preconnect.Stop(id)
+	state := model.ConnectionState{ConnectionID: id, Status: "disconnected", Since: nowMillis()}
+	if existing, err := s.deps.Conns.Get(id); err == nil && existing != nil {
+		// Disconnect raced us, not Remove — the row is still there, so keep states[id] in sync
+		// (idempotent if Disconnect() itself already emitted this same state).
+		s.emitState(state)
+	} else {
+		// Remove raced us — the row (and, by the time this runs, likely its states entry too) is
+		// already gone. Delete states[id] rather than resurrecting an entry for an id that no
+		// longer exists, regardless of whether Remove's own delete already ran.
+		s.mu.Lock()
+		delete(s.states, id)
+		s.mu.Unlock()
+	}
+	return state, nil
+}
+
 func (s *Service) Disconnect(id string) (model.ConnectionState, error) {
+	// F4 (P108 Part 3): abort a racing in-flight Connect before it can finish and re-register a
+	// live adapter/"connected" state moments after this call reports "disconnected".
+	s.cancelInFlight(id)
 	s.deps.Preconnect.Stop(id)
 	_ = s.deps.Backend.Disconnect(context.Background(), id)
 	// Cached metadata stays — "metadata stays, it is on disk".

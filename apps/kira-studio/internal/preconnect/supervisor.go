@@ -4,6 +4,7 @@
 package preconnect
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -118,10 +119,15 @@ func (s *Supervisor) OnExit(fn func(Exit)) (unsubscribe func()) {
 }
 
 // Start kills anything already tracked for connectionID, spawns command, and returns once the
-// script is judged ready. It returns an error if the script exits non-zero, dies on a signal, or
-// fails to spawn before the settle window elapses — the message names the exit code/signal and
-// the last stderr line, exactly as preconnect.ts:182 composes it.
-func (s *Supervisor) Start(connectionID, command string) (Start, error) {
+// script is judged ready. It returns an error if the script exits non-zero, dies on a signal,
+// fails to spawn before the settle window elapses, or ctx is cancelled first — the message names
+// the exit code/signal and the last stderr line, exactly as preconnect.ts:182 composes it.
+//
+// F4 (P108 Part 3): ctx lets a caller racing this call (connections.Service.Disconnect/Remove
+// against an in-flight Connect) abort a script still inside the settle window, when it is not yet
+// tracked in s.entries at all — an external Stop(connectionID) call arriving in that window would
+// otherwise find nothing to do and silently leave the script running.
+func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (Start, error) {
 	s.mu.Lock()
 	existing := s.entries[connectionID]
 	s.mu.Unlock()
@@ -166,6 +172,13 @@ func (s *Supervisor) Start(connectionID, command string) (Start, error) {
 	defer timer.Stop()
 
 	select {
+	case <-ctx.Done():
+		// Not yet tracked in s.entries (only the timer/sidecar branch below adds it) — killEntry
+		// operates on e directly regardless, and F1's own bound on it means this returns promptly
+		// rather than blocking for however long the script would otherwise have run.
+		s.killEntry(connectionID, e)
+		return Start{}, ctx.Err()
+
 	case <-timer.C:
 		s.mu.Lock()
 		s.entries[connectionID] = e

@@ -551,6 +551,82 @@ func TestInFlightConnectDedupe(t *testing.T) {
 	}
 }
 
+// TestDisconnectWhileConnectingAbortsTheInFlightAttempt is F4 (P108 Part 3): a Disconnect that
+// arrives while a Connect for the same id is still in flight must not be silently undone once
+// that Connect finishes — without cancelling the attempt, Backend.Connect (fakeBackend, gated on
+// the "slow-conn" name) finishes after Disconnect already reported "disconnected", finalizes as
+// "connected", and resurrects exactly what the caller just asked to go away.
+func TestDisconnectWhileConnectingAbortsTheInFlightAttempt(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+
+	type connectResult struct {
+		state model.ConnectionState
+		err   error
+	}
+	connectDone := make(chan connectResult, 1)
+	go func() {
+		state, err := h.svc.Connect(created.ID)
+		connectDone <- connectResult{state, err}
+	}()
+
+	// TestInFlightConnectDedupe's own precedent: give Connect time to reach the blocked
+	// Backend.Connect call before racing Disconnect against it.
+	time.Sleep(200 * time.Millisecond)
+
+	disconnectState, err := h.svc.Disconnect(created.ID)
+	if err != nil {
+		t.Fatalf("Disconnect: %v", err)
+	}
+	if disconnectState.Status != "disconnected" {
+		t.Fatalf("Disconnect status = %q, want disconnected", disconnectState.Status)
+	}
+
+	h.backend.releaseSlow()
+	result := <-connectDone
+	if result.err != nil {
+		t.Fatalf("Connect: %v", result.err)
+	}
+	if result.state.Status == "connected" {
+		t.Fatalf("Connect's own result = %q after a racing Disconnect, want anything but connected", result.state.Status)
+	}
+
+	// The critical assertion: StateOf must not have flipped back to "connected" once the
+	// cancelled attempt actually finished running well after Disconnect already returned.
+	if got := h.svc.StateOf(created.ID).Status; got == "connected" {
+		t.Fatalf("StateOf after the aborted attempt finished = %q, want it to stay disconnected", got)
+	}
+}
+
+// TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry is F4's own Remove-side
+// case: a Remove that arrives while Connect is still in flight must not let that Connect leave a
+// live adapter/states entry behind for an id whose row no longer exists.
+func TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+
+	connectDone := make(chan struct{})
+	go func() {
+		_, _ = h.svc.Connect(created.ID)
+		close(connectDone)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	if err := h.svc.Remove(created.ID); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	h.backend.releaseSlow()
+	<-connectDone
+
+	for _, st := range h.svc.States() {
+		if st.ConnectionID == created.ID {
+			t.Fatalf("States() still carries an entry for the removed id: %+v", st)
+		}
+	}
+}
+
 // TestTestValidatesInputBeforeProbing is a regression test for the P2 R1 finding where Test was
 // the one Input-accepting entry point (unlike Create/Update) that never called Validate() —  a
 // port outside 1-65535 reached the backend unchecked, and postgres/client.go's own
