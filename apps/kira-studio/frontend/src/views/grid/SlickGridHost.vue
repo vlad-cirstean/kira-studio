@@ -50,10 +50,12 @@ import {
   pageColumnIndexFor,
   resetMeasureCtx,
   resolveColumnOrder,
+  tooltipAttrs,
 } from '../shared/page/columns';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
+import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import FkPreviewPopover from './FkPreviewPopover.vue';
@@ -437,21 +439,11 @@ function keyLabelFor(
   return null;
 }
 
-// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so this writes the same
-// shape AttributeTooltip.vue's own bridge (packages/workbench/src/components/) reads by hand:
-// data-kira-tip (the plain, newline-joined a11y text) and data-kira-tip-parts (the structured
-// JSON a real TooltipContent would render) plus aria-label — since no Vue component tree mounts
-// over SlickGrid-owned DOM.
-function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<string, string> {
-  const plain = [content.title, content.meta, content.body]
-    .filter((v): v is string => !!v)
-    .join('\n');
-  return {
-    'data-kira-tip': plain,
-    'data-kira-tip-parts': JSON.stringify(content),
-    'aria-label': plain,
-  };
-}
+// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so tooltipAttrs (views/
+// shared/page/columns.ts, P107 T2-17) writes the same shape AttributeTooltip.vue's own bridge
+// (packages/workbench/src/components/) reads by hand: data-kira-tip (the plain, newline-joined
+// a11y text) and data-kira-tip-parts (the structured JSON a real TooltipContent would render) plus
+// aria-label — since no Vue component tree mounts over SlickGrid-owned DOM.
 
 // The DESCRIBE-derived dataType (meta.columns) when it has loaded, else the page's own
 // ColumnDescriptor — mirrors DataGrid.vue's own dataTypeFor, so the header tooltip can never show
@@ -755,82 +747,17 @@ let navColumns: NavColumns = navColumnsFor(null);
 // `placeNavButtonsForRenderedCells`' own comment — with a real button per nav-eligible rendered
 // cell, always visible, no hover tracking left to own.
 
-// Mirrors DataGrid.vue's own onScroll velocity sampler (rowVelocity()) verbatim — plain variables,
-// not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only from inside
-// getRenderedRange (entirely outside Vue's reactivity graph). See that file's own comment for why a
-// discrete jump (a scrollbar click, a test driving scrollTop directly) must not be read as a fling.
-let lastOffset = 0;
-let lastOffsetT = 0;
-let prevOffset = 0;
-let prevOffsetT = 0;
 // P22 iter2-onset D2 — incremented by every native `scroll` event on the viewport, and read by
 // KiraSlickGrid's own per-frame chase gate (see `scheduleChase` there). A counter, not a
 // timestamp: the wall-clock gate it joins cannot tell "no scroll is driving this frame" from
 // "the scroll that is driving this frame arrived in the previous, long, frame".
 let scrollEventSeq = 0;
-const MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME = 800;
-
-/**
- * P22 iter2-onset D1 — the gesture-onset fix. `false` restores the pre-fix behaviour *exactly*
- * (sampling only from `onViewportScroll` below, with no dedupe), so the real-Mac A/B is a console
- * line and not a rebuild — the same contract `chaseQuietMsOverride = 0` already has.
- */
-function freshVelocitySample(): boolean {
-  return window.__kiraGridTuning?.freshVelocitySampleOverride ?? true;
-}
-
-/**
- * P22 iter2-onset D1. The sampler's single write point, so it can be driven from *either* the
- * scroll listener below or — the fix — from `velocity()` itself, at the moment the value is
- * actually consumed.
- *
- * Why the fix is needed at all, read from source this session: SlickGrid binds its own viewport
- * `scroll` listener inside `finishInitialization()` (slickgrid dist/esm/index.js:7572, reached from
- * the constructor because `explicitInitialization: false`), and this host binds `onViewportScroll`
- * on that same element only *after* `new KiraSlickGrid(...)` returns. Two non-capturing listeners
- * on one target fire in registration order, so SlickGrid's `handleScroll` — and the synchronous
- * `render()` → `getRenderedRange()` → `velocity()` it drives (`_handleScroll`, :10589) — always ran
- * one sample *ahead* of this host's own sampling of the very event that triggered it. Mid-fling
- * that staleness is harmless (velocity barely changes frame to frame). At the first render of a
- * fresh gesture it is not: the only sample on hand is the one taken *before* the gesture began, so
- * `performance.now() - lastOffsetT > 150` fires and `velocity()` returns `{0, 0}` — the grid sizes
- * its runway as if standing still, `target` collapses to the base runway, the per-call budget is
- * left entirely unspent, and `getRenderedRange` does not even flag a deficit (`chaseWanted` is
- * false, because the range it returned *does* reach that collapsed target). One whole frame of
- * runway-building is lost at the exact moment a fling needs it most, on every gesture.
- *
- * The dedupe is what makes pulling safe: a scroll event that did not move the vertical offset is
- * not a velocity sample (a *horizontal* scroll fires this same listener), and without it a
- * listener-driven sample landing after a pull of the same position would shift `prev` up to
- * `last` and read the next frame's delta as 0.
- */
-function recordOffsetSample(offset: number, now: number): void {
-  if (freshVelocitySample() && offset === lastOffset) return;
-  prevOffset = lastOffset;
-  prevOffsetT = lastOffsetT;
-  lastOffset = offset;
-  lastOffsetT = now;
-}
-
-function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
-  // P22 iter2-onset D1 — sample at the point of consumption, not one listener too late (see
-  // recordOffsetSample above). This adds one `scrollTop` read per render pass; it is inside the
-  // envelope getRenderedRange already works in, which does its own layout read
-  // (`getCanvasNode(1)?.clientWidth`) and is reached from `_handleScroll`, which has just read
-  // scrollHeight/clientHeight/scrollWidth/clientWidth off the same element (dist/esm/index.js:10576)
-  // — layout is already flushed at this point on the scroll path.
-  if (freshVelocitySample() && viewportEl) {
-    recordOffsetSample(viewportEl.scrollTop, performance.now());
-  }
-  const dt = lastOffsetT - prevOffsetT;
-  if (!prevOffsetT || dt <= 0 || performance.now() - lastOffsetT > 150) {
-    return { pxPerFrame: 0, direction: 0 };
-  }
-  const delta = lastOffset - prevOffset;
-  const pxPerFrame = Math.abs(delta);
-  if (pxPerFrame > MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME) return { pxPerFrame: 0, direction: 0 };
-  return { pxPerFrame, direction: delta > 0 ? 1 : delta < 0 ? -1 : 0 };
-}
+// P107 T2-17: the gesture-onset fix (P22 iter2-onset D1) and its dedupe/seed/lastScrollEventAt
+// plumbing moved into views/shared/slick/scrollVelocity.ts, byte-identical to
+// ConsoleSlickGrid.vue's own copy — see that module's own comments for why the fix is needed and
+// why the dedupe makes pulling from velocity() itself safe.
+const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
+const { velocity } = scrollVelocityTracker;
 
 // §6 D9 — called from the host's own viewport scroll listener, the same logical point
 // markScrollWork marks in DataGrid.vue today (before the render work, after the browser's own
@@ -851,8 +778,8 @@ function onViewportScroll(): void {
   scrollEventSeq++;
   // P22 iter2-onset D1: still the sampler's other driver, unchanged in effect — but now a no-op
   // whenever velocity() already pulled this very position a moment earlier, from inside the
-  // render this same event drove (see recordOffsetSample's own comment).
-  recordOffsetSample(el.scrollTop, now);
+  // render this same event drove (see scrollVelocity.ts's own comment).
+  scrollVelocityTracker.recordOffsetSample(el.scrollTop, now);
 }
 
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted replaces the
@@ -2140,9 +2067,9 @@ onMounted(() => {
     },
   );
   grid.velocity = velocity;
-  // P22 iter2-pacing D1 — the chase's own quiescence gate. `lastOffsetT` is already
+  // P22 iter2-pacing D1 — the chase's own quiescence gate. `lastScrollEventAt()` is already
   // performance.now() at the last native scroll event (onViewportScroll, above); no new sampling.
-  grid.lastScrollEventAt = () => lastOffsetT;
+  grid.lastScrollEventAt = () => scrollVelocityTracker.lastScrollEventAt();
   // P22 iter2-onset D2 — the chase's per-frame gate, beside the wall-clock one above.
   grid.scrollEventSeq = () => scrollEventSeq;
 
@@ -2234,8 +2161,7 @@ onMounted(() => {
     // pulls, velocity() takes its own `!prevOffsetT` branch, and the exact defect this fix exists
     // for survives on one gesture per tab. `grid.render()` just below pulls the same position and
     // dedupes, so this seeding costs nothing and changes nothing at rest.
-    lastOffset = viewportEl.scrollTop;
-    lastOffsetT = performance.now();
+    scrollVelocityTracker.seed(viewportEl.scrollTop, performance.now());
   }
   grid.render();
   syncSortIndicators();

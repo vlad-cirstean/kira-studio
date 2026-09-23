@@ -393,3 +393,19 @@ export function columnHeaderTooltip(
     body: [description, comment].filter((line): line is string => !!line).join('\n') || undefined,
   };
 }
+
+// P107 T2-17: byte-identical across SlickGridHost.vue/ConsoleSlickGrid.vue — the DOM attributes a
+// header cell's tooltip formatter spreads onto its element, next to columnHeaderTooltip's own
+// content it reads.
+export function tooltipAttrs(
+  content: ReturnType<typeof columnHeaderTooltip>,
+): Record<string, string> {
+  const plain = [content.title, content.meta, content.body]
+    .filter((v): v is string => !!v)
+    .join('\n');
+  return {
+    'data-kira-tip': plain,
+    'data-kira-tip-parts': JSON.stringify(content),
+    'aria-label': plain,
+  };
+}
