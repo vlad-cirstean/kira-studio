@@ -13,6 +13,7 @@ import {
   percentile,
 } from './support/measure';
 import {
+  APP_CHILDREN,
   APP_PATH,
   BIG_ROWS_META,
   BIG_ROWS_PATH,
@@ -165,155 +166,20 @@ function scrollGridMeta() {
 // Real capture (scripts/capture-postgres-tree.ts, `children` step against database:kira_test/
 // schema:app, run against a container the new `seedScrollGrid` step had already seeded) — identical
 // to postgresFixture.ts's own APP_CHILDREN with one extra real entry (`scroll_grid` did not exist
-// when that capture ran, since it is never part of packages/db-fixtures/fixtures/0001_seed.sql).
-const APP_CHILDREN_WITH_SCROLL_GRID = [
-  {
-    kind: 'table',
-    name: 'Order Items',
-    path: `${APP_PATH}/table:Order%20Items`,
-    hasChildren: false,
-  },
-  {
-    kind: 'table',
-    name: 'big_rows',
-    path: BIG_ROWS_PATH,
-    hasChildren: false,
-    detail: '~1M rows',
-  },
-  {
-    kind: 'table',
-    name: 'composite_pk',
-    path: `${APP_PATH}/table:composite_pk`,
-    hasChildren: false,
-  },
-  { kind: 'table', name: 'customers', path: `${APP_PATH}/table:customers`, hasChildren: false },
-  { kind: 'table', name: 'employees', path: `${APP_PATH}/table:employees`, hasChildren: false },
-  { kind: 'table', name: 'formats', path: `${APP_PATH}/table:formats`, hasChildren: false },
-  { kind: 'table', name: 'nested_json', path: `${APP_PATH}/table:nested_json`, hasChildren: false },
-  {
-    kind: 'table',
-    name: 'nulls_and_unicode',
-    path: `${APP_PATH}/table:nulls_and_unicode`,
-    hasChildren: false,
-  },
-  { kind: 'table', name: 'order_items', path: `${APP_PATH}/table:order_items`, hasChildren: false },
-  { kind: 'table', name: 'orders', path: `${APP_PATH}/table:orders`, hasChildren: false },
-  { kind: 'table', name: 'products', path: `${APP_PATH}/table:products`, hasChildren: false },
-  { kind: 'table', name: 'regions', path: `${APP_PATH}/table:regions`, hasChildren: false },
-  {
+// when that capture ran, since it is never part of packages/db-fixtures/fixtures/0001_seed.sql) —
+// spliced in at its sorted position rather than duplicating the whole literal a second time.
+const APP_CHILDREN_WITH_SCROLL_GRID = (() => {
+  const withScrollGrid = [...APP_CHILDREN];
+  const insertAt = withScrollGrid.findIndex((entry) => entry.name === 'weird"name');
+  withScrollGrid.splice(insertAt, 0, {
     kind: 'table',
     name: 'scroll_grid',
     path: SCROLL_GRID_PATH,
     hasChildren: false,
     detail: '~5K rows',
-  },
-  { kind: 'table', name: 'weird"name', path: `${APP_PATH}/table:weird%22name`, hasChildren: false },
-  { kind: 'table', name: 'wide_table', path: WIDE_TABLE_PATH, hasChildren: false },
-  {
-    kind: 'view',
-    name: 'order_summary',
-    path: `${APP_PATH}/view:order_summary`,
-    hasChildren: false,
-  },
-  {
-    kind: 'matview',
-    name: 'customer_totals',
-    path: `${APP_PATH}/matview:customer_totals`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'Order Items_id_seq',
-    path: `${APP_PATH}/sequence:Order%20Items_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'customers_id_seq',
-    path: `${APP_PATH}/sequence:customers_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'employees_id_seq',
-    path: `${APP_PATH}/sequence:employees_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'formats_id_seq',
-    path: `${APP_PATH}/sequence:formats_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'invoice_number_seq',
-    path: `${APP_PATH}/sequence:invoice_number_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'nested_json_id_seq',
-    path: `${APP_PATH}/sequence:nested_json_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'nulls_and_unicode_id_seq',
-    path: `${APP_PATH}/sequence:nulls_and_unicode_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'order_items_id_seq',
-    path: `${APP_PATH}/sequence:order_items_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'orders_id_seq',
-    path: `${APP_PATH}/sequence:orders_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'products_id_seq',
-    path: `${APP_PATH}/sequence:products_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'regions_id_seq',
-    path: `${APP_PATH}/sequence:regions_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'weird"name_id_seq',
-    path: `${APP_PATH}/sequence:weird%22name_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'sequence',
-    name: 'wide_table_id_seq',
-    path: `${APP_PATH}/sequence:wide_table_id_seq`,
-    hasChildren: false,
-  },
-  {
-    kind: 'function',
-    name: 'full_name',
-    path: `${APP_PATH}/function:full_name`,
-    hasChildren: false,
-    detail: '(first_name text, last_name text)',
-  },
-  {
-    kind: 'function',
-    name: 'noop_procedure',
-    path: `${APP_PATH}/function:noop_procedure`,
-    hasChildren: false,
-    detail: '()',
-  },
-];
+  });
+  return withScrollGrid;
+})();
 
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
