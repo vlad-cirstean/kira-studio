@@ -277,6 +277,40 @@ func TestClassifyOpError_NetworkFailed(t *testing.T) {
 	}
 }
 
+// TestClassifyOpError_ConflictNotMisledBySubjectSubstring is P108 Part 15 F4's own regression
+// proof: a commit SUBJECT is user-controlled text embedded in git's own conflict message, and
+// every row ahead of the (unanchored) Conflict row further down is a plain, whole-blob
+// strings.Contains — so a commit titled "Handle connection refused" was classified as
+// NetworkFailed instead of the real conflict it actually is.
+func TestClassifyOpError_ConflictNotMisledBySubjectSubstring(t *testing.T) {
+	t.Parallel()
+	for _, stderr := range []string{
+		// A cherry-pick whose commit subject happens to read like a network failure.
+		"error: could not apply c8fd25a... Handle connection refused",
+		// A revert whose commit subject happens to read like an already-exists/lease collision.
+		`error: could not revert c8fd25a... Revert "already exists in the changelog"`,
+	} {
+		if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "Conflict" {
+			t.Fatalf("%q -> %q, want Conflict (not misled by the commit subject's own text)", stderr, kind)
+		}
+	}
+}
+
+// TestClassifyOpError_ConflictNotMisledByPathSubstring is F4's own second regression proof: a
+// merge conflict's OWN file path is likewise user-controlled and sits in the same stderr blob a
+// row ahead of Conflict scans wholesale.
+func TestClassifyOpError_ConflictNotMisledByPathSubstring(t *testing.T) {
+	t.Parallel()
+	// A path containing "already exists" sits inside a real conflict marker line, but
+	// AlreadyExists's own substring rule ("already exists") sits well ahead of the (unanchored)
+	// Conflict row further down in this table — exactly the ordering this fix must not let win.
+	stderr := "Auto-merging the file already exists.md\n" +
+		"CONFLICT (content): Merge conflict in the file already exists.md"
+	if kind, _ := gitops.ClassifyOpError(stderr, 1); kind != "Conflict" {
+		t.Fatalf("got %q, want Conflict (not AlreadyExists, misled by the conflicting path's own name)", kind)
+	}
+}
+
 func TestClassifyOpError_RemoteNotFound(t *testing.T) {
 	t.Parallel()
 	// The GitHub shape of RemoteNotFound — must not be swallowed by the local "not found" row.

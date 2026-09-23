@@ -22,7 +22,31 @@ type classifyRule struct {
 // classifyOpErrorRules is ClassifyOpError's own ordered pattern table — order matters as much as
 // the patterns (a more specific rule must precede the general one it would be swallowed by). Kept
 // as a slice, not a map, for exactly that reason: a map has no order to preserve.
+// hasConflictLine is P108 Part 15 F4's own line-anchored check, run before every row below
+// (including this table's own unanchored Conflict row further down): a commit SUBJECT
+// (`could not apply <sha>... <subject>`, `could not revert <sha>... Revert "<subject>"`) or a
+// file PATH (`Auto-merging <path>`, `CONFLICT (...): Merge conflict in <path>`) is user-controlled
+// text sitting in the SAME stderr blob every row below scans with a plain, whole-blob
+// strings.Contains — a commit titled "Handle connection refused" tripped NetworkFailed instead of
+// a real conflict; other subjects/paths can trip AlreadyExists/NonFastForward/RemoteNotFound/
+// NotFullyMerged the same way. Anchoring on line start sidesteps this: none of that user text can
+// ever sit at the very start of a line git itself writes one of these two markers at.
+func hasConflictLine(lower string) bool {
+	for _, line := range strings.Split(lower, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "error: could not apply ") ||
+			strings.HasPrefix(line, "error: could not revert ") ||
+			strings.HasPrefix(line, "conflict (") {
+			return true
+		}
+	}
+	return false
+}
+
 var classifyOpErrorRules = []classifyRule{
+	// F4: checked first, ahead of every row below — see hasConflictLine's own doc comment.
+	{kind: "Conflict", match: hasConflictLine},
+
 	// G7 D14/F18: eight rows prepended, in this exact order, ahead of every G5 row below — "not
 	// found" would otherwise swallow RemoteNotFound, and a broad "! [rejected]" would swallow the
 	// two lease kinds. Every pattern here is verbatim from a real failure this chapter's own
