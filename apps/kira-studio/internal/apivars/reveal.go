@@ -50,27 +50,29 @@ func (s *Service) RevealHistory(historyID string, confirmed bool) RevealResult {
 }
 
 func (s *Service) reveal(reason, id string, confirmed bool, decrypt func(string) (string, error), subject string) RevealResult {
-	outcome, err := s.deps.Auth.Authorize(reason, confirmed)
-	if err != nil {
+	outcome, value, err := localauth.Gated(s.deps.Auth.Authorize, reason, confirmed, func() (*string, error) {
+		v, err := decrypt(id)
+		if err != nil {
+			return nil, err
+		}
+		return &v, nil
+	})
+	switch outcome {
+	case localauth.GateAuthError:
 		msg := err.Error()
 		slog.Warn(fmt.Sprintf("local authentication errored before revealing a %s (%s): %s", subject, id, msg), "scope", "apivars")
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
-	}
-	switch outcome {
-	case localauth.Cancelled:
+	case localauth.GateCancelled:
 		// D11 (inherited via P14): the user cancelled on purpose — no message, that would nag.
 		return RevealResult{Outcome: OutcomeCancelled}
-	case localauth.Unavailable:
+	case localauth.GateConfirmationRequired:
 		return RevealResult{Outcome: OutcomeConfirmationRequired}
-	}
-
-	value, err := decrypt(id)
-	if err != nil {
+	case localauth.GateFetchError:
 		msg := err.Error()
 		slog.Warn(fmt.Sprintf("reveal failed for a %s (%s): %s", subject, id, msg), "scope", "apivars")
 		return RevealResult{Outcome: OutcomeError, Error: &msg}
 	}
 	// D5: the subject, never the value — connections.Service.Reveal's own precedent.
 	slog.Info(fmt.Sprintf("%s revealed for %s", subject, id), "scope", "apivars")
-	return RevealResult{Outcome: OutcomeRevealed, Value: &value}
+	return RevealResult{Outcome: OutcomeRevealed, Value: value}
 }
