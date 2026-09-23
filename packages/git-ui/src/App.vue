@@ -72,6 +72,7 @@ import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
+import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
 import { GraphOrderState } from './state/graphOrder.ts';
@@ -1121,13 +1122,8 @@ onMounted(() => {
     });
 });
 
-/** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
- *  replaces the first rather than appearing to do nothing. */
 function retryBootstrap(): void {
-  bootError.value = undefined;
-  void bootstrap().catch((err: unknown) => {
-    bootError.value = err instanceof Error ? err.message : String(err);
-  });
+  sharedRetryBootstrap(bootError, bootstrap);
 }
 
 // `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
