@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Client } from 'pg';
+import { baseConnectionConfig } from './common';
 import type { ResolvedConnectionConfig } from './connectionConfig';
 import { resolveDockerHost } from './docker';
 
@@ -64,33 +65,16 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
     await seedClient.end();
   }
 
-  const now = new Date().toISOString();
-  const config: ResolvedConnectionConfig = {
+  const config: ResolvedConnectionConfig = baseConnectionConfig({
     id: 'test-postgres',
-    sortOrder: 0,
-    createdAt: now,
-    updatedAt: now,
     name: 'Test Postgres',
     kind: 'postgres',
-    color: 'blue',
-    mode: 'fields',
-    readOnly: false,
     host,
     port,
     database: DATABASE,
     username: 'postgres',
-    uri: null,
-    options: {},
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
     password: PASSWORD,
-  };
+  });
 
   return {
     container,

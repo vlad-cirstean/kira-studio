@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { MariaDbContainer, type StartedMariaDbContainer } from '@testcontainers/mariadb';
 import { createConnection, importFile } from 'mariadb';
 import { Wait } from 'testcontainers';
+import { baseConnectionConfig } from './common';
 import type { ResolvedConnectionConfig } from './connectionConfig';
 import { resolveDockerHost } from './docker';
 
@@ -117,33 +118,16 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     await rootConn.end();
   }
 
-  const now = new Date().toISOString();
-  const config: ResolvedConnectionConfig = {
+  const config: ResolvedConnectionConfig = baseConnectionConfig({
     id: 'test-mariadb',
-    sortOrder: 0,
-    createdAt: now,
-    updatedAt: now,
     name: 'Test MariaDB',
     kind: 'mariadb',
-    color: 'blue',
-    mode: 'fields',
-    readOnly: false,
     host,
     port,
     database: DATABASE,
     username: USERNAME,
-    uri: null,
-    options: {},
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
     password: PASSWORD,
-  };
+  });
 
   return {
     container,
