@@ -16,6 +16,7 @@ import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
@@ -45,6 +46,7 @@ import { useStreamSearchStore } from './search';
 import { useStreamViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
+const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
@@ -559,6 +561,11 @@ onUnmounted(() => {
 
 <template>
   <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
+    <!-- P104: SplitterGroup wraps ViewChrome (untouched inside) + CellEditorDock, since the
+         resize handle must sit as reka's own direct child alongside the panel it resizes
+         (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
+    <SplitterGroup direction="vertical" class="stream-split">
+    <SplitterPanel class="stream-split-top" :order="1">
     <!-- Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
          `false`, not `undefined` — ViewChrome.vue's own `:disabled="canRefresh === false"` made
          omitting can-refresh here silently mean "always disabled", regardless of connection or
@@ -1083,7 +1090,10 @@ onUnmounted(() => {
       </div>
       </template>
     </ViewChrome>
+    </SplitterPanel>
+    <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
+    </SplitterGroup>
   </div>
 </template>
 
@@ -1092,6 +1102,25 @@ onUnmounted(() => {
 
 .stream-view {
   @apply h-full flex flex-col min-h-0;
+}
+
+/* P104: the SplitterGroup wrapping ViewChrome + CellEditorDock.vue's own dock panel — the
+   vertical split (row-resize) that used to be CellEditorDock's own internal PanelSplitter. */
+.stream-split {
+  @apply flex flex-1 min-h-0 flex-col;
+}
+
+.stream-split-top {
+  @apply flex flex-col min-h-0;
+}
+
+.cell-splitter {
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.cell-splitter:hover,
+.cell-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 /* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */

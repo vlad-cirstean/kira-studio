@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
+import { SplitterPanel } from 'reka-ui';
 import { computed } from 'vue';
 import { useCellSelectionStore } from '../../../state/cellSelection';
 import { useLayoutStore } from '../../../state/layout';
@@ -21,41 +21,33 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
 </script>
 
 <template>
-  <template v-if="cell">
-    <PanelSplitter
-      class="cell-splitter"
-      orientation="row"
-      reverse
-      :size="layoutStore.panel.cellEditor.height"
-      :min="120"
-      :max="480"
-      divider
-      @resize="layoutStore.setCellEditorHeight"
-    />
-    <div
-      class="cell-dock"
-      data-testid="cell-editor"
-      :data-tab-id="tabId"
-      :style="{ height: `${layoutStore.panel.cellEditor.height}px` }"
-    >
-      <CellEditorView :cell="cell" :read-only="readOnly" />
-    </div>
-  </template>
+  <!-- P104: a plain content panel — the drag handle (SplitterResizeHandle) that used to be this
+       component's own first template child now lives in each mounting view's own SplitterGroup,
+       since a resize handle must be reka's direct child alongside the panel it sits next to
+       (SplitterPanel.vue's own `order` doc: "required for groups with conditionally rendered
+       panels" — every mounting view gates that handle on the same `cell` condition this panel's
+       own `v-if` uses). Still owns its own size/min/max/resize wiring (layoutStore), so there is
+       exactly one place that reads/writes the cell-editor height, not one per mounting view. -->
+  <SplitterPanel
+    v-if="cell"
+    class="cell-dock"
+    data-testid="cell-editor"
+    :data-tab-id="tabId"
+    size-unit="px"
+    :default-size="layoutStore.panel.cellEditor.height"
+    :min-size="120"
+    :max-size="480"
+    :order="2"
+    @resize="layoutStore.setCellEditorHeight"
+  >
+    <CellEditorView :cell="cell" :read-only="readOnly" />
+  </SplitterPanel>
 </template>
 
 <style scoped>
 @reference "@theme/base.css";
 
-/* The workbench grid gave the splitter its size (a `--kira-gap` row between two gap-separated
-   panels, tokens.css:31-36); inside a view there is no gap band to aim at, so the track carries
-   its own height. P22 D13: `divider` (above) now draws the visible boundary the comment below
-   used to hand off to `.cell-dock`'s own border-top — one mechanism for "a splitter inside a view
-   is visible" instead of two that happened to agree, same rendered line in the same place. */
-.cell-splitter {
-  @apply shrink-0 h-1;
-}
-
 .cell-dock {
-  @apply shrink-0 min-h-0 overflow-hidden bg-bg;
+  @apply min-h-0 overflow-hidden bg-bg;
 }
 </style>

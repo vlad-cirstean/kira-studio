@@ -11,8 +11,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
+import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
@@ -44,9 +46,11 @@ const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
 const consoleViewStore = useConsoleViewStore();
+const cellSelectionStore = useCellSelectionStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
+const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 
 // A console tab hydrates without loading anything (there is nothing to load until a statement
 // runs), so no onLoad is passed.
@@ -747,6 +751,11 @@ const statusLine = computed(() => {
            nothing left to gate — the editor already stayed visible behind it (item 2), and running
            a restored tab's query now reconnects itself, so the button was just a second, redundant
            way to do what pressing Run already does. Removed rather than kept as a no-op. -->
+      <!-- P104: SplitterGroup wrapping the editor+results body and CellEditorDock.vue's own dock
+           panel — the resize handle must sit as reka's own direct child alongside the panel it
+           resizes (CellEditorDock.vue's own header comment). -->
+      <SplitterGroup direction="vertical" class="console-split">
+      <SplitterPanel class="console-split-top" :order="1">
       <div class="editor-body">
         <MonacoHost
           ref="editorHost"
@@ -862,9 +871,12 @@ const statusLine = computed(() => {
         </div>
       </div>
 
+      </SplitterPanel>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
+      <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
+      </SplitterGroup>
     </ViewChrome>
   </div>
 </template>
@@ -874,6 +886,30 @@ const statusLine = computed(() => {
 
 .console-view {
   @apply h-full flex flex-col min-h-0;
+}
+
+/* P104: the SplitterGroup wrapping the editor+results body and CellEditorDock.vue's own dock
+   panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
+   PanelSplitter. */
+.console-split {
+  @apply flex flex-1 min-h-0 flex-col;
+}
+
+.console-split-top {
+  @apply flex flex-col min-h-0;
+}
+
+/* Reproduces PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow,
+   cleared on hover/drag, --kira-focus fill taking over instead) — same pattern as
+   DataView.vue/KeyValuePane.vue's own .cell-splitter. cell-editor.spec.ts polls this class's
+   box-shadow. */
+.cell-splitter {
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.cell-splitter:hover,
+.cell-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .saved-anchor {

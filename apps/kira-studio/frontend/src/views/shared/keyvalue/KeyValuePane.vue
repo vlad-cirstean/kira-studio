@@ -49,6 +49,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
@@ -88,6 +89,11 @@ const props = defineProps<{
 }>();
 
 const host = computed(() => keyValueHost(props.viewKey));
+
+// P104: CellEditorDock.vue is now a plain SplitterPanel (its own header comment) — the resize
+// handle beside it must be this view's own direct SplitterGroup child, gated on the same
+// condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
+const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.viewKey) !== null);
 
 // Reconnect gating only applies in tab mode (see the module doc comment above) — useConnectionGate
 // needs a stable {id, connectionId}, which only a real tab record's lifetime guarantees.
@@ -769,6 +775,8 @@ onUnmounted(() => {
       </div>
     </template>
 
+    <SplitterGroup direction="vertical" class="kv-split">
+    <SplitterPanel class="kv-split-top" :order="1">
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
@@ -1143,7 +1151,10 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
+    </SplitterPanel>
+    <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="viewKey" />
+    </SplitterGroup>
   </div>
 </template>
 
@@ -1152,6 +1163,34 @@ onUnmounted(() => {
 
 .keyvalue-pane {
   @apply flex-1 min-h-0 flex flex-col;
+}
+
+/* P104: the SplitterGroup wrapping the reconnect/main content + CellEditorDock.vue's own dock
+   panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
+   PanelSplitter. */
+.kv-split {
+  @apply flex flex-1 min-h-0 flex-col;
+}
+
+/* SplitterPanel's own inline style owns flex-grow/basis (it always wins over a class rule) — the
+   badges/strips/table still stack in a column inside it, same as .keyvalue-pane's own layout
+   before. */
+.kv-split-top {
+  @apply flex flex-col min-h-0;
+}
+
+/* P104: reproduces PanelSplitter.vue's old `divider` prop line exactly (a centred inset
+   box-shadow, cleared on hover/drag, --kira-focus fill taking over instead) — moved here from
+   CellEditorDock.vue's own <style>, since the resize handle now lives in this view's own
+   SplitterGroup (CellEditorDock.vue's own header comment). cell-editor.spec.ts polls
+   `.cell-splitter`'s box-shadow — kept as a marker class. */
+.cell-splitter {
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.cell-splitter:hover,
+.cell-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .table-panel {

@@ -7,7 +7,9 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { useRunState } from '../../state/runState';
@@ -33,7 +35,13 @@ const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 const gridViewStore = useGridViewStore();
+const cellSelectionStore = useCellSelectionStore();
 const props = defineProps<{ tab: DataTabRecord }>();
+
+// P104: CellEditorDock.vue is now a plain SplitterPanel (its own header comment) — the resize
+// handle beside it must be this view's own direct SplitterGroup child, gated on the same
+// condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
+const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -342,60 +350,65 @@ function onCloseSearch(): void {
       @close="onCloseSearch"
     />
 
-    <div
-      v-if="needsReconnect"
-      class="p-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-subtle"
-      data-testid="reconnect-panel"
-    >
-      <Button
-        variant="dialog-primary"
-        size="kira-lg"
-        data-testid="reconnect-load"
-        @click="onReconnectAndLoad"
-      >
-        Reconnect & load
-      </Button>
-    </div>
-    <template v-else>
-      <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
-           that started it (RunState, above), never a bar across the top of the view — §8.5's
-           "never a spinner that replaces the previous page" still holds, it just no longer needs a
-           bar of its own to say so. -->
-      <Alert
-        v-if="rt?.status === 'error' && rt.error"
-        variant="destructive"
-        data-testid="error-strip"
-        class="error-strip"
-      >
-        <CodiconIcon name="warning" :size="16" />
-        <AlertDescription>{{ rt.error.message }}</AlertDescription>
-      </Alert>
-      <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
-           showing a perfectly valid page, only the write was refused. -->
-      <Alert
-        v-if="rt?.actionError"
-        variant="destructive"
-        data-testid="data-action-error"
-        class="error-strip"
-      >
-        <CodiconIcon name="warning" :size="16" />
-        <AlertDescription>{{ rt.actionError }}</AlertDescription>
-      </Alert>
-      <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
-           stored data — a preview convenience (§6.1), not the security boundary, but a user
-           switching tabs or taking a screenshot must not mistake a bucket string for a literal
-           value. -->
-      <Alert v-if="rt?.maskPreview" class="strip-note" data-testid="mask-preview-strip">
-        <CodiconIcon name="eye-closed" :size="16" />
-        <AlertDescription class="strip-note-text">
-          Values shown are masked for this preview — not the stored data. Editing is off while it's on.
-        </AlertDescription>
-      </Alert>
-      <div class="grid-area">
-        <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
-      </div>
-    </template>
-    <CellEditorDock :tab-id="tab.id" />
+    <SplitterGroup direction="vertical" class="grid-split">
+      <SplitterPanel class="grid-split-top" :order="1">
+        <div
+          v-if="needsReconnect"
+          class="p-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-subtle"
+          data-testid="reconnect-panel"
+        >
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="reconnect-load"
+            @click="onReconnectAndLoad"
+          >
+            Reconnect & load
+          </Button>
+        </div>
+        <template v-else>
+          <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
+               that started it (RunState, above), never a bar across the top of the view — §8.5's
+               "never a spinner that replaces the previous page" still holds, it just no longer needs a
+               bar of its own to say so. -->
+          <Alert
+            v-if="rt?.status === 'error' && rt.error"
+            variant="destructive"
+            data-testid="error-strip"
+            class="error-strip"
+          >
+            <CodiconIcon name="warning" :size="16" />
+            <AlertDescription>{{ rt.error.message }}</AlertDescription>
+          </Alert>
+          <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
+               showing a perfectly valid page, only the write was refused. -->
+          <Alert
+            v-if="rt?.actionError"
+            variant="destructive"
+            data-testid="data-action-error"
+            class="error-strip"
+          >
+            <CodiconIcon name="warning" :size="16" />
+            <AlertDescription>{{ rt.actionError }}</AlertDescription>
+          </Alert>
+          <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
+               stored data — a preview convenience (§6.1), not the security boundary, but a user
+               switching tabs or taking a screenshot must not mistake a bucket string for a literal
+               value. -->
+          <Alert v-if="rt?.maskPreview" class="strip-note" data-testid="mask-preview-strip">
+            <CodiconIcon name="eye-closed" :size="16" />
+            <AlertDescription class="strip-note-text">
+              Values shown are masked for this preview — not the stored data. Editing is off while it's on.
+            </AlertDescription>
+          </Alert>
+          <div class="grid-area">
+            <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
+          </div>
+        </template>
+      </SplitterPanel>
+      <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <CellEditorDock :tab-id="tab.id" />
+    </SplitterGroup>
   </div>
 </template>
 
@@ -410,8 +423,34 @@ function onCloseSearch(): void {
   @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
 }
 
+/* P104: the SplitterGroup wrapping the grid + CellEditorDock.vue's own dock panel — the vertical
+   split (row-resize) that used to be CellEditorDock's own internal PanelSplitter. */
+.grid-split {
+  @apply flex flex-1 min-h-0 flex-col;
+}
+
+/* SplitterPanel's own inline style owns flex-grow/basis (it always wins over a class rule) — the
+   alerts + grid-area still stack in a column inside it, same as .data-view's own layout before. */
+.grid-split-top {
+  @apply flex flex-col min-h-0;
+}
+
 .grid-area {
   @apply flex-1 min-h-0 relative;
+}
+
+/* P104: reproduces PanelSplitter.vue's old `divider` prop line exactly (a centred inset
+   box-shadow, cleared on hover/drag, --kira-focus fill taking over instead) — moved here from
+   CellEditorDock.vue's own <style>, since the resize handle now lives in this view's own
+   SplitterGroup (CellEditorDock.vue's own header comment). cell-editor.spec.ts polls
+   `.cell-splitter`'s box-shadow — kept as a marker class. */
+.cell-splitter {
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.cell-splitter:hover,
+.cell-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .preview-anchor {
