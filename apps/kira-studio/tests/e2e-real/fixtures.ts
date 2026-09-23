@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdir, mkdtemp, open, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, rm, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -32,14 +32,74 @@ function envWithGoBin(): NodeJS.ProcessEnv {
   return { ...process.env, PATH: path.includes(extra) ? path : `${path}:${extra}` };
 }
 
-async function acquireBuildLock(): Promise<() => Promise<void>> {
+// staleLockAgeMs is the age-based backstop (F10, P108 Part 6): a lock this old is reclaimed
+// regardless of whether its own owner PID looks alive — generous past this repo's own build time,
+// so it only ever fires for a genuinely abandoned lock, never a real in-progress build.
+const staleLockAgeMs = 10 * 60 * 1000; // 10 minutes
+// acquireLockTimeoutMs is the hard ceiling on how long acquireBuildLock waits overall — a loud,
+// specific failure instead of the silent-forever hang this fixes: acquireBuildLock used to loop on
+// EEXIST with no way out at all, so a killed test run's own leftover lock file hung every later
+// run indefinitely with no indication why.
+const acquireLockTimeoutMs = 15 * 60 * 1000; // 15 minutes
+
+/** True when pid does not name a live process on this machine — the PID-liveness half of F10's
+ *  stale-lock check. ESRCH means no such process (dead); EPERM means it exists but isn't ours to
+ *  signal (still alive, just owned by someone else) — anything else is treated as "can't tell,
+ *  assume alive" so this never falsely reclaims a lock a live process still holds. */
+function processIsDead(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ESRCH';
+  }
+}
+
+// isLockStale is F10's own reclaim decision: age-based (a lock older than staleLockAgeMs, the
+// simplest and most robust signal — a build genuinely running this long would be its own separate
+// problem) OR the PID the lock file itself records is no longer alive (a killed run's own lock,
+// caught quickly even before the age threshold). Either check returning false just means "keep
+// waiting", never "this lock is definitely healthy" — a lock that vanished between the EEXIST
+// above and this check (a racing worker already reclaimed or released it) reads as not stale
+// either, which is correct: there is nothing left here for this call to reclaim. lockPath defaults
+// to the real LOCK_PATH; parameterized (like acquireBuildLock below) so a unit test can point this
+// at a throwaway file instead of the real cross-process lock.
+export async function isLockStale(lockPath: string = LOCK_PATH): Promise<boolean> {
+  let mtimeMs: number;
+  let pidText: string;
+  try {
+    [{ mtimeMs }, pidText] = await Promise.all([stat(lockPath), readFile(lockPath, 'utf8')]);
+  } catch {
+    return false;
+  }
+  if (Date.now() - mtimeMs > staleLockAgeMs) return true;
+  const pid = Number.parseInt(pidText, 10);
+  return Number.isInteger(pid) && pid > 0 && processIsDead(pid);
+}
+
+export async function acquireBuildLock(lockPath: string = LOCK_PATH): Promise<() => Promise<void>> {
+  const startedAt = Date.now();
   for (;;) {
     try {
-      const handle = await open(LOCK_PATH, 'wx');
+      const handle = await open(lockPath, 'wx');
+      // The owning process's own pid — F10: what isLockStale reads back to decide whether a
+      // later caller's lock is abandoned.
+      await handle.writeFile(String(process.pid));
       await handle.close();
-      return () => rm(LOCK_PATH, { force: true });
+      return () => rm(lockPath, { force: true });
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      if (Date.now() - startedAt > acquireLockTimeoutMs) {
+        throw new Error(
+          `timed out after ${acquireLockTimeoutMs}ms waiting for the e2e-real build lock ` +
+            `(${lockPath}) — a previous run may have been killed without cleaning it up; ` +
+            'delete that file by hand and retry if so.',
+        );
+      }
+      if (await isLockStale(lockPath)) {
+        await rm(lockPath, { force: true });
+        continue; // retry acquiring immediately — no sleep, another waiter may win it first.
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
   }
