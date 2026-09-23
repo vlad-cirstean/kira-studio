@@ -840,7 +840,7 @@ func TestRunRestack_SecondCallWhileRunningIsRefusedNoSpawn(t *testing.T) {
 	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
 	ctx := context.Background()
 
-	if !entry.restack.claim(func() {}) {
+	if !entry.restack.claimAlways("restack", func() {}) {
 		t.Fatal("test setup: claim should succeed on an idle slot")
 	}
 	defer entry.restack.release()
@@ -957,16 +957,16 @@ func TestCancelRestack_IdleReportsFalse(t *testing.T) {
 
 func TestRestackSlot_ClaimReleaseCancel(t *testing.T) {
 	t.Parallel()
-	var s restackSlot
-	if !s.claim(func() {}) {
+	var s opSlot
+	if !s.claimAlways("restack", func() {}) {
 		t.Fatal("first claim should succeed")
 	}
-	if s.claim(func() {}) {
+	if s.claimAlways("restack", func() {}) {
 		t.Fatal("a second claim while occupied should be refused")
 	}
 	s.release()
 	cancelled := false
-	s.claim(func() { cancelled = true })
+	s.claimAlways("restack", func() { cancelled = true })
 	if !s.tryCancel() {
 		t.Fatal("cancelling an active slot must report true")
 	}
@@ -977,9 +977,9 @@ func TestRestackSlot_ClaimReleaseCancel(t *testing.T) {
 
 func TestRestackSlot_ForceCancel(t *testing.T) {
 	t.Parallel()
-	var s restackSlot
+	var s opSlot
 	cancelled := false
-	s.claim(func() { cancelled = true })
+	s.claimAlways("restack", func() { cancelled = true })
 	s.forceCancel()
 	if !cancelled {
 		t.Fatal("forceCancel must cancel")

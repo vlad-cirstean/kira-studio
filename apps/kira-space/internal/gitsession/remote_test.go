@@ -11,11 +11,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 )
 
-// --- remoteOpSlot: D24's own ≤1-slot concurrency matrix -----------------------------------------
+// --- opSlot: D24's own ≤1-slot concurrency matrix -----------------------------------------
 
 func TestRemoteOpSlot_SecondClaimIsRefused(t *testing.T) {
 	t.Parallel()
-	var s remoteOpSlot
+	var s opSlot
 	if !s.claim("fetch", func() {}) {
 		t.Fatal("first claim should succeed")
 	}
@@ -30,7 +30,7 @@ func TestRemoteOpSlot_SecondClaimIsRefused(t *testing.T) {
 
 func TestRemoteOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 	t.Parallel()
-	var s remoteOpSlot
+	var s opSlot
 	if s.tryCancel() {
 		t.Fatal("cancelling an idle slot must report false, never true")
 	}
@@ -38,7 +38,7 @@ func TestRemoteOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 
 func TestRemoteOpSlot_CancelOnNonKillablePhaseReportsFalseAndNeverCancels(t *testing.T) {
 	t.Parallel()
-	var s remoteOpSlot
+	var s opSlot
 	cancelled := false
 	s.claim("push", func() { cancelled = true })
 	// killable defaults to false on claim (push's own default — never killable, D19).
@@ -52,7 +52,7 @@ func TestRemoteOpSlot_CancelOnNonKillablePhaseReportsFalseAndNeverCancels(t *tes
 
 func TestRemoteOpSlot_CancelOnKillablePhaseCancelsAndReportsTrue(t *testing.T) {
 	t.Parallel()
-	var s remoteOpSlot
+	var s opSlot
 	cancelled := false
 	s.claim("fetch", func() { cancelled = true })
 	s.setKillable(true)
@@ -66,7 +66,7 @@ func TestRemoteOpSlot_CancelOnKillablePhaseCancelsAndReportsTrue(t *testing.T) {
 
 func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
 	t.Parallel()
-	var s remoteOpSlot
+	var s opSlot
 	cancelled := false
 	s.claim("push", func() { cancelled = true })
 	s.forceCancel()

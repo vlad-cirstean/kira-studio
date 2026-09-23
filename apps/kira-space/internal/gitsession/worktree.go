@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
@@ -391,49 +390,6 @@ func prepareWorktreeRemove(ctx context.Context, e *RepoEntry, _ ConnID, _ string
 // worktree.prepare / worktree.cancelPrepare (D9-D14)
 // ---------------------------------------------------------------------------------------
 
-// prepareOpSlot is D13's own "≤1 prepare run per repository" box — simpler than remoteOpSlot
-// (remote.go): a prepare run is ALWAYS cancellable (D12), so there is no killable toggle to track.
-type prepareOpSlot struct {
-	mu     sync.Mutex
-	active bool
-	cancel context.CancelFunc
-}
-
-func (s *prepareOpSlot) claim(cancel context.CancelFunc) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.active {
-		return false
-	}
-	s.active = true
-	s.cancel = cancel
-	return true
-}
-
-func (s *prepareOpSlot) release() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.active, s.cancel = false, nil
-}
-
-func (s *prepareOpSlot) tryCancel() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.active {
-		return false
-	}
-	s.cancel()
-	return true
-}
-
-func (s *prepareOpSlot) forceCancel() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cancel != nil {
-		s.cancel()
-	}
-}
-
 // WorktreePrepareLine mirrors one gitprepare.Line at the wire (D13) — gitprepare itself carries no
 // json tags (D18: it knows nothing about the wire), so this is the one place a Line is dressed for
 // transport.
@@ -501,7 +457,7 @@ type WorktreePrepareDeps struct {
 
 func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha256 string, deps WorktreePrepareDeps) (WorktreePrepareResult, error) {
 	opCtx, cancel := context.WithCancel(ctx)
-	if !e.prepare.claim(cancel) {
+	if !e.prepare.claimAlways("prepare", cancel) {
 		cancel()
 		return noSpawnPrepareResult("AlreadyRunning", "A prepare script is already running for this repository.")
 	}

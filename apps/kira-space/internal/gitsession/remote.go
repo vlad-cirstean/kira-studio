@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
@@ -15,64 +14,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// remoteOpSlot is SPEC §6's own "active remote op (≤1)" box — shared across every connection open
-// on this repository (D9/D11/D20): a second remote.run on the same repository, from any
-// connection, is refused rather than queued (upstream's own OQ7 — a push sitting invisibly behind
-// a ninety-second fetch is worse than being told to wait, and it makes "which op does cancel
-// cancel?" ambiguous).
-type remoteOpSlot struct {
-	mu       sync.Mutex
-	kind     string // "" when idle
-	killable bool   // flips per phase (D19)
-	cancel   context.CancelFunc
-}
-
-func (s *remoteOpSlot) claim(kind string, cancel context.CancelFunc) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.kind != "" {
-		return false
-	}
-	s.kind, s.killable, s.cancel = kind, false, cancel
-	return true
-}
-
-func (s *remoteOpSlot) setKillable(v bool) {
-	s.mu.Lock()
-	s.killable = v
-	s.mu.Unlock()
-}
-
-func (s *remoteOpSlot) release() {
-	s.mu.Lock()
-	s.kind, s.killable, s.cancel = "", false, nil
-	s.mu.Unlock()
-}
-
-// tryCancel is remote.cancel's own executor (D19): false — NEVER an error — when nothing is
-// running or the current phase is not killable; a cancel racing a just-finished op is an ordinary
-// outcome, not a fault.
-func (s *remoteOpSlot) tryCancel() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.kind == "" || !s.killable {
-		return false
-	}
-	s.cancel()
-	return true
-}
-
-// forceCancel is teardown's own unconditional cancel — the entry itself is going away, so any
-// in-flight op's context is cancelled regardless of its killable flag.
-func (s *remoteOpSlot) forceCancel() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cancel != nil {
-		s.cancel()
-	}
-}
-
-// CancelRemote is remote.cancel's own entry point.
+// CancelRemote is remote.cancel's own entry point. SPEC §6's own "active remote op (≤1)" box is
+// shared across every connection open on this repository (D9/D11/D20): a second remote.run on the
+// same repository, from any connection, is refused rather than queued (upstream's own OQ7 — a
+// push sitting invisibly behind a ninety-second fetch is worse than being told to wait, and it
+// makes "which op does cancel cancel?" ambiguous). The box itself is opSlot (opslot.go) — shared
+// with stack.go's restack slot and worktree.go's prepare slot.
 func (e *RepoEntry) CancelRemote() bool {
 	return e.remoteOp.tryCancel()
 }
