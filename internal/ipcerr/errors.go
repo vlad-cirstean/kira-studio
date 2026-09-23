@@ -4,7 +4,10 @@
 // returns a structured {code, message} error instead.
 package ipcerr
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+)
 
 // Error is the one error type every bound service method returns on failure. Its Error() method
 // returns the JSON encoding {"code":"...","message":"..."} — the single shape the renderer's
@@ -41,3 +44,17 @@ func Disconnected(name string) *Error { return New("E_DISCONNECTED", name+" is n
 
 // SecretStore mirrors secret-cipher.ts's SecretStoreError code.
 func SecretStore(message string) *Error { return New("E_SECRET_STORE", message) }
+
+// Wrap returns err unchanged if it already carries a structured *Error (connections/service.go
+// and tree/service.go's own wrapErr), or folds any other error into Internal(err.Error()). Returns
+// nil for a nil err.
+func Wrap(err error) error {
+	if err == nil {
+		return nil
+	}
+	var ie *Error
+	if errors.As(err, &ie) {
+		return ie
+	}
+	return Internal(err.Error())
+}

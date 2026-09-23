@@ -8,8 +8,9 @@ package tree
 import (
 	"context"
 	"encoding/json"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -74,15 +75,6 @@ func New(conns *repos.ConnectionsRepo, meta *repos.MetadataCacheRepo, backend Ba
 }
 
 // wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error.
-func wrapErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	if ie, ok := err.(*ipcerr.Error); ok {
-		return ie
-	}
-	return ipcerr.Internal(err.Error())
-}
 
 // requireConnected ports tree-service.ts:73-79. name is the connection row's Name, or the id
 // itself if the row is gone — tree-service.ts:77's own fallback, and the message P55 §2 D11
@@ -288,7 +280,7 @@ func (s *Service) KeyTypes(connectionID string, paths []string) ([]string, error
 // connections.OnMetadataInvalidated, a separate concern owned by internal/connections).
 func (s *Service) Invalidate(connectionID string, path *string) error {
 	if path == nil {
-		return wrapErr(s.meta.DropConnection(connectionID))
+		return ipcerr.Wrap(s.meta.DropConnection(connectionID))
 	}
-	return wrapErr(s.meta.Drop(connectionID, *path))
+	return ipcerr.Wrap(s.meta.Drop(connectionID, *path))
 }
