@@ -3,6 +3,9 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 )
 
 // historyTable is the read/adopt/orphan-sweep/single-delete shape grpc_history.go and
@@ -85,4 +88,132 @@ func (h historyTable[T]) SweepOrphans(db *sql.DB) error {
 		return fmt.Errorf("repos/%s: sweep orphans: %w", h.scope, err)
 	}
 	return nil
+}
+
+// historyRecordInput is Record's own common envelope — the three fields its shared chain
+// (environment resolution, id minting, scope-key derivation) needs, out of each table's own
+// larger, genuinely different rec type (grpc_history.go's own model.GrpcCallHistoryRecord vs
+// response_history.go's own model.ResponseHistoryRecord, P107 I2-8).
+type historyRecordInput struct {
+	TabID, ItemID, EnvironmentID string
+}
+
+// Record is the transaction/environment-resolve/elide-once/insert/cap/sweep/commit chain both
+// grpc_history.go's and response_history.go's own Record share (P107 I2-8) — everything around
+// the two tables' genuinely different snapshot shape and INSERT column list, which is exactly
+// what build/elide/insert supply:
+//
+//   - build returns the caller's own snapshot, already marshaled — neither table's snapshot
+//     struct carries the resolved environment name (only each INSERT's own `environment` column
+//     does), so unlike the doc's own stated shape, build takes no argument.
+//   - elide is called once, only if build's own result would push the row past half byteBudget —
+//     it closes over the same snapshot build already constructed (a package-level generic method
+//     cannot add its own type parameter beyond the receiver's T, so there is no shared Go type to
+//     hand elide instead), drops whichever fields make the row oversized, and remarshals.
+//   - insert receives everything the per-table INSERT needs beyond its own rec (id, itemID, the
+//     resolved timestamp/environment, storedBytes, the final snapshotJSON) and runs its own
+//     column-specific statement.
+//
+// perScopeCap/byteBudget are each table's own constant/var (P8 D6 vs P11 D11); the cap DELETE and
+// the global byte sweep below are otherwise identical SQL, parameterized by h.table/h.timeColumn
+// (already on this struct) the same way List/Delete/Adopt/SweepOrphans above already are.
+func (h historyTable[T]) Record(
+	db *sql.DB, in historyRecordInput, perScopeCap, byteBudget int,
+	build func() ([]byte, error),
+	elide func() ([]byte, error),
+	insert func(tx *sql.Tx, id string, itemID *string, timestamp, environment string, storedBytes int, snapshotJSON []byte) error,
+) (string, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("repos/%s: begin: %w", h.scope, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	environment := ""
+	if in.EnvironmentID != "" {
+		if err := tx.QueryRow(
+			`SELECT name FROM api_environments WHERE id = ?`, in.EnvironmentID,
+		).Scan(&environment); err != nil && err != sql.ErrNoRows {
+			return "", fmt.Errorf("repos/%s: resolve environment: %w", h.scope, err)
+		}
+	}
+
+	snapshotJSON, err := build()
+	if err != nil {
+		return "", fmt.Errorf("repos/%s: encode snapshot: %w", h.scope, err)
+	}
+	if len(snapshotJSON) > byteBudget/2 {
+		snapshotJSON, err = elide()
+		if err != nil {
+			return "", fmt.Errorf("repos/%s: encode snapshot: %w", h.scope, err)
+		}
+	}
+
+	id := uuid.NewString()
+	var itemID *string
+	if in.ItemID != "" {
+		itemID = &in.ItemID
+	}
+	timestamp := kiratime.NowISO()
+	storedBytes := len(snapshotJSON)
+
+	if err := insert(tx, id, itemID, timestamp, environment, storedBytes, snapshotJSON); err != nil {
+		return "", fmt.Errorf("repos/%s: insert: %w", h.scope, err)
+	}
+
+	// Per-scope count cap.
+	scopeKey := "tab:" + in.TabID
+	if itemID != nil {
+		scopeKey = *itemID
+	}
+	if _, err := tx.Exec(
+		`DELETE FROM `+h.table+`
+		  WHERE scope_key = ?
+		    AND id NOT IN (SELECT id FROM `+h.table+`
+		                     WHERE scope_key = ?
+		                     ORDER BY `+h.timeColumn+` DESC, rowid DESC LIMIT ?)`,
+		scopeKey, scopeKey, perScopeCap,
+	); err != nil {
+		return "", fmt.Errorf("repos/%s: cap scope: %w", h.scope, err)
+	}
+
+	// Global byte budget, oldest-first across every scope — the per-entry caps each build/elide
+	// closure enforces are what make this safe: no single row can exceed the budget by itself.
+	var totalBytes int64
+	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM ` + h.table).Scan(&totalBytes); err != nil {
+		return "", fmt.Errorf("repos/%s: sum stored_bytes: %w", h.scope, err)
+	}
+	if totalBytes > int64(byteBudget) {
+		if _, err := tx.Exec(
+			`DELETE FROM `+h.table+` WHERE id NOT IN (
+			   SELECT id FROM (
+			     SELECT id, SUM(stored_bytes) OVER (ORDER BY `+h.timeColumn+` DESC, rowid DESC
+			                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
+			       FROM `+h.table+`
+			   ) WHERE running <= ?)`,
+			byteBudget,
+		); err != nil {
+			return "", fmt.Errorf("repos/%s: sweep budget: %w", h.scope, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("repos/%s: commit: %w", h.scope, err)
+	}
+	return id, nil
+}
+
+// GetHistory is the lookup-by-id shape both grpc_history.go's and response_history.go's own Get
+// share (P107 I2-8): query the summary columns plus snapshot_json in one row and hand it to
+// scanAndAssemble. A package-level function, not a historyTable[T] method: Get's result is never
+// T (List's own summary Entry) but each table's own richer Snapshot, and Go allows no additional
+// type parameter on a method beyond its receiver's own — the doc's own stated
+// `Get(db, id string) (T, error)` does not typecheck against historyTable[T] for that reason.
+// scanAndAssemble does the summary-column Scan, the snapshot_json Scan and its json.Unmarshal,
+// and the final Snapshot struct literal in one closure, wrapping its own two distinct errors
+// ("get" for a Scan failure, "decode snapshot %s" for an Unmarshal one) exactly as each table's
+// own Get always did — collapsing them into one message here would lose that distinction.
+func GetHistory[S any](db *sql.DB, table, columns, id string, scanAndAssemble func(rowScanner) (S, error)) (S, error) {
+	row := db.QueryRow(`SELECT `+columns+`, snapshot_json FROM `+table+` WHERE id = ?`, id)
+	return scanAndAssemble(row)
 }

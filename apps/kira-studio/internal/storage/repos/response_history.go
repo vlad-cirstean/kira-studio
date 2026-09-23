@@ -4,9 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 
-	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -54,158 +52,82 @@ type storedSnapshot struct {
 	RequestFieldsElided bool `json:"requestFieldsElided,omitempty"`
 }
 
-// Record is the whole storage policy (D4/D5/D6), in one transaction: resolve the environment
-// name, apply the two body rules, marshal, insert, per-scope trim, global byte sweep. The three
-// caps live here, not in bridge/http.go (§0.3) — Record is the only writer, so they cannot be
-// bypassed by a future caller.
+// Record is the whole storage policy (D4/D5/D6): apply the two body rules, then
+// responseHistoryTable.Record (P107 I2-8) runs the shared transaction/environment-resolve/
+// elide-once/insert/cap/sweep/commit chain. The caps live here, not in bridge/http.go (§0.3) —
+// Record is the only writer, so they cannot be bypassed by a future caller.
 func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	if err := rec.Validate(); err != nil {
 		return err
 	}
 
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("repos/response_history: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	var snap storedSnapshot
+	_, err := responseHistoryTable.Record(r.DB,
+		historyRecordInput{TabID: rec.TabID, ItemID: rec.ItemID, EnvironmentID: rec.EnvironmentID},
+		historyPerScopeLimit, historyByteBudget,
+		func() ([]byte, error) {
+			reqBody, requestBodyStorageTruncated := capBody(rec.Body)
+			resp := rec.Response
+			// P9 D7/F12: the rendered exchange is live-only. It is the resolved request in text
+			// form, and even masked (P9 D6) it would double a snapshot's size for a pane that
+			// cannot be opened from a stored entry anyway (D7). Wire is a pointer with
+			// json:"wire,omitempty" (httpclient.Response), so nil here means a stored snapshot's
+			// JSON carries no "wire" key at all, not just a null one.
+			resp.Wire = nil
+			bodyStored := resp.BodyEncoding != "base64"
+			bodyStorageTruncated := false
+			if bodyStored {
+				if len(resp.Body) > maxHistoryBodyBytes {
+					resp.Body = resp.Body[:maxHistoryBodyBytes]
+					bodyStorageTruncated = true
+				}
+			} else {
+				// D5 rule 2: a binary body is not stored at all — every other field (including
+				// BodyBytes, F10's "412 KB of binary data") stays intact.
+				resp.Body = ""
+			}
 
-	environment := ""
-	if rec.EnvironmentID != "" {
-		if err := tx.QueryRow(
-			`SELECT name FROM api_environments WHERE id = ?`, rec.EnvironmentID,
-		).Scan(&environment); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("repos/response_history: resolve environment: %w", err)
-		}
-	}
-
-	reqBody, requestBodyStorageTruncated := capBody(rec.Body)
-	resp := rec.Response
-	// P9 D7/F12: the rendered exchange is live-only. It is the resolved request in text form, and
-	// even masked (P9 D6) it would double a snapshot's size for a pane that cannot be opened from a
-	// stored entry anyway (D7). Wire is a pointer with json:"wire,omitempty" (httpclient.Response),
-	// so nil here means a stored snapshot's JSON carries no "wire" key at all, not just a null one.
-	resp.Wire = nil
-	bodyStored := resp.BodyEncoding != "base64"
-	bodyStorageTruncated := false
-	if bodyStored {
-		if len(resp.Body) > maxHistoryBodyBytes {
-			resp.Body = resp.Body[:maxHistoryBodyBytes]
-			bodyStorageTruncated = true
-		}
-	} else {
-		// D5 rule 2: a binary body is not stored at all — every other field (including
-		// BodyBytes, F10's "412 KB of binary data") stays intact.
-		resp.Body = ""
-	}
-
-	snap := storedSnapshot{
-		Request: model.ResponseHistoryRequest{
-			Method:  rec.Method,
-			URL:     rec.URL,
-			Headers: rec.Headers,
-			Body:    reqBody,
+			snap = storedSnapshot{
+				Request: model.ResponseHistoryRequest{
+					Method:  rec.Method,
+					URL:     rec.URL,
+					Headers: rec.Headers,
+					Body:    reqBody,
+				},
+				Response:                    resp,
+				BodyStored:                  bodyStored,
+				BodyStorageTruncated:        bodyStorageTruncated,
+				RequestBodyStorageTruncated: requestBodyStorageTruncated,
+			}
+			return json.Marshal(snap)
 		},
-		Response:                    resp,
-		BodyStored:                  bodyStored,
-		BodyStorageTruncated:        bodyStorageTruncated,
-		RequestBodyStorageTruncated: requestBodyStorageTruncated,
-	}
-	snapshotJSON, err := json.Marshal(snap)
-	if err != nil {
-		return fmt.Errorf("repos/response_history: encode snapshot: %w", err)
-	}
-
-	// F9/P21 round 1: cap the snapshot as a whole, not just field by field. capBody only bounds
-	// 'raw'/'code'; a urlencoded/formdata body's field values have no per-field cap at all and
-	// could otherwise push a single row's stored_bytes past the sweep's own safety margin (the
-	// sweep is safe only because no single row can exceed the budget by itself).
-	if len(snapshotJSON) > historyByteBudget/2 {
-		snap.Request.Body.URLEncoded = nil
-		snap.Request.Body.FormData = nil
-		snap.Request.Body.Raw = ""
-		snap.Request.Body.Code = ""
-		snap.RequestFieldsElided = true
-		snapshotJSON, err = json.Marshal(snap)
-		if err != nil {
-			return fmt.Errorf("repos/response_history: encode snapshot: %w", err)
-		}
-	}
-
-	id := uuid.NewString()
-	var itemID *string
-	if rec.ItemID != "" {
-		itemID = &rec.ItemID
-	}
-	scopeKey := "tab:" + rec.TabID
-	if itemID != nil {
-		scopeKey = *itemID
-	}
-	sentAt := kiratime.NowISO()
-	storedBytes := len(snapshotJSON)
-
-	if _, err := tx.Exec(
-		`INSERT INTO api_response_history
-		   (id, item_id, tab_id, sent_at, method, url, environment, status, status_text,
-		    elapsed_ms, body_bytes, stored_bytes, snapshot_json)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, itemID, rec.TabID, sentAt, rec.Method, rec.URL, environment,
-		rec.Response.Status, rec.Response.StatusText, rec.Response.ElapsedMs,
-		rec.Response.BodyBytes, storedBytes, string(snapshotJSON),
-	); err != nil {
-		return fmt.Errorf("repos/response_history: insert: %w", err)
-	}
-
-	// Per-scope count cap — the exact shape filter_history.go/variables.go's own trim uses.
-	if _, err := tx.Exec(
-		`DELETE FROM api_response_history
-		  WHERE scope_key = ?
-		    AND id NOT IN (SELECT id FROM api_response_history
-		                     WHERE scope_key = ?
-		                     ORDER BY sent_at DESC, rowid DESC LIMIT ?)`,
-		scopeKey, scopeKey, historyPerScopeLimit,
-	); err != nil {
-		return fmt.Errorf("repos/response_history: cap scope: %w", err)
-	}
-
-	// Global byte budget, oldest-first across every scope (F7). The per-entry cap above is what
-	// makes this safe: no single row can exceed the budget, so the row just inserted is never
-	// itself evicted.
-	//
-	// A8/P21 round 1: the window-function sweep below is an unindexed full scan plus a running
-	// sum over the entire table — unconditionally, on every single send, even though the caps mean
-	// it can only ever delete something after ~512 maximal (256 KiB) entries have accumulated. An
-	// indexed aggregate first skips the expensive sweep for the overwhelming majority of sends,
-	// where the table is nowhere near the budget; the sweep itself is unchanged, so its safety
-	// argument (the row just inserted is never itself evicted) still holds exactly.
-	//
-	// P21 round 3 performance finding 11: this comment originally claimed the SUM below was
-	// already a "cheap indexed aggregate" — it wasn't; there was no index on stored_bytes, so
-	// SQLite full-scanned the table's own b-tree on every completed send regardless (tens of
-	// thousands of rows scanned per send at the table's own byte cap). Migration
-	// 0013_p21r3_history_bytes_index.sql adds api_response_history_bytes, a covering index over
-	// exactly this column, making the SUM an index-only scan and making this comment true.
-	var totalBytes int64
-	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM api_response_history`).Scan(&totalBytes); err != nil {
-		return fmt.Errorf("repos/response_history: sum stored_bytes: %w", err)
-	}
-	if totalBytes > int64(historyByteBudget) {
-		if _, err := tx.Exec(
-			`DELETE FROM api_response_history WHERE id NOT IN (
-			   SELECT id FROM (
-			     SELECT id, SUM(stored_bytes) OVER (ORDER BY sent_at DESC, rowid DESC
-			                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
-			       FROM api_response_history
-			   ) WHERE running <= ?)`,
-			historyByteBudget,
-		); err != nil {
-			return fmt.Errorf("repos/response_history: sweep budget: %w", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos/response_history: commit: %w", err)
-	}
-	return nil
+		func() ([]byte, error) {
+			// F9/P21 round 1: cap the snapshot as a whole, not just field by field. capBody only
+			// bounds 'raw'/'code'; a urlencoded/formdata body's field values have no per-field cap
+			// at all and could otherwise push a single row's stored_bytes past the sweep's own
+			// safety margin (the sweep is safe only because no single row can exceed the budget by
+			// itself).
+			snap.Request.Body.URLEncoded = nil
+			snap.Request.Body.FormData = nil
+			snap.Request.Body.Raw = ""
+			snap.Request.Body.Code = ""
+			snap.RequestFieldsElided = true
+			return json.Marshal(snap)
+		},
+		func(tx *sql.Tx, id string, itemID *string, sentAt, environment string, storedBytes int, snapshotJSON []byte) error {
+			_, err := tx.Exec(
+				`INSERT INTO api_response_history
+				   (id, item_id, tab_id, sent_at, method, url, environment, status, status_text,
+				    elapsed_ms, body_bytes, stored_bytes, snapshot_json)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, itemID, rec.TabID, sentAt, rec.Method, rec.URL, environment,
+				rec.Response.Status, rec.Response.StatusText, rec.Response.ElapsedMs,
+				rec.Response.BodyBytes, storedBytes, string(snapshotJSON),
+			)
+			return err
+		},
+	)
+	return err
 }
 
 // capBody applies D5's per-entry byte cap to whichever member of Body actually carries free-form
@@ -265,41 +187,39 @@ func (r *ResponseHistoryRepo) List(scopeKey string) ([]model.ResponseHistoryEntr
 // Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns
 // (D4) — a corrupt snapshot_json is reported, not silently blanked, since Get is a single-entry
 // lookup rather than a list a bad row could otherwise blank entirely (repos/saved_queries.go's
-// posture is for List, not Get).
+// posture is for List, not Get). GetHistory (P107 I2-8) runs the shared query, this closure does
+// the rest.
 func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, error) {
-	row := r.DB.QueryRow(
-		`SELECT `+responseHistoryEntryColumns+`, snapshot_json
-		   FROM api_response_history WHERE id = ?`,
-		id,
-	)
-	var (
-		e            model.ResponseHistoryEntry
-		itemID       sql.NullString
-		snapshotJSON string
-	)
-	if err := row.Scan(
-		&e.ID, &itemID, &e.TabID, &e.SentAt, &e.Method, &e.URL, &e.Environment,
-		&e.Status, &e.StatusText, &e.ElapsedMs, &e.BodyBytes, &e.StoredBytes, &snapshotJSON,
-	); err != nil {
-		return model.ResponseHistorySnapshot{}, fmt.Errorf("repos/response_history: get: %w", err)
-	}
-	if itemID.Valid {
-		e.ItemID = &itemID.String
-	}
+	return GetHistory(r.DB, "api_response_history", responseHistoryEntryColumns, id, func(row rowScanner) (model.ResponseHistorySnapshot, error) {
+		var (
+			e            model.ResponseHistoryEntry
+			itemID       sql.NullString
+			snapshotJSON string
+		)
+		if err := row.Scan(
+			&e.ID, &itemID, &e.TabID, &e.SentAt, &e.Method, &e.URL, &e.Environment,
+			&e.Status, &e.StatusText, &e.ElapsedMs, &e.BodyBytes, &e.StoredBytes, &snapshotJSON,
+		); err != nil {
+			return model.ResponseHistorySnapshot{}, fmt.Errorf("repos/response_history: get: %w", err)
+		}
+		if itemID.Valid {
+			e.ItemID = &itemID.String
+		}
 
-	var snap storedSnapshot
-	if err := json.Unmarshal([]byte(snapshotJSON), &snap); err != nil {
-		return model.ResponseHistorySnapshot{}, fmt.Errorf("repos/response_history: decode snapshot %s: %w", id, err)
-	}
+		var snap storedSnapshot
+		if err := json.Unmarshal([]byte(snapshotJSON), &snap); err != nil {
+			return model.ResponseHistorySnapshot{}, fmt.Errorf("repos/response_history: decode snapshot %s: %w", id, err)
+		}
 
-	return model.ResponseHistorySnapshot{
-		Entry:                       e,
-		Request:                     snap.Request,
-		Response:                    snap.Response,
-		BodyStored:                  snap.BodyStored,
-		BodyStorageTruncated:        snap.BodyStorageTruncated,
-		RequestBodyStorageTruncated: snap.RequestBodyStorageTruncated,
-	}, nil
+		return model.ResponseHistorySnapshot{
+			Entry:                       e,
+			Request:                     snap.Request,
+			Response:                    snap.Response,
+			BodyStored:                  snap.BodyStored,
+			BodyStorageTruncated:        snap.BodyStorageTruncated,
+			RequestBodyStorageTruncated: snap.RequestBodyStorageTruncated,
+		}, nil
+	})
 }
 
 // Delete removes one entry.
