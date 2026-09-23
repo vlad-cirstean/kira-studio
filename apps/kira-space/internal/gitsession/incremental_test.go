@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
@@ -55,23 +54,8 @@ func commitInc(t *testing.T, dir, msg string) string {
 // seed a FileRecord directly with Store.Put before driving FileDelta/ReviewFileDiff.
 func newIncrementalTestEntry(t *testing.T, repoDir string) (*RepoEntry, *gitreview.Store) {
 	t.Helper()
-	runner := gitclient.NewExecRunner()
-	registry := NewRegistry(runner)
 	store := gitreview.NewStore(filepath.Join(t.TempDir(), "review.db"))
-	registry.Review = store
-	t.Cleanup(registry.Close)
-
-	conn := NewConn(ConnID("incremental-test-conn"), "test-client", "test-client-label", nil)
-	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	t.Cleanup(conn.Close)
-
-	entry, ok := conn.Entry(summary.RepoID)
-	if !ok {
-		t.Fatal("conn.Entry: not held after Open")
-	}
+	_, entry := newTestEntry(t, ConnID("incremental-test-conn"), repoDir, testEntryOpts{store: store})
 	return entry, store
 }
 

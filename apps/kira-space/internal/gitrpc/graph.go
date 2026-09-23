@@ -90,13 +90,19 @@ func mapConnError(err error) error {
 	return err
 }
 
+// graph.status/graph.loadMore/graph.refresh/graph.stream stay on their own hand-rolled dispatch
+// (P107 I2-13): they resolve through c.Walk/c.WalkFor/c.ReviewWalkFor, not entryFor, and
+// deliberately tolerate an unheld repo (an unopened walk answers a zero-value result, never
+// ErrRepoNotHeld — see graph.status's own comment below) — handleRepoCall's entryFor gate would
+// turn that into an error these handlers were written specifically to avoid. Only the plain
+// "repoId is required" check is shared, via requireNonEmpty.
 func (r *Router) handleGraphStatus(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p GraphStatusParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: graph.status: invalid params")
 	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: graph.status: repoId is required")
+	if err := requireNonEmpty("graph.status", "repoId", p.RepoID); err != nil {
+		return nil, err
 	}
 	// G31 round-2 architecture/security review, finding #4: normalized once, here, at wire
 	// ingestion — see this file's own resolveWalkRequest, which already normalized ITS internal
@@ -140,8 +146,8 @@ func (r *Router) handleGraphLoadMore(ctx context.Context, c *gitsession.Conn, pa
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: invalid params")
 	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: graph.loadMore: repoId is required")
+	if err := requireNonEmpty("graph.loadMore", "repoId", p.RepoID); err != nil {
+		return nil, err
 	}
 	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 
@@ -176,8 +182,8 @@ func (r *Router) handleGraphRefresh(_ context.Context, c *gitsession.Conn, param
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: graph.refresh: invalid params")
 	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: graph.refresh: repoId is required")
+	if err := requireNonEmpty("graph.refresh", "repoId", p.RepoID); err != nil {
+		return nil, err
 	}
 	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 
@@ -236,8 +242,8 @@ func (r *Router) handleGraphStream(ctx context.Context, c *gitsession.Conn, para
 	if err := json.Unmarshal(params, &p); err != nil {
 		return ipcerr.BadRequest("gitrpc: graph.stream: invalid params")
 	}
-	if p.RepoID == "" {
-		return ipcerr.BadRequest("gitrpc: graph.stream: repoId is required")
+	if err := requireNonEmpty("graph.stream", "repoId", p.RepoID); err != nil {
+		return err
 	}
 	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4:
 	// also fixes graph.stream's own chunk echo (RepoID: p.RepoID below) carrying the client's raw

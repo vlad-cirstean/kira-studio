@@ -70,9 +70,8 @@ func (c flippingCtx) Err() error {
 }
 func (c flippingCtx) Done() <-chan struct{} { return nil }
 
-func nodePath(connectionID string, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(connectionID, segments...)
-}
+// nodePath is testsupport.NodePath (P107 I2-28).
+var nodePath = testsupport.NodePath
 
 // sideDSN builds a plain go-sql-driver DSN from cfg's own credentials — a side connection for
 // test-only DDL (e.g. a throwaway no-PK probe table), not the adapter's own connection.
@@ -952,54 +951,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 		}
 		t.Cleanup(func() { probeDB.ExecContext(context.Background(), "DROP TABLE IF EXISTS p26_insdel") })
 
-		insertPlan := model.MutationPlan{
-			Path: tablePath,
-			Ops: []model.MutationRowOp{
-				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("1")}, {Name: "name", Value: strp("first")}}},
-				{Kind: "insert", Values: model.RowValues{{Name: "id", Value: strp("2")}, {Name: "name", Value: strp("second")}}},
-			},
-		}
-		if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-insdel-1")); err != nil {
-			t.Fatalf("Mutate(insert): %v", err)
-		}
-		countAfterInsert, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-2"))
-		if err != nil {
-			t.Fatalf("Count: %v", err)
-		}
-		if countAfterInsert.Value != 2 {
-			t.Fatalf("Count after insert = %d, want 2", countAfterInsert.Value)
-		}
-
-		deletePlan := model.MutationPlan{
-			Path: tablePath,
-			Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: strp("1")}}}},
-		}
-		result, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-insdel-3"))
-		if err != nil {
-			t.Fatalf("Mutate(delete): %v", err)
-		}
-		if result.AffectedRows != 1 {
-			t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
-		}
-		countAfterDelete, err := a.Count(ctx, adapters.CountRequest{Path: tablePath}, adapters.NewOpCtx("op-insdel-4"))
-		if err != nil {
-			t.Fatalf("Count: %v", err)
-		}
-		if countAfterDelete.Value != 1 {
-			t.Fatalf("Count after delete = %d, want 1", countAfterDelete.Value)
-		}
-
-		read, err := a.Read(ctx, adapters.ReadRequest{
-			Path: tablePath, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-		}, adapters.NewOpCtx("op-insdel-5"))
-		if err != nil {
-			t.Fatalf("Read: %v", err)
-		}
-		readPage := read.(page.TabularPage)
-		id := cellAt(t, readPage, 0, 0)
-		if id == nil || *id != "2" {
-			t.Errorf("surviving row id = %v, want 2", id)
-		}
+		testsupport.InsertDeleteRoundTrip(t, a, tablePath)
 	})
 
 	t.Run("read-only connection cannot write", func(t *testing.T) {

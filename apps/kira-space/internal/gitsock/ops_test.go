@@ -55,38 +55,7 @@ func opsFixtureEnv() []string {
 
 func buildOpsFixtureRepo(t *testing.T) *opsFixture {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-	dir := t.TempDir()
-
-	run := func(args ...string) string {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Env = opsFixtureEnv()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-		return string(out)
-	}
-	writeFile := func(name, content string) {
-		t.Helper()
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", name, err)
-		}
-	}
-	commit := func(msg string) string {
-		t.Helper()
-		cmd := exec.Command("git", "-c", "commit.gpgsign=false", "commit", "-q", "-m", msg, "--allow-empty-message")
-		cmd.Dir = dir
-		cmd.Env = opsFixtureEnv()
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git commit: %v\n%s", err, out)
-		}
-		return trimNewline(run("rev-parse", "HEAD"))
-	}
+	dir, run, writeFile, commit := fixtureRepoScaffold(t, true)
 
 	run("init", "-q", "-b", "main")
 	f := &opsFixture{dir: dir}

@@ -21,29 +21,62 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
-// scanAll reads every stored leaf from whatever rows/err a query against either the top-level DB
-// (GetAll's own fast path) or a live transaction (Set's fix below) produced — factored out so
-// both callers build the same model.Layout from the same rows shape.
-func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, error) {
-	stored, err := appstorage.ScanLayoutRows(rows, queryErr)
-	if err != nil {
-		return model.Layout{}, err
-	}
-
+// decodeLayout builds model.Layout from an already-scanned leaf map — the part of GetAll's read
+// path that Set's own apply callback needs too, reading the same leaves inside its own
+// transaction (P107 I2-1).
+func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	result := model.DefaultLayout()
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
 	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
 	appsettings.Leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
 	appsettings.Leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
 	appsettings.Leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
-	return result, nil
+	return result
+}
+
+// applyLayoutPatch merges patch's set leaves onto merged — split out of Set's own closure to keep
+// its cognitive complexity within this repo's linted bound (gocognit).
+func applyLayoutPatch(merged *model.Layout, patch model.LayoutPatch) {
+	p := patch.Panel
+	if p == nil {
+		return
+	}
+	if p.Project != nil {
+		if p.Project.Visible != nil {
+			merged.Panel.Project.Visible = *p.Project.Visible
+		}
+		if p.Project.Width != nil {
+			merged.Panel.Project.Width = *p.Project.Width
+		}
+	}
+	if p.Operations != nil {
+		if p.Operations.Visible != nil {
+			merged.Panel.Operations.Visible = *p.Operations.Visible
+		}
+		if p.Operations.Height != nil {
+			merged.Panel.Operations.Height = *p.Operations.Height
+		}
+	}
+	if p.CellEditor != nil && p.CellEditor.Height != nil {
+		merged.Panel.CellEditor.Height = *p.CellEditor.Height
+	}
 }
 
 func (r *LayoutRepo) GetAll() (model.Layout, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 	if r.selectAll != nil {
-		return r.scanAll(r.selectAll.Query())
+		rows, err = r.selectAll.Query()
+	} else {
+		rows, err = r.DB.Query(appstorage.LayoutSelectAllSQL)
 	}
-	return r.scanAll(r.DB.Query(appstorage.LayoutSelectAllSQL))
+	stored, err := appstorage.ScanLeafRows(rows, err)
+	if err != nil {
+		return model.Layout{}, err
+	}
+	return decodeLayout(stored), nil
 }
 
 // Set writes all six leaves every time (unlike SettingsRepo.Set's patched-leaves-only write —
@@ -57,69 +90,38 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 // the database's one connection exclusively until Commit/Rollback, so no other Set's read or
 // write can land between this one's own read and write.
 func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	var merged model.Layout
+	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {
+		merged = decodeLayout(stored)
+		applyLayoutPatch(&merged, patch)
 
-	var current model.Layout
-	if r.selectAll != nil {
-		current, err = r.scanAll(tx.Stmt(r.selectAll).Query())
-	} else {
-		current, err = r.scanAll(tx.Query(appstorage.LayoutSelectAllSQL))
-	}
+		leaves := []struct {
+			key   string
+			value any
+		}{
+			{"panel.project.visible", merged.Panel.Project.Visible},
+			{"panel.project.width", merged.Panel.Project.Width},
+			{"panel.operations.visible", merged.Panel.Operations.Visible},
+			{"panel.operations.height", merged.Panel.Operations.Height},
+			{"panel.cellEditor.height", merged.Panel.CellEditor.Height},
+		}
+		for _, l := range leaves {
+			encoded, err := json.Marshal(l.value)
+			if err != nil {
+				return fmt.Errorf("repos/layout: encode %s: %w", l.key, err)
+			}
+			if _, err := tx.Exec(
+				`INSERT INTO ui_layout (key, value) VALUES (?, ?)
+				   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+				l.key, string(encoded),
+			); err != nil {
+				return fmt.Errorf("repos/layout: upsert %s: %w", l.key, err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return model.Layout{}, err
-	}
-	merged := current
-	if p := patch.Panel; p != nil {
-		if p.Project != nil {
-			if p.Project.Visible != nil {
-				merged.Panel.Project.Visible = *p.Project.Visible
-			}
-			if p.Project.Width != nil {
-				merged.Panel.Project.Width = *p.Project.Width
-			}
-		}
-		if p.Operations != nil {
-			if p.Operations.Visible != nil {
-				merged.Panel.Operations.Visible = *p.Operations.Visible
-			}
-			if p.Operations.Height != nil {
-				merged.Panel.Operations.Height = *p.Operations.Height
-			}
-		}
-		if p.CellEditor != nil && p.CellEditor.Height != nil {
-			merged.Panel.CellEditor.Height = *p.CellEditor.Height
-		}
-	}
-
-	leaves := []struct {
-		key   string
-		value any
-	}{
-		{"panel.project.visible", merged.Panel.Project.Visible},
-		{"panel.project.width", merged.Panel.Project.Width},
-		{"panel.operations.visible", merged.Panel.Operations.Visible},
-		{"panel.operations.height", merged.Panel.Operations.Height},
-		{"panel.cellEditor.height", merged.Panel.CellEditor.Height},
-	}
-	for _, l := range leaves {
-		encoded, err := json.Marshal(l.value)
-		if err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: encode %s: %w", l.key, err)
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO ui_layout (key, value) VALUES (?, ?)
-			   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-			l.key, string(encoded),
-		); err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: upsert %s: %w", l.key, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: commit: %w", err)
 	}
 	return merged, nil
 }

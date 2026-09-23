@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 const customScriptsSelectColumns = `id, name, command, working_dir, color, sort_order, created_at, updated_at`
@@ -31,23 +32,10 @@ func scanCustomScriptRow(row rowScanner) (model.CustomScript, error) {
 // List orders by sort_order ASC, name ASC — CodeReposRepo.List's own tiebreak.
 func (r *CustomScriptsRepo) List() ([]model.CustomScript, error) {
 	rows, err := r.DB.Query(`SELECT ` + customScriptsSelectColumns + ` FROM custom_scripts ORDER BY sort_order ASC, name ASC`)
-	if err != nil {
-		return nil, fmt.Errorf("repos/customscripts: query: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.CustomScript{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.CustomScript, bool, error) {
 		rec, err := scanCustomScriptRow(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repos/customscripts: scan: %w", err)
-		}
-		out = append(out, rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos/customscripts: rows: %w", err)
-	}
-	return out, nil
+		return rec, true, err
+	})
 }
 
 // Get reads one row by id, (nil, nil) when not found.

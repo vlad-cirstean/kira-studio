@@ -10,7 +10,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // quoteIdent is read.ts's quoteIdent. The NUL check is unreachable with any real Postgres
@@ -74,13 +73,10 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 		// adapter currently reads it) — false rather than a guess.
 		GeneratedFor: func(string) bool { return false },
 		QuoteIdent:   quoteIdent,
-		Fingerprint: struct {
-			Path       QualifiedName   `json:"path"`
-			Projection []string        `json:"projection"`
-			Filter     *string         `json:"filter"`
-			Sort       *model.SortSpec `json:"sort"`
-			PageSize   int             `json:"pageSize"`
-		}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize},
+		Fingerprint: adapters.RelationalFingerprint[QualifiedName]{
+			Path: target.QualifiedName, Projection: req.Projection, Filter: req.Filter,
+			Sort: req.Sort, PageSize: req.PageSize,
+		},
 	})
 	if err != nil {
 		return page.TabularPage{}, err
@@ -118,13 +114,10 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 	// most one row ever arrives past req.PageSize, so probing it needs no early cancellation — the
 	// callback just declines to push or track it.
 	builder := page.NewTabularPageBuilder(columns)
-	var rowCount int
-	var probedExtra bool
+	var collector adapters.KeysetPageCollector
 	var firstRow, lastRow []*string
 	err = streamArrayQuery(ctx, conn, sql, params, op, track, QueryOptions{TextMode: true, LogParams: true}, func(row []*string) error {
-		rowCount++
-		if rowCount > req.PageSize {
-			probedExtra = true
+		if !collector.Track(req.PageSize) {
 			return nil
 		}
 
@@ -156,31 +149,14 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 		return page.TabularPage{}, err
 	}
 
-	if plan.ReverseRows {
-		builder.Reverse()
-		firstRow, lastRow = lastRow, firstRow
-	}
-	displayRowCount := rowCount
-	if probedExtra {
-		displayRowCount--
-	}
-
-	position, err := adapters.BuildKeysetPosition(adapters.KeysetPositionArgs{
-		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
-		ProbedExtra: probedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
-		Fingerprint: plan.Fingerprint,
-		CellAt: func(row, col int) *string {
+	return collector.Finish(builder, plan, req, fetch, order,
+		func() { firstRow, lastRow = lastRow, firstRow },
+		func(row, col int) *string {
 			if row == 0 {
 				return firstRow[col]
 			}
 			return lastRow[col]
-		},
-	})
-	if err != nil {
-		return page.TabularPage{}, err
-	}
-
-	return builder.Finish(position), nil
+		})
 }
 
 func dollarPlaceholder(i int) string { return "$" + strconv.Itoa(i) }

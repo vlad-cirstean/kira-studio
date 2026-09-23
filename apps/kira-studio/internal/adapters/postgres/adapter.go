@@ -134,7 +134,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	databaseSegment := segments[0]
 	if databaseSegment.Kind != "database" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+databaseSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, databaseSegment.Kind)
 	}
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
@@ -153,7 +153,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	schemaSegment := segments[1]
 	if schemaSegment.Kind != "schema" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected path segment kind at depth 1: "+schemaSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(1, schemaSegment.Kind)
 	}
 
 	if len(segments) == 2 {
@@ -170,15 +170,13 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		// table/view/matview are leaves too now — their columns moved into the definition view,
 		// and catalog.go's own hasChildren:false for relations is what keeps the tree from ever
 		// showing a twisty here in the first place.
-		switch objectSegment.Kind {
-		case "sequence", "function", "table", "view", "matview":
-			return adapters.TreeChildren{Nodes: []model.TreeNode{}}, nil
-		}
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected object kind: "+objectSegment.Kind, nil)
+		return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 	}
 
 	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
 }
+
+var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true, "matview": true}
 
 func requireThreeSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, schemaSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 3 || segments[0].Kind != "database" || segments[1].Kind != "schema" {

@@ -304,6 +304,53 @@ func RunSQLMutation(ctx context.Context, beginSQL string, exec func(sqlText stri
 	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
 }
 
+// RelationalMutateDeps is mutate.ts's own mutate body, beyond CompileMutationOps/RunSQLMutation
+// above: what postgres/mysqlfamily/sqlite's own mutate() functions still differ on (P107 I2-11).
+type RelationalMutateDeps struct {
+	// Resolve parses plan.Path, re-fetches the target's live columns/primary key against the
+	// catalog (never trusts a stale value the caller sent — same discipline the read path's
+	// resolveProjection uses), and reports the fully-qualified relation text mutate's SQL is built
+	// against, plus the qualifiedName ValidateMutationOps reports errors against.
+	Resolve         func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error)
+	Quote           func(string) string
+	Placeholder     func(int) string
+	TypeClassFor    func(dataType string) page.TypeClass
+	LiteralRenderer ValueRenderer
+	BeginSQL        string
+	Exec            func(sqlText string, params []any) (int64, error)
+	Rollback        func(context.Context)
+}
+
+// RunRelationalMutate is mutate.ts's own mutate, shared verbatim across postgres/mysqlfamily/
+// sqlite (P107 I2-11): AssertWritable, resolve+validate, compile, one SetCommand call, then
+// RunSQLMutation. deps.Resolve, deps.Exec and deps.Rollback stay adapter-owned because their own
+// driver calls (execFor/getReadTarget/runCommand signatures, the rollback statement itself) differ
+// per package.
+func RunRelationalMutate(ctx context.Context, op *OpCtx, readOnly bool, plan model.MutationPlan, deps RelationalMutateDeps) (model.MutationResult, error) {
+	if err := AssertWritable(readOnly); err != nil {
+		return model.MutationResult{}, err
+	}
+
+	relationSQL, qualifiedName, columns, primaryKey, err := deps.Resolve()
+	if err != nil {
+		return model.MutationResult{}, err
+	}
+	if err := ValidateMutationOps(plan.Ops, columns, primaryKey, qualifiedName); err != nil {
+		return model.MutationResult{}, err
+	}
+
+	paramRenderer := NewParamRenderer(deps.Placeholder, BinaryColumnsOf(columns, deps.TypeClassFor))
+	ordered := OrderedOps(plan.Ops)
+	compiled, previewParts, err := CompileMutationOps(relationSQL, ordered, paramRenderer, deps.LiteralRenderer, deps.Quote)
+	if err != nil {
+		return model.MutationResult{}, err
+	}
+	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
+	op.SetCommand(strings.Join(previewParts, ";\n"))
+
+	return RunSQLMutation(ctx, deps.BeginSQL, deps.Exec, deps.Rollback, compiled)
+}
+
 // ResolveDatabaseTablePath ports sql-mutate.ts's resolveDatabaseTablePath — the two-segment
 // database/table path check clickhouse/mysql-family/sqlite's mutate.ts each wrote out; postgres
 // keeps its own three-segment resolveTablePath. Ported here in M1 because P58b's three adapters

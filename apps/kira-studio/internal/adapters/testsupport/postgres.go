@@ -53,6 +53,9 @@ type PgFixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f PgFixture) ConnectionID() string { return f.Config.ID }
+
 var pgMemo fixture[PgFixture]
 
 // repoRoot resolves the repository root relative to this source file, so the seed SQL path does

@@ -79,9 +79,8 @@ func connectedAdapter(t *testing.T, fixture *testsupport.MongoFixture) adapters.
 	return a
 }
 
-func nodePath(fixture *testsupport.MongoFixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(fixture.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *MongoFixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.MongoFixture]
 
 // rootClient is a side connection for test-side assertions only (§1.6/C24: mutate_probe,
 // literal_probe and slow_probe are created per test from the root client, never widgets).

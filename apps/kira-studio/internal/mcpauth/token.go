@@ -13,10 +13,6 @@ package mcpauth
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,13 +20,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/kirathecat/kira-studio/internal/tokenauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
-)
-
-// tokenBytes/saltBytes mirror gitsock/token.go's own D6 shape exactly.
-const (
-	tokenBytes = 32
-	saltBytes  = 16
 )
 
 // TTL is every token's fixed lifetime, applied uniformly to both servers (M1 §2.1).
@@ -49,39 +40,24 @@ type Record struct {
 // MintTTL returns a fresh token in both forms D8 needs: plain (rendered into the registration
 // command exactly once) and the Record (what gets persisted), with ExpiresAt set to now+ttl. A
 // short read or any crypto/rand error is a hard failure — never a weaker token, mirroring
-// gitsock's own mintToken.
+// gitsock's own mintToken (internal/tokenauth, P107 I2-29).
 func MintTTL(ttl time.Duration) (plain string, rec Record, err error) {
-	tok := make([]byte, tokenBytes)
-	if _, err := rand.Read(tok); err != nil {
+	plain, hash, salt, err := tokenauth.Mint()
+	if err != nil {
 		return "", Record{}, fmt.Errorf("mcpauth: mint: %w", err)
 	}
-	salt := make([]byte, saltBytes)
-	if _, err := rand.Read(salt); err != nil {
-		return "", Record{}, fmt.Errorf("mcpauth: mint: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(tok), Record{
-		Hash:      hashToken(tok, salt),
+	return plain, Record{
+		Hash:      hash,
 		Salt:      salt,
 		ExpiresAt: time.Now().Add(ttl),
 	}, nil
 }
 
-func hashToken(tok, salt []byte) []byte {
-	sum := sha256.Sum256(append(append([]byte{}, salt...), tok...))
-	return sum[:]
-}
-
-// Verify recomputes sha256(salt‖presented) and compares against rec.Hash in constant time. An
-// undecodable presented token fails like any other mismatch, after still doing the comparison so
-// its cost doesn't itself leak information (gitsock/token.go's own verifyToken discipline). Does
+// Verify recomputes sha256(salt‖presented) and compares against rec.Hash in constant time. Does
 // not check expiry — Check wraps this plus the expiry test for the two-outcome distinction a
 // lapsed-token response needs.
 func Verify(presented string, rec Record) bool {
-	tok, err := base64.RawURLEncoding.DecodeString(presented)
-	if err != nil {
-		tok = nil
-	}
-	return subtle.ConstantTimeCompare(hashToken(tok, rec.Salt), rec.Hash) == 1
+	return tokenauth.Verify(presented, rec.Hash, rec.Salt)
 }
 
 // Expired reports whether rec has lapsed as of now. A zero ExpiresAt (a pre-M1 file not yet

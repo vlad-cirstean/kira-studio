@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/migrations"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 	_ "modernc.org/sqlite"
 )
 
@@ -113,7 +114,7 @@ func TestMigration10RenamesTablesAndPreservesData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrations.All: %v", err)
 	}
-	var m10 *migrations.Migration
+	var m10 *sqlitex.Migration
 	for i := range steps {
 		if steps[i].Version == 10 {
 			m10 = &steps[i]

@@ -3,7 +3,6 @@ package awscfg
 import (
 	"context"
 	"errors"
-	"net"
 	"os"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -64,9 +63,7 @@ func MapError(err error) *adapters.Error {
 		return adapters.New(adapters.CodeTimeout, message, err)
 	}
 
-	var dnsErr *net.DNSError
-	var opErr *net.OpError
-	if errors.As(err, &dnsErr) || errors.As(err, &opErr) {
+	if ne := adapters.ClassifyNetError(err); ne.DNS || ne.OpError != nil {
 		return adapters.New(adapters.CodeConnect, message, err)
 	}
 

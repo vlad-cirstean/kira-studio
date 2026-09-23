@@ -132,3 +132,49 @@ func (a *Authorizer) Authorize(reason string, confirmed bool) (Outcome, error) {
 	}
 	return outcome, nil
 }
+
+// GateOutcome is Gated's own vocabulary — Authorize's own three outcomes plus the fetch call's,
+// split into GateAuthError/GateFetchError rather than one combined error case because
+// internal/connections.Service.Reveal and internal/apivars.Service.reveal each log a different
+// message for the two (P107 I2-36; connections.RevealResult and apivars.RevealResult's own
+// four-outcome vocabulary is each caller's own mapping of this).
+type GateOutcome int
+
+const (
+	GateRevealed GateOutcome = iota
+	GateCancelled
+	GateConfirmationRequired
+	GateAuthError
+	GateFetchError
+)
+
+// Gated runs P14 D6's whole reveal gate once: authorize(reason, confirmed), pass Cancelled/
+// Unavailable straight through, otherwise call fetch and report its own error separately from an
+// Authorize error. Both internal/connections.Service.Reveal and internal/apivars.Service.reveal
+// call this with their own *Authorizer.Authorize method value and their own decrypt/secrets-get
+// fetch, then map GateOutcome to their own result type and do their own logging. fetch returns
+// *string rather than string: connections.Service.Reveal's own Secrets.Get can legitimately answer
+// (nil, nil) for a connection with no stored password, a real outcome distinct from an empty
+// string that both RevealResult types' own Password/Value field already carries as *string.
+func Gated(
+	authorize func(reason string, confirmed bool) (Outcome, error),
+	reason string, confirmed bool,
+	fetch func() (*string, error),
+) (GateOutcome, *string, error) {
+	outcome, err := authorize(reason, confirmed)
+	if err != nil {
+		return GateAuthError, nil, err
+	}
+	switch outcome {
+	case Cancelled:
+		return GateCancelled, nil, nil
+	case Unavailable:
+		return GateConfirmationRequired, nil, nil
+	}
+
+	value, err := fetch()
+	if err != nil {
+		return GateFetchError, nil, err
+	}
+	return GateRevealed, value, nil
+}

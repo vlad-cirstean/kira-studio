@@ -64,9 +64,8 @@ func (d *Dispatcher) Read(ctx context.Context, req ReadRequestWire) (ReadRespons
 		return ReadResponse{}, err
 	}
 
-	connID := req.ConnectionID
-	_, value, err := d.host.RunOp(ctx, OpSpec{ConnectionID: &connID, Kind: "read", OpID: req.OpID, TabID: req.TabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	p, err := runOp(ctx, d.host, req.ConnectionID, "read", req.OpID, req.TabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (page.Page, error) {
 			p, err := adapter.Read(ctx, adapters.ReadRequest{
 				Path: path, Projection: req.Projection, Filter: req.Filter, Sort: req.Sort,
 				PageSize: req.PageSize, Cursor: req.Cursor,
@@ -81,7 +80,6 @@ func (d *Dispatcher) Read(ctx context.Context, req ReadRequestWire) (ReadRespons
 		return ReadResponse{}, err
 	}
 
-	p := value.(page.Page)
 	d.cache.StorePage(key, label, cacheReq, p)
 	return ReadResponse{Page: p, Source: "server"}, nil
 }
@@ -104,22 +102,19 @@ func (d *Dispatcher) Count(ctx context.Context, req CountRequestWire) (CountResp
 		return CountResponse{}, err
 	}
 
-	connID := req.ConnectionID
-	_, value, err := d.host.RunOp(ctx, OpSpec{ConnectionID: &connID, Kind: "count", OpID: req.OpID, TabID: req.TabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	result, err := runOp(ctx, d.host, req.ConnectionID, "count", req.OpID, req.TabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (adapters.CountResult, error) {
 			result, err := adapter.Count(ctx, adapters.CountRequest{Path: path, Filter: req.Filter}, op)
 			if err != nil {
-				return nil, err
+				return adapters.CountResult{}, err
 			}
-			rows := int(result.Value)
-			op.SetRows(rows)
+			op.SetRows(int(result.Value))
 			return result, nil
 		})
 	if err != nil {
 		return CountResponse{}, err
 	}
 
-	result := value.(adapters.CountResult)
 	d.cache.StoreCount(req.ConnectionID, req.Path, req.Filter, result.Value, result.Exact)
 	return CountResponse{Value: result.Value, Exact: result.Exact, At: time.Now().UnixMilli(), Stale: false, Source: "server"}, nil
 }
@@ -156,17 +151,16 @@ func (d *Dispatcher) Mutate(ctx context.Context, req MutateRequestWire) (MutateR
 		return MutateResponse{}, err
 	}
 
-	connID := req.ConnectionID
 	defer d.cache.InvalidateAfterMutation(req.ConnectionID, req.Path)
 
-	_, value, err := d.host.RunOp(ctx, OpSpec{ConnectionID: &connID, Kind: "mutate", OpID: req.OpID, TabID: req.TabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	result, err := runOp(ctx, d.host, req.ConnectionID, "mutate", req.OpID, req.TabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (model.MutationResult, error) {
 			return adapter.Mutate(ctx, model.MutationPlan{Path: path, Ops: req.Ops}, op)
 		})
 	if err != nil {
 		return MutateResponse{}, err
 	}
-	return MutateResponse{AffectedRows: value.(model.MutationResult).AffectedRows}, nil
+	return MutateResponse{AffectedRows: result.AffectedRows}, nil
 }
 
 // ObjectDownload is data.ts's handleObjectDownload. "transfer", not "read" (D9), so a
@@ -182,15 +176,14 @@ func (d *Dispatcher) ObjectDownload(ctx context.Context, req ObjectDownloadReque
 		return ObjectDownloadResponse{}, err
 	}
 
-	connID := req.ConnectionID
-	_, value, err := d.host.RunOp(ctx, OpSpec{ConnectionID: &connID, Kind: "transfer", OpID: req.OpID, TabID: req.TabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	result, err := runOp(ctx, d.host, req.ConnectionID, "transfer", req.OpID, req.TabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (model.ObjectTransferResult, error) {
 			return adapter.DownloadObject(ctx, model.ObjectDownloadRequest{Path: path, DestPath: req.DestPath}, op)
 		})
 	if err != nil {
 		return ObjectDownloadResponse{}, err
 	}
-	return ObjectDownloadResponse{Bytes: value.(model.ObjectTransferResult).Bytes}, nil
+	return ObjectDownloadResponse{Bytes: result.Bytes}, nil
 }
 
 // Execute is data.ts's handleExecute: no cache interaction at all, either direction — console

@@ -1,10 +1,6 @@
 package bridge
 
-import (
-	"net/url"
-
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
-)
+import "github.com/kirathecat/kira-studio/internal/shell"
 
 // LinkService is P79 finding 4's own generic "open this URL in the OS browser" surface —
 // linkify.ts finds arbitrary URLs in a commit message body, which CommitMeta.vue used to render
@@ -26,12 +22,5 @@ type LinkOpenExternalArgs struct {
 // OpenExternal opens args.URL in the OS browser, refusing anything that is not a well-formed
 // http(s) URL with a non-empty host.
 func (s *LinkService) OpenExternal(args LinkOpenExternalArgs) error {
-	u, err := url.Parse(args.URL)
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return ipcerr.BadRequest("bridge: LinkService.OpenExternal: not a well-formed http(s) URL")
-	}
-	if err := s.Browser.OpenURL(args.URL); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return shell.OpenExternalURL(s.Browser, args.URL)
 }

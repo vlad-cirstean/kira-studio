@@ -92,23 +92,11 @@ func (r *GitClientsRepo) Revoke(id string, now int64) error {
 // history — most recently seen first, projected to model.GitClient (never the hash or the salt).
 func (r *GitClientsRepo) List() ([]model.GitClient, error) {
 	rows, err := r.DB.Query(`SELECT id, label, created_at, last_seen_at, revoked_at FROM git_clients ORDER BY last_seen_at DESC`)
-	if err != nil {
-		return nil, fmt.Errorf("repos: list git clients: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.GitClient{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.GitClient, bool, error) {
 		var c model.GitClient
-		if err := rows.Scan(&c.ID, &c.Label, &c.CreatedAt, &c.LastSeenAt, &c.RevokedAt); err != nil {
-			return nil, fmt.Errorf("repos: scan git client: %w", err)
-		}
-		out = append(out, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos: git client rows: %w", err)
-	}
-	return out, nil
+		err := rows.Scan(&c.ID, &c.Label, &c.CreatedAt, &c.LastSeenAt, &c.RevokedAt)
+		return c, true, err
+	})
 }
 
 func scanGitClientRow(row *sql.Row) (GitClientRow, error) {

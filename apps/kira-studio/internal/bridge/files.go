@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
 // The four wire shapes, byte for byte packages/shared/protocol/ipc.ts:133-149's.
@@ -123,11 +124,13 @@ type FilesChooseFolderResult struct {
 // wrapper with no directory-shape validation of its own — Scan's own error is what a bad path
 // surfaces as).
 func (s *FilesService) ChooseFolder(args FilesChooseFolderArgs) (FilesChooseFolderResult, error) {
-	path, err := s.Dialogs.OpenDirectory(OpenDirectoryRequest{Title: args.Title})
+	path, canceled, err := shell.ChooseFolder(func(title string) (string, error) {
+		return s.Dialogs.OpenDirectory(OpenDirectoryRequest{Title: title})
+	}, args.Title)
 	if err != nil {
-		return FilesChooseFolderResult{}, ipcerr.Internal(err.Error())
+		return FilesChooseFolderResult{}, err
 	}
-	if path == "" {
+	if canceled {
 		return FilesChooseFolderResult{Canceled: true}, nil
 	}
 	return FilesChooseFolderResult{Canceled: false, Path: &path}, nil

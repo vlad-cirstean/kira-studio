@@ -20,23 +20,31 @@ type LayoutRepo struct {
 	selectAll *sql.Stmt
 }
 
-func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, error) {
-	stored, err := appstorage.ScanLayoutRows(rows, queryErr)
-	if err != nil {
-		return model.Layout{}, err
-	}
-
+// decodeLayout builds model.Layout from an already-scanned leaf map — the part of GetAll's read
+// path that Set's own apply callback needs too, reading the same leaves inside its own
+// transaction (P107 I2-1).
+func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	result := model.DefaultLayout()
 	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
 	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
-	return result, nil
+	return result
 }
 
 func (r *LayoutRepo) GetAll() (model.Layout, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 	if r.selectAll != nil {
-		return r.scanAll(r.selectAll.Query())
+		rows, err = r.selectAll.Query()
+	} else {
+		rows, err = r.DB.Query(appstorage.LayoutSelectAllSQL)
 	}
-	return r.scanAll(r.DB.Query(appstorage.LayoutSelectAllSQL))
+	stored, err := appstorage.ScanLeafRows(rows, err)
+	if err != nil {
+		return model.Layout{}, err
+	}
+	return decodeLayout(stored), nil
 }
 
 // Set writes both leaves every time, mirroring Kira Studio's own LayoutRepo.Set (the read-modify-
@@ -44,53 +52,42 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 // Begin() hold the database's one connection exclusively until Commit/Rollback, so no concurrent
 // Set can race it — same C7/F7 fix Kira Studio's own copy documents).
 func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	var merged model.Layout
+	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {
+		merged = decodeLayout(stored)
+		if p := patch.Panel; p != nil && p.Project != nil {
+			if p.Project.Visible != nil {
+				merged.Panel.Project.Visible = *p.Project.Visible
+			}
+			if p.Project.Width != nil {
+				merged.Panel.Project.Width = *p.Project.Width
+			}
+		}
 
-	var current model.Layout
-	if r.selectAll != nil {
-		current, err = r.scanAll(tx.Stmt(r.selectAll).Query())
-	} else {
-		current, err = r.scanAll(tx.Query(appstorage.LayoutSelectAllSQL))
-	}
+		leaves := []struct {
+			key   string
+			value any
+		}{
+			{"panel.project.visible", merged.Panel.Project.Visible},
+			{"panel.project.width", merged.Panel.Project.Width},
+		}
+		for _, l := range leaves {
+			encoded, err := json.Marshal(l.value)
+			if err != nil {
+				return fmt.Errorf("repos/layout: encode %s: %w", l.key, err)
+			}
+			if _, err := tx.Exec(
+				`INSERT INTO ui_layout (key, value) VALUES (?, ?)
+				   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+				l.key, string(encoded),
+			); err != nil {
+				return fmt.Errorf("repos/layout: upsert %s: %w", l.key, err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return model.Layout{}, err
-	}
-	merged := current
-	if p := patch.Panel; p != nil && p.Project != nil {
-		if p.Project.Visible != nil {
-			merged.Panel.Project.Visible = *p.Project.Visible
-		}
-		if p.Project.Width != nil {
-			merged.Panel.Project.Width = *p.Project.Width
-		}
-	}
-
-	leaves := []struct {
-		key   string
-		value any
-	}{
-		{"panel.project.visible", merged.Panel.Project.Visible},
-		{"panel.project.width", merged.Panel.Project.Width},
-	}
-	for _, l := range leaves {
-		encoded, err := json.Marshal(l.value)
-		if err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: encode %s: %w", l.key, err)
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO ui_layout (key, value) VALUES (?, ?)
-			   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-			l.key, string(encoded),
-		); err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: upsert %s: %w", l.key, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: commit: %w", err)
 	}
 	return merged, nil
 }

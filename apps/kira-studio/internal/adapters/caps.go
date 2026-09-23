@@ -48,3 +48,16 @@ type Caps struct {
 	FileTransfer  bool               `json:"fileTransfer"`
 	MaxPageSize   *int               `json:"maxPageSize,omitempty"`
 }
+
+// RelationalCaps is the four relational engines' own caps value, byte-identical across
+// mariadb/mysql/postgres/sqlite (P34 D10 keeps it declared per engine rather than shared, so a
+// future real divergence has somewhere honest to be said; P107 I2-37 found the four still equal,
+// so each package's own caps var is this value, unmodified).
+var RelationalCaps = Caps{
+	Tabular: true, Documents: false, KeyValue: false, Stream: false,
+	KeyBrowser: false, KeyTypes: false, DefaultPageKind: page.PageKindTabular,
+	SQL: true, Definition: true, Describe: true, SchemaColumns: true,
+	Projection: true, ServerFilter: true, ExactCount: true, Pagination: PaginationKeyset,
+	ForeignKeys: true, CanInsert: true, CanUpdate: true, CanDelete: true,
+	Writable: true, Transactions: true, Cancel: true, FileTransfer: false,
+}

@@ -15,14 +15,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/logsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGit(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGit is testx.SkipWithoutGit (P107 I2-28).
+var skipWithoutGit = testx.SkipWithoutGit
 
 func passthroughRead(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
 

@@ -143,7 +143,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	databaseSegment := segments[0]
 	if databaseSegment.Kind != "database" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+databaseSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, databaseSegment.Kind)
 	}
 	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
@@ -163,15 +163,13 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	objectSegment := segments[1]
 	if len(segments) == 2 {
 		// Rule 5: Children returns [] for a leaf, never an error. P19 D5: every relation is a leaf.
-		switch objectSegment.Kind {
-		case "sequence", "function", "table", "view":
-			return adapters.TreeChildren{Nodes: []model.TreeNode{}}, nil
-		}
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected object kind: "+objectSegment.Kind, nil)
+		return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 	}
 
 	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
 }
+
+var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true}
 
 func requireTwoSegmentPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 2 || segments[0].Kind != "database" {

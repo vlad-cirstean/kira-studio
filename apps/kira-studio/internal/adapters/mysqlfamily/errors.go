@@ -2,8 +2,6 @@ package mysqlfamily
 
 import (
 	"errors"
-	"net"
-	"syscall"
 
 	"github.com/go-sql-driver/mysql"
 
@@ -29,15 +27,7 @@ func mapError(err error) *adapters.Error {
 		return adapters.New(adapters.CodeQuery, message, err)
 	}
 
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
-		return adapters.New(adapters.CodeConnect, message, err)
-	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
-		return adapters.New(adapters.CodeConnect, message, err)
-	}
-	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	if ne := adapters.ClassifyNetError(err); ne.DNS || ne.Refused || ne.NetTimeout {
 		return adapters.New(adapters.CodeConnect, message, err)
 	}
 

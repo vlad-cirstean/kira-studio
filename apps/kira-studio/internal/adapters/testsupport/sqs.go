@@ -35,6 +35,9 @@ type SqsFixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f SqsFixture) ConnectionID() string { return f.Config.ID }
+
 var sqsMemo fixture[SqsFixture]
 
 // StartSqs is support/sqs.ts's startSqs. Skips the test when Docker is unreachable.

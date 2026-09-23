@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/rpcstream"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/rpcstream"
 )
 
 // Deps is everything Server needs to listen and serve. SocketPath/LockPath are the two files under

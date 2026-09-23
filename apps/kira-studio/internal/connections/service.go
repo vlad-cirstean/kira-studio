@@ -470,22 +470,20 @@ func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 // Authorizer.Authorize enforces that (it ignores confirmed whenever it can actually evaluate), so
 // this method never has to re-check which branch produced a grant.
 func (s *Service) Reveal(id string, confirmed bool) RevealResult {
-	outcome, err := s.deps.Auth.Authorize(revealReason, confirmed)
-	if err != nil {
+	outcome, password, err := localauth.Gated(s.deps.Auth.Authorize, revealReason, confirmed, func() (*string, error) {
+		return s.deps.Secrets.Get(id)
+	})
+	switch outcome {
+	case localauth.GateAuthError:
 		msg := errorMessage(err)
 		slog.Warn(fmt.Sprintf("local authentication errored before reveal of %s: %s", id, msg), "scope", "connections")
 		return RevealResult{Outcome: revealOutcomeError, Error: &msg}
-	}
-	switch outcome {
-	case localauth.Cancelled:
+	case localauth.GateCancelled:
 		// D11: the user cancelled on purpose — no message, that would be nagging.
 		return RevealResult{Outcome: revealOutcomeCancelled}
-	case localauth.Unavailable:
+	case localauth.GateConfirmationRequired:
 		return RevealResult{Outcome: revealOutcomeConfirmationRequired}
-	}
-
-	password, err := s.deps.Secrets.Get(id)
-	if err != nil {
+	case localauth.GateFetchError:
 		msg := errorMessage(err)
 		slog.Warn(fmt.Sprintf("secret reveal failed for %s: %s", id, msg), "scope", "connections")
 		return RevealResult{Outcome: revealOutcomeError, Error: &msg}

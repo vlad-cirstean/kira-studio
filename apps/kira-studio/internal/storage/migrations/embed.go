@@ -8,64 +8,45 @@ package migrations
 
 import (
 	"embed"
-	"sort"
+
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 //go:embed *.sql
 var files embed.FS
 
-// Migration is one forward-only schema step.
-type Migration struct {
-	Version int
-	Name    string
-	SQL     string
-}
-
 // names lists the embedded files in the exact order they must apply, rather than trusting
 // directory listing order.
-var names = []struct {
-	version int
-	name    string
-	file    string
-}{
-	{1, "init", "0001_init.sql"},
-	{2, "p8_windows", "0002_p8_windows.sql"},
-	{3, "p18_connection_ddl", "0003_p18_connection_ddl.sql"},
-	{4, "p18_auto_explain", "0004_p18_auto_explain.sql"},
-	{5, "p28_throttle", "0005_p28_throttle.sql"},
-	{6, "p4_collections", "0006_p4_collections.sql"},
-	{7, "p5_variables", "0007_p5_variables.sql"},
-	{8, "p8_response_history", "0008_p8_response_history.sql"},
-	{9, "p11_grpc", "0009_p11_grpc.sql"},
-	{10, "p12_api_rename", "0010_p12_api_rename.sql"},
-	{11, "p17_variable_description", "0011_p17_variable_description.sql"},
-	{12, "p18_environment_color", "0012_p18_environment_color.sql"},
-	{13, "p21r3_history_bytes_index", "0013_p21r3_history_bytes_index.sql"},
-	{14, "p22_window_mode", "0014_p22_window_mode.sql"},
-	{15, "p23_op_log_bytes", "0015_p23_op_log_bytes.sql"},
-	{16, "g1_git_clients", "0016_g1_git_clients.sql"},
-	{17, "g18_git_repo_settings", "0017_g18_git_repo_settings.sql"},
-	{18, "c5_code_repos", "0018_c5_code_repos.sql"},
-	{19, "p67d_repo_map_access", "0019_p67d_repo_map_access.sql"},
-	{20, "m1_connection_mcp", "0020_m1_connection_mcp.sql"},
-	{21, "m2_connection_permissions", "0021_m2_connection_permissions.sql"},
-	{22, "m3_connection_mcp_explain", "0022_m3_connection_mcp_explain.sql"},
-	{23, "m5_column_mask_rules", "0023_m5_column_mask_rules.sql"},
-	{24, "p85_custom_scripts", "0024_p85_custom_scripts.sql"},
-	{25, "p97_drop_repo_map", "0025_p97_drop_repo_map.sql"},
-	{26, "p100_drop_git_tables", "0026_p100_drop_git_tables.sql"},
+var names = []sqlitex.MigrationSource{
+	{Version: 1, Name: "init", File: "0001_init.sql"},
+	{Version: 2, Name: "p8_windows", File: "0002_p8_windows.sql"},
+	{Version: 3, Name: "p18_connection_ddl", File: "0003_p18_connection_ddl.sql"},
+	{Version: 4, Name: "p18_auto_explain", File: "0004_p18_auto_explain.sql"},
+	{Version: 5, Name: "p28_throttle", File: "0005_p28_throttle.sql"},
+	{Version: 6, Name: "p4_collections", File: "0006_p4_collections.sql"},
+	{Version: 7, Name: "p5_variables", File: "0007_p5_variables.sql"},
+	{Version: 8, Name: "p8_response_history", File: "0008_p8_response_history.sql"},
+	{Version: 9, Name: "p11_grpc", File: "0009_p11_grpc.sql"},
+	{Version: 10, Name: "p12_api_rename", File: "0010_p12_api_rename.sql"},
+	{Version: 11, Name: "p17_variable_description", File: "0011_p17_variable_description.sql"},
+	{Version: 12, Name: "p18_environment_color", File: "0012_p18_environment_color.sql"},
+	{Version: 13, Name: "p21r3_history_bytes_index", File: "0013_p21r3_history_bytes_index.sql"},
+	{Version: 14, Name: "p22_window_mode", File: "0014_p22_window_mode.sql"},
+	{Version: 15, Name: "p23_op_log_bytes", File: "0015_p23_op_log_bytes.sql"},
+	{Version: 16, Name: "g1_git_clients", File: "0016_g1_git_clients.sql"},
+	{Version: 17, Name: "g18_git_repo_settings", File: "0017_g18_git_repo_settings.sql"},
+	{Version: 18, Name: "c5_code_repos", File: "0018_c5_code_repos.sql"},
+	{Version: 19, Name: "p67d_repo_map_access", File: "0019_p67d_repo_map_access.sql"},
+	{Version: 20, Name: "m1_connection_mcp", File: "0020_m1_connection_mcp.sql"},
+	{Version: 21, Name: "m2_connection_permissions", File: "0021_m2_connection_permissions.sql"},
+	{Version: 22, Name: "m3_connection_mcp_explain", File: "0022_m3_connection_mcp_explain.sql"},
+	{Version: 23, Name: "m5_column_mask_rules", File: "0023_m5_column_mask_rules.sql"},
+	{Version: 24, Name: "p85_custom_scripts", File: "0024_p85_custom_scripts.sql"},
+	{Version: 25, Name: "p97_drop_repo_map", File: "0025_p97_drop_repo_map.sql"},
+	{Version: 26, Name: "p100_drop_git_tables", File: "0026_p100_drop_git_tables.sql"},
 }
 
 // All returns every migration in ascending version order.
-func All() ([]Migration, error) {
-	out := make([]Migration, 0, len(names))
-	for _, n := range names {
-		b, err := files.ReadFile(n.file)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, Migration{Version: n.version, Name: n.name, SQL: string(b)})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
-	return out, nil
+func All() ([]sqlitex.Migration, error) {
+	return sqlitex.LoadMigrations(files, names)
 }

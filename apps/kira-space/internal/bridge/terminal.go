@@ -2,8 +2,6 @@ package bridge
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -83,27 +81,11 @@ type TerminalCloseArgs struct {
 // Open validates args, spawns a new session and returns its resolved shell path — Kira Studio's
 // own Open, minus the AgentHooks command/env composition.
 func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error) {
-	if args.TerminalID == "" {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "terminalId is required")
-	}
-	if args.WindowKey == "" {
-		return TerminalOpenResult{}, ipcerr.BadRequest("windowKey is required")
-	}
-	if !terminal.ValidDim(args.Cols) || !terminal.ValidDim(args.Rows) {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
-	}
-	if !filepath.IsAbs(args.Cwd) {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cwd must be an absolute path")
-	}
-	info, err := os.Stat(args.Cwd)
-	if err != nil || !info.IsDir() {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
-	}
-	if len(args.Command) > terminal.MaxCommandBytes {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "command is too long")
-	}
-	if !terminal.ValidLaunchKind(args.LaunchKind) {
-		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
+	if err := terminal.ValidateOpen(terminal.OpenArgs{
+		TerminalID: args.TerminalID, WindowKey: args.WindowKey, Cwd: args.Cwd,
+		Cols: args.Cols, Rows: args.Rows, Command: args.Command, LaunchKind: args.LaunchKind,
+	}); err != nil {
+		return TerminalOpenResult{}, err
 	}
 
 	sess, err := s.svc().OpenWithCoalescedOutput(terminal.OpenParams{

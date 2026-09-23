@@ -19,43 +19,24 @@ import (
 // unlike reset_test.go's flow (preflight.reset/op.run/undo.peek), which never reaches Discovery.
 type alwaysGitLocator struct{}
 
-func (alwaysGitLocator) Locate(_ string) (string, []string, bool) { return "git", []string{"git"}, true }
+func (alwaysGitLocator) Locate(_ string) (string, []string, bool) {
+	return "git", []string{"git"}, true
+}
 
 // searchSmokeConn is resetSmokeConn's own shape plus a working Discovery — search.run's handler
 // needs one to resolve the gitPath it hands to c.Walk, where reset/preflight/op.run never do.
 func searchSmokeConn(t *testing.T, dir string) (Handlers, string) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-	runner := gitclient.NewExecRunner()
-	registry := gitsession.NewRegistry(runner)
-	t.Cleanup(registry.Close)
-	discovery := gitclient.NewDiscovery(alwaysGitLocator{}, runner, gitclient.NewRealClock())
-	router := New(Deps{Discovery: discovery, Runner: runner, Registry: registry, ServerVersion: "test"})
-	conn := gitsession.NewConn(gitsession.ConnID("search-rpc-test-conn"), "test-client", "test-label", nil)
-	t.Cleanup(conn.Close)
-	handlers := router.ForConn(conn)
-
-	summary, err := conn.Open(context.Background(), registry, "git", dir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	return handlers, summary.RepoID
+	return smokeConn(t, gitsession.ConnID("search-rpc-test-conn"), dir, smokeConnOpts{
+		discovery: func(runner gitclient.Runner) *gitclient.Discovery {
+			return gitclient.NewDiscovery(alwaysGitLocator{}, runner, gitclient.NewRealClock())
+		},
+	})
 }
 
 func searchSmokeGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
-		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	smokeGit(t, dir, []string{"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null"}, args...)
 }
 
 // TestSearchRun_ParamValidation exercises handleSearchRun's own param checks through the real

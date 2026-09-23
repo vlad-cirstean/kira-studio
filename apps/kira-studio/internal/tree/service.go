@@ -124,24 +124,53 @@ func (s *Service) getCached(connectionID, path, kind string) (json.RawMessage, b
 	return raw, true
 }
 
+// tryCache is Children/Describe/Definition/SchemaColumns's own shared cache-lookup half (P107
+// I2-10): fetch the raw cached row (already floor-checked by getCached), hand it to unmarshal, and
+// drop the row — never trust it further — the moment it fails to unmarshal or fails its own model
+// validator (P55 §1.6). A single cachedRead[T] covering lookup-through-return doesn't fit here:
+// Children caches only result.Nodes ([]model.TreeNode) while returning a ChildrenResult wrapper,
+// and SchemaColumns nil-defaults its fetched slice before caching it — the cached shape and the
+// method's own return shape diverge per caller, so only the lookup half is shared.
+func tryCache[T any](s *Service, connectionID, path, kind string, unmarshal func(raw json.RawMessage) (T, bool)) (T, bool) {
+	var zero T
+	raw, ok := s.getCached(connectionID, path, kind)
+	if !ok {
+		return zero, false
+	}
+	if v, ok := unmarshal(raw); ok {
+		return v, true
+	}
+	_ = s.meta.Drop(connectionID, path)
+	return zero, false
+}
+
+// resolvePath is Children/Describe/Definition/SchemaColumns's own shared connected-check + path-
+// decode half (P107 I2-10), run only once the cache has already been tried and missed.
+func (s *Service) resolvePath(connectionID, path string) (model.NodePath, error) {
+	if err := s.requireConnected(connectionID); err != nil {
+		return model.NodePath{}, err
+	}
+	nodePath, err := model.DecodePath(connectionID, path)
+	if err != nil {
+		return model.NodePath{}, ipcerr.Internal(err.Error())
+	}
+	return nodePath, nil
+}
+
 // Children ports tree-service.ts:82-108, including P43 iter2 D22 (a truncated listing is never
 // cached) and P43 iter3 D38 (a truncated refresh drops any older complete row for the same path).
 func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenResult, error) {
 	if !refresh {
-		if raw, ok := s.getCached(connectionID, path, "children"); ok {
+		if nodes, ok := tryCache(s, connectionID, path, "children", func(raw json.RawMessage) ([]model.TreeNode, bool) {
 			var nodes []model.TreeNode
-			if err := json.Unmarshal(raw, &nodes); err == nil && model.ValidateTreeNodes(nodes) {
-				return ChildrenResult{Nodes: nodes, Source: "cache", Truncated: false}, nil
-			}
-			_ = s.meta.Drop(connectionID, path)
+			return nodes, json.Unmarshal(raw, &nodes) == nil && model.ValidateTreeNodes(nodes)
+		}); ok {
+			return ChildrenResult{Nodes: nodes, Source: "cache", Truncated: false}, nil
 		}
 	}
-	if err := s.requireConnected(connectionID); err != nil {
-		return ChildrenResult{}, err
-	}
-	nodePath, err := model.DecodePath(connectionID, path)
+	nodePath, err := s.resolvePath(connectionID, path)
 	if err != nil {
-		return ChildrenResult{}, ipcerr.Internal(err.Error())
+		return ChildrenResult{}, err
 	}
 	result, err := s.backend.Children(context.Background(), connectionID, nodePath)
 	if err != nil {
@@ -161,20 +190,16 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 // nothing, which is correct: there is no duration to show for work that never happened.
 func (s *Service) Describe(connectionID, path string, refresh bool, tabID *string) (DescribeResult, error) {
 	if !refresh {
-		if raw, ok := s.getCached(connectionID, path, "describe"); ok {
+		if meta, ok := tryCache(s, connectionID, path, "describe", func(raw json.RawMessage) (model.ObjectMeta, bool) {
 			var meta model.ObjectMeta
-			if err := json.Unmarshal(raw, &meta); err == nil && model.ValidateObjectMeta(&meta) {
-				return DescribeResult{Meta: meta, Source: "cache"}, nil
-			}
-			_ = s.meta.Drop(connectionID, path)
+			return meta, json.Unmarshal(raw, &meta) == nil && model.ValidateObjectMeta(&meta)
+		}); ok {
+			return DescribeResult{Meta: meta, Source: "cache"}, nil
 		}
 	}
-	if err := s.requireConnected(connectionID); err != nil {
-		return DescribeResult{}, err
-	}
-	nodePath, err := model.DecodePath(connectionID, path)
+	nodePath, err := s.resolvePath(connectionID, path)
 	if err != nil {
-		return DescribeResult{}, ipcerr.Internal(err.Error())
+		return DescribeResult{}, err
 	}
 	meta, err := s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
@@ -189,20 +214,16 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 // Definition ports tree-service.ts:130-148.
 func (s *Service) Definition(connectionID, path string, refresh bool, tabID *string) (DefinitionResult, error) {
 	if !refresh {
-		if raw, ok := s.getCached(connectionID, path, "definition"); ok {
+		if def, ok := tryCache(s, connectionID, path, "definition", func(raw json.RawMessage) (model.ObjectDefinition, bool) {
 			var def model.ObjectDefinition
-			if err := json.Unmarshal(raw, &def); err == nil && model.ValidateObjectDefinition(&def) {
-				return DefinitionResult{Definition: def, Source: "cache"}, nil
-			}
-			_ = s.meta.Drop(connectionID, path)
+			return def, json.Unmarshal(raw, &def) == nil && model.ValidateObjectDefinition(&def)
+		}); ok {
+			return DefinitionResult{Definition: def, Source: "cache"}, nil
 		}
 	}
-	if err := s.requireConnected(connectionID); err != nil {
-		return DefinitionResult{}, err
-	}
-	nodePath, err := model.DecodePath(connectionID, path)
+	nodePath, err := s.resolvePath(connectionID, path)
 	if err != nil {
-		return DefinitionResult{}, ipcerr.Internal(err.Error())
+		return DefinitionResult{}, err
 	}
 	definition, err := s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
@@ -220,20 +241,16 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 // a design that wrote one row per relation would evict the tree's own children on a large schema).
 func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (SchemaColumnsResult, error) {
 	if !refresh {
-		if raw, ok := s.getCached(connectionID, path, "columns"); ok {
+		if rels, ok := tryCache(s, connectionID, path, "columns", func(raw json.RawMessage) ([]model.RelationColumns, bool) {
 			var rels []model.RelationColumns
-			if err := json.Unmarshal(raw, &rels); err == nil && model.ValidateRelationColumns(rels) {
-				return SchemaColumnsResult{Relations: rels, Source: "cache"}, nil
-			}
-			_ = s.meta.Drop(connectionID, path)
+			return rels, json.Unmarshal(raw, &rels) == nil && model.ValidateRelationColumns(rels)
+		}); ok {
+			return SchemaColumnsResult{Relations: rels, Source: "cache"}, nil
 		}
 	}
-	if err := s.requireConnected(connectionID); err != nil {
-		return SchemaColumnsResult{}, err
-	}
-	nodePath, err := model.DecodePath(connectionID, path)
+	nodePath, err := s.resolvePath(connectionID, path)
 	if err != nil {
-		return SchemaColumnsResult{}, ipcerr.Internal(err.Error())
+		return SchemaColumnsResult{}, err
 	}
 	relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
 	if err != nil {

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/jsonx"
 )
 
 // RowValues is domain/mutations.ts's rowValuesSchema (Record<string, string | null>), kept as an
@@ -39,26 +41,11 @@ func (r RowValues) Names() []string {
 }
 
 func (r RowValues) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteByte('{')
+	pairs := make([]jsonx.Pair, len(r))
 	for i, v := range r {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		key, err := json.Marshal(v.Name)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(key)
-		buf.WriteByte(':')
-		val, err := json.Marshal(v.Value)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(val)
+		pairs[i] = jsonx.Pair{Name: v.Name, Value: v.Value}
 	}
-	buf.WriteByte('}')
-	return buf.Bytes(), nil
+	return jsonx.MarshalOrderedObject(pairs)
 }
 
 // UnmarshalJSON reads the object through json.Decoder's own token stream to preserve the wire's

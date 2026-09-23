@@ -96,8 +96,8 @@ func TestProjectRanges(t *testing.T) {
 			want: []LineRange{{4, 4}, {8, 9}},
 		},
 		{
-			name:         "a hunk at line 1",
-			ranges:       []LineRange{{1, 3}},
+			name:   "a hunk at line 1",
+			ranges: []LineRange{{1, 3}},
 			hunks: []porcelain.DiffHunk{
 				{OldStart: 1, OldLines: 2, NewStart: 1, NewLines: 1, Lines: []porcelain.DiffLine{
 					delLine(1), ctxLine(2, 1),

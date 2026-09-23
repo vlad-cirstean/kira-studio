@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
@@ -14,39 +15,37 @@ import (
 // concern, ops.go).
 
 func (r *Router) handlePreflightReset(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p PreflightResetParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.reset: invalid params")
-	}
-	if p.RepoID == "" || p.Target == "" || (p.Mode != "soft" && p.Mode != "mixed" && p.Mode != "hard") {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.reset: repoId, target and a valid mode are required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.PreflightReset(ctx, p.Target, p.Mode)
-	if err != nil {
-		return nil, mapGitError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "preflight.reset", params,
+		func(p PreflightResetParams) (string, error) {
+			if p.RepoID == "" || p.Target == "" || (p.Mode != "soft" && p.Mode != "mixed" && p.Mode != "hard") {
+				return "", ipcerr.BadRequest("gitrpc: preflight.reset: repoId, target and a valid mode are required")
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightResetParams) (gitpreflight.ResetPreflight, error) {
+			result, err := entry.PreflightReset(ctx, p.Target, p.Mode)
+			if err != nil {
+				return gitpreflight.ResetPreflight{}, mapGitError(err)
+			}
+			return result, nil
+		},
+	)
 }
 
 func (r *Router) handlePreflightCherryPick(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p PreflightCherryPickParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.cherryPick: invalid params")
-	}
-	if p.RepoID == "" || p.SHA == "" {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.cherryPick: repoId and sha are required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.PreflightCherryPick(ctx, p.SHA, p.Mainline)
-	if err != nil {
-		return nil, mapGitError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "preflight.cherryPick", params,
+		func(p PreflightCherryPickParams) (string, error) {
+			if err := requireNonEmpty("preflight.cherryPick", "repoId", p.RepoID, "sha", p.SHA); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightCherryPickParams) (gitpreflight.CherryPickPreflight, error) {
+			result, err := entry.PreflightCherryPick(ctx, p.SHA, p.Mainline)
+			if err != nil {
+				return gitpreflight.CherryPickPreflight{}, mapGitError(err)
+			}
+			return result, nil
+		},
+	)
 }

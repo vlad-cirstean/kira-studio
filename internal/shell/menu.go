@@ -84,3 +84,55 @@ func buildItem(sub *application.Menu, item Item, d MenuDeps) {
 func addItem(m *application.Menu, item *application.MenuItem) {
 	m.Append(application.NewMenuFromItems(item))
 }
+
+// EditMenu is both apps' own identical Edit section (P107 I2-7): undo/redo/cut/copy/paste/
+// select-all, no app ever adds anything to it.
+func EditMenu() []Item {
+	return []Item{
+		{Kind: ItemRole, Role: application.Undo},
+		{Kind: ItemRole, Role: application.Redo},
+		{Kind: ItemSeparator},
+		{Kind: ItemRole, Role: application.Cut},
+		{Kind: ItemRole, Role: application.Copy},
+		{Kind: ItemRole, Role: application.Paste},
+		{Kind: ItemRole, Role: application.SelectAll},
+	}
+}
+
+// AppMenuHead is the App section's own identical opening, before each app's own items begin
+// (P107 I2-7) — About, then a separator.
+func AppMenuHead() []Item {
+	return []Item{
+		{Kind: ItemRole, Role: application.About},
+		{Kind: ItemSeparator},
+	}
+}
+
+// AppMenuTail is the App section's own identical closing, after each app's own items (P107 I2-7).
+// Electron's role: 'unhide' maps to ShowAll, never Wails' own dead UnHide role (P56 §1.4). Quit
+// alone needs appName, so it stays this function's one argument rather than a caller-appended item.
+func AppMenuTail(appName string) []Item {
+	return []Item{
+		{Kind: ItemRole, Role: application.ServicesMenu},
+		{Kind: ItemSeparator},
+		{Kind: ItemRole, Role: application.Hide},
+		{Kind: ItemRole, Role: application.HideOthers},
+		{Kind: ItemRole, Role: application.ShowAll},
+		{Kind: ItemSeparator},
+		{Kind: ItemQuit, Label: "Quit " + appName, Accelerator: "CmdOrCtrl+Q"},
+	}
+}
+
+// WindowMenuTail is the Window section's own identical closing, after each app's own tab/New-
+// Window items (P107 I2-7): Minimise, Zoom, CloseWindow. closeAccelerator re-accelerates
+// CloseWindow — Kira Studio's own Shift+W remap (menu.ts:120-122): role:'close' defaults to
+// CmdOrCtrl+W, which "Close Tab" already claims there. "" leaves the role default untouched (Kira
+// Space, which has no "Close Tab" to collide with) — the one real divergence in this "identical"
+// tail, so it stays a parameter rather than being silently unified.
+func WindowMenuTail(closeAccelerator string) []Item {
+	return []Item{
+		{Kind: ItemRole, Role: application.Minimise},
+		{Kind: ItemRole, Role: application.Zoom},
+		{Kind: ItemRole, Role: application.CloseWindow, Accelerator: closeAccelerator},
+	}
+}

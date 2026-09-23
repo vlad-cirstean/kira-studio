@@ -1,6 +1,10 @@
 package connections
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/testx"
+)
 
 func strPtr(s string) *string { return &s }
 
@@ -35,12 +39,8 @@ func TestStripURIPassword(t *testing.T) {
 	}
 }
 
-func derefOrNil(s *string) any {
-	if s == nil {
-		return nil
-	}
-	return *s
-}
+// derefOrNil is testx.DerefOrNil (P107 I2-28).
+var derefOrNil = testx.DerefOrNil
 
 func TestURIPasswordRoundTripSurvivesSpecialCharacters(t *testing.T) {
 	// A password containing '@' and ':' must survive an inject-then-strip round trip: inject

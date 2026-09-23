@@ -4,9 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 
-	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -57,164 +55,92 @@ type storedGrpcSnapshot struct {
 	MetadataElided bool `json:"metadataElided,omitempty"`
 }
 
-// Record is the whole storage policy (D11), in one transaction: apply the four caps, marshal,
-// insert, per-scope trim, global byte sweep. The caps live here, not in bridge/grpc.go (§0.3) —
-// Record is the only writer, so they cannot be bypassed by a future caller. Only a COMPLETED call
-// is ever recorded (any terminal status, including non-OK and a cancellation that received
-// messages) — an in-flight stream writes nothing.
+// Record is the whole storage policy (D11): apply the four caps, then grpcHistoryTable.Record
+// (P107 I2-8) runs the shared transaction/environment-resolve/elide-once/insert/cap/sweep/commit
+// chain. The caps live here, not in bridge/grpc.go (§0.3) — Record is the only writer, so they
+// cannot be bypassed by a future caller. Only a COMPLETED call is ever recorded (any terminal
+// status, including non-OK and a cancellation that received messages) — an in-flight stream
+// writes nothing.
 func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 	if err := rec.Validate(); err != nil {
 		return err
 	}
 
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("repos/grpc_history: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	var snap storedGrpcSnapshot
+	_, err := grpcHistoryTable.Record(r.DB,
+		historyRecordInput{TabID: rec.TabID, ItemID: rec.ItemID, EnvironmentID: rec.EnvironmentID},
+		grpcHistoryPerScopeCap, grpcHistoryByteBudget,
+		func() ([]byte, error) {
+			// D7/F9a: the request message, capped at 256 KiB — response_history.go's own
+			// maxHistoryBodyBytes (same package: "the request body a user typed" is one policy, not
+			// two). This was the one free-form string in either history table with no per-entry cap
+			// at all, which broke the global sweep's own safety invariant (F9a) — the sweep is safe
+			// only because no single row can exceed its budget, and an uncapped multi-MiB request
+			// message could make the running-sum window match zero rows, deleting the entire table
+			// including the row just inserted. maxGrpcMessageBytes (64 KiB) stays reserved for
+			// *response* messages, of which a call can store up to maxGrpcStoredMessages of; a
+			// request message is exactly one per entry, so it gets HTTP's own request-body cap
+			// instead.
+			message := rec.Message
+			requestMessageTruncated := false
+			if len(message) > maxHistoryBodyBytes {
+				message = message[:maxHistoryBodyBytes]
+				requestMessageTruncated = true
+			}
 
-	environment := ""
-	if rec.EnvironmentID != "" {
-		if err := tx.QueryRow(
-			`SELECT name FROM api_environments WHERE id = ?`, rec.EnvironmentID,
-		).Scan(&environment); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("repos/grpc_history: resolve environment: %w", err)
-		}
-	}
+			messages := make([]model.GrpcCallSnapshotMessage, 0, len(rec.Messages))
+			for _, m := range rec.Messages {
+				if len(messages) >= maxGrpcStoredMessages {
+					break
+				}
+				if len(m.JSON) > maxGrpcMessageBytes {
+					m.JSON = m.JSON[:maxGrpcMessageBytes]
+					m.Truncated = true
+				}
+				messages = append(messages, m)
+			}
+			// Finding 8: compared against the call's own true MessageCount, not len(rec.Messages) —
+			// the caller (grpcclient.ServerStream) already bounds its own Messages slice at the
+			// identical cap to keep a long-running stream's in-memory footprint flat, so the
+			// slice's length alone can no longer tell an elided call apart from one that produced
+			// exactly maxGrpcStoredMessages.
+			messagesElided := rec.MessageCount > maxGrpcStoredMessages
 
-	// D7/F9a: the request message, capped at 256 KiB — response_history.go's own
-	// maxHistoryBodyBytes (same package: "the request body a user typed" is one policy, not two).
-	// This was the one free-form string in either history table with no per-entry cap at all, which
-	// broke the global sweep's own safety invariant (F9a) — the sweep is safe only because no
-	// single row can exceed its budget, and an uncapped multi-MiB request message could make the
-	// running-sum window match zero rows, deleting the entire table including the row just
-	// inserted. maxGrpcMessageBytes (64 KiB) stays reserved for *response* messages, of which a
-	// call can store up to maxGrpcStoredMessages of; a request message is exactly one per entry, so
-	// it gets HTTP's own request-body cap instead.
-	message := rec.Message
-	requestMessageTruncated := false
-	if len(message) > maxHistoryBodyBytes {
-		message = message[:maxHistoryBodyBytes]
-		requestMessageTruncated = true
-	}
-
-	messages := make([]model.GrpcCallSnapshotMessage, 0, len(rec.Messages))
-	for _, m := range rec.Messages {
-		if len(messages) >= maxGrpcStoredMessages {
-			break
-		}
-		if len(m.JSON) > maxGrpcMessageBytes {
-			m.JSON = m.JSON[:maxGrpcMessageBytes]
-			m.Truncated = true
-		}
-		messages = append(messages, m)
-	}
-	// Finding 8: compared against the call's own true MessageCount, not len(rec.Messages) — the
-	// caller (grpcclient.ServerStream) already bounds its own Messages slice at the identical cap
-	// to keep a long-running stream's in-memory footprint flat, so the slice's length alone can no
-	// longer tell an elided call apart from one that produced exactly maxGrpcStoredMessages.
-	messagesElided := rec.MessageCount > maxGrpcStoredMessages
-
-	snap := storedGrpcSnapshot{
-		Target: rec.Target, Method: rec.Method, Streaming: rec.Streaming,
-		Message: message, RequestMessageTruncated: requestMessageTruncated, Metadata: rec.Metadata,
-		Messages: messages, MessagesElided: messagesElided,
-		Header: rec.Header, Trailer: rec.Trailer,
-	}
-	snapshotJSON, err := json.Marshal(snap)
-	if err != nil {
-		return fmt.Errorf("repos/grpc_history: encode snapshot: %w", err)
-	}
-
-	// F9/P21 round 1: cap the snapshot as a whole, not just field by field — Message and Messages
-	// are already bounded (256 KiB / 100 × 64 KiB, well under half the budget), so a snapshot this
-	// large can only mean Metadata/Header/Trailer (still uncapped) grew unreasonably. Dropping
-	// them and re-marshalling makes the sweep's safety property structural rather than a per-field
-	// audit that has to be redone every time a field is added.
-	if len(snapshotJSON) > grpcHistoryByteBudget/2 {
-		snap.Metadata = nil
-		snap.Header = nil
-		snap.Trailer = nil
-		snap.MetadataElided = true
-		snapshotJSON, err = json.Marshal(snap)
-		if err != nil {
-			return fmt.Errorf("repos/grpc_history: encode snapshot: %w", err)
-		}
-	}
-
-	id := uuid.NewString()
-	var itemID *string
-	if rec.ItemID != "" {
-		itemID = &rec.ItemID
-	}
-	calledAt := kiratime.NowISO()
-	storedBytes := len(snapshotJSON)
-
-	if _, err := tx.Exec(
-		`INSERT INTO grpc_call_history
-		   (id, item_id, tab_id, called_at, target, method, streaming, environment,
-		    code, code_name, status_message, elapsed_ms, message_count, message_bytes, stored_bytes, snapshot_json)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, itemID, rec.TabID, calledAt, rec.Target, rec.Method, rec.Streaming, environment,
-		rec.Code, rec.CodeName, rec.StatusMessage, rec.ElapsedMs, rec.MessageCount, rec.MessageBytes,
-		storedBytes, string(snapshotJSON),
-	); err != nil {
-		return fmt.Errorf("repos/grpc_history: insert: %w", err)
-	}
-
-	// Per-scope count cap — the exact shape api_response_history's own trim uses.
-	scopeKey := "tab:" + rec.TabID
-	if itemID != nil {
-		scopeKey = *itemID
-	}
-	if _, err := tx.Exec(
-		`DELETE FROM grpc_call_history
-		  WHERE scope_key = ?
-		    AND id NOT IN (SELECT id FROM grpc_call_history
-		                     WHERE scope_key = ?
-		                     ORDER BY called_at DESC, rowid DESC LIMIT ?)`,
-		scopeKey, scopeKey, grpcHistoryPerScopeCap,
-	); err != nil {
-		return fmt.Errorf("repos/grpc_history: cap scope: %w", err)
-	}
-
-	// Global byte budget, oldest-first across every scope — the per-entry caps above are what
-	// make this safe: no single row can exceed the budget by itself.
-	//
-	// A8/P21 round 1: the window-function sweep below is an unindexed full scan plus a running
-	// sum over the entire table — unconditionally, on every completed call, even though the caps
-	// mean it can only ever delete something once the table has accumulated well over 512 maximal
-	// entries. An indexed aggregate first skips the expensive sweep for the overwhelming majority
-	// of calls, where the table is nowhere near the budget; the sweep itself is unchanged, so its
-	// safety argument still holds exactly.
-	//
-	// P21 round 3 performance finding 11: this comment originally claimed the SUM below was
-	// already a "cheap indexed aggregate" — it wasn't; there was no index on stored_bytes, so
-	// SQLite full-scanned the table's own b-tree on every completed call regardless. Migration
-	// 0013_p21r3_history_bytes_index.sql adds grpc_call_history_bytes, a covering index over
-	// exactly this column, making the SUM an index-only scan and making this comment true.
-	var totalBytes int64
-	if err := tx.QueryRow(`SELECT COALESCE(SUM(stored_bytes), 0) FROM grpc_call_history`).Scan(&totalBytes); err != nil {
-		return fmt.Errorf("repos/grpc_history: sum stored_bytes: %w", err)
-	}
-	if totalBytes > int64(grpcHistoryByteBudget) {
-		if _, err := tx.Exec(
-			`DELETE FROM grpc_call_history WHERE id NOT IN (
-			   SELECT id FROM (
-			     SELECT id, SUM(stored_bytes) OVER (ORDER BY called_at DESC, rowid DESC
-			                                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running
-			       FROM grpc_call_history
-			   ) WHERE running <= ?)`,
-			grpcHistoryByteBudget,
-		); err != nil {
-			return fmt.Errorf("repos/grpc_history: sweep budget: %w", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos/grpc_history: commit: %w", err)
-	}
-	return nil
+			snap = storedGrpcSnapshot{
+				Target: rec.Target, Method: rec.Method, Streaming: rec.Streaming,
+				Message: message, RequestMessageTruncated: requestMessageTruncated, Metadata: rec.Metadata,
+				Messages: messages, MessagesElided: messagesElided,
+				Header: rec.Header, Trailer: rec.Trailer,
+			}
+			return json.Marshal(snap)
+		},
+		func() ([]byte, error) {
+			// F9/P21 round 1: cap the snapshot as a whole, not just field by field — Message and
+			// Messages are already bounded (256 KiB / 100 × 64 KiB, well under half the budget), so
+			// a snapshot this large can only mean Metadata/Header/Trailer (still uncapped) grew
+			// unreasonably. Dropping them and re-marshalling makes the sweep's safety property
+			// structural rather than a per-field audit that has to be redone every time a field is
+			// added.
+			snap.Metadata = nil
+			snap.Header = nil
+			snap.Trailer = nil
+			snap.MetadataElided = true
+			return json.Marshal(snap)
+		},
+		func(tx *sql.Tx, id string, itemID *string, calledAt, environment string, storedBytes int, snapshotJSON []byte) error {
+			_, err := tx.Exec(
+				`INSERT INTO grpc_call_history
+				   (id, item_id, tab_id, called_at, target, method, streaming, environment,
+				    code, code_name, status_message, elapsed_ms, message_count, message_bytes, stored_bytes, snapshot_json)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, itemID, rec.TabID, calledAt, rec.Target, rec.Method, rec.Streaming, environment,
+				rec.Code, rec.CodeName, rec.StatusMessage, rec.ElapsedMs, rec.MessageCount, rec.MessageBytes,
+				storedBytes, string(snapshotJSON),
+			)
+			return err
+		},
+	)
+	return err
 }
 
 const grpcHistoryEntryColumns = `id, item_id, tab_id, called_at, target, method, streaming, environment,
@@ -250,41 +176,39 @@ func (r *GrpcHistoryRepo) List(scopeKey string) ([]model.GrpcCallHistoryEntry, e
 	return grpcHistoryTable.List(r.DB, scopeKey)
 }
 
-// Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns.
+// Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns —
+// GetHistory (P107 I2-8) runs the shared query, this closure does the rest.
 func (r *GrpcHistoryRepo) Get(id string) (model.GrpcCallSnapshot, error) {
-	row := r.DB.QueryRow(
-		`SELECT `+grpcHistoryEntryColumns+`, snapshot_json
-		   FROM grpc_call_history WHERE id = ?`,
-		id,
-	)
-	var (
-		e            model.GrpcCallHistoryEntry
-		itemID       sql.NullString
-		snapshotJSON string
-	)
-	if err := row.Scan(
-		&e.ID, &itemID, &e.TabID, &e.CalledAt, &e.Target, &e.Method, &e.Streaming, &e.Environment,
-		&e.Code, &e.CodeName, &e.StatusMessage, &e.ElapsedMs, &e.MessageCount, &e.MessageBytes, &e.StoredBytes,
-		&snapshotJSON,
-	); err != nil {
-		return model.GrpcCallSnapshot{}, fmt.Errorf("repos/grpc_history: get: %w", err)
-	}
-	if itemID.Valid {
-		e.ItemID = &itemID.String
-	}
+	return GetHistory(r.DB, "grpc_call_history", grpcHistoryEntryColumns, id, func(row rowScanner) (model.GrpcCallSnapshot, error) {
+		var (
+			e            model.GrpcCallHistoryEntry
+			itemID       sql.NullString
+			snapshotJSON string
+		)
+		if err := row.Scan(
+			&e.ID, &itemID, &e.TabID, &e.CalledAt, &e.Target, &e.Method, &e.Streaming, &e.Environment,
+			&e.Code, &e.CodeName, &e.StatusMessage, &e.ElapsedMs, &e.MessageCount, &e.MessageBytes, &e.StoredBytes,
+			&snapshotJSON,
+		); err != nil {
+			return model.GrpcCallSnapshot{}, fmt.Errorf("repos/grpc_history: get: %w", err)
+		}
+		if itemID.Valid {
+			e.ItemID = &itemID.String
+		}
 
-	var snap storedGrpcSnapshot
-	if err := json.Unmarshal([]byte(snapshotJSON), &snap); err != nil {
-		return model.GrpcCallSnapshot{}, fmt.Errorf("repos/grpc_history: decode snapshot %s: %w", id, err)
-	}
+		var snap storedGrpcSnapshot
+		if err := json.Unmarshal([]byte(snapshotJSON), &snap); err != nil {
+			return model.GrpcCallSnapshot{}, fmt.Errorf("repos/grpc_history: decode snapshot %s: %w", id, err)
+		}
 
-	return model.GrpcCallSnapshot{
-		Entry: e, Target: snap.Target, Method: snap.Method, Streaming: snap.Streaming,
-		Message: snap.Message, RequestMessageTruncated: snap.RequestMessageTruncated,
-		Metadata: snap.Metadata,
-		Messages: snap.Messages, MessagesElided: snap.MessagesElided,
-		Header: snap.Header, Trailer: snap.Trailer,
-	}, nil
+		return model.GrpcCallSnapshot{
+			Entry: e, Target: snap.Target, Method: snap.Method, Streaming: snap.Streaming,
+			Message: snap.Message, RequestMessageTruncated: snap.RequestMessageTruncated,
+			Metadata: snap.Metadata,
+			Messages: snap.Messages, MessagesElided: snap.MessagesElided,
+			Header: snap.Header, Trailer: snap.Trailer,
+		}, nil
+	})
 }
 
 // Delete removes one entry.

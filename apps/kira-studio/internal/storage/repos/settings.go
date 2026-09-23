@@ -8,6 +8,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // SettingsRepo reads and writes the `settings` table, one JSON-valued row per leaf
@@ -34,21 +35,9 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	} else {
 		rows, err = r.DB.Query(settingsSelectAllSQL)
 	}
+	stored, err := appstorage.ScanLeafRows(rows, err)
 	if err != nil {
-		return model.Settings{}, fmt.Errorf("repos/settings: query: %w", err)
-	}
-	defer rows.Close()
-
-	stored := map[string]json.RawMessage{}
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return model.Settings{}, fmt.Errorf("repos/settings: scan: %w", err)
-		}
-		stored[key] = json.RawMessage(value)
-	}
-	if err := rows.Err(); err != nil {
-		return model.Settings{}, fmt.Errorf("repos/settings: rows: %w", err)
+		return model.Settings{}, err
 	}
 
 	result := model.DefaultSettings()
@@ -74,110 +63,75 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 }
 
 func upsertDataSection(tx *sql.Tx, d *model.DataPatch) error {
-	if d == nil || d.DefaultPageSize == nil {
+	if d == nil {
 		return nil
 	}
-	return appsettings.UpsertLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize)
+	return appsettings.UpsertOptional(tx, "data.defaultPageSize", d.DefaultPageSize)
 }
 
 func upsertCacheSection(tx *sql.Tx, c *model.CachePatch) error {
-	if c == nil || c.L2BudgetMb == nil {
+	if c == nil {
 		return nil
 	}
-	return appsettings.UpsertLeaf(tx, "cache.l2BudgetMb", *c.L2BudgetMb)
+	return appsettings.UpsertOptional(tx, "cache.l2BudgetMb", c.L2BudgetMb)
 }
 
 func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 	if a == nil {
 		return nil
 	}
-	if a.OpLogRetentionDays != nil {
-		if err := appsettings.UpsertLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "advanced.opLogRetentionDays", a.OpLogRetentionDays); err != nil {
+		return err
 	}
-	if a.ExpensiveQueryRows != nil {
-		if err := appsettings.UpsertLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "advanced.expensiveQueryRows", a.ExpensiveQueryRows); err != nil {
+		return err
 	}
-	if a.GitLogLevel != nil {
-		if err := appsettings.UpsertLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
-			return err
-		}
-	}
-	return nil
+	return appsettings.UpsertOptional(tx, "advanced.gitLogLevel", a.GitLogLevel)
 }
 
 func upsertApiSection(tx *sql.Tx, a *model.ApiPatch) error {
 	if a == nil {
 		return nil
 	}
-	if a.HTTPVersion != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.httpVersion", a.HTTPVersion); err != nil {
+		return err
 	}
-	if a.RequestTimeoutMs != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.requestTimeoutMs", a.RequestTimeoutMs); err != nil {
+		return err
 	}
-	if a.MaxResponseMb != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.maxResponseMb", a.MaxResponseMb); err != nil {
+		return err
 	}
-	if a.SSLVerify != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.sslVerify", a.SSLVerify); err != nil {
+		return err
 	}
-	if a.FollowRedirects != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.followRedirects", a.FollowRedirects); err != nil {
+		return err
 	}
-	if a.MaxRedirects != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "api.maxRedirects", a.MaxRedirects); err != nil {
+		return err
 	}
-	if a.DisableCookieJar != nil {
-		if err := appsettings.UpsertLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
-			return err
-		}
-	}
-	return nil
+	return appsettings.UpsertOptional(tx, "api.disableCookieJar", a.DisableCookieJar)
 }
 
 func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
-	if dm == nil || dm.ServerEnabled == nil {
+	if dm == nil {
 		return nil
 	}
-	return appsettings.UpsertLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled)
+	return appsettings.UpsertOptional(tx, "dbMcp.serverEnabled", dm.ServerEnabled)
 }
 
 func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
 	if cc == nil {
 		return nil
 	}
-	if cc.HooksEnabled != nil {
-		if err := appsettings.UpsertLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "claudeCode.hooksEnabled", cc.HooksEnabled); err != nil {
+		return err
 	}
-	if cc.HooksPromptDismissed != nil {
-		if err := appsettings.UpsertLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
-			return err
-		}
+	if err := appsettings.UpsertOptional(tx, "claudeCode.hooksPromptDismissed", cc.HooksPromptDismissed); err != nil {
+		return err
 	}
-	if cc.KeepAwakeWithAgents != nil {
-		if err := appsettings.UpsertLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
-			return err
-		}
-	}
-	return nil
+	return appsettings.UpsertOptional(tx, "claudeCode.keepAwakeWithAgents", cc.KeepAwakeWithAgents)
 }
 
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction
@@ -187,39 +141,32 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		return model.Settings{}, fmt.Errorf("repos/settings: %w", err)
 	}
 
-	tx, err := r.DB.Begin()
+	err := appstorage.UpdateLeaves(r.DB, r.selectAll, settingsSelectAllSQL, func(tx *sql.Tx, _ map[string]json.RawMessage) error {
+		if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
+			return err
+		}
+		if err := upsertDataSection(tx, patch.Data); err != nil {
+			return err
+		}
+		if err := upsertCacheSection(tx, patch.Cache); err != nil {
+			return err
+		}
+		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
+			return err
+		}
+		if err := appsettings.UpsertGit(tx, patch.Git); err != nil {
+			return err
+		}
+		if err := upsertApiSection(tx, patch.Api); err != nil {
+			return err
+		}
+		if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {
+			return err
+		}
+		return upsertClaudeCodeSection(tx, patch.ClaudeCode)
+	})
 	if err != nil {
-		return model.Settings{}, fmt.Errorf("repos/settings: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
 		return model.Settings{}, err
-	}
-	if err := upsertDataSection(tx, patch.Data); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertCacheSection(tx, patch.Cache); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
-		return model.Settings{}, err
-	}
-	if err := appsettings.UpsertGit(tx, patch.Git); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertApiSection(tx, patch.Api); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertClaudeCodeSection(tx, patch.ClaudeCode); err != nil {
-		return model.Settings{}, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return model.Settings{}, fmt.Errorf("repos/settings: commit: %w", err)
 	}
 	return r.GetAll()
 }

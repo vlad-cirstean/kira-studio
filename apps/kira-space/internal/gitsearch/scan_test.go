@@ -11,14 +11,11 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGitScan(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGitScan is testx.SkipWithoutGit (P107 I2-28).
+var skipWithoutGitScan = testx.SkipWithoutGit
 
 // initScanRepo builds a repo of n commits via `git fast-import` — orders of magnitude faster than
 // n real `git commit` spawns, which is what makes a 1000+-commit budget test practical to run on
@@ -198,7 +195,9 @@ func TestScan_CancelledContextStopsPromptlyAndKillsTheChild(t *testing.T) {
 	skipWithoutGitScan(t)
 	// Large enough that an uncancelled scan would still be reading when the cancel fires.
 	const n = 5000
-	dir := initScanRepo(t, n, func(i int) string { return fmt.Sprintf("commit number %d has a fairly long subject line to pad the scan's own output a little", i) })
+	dir := initScanRepo(t, n, func(i int) string {
+		return fmt.Sprintf("commit number %d has a fairly long subject line to pad the scan's own output a little", i)
+	})
 	m, err := Compile(Query{Text: "commit"})
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

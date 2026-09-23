@@ -25,6 +25,60 @@ const (
 	byFilename
 )
 
+// fetchWith runs one reflection request/response round trip — send, receive, then either the
+// error the server returned or the file descriptor bytes — the shape v1Transport.fetch and
+// v1AlphaTransport.fetch shared exactly except for their own generated Req/Resp package
+// (P107 I2-34). getError reports whether resp carries an ErrorResponse; getFiles extracts the
+// FileDescriptorProto bytes, nil when the response carried neither.
+func fetchWith[Req, Resp any](
+	send func(Req) error, recv func() (Resp, error), req Req,
+	getError func(Resp) (code int32, msg string, ok bool),
+	getFiles func(Resp) [][]byte,
+) ([][]byte, error) {
+	if err := send(req); err != nil {
+		return nil, err
+	}
+	resp, err := recv()
+	if err != nil {
+		return nil, err
+	}
+	if code, msg, ok := getError(resp); ok {
+		return nil, status.Error(codes.Code(code), msg)
+	}
+	files := getFiles(resp)
+	if files == nil {
+		return nil, fmt.Errorf("grpcclient: reflection: unexpected response")
+	}
+	return files, nil
+}
+
+// listServicesWith runs one reflection ListServices request/response round trip — the shape
+// v1Transport.listServices and v1AlphaTransport.listServices shared exactly except for their own
+// generated Req/Resp package and (v1alpha) an extra type conversion (P107 I2-34). getError reports
+// an ErrorResponse; getServices converts resp's own service list into v1's ServiceResponse shape,
+// nil when the response carried neither.
+func listServicesWith[Req, Resp any](
+	send func(Req) error, recv func() (Resp, error), req Req,
+	getError func(Resp) (code int32, msg string, ok bool),
+	getServices func(Resp) []*grpc_reflection_v1.ServiceResponse,
+) ([]string, error) {
+	if err := send(req); err != nil {
+		return nil, err
+	}
+	resp, err := recv()
+	if err != nil {
+		return nil, err
+	}
+	if code, msg, ok := getError(resp); ok {
+		return nil, status.Error(codes.Code(code), msg)
+	}
+	services := getServices(resp)
+	if services == nil {
+		return nil, fmt.Errorf("grpcclient: reflection: unexpected response to ListServices")
+	}
+	return filterServiceNames(services), nil
+}
+
 // reflectionTransport is the one seam between the version-negotiation this file does (v1, falling
 // back to v1alpha on codes.Unimplemented, D4/F2) and the recursive dependency-linking algorithm
 // resolveViaTransport runs — v1 and v1alpha are structurally identical wire protocols with two
@@ -49,23 +103,24 @@ func newV1Transport(ctx context.Context, conn *grpc.ClientConn) (*v1Transport, e
 }
 
 func (t *v1Transport) listServices() ([]string, error) {
-	if err := t.stream.Send(&grpc_reflection_v1.ServerReflectionRequest{
+	req := &grpc_reflection_v1.ServerReflectionRequest{
 		MessageRequest: &grpc_reflection_v1.ServerReflectionRequest_ListServices{ListServices: "*"},
-	}); err != nil {
-		return nil, err
 	}
-	resp, err := t.stream.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if e := resp.GetErrorResponse(); e != nil {
-		return nil, status.Error(codes.Code(e.GetErrorCode()), e.GetErrorMessage())
-	}
-	list := resp.GetListServicesResponse()
-	if list == nil {
-		return nil, fmt.Errorf("grpcclient: reflection: unexpected response to ListServices")
-	}
-	return filterServiceNames(list.GetService()), nil
+	return listServicesWith(t.stream.Send, t.stream.Recv, req,
+		func(resp *grpc_reflection_v1.ServerReflectionResponse) (int32, string, bool) {
+			if e := resp.GetErrorResponse(); e != nil {
+				return e.GetErrorCode(), e.GetErrorMessage(), true
+			}
+			return 0, "", false
+		},
+		func(resp *grpc_reflection_v1.ServerReflectionResponse) []*grpc_reflection_v1.ServiceResponse {
+			list := resp.GetListServicesResponse()
+			if list == nil {
+				return nil
+			}
+			return list.GetService()
+		},
+	)
 }
 
 func (t *v1Transport) fetch(kind reflectKind, value string) ([][]byte, error) {
@@ -76,21 +131,21 @@ func (t *v1Transport) fetch(kind reflectKind, value string) ([][]byte, error) {
 	case byFilename:
 		req.MessageRequest = &grpc_reflection_v1.ServerReflectionRequest_FileByFilename{FileByFilename: value}
 	}
-	if err := t.stream.Send(req); err != nil {
-		return nil, err
-	}
-	resp, err := t.stream.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if e := resp.GetErrorResponse(); e != nil {
-		return nil, status.Error(codes.Code(e.GetErrorCode()), e.GetErrorMessage())
-	}
-	fd := resp.GetFileDescriptorResponse()
-	if fd == nil {
-		return nil, fmt.Errorf("grpcclient: reflection: unexpected response")
-	}
-	return fd.GetFileDescriptorProto(), nil
+	return fetchWith(t.stream.Send, t.stream.Recv, req,
+		func(resp *grpc_reflection_v1.ServerReflectionResponse) (int32, string, bool) {
+			if e := resp.GetErrorResponse(); e != nil {
+				return e.GetErrorCode(), e.GetErrorMessage(), true
+			}
+			return 0, "", false
+		},
+		func(resp *grpc_reflection_v1.ServerReflectionResponse) [][]byte {
+			fd := resp.GetFileDescriptorResponse()
+			if fd == nil {
+				return nil
+			}
+			return fd.GetFileDescriptorProto()
+		},
+	)
 }
 
 // ---- v1alpha (D4's fallback, on codes.Unimplemented from v1 — the same negotiation
@@ -109,27 +164,28 @@ func newV1AlphaTransport(ctx context.Context, conn *grpc.ClientConn) (*v1AlphaTr
 }
 
 func (t *v1AlphaTransport) listServices() ([]string, error) {
-	if err := t.stream.Send(&grpc_reflection_v1alpha.ServerReflectionRequest{
+	req := &grpc_reflection_v1alpha.ServerReflectionRequest{
 		MessageRequest: &grpc_reflection_v1alpha.ServerReflectionRequest_ListServices{ListServices: "*"},
-	}); err != nil {
-		return nil, err
 	}
-	resp, err := t.stream.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if e := resp.GetErrorResponse(); e != nil {
-		return nil, status.Error(codes.Code(e.GetErrorCode()), e.GetErrorMessage())
-	}
-	list := resp.GetListServicesResponse()
-	if list == nil {
-		return nil, fmt.Errorf("grpcclient: reflection: unexpected response to ListServices")
-	}
-	names := make([]*grpc_reflection_v1.ServiceResponse, 0, len(list.GetService()))
-	for _, s := range list.GetService() {
-		names = append(names, &grpc_reflection_v1.ServiceResponse{Name: s.GetName()})
-	}
-	return filterServiceNames(names), nil
+	return listServicesWith(t.stream.Send, t.stream.Recv, req,
+		func(resp *grpc_reflection_v1alpha.ServerReflectionResponse) (int32, string, bool) {
+			if e := resp.GetErrorResponse(); e != nil {
+				return e.GetErrorCode(), e.GetErrorMessage(), true
+			}
+			return 0, "", false
+		},
+		func(resp *grpc_reflection_v1alpha.ServerReflectionResponse) []*grpc_reflection_v1.ServiceResponse {
+			list := resp.GetListServicesResponse()
+			if list == nil {
+				return nil
+			}
+			names := make([]*grpc_reflection_v1.ServiceResponse, 0, len(list.GetService()))
+			for _, s := range list.GetService() {
+				names = append(names, &grpc_reflection_v1.ServiceResponse{Name: s.GetName()})
+			}
+			return names
+		},
+	)
 }
 
 func (t *v1AlphaTransport) fetch(kind reflectKind, value string) ([][]byte, error) {
@@ -140,21 +196,21 @@ func (t *v1AlphaTransport) fetch(kind reflectKind, value string) ([][]byte, erro
 	case byFilename:
 		req.MessageRequest = &grpc_reflection_v1alpha.ServerReflectionRequest_FileByFilename{FileByFilename: value}
 	}
-	if err := t.stream.Send(req); err != nil {
-		return nil, err
-	}
-	resp, err := t.stream.Recv()
-	if err != nil {
-		return nil, err
-	}
-	if e := resp.GetErrorResponse(); e != nil {
-		return nil, status.Error(codes.Code(e.GetErrorCode()), e.GetErrorMessage())
-	}
-	fd := resp.GetFileDescriptorResponse()
-	if fd == nil {
-		return nil, fmt.Errorf("grpcclient: reflection: unexpected response")
-	}
-	return fd.GetFileDescriptorProto(), nil
+	return fetchWith(t.stream.Send, t.stream.Recv, req,
+		func(resp *grpc_reflection_v1alpha.ServerReflectionResponse) (int32, string, bool) {
+			if e := resp.GetErrorResponse(); e != nil {
+				return e.GetErrorCode(), e.GetErrorMessage(), true
+			}
+			return 0, "", false
+		},
+		func(resp *grpc_reflection_v1alpha.ServerReflectionResponse) [][]byte {
+			fd := resp.GetFileDescriptorResponse()
+			if fd == nil {
+				return nil
+			}
+			return fd.GetFileDescriptorProto()
+		},
+	)
 }
 
 // filterServiceNames drops the reflection service's own entries (grpc.reflection.v1.*,

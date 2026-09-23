@@ -64,9 +64,8 @@ func connectedAdapter(t *testing.T, fixture *testsupport.RedisFixture) adapters.
 	return a
 }
 
-func nodePath(fixture *testsupport.RedisFixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(fixture.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *RedisFixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.RedisFixture]
 
 // 1. connect / disconnect
 func TestRedis_ConnectDisconnect(t *testing.T) {

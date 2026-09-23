@@ -24,13 +24,6 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 	return adapters.LiteralRenderer(name, &escaped)
 }
 
-// binaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
-// resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
-// convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
-func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
-	return adapters.BinaryColumnsOf(columns, typeClassFor)
-}
-
 // preview is mutate.ts's preview — synchronous (D6): no catalog lookup, no network.
 func preview(plan model.MutationPlan) ([]string, error) {
 	database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
@@ -43,35 +36,20 @@ func preview(plan model.MutationPlan) ([]string, error) {
 
 // mutate is mutate.ts's mutate.
 func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
-	if err := adapters.AssertWritable(readOnly); err != nil {
-		return model.MutationResult{}, err
+	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
+		database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		exec := execFor(conn, threadID, op, track)
+		target, err := getReadTarget(ctx, exec, database, table)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		relationSQL = quoteIdent(database) + "." + quoteIdent(table)
+		qualifiedName = target.QualifiedName.Database + "." + target.QualifiedName.Table
+		return relationSQL, qualifiedName, target.Columns, target.PrimaryKey, nil
 	}
-
-	database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	relationSQL := quoteIdent(database) + "." + quoteIdent(table)
-
-	exec := execFor(conn, threadID, op, track)
-	target, err := getReadTarget(ctx, exec, database, table)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-
-	qualifiedName := target.QualifiedName.Database + "." + target.QualifiedName.Table
-	if err := adapters.ValidateMutationOps(plan.Ops, target.Columns, target.PrimaryKey, qualifiedName); err != nil {
-		return model.MutationResult{}, err
-	}
-
-	paramRenderer := adapters.NewParamRenderer(questionPlaceholder, binaryColumnsOf(target.Columns))
-	ordered := adapters.OrderedOps(plan.Ops)
-	compiled, previewParts, err := adapters.CompileMutationOps(relationSQL, ordered, paramRenderer, literalRenderer, quoteIdent)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
-	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sql string, params []any) (int64, error) {
 		return runCommand(ctx, conn, threadID, sql, params, op, track, CommandOptions{SuppressCommand: true})
@@ -87,5 +65,10 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 		defer cancel()
 		_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
 	}
-	return adapters.RunSQLMutation(ctx, "START TRANSACTION", execCommand, rollback, compiled)
+
+	return adapters.RunRelationalMutate(ctx, op, readOnly, plan, adapters.RelationalMutateDeps{
+		Resolve: resolve, Quote: quoteIdent, Placeholder: questionPlaceholder,
+		TypeClassFor: typeClassFor, LiteralRenderer: literalRenderer,
+		BeginSQL: "START TRANSACTION", Exec: execCommand, Rollback: rollback,
+	})
 }

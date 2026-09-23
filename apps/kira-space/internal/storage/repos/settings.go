@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // SettingsRepo reads and writes the `settings` table, one JSON-valued row per leaf
@@ -34,21 +35,9 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	} else {
 		rows, err = r.DB.Query(settingsSelectAllSQL)
 	}
+	stored, err := appstorage.ScanLeafRows(rows, err)
 	if err != nil {
-		return model.Settings{}, fmt.Errorf("repos: query settings: %w", err)
-	}
-	defer rows.Close()
-
-	stored := map[string]json.RawMessage{}
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return model.Settings{}, fmt.Errorf("repos: scan settings: %w", err)
-		}
-		stored[key] = json.RawMessage(value)
-	}
-	if err := rows.Err(); err != nil {
-		return model.Settings{}, fmt.Errorf("repos: settings rows: %w", err)
+		return model.Settings{}, err
 	}
 
 	result := model.DefaultSettings()
@@ -59,10 +48,10 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 }
 
 func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
-	if a == nil || a.GitLogLevel == nil {
+	if a == nil {
 		return nil
 	}
-	return appsettings.UpsertLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel)
+	return appsettings.UpsertOptional(tx, "advanced.gitLogLevel", a.GitLogLevel)
 }
 
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction,
@@ -72,24 +61,17 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		return model.Settings{}, fmt.Errorf("repos: %w", err)
 	}
 
-	tx, err := r.DB.Begin()
+	err := appstorage.UpdateLeaves(r.DB, r.selectAll, settingsSelectAllSQL, func(tx *sql.Tx, _ map[string]json.RawMessage) error {
+		if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
+			return err
+		}
+		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
+			return err
+		}
+		return appsettings.UpsertGit(tx, patch.Git)
+	})
 	if err != nil {
-		return model.Settings{}, fmt.Errorf("repos: begin settings: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
 		return model.Settings{}, err
-	}
-	if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
-		return model.Settings{}, err
-	}
-	if err := appsettings.UpsertGit(tx, patch.Git); err != nil {
-		return model.Settings{}, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return model.Settings{}, fmt.Errorf("repos: commit settings: %w", err)
 	}
 	return r.GetAll()
 }

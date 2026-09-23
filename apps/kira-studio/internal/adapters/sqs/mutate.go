@@ -60,16 +60,8 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	commandText := ""
-	for i, s := range statements {
-		if i > 0 {
-			commandText += ";\n"
-		}
-		commandText += s
-	}
-	op.SetCommand(commandText)
 
-	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
+	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
 		switch rowOp.Kind {
 		case "insert":
 			body, ok := rowOp.Values.Get(bodyField)

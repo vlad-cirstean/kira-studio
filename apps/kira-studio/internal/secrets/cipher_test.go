@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 func fakeLoadOK() ([]byte, error) { return bytes.Repeat([]byte{0x01}, 32), nil }
@@ -65,14 +65,8 @@ func availableCipher(t *testing.T) *Cipher {
 	return &Cipher{status: status, aead: aead}
 }
 
-func asIpcErr(t *testing.T, err error) *ipcerr.Error {
-	t.Helper()
-	var ie *ipcerr.Error
-	if !errors.As(err, &ie) {
-		t.Fatalf("error %v (%T) is not an *ipcerr.Error", err, err)
-	}
-	return ie
-}
+// asIpcErr is testx.AsIpcErr (P107 I2-28).
+var asIpcErr = testx.AsIpcErr
 
 // TestEncryptUsesAFreshNoncePerCall is the property that makes the envelope safe to store: two
 // encryptions of the same credential must never produce the same ciphertext, or a reused nonce

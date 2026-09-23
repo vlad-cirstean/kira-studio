@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +12,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 // fakeSource is an EventSource a test drives directly, without a real engine child.
@@ -116,19 +117,8 @@ func fetchOp(t *testing.T, ops *repos.OpsRepo, id string) model.OpRecord {
 	return model.OpRecord{}
 }
 
-func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatalf("condition not met within %s", timeout)
-	}
-}
+// waitUntil is testx.WaitUntil (P107 I2-28).
+var waitUntil = testx.WaitUntil
 
 // updateCollector is an OnUpdate sink safe for concurrent use.
 type updateCollector struct {

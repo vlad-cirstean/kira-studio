@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
@@ -22,22 +23,21 @@ func validStashScope(scope string) bool {
 }
 
 func (r *Router) handleStashList(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p StashListParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: stash.list: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: stash.list: repoId is required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := entry.StashList(ctx)
-	if err != nil {
-		return nil, mapGitError(err)
-	}
-	return StashListResult{Entries: entries}, nil
+	return handleRepoCall(ctx, c, "stash.list", params,
+		func(p StashListParams) (string, error) {
+			if err := requireNonEmpty("stash.list", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, _ StashListParams) (StashListResult, error) {
+			entries, err := entry.StashList(ctx)
+			if err != nil {
+				return StashListResult{}, mapGitError(err)
+			}
+			return StashListResult{Entries: entries}, nil
+		},
+	)
 }
 
 // mapStashError maps gitsession.ErrStashNotFound — a caller mistake or a genuine race (the stack
@@ -52,89 +52,85 @@ func mapStashError(err error) error {
 }
 
 func (r *Router) handleStashShow(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p StashShowParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: stash.show: invalid params")
-	}
-	if p.RepoID == "" || p.SHA == "" {
-		return nil, ipcerr.BadRequest("gitrpc: stash.show: repoId and sha are required")
-	}
-	if !validStashScope(p.Scope) {
-		return nil, ipcerr.BadRequest("gitrpc: stash.show: invalid scope " + p.Scope)
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.StashShow(ctx, p.SHA, p.Scope)
-	if err != nil {
-		return nil, mapStashError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "stash.show", params,
+		func(p StashShowParams) (string, error) {
+			if err := requireNonEmpty("stash.show", "repoId", p.RepoID, "sha", p.SHA); err != nil {
+				return "", err
+			}
+			if !validStashScope(p.Scope) {
+				return "", ipcerr.BadRequest("gitrpc: stash.show: invalid scope " + p.Scope)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p StashShowParams) (gitsession.StashShowResult, error) {
+			result, err := entry.StashShow(ctx, p.SHA, p.Scope)
+			if err != nil {
+				return gitsession.StashShowResult{}, mapStashError(err)
+			}
+			return result, nil
+		},
+	)
 }
 
 func (r *Router) handlePreflightStashPop(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p PreflightStashPopParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashPop: invalid params")
-	}
-	if p.RepoID == "" || p.SHA == "" {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashPop: repoId and sha are required")
-	}
-	if !validStashScope(p.Scope) {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashPop: invalid scope " + p.Scope)
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.PreflightStashPop(ctx, p.SHA, p.TargetSHA, p.Scope)
-	if err != nil {
-		return nil, mapStashError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "preflight.stashPop", params,
+		func(p PreflightStashPopParams) (string, error) {
+			if err := requireNonEmpty("preflight.stashPop", "repoId", p.RepoID, "sha", p.SHA); err != nil {
+				return "", err
+			}
+			if !validStashScope(p.Scope) {
+				return "", ipcerr.BadRequest("gitrpc: preflight.stashPop: invalid scope " + p.Scope)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightStashPopParams) (gitpreflight.StashPopPreflight, error) {
+			result, err := entry.PreflightStashPop(ctx, p.SHA, p.TargetSHA, p.Scope)
+			if err != nil {
+				return gitpreflight.StashPopPreflight{}, mapStashError(err)
+			}
+			return result, nil
+		},
+	)
 }
 
 func (r *Router) handlePreflightStashBranch(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p PreflightStashBranchParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashBranch: invalid params")
-	}
-	if p.RepoID == "" || p.SHA == "" || p.Branch == "" {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashBranch: repoId, sha and branch are required")
-	}
-	if !validStashScope(p.Scope) {
-		return nil, ipcerr.BadRequest("gitrpc: preflight.stashBranch: invalid scope " + p.Scope)
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.PreflightStashBranch(ctx, p.SHA, p.Branch, p.Scope)
-	if err != nil {
-		return nil, mapStashError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "preflight.stashBranch", params,
+		func(p PreflightStashBranchParams) (string, error) {
+			if err := requireNonEmpty("preflight.stashBranch", "repoId", p.RepoID, "sha", p.SHA, "branch", p.Branch); err != nil {
+				return "", err
+			}
+			if !validStashScope(p.Scope) {
+				return "", ipcerr.BadRequest("gitrpc: preflight.stashBranch: invalid scope " + p.Scope)
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightStashBranchParams) (gitpreflight.StashBranchPreflight, error) {
+			result, err := entry.PreflightStashBranch(ctx, p.SHA, p.Branch, p.Scope)
+			if err != nil {
+				return gitpreflight.StashBranchPreflight{}, mapStashError(err)
+			}
+			return result, nil
+		},
+	)
 }
 
 // handleGlobalStashList is globalStash.list's own dispatch (G28 D9/D17) — the bucket's own
 // listing, reusing StashListResult verbatim (D17: zero new wire interfaces — the shape `{entries:
 // StashEntry[]}` is already exactly what stash.list answers).
 func (r *Router) handleGlobalStashList(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p GlobalStashListParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: globalStash.list: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: globalStash.list: repoId is required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := entry.GlobalStashList(ctx)
-	if err != nil {
-		return nil, mapGitError(err)
-	}
-	return StashListResult{Entries: entries}, nil
+	return handleRepoCall(ctx, c, "globalStash.list", params,
+		func(p GlobalStashListParams) (string, error) {
+			if err := requireNonEmpty("globalStash.list", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, _ GlobalStashListParams) (StashListResult, error) {
+			entries, err := entry.GlobalStashList(ctx)
+			if err != nil {
+				return StashListResult{}, mapGitError(err)
+			}
+			return StashListResult{Entries: entries}, nil
+		},
+	)
 }

@@ -11,14 +11,12 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGitStack(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGitStack is testx.SkipWithoutGit (P107 I2-28) — suffixed, same package as
+// walk_test.go's and queries_test.go's own copies.
+var skipWithoutGitStack = testx.SkipWithoutGit
 
 func runGitStack(t *testing.T, dir string, args ...string) {
 	t.Helper()
@@ -75,19 +73,7 @@ func newStackTestEntryWithRunner(t *testing.T, runner gitclient.Runner, repoDir 
 
 func newStackTestConnAndEntry(t *testing.T, runner gitclient.Runner, repoDir string) (*Conn, *RepoEntry) {
 	t.Helper()
-	registry := NewRegistry(runner)
-	t.Cleanup(registry.Close)
-	conn := NewConn(ConnID("stack-test-conn"), "test-client", "test-client-label", nil)
-	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	t.Cleanup(conn.Close)
-	entry, ok := conn.Entry(summary.RepoID)
-	if !ok {
-		t.Fatal("conn.Entry: not held after Open")
-	}
-	return conn, entry
+	return newTestEntry(t, ConnID("stack-test-conn"), repoDir, testEntryOpts{runner: runner})
 }
 
 func initUnstackedRepo(t *testing.T) string {

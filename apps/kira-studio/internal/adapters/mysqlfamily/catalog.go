@@ -280,12 +280,7 @@ var constraintActionNames = map[string]string{
 // listForeignKeys is catalog.ts's listForeignKeys — outbound (this table's own FKs). referencedPath
 // is a two-segment path (database/table), one shallower than Postgres's three (§6d).
 func listForeignKeys(ctx context.Context, exec queryExec, database, table string) ([]model.ForeignKeyMeta, error) {
-	type row struct {
-		name, column, refSchema, refTable, refColumn string
-		onDelete, onUpdate                           string
-	}
-	var rowsOut []row
-	err := exec(ctx, `SELECT kcu.CONSTRAINT_NAME AS name, kcu.COLUMN_NAME AS column_name,
+	return queryForeignKeys(ctx, exec, `SELECT kcu.CONSTRAINT_NAME AS name, kcu.COLUMN_NAME AS column_name,
 	        kcu.REFERENCED_TABLE_SCHEMA AS ref_schema, kcu.REFERENCED_TABLE_NAME AS ref_table,
 	        kcu.REFERENCED_COLUMN_NAME AS ref_column,
 	        rc.DELETE_RULE AS on_delete, rc.UPDATE_RULE AS on_update
@@ -293,40 +288,44 @@ func listForeignKeys(ctx context.Context, exec queryExec, database, table string
 	 JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
 	   ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
 	 WHERE kcu.TABLE_SCHEMA = ? AND kcu.TABLE_NAME = ? AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-	 ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`, []any{database, table}, func(rows *sql.Rows) error {
-		var r row
-		if err := rows.Scan(&r.name, &r.column, &r.refSchema, &r.refTable, &r.refColumn, &r.onDelete, &r.onUpdate); err != nil {
-			return err
-		}
-		rowsOut = append(rowsOut, r)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return groupForeignKeys(rowsOut, func(r row) (name, col, refDB, refTable, refCol, onDel, onUpd string) {
-		return r.name, r.column, r.refSchema, r.refTable, r.refColumn, r.onDelete, r.onUpdate
-	}), nil
+	 ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`, []any{database, table},
+		func(r fkScanRow) (name, col, refDB, refTable, refCol, onDel, onUpd string) {
+			return r.Name, r.Col2, r.Col3, r.Col4, r.Col5, r.OnDelete, r.OnUpdate
+		})
 }
 
 // listReferencedBy is catalog.ts's listReferencedBy (D17): I am the referenced table, so my own
 // columns are ref_column and the other (referencing) table is src_* — the mirror image.
 func listReferencedBy(ctx context.Context, exec queryExec, database, table string) ([]model.ForeignKeyMeta, error) {
-	type row struct {
-		name, srcSchema, srcTable, srcColumn, refColumn string
-		onDelete, onUpdate                              string
-	}
-	var rowsOut []row
-	err := exec(ctx, `SELECT kcu.CONSTRAINT_NAME AS name, kcu.TABLE_SCHEMA AS src_schema, kcu.TABLE_NAME AS src_table,
+	return queryForeignKeys(ctx, exec, `SELECT kcu.CONSTRAINT_NAME AS name, kcu.TABLE_SCHEMA AS src_schema, kcu.TABLE_NAME AS src_table,
 	        kcu.COLUMN_NAME AS src_column, kcu.REFERENCED_COLUMN_NAME AS ref_column,
 	        rc.DELETE_RULE AS on_delete, rc.UPDATE_RULE AS on_update
 	 FROM information_schema.KEY_COLUMN_USAGE kcu
 	 JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
 	   ON rc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
 	 WHERE kcu.REFERENCED_TABLE_SCHEMA = ? AND kcu.REFERENCED_TABLE_NAME = ?
-	 ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`, []any{database, table}, func(rows *sql.Rows) error {
-		var r row
-		if err := rows.Scan(&r.name, &r.srcSchema, &r.srcTable, &r.srcColumn, &r.refColumn, &r.onDelete, &r.onUpdate); err != nil {
+	 ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION`, []any{database, table},
+		func(r fkScanRow) (name, col, refDB, refTable, refCol, onDel, onUpd string) {
+			return r.Name, r.Col5, r.Col2, r.Col3, r.Col4, r.OnDelete, r.OnUpdate
+		})
+}
+
+// fkScanRow is queryForeignKeys' own scan target: five same-order, role-varying columns (each call
+// site's own SELECT list says what Col2-Col5 actually hold) plus the two always-named ones.
+type fkScanRow struct {
+	Name                   string
+	Col2, Col3, Col4, Col5 string
+	OnDelete, OnUpdate     string
+}
+
+// queryForeignKeys runs listForeignKeys/listReferencedBy's own shared KEY_COLUMN_USAGE +
+// REFERENTIAL_CONSTRAINTS join shape (P107 I2-11: identical query/scan/group structure, only the
+// WHERE clause and which raw column plays which ForeignKeyMeta role differ) and groups the result.
+func queryForeignKeys(ctx context.Context, exec queryExec, query string, params []any, get func(fkScanRow) (name, col, refDatabase, refTable, refCol, onDelete, onUpdate string)) ([]model.ForeignKeyMeta, error) {
+	var rowsOut []fkScanRow
+	err := exec(ctx, query, params, func(rows *sql.Rows) error {
+		var r fkScanRow
+		if err := rows.Scan(&r.Name, &r.Col2, &r.Col3, &r.Col4, &r.Col5, &r.OnDelete, &r.OnUpdate); err != nil {
 			return err
 		}
 		rowsOut = append(rowsOut, r)
@@ -335,9 +334,7 @@ func listReferencedBy(ctx context.Context, exec queryExec, database, table strin
 	if err != nil {
 		return nil, err
 	}
-	return groupForeignKeys(rowsOut, func(r row) (name, col, refDB, refTable, refCol, onDel, onUpd string) {
-		return r.name, r.refColumn, r.srcSchema, r.srcTable, r.srcColumn, r.onDelete, r.onUpdate
-	}), nil
+	return groupForeignKeys(rowsOut, get), nil
 }
 
 // groupForeignKeys folds a flat list of key-column rows into one ForeignKeyMeta per constraint,

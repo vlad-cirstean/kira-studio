@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/migrations"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 func TestMigration15BackfillsByteCountAndPurgesOversizedRows(t *testing.T) {
@@ -38,7 +39,7 @@ func TestMigration15BackfillsByteCountAndPurgesOversizedRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("migrations.All: %v", err)
 	}
-	var m15 *migrations.Migration
+	var m15 *sqlitex.Migration
 	for i := range steps {
 		if steps[i].Version == 15 {
 			m15 = &steps[i]

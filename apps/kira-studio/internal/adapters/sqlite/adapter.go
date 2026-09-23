@@ -205,7 +205,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 		databaseSegment := segments[0]
 		if databaseSegment.Kind != "database" {
-			return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+databaseSegment.Kind, nil)
+			return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, databaseSegment.Kind)
 		}
 		if len(segments) == 1 {
 			nodes, err := listTablesAndViews(exec, databaseSegment.Name)
@@ -219,15 +219,14 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		if len(segments) == 2 {
 			// Rule 5 (Adapter doc comment): every relation is a leaf (P19 D5) — its columns live
 			// in the definition view, not the tree.
-			if objectSegment.Kind == "table" || objectSegment.Kind == "view" {
-				return adapters.TreeChildren{Nodes: []model.TreeNode{}}, nil
-			}
-			return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected object kind: "+objectSegment.Kind, nil)
+			return adapters.LeafChildren(objectSegment.Kind, leafObjectKinds)
 		}
 
 		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
 	})
 }
+
+var leafObjectKinds = map[string]bool{"table": true, "view": true}
 
 func requireTwoSegmentPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 2 || segments[0].Kind != "database" || (segments[1].Kind != "table" && segments[1].Kind != "view") {

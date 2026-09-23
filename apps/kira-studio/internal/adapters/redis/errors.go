@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"errors"
-	"net"
 	"regexp"
 
 	goredis "github.com/redis/go-redis/v9"
@@ -36,12 +35,7 @@ func mapError(err error) *adapters.Error {
 		return adapters.New(adapters.CodeQuery, message, err)
 	}
 
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
-		return adapters.New(adapters.CodeConnect, message, err)
-	}
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if ne := adapters.ClassifyNetError(err); ne.IsNetError {
 		return adapters.New(adapters.CodeConnect, message, err)
 	}
 	if errors.Is(err, goredis.ErrClosed) {

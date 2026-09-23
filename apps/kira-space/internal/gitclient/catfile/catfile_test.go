@@ -14,14 +14,11 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGit(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGit is testx.SkipWithoutGit (P107 I2-28).
+var skipWithoutGit = testx.SkipWithoutGit
 
 func initRepo(t *testing.T) string {
 	t.Helper()

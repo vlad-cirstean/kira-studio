@@ -15,48 +15,26 @@ import (
 // BuildTemplate is the direct analogue of buildMenu({isDev}) (src/main/menu.ts). Same four
 // sections, same order, same labels, same accelerators.
 func BuildTemplate(appName string, isDev bool) []shell.Section {
-	appSection := shell.Section{
-		Label: appName,
-		Items: []shell.Item{
-			{Kind: shell.ItemRole, Role: application.About},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemEmit, Label: "New Connection", Accelerator: shell.Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
-			// P28 D18: three actions that were prominent panel buttons for how rarely they are used
-			// — the two imports outright, New Request additionally (its panel + button stays, since
-			// creating a request is frequent and the panel is where the collections are). No
-			// accelerators: none is frequent enough to spend one, and accel.go's Shortcuts map is
-			// deliberately untouched.
-			{Kind: shell.ItemEmit, Label: "New Request", Channel: bridge.ChannelNewRequest},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemEmit, Label: "Import Postman Collection…", Channel: bridge.ChannelImportPostman},
-			{Kind: shell.ItemEmit, Label: "Import DataGrip Connections…", Channel: bridge.ChannelImportDataGrip},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemEmit, Label: "Settings…", Accelerator: shell.Shortcuts["app.settings"].Accelerator(), Channel: bridge.ChannelOpenSettings},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemRole, Role: application.ServicesMenu},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemRole, Role: application.Hide},
-			{Kind: shell.ItemRole, Role: application.HideOthers},
-			// Electron's role: 'unhide' maps to ShowAll, never Wails' own dead UnHide role
-			// (P56 §1.4).
-			{Kind: shell.ItemRole, Role: application.ShowAll},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemQuit, Label: "Quit " + appName, Accelerator: "CmdOrCtrl+Q"},
-		},
-	}
+	appItems := shell.AppMenuHead()
+	appItems = append(appItems,
+		shell.Item{Kind: shell.ItemEmit, Label: "New Connection", Accelerator: shell.Shortcuts["app.newConnection"].Accelerator(), Channel: bridge.ChannelNewConnection},
+		// P28 D18: three actions that were prominent panel buttons for how rarely they are used
+		// — the two imports outright, New Request additionally (its panel + button stays, since
+		// creating a request is frequent and the panel is where the collections are). No
+		// accelerators: none is frequent enough to spend one, and accel.go's Shortcuts map is
+		// deliberately untouched.
+		shell.Item{Kind: shell.ItemEmit, Label: "New Request", Channel: bridge.ChannelNewRequest},
+		shell.Item{Kind: shell.ItemSeparator},
+		shell.Item{Kind: shell.ItemEmit, Label: "Import Postman Collection…", Channel: bridge.ChannelImportPostman},
+		shell.Item{Kind: shell.ItemEmit, Label: "Import DataGrip Connections…", Channel: bridge.ChannelImportDataGrip},
+		shell.Item{Kind: shell.ItemSeparator},
+		shell.Item{Kind: shell.ItemEmit, Label: "Settings…", Accelerator: shell.Shortcuts["app.settings"].Accelerator(), Channel: bridge.ChannelOpenSettings},
+		shell.Item{Kind: shell.ItemSeparator},
+	)
+	appItems = append(appItems, shell.AppMenuTail(appName)...)
+	appSection := shell.Section{Label: appName, Items: appItems}
 
-	editSection := shell.Section{
-		Label: "Edit",
-		Items: []shell.Item{
-			{Kind: shell.ItemRole, Role: application.Undo},
-			{Kind: shell.ItemRole, Role: application.Redo},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemRole, Role: application.Cut},
-			{Kind: shell.ItemRole, Role: application.Copy},
-			{Kind: shell.ItemRole, Role: application.Paste},
-			{Kind: shell.ItemRole, Role: application.SelectAll},
-		},
-	}
+	editSection := shell.Section{Label: "Edit", Items: shell.EditMenu()}
 
 	viewItems := []shell.Item{
 		{Kind: shell.ItemEmit, Label: "Toggle Project Panel", Accelerator: shell.Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
@@ -78,22 +56,17 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 	}
 	viewSection := shell.Section{Label: "View", Items: viewItems}
 
-	windowSection := shell.Section{
-		Label: "Window",
-		Items: []shell.Item{
-			{Kind: shell.ItemEmit, Label: "Next Tab", Accelerator: shell.Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
-			{Kind: shell.ItemEmit, Label: "Previous Tab", Accelerator: shell.Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
-			{Kind: shell.ItemEmit, Label: "Close Tab", Accelerator: shell.Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: shell.Shortcuts["window.new"].Accelerator()},
-			{Kind: shell.ItemSeparator},
-			{Kind: shell.ItemRole, Role: application.Minimise},
-			{Kind: shell.ItemRole, Role: application.Zoom},
-			// role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" above already claims —
-			// re-accelerated to Shift+W (menu.ts:120-122's deliberate remap).
-			{Kind: shell.ItemRole, Role: application.CloseWindow, Accelerator: shell.Shortcuts["window.close"].Accelerator()},
-		},
-	}
+	// role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" below already claims — re-
+	// accelerated to Shift+W (menu.ts:120-122's deliberate remap).
+	windowItems := append([]shell.Item{
+		{Kind: shell.ItemEmit, Label: "Next Tab", Accelerator: shell.Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
+		{Kind: shell.ItemEmit, Label: "Previous Tab", Accelerator: shell.Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
+		{Kind: shell.ItemEmit, Label: "Close Tab", Accelerator: shell.Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
+		{Kind: shell.ItemSeparator},
+		{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: shell.Shortcuts["window.new"].Accelerator()},
+		{Kind: shell.ItemSeparator},
+	}, shell.WindowMenuTail(shell.Shortcuts["window.close"].Accelerator())...)
+	windowSection := shell.Section{Label: "Window", Items: windowItems}
 
 	return []shell.Section{appSection, editSection, viewSection, windowSection}
 }

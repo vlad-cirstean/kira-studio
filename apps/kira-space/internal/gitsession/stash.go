@@ -30,12 +30,28 @@ func distinctBaseShas(entries []porcelain.StashEntry) []string {
 	return out
 }
 
-// StashList is stash.list's own query (D3, probe 12): one spawn (StashListArgs) plus one small
-// batch spawn resolving every distinct baseSha's own subject (model/stash.ts's own doc comment —
-// %gs cannot name a PARENT commit's subject). Deliberately uncached: every mutating stash op and
-// every stash preflight re-reads this immediately before acting, as its own sha-verification race
-// guard (the contract's own "the service verifies... immediately before writing" convention) — a
-// stale cached value here would be actively wrong, not merely imprecise.
+// resolveBaseSubjects resolves every distinct StashEntry.BaseSha in provisional to its own commit
+// subject (model/stash.ts's own doc comment — %gs cannot name a PARENT commit's subject), via one
+// small batch spawn (StashBaseSubjectArgs) skipped entirely when provisional has no base shas.
+// Shared by StashList and GlobalStashList (P107 I2-33), which otherwise reparse their own raw
+// output with the result.
+func (e *RepoEntry) resolveBaseSubjects(ctx context.Context, provisional []porcelain.StashEntry) (map[string]string, error) {
+	baseShas := distinctBaseShas(provisional)
+	if len(baseShas) == 0 {
+		return map[string]string{}, nil
+	}
+	subjRaw, err := e.runOne(ctx, porcelain.StashBaseSubjectArgs(baseShas))
+	if err != nil {
+		return nil, err
+	}
+	return porcelain.ParseStashBaseSubjects(subjRaw)
+}
+
+// StashList is stash.list's own query (D3, probe 12): one spawn (StashListArgs) plus
+// resolveBaseSubjects. Deliberately uncached: every mutating stash op and every stash preflight
+// re-reads this immediately before acting, as its own sha-verification race guard (the contract's
+// own "the service verifies... immediately before writing" convention) — a stale cached value here
+// would be actively wrong, not merely imprecise.
 func (e *RepoEntry) StashList(ctx context.Context) ([]porcelain.StashEntry, error) {
 	listRaw, err := e.runOne(ctx, porcelain.StashListArgs())
 	if err != nil {
@@ -46,16 +62,9 @@ func (e *RepoEntry) StashList(ctx context.Context) ([]porcelain.StashEntry, erro
 		return nil, err
 	}
 
-	subjects := map[string]string{}
-	if baseShas := distinctBaseShas(provisional); len(baseShas) > 0 {
-		subjRaw, err := e.runOne(ctx, porcelain.StashBaseSubjectArgs(baseShas))
-		if err != nil {
-			return nil, err
-		}
-		subjects, err = porcelain.ParseStashBaseSubjects(subjRaw)
-		if err != nil {
-			return nil, err
-		}
+	subjects, err := e.resolveBaseSubjects(ctx, provisional)
+	if err != nil {
+		return nil, err
 	}
 
 	entries, err := porcelain.ParseStashList(listRaw, subjects)
@@ -90,11 +99,10 @@ func (e *RepoEntry) resolveStashEntry(ctx context.Context, sha string) (porcelai
 // answering the bucket's own sha set, stopping there — no second spawn at all — when the bucket is
 // empty (probe P10: an empty namespace answers exit 0 with empty output). Otherwise a second spawn
 // (GlobalStashLogArgs) reads every entry's own commit metadata in the same header-then-numstat
-// framing stash.list's own format uses (probe P12), plus StashBaseSubjectArgs' existing small batch
-// spawn resolving every distinct baseSha's own subject — exactly the same three-spawn shape
-// StashList already has, reused rather than re-invented. Deliberately uncached, same reason
-// StashList is uncached: every mutating global-stash op re-reads this immediately before acting, as
-// its own race guard.
+// framing stash.list's own format uses (probe P12), plus resolveBaseSubjects — exactly the same
+// three-spawn shape StashList already has, reused rather than re-invented. Deliberately uncached,
+// same reason StashList is uncached: every mutating global-stash op re-reads this immediately
+// before acting, as its own race guard.
 func (e *RepoEntry) GlobalStashList(ctx context.Context) ([]porcelain.StashEntry, error) {
 	refRaw, err := e.runOne(ctx, gitops.GlobalStashListRefsArgs())
 	if err != nil {
@@ -114,16 +122,9 @@ func (e *RepoEntry) GlobalStashList(ctx context.Context) ([]porcelain.StashEntry
 		return nil, err
 	}
 
-	subjects := map[string]string{}
-	if baseShas := distinctBaseShas(provisional); len(baseShas) > 0 {
-		subjRaw, err := e.runOne(ctx, porcelain.StashBaseSubjectArgs(baseShas))
-		if err != nil {
-			return nil, err
-		}
-		subjects, err = porcelain.ParseStashBaseSubjects(subjRaw)
-		if err != nil {
-			return nil, err
-		}
+	subjects, err := e.resolveBaseSubjects(ctx, provisional)
+	if err != nil {
+		return nil, err
 	}
 
 	entries, err := porcelain.ParseGlobalStashList(logRaw, subjects, gitops.GlobalStashRefPrefix)

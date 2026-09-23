@@ -37,9 +37,8 @@ var (
 	strp         = testsupport.Strp
 )
 
-func nodePath(connectionID string, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(connectionID, segments...)
-}
+// nodePath is testsupport.NodePath (P107 I2-28).
+var nodePath = testsupport.NodePath
 
 func newAdapter(t *testing.T) adapters.Adapter {
 	t.Helper()

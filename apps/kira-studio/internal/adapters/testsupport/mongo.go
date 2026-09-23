@@ -43,6 +43,9 @@ type MongoFixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f MongoFixture) ConnectionID() string { return f.Config.ID }
+
 var mongoMemo fixture[MongoFixture]
 
 // StartMongo is support/mongo.ts's startMongo. Skips the test when Docker is unreachable.

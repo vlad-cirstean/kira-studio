@@ -52,9 +52,8 @@ func connectedAdapter(t *testing.T, f *testsupport.KafkaFixture) adapters.Adapte
 	return a
 }
 
-func nodePath(f *testsupport.KafkaFixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(f.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *KafkaFixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.KafkaFixture]
 
 func topicPath(f *testsupport.KafkaFixture, topic string) model.NodePath {
 	return nodePath(f, testsupport.Seg("topic", topic))
@@ -64,9 +63,8 @@ func groupPath(f *testsupport.KafkaFixture, group string) model.NodePath {
 	return nodePath(f, testsupport.Seg("consumerGroup", group))
 }
 
-func offsetRead(path model.NodePath, pageSize int) adapters.ReadRequest {
-	return adapters.ReadRequest{Path: path, PageSize: pageSize, Cursor: model.PageCursor{Mode: "offset", Offset: 0}}
-}
+// offsetRead is testsupport.OffsetRead (P107 I2-28).
+var offsetRead = testsupport.OffsetRead
 
 // rowSeq reads a seeded/produced message's {"seq": N} body back into an int.
 func rowSeq(t *testing.T, sp page.StreamPage, row int) int {
