@@ -85,7 +85,7 @@ func preview(plan model.MutationPlan) ([]string, error) {
 
 // applyUpdate is mutateDB's "update" arm: a whole-document replaceOne keyed by _id, driven by the
 // $document sentinel both it and applyInsert share.
-func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp, track TrackQuery) (int, error) {
 	id, err := parseIdKey(rowOp.Key)
 	if err != nil {
 		return 0, err
@@ -99,7 +99,7 @@ func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *ad
 		return 0, err
 	}
 	replacement := setField(parsed, "_id", id)
-	matchedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
+	matchedCount, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (int64, error) {
 		result, err := collection.ReplaceOne(qctx, bson.D{{Key: "_id", Value: id}}, replacement, options.Replace().SetComment(op.OpID))
 		if err != nil {
 			return 0, mapError(err)
@@ -117,12 +117,12 @@ func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *ad
 }
 
 // applyDelete is mutateDB's "delete" arm.
-func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp, track TrackQuery) (int, error) {
 	id, err := parseIdKey(rowOp.Key)
 	if err != nil {
 		return 0, err
 	}
-	deletedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
+	deletedCount, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (int64, error) {
 		result, err := collection.DeleteOne(qctx, bson.D{{Key: "_id", Value: id}}, options.DeleteOne().SetComment(op.OpID))
 		if err != nil {
 			return 0, mapError(err)
@@ -142,7 +142,7 @@ func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *ad
 // applyInsert is mutateDB's default (insert) arm: the same $document sentinel the update branch
 // uses, holding the new document's full EJSON body rather than a replacement for an existing one —
 // no key to parse, since InsertOne assigns a fresh ObjectID when the body omits _id.
-func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp, track TrackQuery) (int, error) {
 	bodyText, ok := rowOp.Values.Get(documentSentinel)
 	if !ok || bodyText == nil {
 		return 0, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document body", nil)
@@ -151,7 +151,7 @@ func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *ad
 	if err != nil {
 		return 0, err
 	}
-	acknowledged, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (bool, error) {
+	acknowledged, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (bool, error) {
 		result, err := collection.InsertOne(qctx, parsed, options.InsertOne().SetComment(op.OpID))
 		if err != nil {
 			return false, mapError(err)
@@ -168,7 +168,7 @@ func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *ad
 }
 
 // mutateDB ports mutate.ts's mutate.
-func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
+func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan, track TrackQuery) (model.MutationResult, error) {
 	// §8.12's standard: enforced here, not only greyed out in the UI.
 	if err := adapters.AssertWritable(readOnly); err != nil {
 		return model.MutationResult{}, err
@@ -187,13 +187,13 @@ func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx,
 
 	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, adapters.DispatchUpdateDeleteInsert(
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
-			return applyUpdate(ctx, collection, op, rowOp)
+			return applyUpdate(ctx, collection, op, rowOp, track)
 		},
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
-			return applyDelete(ctx, collection, op, rowOp)
+			return applyDelete(ctx, collection, op, rowOp, track)
 		},
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
-			return applyInsert(ctx, collection, op, rowOp)
+			return applyInsert(ctx, collection, op, rowOp, track)
 		},
 	))
 }

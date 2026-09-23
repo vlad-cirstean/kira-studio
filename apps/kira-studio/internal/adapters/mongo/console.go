@@ -131,14 +131,20 @@ func parseStatement(text string) (parsedStatement, error) {
 		if err != nil {
 			return parsedStatement{}, err
 		}
-		args = append(args, v)
+		// F8: every argument goes through ResolveEJSONWrappers, exactly like ParseDocumentLiteral's
+		// own doc comment ("the one grammar every Mongo text surface... parses with") — without it, a
+		// {$oid:"…"}/{$date:…}/{$numberLong:…} value copied straight from the grid either fails as an
+		// unknown filter operator, or (in insertOne/updateOne bodies, since MongoDB 5.0+ accepts
+		// $-prefixed nested field names) gets silently stored as a literal wrapper object instead of
+		// the Date/ObjectId it denotes.
+		args = append(args, ResolveEJSONWrappers(v))
 		for parser.PeekPunct(",") {
 			_ = parser.ExpectPunct(",")
 			v, err := parser.ParseValue()
 			if err != nil {
 				return parsedStatement{}, err
 			}
-			args = append(args, v)
+			args = append(args, ResolveEJSONWrappers(v))
 		}
 	}
 	if err := parser.ExpectPunct(")"); err != nil {
@@ -216,7 +222,7 @@ func argOrEmptyDoc(args []any, i int, label string) (bson.D, error) {
 
 // statementRunner is one console method's own body — runStatement's dispatch table maps a method
 // name straight to its runner, the map miss taking the place of the old switch's default arm.
-type statementRunner func(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error)
+type statementRunner func(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error)
 
 var statementRunners = map[string]statementRunner{
 	"find":           runFind,
@@ -233,8 +239,8 @@ var statementRunners = map[string]statementRunner{
 
 // runCursorOp folds find/aggregate's own shared shape: run a cursor-returning driver call with
 // RunWithAbortRace, materialize every document, render the page (P107 I2-12).
-func runCursorOp(ctx context.Context, open func(qctx context.Context) (*mongodriver.Cursor, error)) (page.DocumentPage, error) {
-	docs, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) ([]bson.D, error) {
+func runCursorOp(ctx context.Context, track TrackQuery, open func(qctx context.Context) (*mongodriver.Cursor, error)) (page.DocumentPage, error) {
+	docs, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) ([]bson.D, error) {
 		cursor, err := open(qctx)
 		if err != nil {
 			return nil, mapError(err)
@@ -252,7 +258,7 @@ func runCursorOp(ctx context.Context, open func(qctx context.Context) (*mongodri
 	return docsToPage(docs)
 }
 
-func runFind(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runFind(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	filter, err := argOrEmptyDoc(stmt.args, 0, "find() filter")
 	if err != nil {
 		return page.DocumentPage{}, err
@@ -265,17 +271,17 @@ func runFind(ctx context.Context, collection *mongodriver.Collection, stmt parse
 		}
 		findOpts.SetProjection(projection)
 	}
-	return runCursorOp(ctx, func(qctx context.Context) (*mongodriver.Cursor, error) {
+	return runCursorOp(ctx, track, func(qctx context.Context) (*mongodriver.Cursor, error) {
 		return collection.Find(qctx, filter, findOpts)
 	})
 }
 
-func runFindOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runFindOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	filter, err := argOrEmptyDoc(stmt.args, 0, "findOne() filter")
 	if err != nil {
 		return page.DocumentPage{}, err
 	}
-	doc, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (bson.D, error) {
+	doc, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (bson.D, error) {
 		var out bson.D
 		err := collection.FindOne(qctx, filter, options.FindOne().SetComment(op.OpID)).Decode(&out)
 		if err != nil {
@@ -295,7 +301,7 @@ func runFindOne(ctx context.Context, collection *mongodriver.Collection, stmt pa
 	return docsToPage([]bson.D{doc})
 }
 
-func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	if len(stmt.args) == 0 {
 		return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "insertOne() document must be a document literal", nil)
 	}
@@ -303,7 +309,7 @@ func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt 
 	if err != nil {
 		return page.DocumentPage{}, err
 	}
-	result, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (*mongodriver.InsertOneResult, error) {
+	result, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (*mongodriver.InsertOneResult, error) {
 		r, err := collection.InsertOne(qctx, doc, options.InsertOne().SetComment(op.OpID))
 		if err != nil {
 			return nil, mapError(err)
@@ -316,7 +322,7 @@ func runInsertOne(ctx context.Context, collection *mongodriver.Collection, stmt 
 	return statusPage(bson.D{{Key: "acknowledged", Value: result.Acknowledged}, {Key: "insertedId", Value: result.InsertedID}})
 }
 
-func runInsertMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runInsertMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	if len(stmt.args) == 0 {
 		return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "insertMany() documents must be an array", nil)
 	}
@@ -328,7 +334,7 @@ func runInsertMany(ctx context.Context, collection *mongodriver.Collection, stmt
 	for i, d := range docs {
 		anyDocs[i] = d
 	}
-	result, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (*mongodriver.InsertManyResult, error) {
+	result, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (*mongodriver.InsertManyResult, error) {
 		r, err := collection.InsertMany(qctx, anyDocs, options.InsertMany().SetComment(op.OpID))
 		if err != nil {
 			return nil, mapError(err)
@@ -344,7 +350,7 @@ func runInsertMany(ctx context.Context, collection *mongodriver.Collection, stmt
 // runFilterUpdateOp folds updateOne/updateMany's own shared shape: parse filter+update doc args,
 // run one driver call, build the result's own status page (P107 I2-12) — status is the caller's
 // own closure because updateOne's own status reports upsertedId and updateMany's doesn't.
-func runFilterUpdateOp(ctx context.Context, stmt parsedStatement, methodName string,
+func runFilterUpdateOp(ctx context.Context, stmt parsedStatement, methodName string, track TrackQuery,
 	call func(ctx context.Context, filter, update bson.D) (*mongodriver.UpdateResult, error),
 	status func(*mongodriver.UpdateResult) bson.D,
 ) (page.DocumentPage, error) {
@@ -359,7 +365,7 @@ func runFilterUpdateOp(ctx context.Context, stmt parsedStatement, methodName str
 	if err != nil {
 		return page.DocumentPage{}, err
 	}
-	result, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (*mongodriver.UpdateResult, error) {
+	result, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (*mongodriver.UpdateResult, error) {
 		return call(qctx, filter, update)
 	})
 	if err != nil {
@@ -368,8 +374,8 @@ func runFilterUpdateOp(ctx context.Context, stmt parsedStatement, methodName str
 	return statusPage(status(result))
 }
 
-func runUpdateOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
-	return runFilterUpdateOp(ctx, stmt, "updateOne",
+func runUpdateOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
+	return runFilterUpdateOp(ctx, stmt, "updateOne", track,
 		func(qctx context.Context, filter, update bson.D) (*mongodriver.UpdateResult, error) {
 			r, err := collection.UpdateOne(qctx, filter, update, options.UpdateOne().SetComment(op.OpID))
 			if err != nil {
@@ -386,8 +392,8 @@ func runUpdateOne(ctx context.Context, collection *mongodriver.Collection, stmt 
 		})
 }
 
-func runUpdateMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
-	return runFilterUpdateOp(ctx, stmt, "updateMany",
+func runUpdateMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
+	return runFilterUpdateOp(ctx, stmt, "updateMany", track,
 		func(qctx context.Context, filter, update bson.D) (*mongodriver.UpdateResult, error) {
 			r, err := collection.UpdateMany(qctx, filter, update, options.UpdateMany().SetComment(op.OpID))
 			if err != nil {
@@ -406,14 +412,14 @@ func runUpdateMany(ctx context.Context, collection *mongodriver.Collection, stmt
 // runFilterOnlyOp folds deleteOne/deleteMany/countDocuments's own shared shape: parse an optional
 // filter arg (defaulting to {}), run one driver call, render its result's own one-key status page
 // (P107 I2-12).
-func runFilterOnlyOp[R any](ctx context.Context, stmt parsedStatement, argLabel string,
+func runFilterOnlyOp[R any](ctx context.Context, stmt parsedStatement, argLabel string, track TrackQuery,
 	call func(ctx context.Context, filter bson.D) (R, error), status func(R) bson.D,
 ) (page.DocumentPage, error) {
 	filter, err := argOrEmptyDoc(stmt.args, 0, argLabel)
 	if err != nil {
 		return page.DocumentPage{}, err
 	}
-	result, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (R, error) {
+	result, err := adapters.RunWithAbortRace(ctx, track(), func(qctx context.Context) (R, error) {
 		return call(qctx, filter)
 	})
 	if err != nil {
@@ -422,8 +428,8 @@ func runFilterOnlyOp[R any](ctx context.Context, stmt parsedStatement, argLabel 
 	return statusPage(status(result))
 }
 
-func runDeleteOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
-	return runFilterOnlyOp(ctx, stmt, "deleteOne() filter",
+func runDeleteOne(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
+	return runFilterOnlyOp(ctx, stmt, "deleteOne() filter", track,
 		func(qctx context.Context, filter bson.D) (*mongodriver.DeleteResult, error) {
 			r, err := collection.DeleteOne(qctx, filter, options.DeleteOne().SetComment(op.OpID))
 			if err != nil {
@@ -434,8 +440,8 @@ func runDeleteOne(ctx context.Context, collection *mongodriver.Collection, stmt 
 		func(r *mongodriver.DeleteResult) bson.D { return bson.D{{Key: "deletedCount", Value: r.DeletedCount}} })
 }
 
-func runDeleteMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
-	return runFilterOnlyOp(ctx, stmt, "deleteMany() filter",
+func runDeleteMany(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
+	return runFilterOnlyOp(ctx, stmt, "deleteMany() filter", track,
 		func(qctx context.Context, filter bson.D) (*mongodriver.DeleteResult, error) {
 			r, err := collection.DeleteMany(qctx, filter, options.DeleteMany().SetComment(op.OpID))
 			if err != nil {
@@ -446,8 +452,8 @@ func runDeleteMany(ctx context.Context, collection *mongodriver.Collection, stmt
 		func(r *mongodriver.DeleteResult) bson.D { return bson.D{{Key: "deletedCount", Value: r.DeletedCount}} })
 }
 
-func runCountDocuments(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
-	return runFilterOnlyOp(ctx, stmt, "countDocuments() filter",
+func runCountDocuments(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
+	return runFilterOnlyOp(ctx, stmt, "countDocuments() filter", track,
 		func(qctx context.Context, filter bson.D) (int64, error) {
 			n, err := collection.CountDocuments(qctx, filter, options.Count().SetComment(op.OpID))
 			if err != nil {
@@ -458,7 +464,7 @@ func runCountDocuments(ctx context.Context, collection *mongodriver.Collection, 
 		func(n int64) bson.D { return bson.D{{Key: "count", Value: n}} })
 }
 
-func runAggregate(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runAggregate(ctx context.Context, collection *mongodriver.Collection, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	var pipeline []bson.D
 	if len(stmt.args) > 0 && stmt.args[0] != nil {
 		p, err := asDocArray(stmt.args[0], "aggregate() pipeline")
@@ -467,33 +473,35 @@ func runAggregate(ctx context.Context, collection *mongodriver.Collection, stmt 
 		}
 		pipeline = p
 	}
-	return runCursorOp(ctx, func(qctx context.Context) (*mongodriver.Cursor, error) {
+	return runCursorOp(ctx, track, func(qctx context.Context) (*mongodriver.Cursor, error) {
 		return collection.Aggregate(qctx, pipeline, options.Aggregate().SetComment(op.OpID))
 	})
 }
 
-func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStatement, op *adapters.OpCtx) (page.DocumentPage, error) {
+func runStatement(ctx context.Context, db *mongodriver.Database, stmt parsedStatement, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	runner, ok := statementRunners[stmt.method]
 	if !ok {
 		return page.DocumentPage{}, adapters.New(adapters.CodeUnsupported,
 			"unsupported console method: db."+stmt.collection+"."+stmt.method+"()", nil)
 	}
-	return runner(ctx, db.Collection(stmt.collection), stmt, op)
+	return runner(ctx, db.Collection(stmt.collection), stmt, op, track)
 }
 
 // execute ports console.ts's execute — one op-log row for the whole batch (P5.5 D9), CheckCancelled
 // between statements, one page per statement.
-func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string) ([]page.Page, error) {
+//
+// F11: every statement is parsed, and the read-only guard checked, up front — before any of them
+// runs. The previous shape parsed statement N only after 1..N-1 had already executed, so a typo
+// further down a batch discarded the already-committed earlier writes with no rollback path;
+// re-running after fixing the typo then double-applied them.
+func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *adapters.OpCtx, statements []string, track TrackQuery) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
 	op.SetCommand(strings.Join(statements, ";\n"))
 
-	pages := make([]page.Page, 0, len(statements))
-	for _, text := range statements {
-		if err := adapters.CheckCancelled(ctx); err != nil {
-			return nil, err
-		}
+	parsed := make([]parsedStatement, len(statements))
+	for i, text := range statements {
 		stmt, err := parseStatement(text)
 		if err != nil {
 			return nil, err
@@ -501,7 +509,15 @@ func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *a
 		if readOnly && isWriteStatement(stmt) {
 			return nil, adapters.AssertWritable(true)
 		}
-		p, err := runStatement(ctx, db, stmt, op)
+		parsed[i] = stmt
+	}
+
+	pages := make([]page.Page, 0, len(parsed))
+	for _, stmt := range parsed {
+		if err := adapters.CheckCancelled(ctx); err != nil {
+			return nil, err
+		}
+		p, err := runStatement(ctx, db, stmt, op, track)
 		if err != nil {
 			return nil, err
 		}

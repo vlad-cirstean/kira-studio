@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"strings"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
@@ -221,10 +222,22 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 	rowCount := len(displayDocs)
 
 	builder := page.NewDocumentPageBuilder(false)
+	// anyMissingID is F7: a document with no _id at all — reachable via a $project: {_id: 0} view,
+	// which this app lists and reads elsewhere — makes doc.Lookup("_id") return an invalid BSON
+	// type IDText can't stringify, which used to fail this whole page outright. The console's own
+	// docsToPage already treats a missing _id as an empty id string; this matches that, and also
+	// forces the page below into offset pagination, since a keyset token needs a real _id boundary
+	// to resume from and this result set doesn't reliably have one.
+	anyMissingID := false
 	for _, doc := range displayDocs {
-		idStr, err := IDText(doc.Lookup("_id"))
-		if err != nil {
-			return page.DocumentPage{}, mapError(err)
+		idStr := ""
+		if idVal, err := doc.LookupErr("_id"); err == nil {
+			idStr, err = IDText(idVal)
+			if err != nil {
+				return page.DocumentPage{}, mapError(err)
+			}
+		} else {
+			anyMissingID = true
 		}
 		bodyStr, err := ejsonStringify(doc, true)
 		if err != nil {
@@ -234,7 +247,7 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 	}
 
 	strategy := "offset"
-	if plan.idOnlySort {
+	if plan.idOnlySort && !anyMissingID {
 		strategy = "keyset"
 	}
 	hasMore := false
@@ -246,13 +259,21 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 		}
 	}
 
-	nextToken, prevToken, err := buildKeysetTokens(req, plan, displayDocs, probedExtra, fingerprint)
-	if err != nil {
-		return page.DocumentPage{}, err
+	var nextToken, prevToken *string
+	var err error
+	if !anyMissingID {
+		nextToken, prevToken, err = buildKeysetTokens(req, plan, displayDocs, probedExtra, fingerprint)
+		if err != nil {
+			return page.DocumentPage{}, err
+		}
 	}
 
 	var offsetPtr *int
-	if req.Cursor.Mode == "offset" {
+	if req.Cursor.Mode == "offset" || anyMissingID {
+		// F7's own fallback: a token-based (keyset) cursor that lands here with no known _id has no
+		// true offset to report either — 0 is what a fresh offset-paginated browse would start from,
+		// the same degraded-but-safe restart this adapter already gives up front for any sort this
+		// view can't keyset at all.
 		o := req.Cursor.Offset
 		offsetPtr = &o
 	}
@@ -266,7 +287,7 @@ func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint 
 
 // readPage ports read.ts's readPage. D6: _id-keyset when the request is unsorted or sorted purely
 // by _id; skip/limit fallback for any other sort.
-func readPage(ctx context.Context, db *mongodriver.Database, collectionName string, req readReq, op *adapters.OpCtx) (page.DocumentPage, error) {
+func readPage(ctx context.Context, db *mongodriver.Database, collectionName string, req readReq, op *adapters.OpCtx, track TrackQuery) (page.DocumentPage, error) {
 	plan, err := resolveReadSortPlan(req)
 	if err != nil {
 		return page.DocumentPage{}, err
@@ -307,7 +328,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	// out. bson.Raw/bson.RawValue have their own codecs (rawEncodeValue/rawValueEncodeValue) that
 	// bson.MarshalExtJSON dispatches to automatically, streaming the wire bytes straight into the
 	// EJSON writer with no intermediate tree at all.
-	docs, err := adapters.RunWithAbortRace(ctx, func() {}, func(queryCtx context.Context) ([]bson.Raw, error) {
+	docs, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) ([]bson.Raw, error) {
 		cursor, err := collection.Find(queryCtx, filter, findOpts)
 		if err != nil {
 			return nil, mapError(err)
@@ -336,20 +357,154 @@ func lookupField(d bson.D, key string) (any, bool) {
 	return nil, false
 }
 
-// mergeKeysetIDCondition combines the keyset boundary condition ($gt/$lt boundaryID) for _id with
-// whatever _id constraint the caller's own filter already carries. P2 R2 (task #94): the previous
-// version only handled an existing operator document (e.g. {"_id": {"$in": [...]}}) — it type-
-// asserted the existing value as bson.D and merged its operators in, but a scalar _id (a
-// single-document lookup, e.g. {"_id": ObjectId("...")}) failed that assertion and was silently
-// discarded when setField then overwrote the _id key outright. Wrapping in $and instead of trying
-// to fold both into one _id document handles either shape without dropping anything, and also
-// avoids two conflicting keys under the same _id document if the filter's own operator document
-// already used the same comparison operator the keyset boundary needs.
-func mergeKeysetIDCondition(baseFilter bson.D, cmpOp string, boundaryID any) bson.D {
-	if _, hasExistingID := lookupField(baseFilter, "_id"); !hasExistingID {
-		return setField(baseFilter, "_id", bson.D{{Key: cmpOp, Value: boundaryID}})
+// bsonSortTiers is MongoDB's own documented cross-BSON-type comparison order ("Comparison/Sort
+// Order"), collapsed into the tiers keysetIDCondition actually needs to reason about (F6): the four
+// numeric aliases share one tier since Mongo already compares them by value regardless of subtype
+// (a bare {_id:{$gt: NumberLong(5)}} already matches a double 6.0 with no help needed here) — the
+// type-bracketing bug this fixes is real only *across* tiers, e.g. a string boundary's own $gt never
+// matching an ObjectId-keyed document that sorts after every string. minKey/maxKey are structural
+// sentinels no real _id ever holds, kept only so the ordering is total and callers need no special
+// case at either end.
+var bsonSortTiers = [][]string{
+	{"minKey"},
+	{"null"},
+	{"double", "int", "long", "decimal"},
+	{"string"},
+	{"object"},
+	{"array"},
+	{"binData"},
+	{"objectId"},
+	{"bool"},
+	{"date"},
+	{"timestamp"},
+	{"regex"},
+	{"maxKey"},
+}
+
+func bsonTierIndex(alias string) int {
+	for i, tier := range bsonSortTiers {
+		for _, a := range tier {
+			if a == alias {
+				return i
+			}
+		}
 	}
-	idCond := bson.D{{Key: "_id", Value: bson.D{{Key: cmpOp, Value: boundaryID}}}}
+	return -1
+}
+
+// typeAliasesAfter/typeAliasesBefore return every $type alias MongoDB's query language accepts that
+// sorts strictly after/before tierAlias's own tier — the widening keysetIDCondition's own $or arm
+// needs, empty when tierAlias is already the outermost tier (never true for a real _id in practice).
+func typeAliasesAfter(tierAlias string) []string {
+	idx := bsonTierIndex(tierAlias)
+	if idx < 0 {
+		return nil
+	}
+	var out []string
+	for _, tier := range bsonSortTiers[idx+1:] {
+		out = append(out, tier...)
+	}
+	return out
+}
+
+func typeAliasesBefore(tierAlias string) []string {
+	idx := bsonTierIndex(tierAlias)
+	if idx <= 0 {
+		return nil
+	}
+	var out []string
+	for _, tier := range bsonSortTiers[:idx] {
+		out = append(out, tier...)
+	}
+	return out
+}
+
+// bsonTypeAliasFor names the $type alias for boundaryID's own concrete Go type — exactly the
+// concrete types ParseJSON5Literal/ResolveEJSONWrappers (literal.go) can hand back as a decoded
+// page-token boundary value. false means the type genuinely isn't one this function recognizes
+// (nothing in this package's own value set), not that the type is somehow invalid.
+func bsonTypeAliasFor(v any) (string, bool) {
+	switch v.(type) {
+	case nil:
+		return "null", true
+	case string:
+		return "string", true
+	case bson.ObjectID:
+		return "objectId", true
+	case bool:
+		return "bool", true
+	case time.Time, bson.DateTime:
+		return "date", true
+	case bson.Timestamp:
+		return "timestamp", true
+	case bson.Binary:
+		return "binData", true
+	case bson.Regex:
+		return "regex", true
+	case bson.D:
+		return "object", true
+	case bson.A:
+		return "array", true
+	case int32, int64, float64, bson.Decimal128:
+		// Any one numeric alias works: bsonSortTiers keeps all four in the same tier, and Mongo's
+		// own $gt/$lt already compares numeric BSON subtypes by value with no widening needed.
+		return "double", true
+	default:
+		return "", false
+	}
+}
+
+// keysetIDCondition builds one page's own _id boundary condition (F6): a bare {_id:{$gt/$lt:
+// boundary}} only ever matches _id values of boundary's own BSON type — MongoDB's query-level
+// comparison type-brackets a non-numeric type this way even though the underlying *sort* itself
+// runs in one global cross-type order (bsonSortTiers above) — so once a page's boundary lands on
+// the last _id of one type (e.g. the last string _id in a collection this app itself can leave with
+// mixed _id types: applyInsert mints a fresh ObjectId whenever the inserted body omits _id), the
+// next page's own boundary condition matches nothing from any other type, silently stranding every
+// document past it. Widening with an $or over every type that sorts on the correct side of
+// boundary's own tier closes that gap while staying indexable (an index range scan/OR-plan over the
+// same field), unlike a filter with no type constraint at all, which would give up the _id index
+// entirely.
+func keysetIDCondition(cmpOp string, boundaryID any) bson.D {
+	direct := bson.D{{Key: "_id", Value: bson.D{{Key: cmpOp, Value: boundaryID}}}}
+	alias, ok := bsonTypeAliasFor(boundaryID)
+	if !ok {
+		return direct
+	}
+	var widerAliases []string
+	if cmpOp == "$gt" {
+		widerAliases = typeAliasesAfter(alias)
+	} else {
+		widerAliases = typeAliasesBefore(alias)
+	}
+	if len(widerAliases) == 0 {
+		return direct
+	}
+	return bson.D{{Key: "$or", Value: bson.A{
+		direct,
+		bson.D{{Key: "_id", Value: bson.D{{Key: "$type", Value: widerAliases}}}},
+	}}}
+}
+
+// mergeKeysetIDCondition combines the keyset boundary condition ($gt/$lt boundaryID, F6's own
+// type-widened form above) for _id with whatever _id constraint the caller's own filter already
+// carries. P2 R2 (task #94): the previous version only handled an existing operator document (e.g.
+// {"_id": {"$in": [...]}}) — it type-asserted the existing value as bson.D and merged its operators
+// in, but a scalar _id (a single-document lookup, e.g. {"_id": ObjectId("...")}) failed that
+// assertion and was silently discarded when setField then overwrote the _id key outright. Wrapping
+// in $and instead of trying to fold both into one _id document handles either shape without
+// dropping anything, and also avoids two conflicting keys under the same _id document if the
+// filter's own operator document already used the same comparison operator the keyset boundary
+// needs. The flatten-into-one-document fast path below only ever fires for a bare (non-widened)
+// idCond — realistically just boundary types with nothing on the widened side (never a real _id) —
+// kept for symmetry with the pre-F6 shape rather than because it is expected to trigger often now.
+func mergeKeysetIDCondition(baseFilter bson.D, cmpOp string, boundaryID any) bson.D {
+	idCond := keysetIDCondition(cmpOp, boundaryID)
+	if len(idCond) == 1 && idCond[0].Key == "_id" {
+		if _, hasExistingID := lookupField(baseFilter, "_id"); !hasExistingID {
+			return setField(baseFilter, "_id", idCond[0].Value)
+		}
+	}
 	return bson.D{{Key: "$and", Value: bson.A{baseFilter, idCond}}}
 }
 
@@ -375,7 +530,7 @@ func setField(d bson.D, key string, value any) bson.D {
 // == false), countDocuments() (exact) only when the caller passes a non-empty filter — an
 // unfiltered estimate is what the pager wants by default, but an estimate ignores any filter
 // entirely, so a filtered count must always go through the exact (slow) path.
-func countRows(ctx context.Context, db *mongodriver.Database, collectionName string, filter *string, op *adapters.OpCtx) (adapters.CountResult, error) {
+func countRows(ctx context.Context, db *mongodriver.Database, collectionName string, filter *string, op *adapters.OpCtx, track TrackQuery) (adapters.CountResult, error) {
 	collection := db.Collection(collectionName)
 	parsedFilter, err := ParseFilterObject(filter)
 	if err != nil {
@@ -384,7 +539,7 @@ func countRows(ctx context.Context, db *mongodriver.Database, collectionName str
 	wantsExact := filter != nil && strings.TrimSpace(*filter) != ""
 
 	if wantsExact {
-		value, err := adapters.RunWithAbortRace(ctx, func() {}, func(queryCtx context.Context) (int64, error) {
+		value, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) (int64, error) {
 			n, err := collection.CountDocuments(queryCtx, parsedFilter, options.Count().SetComment(op.OpID))
 			if err != nil {
 				return 0, mapError(err)
@@ -400,7 +555,7 @@ func countRows(ctx context.Context, db *mongodriver.Database, collectionName str
 	// EstimatedDocumentCount has no per-call comment/killOp-fallback tag in the driver — a single
 	// fast metadata command, so this is not a gap in the cancel coverage in practice (mirrors
 	// read.ts's own note that estimatedDocumentCount() has no AbortSignal support either).
-	value, err := adapters.RunWithAbortRace(ctx, func() {}, func(queryCtx context.Context) (int64, error) {
+	value, err := adapters.RunWithAbortRace(ctx, track(), func(queryCtx context.Context) (int64, error) {
 		n, err := collection.EstimatedDocumentCount(queryCtx)
 		if err != nil {
 			return 0, mapError(err)

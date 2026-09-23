@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	mongodriver "go.mongodb.org/mongo-driver/v2/mongo"
@@ -19,20 +21,101 @@ func init() {
 	})
 }
 
+// disconnectTimeout bounds Disconnect's own client.Disconnect call (F4a): a no-deadline ctx makes
+// the driver wait until every in-use connection returns on its own (confirmed against
+// mongo-driver's own Client.Disconnect) — Router.Connect's reconnect path passes
+// context.Background() with no bound at all (adapterhost, Part 6's own file, out of scope here),
+// and even Router.Disconnect's own ctx could be near its own deadline already. A fixed deadline
+// here is what actually force-closes a still-in-use connection regardless of what ctx this call was
+// handed.
+const disconnectTimeout = 10 * time.Second
+
 // Adapter is index.ts's MongoAdapter. D8: one pooled *mongo.Client — the driver's own internal
 // pool handles concurrency, so there is no ConnSet/LRU analog to MariaDB's (client.Database(name)
 // is a cheap synchronous handle-get, not a new connection).
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards every field below (F3): Connect/Disconnect write client/defaultDatabase/readOnly
+	// from whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op
+	// reading them (requireClient's own RequireConnected(a.getClient()), Execute's own
+	// a.getDefaultDatabase(), Read/Count/Mutate/Execute's own a.getReadOnly()) — the same class of
+	// data race Part 4's own F3 fixed for the SQL engines.
+	mu              sync.Mutex
 	client          *mongodriver.Client
 	defaultDatabase *string
 	readOnly        bool
 
-	// inFlight mirrors postgres's/mysqlfamily's/clickhouse's own field of the same name:
-	// RunWithAbortRace's background goroutines can still be touching the client well after a
-	// local op abort returns to its caller. Disconnect must wait for them before closing.
-	inFlight sync.WaitGroup
+	// tracker replaces a bare inFlight sync.WaitGroup (F4): the old field's own doc comment claimed
+	// it tracked RunWithAbortRace's detached background goroutines, but every RunWithAbortRace call
+	// site in read.go/mutate.go/console.go passed a no-op release (func(){}), so nothing was ever
+	// actually counted — Add/Done only ever wrapped the synchronous foreground call in
+	// Read/Count/Mutate/Execute below, which returns to its caller in lockstep with the call it
+	// wraps and proves nothing about the detached goroutine RunWithAbortRace itself spawns.
+	// QueryTracker[uint64] (mirroring postgres/mysqlfamily/clickhouse's own shared tracker) is
+	// registered directly at each RunWithAbortRace call site instead (via trackerFor below), and
+	// additionally gives Disconnect a real opID Snapshot to killOp/Cancel before it Drains.
+	tracker adapters.QueryTracker[uint64]
+}
+
+// getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
+// takes its result, never a.client directly.
+func (a *Adapter) getClient() *mongodriver.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.client
+}
+
+// getDefaultDatabase is Execute's own locked read of a.defaultDatabase (F3).
+func (a *Adapter) getDefaultDatabase() *string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.defaultDatabase
+}
+
+// getReadOnly is Read/Count/Mutate/Execute's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
+
+// setConnected is Connect's own locked write of every field a successful connect fills in (F3).
+func (a *Adapter) setConnected(client *mongodriver.Client, defaultDatabase *string, readOnly bool) {
+	a.mu.Lock()
+	a.client = client
+	a.defaultDatabase = defaultDatabase
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write, once client.Disconnect (a real network call, run
+// with no lock held) has returned (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.client = nil
+	a.defaultDatabase = nil
+	a.mu.Unlock()
+}
+
+// queryTokenSeq hands trackerFor a unique identity per registration (F4b/c): mongo has no natural
+// per-call identity the way postgres's own backend PID is — RunWithAbortRace can return to its
+// caller well before its own goroutine actually finishes, so a later statement in the same
+// batch/op can start (and register) while an earlier one's release is still pending; without a
+// unique token, the earlier release's own identity check in QueryTracker could delete the later
+// registration out from under it.
+var queryTokenSeq atomic.Uint64
+
+// TrackQuery is trackerFor's own release-registration hook, threaded down to read.go/mutate.go/
+// console.go's RunWithAbortRace call sites in place of the previous no-op release (F4b).
+type TrackQuery func() (release func())
+
+// trackerFor is Read/Count/Mutate/Execute's own registration hook (F4b/c).
+func (a *Adapter) trackerFor(opID string) TrackQuery {
+	register := a.tracker.TrackerFor(opID)
+	return func() (release func()) {
+		return register(queryTokenSeq.Add(1))
+	}
 }
 
 func (a *Adapter) Kind() string        { return "mongodb" }
@@ -56,34 +139,40 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		return adapters.ConnectInfo{}, mapError(err)
 	}
 
-	a.client = handle.Client
-	a.defaultDatabase = handle.DefaultDatabase
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(handle.Client, handle.DefaultDatabase, cfg.ReadOnly)
 
 	version := info.Version
 	if version == "" {
 		version = "unknown"
 	}
 	var details map[string]string
-	if a.defaultDatabase != nil {
-		details = map[string]string{"database": *a.defaultDatabase}
+	if handle.DefaultDatabase != nil {
+		details = map[string]string{"database": *handle.DefaultDatabase}
 	}
 	return adapters.ConnectInfo{ServerVersion: "MongoDB " + version, Details: details}, nil
 }
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.inFlight.Wait()
-	if a.client != nil {
-		_ = a.client.Disconnect(ctx)
+	// F4: cancel every query this adapter still tracks as running, server-side, before Drain —
+	// mirrors postgres/mysqlfamily/clickhouse's own Part 4 F4 fix, via the identical killOp path
+	// Cancel already uses.
+	for _, opID := range a.tracker.Snapshot() {
+		_, _ = a.Cancel(ctx, opID)
 	}
-	a.client = nil
-	a.defaultDatabase = nil
+	a.tracker.Drain(ctx)
+
+	if client := a.getClient(); client != nil {
+		disconnectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), disconnectTimeout)
+		_ = client.Disconnect(disconnectCtx)
+		cancel()
+	}
+	a.clearConnected()
 	return nil
 }
 
 func (a *Adapter) requireClient() (*mongodriver.Client, error) {
-	return adapters.RequireConnected(a.client)
+	return adapters.RequireConnected(a.getClient())
 }
 
 func (a *Adapter) dbFor(name string) (*mongodriver.Database, error) {
@@ -221,12 +310,10 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	a.inFlight.Add(1)
-	defer a.inFlight.Done()
 	result, err := readPage(ctx, db, collection, readReq{
 		Projection: req.Projection, Filter: req.Filter, Sort: req.Sort,
 		PageSize: req.PageSize, Cursor: req.Cursor,
-	}, op)
+	}, op, a.trackerFor(op.OpID))
 	if err != nil {
 		return nil, err
 	}
@@ -239,9 +326,7 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
-	a.inFlight.Add(1)
-	defer a.inFlight.Done()
-	return countRows(ctx, db, collection, req.Filter, op)
+	return countRows(ctx, db, collection, req.Filter, op, a.trackerFor(op.OpID))
 }
 
 // Preview is index.ts's preview.
@@ -258,14 +343,12 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	a.inFlight.Add(1)
-	defer a.inFlight.Done()
-	return mutateDB(ctx, db, op, a.readOnly, plan)
+	return mutateDB(ctx, db, op, a.getReadOnly(), plan, a.trackerFor(op.OpID))
 }
 
 // Execute is index.ts's execute.
 func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *adapters.OpCtx) ([]page.Page, error) {
-	dbName := a.defaultDatabase
+	dbName := a.getDefaultDatabase()
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		name := req.Path.Segments[0].Name
 		dbName = &name
@@ -277,9 +360,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	a.inFlight.Add(1)
-	defer a.inFlight.Done()
-	return execute(ctx, db, a.readOnly, op, req.Statements)
+	return execute(ctx, db, a.getReadOnly(), op, req.Statements, a.trackerFor(op.OpID))
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers
@@ -308,7 +389,7 @@ type currentOpEntry struct {
 // ops and needs no special privilege — the common case is an ordinary connection with plain
 // readWrite on its own database, not an admin one.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
-	client := a.client
+	client := a.getClient()
 	if client == nil {
 		return false, nil
 	}
