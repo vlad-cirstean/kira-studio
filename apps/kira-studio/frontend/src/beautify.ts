@@ -1,3 +1,10 @@
+import {
+  parseContainer,
+  type RawNode,
+  renderCompact,
+  renderIndented,
+} from './views/shared/document/rawTree';
+
 export type BeautifyMode = 'indented' | 'compact';
 
 export interface BeautifyResult {
@@ -13,11 +20,6 @@ export interface BeautifyResult {
 // its exact raw slice, never round-tripped through a JS `number`, so a numeric(20,6)-shaped
 // literal survives byte-identical. Structural whitespace is the only thing that changes.
 // ---------------------------------------------------------------------------------------------
-
-type JsonNode =
-  | { kind: 'literal'; raw: string }
-  | { kind: 'object'; members: { keyRaw: string; value: JsonNode }[] }
-  | { kind: 'array'; items: JsonNode[] };
 
 class JsonScanError extends Error {
   constructor(readonly offset: number) {
@@ -81,7 +83,7 @@ function parseJsonNumber(c: Cursor): string {
   return m[0];
 }
 
-function parseJsonValue(c: Cursor): JsonNode {
+function parseJsonValue(c: Cursor): RawNode {
   skipJsonWs(c);
   const ch = c.text[c.i];
   if (ch === '{') return parseJsonObject(c);
@@ -103,62 +105,30 @@ function parseJsonValue(c: Cursor): JsonNode {
   throw new JsonScanError(c.i);
 }
 
-function parseJsonObject(c: Cursor): JsonNode {
-  c.i++; // '{'
-  const members: { keyRaw: string; value: JsonNode }[] = [];
-  skipJsonWs(c);
-  if (c.text[c.i] === '}') {
-    c.i++;
-    return { kind: 'object', members };
-  }
-  for (;;) {
-    skipJsonWs(c);
-    if (c.text[c.i] !== '"') throw new JsonScanError(c.i);
-    const keyRaw = parseJsonString(c);
-    skipJsonWs(c);
-    if (c.text[c.i] !== ':') throw new JsonScanError(c.i);
-    c.i++;
-    const value = parseJsonValue(c);
-    members.push({ keyRaw, value });
-    skipJsonWs(c);
-    if (c.text[c.i] === ',') {
-      c.i++;
-      continue;
-    }
-    if (c.text[c.i] === '}') {
-      c.i++;
-      break;
-    }
-    throw new JsonScanError(c.i);
-  }
-  return { kind: 'object', members };
+function parseJsonObject(c: Cursor): RawNode {
+  return parseContainer(c, {
+    parseKey: (cur) => {
+      skipJsonWs(cur);
+      if (cur.text[cur.i] !== '"') throw new JsonScanError(cur.i);
+      return parseJsonString(cur);
+    },
+    parseValue: parseJsonValue,
+    skipWs: skipJsonWs,
+    allowTrailingComma: false,
+    error: (offset) => new JsonScanError(offset),
+  });
 }
 
-function parseJsonArray(c: Cursor): JsonNode {
-  c.i++; // '['
-  const items: JsonNode[] = [];
-  skipJsonWs(c);
-  if (c.text[c.i] === ']') {
-    c.i++;
-    return { kind: 'array', items };
-  }
-  for (;;) {
-    items.push(parseJsonValue(c));
-    skipJsonWs(c);
-    if (c.text[c.i] === ',') {
-      c.i++;
-      continue;
-    }
-    if (c.text[c.i] === ']') {
-      c.i++;
-      break;
-    }
-    throw new JsonScanError(c.i);
-  }
-  return { kind: 'array', items };
+function parseJsonArray(c: Cursor): RawNode {
+  return parseContainer(c, {
+    parseValue: parseJsonValue,
+    skipWs: skipJsonWs,
+    allowTrailingComma: false,
+    error: (offset) => new JsonScanError(offset),
+  });
 }
 
-type JsonParse = { ok: true; node: JsonNode } | { ok: false; offset: number };
+type JsonParse = { ok: true; node: RawNode } | { ok: false; offset: number };
 
 function tryParseJson(text: string): JsonParse {
   const c: Cursor = { text, i: 0 };
@@ -179,72 +149,15 @@ export function scanJson(text: string): { ok: boolean; offset?: number } {
   return r.ok ? { ok: true } : { ok: false, offset: r.offset };
 }
 
-function renderJsonIndented(node: JsonNode, depth: number, out: string[]): void {
-  const pad = '  '.repeat(depth);
-  const padIn = '  '.repeat(depth + 1);
-  if (node.kind === 'literal') {
-    out.push(node.raw);
-    return;
-  }
-  if (node.kind === 'object') {
-    if (node.members.length === 0) {
-      out.push('{}');
-      return;
-    }
-    out.push('{\n');
-    node.members.forEach((m, idx) => {
-      out.push(padIn, m.keyRaw, ': ');
-      renderJsonIndented(m.value, depth + 1, out);
-      if (idx < node.members.length - 1) out.push(',');
-      out.push('\n');
-    });
-    out.push(pad, '}');
-    return;
-  }
-  if (node.items.length === 0) {
-    out.push('[]');
-    return;
-  }
-  out.push('[\n');
-  node.items.forEach((item, idx) => {
-    out.push(padIn);
-    renderJsonIndented(item, depth + 1, out);
-    if (idx < node.items.length - 1) out.push(',');
-    out.push('\n');
-  });
-  out.push(pad, ']');
-}
-
-function renderJsonCompact(node: JsonNode, out: string[]): void {
-  if (node.kind === 'literal') {
-    out.push(node.raw);
-    return;
-  }
-  if (node.kind === 'object') {
-    out.push('{');
-    node.members.forEach((m, idx) => {
-      if (idx > 0) out.push(',');
-      out.push(m.keyRaw, ':');
-      renderJsonCompact(m.value, out);
-    });
-    out.push('}');
-    return;
-  }
-  out.push('[');
-  node.items.forEach((item, idx) => {
-    if (idx > 0) out.push(',');
-    renderJsonCompact(item, out);
-  });
-  out.push(']');
-}
+// JSON keys are already double-quoted raw slices — rendered verbatim, no normalization.
+const jsonKeyText = (raw: string): string => raw;
 
 export function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
   const r = tryParseJson(text);
   if (!r.ok) return { text, ok: false, reason: `invalid JSON at offset ${r.offset}` };
-  const out: string[] = [];
-  if (mode === 'indented') renderJsonIndented(r.node, 0, out);
-  else renderJsonCompact(r.node, out);
-  return { text: out.join(''), ok: true };
+  const rendered =
+    mode === 'indented' ? renderIndented(r.node, jsonKeyText) : renderCompact(r.node, jsonKeyText);
+  return { text: rendered, ok: true };
 }
 
 // ---------------------------------------------------------------------------------------------

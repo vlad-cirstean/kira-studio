@@ -8,6 +8,7 @@
 // cell editor's raw numeric literals (`beautify.ts`'s reason for a hand-written scanner there) —
 // plain `JSON.parse` is exact here.
 import type { BeautifyMode, BeautifyResult } from '../../../beautify';
+import { parseContainer, type RawNode, renderCompact, renderIndented } from './rawTree';
 
 type DocNodeKind = 'object' | 'array' | 'scalar';
 
@@ -512,11 +513,6 @@ export function toPlainJson(body: string): string {
 // the buffer; they never re-serialise it or change a type.
 // ---------------------------------------------------------------------------------------------
 
-type ShellNode =
-  | { kind: 'literal'; raw: string }
-  | { kind: 'object'; members: { keyRaw: string; value: ShellNode }[] }
-  | { kind: 'array'; items: ShellNode[] };
-
 class ShellScanError extends Error {
   constructor(readonly offset: number) {
     super(`invalid document text at offset ${offset}`);
@@ -597,7 +593,7 @@ function parseShellCall(c: ShellCursor, identStart: number): string {
   throw new ShellScanError(c.i);
 }
 
-function parseShellValue(c: ShellCursor): ShellNode {
+function parseShellValue(c: ShellCursor): RawNode {
   skipShellWs(c);
   const ch = c.text[c.i];
   if (ch === '{') return parseShellObject(c);
@@ -625,67 +621,23 @@ function parseShellKey(c: ShellCursor): string {
   throw new ShellScanError(c.i);
 }
 
-function parseShellObject(c: ShellCursor): ShellNode {
-  c.i++; // '{'
-  const members: { keyRaw: string; value: ShellNode }[] = [];
-  skipShellWs(c);
-  if (c.text[c.i] === '}') {
-    c.i++;
-    return { kind: 'object', members };
-  }
-  for (;;) {
-    const keyRaw = parseShellKey(c);
-    skipShellWs(c);
-    if (c.text[c.i] !== ':') throw new ShellScanError(c.i);
-    c.i++;
-    const value = parseShellValue(c);
-    members.push({ keyRaw, value });
-    skipShellWs(c);
-    if (c.text[c.i] === ',') {
-      c.i++;
-      skipShellWs(c);
-      if (c.text[c.i] === '}') {
-        c.i++;
-        break;
-      }
-      continue;
-    }
-    if (c.text[c.i] === '}') {
-      c.i++;
-      break;
-    }
-    throw new ShellScanError(c.i);
-  }
-  return { kind: 'object', members };
+function parseShellObject(c: ShellCursor): RawNode {
+  return parseContainer(c, {
+    parseKey: parseShellKey,
+    parseValue: parseShellValue,
+    skipWs: skipShellWs,
+    allowTrailingComma: true,
+    error: (offset) => new ShellScanError(offset),
+  });
 }
 
-function parseShellArray(c: ShellCursor): ShellNode {
-  c.i++; // '['
-  const items: ShellNode[] = [];
-  skipShellWs(c);
-  if (c.text[c.i] === ']') {
-    c.i++;
-    return { kind: 'array', items };
-  }
-  for (;;) {
-    items.push(parseShellValue(c));
-    skipShellWs(c);
-    if (c.text[c.i] === ',') {
-      c.i++;
-      skipShellWs(c);
-      if (c.text[c.i] === ']') {
-        c.i++;
-        break;
-      }
-      continue;
-    }
-    if (c.text[c.i] === ']') {
-      c.i++;
-      break;
-    }
-    throw new ShellScanError(c.i);
-  }
-  return { kind: 'array', items };
+function parseShellArray(c: ShellCursor): RawNode {
+  return parseContainer(c, {
+    parseValue: parseShellValue,
+    skipWs: skipShellWs,
+    allowTrailingComma: true,
+    error: (offset) => new ShellScanError(offset),
+  });
 }
 
 // P42 D12: exported so views/console/lint.ts can validate a Mongo statement's argument against
@@ -693,7 +645,7 @@ function parseShellArray(c: ShellCursor): ShellNode {
 // calls) instead of JSON.parse, which would reject valid input this console actually accepts.
 export function tryParseShellText(
   text: string,
-): { ok: true; node: ShellNode } | { ok: false; offset: number } {
+): { ok: true; node: RawNode } | { ok: false; offset: number } {
   const c: ShellCursor = { text, i: 0 };
   try {
     const node = parseShellValue(c);
@@ -706,64 +658,9 @@ export function tryParseShellText(
   }
 }
 
-function renderShellIndented(node: ShellNode, depth: number, out: string[]): void {
-  const pad = '  '.repeat(depth);
-  const padIn = '  '.repeat(depth + 1);
-  if (node.kind === 'literal') {
-    out.push(node.raw);
-    return;
-  }
-  if (node.kind === 'object') {
-    if (node.members.length === 0) {
-      out.push('{}');
-      return;
-    }
-    out.push('{\n');
-    node.members.forEach((m, idx) => {
-      out.push(padIn, JSON.stringify(m.keyRaw.replace(/^['"]|['"]$/g, '')), ': ');
-      renderShellIndented(m.value, depth + 1, out);
-      if (idx < node.members.length - 1) out.push(',');
-      out.push('\n');
-    });
-    out.push(pad, '}');
-    return;
-  }
-  if (node.items.length === 0) {
-    out.push('[]');
-    return;
-  }
-  out.push('[\n');
-  node.items.forEach((item, idx) => {
-    out.push(padIn);
-    renderShellIndented(item, depth + 1, out);
-    if (idx < node.items.length - 1) out.push(',');
-    out.push('\n');
-  });
-  out.push(pad, ']');
-}
-
-function renderShellCompact(node: ShellNode, out: string[]): void {
-  if (node.kind === 'literal') {
-    out.push(node.raw);
-    return;
-  }
-  if (node.kind === 'object') {
-    out.push('{');
-    node.members.forEach((m, idx) => {
-      if (idx > 0) out.push(',');
-      out.push(JSON.stringify(m.keyRaw.replace(/^['"]|['"]$/g, '')), ':');
-      renderShellCompact(m.value, out);
-    });
-    out.push('}');
-    return;
-  }
-  out.push('[');
-  node.items.forEach((item, idx) => {
-    if (idx > 0) out.push(',');
-    renderShellCompact(item, out);
-  });
-  out.push(']');
-}
+// An unquoted/single-quoted raw key is normalized through JSON.stringify — beautify/minify always
+// emit a double-quoted key, even when the source used a bare identifier or single quotes.
+const shellKeyText = (raw: string): string => JSON.stringify(raw.replace(/^['"]|['"]$/g, ''));
 
 /**
  * Beautify/Minify for the document editor's edit buffer — reindents Mongo shell literal text
@@ -774,8 +671,9 @@ function renderShellCompact(node: ShellNode, out: string[]): void {
 export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyResult {
   const r = tryParseShellText(text);
   if (!r.ok) return { text, ok: false, reason: `invalid document text at offset ${r.offset}` };
-  const out: string[] = [];
-  if (mode === 'indented') renderShellIndented(r.node, 0, out);
-  else renderShellCompact(r.node, out);
-  return { text: out.join(''), ok: true };
+  const rendered =
+    mode === 'indented'
+      ? renderIndented(r.node, shellKeyText)
+      : renderCompact(r.node, shellKeyText);
+  return { text: rendered, ok: true };
 }
