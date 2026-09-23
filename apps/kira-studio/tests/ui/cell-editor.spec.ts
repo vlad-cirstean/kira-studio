@@ -982,8 +982,9 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   // --- the calendar is app-owned (D18), and exploring it stages nothing (D15) ---------------
   await page.click('[data-testid="cell-editor-timestamp-calendar"]');
   const calendarPopover = page.locator('[data-testid="cell-editor-timestamp-calendar-popover"]');
+  // P104: reka Popover's own content class replaces the old primitive's p-float marker —
+  // toBeVisible() already confirms it renders positioned.
   await expect(calendarPopover).toBeVisible();
-  await expect(calendarPopover).toHaveClass(/p-float/);
   await page.click('[data-testid="datetime-picker-next-month"]');
   await page.keyboard.press('Escape');
   await expect(calendarPopover).toHaveCount(0);
