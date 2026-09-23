@@ -144,115 +144,42 @@ func verifyChainSkipHostname(rawCerts [][]byte, roots *x509.CertPool) error {
 
 // ConnSet is client.ts's ClientSet — misleadingly-named "Pool" avoided on purpose (D14): one
 // *pgx.Conn per (connection, database), never a pool, because pg_cancel_backend needs a known
-// backend pid and a pool does not reliably tell you which backend ran your query.
+// backend pid and a pool does not reliably tell you which backend ran your query. The LRU pool
+// with single-flight dial (P21 round 2 performance finding 4) is adapters.ConnSet — only Dial and
+// the eviction Close stay dialect-specific here.
 type ConnSet struct {
 	cfg model.ResolvedConnectionConfig
 	log func(level, message string)
 
-	mu    sync.Mutex
-	conns map[string]*connEntry
-	lru   []string
-	// P21 round 2 performance finding 4(b): keyed by the same key as conns — a dial in progress
-	// for a not-yet-open database, so a second concurrent get() for it waits on this dial's own
-	// outcome instead of starting a duplicate one. This used to be documented as "a faithful port
-	// of an existing, accepted behaviour" (client.ts has the identical race under JS's
-	// single-threaded await interleaving), but adapterhost dispatches concurrently by design here
-	// — not just interleaved — so two Reads opening the same cold database really do race, and the
-	// loser's own *pgx.Conn (and the real Postgres backend process behind it) used to leak
-	// silently, living until the app exits.
-	dialing map[string]*dialInFlight
-}
-
-// dialInFlight is one in-progress get() dial for a key — done closes once the attempt finishes,
-// success or failure. A waiter never reads this dial's own outcome directly: it simply re-runs
-// get()'s own loop once done closes, which re-checks s.conns (present if this dial succeeded) and
-// otherwise falls through to dialing the key itself (if it failed, or if this dial was for a
-// different generation of the same key — see get()'s own comment). That keeps a failed dial's
-// error from needing to be threaded through every waiter; each one gets an equal chance to retry.
-type dialInFlight struct {
-	done chan struct{}
+	inner *adapters.ConnSet[string, *connEntry]
 }
 
 // NewConnSet constructs a ConnSet for cfg.
 func NewConnSet(cfg model.ResolvedConnectionConfig, log func(level, message string)) *ConnSet {
-	return &ConnSet{cfg: cfg, log: log, conns: make(map[string]*connEntry), dialing: make(map[string]*dialInFlight)}
-}
-
-// get returns the entry for database (empty string means the primary), opening a connection for it
-// if none exists yet and evicting the least-recently-used non-primary connection first if the set is
-// full.
-//
-// P21 round 2 performance finding 4: two independent fixes over the single-dial version.
-// (a) evictLRULocked used to run — network Close(ctx) round trip and all — while s.mu was still
-// held, so opening a 9th database while a long op ran on the LRU victim blocked *every* other
-// database of this connection (including a bare map lookup for the already-open primary) behind
-// that op's own victim.mu.Lock(). detachLRULocked below only touches the map/lru under s.mu; the
-// actual close happens after s.mu is released.
-// (b) the dial itself used to run with no lock held at all, so two concurrent get() calls for the
-// same not-yet-open database both dialed, with the second overwriting the first in conns — a
-// leaked *pgx.Conn and a leaked live Postgres backend process for the life of the app. The
-// dialing map above turns this into a single-flight: the first caller for a key dials while
-// holding a placeholder; everyone else waits on that placeholder's own outcome instead.
-func (s *ConnSet) get(ctx context.Context, database string) (*connEntry, error) {
-	key := database
-	if key == "" {
-		key = primaryKey
-	}
-
-	for {
-		s.mu.Lock()
-		if existing, ok := s.conns[key]; ok {
-			s.touchLocked(key)
-			s.mu.Unlock()
-			return existing, nil
-		}
-		if inFlight, ok := s.dialing[key]; ok {
-			s.mu.Unlock()
-			select {
-			case <-inFlight.done:
-				// Re-check from the top: the dial that just finished may have been this key's
-				// (conns now has it, or it failed and this caller should try dialing itself) or
-				// — in principle — a still-different one if keys were reused mid-wait, which
-				// cannot happen here since a key is only ever removed from dialing once, by its
-				// own dialer.
-				continue
-			case <-ctx.Done():
-				return nil, ctx.Err()
+	s := &ConnSet{cfg: cfg, log: log}
+	s.inner = adapters.NewConnSet(adapters.ConnSetOptions[string, *connEntry]{
+		// key normalizes "" (the primary) to primaryKey for the pool's own map/lru; dial itself
+		// always wants the original, possibly-empty database argument (buildConfig's own "" means
+		// no explicit override).
+		Dial: func(ctx context.Context, key string) (*connEntry, error) {
+			database := key
+			if database == primaryKey {
+				database = ""
 			}
-		}
-		// This goroutine is now the one dialing key — every concurrent caller for the same key
-		// takes the branch above instead, until waiter.done closes.
-		waiter := &dialInFlight{done: make(chan struct{})}
-		s.dialing[key] = waiter
-		var victim *connEntry
-		// Counting in-flight dials against maxConns too (not just s.conns) closes the "related,
-		// minor" gap the same finding names: without it, N concurrent first-time opens could
-		// previously all pass this check before any of them finished dialing, transiently
-		// exceeding maxConns.
-		if len(s.conns)+len(s.dialing) > maxConns {
-			victim = s.detachLRULocked()
-		}
-		s.mu.Unlock()
-
-		if victim != nil {
-			victim.mu.Lock()
-			_ = victim.conn.Close(ctx)
-			victim.mu.Unlock()
-		}
-
-		entry, err := s.dial(ctx, database)
-
-		s.mu.Lock()
-		delete(s.dialing, key)
-		if err == nil {
-			s.conns[key] = entry
-			s.touchLocked(key)
-		}
-		s.mu.Unlock()
-
-		close(waiter.done)
-		return entry, err
-	}
+			return s.dial(ctx, database)
+		},
+		// P2 R2: the victim's own per-connection lock (held for its entire in-flight op) is taken
+		// here, not inside adapters.ConnSet — the pool's own mu is already released by the time
+		// Close runs (see adapters.ConnSet.Get's own doc comment).
+		Close: func(ctx context.Context, e *connEntry) {
+			e.mu.Lock()
+			_ = e.conn.Close(ctx)
+			e.mu.Unlock()
+		},
+		Max:     maxConns,
+		Primary: primaryKey,
+	})
+	return s
 }
 
 // pgxConnect — pgx.ConnectConfig, the exact function dial calls — is a package-level var (the
@@ -296,7 +223,11 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 // same conn for its whole duration, not just between individual statements, or a racing Read could
 // execute inside the open transaction (P2 R2).
 func (s *ConnSet) Acquire(ctx context.Context, database string) (*pgx.Conn, func(), error) {
-	entry, err := s.get(ctx, database)
+	key := database
+	if key == "" {
+		key = primaryKey
+	}
+	entry, err := s.inner.Get(ctx, key)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -309,67 +240,8 @@ func (s *ConnSet) Primary(ctx context.Context) (*pgx.Conn, func(), error) {
 	return s.Acquire(ctx, "")
 }
 
-func (s *ConnSet) touchLocked(key string) {
-	for i, k := range s.lru {
-		if k == key {
-			s.lru = append(s.lru[:i], s.lru[i+1:]...)
-			break
-		}
-	}
-	s.lru = append(s.lru, key)
-}
-
-// detachLRULocked picks the least-recently-used non-primary connection to make room — a user
-// expanding twenty databases should not open twenty backends — removes it from the map/lru under
-// s.mu (the only part of eviction that needs the global lock), and returns it for the caller to
-// close *after* releasing s.mu. A no-op (nil) if every open connection is the primary (never
-// evicted).
-//
-// P21 round 2 performance finding 4(a): this used to close the victim (victim.mu.Lock() — held for
-// the victim's entire in-flight op, per connEntry's own doc comment — plus a real network
-// Close(ctx) round trip) while s.mu was still held by get()'s own caller. That meant opening a 9th
-// database while a long query ran on the LRU victim blocked get()/Acquire() for *every* database
-// of this connection, including a bare map lookup for an already-open, completely unrelated
-// primary, until the long query finished. Splitting detach (map-only, fast, needs s.mu) from close
-// (can block on the network and on the victim's own lock, needs no lock at all once detached) is
-// the fix — get() now calls this and does the actual Close after unlocking s.mu.
-func (s *ConnSet) detachLRULocked() *connEntry {
-	var victimKey string
-	for _, k := range s.lru {
-		if k != primaryKey {
-			victimKey = k
-			break
-		}
-	}
-	if victimKey == "" {
-		return nil
-	}
-	victim := s.conns[victimKey]
-	delete(s.conns, victimKey)
-	for i, k := range s.lru {
-		if k == victimKey {
-			s.lru = append(s.lru[:i], s.lru[i+1:]...)
-			break
-		}
-	}
-	return victim
-}
-
-// CloseAll closes every open connection, taking each one's own lock first (P2 R2 — see
-// evictLRULocked's own comment).
+// CloseAll closes every open connection, taking each one's own lock first (P2 R2 — see the Close
+// closure NewConnSet builds above).
 func (s *ConnSet) CloseAll(ctx context.Context) {
-	s.mu.Lock()
-	all := make([]*connEntry, 0, len(s.conns))
-	for _, e := range s.conns {
-		all = append(all, e)
-	}
-	s.conns = make(map[string]*connEntry)
-	s.lru = nil
-	s.mu.Unlock()
-
-	for _, e := range all {
-		e.mu.Lock()
-		_ = e.conn.Close(ctx)
-		e.mu.Unlock()
-	}
+	s.inner.CloseAll(ctx)
 }

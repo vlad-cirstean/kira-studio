@@ -115,102 +115,30 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 // dbConnectionSet mirrors client.ts's DbConnectionSet exactly, keyed by logical db index instead
 // of database name (P9's D9): one distinct *redis.Client per db index, each carrying its own DB
 // option baked in at construction rather than sharing one connection and issuing a runtime
-// SELECT.
+// SELECT. The LRU pool with single-flight dial (P21 round 3 performance finding 5) is
+// adapters.ConnSet — only Dial and the eviction Close stay dialect-specific here.
 type dbConnectionSet struct {
 	fields         connectFields
 	defaultDbIndex int
 	log            func(level, message string)
 
-	mu          sync.Mutex
-	connections map[int]*goredis.Client
-	lru         []int
-	// P21 round 3 performance finding 5(b), porting postgres/client.go's own round-2 single-flight
-	// fix (mirrored into mysqlfamily/client.go too): keyed by the same key as connections — a dial
-	// in progress for a not-yet-open db index, so a second concurrent get() for it waits on this
-	// dial's own outcome instead of starting a duplicate one. Without this, two concurrent get()
-	// calls for the same not-yet-open db index (routine — expanding a namespace while a tab loads
-	// from it) both dialed, and the second overwrote the first in connections: a leaked
-	// *goredis.Client and its whole connection pool for the life of the app.
-	dialing map[int]*dialInFlight
+	inner *adapters.ConnSet[int, *goredis.Client]
 
 	cmdMu   sync.Mutex
 	cmdInfo map[string]*goredis.CommandInfo
 }
 
-// dialInFlight is one in-progress get() dial for a db index — see postgres/client.go's own doc
-// comment on the identical type; the semantics here are byte-for-byte the same.
-type dialInFlight struct {
-	done chan struct{}
-}
-
 func newDbConnectionSet(fields connectFields, defaultDbIndex int, log func(level, message string)) *dbConnectionSet {
-	return &dbConnectionSet{
-		fields: fields, defaultDbIndex: defaultDbIndex, log: log,
-		connections: make(map[int]*goredis.Client),
-		dialing:     make(map[int]*dialInFlight),
-	}
-}
-
-// get returns dbIndex's connection, opening one if none exists yet and evicting the
-// least-recently-used non-default entry first if the set is full.
-//
-// P21 round 3 performance finding 5, porting postgres/client.go's own round-2 fixes: (a)
-// detachLRULocked below only touches the map/lru under s.mu, closing the victim's connection after
-// releasing it — a goredis.Client has no per-connection lock to hold (unlike postgres/mysqlfamily's
-// pinned single connection, a real *redis.Client is already safe for concurrent use and pools its
-// own connections), so this half is a smaller win here, but the shape stays consistent with the
-// other two adapters. (b) the dialing map above turns the dial into a single-flight: the first
-// caller for a key dials while holding a placeholder; everyone else waits on that placeholder's own
-// outcome instead of starting a duplicate dial.
-func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client, error) {
-	for {
-		s.mu.Lock()
-		if existing, ok := s.connections[dbIndex]; ok {
-			s.touchLocked(dbIndex)
-			s.mu.Unlock()
-			return existing, nil
-		}
-		if inFlight, ok := s.dialing[dbIndex]; ok {
-			s.mu.Unlock()
-			select {
-			case <-inFlight.done:
-				// Re-check from the top, exactly as postgres/client.go's get() does — see its own
-				// comment for why this can never spin on a reused key.
-				continue
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		// This goroutine is now the one dialing dbIndex — every concurrent caller for the same
-		// index takes the branch above instead, until waiter.done closes.
-		waiter := &dialInFlight{done: make(chan struct{})}
-		s.dialing[dbIndex] = waiter
-		var victim *goredis.Client
-		// Counting in-flight dials against maxConnections too closes the same "related, minor" gap
-		// postgres/client.go's own comment names: without it, N concurrent first-time opens could
-		// all pass this check before any of them finished dialing, transiently exceeding the cap.
-		if len(s.connections)+len(s.dialing) > maxConnections {
-			victim = s.detachLRULocked()
-		}
-		s.mu.Unlock()
-
-		if victim != nil {
-			_ = victim.Close()
-		}
-
-		client, err := s.dial(ctx, dbIndex)
-
-		s.mu.Lock()
-		delete(s.dialing, dbIndex)
-		if err == nil {
-			s.connections[dbIndex] = client
-			s.touchLocked(dbIndex)
-		}
-		s.mu.Unlock()
-
-		close(waiter.done)
-		return client, err
-	}
+	s := &dbConnectionSet{fields: fields, defaultDbIndex: defaultDbIndex, log: log}
+	s.inner = adapters.NewConnSet(adapters.ConnSetOptions[int, *goredis.Client]{
+		Dial: s.dial,
+		// a goredis.Client has no per-connection lock to hold (unlike postgres/mysqlfamily's pinned
+		// single connection, it is already safe for concurrent use and pools its own connections).
+		Close:   func(_ context.Context, c *goredis.Client) { _ = c.Close() },
+		Max:     maxConnections,
+		Primary: defaultDbIndex,
+	})
+	return s
 }
 
 // redisPing — the exact call dial makes to verify the connection — is a package-level var (the
@@ -253,6 +181,11 @@ func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*goredis.Clien
 	return client, nil
 }
 
+// get returns dbIndex's connection, opening one via adapters.ConnSet if none exists yet.
+func (s *dbConnectionSet) get(ctx context.Context, dbIndex int) (*goredis.Client, error) {
+	return s.inner.Get(ctx, dbIndex)
+}
+
 func (s *dbConnectionSet) primary(ctx context.Context) (*goredis.Client, error) {
 	return s.get(ctx, s.defaultDbIndex)
 }
@@ -278,49 +211,7 @@ func (s *dbConnectionSet) isReadOnlyCommand(ctx context.Context, client *goredis
 }
 
 func (s *dbConnectionSet) closeAll() {
-	s.mu.Lock()
-	all := make([]*goredis.Client, 0, len(s.connections))
-	for _, c := range s.connections {
-		all = append(all, c)
-	}
-	s.connections = make(map[int]*goredis.Client)
-	s.lru = nil
-	s.mu.Unlock()
-	for _, c := range all {
-		_ = c.Close()
-	}
-}
-
-func (s *dbConnectionSet) touchLocked(key int) {
-	for i, k := range s.lru {
-		if k == key {
-			s.lru = append(s.lru[:i], s.lru[i+1:]...)
-			break
-		}
-	}
-	s.lru = append(s.lru, key)
-}
-
-// detachLRULocked picks the least-recently-used non-default db index to make room, removes it
-// from the map/lru under s.mu, and returns it for the caller to close *after* releasing s.mu — the
-// default db index is never evicted (client.ts:141-149). A no-op (nil) if every open connection is
-// the default.
-func (s *dbConnectionSet) detachLRULocked() *goredis.Client {
-	victimIdx := -1
-	for i, key := range s.lru {
-		if key != s.defaultDbIndex {
-			victimIdx = i
-			break
-		}
-	}
-	if victimIdx < 0 {
-		return nil
-	}
-	victimKey := s.lru[victimIdx]
-	s.lru = append(s.lru[:victimIdx], s.lru[victimIdx+1:]...)
-	victim := s.connections[victimKey]
-	delete(s.connections, victimKey)
-	return victim
+	s.inner.CloseAll(context.Background())
 }
 
 // connectRedis is client.ts's connectRedis.
