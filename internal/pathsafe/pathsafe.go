@@ -24,10 +24,14 @@ var ErrPathEscapesRoot = errors.New("pathsafe: path escapes repository root")
 // ~/.ssh/id_rsa.
 //
 // EvalSymlinks requires its argument to exist, which a listed-but-since-deleted file (a race
-// between listing and reading) would not — that case carries no traversal risk (nothing to resolve
-// through), so it falls back to resolving the parent directory only and joining the leaf name back
-// on, leaving the caller's own os.Stat/os.Open to report it missing rather than this function
-// misreporting a benign race as a security failure.
+// between listing and reading) would not — that case falls back to resolving the parent directory
+// only and joining the leaf name back on, leaving the caller's own os.Stat/os.Open to report it
+// missing rather than this function misreporting a benign race as a security failure. A dangling
+// symlink leaf (the dirent exists, its target doesn't yet) hits that same ENOENT from
+// EvalSymlinks, but does carry traversal risk: an Lstat there rejects it outright rather than
+// falling through, since something can create the link's target — outside root — between this
+// call returning and the caller's later os.ReadFile/os.Open following the still-dangling link
+// (TOCTOU).
 func ValidateRelPath(root, relPath string) (string, error) {
 	if relPath == "" {
 		return "", fmt.Errorf("pathsafe: path is required")
@@ -52,6 +56,13 @@ func ValidateRelPath(root, relPath string) (string, error) {
 		return requireUnder(resolvedRoot, resolved)
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("pathsafe: resolve %q: %w", relPath, err)
+	}
+
+	// A dangling symlink leaf hits the same ENOENT from EvalSymlinks above as a plain missing file
+	// — Lstat (which does not follow the link) tells the two apart, and only a genuinely missing
+	// leaf falls through to the parent-directory resolution below.
+	if info, lerr := os.Lstat(joined); lerr == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("%w: dangling symlink %q", ErrPathEscapesRoot, relPath)
 	}
 
 	// The leaf itself doesn't exist (or a component of it doesn't) — resolve as far as the parent
