@@ -56,7 +56,7 @@ async function submit(): Promise<void> {
 
     <label class="kv-dialog-field">
       New name
-      <input type="text" v-model="name" autofocus />
+      <input type="text" v-model="name" />
     </label>
     <p v-if="nameError" class="kv-dialog-error">{{ nameError }}</p>
 

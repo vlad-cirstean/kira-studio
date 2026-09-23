@@ -257,7 +257,7 @@ function onClose(): void {
     <template v-if="mode === 'create'">
       <label class="kv-dialog-field">
         Message (optional)
-        <input type="text" v-model="message" autofocus placeholder="git's own WIP message" />
+        <input type="text" v-model="message" placeholder="git's own WIP message" />
       </label>
       <label class="kv-dialog-field kv-dialog-field--inline">
         <input type="checkbox" v-model="includeUntracked" />
@@ -285,7 +285,7 @@ function onClose(): void {
       </p>
       <label class="kv-dialog-field">
         Branch name
-        <input type="text" v-model="branchName" autofocus />
+        <input type="text" v-model="branchName" />
       </label>
       <p v-if="branchNameLocalError" class="kv-dialog-error">{{ branchNameLocalError }}</p>
       <p v-else-if="branchPreflight?.name.error" class="kv-dialog-error">
@@ -303,7 +303,7 @@ function onClose(): void {
     <template v-else-if="mode === 'save'">
       <label class="kv-dialog-field">
         Label
-        <input type="text" v-model="saveLabel" autofocus />
+        <input type="text" v-model="saveLabel" />
       </label>
       <fieldset class="kv-dialog-field">
         <legend>Source</legend>

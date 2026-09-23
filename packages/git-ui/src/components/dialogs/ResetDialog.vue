@@ -165,7 +165,7 @@ function confirm(): void {
       <template v-if="!stashFirst">
         <label class="kv-reset-field">
           Type <code>{{ shortTarget }}</code> to confirm
-          <input v-model="typedToken" type="text" autofocus data-testid="reset-confirm-token" />
+          <input v-model="typedToken" type="text" data-testid="reset-confirm-token" />
         </label>
       </template>
     </template>

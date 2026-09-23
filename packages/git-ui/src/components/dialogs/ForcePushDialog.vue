@@ -90,7 +90,6 @@ function confirmPlain(): void {
       <input
         v-model="typedBranch"
         type="text"
-        autofocus
         :placeholder="pending.branch"
         data-testid="force-push-confirm-branch"
       />
