@@ -23,7 +23,14 @@ function onConfirm(): void {
 </script>
 
 <template>
-  <Dialog :open="confirmDialogStore.open" @update:open="(v) => !v && onCancel()">
+  <!-- v-if, not just :open — reka's DialogPortal inserts each open dialog's node at the *end* of
+       body at open time, so DOM (and paint) order tracks open order. Bound only by :open, this
+       component's Teleport target would instead claim a fixed, early DOM position from app boot
+       (ConfirmDialog is always mounted, unlike whatever dialog it confirms over), permanently
+       under any dialog opened later — exactly the DbMcpApprovalDialog.vue precedent this mirrors.
+       Losing the closing fade (v-if unmounts immediately, no exit transition) is the accepted
+       trade-off for correct stacking when nested under another open dialog. -->
+  <Dialog v-if="confirmDialogStore.open" :open="true" @update:open="(v) => !v && onCancel()">
     <!-- DialogContent's own base classes cap max-width at sm:max-w-sm (384px < w-100's 400px) —
          max-w-100/sm:max-w-100 replace both the bare and the sm: rule (twMerge needs the same
          variant to dedupe a conflict). -->
