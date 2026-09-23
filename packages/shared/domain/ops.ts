@@ -21,6 +21,11 @@ export const opKindSchema = /*#__PURE__*/ z.enum([
   // P11 D7: a gRPC unary or server-streaming call (internal/grpcclient) — the same connectionless
   // op shape 'http' already established, joining the same op log rather than a second scheduler.
   'grpc',
+  // P108 Part 6 F3: Router.SchemaColumns' schema-wide column fetch (P22c) and Router.KeyTypes
+  // (P63) — mirrors model.opKinds' own Go-side addition, both already reaching RunOp with these
+  // kinds well before this schema recognized them.
+  'schemaColumns',
+  'keyTypes',
 ]);
 export type OpKind = z.infer<typeof opKindSchema>;
 

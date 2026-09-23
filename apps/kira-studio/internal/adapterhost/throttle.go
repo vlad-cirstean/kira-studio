@@ -20,6 +20,10 @@ const throttleMaxWait = 30 * time.Second
 var throttledKinds = map[string]bool{
 	"read": true, "count": true, "mutate": true, "execute": true, "transfer": true,
 	"children": true, "describe": true, "definition": true,
+	// P108 Part 6 F3: schemaColumns/keyTypes were missing here too, so a schema-wide column fetch
+	// or a keyTypes call (up to 200 keys per call) bypassed the per-connection rate limit
+	// entirely — the same real server load every other data-plane op kind above is paced against.
+	"schemaColumns": true, "keyTypes": true,
 }
 
 // throttleRegistry maps a connection id to its live *rate.Limiter. A dedicated mutex, not
