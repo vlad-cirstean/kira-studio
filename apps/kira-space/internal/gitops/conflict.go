@@ -50,47 +50,50 @@ func ReadInProgressStateFiles(gitDir string) gitpreflight.InProgressStateFiles {
 	}
 }
 
+// sequencerVerb maps an InProgressKind to its git subcommand token — the value ContinueArgs/
+// AbortArgs/SkipArgs each switched on before appending their own action suffix (I2-46).
+var sequencerVerb = map[gitpreflight.InProgressKind]string{
+	gitpreflight.InProgressMerge:      "merge",
+	gitpreflight.InProgressCherryPick: "cherry-pick",
+	gitpreflight.InProgressRevert:     "revert",
+	gitpreflight.InProgressRebase:     "rebase",
+}
+
+// sequencerArgs is ContinueArgs/AbortArgs/SkipArgs's shared shape: {verb, action} for a kind in
+// allowed, else (nil, false) — matching InProgressOperation's own Can{Continue,Abort,Skip} gate,
+// which the caller (gitsession.RunOp) treats false as "refuse before spawning".
+func sequencerArgs(kind gitpreflight.InProgressKind, action string, allowed ...gitpreflight.InProgressKind) ([]string, bool) {
+	for _, k := range allowed {
+		if k == kind {
+			return []string{sequencerVerb[kind], action}, true
+		}
+	}
+	return nil, false
+}
+
 // ContinueArgs is the Ordering table's own --continue column: (nil, false) for the two kinds v1
 // never offers it for — bisect (nothing to continue) and unmergedOnly (no state file to advance).
 // Rebase gained Continue at G26 D12, retiring G5's "§9 report-only posture": that posture was
 // correct only while nothing in the app could START a rebase, and G26's restack executor does.
 // GIT_EDITOR=true is already in hygieneEnv (runner.go) and probe M5/P11 both confirm
-// `rebase --continue` never opens an editor anyway (no -i in play here). The caller
-// (gitsession.RunOp) treats false as "refuse before spawning", matching
-// InProgressOperation.CanContinue.
+// `rebase --continue` never opens an editor anyway (no -i in play here).
 func ContinueArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
-	switch kind {
-	case gitpreflight.InProgressMerge:
-		return []string{"merge", "--continue"}, true
-	case gitpreflight.InProgressCherryPick:
-		return []string{"cherry-pick", "--continue"}, true
-	case gitpreflight.InProgressRevert:
-		return []string{"revert", "--continue"}, true
-	case gitpreflight.InProgressRebase:
-		return []string{"rebase", "--continue"}, true
-	default:
-		return nil, false
-	}
+	return sequencerArgs(kind, "--continue",
+		gitpreflight.InProgressMerge, gitpreflight.InProgressCherryPick,
+		gitpreflight.InProgressRevert, gitpreflight.InProgressRebase)
 }
 
 // AbortArgs is the Ordering table's own --abort column: every kind except unmergedOnly (there is
 // no state file for git to abort — InProgressOperation.CanAbort is false for exactly that kind).
-// bisect's "abort" is `git bisect reset` (bisect has no --abort flag).
+// bisect's "abort" is `git bisect reset` (bisect has no --abort flag), handled here directly
+// rather than through sequencerVerb/sequencerArgs.
 func AbortArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
-	switch kind {
-	case gitpreflight.InProgressMerge:
-		return []string{"merge", "--abort"}, true
-	case gitpreflight.InProgressCherryPick:
-		return []string{"cherry-pick", "--abort"}, true
-	case gitpreflight.InProgressRevert:
-		return []string{"revert", "--abort"}, true
-	case gitpreflight.InProgressRebase:
-		return []string{"rebase", "--abort"}, true
-	case gitpreflight.InProgressBisect:
+	if kind == gitpreflight.InProgressBisect {
 		return []string{"bisect", "reset"}, true
-	default:
-		return nil, false
 	}
+	return sequencerArgs(kind, "--abort",
+		gitpreflight.InProgressMerge, gitpreflight.InProgressCherryPick,
+		gitpreflight.InProgressRevert, gitpreflight.InProgressRebase)
 }
 
 // SkipArgs is probe P6's own sequencer remedy for an empty pick or revert, joined at G26 D12 by
@@ -100,14 +103,6 @@ func AbortArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
 // every other kind, since InProgressOperation.CanSkip is the UI's own gate and this is only the
 // second line of defence, not the first.
 func SkipArgs(kind gitpreflight.InProgressKind) ([]string, bool) {
-	switch kind {
-	case gitpreflight.InProgressCherryPick:
-		return []string{"cherry-pick", "--skip"}, true
-	case gitpreflight.InProgressRevert:
-		return []string{"revert", "--skip"}, true
-	case gitpreflight.InProgressRebase:
-		return []string{"rebase", "--skip"}, true
-	default:
-		return nil, false
-	}
+	return sequencerArgs(kind, "--skip",
+		gitpreflight.InProgressCherryPick, gitpreflight.InProgressRevert, gitpreflight.InProgressRebase)
 }
