@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -43,8 +42,70 @@ type DbMcpService struct {
 	// stays valid across a restart of the embedded server.
 	Approvals *dbmcp.ApprovalBroker
 
-	mu     sync.Mutex
-	server *dbmcp.Server
+	embedded embeddedService[*dbmcp.Server, DbMcpStatus]
+}
+
+// NewDbMcpService wires the embedded lifecycle's own start/stop/status closures once, here, so
+// every other method can assume s.embedded is ready — a plain struct literal (main.go's own shape
+// before T2-13) would leave them nil.
+func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp.ApprovalBroker) *DbMcpService {
+	s := &DbMcpService{Deps: deps, Installer: installer, Approvals: approvals}
+	s.embedded = embeddedService[*dbmcp.Server, DbMcpStatus]{
+		startFn: func(mint bool) (*dbmcp.Server, error) {
+			home := config.KiraHome()
+			srv, err := dbmcp.New(dbmcp.Config{
+				Home:             home,
+				Token:            dbMcpTokenProviderFor(home, mint),
+				Conns:            s.Deps.Connections,
+				Tree:             s.Deps.Tree,
+				Query:            s.Deps.Router,
+				Approvals:        s.Approvals,
+				MaskRules:        s.Deps.MaskRules,
+				ExplainThreshold: s.explainThreshold,
+				Logger:           slog.Default(),
+			})
+			if err != nil {
+				return nil, err
+			}
+			go func() {
+				if err := srv.Serve(); err != nil {
+					slog.Warn("db mcp embedded server", "scope", "dbmcp", "err", err)
+				}
+			}()
+			return srv, nil
+		},
+		// Approvals stays usable — a later re-enable within the same app run constructs a fresh
+		// server against it. AbandonAll runs before Close, not after (finding #17, M6): a run_query
+		// handler mid-flight can be parked in ApprovalBroker.Request (M2 §5.3) waiting on a human
+		// who will never answer once the server is going away. Close's own closeHTTP calls
+		// http.Server.Shutdown, which waits for every in-flight handler to return — closing before
+		// abandoning would have that handler, and Shutdown itself, both wait on each other with
+		// nothing left to break the deadlock but closeHTTP's own backstop timeout. Abandoning first
+		// lets the parked handler return immediately (ApprovalAbandoned), so Shutdown's ordinary
+		// graceful drain finds nothing left in flight.
+		stopFn: func(srv *dbmcp.Server) {
+			s.Approvals.AbandonAll()
+			_ = srv.Close()
+		},
+		statusFn: func(srv *dbmcp.Server) DbMcpStatus {
+			inst := s.Installer.Status()
+			st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
+			if srv == nil {
+				return st
+			}
+			st.Running = true
+			// Command is "" whenever no plaintext is currently held (an app restart with the
+			// setting already on) — the Database MCP section shows a Regenerate action instead.
+			if plain, minted := srv.Token(); minted {
+				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), plain)
+			}
+			if exp := srv.TokenExpiry(); !exp.IsZero() {
+				st.ExpiresAt = exp.Format(time.RFC3339)
+			}
+			return st
+		},
+	}
+	return s
 }
 
 // DbMcpStatus is the wire projection every method below returns.
@@ -61,29 +122,9 @@ type DbMcpStatus struct {
 	Error string `json:"error"`
 }
 
-func (s *DbMcpService) statusLocked() DbMcpStatus {
-	inst := s.Installer.Status()
-	st := DbMcpStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
-	if s.server == nil {
-		return st
-	}
-	st.Running = true
-	// Command is "" whenever no plaintext is currently held (an app restart with the setting
-	// already on) — the Database MCP section shows a Regenerate action instead.
-	if plain, minted := s.server.Token(); minted {
-		st.Command = mcpinstall.Command(dbMcpServerName, s.server.URL(), plain)
-	}
-	if exp := s.server.TokenExpiry(); !exp.IsZero() {
-		st.ExpiresAt = exp.Format(time.RFC3339)
-	}
-	return st
-}
-
 // Status reads the embedded instance's current state — never starts or stops anything.
 func (s *DbMcpService) Status() DbMcpStatus {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.statusLocked()
+	return s.embedded.Status()
 }
 
 // dbMcpTokenProviderFor implements dbmcp.TokenProvider's own no-repoID signature with a mint/!mint
@@ -108,36 +149,6 @@ func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 	}
 }
 
-// startLocked constructs and starts a new embedded instance if one is not already running. mu
-// must be held by the caller.
-func (s *DbMcpService) startLocked(mint bool) error {
-	if s.server != nil {
-		return nil
-	}
-	home := config.KiraHome()
-	srv, err := dbmcp.New(dbmcp.Config{
-		Home:             home,
-		Token:            dbMcpTokenProviderFor(home, mint),
-		Conns:            s.Deps.Connections,
-		Tree:             s.Deps.Tree,
-		Query:            s.Deps.Router,
-		Approvals:        s.Approvals,
-		MaskRules:        s.Deps.MaskRules,
-		ExplainThreshold: s.explainThreshold,
-		Logger:           slog.Default(),
-	})
-	if err != nil {
-		return err
-	}
-	s.server = srv
-	go func() {
-		if err := srv.Serve(); err != nil {
-			slog.Warn("db mcp embedded server", "scope", "dbmcp", "err", err)
-		}
-	}()
-	return nil
-}
-
 // explainThreshold is dbmcp.Config.ExplainThreshold's real backend: settingsState.advanced.
 // expensiveQueryRows's own Go leaf, read fresh on every call — never cached, since a stale
 // threshold would silently mis-flag every query after the user changes it (M3 §3.3). A settings
@@ -151,53 +162,25 @@ func (s *DbMcpService) explainThreshold() int {
 	return settings.Advanced.ExpensiveQueryRows
 }
 
-// stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
-//
-// AbandonAll runs before Close, not after (finding #17, M6): a run_query handler mid-flight can be
-// parked in ApprovalBroker.Request (M2 §5.3) waiting on a human who will never answer once the
-// server is going away. Close's own closeHTTP calls http.Server.Shutdown, which waits for every
-// in-flight handler to return — closing before abandoning would have that handler, and Shutdown
-// itself, both wait on each other with nothing left to break the deadlock but closeHTTP's own
-// backstop timeout. Abandoning first lets the parked handler return immediately (ApprovalAbandoned),
-// so Shutdown's ordinary graceful drain finds nothing left in flight.
-func (s *DbMcpService) stopLocked() {
-	if s.server == nil {
-		return
-	}
-	// The broker itself stays usable — a later re-enable within the same app run constructs a
-	// fresh server against it.
-	s.Approvals.AbandonAll()
-	_ = s.server.Close()
-	s.server = nil
-}
-
 // startIfEnabled is main.go's own boot-time call: a failure (a bind conflict) is logged, never
 // fatal — the app boots regardless.
 //
 // Unexported, reached only through StartDbMcpIfEnabled below: Wails binds every exported method of
 // a registered service, and a wire-callable Start would let a stray call bypass the settings leaf.
 func (s *DbMcpService) startIfEnabled() {
-	settings, err := s.Deps.Repos.Settings.GetAll()
-	if err != nil {
-		slog.Warn("db mcp: read settings at boot", "scope", "dbmcp", "err", err)
-		return
-	}
-	if !settings.DbMcp.ServerEnabled {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.startLocked(false); err != nil {
-		slog.Warn("db mcp: start at boot", "scope", "dbmcp", "err", err)
-	}
+	s.embedded.startIfEnabled("dbmcp", func() (bool, error) {
+		settings, err := s.Deps.Repos.Settings.GetAll()
+		if err != nil {
+			return false, err
+		}
+		return settings.DbMcp.ServerEnabled, nil
+	})
 }
 
 // stop is main.go's own shutdown call — see startIfEnabled's own note on why this is unexported
 // and reached only through StopDbMcp.
 func (s *DbMcpService) stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stopLocked()
+	s.embedded.stop()
 }
 
 // StartDbMcpIfEnabled and StopDbMcp are main.go's own boot/shutdown hooks for the embedded
@@ -224,42 +207,35 @@ func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if args.Enabled {
-		if err := s.startLocked(true); err != nil {
-			slog.Warn("db mcp: start on enable", "scope", "dbmcp", "err", err)
-			st := s.statusLocked()
-			st.Error = err.Error()
-			return st, nil
-		}
-	} else {
-		s.stopLocked()
+	st, err := s.embedded.setRunning(args.Enabled)
+	if err != nil {
+		slog.Warn("db mcp: start on enable", "scope", "dbmcp", "err", err)
+		st.Error = err.Error()
 	}
-	return s.statusLocked(), nil
+	return st, nil
 }
 
 // Regenerate mints a fresh token for the already-running embedded instance without touching the
 // setting or its lifecycle (an app restart loaded the existing hash+salt but has no plaintext to
 // show). A no-op, returning the current status unchanged, when nothing is running.
 func (s *DbMcpService) Regenerate() DbMcpStatus {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.server == nil {
-		return s.statusLocked()
+	s.embedded.mu.Lock()
+	defer s.embedded.mu.Unlock()
+	if s.embedded.server == nil {
+		return s.embedded.statusLocked()
 	}
 	path := mcpauth.PathNamed(config.KiraHome(), dbMcpTokenName)
 	plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
 	if err != nil {
 		slog.Warn("db mcp: regenerate token", "scope", "dbmcp", "err", err)
-		return s.statusLocked()
+		return s.embedded.statusLocked()
 	}
 	if err := mcpauth.Save(path, rec); err != nil {
 		slog.Warn("db mcp: persist regenerated token", "scope", "dbmcp", "err", err)
-		return s.statusLocked()
+		return s.embedded.statusLocked()
 	}
-	s.server.SetToken(rec, plain)
-	return s.statusLocked()
+	s.embedded.server.SetToken(rec, plain)
+	return s.embedded.statusLocked()
 }
 
 // DbMcpInstallResult is mcpinstall.Result's wire projection — GitVsixInstallResult's own precedent
@@ -279,16 +255,16 @@ func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
 // connections.Service.Reveal/gitvsix.Installer.Install's precedent. A no-op result (outcome
 // notFound) when nothing is running: there is nothing to register yet.
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.server == nil {
+	s.embedded.mu.Lock()
+	defer s.embedded.mu.Unlock()
+	if s.embedded.server == nil {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	plain, minted := s.server.Token()
+	plain, minted := s.embedded.server.Token()
 	if !minted {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.server.URL(), plain))
+	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.embedded.server.URL(), plain))
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own

@@ -388,13 +388,13 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
-	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
+	dbMcpSvc := bridge.NewDbMcpService(deps, mcpinstall.New(mcpinstall.Deps{}), dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
 	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
 	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
 	// leaf is already on).
-	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
+	agentHooksSvc := bridge.NewAgentHooksService(deps)
 	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
 
 	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
