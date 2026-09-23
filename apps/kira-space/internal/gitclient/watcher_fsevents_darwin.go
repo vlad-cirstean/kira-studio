@@ -107,6 +107,7 @@ func (b *fseventsBackend) run() {
 				continue // draining for Close (D10 step 1): discard, do not forward.
 			default:
 			}
+		batchLoop:
 			for _, ev := range batch {
 				re := rawEvent{Path: ev.Path}
 				if ev.Flags&droppedFlags != 0 {
@@ -114,6 +115,13 @@ func (b *fseventsBackend) run() {
 				}
 				select {
 				case b.out <- re:
+				case <-b.stopping:
+					// F6: a stopping signal mid-batch must abandon this send, not block on it —
+					// Close's drain guarantee (D10 step 1) otherwise only covers a NEW batch
+					// arriving after stopping closed, not one already being forwarded when it
+					// closes. Abandon and let the outer loop's own drain-and-discard handle
+					// whatever comes next (including b.done, already closed or not).
+					break batchLoop
 				case <-b.done:
 					close(b.out)
 					return
