@@ -152,7 +152,7 @@ onUnmounted(() => {
 <template>
   <!-- P104 §3: PanelShell inlined (no library counterpart). -->
   <div class="flex h-full flex-col" @keydown="onPanelKeydown">
-    <div class="p-panel-head h-[34px]">
+    <div class="p-panel-head h-bar">
       <span>Collections</span>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -288,7 +288,7 @@ onUnmounted(() => {
    category shape (P18's own "promote when a second consumer appears" rule). */
 .panel-category-head {
   all: unset;
-  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted uppercase tracking-[0.05em] h-control text-kira-sm;
+  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted uppercase tracking-wider h-control text-kira-sm;
 }
 .panel-category-head:hover {
   @apply text-fg;

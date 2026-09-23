@@ -124,7 +124,7 @@ onUnmounted(() => {
   /* P28 D17(c): the menu rung. This was a bare 200 — above the dialog scrim (then 100) and below
      the tooltip (then 300). Both relationships are preserved by the ladder: 300 sits above
      --kira-z-dialog and below --kira-z-tooltip. */
-  @apply fixed w-[340px] max-h-[240px] flex flex-col;
+  @apply fixed w-80 max-h-60 flex flex-col;
   z-index: var(--kira-z-menu);
   max-width: calc(100vw - 8px);
   font-size: var(--kira-t-md);

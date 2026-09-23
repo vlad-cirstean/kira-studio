@@ -200,7 +200,7 @@ function onTwistyClick(e: MouseEvent): void {
 /* A fixed width so every row's name starts at the same x — an unaligned ragged edge is exactly
    what makes a long request list hard to scan, which is the reason the chip exists at all. */
 .method {
-  @apply w-[52px] shrink-0 overflow-hidden text-center text-ellipsis tracking-[0.02em] text-kira-xs;
+  @apply w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs;
 }
 
 .label {
