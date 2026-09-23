@@ -542,25 +542,6 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 		return updates, &RemoteOpError{Kind: kind, Message: message}, nil
 	}
 
-	// G30 round-1 functional-correctness review, finding #2: unlike forcePush's own re-check above
-	// (step 3, D12) and every other write in this chapter ("a pre-flight is advice, not a lock",
-	// ops.go's own prepareReset doc comment), this integrate phase never re-verified HEAD was still
-	// params.Branch before merging/rebasing INTO WHATEVER IS CHECKED OUT NOW. The fetch above can
-	// take an arbitrary amount of wall-clock time (network, credential prompt) during which another
-	// window/terminal can check out a different branch — the merge/rebase below would then silently
-	// write onto that branch instead, with no error. Re-read fresh, immediately before the write
-	// this gates, same shape as prepareReset's own fresh in-progress re-check.
-	head, herr := e.Head(roCtx)
-	if herr != nil {
-		return updates, nil, herr
-	}
-	if head.Kind != "branch" || head.Name != params.Branch {
-		return updates, &RemoteOpError{
-			Kind:    "BranchChanged",
-			Message: fmt.Sprintf("%s is no longer checked out — the pull was not applied", params.Branch),
-		}, nil
-	}
-
 	// Past this point the op is a local write and is never killable again (D19).
 	e.remoteOp.setKillable(false)
 
@@ -589,6 +570,32 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 
 	var opErr *RemoteOpError
 	writeErr := e.Repo.Write(roCtx, func(wctx context.Context) error {
+		// G30 round-1 functional-correctness review, finding #2 (originally checked here, but
+		// stale and non-atomic — F5, P108 Part 16 review): unlike forcePush's own re-check above
+		// (step 3, D12) and every other write in this chapter ("a pre-flight is advice, not a
+		// lock", ops.go's own prepareReset doc comment), this integrate phase must re-verify HEAD
+		// is still params.Branch before merging/rebasing INTO WHATEVER IS CHECKED OUT NOW. The
+		// fetch above can take an arbitrary amount of wall-clock time (network, credential prompt)
+		// during which another window/terminal can check out a different branch — the
+		// merge/rebase below would then silently write onto that branch instead, with no error.
+		// e.Head's own cache is staleness-gated by the watcher's 200ms-debounced update (or a
+		// local write) — a slower concurrent status read's own setHead can clear that staleness
+		// right when this check needs it to still be pending, and checking before Repo.Write is
+		// taken at all leaves a window for another window's checkout to land between the check and
+		// the write. Both close at once by re-resolving fresh (never cached) HERE, inside the same
+		// Repo.Write acquisition the merge/rebase spawns under, immediately before it spawns.
+		head, herr := gitclient.ResolveHead(wctx, e.Repo.Runner(), e.Repo.GitPath(), repoWorkingDir(e.Summary))
+		if herr != nil {
+			return herr
+		}
+		if head.Kind != "branch" || head.Name != params.Branch {
+			opErr = &RemoteOpError{
+				Kind:    "BranchChanged",
+				Message: fmt.Sprintf("%s is no longer checked out — the pull was not applied", params.Branch),
+			}
+			return nil
+		}
+
 		res, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: integrateArgv, ReadOnly: false,
 			// G8 D6 (F6): this is a local write (merge/rebase), not the fetch above — a signing

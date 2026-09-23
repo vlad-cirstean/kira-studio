@@ -596,3 +596,39 @@ func TestRunRemote_Pull_ClearsUndoSlot(t *testing.T) {
 		t.Fatal("pull must clear the undo slot -- its stale reset/etc. record is no longer safe to replay")
 	}
 }
+
+// TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite is F5's own regression proof (P108 Part
+// 16 review): the "is the pulled branch still checked out" re-check now runs fresh, INSIDE
+// Repo.Write, immediately before the merge/rebase spawns -- not before Repo.Write is even
+// acquired. Confirms the refactor still catches "the checked-out branch changed" and reports
+// BranchChanged rather than silently merging into whatever is checked out now.
+func TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+	remoteDir := t.TempDir()
+	runGitStack(t, remoteDir, "init", "-q", "--bare", "-b", "main")
+
+	dir := t.TempDir()
+	runGitStack(t, dir, "clone", "-q", remoteDir, ".")
+	runGitStack(t, dir, "checkout", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "line1\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "push", "-q", "-u", "origin", "main")
+
+	// feat is checked out, not main -- what runPullOp is about to be asked to pull.
+	runGitStack(t, dir, "checkout", "-q", "-b", "feat")
+
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	result, err := entry.RunRemote(ctx, conn, RemoteOpParams{
+		Kind: "pull", Remote: "origin", Branch: "main", Strategy: "ff",
+	}, RemoteDeps{})
+	if err != nil {
+		t.Fatalf("RunRemote(pull): %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "BranchChanged" {
+		t.Fatalf("pull result = %+v, want a blocked BranchChanged result -- feat is checked out, not main", result)
+	}
+}

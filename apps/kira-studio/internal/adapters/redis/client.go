@@ -3,7 +3,7 @@ package redis
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
+	"net"
 	"net/url"
 	"strconv"
 	"strings"
@@ -155,7 +155,9 @@ var redisPing = func(ctx context.Context, client *goredis.Client) error {
 // redisPing is a real network round trip, the whole point of the dialing placeholder above.
 func (s *dbConnectionSet) dial(ctx context.Context, dbIndex int) (*goredis.Client, error) {
 	opts := &goredis.Options{
-		Addr:     fmt.Sprintf("%s:%d", s.fields.host, s.fields.port),
+		// F13b: net.JoinHostPort brackets an IPv6 literal correctly — a bare "%s:%d" produces an
+		// invalid address for one (Kafka's own adapter already does this correctly).
+		Addr:     net.JoinHostPort(s.fields.host, strconv.Itoa(s.fields.port)),
 		Username: s.fields.username,
 		Password: s.fields.password,
 		DB:       dbIndex,

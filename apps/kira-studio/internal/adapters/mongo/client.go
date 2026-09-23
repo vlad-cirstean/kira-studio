@@ -3,8 +3,9 @@ package mongo
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,11 +103,18 @@ func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
 	}
 	auth := ""
 	if cfg.Username != nil && *cfg.Username != "" {
-		auth = url.QueryEscape(*cfg.Username)
+		// F13a: the driver decodes URI userinfo with url.PathUnescape (connstring.go), not the
+		// url.QueryEscape scheme this used to hand-roll with — the two diverge on a space (QueryEscape
+		// writes "+", which PathUnescape never turns back into one), breaking auth for any password
+		// containing one. url.UserPassword builds userinfo exactly the way net/url's own URI writer
+		// does, matching what PathUnescape expects on the way back in.
+		var userinfo *url.Userinfo
 		if cfg.Password != nil && *cfg.Password != "" {
-			auth += ":" + url.QueryEscape(*cfg.Password)
+			userinfo = url.UserPassword(*cfg.Username, *cfg.Password)
+		} else {
+			userinfo = url.User(*cfg.Username)
 		}
-		auth += "@"
+		auth = userinfo.String() + "@"
 	}
 	db := "/"
 	if cfg.Database != nil && *cfg.Database != "" {
@@ -121,7 +129,9 @@ func buildURIFromFields(cfg model.ResolvedConnectionConfig) string {
 	if src, ok := cfg.Options["authSource"].(string); ok && src != "" {
 		db += "?authSource=" + url.QueryEscape(src)
 	}
-	return fmt.Sprintf("mongodb://%s%s:%d%s", auth, host, port, db)
+	// F13b: net.JoinHostPort brackets an IPv6 literal correctly — a bare "%s:%d" produces an invalid
+	// address for one (Kafka's own adapter already does this correctly).
+	return "mongodb://" + auth + net.JoinHostPort(host, strconv.Itoa(port)) + db
 }
 
 // databaseFromURI is the one field of uri.ts's parseConnectionUri this package needs.
