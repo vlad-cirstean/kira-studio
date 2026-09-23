@@ -130,7 +130,7 @@ function pick(ref: string): void {
         ariaLabel="Filter branches"
       />
       <div class="kv-base-panel-scroll">
-        <div v-if="suggested.length > 0" class="kv-base-section" aria-label="Suggested">
+        <section v-if="suggested.length > 0" class="kv-base-section" aria-label="Suggested">
           <div class="kv-base-section-title">Suggested</div>
           <KuiButton
             v-for="candidate in suggested"
@@ -141,9 +141,9 @@ function pick(ref: string): void {
             <span class="kv-base-row-name">{{ candidate.ref }}</span>
             <span class="kv-base-row-reason">{{ candidateReason(candidate) }}</span>
           </KuiButton>
-        </div>
+        </section>
 
-        <div class="kv-base-section" aria-label="All branches">
+        <section class="kv-base-section" aria-label="All branches">
           <div class="kv-base-section-title">All branches</div>
           <KuiButton
             v-for="row in sections.branches.visible"
@@ -168,7 +168,7 @@ function pick(ref: string): void {
           >
             No matching branches
           </div>
-        </div>
+        </section>
       </div>
     </div>
     </KuiPopoverPanel>

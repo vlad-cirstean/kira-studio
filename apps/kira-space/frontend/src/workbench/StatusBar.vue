@@ -37,6 +37,7 @@ function onRevealBlameCommit(): void {
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger>
             <button
+              type="button"
               class="p-status blame"
               data-testid="blame-status"
               :disabled="!blameStatusStore.reveal"

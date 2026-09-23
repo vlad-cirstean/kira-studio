@@ -111,7 +111,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-branch-section" aria-label="Tags">
+  <section class="kv-branch-section" aria-label="Tags">
     <div class="kv-branch-section-title">Tags</div>
     <div
       v-for="row in section.visible"
@@ -157,7 +157,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       @select="onRefMenuSelect"
       @close="refMenu = undefined"
     />
-  </div>
+  </section>
 </template>
 
 <style>

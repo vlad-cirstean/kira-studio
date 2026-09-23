@@ -30,14 +30,20 @@ const props = defineProps<{
   placeholder?: string;
   ariaLabel: string;
   /** Combobox callers only (`git-ui`'s `SearchBox.vue`): forwarded verbatim onto the real
-   *  `<input>`. */
+   *  `<input>`. Hyphenated `aria-*` keys (not `ariaExpanded`-style) so a static `role="combobox"`
+   *  at a call site sits beside attributes Biome's a11y analyzer actually recognizes as ARIA
+   *  props, rather than opaque camelCase props it can't connect to the role. */
   role?: string;
-  ariaExpanded?: boolean;
-  ariaControls?: string;
+  'aria-expanded'?: boolean;
+  'aria-controls'?: string;
+  /** Deliberately not hyphenated (unlike its five siblings above): a literal `aria-activedescendant`
+   *  on this *component* tag makes Biome's `useAriaActivedescendantWithTabindex` demand a tabindex
+   *  on the same tag, but the tabbable element is the real `<input>` this attribute actually lands
+   *  on, one component boundary away — invisible to that check either way. */
   ariaActivedescendant?: string;
-  ariaDescribedby?: string;
-  ariaInvalid?: boolean;
-  ariaHaspopup?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean;
+  'aria-haspopup'?: string;
 }>();
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;
@@ -53,7 +59,7 @@ const inputEl = ref<HTMLInputElement | null>(null);
 // the binding site — the others (aria-expanded/controls/activedescendant/describedby/invalid,
 // role) type-check fine as plain string/boolean against the DOM lib's own attribute types.
 type AriaHaspopup = 'listbox' | 'menu' | 'tree' | 'grid' | 'dialog' | 'true' | 'false' | undefined;
-const ariaHaspopupAttr = computed(() => props.ariaHaspopup as AriaHaspopup);
+const ariaHaspopupAttr = computed(() => props['aria-haspopup'] as AriaHaspopup);
 
 function onInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLInputElement).value);
@@ -77,11 +83,11 @@ defineExpose({ focus: () => inputEl.value?.focus() });
       :placeholder="props.placeholder"
       :aria-label="props.ariaLabel"
       :role="props.role"
-      :aria-expanded="props.ariaExpanded"
-      :aria-controls="props.ariaControls"
+      :aria-expanded="props['aria-expanded']"
+      :aria-controls="props['aria-controls']"
       :aria-activedescendant="props.ariaActivedescendant"
-      :aria-describedby="props.ariaDescribedby"
-      :aria-invalid="props.ariaInvalid"
+      :aria-describedby="props['aria-describedby']"
+      :aria-invalid="props['aria-invalid']"
       :aria-haspopup="ariaHaspopupAttr"
       @input="onInput"
       @keydown="emit('keydown', $event)"

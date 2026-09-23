@@ -296,7 +296,7 @@ onUnmounted(() => {
       </span>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="dirty-mark" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
+          <span class="dirty-mark" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
         </TooltipTrigger>
         <TooltipContent>Unsaved changes</TooltipContent>
       </Tooltip>

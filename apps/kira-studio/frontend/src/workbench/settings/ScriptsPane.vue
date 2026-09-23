@@ -163,24 +163,36 @@ async function onAddScript(): Promise<void> {
               @blur="onScriptFieldBlur(script)"
             />
           </div>
-          <div class="color-picker flex h-6.5 flex-wrap items-center gap-1" role="radiogroup" aria-label="Script colour">
+          <fieldset
+            class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
+            aria-label="Script colour"
+          >
             <Tooltip v-for="color in scriptColors" :key="color">
               <TooltipTrigger as-child>
-                <Button
-                  variant="ghost"
-                  class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
-                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': script.color === color, none: color === 'none' }"
-                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                  :aria-label="color === 'none' ? 'No colour' : color"
-                  role="radio"
-                  :aria-checked="script.color === color"
-                  :data-testid="`color-${color}`"
-                  @click="onScriptColorChange(script, color)"
-                />
+                <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
+                  <input
+                    type="radio"
+                    :name="`script-color-${script.id}`"
+                    class="peer sr-only"
+                    :value="color"
+                    :checked="script.color === color"
+                    :aria-label="color === 'none' ? 'No colour' : color"
+                    :data-testid="`color-${color}`"
+                    @change="onScriptColorChange(script, color)"
+                  />
+                  <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
+                       an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
+                  <span
+                    aria-hidden="true"
+                    class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                    :class="{ 'outline outline-2 outline-offset-2 outline-fg': script.color === color, none: color === 'none' }"
+                    :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                    >&nbsp;</span>
+                </label>
               </TooltipTrigger>
               <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
             </Tooltip>
-          </div>
+          </fieldset>
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -230,24 +242,36 @@ async function onAddScript(): Promise<void> {
             data-testid="custom-script-add-name"
           />
         </div>
-        <div class="color-picker flex h-6.5 flex-wrap items-center gap-1" role="radiogroup" aria-label="Script colour">
+        <fieldset
+          class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
+          aria-label="Script colour"
+        >
           <Tooltip v-for="color in scriptColors" :key="color">
             <TooltipTrigger as-child>
-              <Button
-                variant="ghost"
-                class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
-                :class="{ 'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color, none: color === 'none' }"
-                :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                :aria-label="color === 'none' ? 'No colour' : color"
-                role="radio"
-                :aria-checked="newScriptColor === color"
-                :data-testid="`color-${color}`"
-                @click="newScriptColor = color"
-              />
+              <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
+                <input
+                  type="radio"
+                  name="new-script-color"
+                  class="peer sr-only"
+                  :value="color"
+                  :checked="newScriptColor === color"
+                  :aria-label="color === 'none' ? 'No colour' : color"
+                  :data-testid="`color-${color}`"
+                  @change="newScriptColor = color"
+                />
+                <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
+                     an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
+                <span
+                  aria-hidden="true"
+                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color, none: color === 'none' }"
+                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                  >&nbsp;</span>
+              </label>
             </TooltipTrigger>
             <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
           </Tooltip>
-        </div>
+        </fieldset>
         <Button
           variant="dialog"
           size="kira-lg"

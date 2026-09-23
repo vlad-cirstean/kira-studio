@@ -11,6 +11,7 @@ const props = defineProps<{
   modelValue: string;
   options: readonly KuiSelectOption[];
   ariaLabel?: string;
+  id?: string;
 }>();
 const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
 
@@ -22,6 +23,7 @@ function onChange(event: Event): void {
 <template>
   <span class="kui-select">
     <select
+      :id="props.id"
       class="kui-select-field"
       :value="props.modelValue"
       :aria-label="props.ariaLabel"

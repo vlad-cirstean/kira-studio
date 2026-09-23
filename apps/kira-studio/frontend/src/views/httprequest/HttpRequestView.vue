@@ -486,7 +486,7 @@ onUnmounted(() => {
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="dirty-mark" data-testid="http-dirty" aria-label="Unsaved changes">•</span>
+          <span class="dirty-mark" role="img" data-testid="http-dirty" aria-label="Unsaved changes">•</span>
         </TooltipTrigger>
         <TooltipContent>Unsaved changes</TooltipContent>
       </Tooltip>

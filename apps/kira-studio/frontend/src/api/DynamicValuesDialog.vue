@@ -107,14 +107,12 @@ function close(): void {
       </Alert>
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>
-          <div
-            class="p-row dynamic-values-row"
+          <button
+            type="button"
+            class="p-row dynamic-values-row w-full border-0 text-left"
             data-testid="dynamic-values-fake-row"
             :data-name="entry.name"
-            role="button"
-            tabindex="0"
             @click="onCopy(entry.name)"
-            @keydown.enter="onCopy(entry.name)"
           >
             <code class="reference" data-testid="dynamic-values-reference">{{
               reference(entry.name)
@@ -122,7 +120,7 @@ function close(): void {
             <span class="p-chip info sample" data-testid="dynamic-values-sample">{{
               samples[entry.name] ?? ''
             }}</span>
-          </div>
+          </button>
         </TooltipTrigger>
         <TooltipContent>Copy</TooltipContent>
       </Tooltip>

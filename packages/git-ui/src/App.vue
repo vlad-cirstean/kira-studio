@@ -1749,10 +1749,9 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             aria-label="Commit detail"
           >
-            <div
+            <hr
               v-if="breakpoint === 'wide'"
               class="kv-detail-resize-handle"
-              role="separator"
               aria-orientation="vertical"
               aria-label="Resize detail pane"
               :aria-valuenow="detailWidth"
@@ -1762,7 +1761,7 @@ onBeforeUnmount(() => {
               tabindex="0"
               @mousedown="startDetailResize"
               @keydown="handleDetailHandleKeydown"
-            ></div>
+            />
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
@@ -2069,7 +2068,8 @@ onBeforeUnmount(() => {
   bottom: 0;
   left: 0;
   width: 5px;
-  margin-left: -2px;
+  margin: 0 0 0 -2px;
+  border: 0;
   cursor: col-resize;
   z-index: 2;
   background: transparent;

@@ -117,7 +117,7 @@ async function confirmRemove(): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-branch-section" aria-label="Worktrees">
+  <section class="kv-branch-section" aria-label="Worktrees">
     <div class="kv-branch-section-title">
       Worktrees
       <KuiButton
@@ -193,7 +193,7 @@ async function confirmRemove(): Promise<void> {
           This worktree has uncommitted changes that will be permanently lost. Type
           <code>{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
         </p>
-        <input type="text" v-model="typedToken" autofocus />
+        <input type="text" v-model="typedToken" />
       </template>
       <template #actions>
         <KuiButton
@@ -207,7 +207,7 @@ async function confirmRemove(): Promise<void> {
         <KuiButton @click="cancelRemove">Cancel</KuiButton>
       </template>
     </KuiDialog>
-  </div>
+  </section>
 </template>
 
 <style scoped>

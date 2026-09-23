@@ -114,7 +114,7 @@ async function onMenuSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-branch-section" aria-label="Stashes">
+  <section class="kv-branch-section" aria-label="Stashes">
     <div class="kv-branch-section-title">Stashes</div>
     <div
       v-for="entry in section.visible"
@@ -168,7 +168,7 @@ async function onMenuSelect(id: string): Promise<void> {
       @select="onMenuSelect"
       @close="stashMenu = undefined"
     />
-  </div>
+  </section>
 </template>
 
 <style>

@@ -190,9 +190,10 @@ async function save(): Promise<void> {
          remaining surface for it. -->
     <section v-if="host !== 'kira'" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Display</h3>
-      <label class="kv-dialog-field">
+      <label class="kv-dialog-field" for="repo-settings-date-format">
         Commit date
         <KuiSelect
+          id="repo-settings-date-format"
           :model-value="dateFormat"
           :options="dateFormatOptions"
           @update:model-value="onDateFormatChange"
@@ -210,12 +211,12 @@ async function save(): Promise<void> {
           v-model.number="draft['kiraSpace.graph.pageSize']"
           :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
           :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
-          autofocus
         />
       </label>
-      <label class="kv-dialog-field">
+      <label class="kv-dialog-field" for="repo-settings-graph-scope">
         Scope
         <KuiSelect
+          id="repo-settings-graph-scope"
           :model-value="draft['kiraSpace.graph.scope']"
           :options="graphScopeOptions"
           @update:model-value="onGraphScopeChange"
@@ -266,9 +267,10 @@ async function save(): Promise<void> {
 
     <section v-if="writeCapability" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Pull</h3>
-      <label class="kv-dialog-field">
+      <label class="kv-dialog-field" for="repo-settings-pull-strategy">
         Strategy
         <KuiSelect
+          id="repo-settings-pull-strategy"
           :model-value="draft['kiraSpace.pull.strategy']"
           :options="pullStrategyOptions"
           @update:model-value="onPullStrategyChange"
@@ -282,9 +284,10 @@ async function save(): Promise<void> {
          genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
     <section v-if="host !== 'kira'" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Diagnostics</h3>
-      <label class="kv-dialog-field">
+      <label class="kv-dialog-field" for="repo-settings-log-level">
         Log level
         <KuiSelect
+          id="repo-settings-log-level"
           :model-value="draft['kiraSpace.log.level']"
           :options="logLevelOptions"
           @update:model-value="onLogLevelChange"

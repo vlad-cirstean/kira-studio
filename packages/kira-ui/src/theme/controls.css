@@ -404,6 +404,8 @@
 .kui-segmented {
   display: inline-flex;
   height: var(--kui-control-h, 22px);
+  margin: 0;
+  padding: 0;
   border: var(--kui-border-width, 1px) solid var(--kui-border-strong, transparent);
   border-radius: var(--kui-radius, 4px);
   overflow: hidden;
