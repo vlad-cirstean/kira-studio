@@ -34,6 +34,14 @@ func TestResolveFilePath_RejectsQueryAndFragmentMetacharacters(t *testing.T) {
 			name: "uri mode: the same metacharacter reaches resolveFilePath after url.Parse strips the leading slash",
 			cfg:  model.ResolvedConnectionConfig{Mode: "uri", URI: strp("sqlite:///data/x.db%3Fmode=rwc")},
 		},
+		{
+			// F12a: SQLite's own URI filename parsing percent-decodes the path component, so a raw
+			// "%" could open a different file than the one assertFileExists just confirmed exists —
+			// e.g. "%2F"/"%20" decoding into a path separator or space that changes which file SQLite
+			// actually opens.
+			name: "fields mode: a raw % could decode into a different path once SQLite opens it",
+			cfg:  model.ResolvedConnectionConfig{Mode: "fields", Database: strp("/data/x%2Fdb")},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

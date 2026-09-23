@@ -59,9 +59,16 @@ func resolveFilePath(cfg model.ResolvedConnectionConfig) (string, error) {
 // assertFileExists (which stats the real, un-truncated path) would not catch it either. Rejecting
 // outright — rather than percent-encoding the path — keeps the read-only guarantee an explicit
 // refusal rather than a best-effort escape.
+//
+// `%` is rejected too (finding F12a): SQLite's own URI filename parsing percent-decodes the path
+// component (e.g. a literal `%2F`/`%20`), so a path assertFileExists already confirmed exists could
+// still open a *different* file once SQLite decodes it — defeating that safeguard the same way an
+// unrejected `?`/`#` would defeat the read-only toggle above. buildDSN never percent-encodes path
+// itself, so the safe fix is refusing a raw `%` outright rather than assuming the caller meant one
+// literal byte.
 func rejectDSNMetacharacters(path string) error {
-	if strings.ContainsAny(path, "?#") {
-		return adapters.New(adapters.CodeConnect, "the database file path must not contain \"?\" or \"#\"", nil)
+	if strings.ContainsAny(path, "?#%") {
+		return adapters.New(adapters.CodeConnect, "the database file path must not contain \"?\", \"#\" or \"%\"", nil)
 	}
 	return nil
 }
