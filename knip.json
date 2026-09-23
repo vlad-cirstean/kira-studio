@@ -35,12 +35,10 @@
     // @lucide/vue/clsx/tailwind-merge dropped from here (P103, folded into P100 Part 2): now that
     // packages/theme is its own scanned knip workspace, real usage
     // (lib/utils.ts/components/ui/**/theme/primitives/*) resolves fine without the ignore.
-    "tw-animate-css",
-    // P104 A0 (§3.4/§8.3): landed as the A0 gate's own additive dependency, ahead of Stream A's
-    // own later VirtualList/TreeHost conversion that actually imports it — genuinely unused for
-    // the gate window between A0 and that phase, not a structural blind spot. Remove this entry
-    // at A-final once that conversion's own import makes it a real finding again.
-    "@tanstack/vue-virtual"
+    "tw-animate-css"
+    // @tanstack/vue-virtual dropped (P104 A-final, §3.4/§7.3/§8.3): VirtualList/TreeHost's own
+    // Stream A conversion (util/virtualRows.ts, util/treeVirtualRows.ts) now imports it for real —
+    // knip resolves that usage fine without the ignore.
   ],
   "workspaces": {
     ".": {

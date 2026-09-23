@@ -25,9 +25,12 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // state/tooltip.ts's own timers are gone from these call sites), hit-testing a disabled control
 // (scenario 2, §6.3's span-wrapper pattern) and a control inside an already-open popover
 // (scenario 3, F3(a) — the popover's own backdrop must not swallow the hit test). Scenario 5 and
-// the two geometry tests below stay on the OLD app-owned mechanism (workbench/state/tooltip.ts +
-// AppTooltip.vue) on purpose: SlickGrid's own header cells (§6.4) are the one residue that still
-// goes through it, and that wiring is explicitly out of this pass's scope.
+// the two geometry tests below exercise SlickGrid's own header cells (§6.4's one residue): that
+// DOM is SlickGrid's, not Vue's, so AttributeTooltip.vue drives the same TooltipProvider/
+// TooltipContent through a pointermove listener scoped to `.slick-header-columns` instead of a
+// real TooltipTrigger. A-final (P104 §8.3) is what finished converting scenario 5 and the
+// geometry tests off the deleted AppTooltip.vue singleton onto this — the last real users of the
+// old mechanism, caught by the same acceptance-gate grep as the primitive call sites.
 
 const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
@@ -43,7 +46,10 @@ const RO_CONNECTION_SUMMARY = {
 };
 const RO_FIXTURE = compositePkConnectAndOpen(RO_CONNECTION_ID);
 
-const CONTROL: ControlSnapshot[] = [
+// Split out so the geometry tests below (which need a real grid open, for `.slick-header-columns`
+// to exist, but no read-only connection) can relaunch with just the RW half rather than the full
+// scenario-1 fixture set.
+const RW_CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
@@ -74,6 +80,11 @@ const CONTROL: ControlSnapshot[] = [
     response: CONNECTION_SUMMARY,
   },
   ...FIXTURE.control,
+];
+const RW_PORT: PortSnapshot[] = [...FIXTURE.port];
+
+const CONTROL: ControlSnapshot[] = [
+  ...RW_CONTROL,
   {
     channel: IPC.connectionsCreate,
     args: {
@@ -105,15 +116,12 @@ const CONTROL: ControlSnapshot[] = [
   ...RO_FIXTURE.control,
 ];
 
-const PORT: PortSnapshot[] = [...FIXTURE.port, ...RO_FIXTURE.port];
+const PORT: PortSnapshot[] = [...RW_PORT, ...RO_FIXTURE.port];
 
-// Scenario 5 and the geometry tests below still hit the OLD app-owned singleton (§6.4's grid-
-// header residue) — this locator stays for them.
-const tooltip = (page: Page): Locator => page.locator('[data-testid="app-tooltip"]');
-
-// Scenarios 1-4: the real reka tooltip, rendered through a TooltipPortal — `[data-slot=
-// "tooltip-content"]` is `ui/tooltip`'s own TooltipContent.vue marker (§6.5's named migration
-// selector), not tied to any one call site's DOM.
+// Every scenario, including 5 and the geometry tests: the real reka tooltip, rendered through a
+// TooltipPortal — `[data-slot="tooltip-content"]` is `ui/tooltip`'s own TooltipContent.vue marker
+// (§6.5's named migration selector), not tied to any one call site's DOM. AttributeTooltip.vue
+// (§6.4's grid-header bridge) renders through this exact same component.
 const tooltipContent = (page: Page): Locator => page.locator('[data-slot="tooltip-content"]');
 
 /** Hovers `trigger` and asserts the real tooltip becomes visible with `text`, well within
@@ -131,12 +139,10 @@ async function assertTooltipShows(
   await expect(tooltipContent(page)).toContainText(text);
 }
 
-test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y', async ({
-  relaunch,
-  consoleErrors,
-}) => {
-  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-
+/** Scenario 1's own connect-and-open steps, factored out for the geometry tests below: they need
+ *  a real grid open (so `.slick-header-columns` exists in the DOM for AttributeTooltip.vue's own
+ *  container prop, §6.4) but not the read-only connection scenario 2 goes on to add. */
+async function openConnectionAndGrid(page: Page): Promise<void> {
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'Tooltips DB');
@@ -160,11 +166,21 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expandRow(page, APP_PATH);
   await (await findRow(page, COMPOSITE_PK_PATH)).dblclick();
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+}
+
+test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y', async ({
+  relaunch,
+  consoleErrors,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+
+  await openConnectionAndGrid(page);
+  const connRow = connectionRow(page);
 
   // --- scenario 1: an enabled control — hidden before the delay, shown after, hides on leave ---
   // A cold hover, not a scan: settle the pointer away from the tree first and outlast
-  // TOOLTIP_REARM_MS (state/tooltip.ts's D6), or this hover lands in the rearm window left by the
-  // dblclick above and opens immediately instead of waiting the full TOOLTIP_DELAY_MS.
+  // TooltipProvider's own skipDelayDuration (300ms), or this hover lands in the rearm window left
+  // by the dblclick above and opens immediately instead of waiting the full delayDuration.
   await page.mouse.move(4, 4);
   await page.waitForTimeout(350);
   const refreshButton = page.locator('[data-testid="toolbar-refresh"]');
@@ -251,48 +267,60 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expect(projectPanel).toHaveCount(wasVisible ? 1 : 0);
 
   // --- scenario 5: a structured tooltip (P42 D19/D20) — the grid header's own name/type/
-  // description renders as three separate elements, while data-kira-tip stays the exact same
-  // newline-joined plain text every existing assertion (and the a11y mirror) already reads. -----
+  // description renders as three separate elements (AttributeTooltip.vue's title/meta/body, §6.4),
+  // while data-kira-tip stays the exact same newline-joined plain text every existing assertion
+  // (and the a11y mirror) already reads. -----
   const tenantIdHeader = page.locator('[data-testid="grid-header-cell"][data-column="tenant_id"]');
   await tenantIdHeader.hover();
-  await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
-  await expect(tooltip(page).locator('.tip-title')).toHaveText('tenant_id');
-  await expect(tooltip(page).locator('.tip-meta')).not.toBeEmpty();
-  await expect(tooltip(page).locator('.tip-body')).not.toBeEmpty();
-  const meta = (await tooltip(page).locator('.tip-meta').innerText()).trim();
-  const body = (await tooltip(page).locator('.tip-body').innerText()).trim();
+  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltipContent(page).locator('[data-testid="tooltip-title"]')).toHaveText(
+    'tenant_id',
+  );
+  await expect(tooltipContent(page).locator('[data-testid="tooltip-meta"]')).not.toBeEmpty();
+  await expect(tooltipContent(page).locator('[data-testid="tooltip-body"]')).not.toBeEmpty();
+  const meta = (
+    await tooltipContent(page).locator('[data-testid="tooltip-meta"]').innerText()
+  ).trim();
+  const body = (
+    await tooltipContent(page).locator('[data-testid="tooltip-body"]').innerText()
+  ).trim();
   await expect(tenantIdHeader).toHaveAttribute(
     'data-kira-tip',
     ['tenant_id', meta, body].join('\n'),
   );
   await expect(tenantIdHeader).toHaveAttribute('aria-label', ['tenant_id', meta, body].join('\n'));
 
+  // A hover elsewhere closes it — AttributeTooltip's own `leave()`, same rearm-window behaviour as
+  // every other tooltip in this app (TooltipProvider's own skipDelayDuration).
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(100);
+  await expect(tooltipContent(page)).toHaveCount(0);
+
   // A plain-string tooltip elsewhere is unaffected — still one text node, no parts.
   await page.mouse.move(4, 4);
   await page.waitForTimeout(350);
   await assertTooltipShows(page, refreshButton, 'Refresh');
-  await expect(tooltipContent(page).locator('.tip-title')).toHaveCount(0);
+  await expect(tooltipContent(page).locator('[data-testid="tooltip-title"]')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
 
-// G20 D9/F11: the app-owned tooltip surface has real flip/shift middleware (theme/
-// floatingPosition.ts's computeFloatPosition, confirmed at F2) but, until now, no geometry
-// regression proving either actually fires at a real viewport edge — every existing scenario
-// above asserts *what* the tooltip shows, never *where*. Both cases below drive the real,
-// shipped mechanism (tooltip.ts's own document-level focusin listener, AppTooltip.vue's own
-// computeFloatPosition call) against a synthetic trigger element carrying the exact
-// `data-kira-tip` attribute `v-tooltip` itself writes (tooltip.ts's `TIP_ATTR`) — not a mock of
-// the controller, just a trigger whose position is set directly rather than inferred from the
-// current title bar layout, so these stay correct regardless of how that layout shifts over
-// time. `focus()` rather than a simulated hover — `onFocusIn` opens immediately (no
-// TOOLTIP_DELAY_MS wait), avoiding a real pointermove-timing dependency in a geometry-only
-// assertion (D9's own note).
-async function injectTooltipTrigger(
+// P104 A-final: this pair used to drive the app-owned computeFloatPosition wrapper through the
+// now-deleted AppTooltip.vue singleton. Grid-header tooltips (§6.4) are reka's own TooltipContent
+// now (AttributeTooltip.vue), so the geometry that needs a regression test is reka's own
+// flip/shift, reached the same way production does: a synthetic `data-kira-tip` cell inside the
+// real grid's `.slick-header-columns` (AttributeTooltip's own `container`), not `document.body` —
+// the pointermove listener is scoped to that element (§6.4), and bubbling is DOM-tree-based, so a
+// fixed-position child still reaches it regardless of where in the viewport it visually sits.
+// reka's own TooltipContentImpl defaults to `side: "top"` (not this app's old 'bottom-start'), so
+// the two cases below test the flip/shift this app's markup actually exercises today.
+async function injectHeaderTooltipTrigger(
   page: Page,
   style: { top?: string; bottom?: string; left?: string; right?: string },
 ): Promise<Locator> {
   await page.evaluate((s) => {
+    const header = document.querySelector('.slick-header-columns');
+    if (!header) throw new Error('.slick-header-columns not found — grid not open');
     const btn = document.createElement('button');
     btn.id = 'g20-tooltip-trigger';
     btn.textContent = 'x';
@@ -303,33 +331,37 @@ async function injectTooltipTrigger(
       height: '20px',
       ...s,
     });
-    document.body.appendChild(btn);
+    header.appendChild(btn);
   }, style);
   return page.locator('#g20-tooltip-trigger');
 }
 
-test('tooltips — flips above the trigger when there is no room below', async ({
+test('tooltips — flips below the trigger when there is no room above', async ({
   relaunch,
   consoleErrors,
 }) => {
-  const { window: page } = await relaunch();
+  const { window: page } = await relaunch({ control: RW_CONTROL, stream: RW_PORT });
+  await openConnectionAndGrid(page);
   await page.setViewportSize({ width: 1000, height: 400 });
 
-  // Plenty of room above (380px), almost none below (4px) — the tooltip's natural below-the-
-  // trigger placement cannot fit, so flip() must open it above instead.
-  const trigger = await injectTooltipTrigger(page, { top: '376px', left: '400px' });
-  await trigger.focus();
-  const tip = tooltip(page);
+  // Almost no room above (4px), plenty below (376px) — reka's default `side: "top"` cannot fit,
+  // so avoidCollisions must flip it below instead.
+  const trigger = await injectHeaderTooltipTrigger(page, { top: '4px', left: '400px' });
+  await trigger.hover();
+  const tip = tooltipContent(page);
   await expect(tip).toBeVisible({ timeout: 1_000 });
   const tipBox = await tip.boundingBox();
   const triggerBox = await trigger.boundingBox();
   if (!tipBox || !triggerBox) throw new Error('tooltip or trigger has no box');
 
   expect(
+    tipBox.y,
+    'flip: the tooltip renders below the trigger, not merely clamped on-screen above it',
+  ).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
+  expect(
     tipBox.y + tipBox.height,
-    'flip: the tooltip renders above the trigger, not merely clamped on-screen below it',
-  ).toBeLessThanOrEqual(triggerBox.y + 1);
-  expect(tipBox.y, 'the flipped tooltip must itself stay on-screen').toBeGreaterThanOrEqual(0);
+    'the flipped tooltip must itself stay on-screen',
+  ).toBeLessThanOrEqual(400 + 1);
 
   expect(consoleErrors).toEqual([]);
 });
@@ -338,15 +370,16 @@ test('tooltips — shifts back on-screen near a horizontal viewport edge', async
   relaunch,
   consoleErrors,
 }) => {
-  const { window: page } = await relaunch();
+  const { window: page } = await relaunch({ control: RW_CONTROL, stream: RW_PORT });
+  await openConnectionAndGrid(page);
   await page.setViewportSize({ width: 400, height: 400 });
 
-  // The tooltip's default placement ('bottom-start') grows rightward from the trigger's own left
-  // edge, up to 320px wide — parking the trigger 4px from the right edge of a 400px-wide
-  // viewport forces real overflow past the right edge without shift().
-  const trigger = await injectTooltipTrigger(page, { top: '200px', right: '4px' });
-  await trigger.focus();
-  const tip = tooltip(page);
+  // reka's default `align: "center"` grows the tooltip both ways from the trigger's own centre —
+  // parking the trigger 4px from the right edge of a 400px-wide viewport forces real overflow past
+  // the right edge without shift().
+  const trigger = await injectHeaderTooltipTrigger(page, { top: '200px', right: '4px' });
+  await trigger.hover();
+  const tip = tooltipContent(page);
   await expect(tip).toBeVisible({ timeout: 1_000 });
   const tipBox = await tip.boundingBox();
   if (!tipBox) throw new Error('tooltip has no box');

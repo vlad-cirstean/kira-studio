@@ -1,14 +1,11 @@
 <script setup lang="ts">
-// P104 A0 (§6.1): mounted additively, alongside the still-live v-tooltip/AppTooltip system --
-// every converted call site (A1...An/B1...Bn) reaches this same provider once it exists; nothing
-// reads it yet.
+// P104 §6.1: every converted call site reaches timing (delayDuration/skipDelayDuration) through
+// this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
-import AppTooltip from '@workbench/components/AppTooltip.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import { workbenchHostKey } from '@workbench/host';
-import { useTooltipStore } from '@workbench/state/tooltip';
-import { onMounted, onUnmounted, provide } from 'vue';
+import { provide } from 'vue';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
@@ -26,25 +23,12 @@ provide(workbenchHostKey, createWorkbenchHost());
 // (onOpenSettings/onToggleProjectPanel/onCommandPalette/onTabNext/…) — this app's own Go menu
 // (internal/shell/menutemplate.go) emits none of those (bridge/index.ts's own control object has
 // no onOpenSettings/onToggleProjectPanel/onCommandPalette/onTabNext/onTabPrev/onTabClose/onViewFind
-// etc. at all, confirmed by grepping it), so there is nothing left to subscribe to here — only
-// tooltip init/teardown remains.
-const tooltipStore = useTooltipStore();
-
-let teardownTooltips: (() => void) | null = null;
-
-onMounted(() => {
-  teardownTooltips = tooltipStore.initTooltips();
-});
-
-onUnmounted(() => {
-  teardownTooltips?.();
-});
+// etc. at all, confirmed by grepping it), so there is nothing left to subscribe to here — P104
+// deleted the last one (tooltip init/teardown, now TooltipProvider's own job).
 </script>
 
 <template>
-  <!-- P104 A0 (§6.1): TooltipProvider owns timing (delayDuration/skipDelayDuration) for every
-       converted call site; disable-hoverable-content matches the current directive's own
-       pointer-events: none tooltip. Purely additive until a call site actually uses it. -->
+  <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
   <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
     <div class="h-full flex flex-col">
       <TitleBar />
@@ -54,6 +38,5 @@ onUnmounted(() => {
     <GitCredentialDialog />
     <ConfirmDialog />
     <ContextMenu />
-    <AppTooltip />
   </TooltipProvider>
 </template>

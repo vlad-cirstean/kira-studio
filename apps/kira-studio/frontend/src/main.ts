@@ -24,7 +24,6 @@ import { useTerminalsStore } from './state/terminals';
 // workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
 // base.css as two separate Tailwind roots and double its output.
 import '@workbench/workbench.css';
-import { useTooltipStore } from '@workbench/state/tooltip';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useSettingsStore } from './state/settings';
@@ -339,7 +338,6 @@ async function bootstrap(): Promise<void> {
   const app = createApp(App);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
-  app.directive('tooltip', useTooltipStore().vTooltip);
   app.mount('#app');
   // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
   // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.

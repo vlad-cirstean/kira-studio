@@ -14,7 +14,6 @@ import { GENERAL_WORKSPACE, useWorkspaceStore } from './state/workspace';
 // workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
 // base.css as two separate Tailwind roots and double its output.
 import '@workbench/workbench.css';
-import { useTooltipStore } from '@workbench/state/tooltip';
 
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
@@ -62,7 +61,6 @@ async function bootstrap(): Promise<void> {
   const app = createApp(App);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
-  app.directive('tooltip', useTooltipStore().vTooltip);
   app.mount('#app');
 }
 

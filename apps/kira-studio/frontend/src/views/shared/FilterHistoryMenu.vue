@@ -156,8 +156,8 @@ async function saveCurrent(): Promise<void> {
   >
     <template #entry="{ entry }">
       <!-- P31 D27/F27: full, untruncated text — the popover is 320px and a WHERE/ORDER BY clause
-           routinely isn't, so truncation here is structural, not a sizing accident. AppTooltip is
-           already max-width: 320px; white-space: pre-wrap, so a long clause wraps instead. -->
+           routinely isn't, so truncation here is structural, not a sizing accident. TooltipContent
+           already wraps (P104 §6.2), so a long clause wraps instead. -->
       <Tooltip v-if="isSaved(entry)">
         <TooltipTrigger as-child>
           <span class="entry-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{

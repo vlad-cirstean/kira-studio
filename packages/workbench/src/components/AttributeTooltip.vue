@@ -85,12 +85,15 @@ useEventListener(containerRef, 'pointerleave', leave);
       <TooltipContent>
         <template v-if="parts">
           <div class="flex items-baseline gap-1.5">
-            <span class="font-semibold">{{ parts.title }}</span>
-            <span v-if="parts.meta" :style="parts.metaColor ? { color: parts.metaColor } : undefined">{{
-              parts.meta
-            }}</span>
+            <span class="font-semibold" data-testid="tooltip-title">{{ parts.title }}</span>
+            <span
+              v-if="parts.meta"
+              data-testid="tooltip-meta"
+              :style="parts.metaColor ? { color: parts.metaColor } : undefined"
+              >{{ parts.meta }}</span
+            >
           </div>
-          <div v-if="parts.body">{{ parts.body }}</div>
+          <div v-if="parts.body" data-testid="tooltip-body">{{ parts.body }}</div>
         </template>
         <template v-else>{{ plainText }}</template>
       </TooltipContent>

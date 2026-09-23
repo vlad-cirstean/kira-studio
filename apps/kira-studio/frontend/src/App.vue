@@ -1,14 +1,11 @@
 <script setup lang="ts">
-// P104 A0 (§6.1): mounted additively, alongside the still-live v-tooltip/AppTooltip system --
-// every converted call site (A1...An/B1...Bn) reaches this same provider once it exists; nothing
-// reads it yet.
+// P104 §6.1: every converted call site reaches timing (delayDuration/skipDelayDuration) through
+// this one provider.
 import { TooltipProvider } from '@theme/components/ui/tooltip';
-import AppTooltip from '@workbench/components/AppTooltip.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { runCommand } from '@workbench/shortcuts/commands';
-import { useTooltipStore } from '@workbench/state/tooltip';
 import { onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { useCollectionsStore } from './api/state/collections';
@@ -39,7 +36,6 @@ import WorkbenchShell from './workbench/WorkbenchShell.vue';
 provide(workbenchHostKey, createWorkbenchHost());
 
 const engineStore = useEngineStore();
-const tooltipStore = useTooltipStore();
 const paletteStore = usePaletteStore();
 const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
@@ -52,7 +48,6 @@ const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
 
 let unsubscribe: Array<() => void> = [];
-let teardownTooltips: (() => void) | null = null;
 
 function closeActiveTab(): void {
   if (modeStore.activeTab) tabsStore.closeTab(modeStore.activeTab.id);
@@ -60,7 +55,6 @@ function closeActiveTab(): void {
 
 onMounted(() => {
   void engineStore.initEngineState();
-  teardownTooltips = tooltipStore.initTooltips();
   unsubscribe = [
     control.onOpenSettings(() => {
       settingsStore.settingsOpen = true;
@@ -96,14 +90,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   for (const off of unsubscribe) off();
-  teardownTooltips?.();
 });
 </script>
 
 <template>
-  <!-- P104 A0 (§6.1): TooltipProvider owns timing (delayDuration/skipDelayDuration) for every
-       converted call site; disable-hoverable-content matches the current directive's own
-       pointer-events: none tooltip. Purely additive until a call site actually uses it. -->
+  <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
   <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
     <!-- P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
          `height: 100%` for `flex: 1; min-height: 0` to match. -->
@@ -120,6 +111,5 @@ onUnmounted(() => {
     <ConfirmDialog />
     <ContextMenu />
     <CommandPalette />
-    <AppTooltip />
   </TooltipProvider>
 </template>

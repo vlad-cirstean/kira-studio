@@ -139,18 +139,22 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, search)">
       <div class="p-panel-head h-[34px]">
         <span class="panel-title">Quick commands</span>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          class="p-push"
-          :data-active="showSearch"
-          aria-label="Search"
-          v-tooltip="showSearch ? 'Hide search' : 'Search'"
-          data-testid="toggle-search"
-          @click="toggleSearch"
-        >
-          <CodiconIcon name="search" :size="13" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              class="p-push"
+              :data-active="showSearch"
+              :aria-label="showSearch ? 'Hide search' : 'Search'"
+              data-testid="toggle-search"
+              @click="toggleSearch"
+            >
+              <CodiconIcon name="search" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
             <Button

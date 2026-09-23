@@ -374,18 +374,22 @@ onUnmounted(() => {
         <ToggleGroupItem value="files" data-testid="git-panel-tab-files">Files</ToggleGroupItem>
         <ToggleGroupItem value="review" data-testid="git-panel-tab-review">Review</ToggleGroupItem>
       </ToggleGroup>
-      <Button
-        variant="toolbar"
-        size="kira-icon"
-        class="p-push"
-        :data-active="showSearch"
-        aria-label="Search"
-        v-tooltip="showSearch ? 'Hide search' : 'Search'"
-        data-testid="toggle-search"
-        @click="toggleSearch"
-      >
-        <CodiconIcon name="search" :size="13" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="p-push"
+            :data-active="showSearch"
+            :aria-label="showSearch ? 'Hide search' : 'Search'"
+            data-testid="toggle-search"
+            @click="toggleSearch"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
+      </Tooltip>
       <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
       <Tooltip v-if="tab === 'repos'">
         <TooltipTrigger as-child>

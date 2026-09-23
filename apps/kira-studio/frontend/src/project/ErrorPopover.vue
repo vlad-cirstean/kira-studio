@@ -34,8 +34,8 @@ function close(): void {
   open.value = false;
 }
 
-// P23: unlike AppTooltip (closes on scroll), this popover has no backdrop and stays open across
-// a page interaction — its trigger is often a row's own error text (TreeRow.vue among others),
+// P23: unlike the app's tooltips (close on scroll), this popover has no backdrop and stays open
+// across a page interaction — its trigger is often a row's own error text (TreeRow.vue among others),
 // which can sit inside a scrolling panel. autoUpdate keeps it pinned to that trigger instead of
 // drifting away from it the moment the panel scrolls.
 watch(open, async (isOpen) => {
