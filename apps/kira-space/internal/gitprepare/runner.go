@@ -137,6 +137,20 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
 	cancelled := !timedOut && ctx.Err() != nil
 
+	if (timedOut || cancelled) && cmd.Process != nil {
+		// P108 Part 15 F8 fix: Wait returning only means cmd.Process (SIGTERM's own direct target,
+		// the shell) has exited — any OTHER process-group member that ignores SIGTERM can still be
+		// running, and escalate.Stop() just above cancelled the only thing that would otherwise
+		// have killed it, letting it outlive the documented hard timeout. Send SIGKILL to the whole
+		// group immediately and unconditionally here instead (tolerate ESRCH: the group may already
+		// be fully gone). G31 round-2's own pid-reuse worry (why Stop() exists at all, on the
+		// DELAYED escalation timer) does not apply to this immediate, same-instant kill: Linux does
+		// not free a PGID for reuse while any member of it is still alive, and this fires the
+		// instant Wait proves cmd.Process itself — a member of exactly this group — has just been
+		// reaped, with no gracefulStopDelay-sized window for anything to reuse it in between.
+		_ = killGroup(cmd.Process.Pid, syscall.SIGKILL)
+	}
+
 	result := Result{
 		Output: collector.finalLines(), Truncated: collector.isTruncated(),
 		TimedOut: timedOut, Cancelled: cancelled,
