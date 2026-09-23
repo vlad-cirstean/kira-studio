@@ -51,7 +51,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if subtle.ConstantTimeCompare([]byte(bearerToken(r)), []byte(s.token)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(bearerToken(r)), []byte(s.ln.Token)) != 1 {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
