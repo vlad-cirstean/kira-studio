@@ -230,15 +230,28 @@ Code navigation in this repo goes through [CodeGraph](https://github.com/colbymc
 not repo-map: symbol index, call graphs, blast radius, registered as an MCP server via the
 committed `.mcp.json` — use the MCP tools, not the `codegraph` CLI.
 
-**Mandatory, not optional — and verified, not assumed.** Read the injected context before opening
-whole files; call `codegraph_explore` before Read/Grep for any symbol, call-graph, or blast-radius
-question. CLAUDE.md being on disk in a subagent's worktree doesn't make it follow this — every
-subagent prompt (Opus planner, Sonnet implementer, review agent) must restate the requirement
-explicitly. Before accepting a subagent's plan or implementation (this file's own verification
-rule), the orchestrating session confirms real `codegraph_explore`/`codegraph_node` tool calls
-happened in that subagent's own run — grep its tool-call log, don't take "I used CodeGraph" on
-prose alone. Loading the tool via `ToolSearch` without ever calling it doesn't count. A subagent
-that skipped it despite loading it goes back to redo the lookup, same as any other short-of-the-ask
+**Mandatory for discovery, not for applying a known fix — and verified, not assumed.** Real usage
+splits cleanly along that line: an audit agent (P107 iter2's own Fable audit) called
+`codegraph_explore` 37 times, all before it ever called `Read` — finding duplication candidates and
+tracing call graphs needs it. An implementer given an exact file:line and a named fix from a
+findings doc called it zero times — `Edit` requires its own prior `Read` on that exact file
+regardless of what CodeGraph already showed, so a resolved fix has no discovery left to do.
+
+So: **mandatory** whenever a subagent is finding or understanding something it doesn't already know
+— an Opus plan being written, a duplication/bug audit, tracing what calls what or a change's blast
+radius before a structural decision. Read the injected context before opening whole files; call
+`codegraph_explore` before Read/Grep for any symbol/call-graph/blast-radius question in that work.
+**Not required** for a subagent executing an already-named fix (an exact file:line and a concrete
+change from a committed plan or findings doc) — there's nothing left to discover, and forcing a call
+there is busywork, not signal.
+
+CLAUDE.md being on disk in a subagent's worktree doesn't make it follow this — every subagent
+prompt doing discovery work (Opus planner, audit agent) must restate the requirement explicitly.
+Before accepting a plan or an audit's findings (this file's own verification rule), the
+orchestrating session confirms real `codegraph_explore`/`codegraph_node` tool calls happened in
+that subagent's own run — grep its tool-call log, don't take "I used CodeGraph" on prose alone.
+Loading the tool via `ToolSearch` without ever calling it doesn't count. A discovery subagent that
+skipped it despite loading it goes back to redo the lookup, same as any other short-of-the-ask
 result.
 
 **The tools aren't in the default tool list.** Call `ToolSearch` for `"codegraph"` first — it
