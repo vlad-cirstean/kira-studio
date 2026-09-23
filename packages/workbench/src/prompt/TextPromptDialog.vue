@@ -2,7 +2,8 @@
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
-import { nextTick, onMounted, ref } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
 
 // P107 T2-19: deliberately NOT built on shadcn-vue's Dialog (declined, real requirement) — its
 // DialogContent wraps reka-ui's DialogPortal, which teleports to document.body. Two of this
@@ -22,10 +23,17 @@ const inputRef = ref<{ $el: HTMLInputElement } | null>(null);
 onMounted(() => {
   void nextTick(() => inputRef.value?.$el.focus());
 });
+
+// P105 §5.2(b): the scrim is a pointer-event shield, not an interactive element — it absorbs a
+// click so it never reaches the ancestor Popover's own outside-click dismiss layer (see the
+// comment above). Not "click outside closes" (there is no close-on-backdrop behaviour here), so
+// this is a plain listener move, not an onClickOutside swap.
+const scrimEl = useTemplateRef<HTMLElement>('scrimEl');
+useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 </script>
 
 <template>
-  <div class="text-prompt-scrim" data-testid="text-prompt" @click.stop>
+  <div ref="scrimEl" class="text-prompt-scrim" data-testid="text-prompt">
     <div class="text-prompt-box p-float">
       <div class="text-prompt-title p-sm muted">{{ title }}</div>
       <Input

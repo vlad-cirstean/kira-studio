@@ -16,6 +16,7 @@
  * `labelledBy` overrides the auto-generated heading id for a caller that needs a stable/known id;
  * every other caller lets `useId()` mint one and never touches the attribute directly.
  */
+import { onClickOutside } from '@vueuse/core';
 import { computed, ref, useId } from 'vue';
 import { useModalFocus } from './modalFocus.ts';
 
@@ -41,11 +42,15 @@ const titleId = computed(() => props.labelledBy ?? generatedId);
 function close(): void {
   emit('close');
 }
+
+// P105 §5.2(b): the backdrop itself has no interactive role — closing on a backdrop click is the
+// panel's own outside-click dismissal (VueUse), not a click handler on the backdrop div.
+onClickOutside(rootEl, close);
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="kui-modal-backdrop" @click.self="close">
+    <div v-if="open" class="kui-modal-backdrop" aria-hidden="true">
       <div
         ref="rootEl"
         class="kui-modal"
