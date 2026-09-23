@@ -3,6 +3,7 @@ package adapters
 import (
 	"encoding/hex"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -43,33 +44,9 @@ func AssertColumnsKnown(columns []model.ColumnMeta, names []string) error {
 // AssertAffectedExactlyOne ports sql-mutate.ts's assertAffectedExactlyOne.
 func AssertAffectedExactlyOne(kind string, n int64) error {
 	if n != 1 {
-		return New(CodeQuery, "expected "+kind+" to affect exactly one row, affected "+itoa(n), nil)
+		return New(CodeQuery, "expected "+kind+" to affect exactly one row, affected "+strconv.FormatInt(n, 10), nil)
 	}
 	return nil
-}
-
-func itoa(n int64) string {
-	// avoids pulling in strconv just for this one call site's formatting need beyond what fmt
-	// already does elsewhere in this package; kept trivial on purpose.
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
 }
 
 // AssertKeyIsPrimaryKey ports sql-mutate.ts's assertKeyIsPrimaryKey — a partial or missing primary

@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -54,7 +55,7 @@ func TestOrderedOps_StableWithinKind(t *testing.T) {
 // RenderRowOp must emit columns in the wire's own key order (A4) — a map would randomise this.
 func TestRenderRowOp_PreservesColumnOrder(t *testing.T) {
 	quote := func(s string) string { return `"` + s + `"` }
-	render := NewParamRenderer(func(n int) string { return "$" + itoa(int64(n)) }, func(string) bool { return false })
+	render := NewParamRenderer(func(n int) string { return "$" + strconv.FormatInt(int64(n), 10) }, func(string) bool { return false })
 	var params []any
 
 	insert := model.MutationRowOp{
@@ -90,7 +91,7 @@ func TestRenderRowOp_PreservesColumnOrder(t *testing.T) {
 func TestNewParamRenderer_DecodesBinaryColumns(t *testing.T) {
 	quote := func(s string) string { return `"` + s + `"` }
 	isBinary := func(name string) bool { return name == "payload" }
-	render := NewParamRenderer(func(n int) string { return "$" + itoa(int64(n)) }, isBinary)
+	render := NewParamRenderer(func(n int) string { return "$" + strconv.FormatInt(int64(n), 10) }, isBinary)
 	var params []any
 
 	update := model.MutationRowOp{

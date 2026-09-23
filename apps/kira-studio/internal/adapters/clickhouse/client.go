@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -178,23 +179,9 @@ func OpenClient(cfg model.ResolvedConnectionConfig, log func(level, message stri
 	}
 	transport := &http.Transport{MaxIdleConnsPerHost: 4}
 	client := &http.Client{Transport: transport, Timeout: httpClientTimeout}
-	u := target.scheme + "://" + target.host + ":" + itoaPositive(target.port)
+	u := target.scheme + "://" + target.host + ":" + strconv.Itoa(target.port)
 	return &Handle{
 		Client: client, URL: u, Username: target.username, Password: target.password,
 		DefaultDatabase: target.database, ReadOnly: cfg.ReadOnly,
 	}, nil
-}
-
-func itoaPositive(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }

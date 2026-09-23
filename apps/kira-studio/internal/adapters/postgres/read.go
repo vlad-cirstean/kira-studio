@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -243,21 +244,7 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 	return builder.Finish(position), nil
 }
 
-func dollarPlaceholder(i int) string { return "$" + itoaPositive(i) }
-
-func itoaPositive(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
-}
+func dollarPlaceholder(i int) string { return "$" + strconv.Itoa(i) }
 
 // countRows is read.ts's countRows.
 func countRows(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {

@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -110,7 +111,7 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 			if err != nil {
 				return nil, err
 			}
-			pages[i] = adapters.SingleStatusPage(itoaPositive(int(written))+" row(s) written", "String")
+			pages[i] = adapters.SingleStatusPage(strconv.Itoa(int(written))+" row(s) written", "String")
 		}
 	}
 	return pages, nil

@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -85,7 +86,7 @@ func (a *Adapter) Disconnect(context.Context) error {
 // index.ts's own instance-per-call closure rather than an instance-level map, since every top-level
 // Adapter method call already gets a fresh, unique op.OpID.
 func (a *Adapter) nextQueryID(opID string, seq int) string {
-	return "kira-" + opID + "-" + itoaPositive(seq)
+	return "kira-" + opID + "-" + strconv.Itoa(seq)
 }
 
 // trackerFor is index.ts's trackerFor (P13 D3): registers the running query_id and hands back its
@@ -344,7 +345,7 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		a.deps.Log("warn", "clickhouse cancel("+opID+") failed: server returned "+itoaPositive(resp.StatusCode))
+		a.deps.Log("warn", "clickhouse cancel("+opID+") failed: server returned "+strconv.Itoa(resp.StatusCode))
 		return false, nil
 	}
 	return true, nil

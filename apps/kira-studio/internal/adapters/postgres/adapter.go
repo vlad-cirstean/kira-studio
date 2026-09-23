@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/jackc/pgx/v5"
@@ -187,7 +188,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 func requireThreeSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, schemaSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 3 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
 		return model.PathSegment{}, model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got depth "+itoaPositive(len(segments)), nil)
+			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	return segments[0], segments[1], segments[2], nil
 }
@@ -254,7 +255,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
 	segments := path.Segments
 	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database/schema path, got depth "+itoaPositive(len(segments)), nil)
+		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database/schema path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	databaseSegment, schemaSegment := segments[0], segments[1]
 

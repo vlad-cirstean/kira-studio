@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -77,7 +78,7 @@ func startSqlite() (*SqliteFixture, error) {
 	bigRowsSQL := `WITH RECURSIVE seq(n) AS (
 		SELECT 1
 		UNION ALL
-		SELECT n + 1 FROM seq WHERE n < ` + itoaPositive(bigRowsSqlite) + `
+		SELECT n + 1 FROM seq WHERE n < ` + strconv.Itoa(bigRowsSqlite) + `
 	)
 	INSERT INTO big_rows (id, payload)
 	SELECT n, hex(randomblob(16)) FROM seq`
@@ -97,18 +98,4 @@ func startSqlite() (*SqliteFixture, error) {
 		Database: Strp(path), Options: map[string]any{},
 	}
 	return &SqliteFixture{Path: path, Dir: dir, Config: cfg}, nil
-}
-
-func itoaPositive(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }
