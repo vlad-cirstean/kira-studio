@@ -497,7 +497,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 }
 
 .kv-field {
-  @apply w-[200px] flex items-center text-muted text-ellipsis px-2;
+  @apply w-52 flex items-center text-muted text-ellipsis px-2;
 }
 
 .kv-value {

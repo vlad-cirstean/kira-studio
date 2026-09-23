@@ -265,7 +265,7 @@ async function onClear(): Promise<void> {
 }
 
 .history-time {
-  @apply min-w-[64px];
+  @apply min-w-16;
 }
 
 .history-url {

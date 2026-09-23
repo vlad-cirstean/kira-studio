@@ -423,7 +423,7 @@ onUnmounted(() => {
       >
         <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
         <span
-          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
           :class="{
             'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
             'border-error': runState.status === 'error',

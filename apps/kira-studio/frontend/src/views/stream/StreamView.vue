@@ -758,7 +758,7 @@ onUnmounted(() => {
           </Tooltip>
           <Popover :open="composeOpen && canInsert" @update:open="(v) => (composeOpen = v)">
             <PopoverAnchor :reference="(addMessageTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="end" class="w-[380px] p-0" data-testid="stream-add-message-panel">
+            <PopoverContent align="end" class="w-96 p-0" data-testid="stream-add-message-panel">
               <StreamComposeMessage
                 :tab-id="tab.id"
                 :kind="isKafka ? 'kafka' : 'sqs'"
@@ -811,7 +811,7 @@ onUnmounted(() => {
           >
             <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
             ><span
-              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
               :class="{
                 'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
                   runState.status === 'running',
@@ -889,7 +889,7 @@ onUnmounted(() => {
           </Tooltip>
           <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
             <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="start" class="w-[200px] p-0" data-testid="stream-partition-menu">
+            <PopoverContent align="start" class="w-52 p-0" data-testid="stream-partition-menu">
               <div class="partition-menu">
                 <div v-if="partitionOptionsLoading" class="p-sm muted partition-menu-empty">
                   Loading…
@@ -924,7 +924,7 @@ onUnmounted(() => {
             <Tooltip :disabled="!timestampError">
               <TooltipTrigger as-child>
                 <div
-                  class="flex items-center gap-1 w-[160px] h-control rounded-kira-sm border bg-input px-2"
+                  class="flex items-center gap-1 w-40 h-control rounded-kira-sm border bg-input px-2"
                   :class="timestampError ? 'border-error' : 'border-border-strong'"
                 >
                   <span
@@ -965,7 +965,7 @@ onUnmounted(() => {
                 <PopoverAnchor :reference="(timestampCalendarTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
                 <PopoverContent
                   align="start"
-                  class="w-[228px] p-0"
+                  class="w-56 p-0"
                   data-testid="stream-filter-timestamp-calendar-popover"
                 >
                   <DateTimePicker :model-value="timestampPickerDate" zone="local" @update:model-value="onPickTimestamp" />
@@ -1311,7 +1311,7 @@ onUnmounted(() => {
 }
 
 .filter-field {
-  @apply w-[160px] shrink-0;
+  @apply w-40 shrink-0;
 }
 
 /* P31 D12/D13: the "since" field's own wrapper — not `.filter-field` (that class's fixed 160px
@@ -1335,7 +1335,7 @@ onUnmounted(() => {
 
 /* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */
 .partition-menu {
-  @apply flex flex-col max-h-[240px] overflow-y-auto gap-0.5 p-1;
+  @apply flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1;
 }
 
 .partition-menu-empty {

@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PopoverContent align="end" class="w-[200px] gap-0 p-0" data-testid="columns-menu">
+  <PopoverContent align="end" class="w-52 gap-0 p-0" data-testid="columns-menu">
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
 @reference "@theme/base.css";
 
 .columns-menu-inner {
-  @apply max-h-[320px] flex flex-col;
+  @apply max-h-80 flex flex-col;
 }
 
 .columns-menu-header {

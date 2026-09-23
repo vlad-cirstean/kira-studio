@@ -89,7 +89,7 @@ onUnmounted(() => {
 @reference "@theme/base.css";
 
 .columns-menu-inner {
-  @apply max-h-[320px] flex flex-col;
+  @apply max-h-80 flex flex-col;
 }
 
 .columns-menu-header {

@@ -218,7 +218,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 }
 
 .orderby-input {
-  @apply w-[230px] shrink-0;
+  @apply w-56 shrink-0;
 }
 
 .orderby-input :deep(.p-input) {

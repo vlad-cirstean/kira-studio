@@ -352,11 +352,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-track {
-  @apply relative h-[10px] overflow-hidden rounded-kira-sm bg-input;
+  @apply relative h-3 overflow-hidden rounded-kira-sm bg-input;
 }
 
 .hop-bar {
-  @apply absolute inset-y-0 flex min-w-[2px];
+  @apply absolute inset-y-0 flex min-w-0.5;
 }
 
 .hop-segment {
@@ -393,7 +393,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .legend-swatch {
-  @apply inline-block h-[8px] w-[8px] rounded-kira-sm;
+  @apply inline-block h-2 w-2 rounded-kira-sm;
 }
 
 .empty-state {

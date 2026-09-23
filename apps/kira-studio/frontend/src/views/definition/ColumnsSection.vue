@@ -123,7 +123,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-null {
-  @apply whitespace-nowrap text-muted w-[76px];
+  @apply whitespace-nowrap text-muted w-20;
 }
 
 .def-col-default {
@@ -131,6 +131,6 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-comment {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted max-w-[240px];
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted max-w-60;
 }
 </style>

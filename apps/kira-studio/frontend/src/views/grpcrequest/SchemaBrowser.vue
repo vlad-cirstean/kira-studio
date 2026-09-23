@@ -274,7 +274,7 @@ function selectMethod(service: string, method: string): void {
 /* D14: a real cap + scroll, so a large .proto tree's import list can never push the source row
    and the whole service browser off the pane. */
 .import-path-list {
-  @apply flex max-h-[132px] flex-col overflow-auto;
+  @apply flex max-h-32 flex-col overflow-auto;
 }
 
 .import-path-text {

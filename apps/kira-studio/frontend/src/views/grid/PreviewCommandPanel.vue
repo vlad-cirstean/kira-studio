@@ -94,7 +94,7 @@ function close(): void {
 @reference "@theme/base.css";
 
 .preview-panel-inner {
-  @apply max-h-[360px] flex flex-col;
+  @apply max-h-96 flex flex-col;
 }
 
 .preview-panel-header {
@@ -111,6 +111,6 @@ function close(): void {
 }
 
 .preview-panel-body {
-  @apply h-[240px];
+  @apply h-60;
 }
 </style>
