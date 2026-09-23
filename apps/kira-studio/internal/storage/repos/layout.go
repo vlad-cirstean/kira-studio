@@ -34,6 +34,34 @@ func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 	return result
 }
 
+// applyLayoutPatch merges patch's set leaves onto merged — split out of Set's own closure to keep
+// its cognitive complexity within this repo's linted bound (gocognit).
+func applyLayoutPatch(merged *model.Layout, patch model.LayoutPatch) {
+	p := patch.Panel
+	if p == nil {
+		return
+	}
+	if p.Project != nil {
+		if p.Project.Visible != nil {
+			merged.Panel.Project.Visible = *p.Project.Visible
+		}
+		if p.Project.Width != nil {
+			merged.Panel.Project.Width = *p.Project.Width
+		}
+	}
+	if p.Operations != nil {
+		if p.Operations.Visible != nil {
+			merged.Panel.Operations.Visible = *p.Operations.Visible
+		}
+		if p.Operations.Height != nil {
+			merged.Panel.Operations.Height = *p.Operations.Height
+		}
+	}
+	if p.CellEditor != nil && p.CellEditor.Height != nil {
+		merged.Panel.CellEditor.Height = *p.CellEditor.Height
+	}
+}
+
 func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	var (
 		rows *sql.Rows
@@ -65,27 +93,7 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	var merged model.Layout
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL, func(tx *sql.Tx, stored map[string]json.RawMessage) error {
 		merged = decodeLayout(stored)
-		if p := patch.Panel; p != nil {
-			if p.Project != nil {
-				if p.Project.Visible != nil {
-					merged.Panel.Project.Visible = *p.Project.Visible
-				}
-				if p.Project.Width != nil {
-					merged.Panel.Project.Width = *p.Project.Width
-				}
-			}
-			if p.Operations != nil {
-				if p.Operations.Visible != nil {
-					merged.Panel.Operations.Visible = *p.Operations.Visible
-				}
-				if p.Operations.Height != nil {
-					merged.Panel.Operations.Height = *p.Operations.Height
-				}
-			}
-			if p.CellEditor != nil && p.CellEditor.Height != nil {
-				merged.Panel.CellEditor.Height = *p.CellEditor.Height
-			}
-		}
+		applyLayoutPatch(&merged, patch)
 
 		leaves := []struct {
 			key   string

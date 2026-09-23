@@ -23,13 +23,6 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 	return adapters.LiteralRenderer(name, value)
 }
 
-// binaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
-// resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
-// convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
-func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
-	return adapters.BinaryColumnsOf(columns, typeClassFor)
-}
-
 // preview is mutate.ts's preview — synchronous (D6): no catalog lookup, no network.
 func preview(plan model.MutationPlan) ([]string, error) {
 	database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)

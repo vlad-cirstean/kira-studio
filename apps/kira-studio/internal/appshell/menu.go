@@ -56,17 +56,16 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 	}
 	viewSection := shell.Section{Label: "View", Items: viewItems}
 
-	windowItems := []shell.Item{
+	// role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" below already claims — re-
+	// accelerated to Shift+W (menu.ts:120-122's deliberate remap).
+	windowItems := append([]shell.Item{
 		{Kind: shell.ItemEmit, Label: "Next Tab", Accelerator: shell.Shortcuts["tab.next"].Accelerator(), Channel: bridge.ChannelTabNext},
 		{Kind: shell.ItemEmit, Label: "Previous Tab", Accelerator: shell.Shortcuts["tab.prev"].Accelerator(), Channel: bridge.ChannelTabPrev},
 		{Kind: shell.ItemEmit, Label: "Close Tab", Accelerator: shell.Shortcuts["tab.close"].Accelerator(), Channel: bridge.ChannelTabClose},
 		{Kind: shell.ItemSeparator},
 		{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: shell.Shortcuts["window.new"].Accelerator()},
 		{Kind: shell.ItemSeparator},
-	}
-	// role: 'close' defaults to CmdOrCtrl+W, which "Close Tab" above already claims — re-
-	// accelerated to Shift+W (menu.ts:120-122's deliberate remap).
-	windowItems = append(windowItems, shell.WindowMenuTail(shell.Shortcuts["window.close"].Accelerator())...)
+	}, shell.WindowMenuTail(shell.Shortcuts["window.close"].Accelerator())...)
 	windowSection := shell.Section{Label: "Window", Items: windowItems}
 
 	return []shell.Section{appSection, editSection, viewSection, windowSection}

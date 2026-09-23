@@ -16,13 +16,6 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 	return adapters.LiteralRenderer(name, value)
 }
 
-// binaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
-// resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
-// convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
-func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
-	return adapters.BinaryColumnsOf(columns, typeClassFor)
-}
-
 // resolveTablePath is mutate.ts's own resolveTablePath — postgres's three-segment
 // database/schema/table form, distinct from sql-mutate.go's ResolveDatabaseTablePath (the
 // two-segment form clickhouse/mysql-family/sqlite share).

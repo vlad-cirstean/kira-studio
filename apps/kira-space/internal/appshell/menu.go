@@ -19,14 +19,13 @@ func BuildTemplate(appName string) []shell.Section {
 
 	editSection := shell.Section{Label: "Edit", Items: shell.EditMenu()}
 
-	windowItems := []shell.Item{
-		{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: "CmdOrCtrl+Shift+N"},
-		{Kind: shell.ItemSeparator},
-	}
 	// role: 'close' defaults to CmdOrCtrl+W — no "Close Tab" here to collide with (Kira Studio's
 	// own re-accelerate-to-Shift+W reason, menu.ts:120-122, does not apply), so this stays the
 	// plain role default with no Accelerator override.
-	windowItems = append(windowItems, shell.WindowMenuTail("")...)
+	windowItems := append([]shell.Item{
+		{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: "CmdOrCtrl+Shift+N"},
+		{Kind: shell.ItemSeparator},
+	}, shell.WindowMenuTail("")...)
 	windowSection := shell.Section{Label: "Window", Items: windowItems}
 
 	return []shell.Section{appSection, editSection, windowSection}

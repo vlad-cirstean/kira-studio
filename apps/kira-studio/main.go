@@ -568,7 +568,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	for _, rec := range records {
 		var bounds *shell.WindowBounds
 		if rec.Bounds != nil {
-			b := shell.WindowBounds(*rec.Bounds)
+			b := *rec.Bounds
 			bounds = &b
 		}
 		shell.OpenWindow(deps, shell.ToWindowRecord(rec.Key, rec.Order, bounds))
