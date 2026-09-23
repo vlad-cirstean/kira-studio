@@ -567,34 +567,11 @@ func targetTable(target string) (string, error) {
 // have. Sparse ordering keys were declined (D2): a parent's children are a handful to a few
 // hundred rows, always rewritten inside one transaction, so gap management buys nothing.
 func reindexSiblings(tx *sql.Tx, collectionID string, parentID *string) error {
-	rows, err := tx.Query(
+	return sqlitex.ReindexSortOrder(tx,
 		`SELECT id FROM api_items WHERE collection_id = ? AND parent_id IS ? ORDER BY sort_order, created_at, id`,
+		`UPDATE api_items SET sort_order = ? WHERE id = ?`,
 		collectionID, parentID,
 	)
-	if err != nil {
-		return fmt.Errorf("repos/collections: read siblings: %w", err)
-	}
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return fmt.Errorf("repos/collections: scan sibling: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return fmt.Errorf("repos/collections: sibling rows: %w", err)
-	}
-	rows.Close()
-
-	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE api_items SET sort_order = ? WHERE id = ?`, order, id); err != nil {
-			return fmt.Errorf("repos/collections: reindex %s: %w", id, err)
-		}
-	}
-	return nil
 }
 
 // ImportTree writes a parsed collection as rows, in one transaction — D3's (parent, index) mapping

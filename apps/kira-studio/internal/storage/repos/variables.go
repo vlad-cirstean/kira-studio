@@ -295,30 +295,10 @@ func (r *VariablesRepo) ReorderEnvironments(ids []string) error {
 // already have — CollectionsRepo.reindexSiblings' own discipline (P4 D2), applied to a table with
 // no parent to scope by.
 func reindexEnvironments(tx *sql.Tx) error {
-	rows, err := tx.Query(`SELECT id FROM api_environments ORDER BY sort_order, created_at, id`)
-	if err != nil {
-		return fmt.Errorf("repos/variables: read environments: %w", err)
-	}
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return fmt.Errorf("repos/variables: scan environment: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return fmt.Errorf("repos/variables: environment rows: %w", err)
-	}
-	rows.Close()
-	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE api_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
-			return fmt.Errorf("repos/variables: reindex environment %s: %w", id, err)
-		}
-	}
-	return nil
+	return sqlitex.ReindexSortOrder(tx,
+		`SELECT id FROM api_environments ORDER BY sort_order, created_at, id`,
+		`UPDATE api_environments SET sort_order = ? WHERE id = ?`,
+	)
 }
 
 // ---- variables (D4/D5/D12) ----
@@ -644,30 +624,11 @@ func reindexVariables(tx *sql.Tx, scope model.VariableScope, ownerID string) err
 	if err != nil {
 		return err
 	}
-	rows, err := tx.Query(`SELECT id FROM api_variables WHERE `+column+` = ? ORDER BY sort_order, created_at, id`, ownerID)
-	if err != nil {
-		return fmt.Errorf("repos/variables: read siblings: %w", err)
-	}
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return fmt.Errorf("repos/variables: scan sibling: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return fmt.Errorf("repos/variables: sibling rows: %w", err)
-	}
-	rows.Close()
-	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE api_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
-			return fmt.Errorf("repos/variables: reindex %s: %w", id, err)
-		}
-	}
-	return nil
+	return sqlitex.ReindexSortOrder(tx,
+		`SELECT id FROM api_variables WHERE `+column+` = ? ORDER BY sort_order, created_at, id`,
+		`UPDATE api_variables SET sort_order = ? WHERE id = ?`,
+		ownerID,
+	)
 }
 
 // Reorder rewrites one scope's sort_order dense, in the order ids names — ConnectionsService.
