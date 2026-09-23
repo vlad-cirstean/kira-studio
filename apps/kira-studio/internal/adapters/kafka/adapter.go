@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"strconv"
+	"sync"
 
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -22,6 +23,10 @@ func init() {
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards every field below (F3): Connect/Disconnect write client/admin/opts/readOnly from
+	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
+	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
+	mu     sync.Mutex
 	client *kgo.Client
 	admin  *kadm.Client
 	// opts is the resolved seed/security options connect() built the long-lived client from —
@@ -29,6 +34,55 @@ type Adapter struct {
 	// connection config on every read().
 	opts     []kgo.Opt
 	readOnly bool
+}
+
+// getClient is Read/Mutate's own locked read of a.client (F3).
+func (a *Adapter) getClient() *kgo.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.client
+}
+
+// getAdmin is every op's own locked read of a.admin (F3) — requireAdmin's RequireConnected call
+// takes its result, never a.admin directly.
+func (a *Adapter) getAdmin() *kadm.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.admin
+}
+
+// getOpts is Read's own locked read of a.opts (F3).
+func (a *Adapter) getOpts() []kgo.Opt {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.opts
+}
+
+// getReadOnly is Mutate's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
+
+// setConnected is Connect's own locked write of every field a successful connect fills in (F3).
+func (a *Adapter) setConnected(client *kgo.Client, admin *kadm.Client, opts []kgo.Opt, readOnly bool) {
+	a.mu.Lock()
+	a.client = client
+	a.admin = admin
+	a.opts = opts
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write, once client.Close (a real network call, run
+// with no lock held) has returned (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.client = nil
+	a.admin = nil
+	a.opts = nil
+	a.mu.Unlock()
 }
 
 func (a *Adapter) Kind() string        { return "kafka" }
@@ -47,10 +101,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		cl.Close()
 		return adapters.ConnectInfo{}, mapError(err)
 	}
-	a.client = cl
-	a.admin = adm
-	a.opts = opts
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(cl, adm, opts, cfg.ReadOnly)
 	return adapters.ConnectInfo{
 		ServerVersion: "Kafka",
 		Details: map[string]string{
@@ -61,17 +112,15 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 }
 
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	if a.client != nil {
-		a.client.Close()
+	if client := a.getClient(); client != nil {
+		client.Close()
 	}
-	a.client = nil
-	a.admin = nil
-	a.opts = nil
+	a.clearConnected()
 	return nil
 }
 
 func (a *Adapter) requireAdmin() (*kadm.Client, error) {
-	return adapters.RequireConnected(a.admin)
+	return adapters.RequireConnected(a.getAdmin())
 }
 
 // Children is index.ts's children. Root is topics ∪ consumer groups (catalog.go's listRoot); a
@@ -154,14 +203,16 @@ func (a *Adapter) resolveTopicTarget(path model.NodePath, what string) (string, 
 
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	if a.client == nil || a.admin == nil {
-		return nil, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
+	admin, err := a.requireAdmin()
+	if err != nil {
+		return nil, err
 	}
+	opts := a.getOpts()
 	topic, err := a.resolveTopicTarget(req.Path, "read")
 	if err != nil {
 		return nil, err
 	}
-	return readTopic(ctx, a.admin, a.opts, topic, req, op)
+	return readTopic(ctx, admin, opts, topic, req, op)
 }
 
 // Count is index.ts's count.
@@ -188,14 +239,15 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
 
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
-	if a.client == nil {
-		return model.MutationResult{}, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
+	client, err := adapters.RequireConnected(a.getClient())
+	if err != nil {
+		return model.MutationResult{}, err
 	}
 	topic, err := a.resolveTopicTarget(plan.Path, "read")
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return produce(ctx, a.client, topic, a.readOnly, plan, op)
+	return produce(ctx, client, topic, a.getReadOnly(), plan, op)
 }
 
 // Execute is index.ts's execute — caps.SQL is false (P10's D13); never reached.

@@ -263,24 +263,29 @@ func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter
 }
 
 // advanceWindows applies P43 iter2 F19/D26's end-of-log clamp for one poll round (P58e E9, unit
-// tested per P58e E26 in read_test.go). touched carries the HighWatermark this SAME round reported
-// for every partition the fetch actually mentioned; pageCapped is whether this round's own
-// delivery reached the caller's page budget. A partition is provably drained — its remaining
-// [Next, End) gap can only ever be non-data offsets (a transaction's commit marker, a compacted
-// offset, or one aged out by retention) that will never arrive as a record — when this round was
-// not capped by the page budget (a capped round proves nothing; there may simply be more the
-// caller didn't ask for yet), and the round's own reported watermark for that partition has
-// reached or passed its frozen End. This is evaluated after every delivering round, never after a
-// follow-up "peek" poll: KF-3 found that once a partition is genuinely exhausted, a subsequent
-// poll blocks for the caller's entire remaining context with no partition metadata to peek at, so
-// the clamp signal has to come from the fetch that actually delivered data.
-func advanceWindows(windows []partitionWindow, touched map[int32]int64, pageCapped bool) {
-	if pageCapped {
-		return
-	}
+// tested per P58e E26 in read_test.go), refined by F2. touched carries the HighWatermark this SAME
+// round reported for every partition the fetch actually mentioned; recordsThisRound carries how
+// many records this SAME round's own fetches.Records() held for each partition, counted before any
+// page-budget cutoff — a partition is provably drained — its remaining [Next, End) gap can only
+// ever be non-data offsets (a transaction's commit marker, a compacted offset, or one aged out by
+// retention) that will never arrive as a record — only when THIS round delivered/skipped zero
+// records for it (not merely "the round as a whole wasn't page-capped": franz-go caps each
+// partition's own fetch at 1 MiB per round (config.go's maxPartBytes) independent of the overall
+// page budget, so a partition can have real, un-fetched data left in [Next, End) even in a round
+// that, as a whole, came in under the page budget — the previous "round wasn't page-capped" test
+// alone treated "the broker had less of *this* partition to send this specific round" as "this
+// partition is drained", silently truncating the browse), and the round's own reported watermark
+// for that partition has reached or passed its frozen End. This is evaluated after every delivering
+// round, never after a follow-up "peek" poll: KF-3 found that once a partition is genuinely
+// exhausted, a subsequent poll blocks for the caller's entire remaining context with no partition
+// metadata to peek at, so the clamp signal has to come from the fetch that actually delivered data.
+func advanceWindows(windows []partitionWindow, touched map[int32]int64, recordsThisRound map[int32]int) {
 	for i := range windows {
 		w := &windows[i]
 		if w.Next >= w.End {
+			continue
+		}
+		if recordsThisRound[w.Partition] > 0 {
 			continue
 		}
 		if hw, ok := touched[w.Partition]; ok && hw >= w.End {
@@ -390,11 +395,21 @@ func pollRound(ctx context.Context, browse *kgo.Client, windows []partitionWindo
 		touched[fp.Partition] = fp.HighWatermark
 	})
 
+	recordsThisRound := make(map[int32]int)
+
 	if fetches.NumRecords() == 0 {
 		*emptyPolls++
 	} else {
 		*emptyPolls = 0
-		for _, rec := range fetches.Records() {
+		// F2: counted over every record this round actually delivered, before the page-budget
+		// break below stops processing them — advanceWindows' own "this partition delivered zero
+		// records this round" signal must reflect what the broker actually sent, not how much of
+		// that this round's own page cap left time to consume.
+		records := fetches.Records()
+		for _, rec := range records {
+			recordsThisRound[rec.Partition]++
+		}
+		for _, rec := range records {
 			if collected >= req.PageSize {
 				break
 			}
@@ -412,7 +427,7 @@ func pollRound(ctx context.Context, browse *kgo.Client, windows []partitionWindo
 		}
 	}
 
-	advanceWindows(windows, touched, collected >= req.PageSize)
+	advanceWindows(windows, touched, recordsThisRound)
 
 	if fetches.NumRecords() == 0 && *emptyPolls >= maxEmptyPolls {
 		return collected, pollRoundExhausted, nil
