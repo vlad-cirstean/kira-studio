@@ -64,6 +64,13 @@ type Walk struct {
 	// not enough.
 	searchCancel context.CancelFunc
 	searchGen    uint64
+
+	// disposed is set once, permanently, by dispose() (F8, P108 Part 16 review): a handler that
+	// grabbed this *Walk before CloseRepo/a spec-change rebuild disposed it could otherwise still
+	// call ReadPage/Stream/Status/Search after the fact, reopening a fresh logsession and spawning
+	// a brand-new `git log` nothing then closes until the 5-minute idle reclaim — well after the
+	// connection released the repo ref that process's own working directory depends on.
+	disposed bool
 }
 
 func newWalk(entry *RepoEntry, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) *Walk {
@@ -112,6 +119,9 @@ func walkDir(s gitclient.RepoSummary) string {
 // own #resetSession minus the stash refresh (G8). Caller holds mu (or this is the constructor,
 // where no other goroutine can see w yet).
 func (w *Walk) resetLocked() {
+	if w.disposed {
+		return
+	}
 	if w.log != nil {
 		w.log.Close()
 	}
@@ -160,6 +170,7 @@ func (w *Walk) MarkRefresh() { w.staleRefresh.Store(true) }
 func (w *Walk) dispose() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.disposed = true
 	if w.log != nil {
 		w.log.Close()
 	}
@@ -184,6 +195,9 @@ func (w *Walk) Spec() porcelain.WalkSpec {
 func (w *Walk) Status(ctx context.Context) (loaded, remaining int, exhausted bool, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.disposed {
+		return 0, 0, false, ErrRepoNotHeld
+	}
 	w.ensureFreshLocked()
 	remaining, err = w.log.Remaining(ctx)
 	if err != nil {
@@ -198,6 +212,9 @@ func (w *Walk) Status(ctx context.Context) (loaded, remaining int, exhausted boo
 func (w *Walk) ReadPage(ctx context.Context, pages int) (started bool, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.disposed {
+		return false, ErrRepoNotHeld
+	}
 	w.ensureFreshLocked()
 	if w.log.Exhausted() {
 		return false, nil
@@ -262,6 +279,9 @@ func (w *Walk) readPageLocked(ctx context.Context) (appended int, err error) {
 func (w *Walk) Stream(ctx context.Context, resumeThroughRow *int, chunkRows int, emit func(StreamChunk) error) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.disposed {
+		return ErrRepoNotHeld
+	}
 	w.ensureFreshLocked()
 
 	if chunkRows <= 0 {

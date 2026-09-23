@@ -28,6 +28,10 @@ func (w *Walk) Search(ctx context.Context, q gitsearch.Query, limit int) (gitsea
 	}
 
 	w.mu.Lock()
+	if w.disposed {
+		w.mu.Unlock()
+		return gitsearch.Result{}, ErrRepoNotHeld
+	}
 	w.ensureFreshLocked()
 	spec := w.spec
 	if w.searchCancel != nil {

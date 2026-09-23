@@ -3,6 +3,7 @@ package gitsession
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsearch"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
@@ -666,5 +668,55 @@ func TestConn_WalkReplaceDoesNotBlockOtherConnOps(t *testing.T) {
 	case <-rebuildDone:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Walk (rebuild) never finished after blockEmit closed")
+	}
+}
+
+// TestWalk_DisposedRefusesEveryOperation is F8's own regression proof (P108 Part 16 review): a
+// disposed walk had no disposed flag at all, so a handler that grabbed the *Walk reference before
+// CloseRepo (or a spec-change rebuild) disposed it could still call ReadPage/Stream/Status/Search,
+// reopening a fresh logsession and spawning a brand-new `git log` nothing then closes until the
+// 5-minute idle reclaim -- well after the connection released the repo ref that process's own
+// working directory depends on. Every one of the five guarded methods must now refuse with
+// ErrRepoNotHeld instead, and (the actual leak this closes) never spawn a new process to do so.
+func TestWalk_DisposedRefusesEveryOperation(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 5)
+
+	var logSpawns int32
+	runner := countingRunner{Runner: gitclient.NewExecRunner(), logSpawns: &logSpawns}
+	conn, _, repoID := newWalkTestConnWithRunner(t, runner, repoDir)
+	defer conn.Close()
+
+	w, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0, nil)
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+	// Load something first so dispose has a real logsession to close.
+	if _, err := w.ReadPage(context.Background(), 1); err != nil {
+		t.Fatalf("ReadPage (before dispose): %v", err)
+	}
+	spawnsBeforeDispose := atomic.LoadInt32(&logSpawns)
+	if spawnsBeforeDispose == 0 {
+		t.Fatal("expected at least one log spawn before dispose")
+	}
+
+	w.dispose()
+
+	if _, err := w.ReadPage(context.Background(), 1); !errors.Is(err, ErrRepoNotHeld) {
+		t.Fatalf("ReadPage (after dispose) = %v, want ErrRepoNotHeld", err)
+	}
+	if err := w.Stream(context.Background(), nil, 5, func(StreamChunk) error { return nil }); !errors.Is(err, ErrRepoNotHeld) {
+		t.Fatalf("Stream (after dispose) = %v, want ErrRepoNotHeld", err)
+	}
+	if _, _, _, err := w.Status(context.Background()); !errors.Is(err, ErrRepoNotHeld) {
+		t.Fatalf("Status (after dispose) = %v, want ErrRepoNotHeld", err)
+	}
+	if _, err := w.Search(context.Background(), gitsearch.Query{Text: "x"}, 10); !errors.Is(err, ErrRepoNotHeld) {
+		t.Fatalf("Search (after dispose) = %v, want ErrRepoNotHeld", err)
+	}
+
+	if got := atomic.LoadInt32(&logSpawns); got != spawnsBeforeDispose {
+		t.Fatalf("log spawns after dispose = %d, want %d (unchanged) -- a disposed walk must never spawn a new git log process", got, spawnsBeforeDispose)
 	}
 }
