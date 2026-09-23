@@ -230,8 +230,16 @@ Code navigation in this repo goes through [CodeGraph](https://github.com/colbymc
 not repo-map: symbol index, call graphs, blast radius, registered as an MCP server via the
 committed `.mcp.json` — use the MCP tools, not the `codegraph` CLI.
 
-**Use it when working in this repository.** Standing expectation, not a demo: read the injected
-context before opening whole files, query it before grepping for a symbol.
+**Mandatory, not optional — and verified, not assumed.** Read the injected context before opening
+whole files; call `codegraph_explore` before Read/Grep for any symbol, call-graph, or blast-radius
+question. CLAUDE.md being on disk in a subagent's worktree doesn't make it follow this — every
+subagent prompt (Opus planner, Sonnet implementer, review agent) must restate the requirement
+explicitly. Before accepting a subagent's plan or implementation (this file's own verification
+rule), the orchestrating session confirms real `codegraph_explore`/`codegraph_node` tool calls
+happened in that subagent's own run — grep its tool-call log, don't take "I used CodeGraph" on
+prose alone. Loading the tool via `ToolSearch` without ever calling it doesn't count. A subagent
+that skipped it despite loading it goes back to redo the lookup, same as any other short-of-the-ask
+result.
 
 **The tools aren't in the default tool list.** Call `ToolSearch` for `"codegraph"` first — it
 loads `codegraph_explore`, `codegraph_node` and the rest by name, then they're callable like any
