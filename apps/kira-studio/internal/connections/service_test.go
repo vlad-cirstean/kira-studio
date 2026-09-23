@@ -1221,3 +1221,45 @@ func TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails(t *testing.T) {
 		}
 	}
 }
+
+// TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails is F8 (P108 Part 3): the new duplicate
+// row is already committed (InsertDuplicateWithSecret) by the time copyMaskRules can fail —
+// emitListChanged must still run on this failure path, or the UI's own connection list never
+// learns the new row exists until some unrelated later refresh.
+func TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("masked-list-changed"))
+
+	// Same deterministic failure as TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails.
+	if _, err := h.repos.MaskRules.DB.Exec(`DROP TABLE connection_mask_rules`); err != nil {
+		t.Fatalf("drop connection_mask_rules: %v", err)
+	}
+
+	var (
+		fired    int
+		lastList []model.ConnectionSummary
+	)
+	unsubscribe := h.svc.OnListChanged(func(list []model.ConnectionSummary) {
+		fired++
+		lastList = list
+	})
+	defer unsubscribe()
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err == nil {
+		t.Fatalf("Duplicate = %+v, nil error, want an error once the mask rule copy fails", dup)
+	}
+	if fired == 0 {
+		t.Fatal("OnListChanged never fired despite the new duplicate row already being committed")
+	}
+
+	found := false
+	for _, c := range lastList {
+		if c.ID != created.ID && strings.HasSuffix(c.Name, " copy") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("emitted list %+v does not carry the already-committed duplicate row", lastList)
+	}
+}

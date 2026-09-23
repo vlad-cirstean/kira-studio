@@ -35,11 +35,22 @@ func scanMaskRuleRow(row rowScanner) (model.MaskRule, error) {
 	return r, nil
 }
 
+// queryer is satisfied by both *sql.DB and *sql.Tx — listForConnection (below) runs the identical
+// query over either, so CopyForConnection's own transaction (F8) can share it with ListForConnection
+// rather than keeping a second, drifting copy of the same query/scan loop.
+type queryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
 // ListForConnection orders by lower(table_name), lower(column_name) — deterministic and matching
 // the unique index's own ordering, so two rules that would collide under the case-insensitive
 // constraint never come back in arbitrary order relative to each other.
 func (r *MaskRulesRepo) ListForConnection(connectionID string) ([]model.MaskRule, error) {
-	rows, err := r.DB.Query(
+	return listForConnection(r.DB, connectionID)
+}
+
+func listForConnection(q queryer, connectionID string) ([]model.MaskRule, error) {
+	rows, err := q.Query(
 		`SELECT `+maskRulesSelectColumns+` FROM connection_mask_rules WHERE connection_id = ? ORDER BY lower(table_name), lower(column_name)`,
 		connectionID,
 	)
@@ -139,39 +150,43 @@ func (r *MaskRulesRepo) findExisting(connectionID, tableName, columnName string)
 }
 
 // CopyForConnection copies every mask rule on fromConnectionID onto toConnectionID, each under a
-// fresh id from ids (one per row, same order ListForConnection returns them — lower(table_name),
-// lower(column_name)) — connections.Service.Duplicate's own use (finding #6, M6): a duplicated
+// fresh id mintID mints — connections.Service.Duplicate's own use (finding #6, M6): a duplicated
 // connection that carried over the source's MCP exposure without its mask rules would immediately
-// expose PII the original was protecting. ids is minted by the caller (uuid.NewString(), the same
-// way Upsert's own id argument is) rather than here, keeping this repo layer free of a uuid
-// dependency the way the rest of it already is. mask_correlation_key lives on `connections`, not
-// this table, and is never touched here — InsertDuplicateWithSecret's own doc comment gives the
-// reasoning for why a duplicate must mint its own key rather than inherit the source's.
-func (r *MaskRulesRepo) CopyForConnection(fromConnectionID, toConnectionID string, ids []string, now string) error {
-	rows, err := r.ListForConnection(fromConnectionID)
-	if err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return nil
-	}
-	if len(ids) != len(rows) {
-		return fmt.Errorf("repos/maskrules: CopyForConnection: %d ids for %d rules", len(ids), len(rows))
-	}
-
+// expose PII the original was protecting. mintID is the caller's own id generator
+// (uuid.NewString, the same way Upsert's own id argument is minted) rather than a uuid dependency
+// in this package, called once per row inside the same transaction the list runs in.
+//
+// F8 (P108 Part 3): the list and the inserts now share one transaction, rather than the caller
+// listing once (to count rows and mint that many ids) and this method listing *again* to actually
+// copy them — a concurrent rule add/remove on fromConnectionID between those two separate list
+// calls used to produce an "N ids for M rules" mismatch here, by which point Duplicate's own new
+// connection row was already committed; since the mismatch error is returned before
+// emitListChanged runs, the UI never learns about the (now partially set up) new connection at
+// all. One transaction removes the mismatch entirely — the list and every insert it drives see
+// the same snapshot, so there is nothing left to race.
+//
+// mask_correlation_key lives on `connections`, not this table, and is never touched here —
+// InsertDuplicateWithSecret's own doc comment gives the reasoning for why a duplicate must mint
+// its own key rather than inherit the source's.
+func (r *MaskRulesRepo) CopyForConnection(fromConnectionID, toConnectionID string, mintID func() string, now string) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("repos/maskrules: begin: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	for i, row := range rows {
+	rows, err := listForConnection(tx, fromConnectionID)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
 		if _, err := tx.Exec(`
 			INSERT INTO connection_mask_rules
 				(id, connection_id, table_name, column_name, mask_kind, keep_hint, correlate, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
-			ids[i], toConnectionID, row.TableName, row.ColumnName, string(row.Kind),
+			mintID(), toConnectionID, row.TableName, row.ColumnName, string(row.Kind),
 			boolToInt(row.KeepHint), boolToInt(row.Correlate), now, now,
 		); err != nil {
 			return fmt.Errorf("repos/maskrules: copy %s/%s.%s to %s: %w", fromConnectionID, row.TableName, row.ColumnName, toConnectionID, err)

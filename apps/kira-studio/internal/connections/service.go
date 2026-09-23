@@ -399,6 +399,11 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// whatever PII the original was protecting.
 	if s.deps.MaskRules != nil {
 		if err := s.copyMaskRules(id, newID); err != nil {
+			// F8 (P108 Part 3): the new row is already committed above (InsertDuplicateWithSecret)
+			// — keep the UI in sync with what storage actually holds (a real, if not fully set up,
+			// duplicate) rather than returning an error the caller sees while emitListChanged never
+			// ran, leaving the new row invisible until the next unrelated list refresh.
+			s.emitListChanged()
 			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 	}
@@ -411,6 +416,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// (safe), never exposed-without-rules (unsafe).
 	if fields.McpEnabled {
 		if err := s.deps.Conns.SetMcpEnabled(newID, true, kiratime.NowISO()); err != nil {
+			s.emitListChanged() // F8: same reasoning as the mask-rule-copy failure above.
 			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 		created.McpEnabled = true
@@ -419,22 +425,14 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	return created, nil
 }
 
-// copyMaskRules copies every mask rule on fromID onto toID, one fresh uuid per row — Duplicate's
-// own step (finding #6, M6). Minting ids here, in this package, rather than in the repo layer
-// keeps repos/maskrules.go free of a uuid dependency the rest of that package doesn't have.
+// copyMaskRules copies every mask rule on fromID onto toID — Duplicate's own step (finding #6,
+// M6). uuid.NewString is passed through as the repo's own id-mint function (F8, P108 Part 3): the
+// list and every insert it drives now run inside CopyForConnection's own single transaction,
+// rather than this method listing once (to count rows and mint that many ids) before a second,
+// separate list call inside the repo — closing the "N ids for M rules" mismatch a concurrent rule
+// add/remove on fromID could otherwise produce between those two, previously-separate list calls.
 func (s *Service) copyMaskRules(fromID, toID string) error {
-	existing, err := s.deps.MaskRules.ListForConnection(fromID)
-	if err != nil {
-		return err
-	}
-	if len(existing) == 0 {
-		return nil
-	}
-	ids := make([]string, len(existing))
-	for i := range existing {
-		ids[i] = uuid.NewString()
-	}
-	return s.deps.MaskRules.CopyForConnection(fromID, toID, ids, kiratime.NowISO())
+	return s.deps.MaskRules.CopyForConnection(fromID, toID, uuid.NewString, kiratime.NowISO())
 }
 
 func (s *Service) Remove(id string) error {
