@@ -1,4 +1,4 @@
-import { type Ref, watch } from 'vue';
+import { onScopeDispose, type Ref, watch } from 'vue';
 
 const FOCUSABLE_SELECTOR =
   "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
@@ -22,17 +22,37 @@ export function useModalFocus(
   rootEl: Ref<HTMLElement | null>,
 ): { onKeydown(event: KeyboardEvent): void } {
   let invoker: HTMLElement | null = null;
+  let wasActive = false;
 
-  watch(active, (isActive) => {
-    if (isActive) {
-      invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      requestAnimationFrame(() => {
-        rootEl.value?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-      });
-    } else {
-      invoker?.focus();
-      invoker = null;
-    }
+  // F5: `immediate` -- a dialog that mounts already open (`v-if="open"` with `open` true from the
+  // very first render, e.g. git-ui's PullDialog/PostCheckoutPullDialog/ResetDialog) never sees
+  // `active` transition false -> true; without `immediate` this watch simply never runs for it, so
+  // it gets no initial focus, no Tab trap and no Escape handling (nothing inside the dialog ever
+  // holds focus for either keydown listener, bound on the dialog's own root, to receive an event
+  // from) until `active` later flips. `BranchPicker`/`BaseSelector` both start `isOpen === false`,
+  // so the immediate call there is a harmless no-op (`invoker` stays null).
+  watch(
+    active,
+    (isActive) => {
+      if (isActive) {
+        invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        requestAnimationFrame(() => {
+          rootEl.value?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+        });
+      } else {
+        invoker?.focus();
+        invoker = null;
+      }
+      wasActive = isActive;
+    },
+    { immediate: true },
+  );
+
+  // Backstop for a caller torn down while still active without `active` ever flipping back to
+  // false first (the watch above already runs, pre-flush, ahead of the DOM patch for the ordinary
+  // `open -> false` case, so this only fires for an abnormal teardown).
+  onScopeDispose(() => {
+    if (wasActive) invoker?.focus();
   });
 
   function onKeydown(event: KeyboardEvent): void {

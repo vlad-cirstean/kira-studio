@@ -46,11 +46,16 @@ function close(): void {
 // P105 §5.2(b): the backdrop itself has no interactive role — closing on a backdrop click is the
 // panel's own outside-click dismissal (VueUse), not a click handler on the backdrop div.
 onClickOutside(rootEl, close);
+
+// F4: P105's own aria-hidden="true" here (§5.2(b)) sat on this backdrop div, but that div is the
+// role="dialog" panel's ancestor, not a sibling -- aria-hidden on an ancestor hides the whole
+// subtree from assistive tech, the dialog included. No replacement attribute: the backdrop itself
+// renders nothing accessibility-relevant.
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="kui-modal-backdrop" aria-hidden="true">
+    <div v-if="open" class="kui-modal-backdrop">
       <div
         ref="rootEl"
         class="kui-modal"

@@ -40,14 +40,29 @@ function onPointerDown(e: PointerEvent): void {
   const onMove = (moveEvent: PointerEvent): void => {
     emit('update:value', clamp(startValue + (moveEvent.clientX - startX)));
   };
-  const onUp = (upEvent: PointerEvent): void => {
-    target.releasePointerCapture?.(upEvent.pointerId);
+  // F14: without this, an interrupted drag (the OS cancels the pointer -- a touch gesture handed
+  // off to scroll/a system gesture, or capture lost some other way) never reached `onUp`, so these
+  // window listeners outlived the drag. They leaked (kept `startX`/`startValue` alive per handle
+  // instance) and a later, unrelated `pointerup` anywhere in the window would still fire this
+  // closure and emit a stale `change` computed from the aborted drag's own start position.
+  const cleanup = (): void => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    window.removeEventListener('lostpointercapture', onCancel);
+  };
+  const onUp = (upEvent: PointerEvent): void => {
+    target.releasePointerCapture?.(upEvent.pointerId);
+    cleanup();
     emit('change', clamp(startValue + (upEvent.clientX - startX)));
+  };
+  const onCancel = (): void => {
+    cleanup();
   };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
+  window.addEventListener('lostpointercapture', onCancel);
 }
 
 function onKeydown(e: KeyboardEvent): void {

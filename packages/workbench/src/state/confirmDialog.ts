@@ -17,6 +17,9 @@ export const useConfirmDialogStore = defineStore('confirmDialog', () => {
 
   function confirmDialog(message: string, options?: { danger?: boolean }): Promise<boolean> {
     return new Promise((resolve) => {
+      // F9: a second call before the first settles would otherwise overwrite `state.resolve`,
+      // leaving the first caller's promise pending forever. Settle it (as a decline) first.
+      state.resolve?.(false);
       state.message = message;
       state.danger = options?.danger ?? true;
       state.resolve = resolve;

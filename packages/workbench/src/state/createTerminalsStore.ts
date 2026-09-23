@@ -95,6 +95,31 @@ export function createTerminalsStore(control: TerminalsControl) {
       }
     }
 
+    // Routes decoded output bytes to an attached sink, or the drain queue's own window (§5.2).
+    // F11: output arriving after closeTerminalSession has already deleted this tab's byTabId entry
+    // (racing terminalClose) has nowhere left to drain to -- buffering it anyway just leaks up to
+    // DRAIN_LIMIT_BYTES per stale tab id forever, so the drain branch checks byTabId first.
+    function routeTerminalData(terminalId: string, bytes: Uint8Array): void {
+      const sink = sinks.get(terminalId);
+      if (sink) {
+        sink(bytes);
+      } else if (byTabId.has(terminalId)) {
+        appendToDrain(terminalId, bytes);
+      }
+    }
+
+    function applyTerminalStatus(event: TerminalEvent): void {
+      const sess = byTabId.get(event.terminalId);
+      if (!sess) return;
+      if (event.exited) {
+        sess.status = event.error ? 'failed' : 'exited';
+        sess.exitCode = event.exitCode ?? null;
+        sess.error = event.error || null;
+      } else if (sess.status === 'starting') {
+        sess.status = 'running';
+      }
+    }
+
     // One module-level control.onTerminal(...) subscription, installed on first use, routes by
     // terminalId (§5.2): a sink attached (the normal case) gets the decoded bytes directly; no sink
     // yet (the drain queue's own window) appends instead.
@@ -103,25 +128,8 @@ export function createTerminalsStore(control: TerminalsControl) {
       if (subscribed) return;
       subscribed = true;
       control.onTerminal((event) => {
-        if (event.data) {
-          const bytes = base64ToBytes(event.data);
-          const sink = sinks.get(event.terminalId);
-          if (sink) {
-            sink(bytes);
-          } else {
-            appendToDrain(event.terminalId, bytes);
-          }
-        }
-
-        const sess = byTabId.get(event.terminalId);
-        if (!sess) return;
-        if (event.exited) {
-          sess.status = event.error ? 'failed' : 'exited';
-          sess.exitCode = event.exitCode ?? null;
-          sess.error = event.error || null;
-        } else if (sess.status === 'starting') {
-          sess.status = 'running';
-        }
+        if (event.data) routeTerminalData(event.terminalId, base64ToBytes(event.data));
+        applyTerminalStatus(event);
       });
     }
 

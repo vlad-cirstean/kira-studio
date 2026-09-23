@@ -17,6 +17,9 @@ export function useTextPrompt() {
 
   function open(title: string, initial: string): Promise<string | null> {
     return new Promise((resolve) => {
+      // F9: a second call before the first settles would otherwise overwrite `prompt.value`,
+      // leaving the first caller's promise pending forever. Settle it (as a cancel) first.
+      prompt.value?.resolve(null);
       prompt.value = { title, value: initial, resolve };
     });
   }

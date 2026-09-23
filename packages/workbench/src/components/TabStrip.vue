@@ -171,7 +171,10 @@ function onDragOver(id: string): void {
   const from = dragId.value;
   if (from === null || from === id) return;
   host.tabs.moveTab(from, id);
-  dragId.value = id;
+  // F6: `dragId` tracks the *dragged* tab throughout the whole gesture, never the hovered one --
+  // reassigning it to `id` here (the old code) meant the next dragover moved whatever tab had just
+  // been hovered, not the tab the user is actually dragging, and `is-dragging` (below, matched
+  // against `dragId`) landed on the wrong chip.
 }
 function onDragEnd(): void {
   dragId.value = null;

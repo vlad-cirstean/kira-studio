@@ -8,7 +8,7 @@ import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import type { ComputedRef, Ref } from 'vue';
-import { computed, ref } from 'vue';
+import { computed, ref, useId } from 'vue';
 
 // I2-18: the data font-size field (stepper, range error, reset button) was byte-identical between
 // kira-studio's and kira-space's own AppearancePane.vue — moved here once, around P105 §4.2's own
@@ -36,12 +36,17 @@ props.registerFieldError('appearance.fontSize', fontSizeError);
 
 const fontSizeGroupRef = ref<HTMLElement | null>(null);
 const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
+
+// F3: see DateFormatField.vue's own comment -- `for` + `id` ties the label to the actual number
+// input, not the stepper buttons (already `tabindex="-1"`/`aria-hidden` decorative) or the Reset
+// button (a sibling, outside the label).
+const fieldId = useId();
 </script>
 
 <template>
-  <Label class="field">
+  <div class="field">
     <div class="field-head">
-      <span>Data font size</span>
+      <Label :for="fieldId">Data font size</Label>
       <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontSize') }">
@@ -63,6 +68,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
     <div class="size-input" ref="fontSizeGroupRef">
       <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
         <InputGroupInput
+          :id="fieldId"
           type="number"
           :min="FONT_SIZE_RANGE.min"
           :max="FONT_SIZE_RANGE.max"
@@ -106,5 +112,5 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       {{ fontSizeError }}
     </span>
     <span v-else class="helper-text">{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</span>
-  </Label>
+  </div>
 </template>

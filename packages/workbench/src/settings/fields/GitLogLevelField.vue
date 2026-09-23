@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useId } from 'vue';
 
 // I2-18: the git-log-level select (options, reset button) was byte-identical between kira-studio's
 // and kira-space's own AdvancedPane.vue; the helper text differs per app, so it stays app-side
@@ -17,12 +18,17 @@ const props = defineProps<{
 function onGitLogLevelChange(e: Event): void {
   props.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
 }
+
+// F3: see DateFormatField.vue's own comment -- `for` + `id` ties the label to the select
+// explicitly, so the Reset button (a sibling, outside the label) is no longer what a title/helper
+// click activates.
+const fieldId = useId();
 </script>
 
 <template>
-  <Label class="field">
+  <div class="field">
     <div class="field-head">
-      <span>Git log level</span>
+      <Label :for="fieldId">Git log level</Label>
       <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
@@ -42,6 +48,7 @@ function onGitLogLevelChange(e: Event): void {
       </Tooltip>
     </div>
     <select
+      :id="fieldId"
       class="p-select bordered md"
       data-testid="settings-git-log-level"
       :value="advanced.gitLogLevel"
@@ -54,5 +61,5 @@ function onGitLogLevelChange(e: Event): void {
       <option value="debug">Debug</option>
     </select>
     <slot />
-  </Label>
+  </div>
 </template>

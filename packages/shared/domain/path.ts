@@ -8,5 +8,11 @@
 // string normalization, so there is nothing for the two apps to diverge on and no reason to pay
 // the duplication cost.
 export function canonicalPath(p: string): string {
-  return p.normalize('NFC').replace(/[/\\]+$/, '');
+  const normalized = p.normalize('NFC');
+  const stripped = normalized.replace(/[/\\]+$/, '');
+  // F13: the filesystem root ('/', or a run of slashes that normalizes to it) has no non-separator
+  // suffix to strip down to -- stripping it to '' produces a relative-looking empty string Go's
+  // own terminal.ValidateOpen then rejects as not absolute. Keep one separator instead of none.
+  if (stripped === '' && /^[/\\]/.test(normalized)) return normalized[0];
+  return stripped;
 }

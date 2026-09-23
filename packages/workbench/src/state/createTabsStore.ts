@@ -240,8 +240,16 @@ export function createTabsStore<
       for (const t of tabs) keys.add(host.workspaceKeyOf(t));
       for (const key of keys) {
         const keyTabs = tabs.filter((t) => host.workspaceKeyOf(t) === key);
-        const active = keyTabs.find((t) => t.active) ?? keyTabs[0];
+        const persistedActive = keyTabs.find((t) => t.active);
+        const active = persistedActive ?? keyTabs[0];
         tabsState.activeIdByWorkspace[key] = active?.id ?? null;
+        // F7: no restored tab was `active` (the previously-active tab was incognito or a terminal,
+        // neither persisted) -- defaulting `activeIdByWorkspace` to the first tab without also
+        // flipping its own `active` field left TabStrip (which reads that field) highlighting
+        // nothing while MainView (which reads the id) rendered that tab.
+        if (active && !persistedActive) {
+          for (const t of keyTabs) t.active = t.id === active.id;
+        }
       }
 
       host.onHydrated?.(tabs);
@@ -425,8 +433,10 @@ export function createTabsStore<
         removeFromPreviewCohort(key, tabId);
       }
       tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
-      keep.active = true;
-      tabsState.activeIdByWorkspace[key] = id;
+      // F8: `keep.active = true` alone never clears a surviving pinned tab that was already
+      // active -- two tabs then read `active`, both get persisted, and both render `is-active`.
+      // `setActiveTabId` clears every other tab in the workspace as it sets this one.
+      setActiveTabId(id, key);
       saveNow();
     }
 
@@ -489,16 +499,20 @@ export function createTabsStore<
       if (fromId === toId) return;
       const tabs = tabsState.tabs;
       const fromIdx = tabs.findIndex((t) => t.id === fromId);
-      const toTab = tabs.find((t) => t.id === toId);
-      if (fromIdx < 0 || !toTab) return;
+      // F6: the target's index in `tabs`, *before* the dragged tab is spliced out -- looking it up
+      // again in the post-splice array (the old code) shifts it left by one whenever the dragged
+      // tab sat earlier in the list, so inserting there lands one slot short and a rightward drag
+      // never actually advances past the tab it's hovering.
+      const toIdx = tabs.findIndex((t) => t.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return;
       const fromTab = tabs[fromIdx];
+      const toTab = tabs[toIdx];
       if (host.kinds[fromTab.kind]?.pinned || host.kinds[toTab.kind]?.pinned) return;
       const key = host.workspaceKeyOf(fromTab);
       removeFromPreviewCohort(key, fromId);
 
       const next = [...tabs];
       const [moved] = next.splice(fromIdx, 1);
-      const toIdx = next.findIndex((t) => t.id === toId);
       next.splice(toIdx, 0, moved);
       tabsState.tabs = next;
       saveNow();

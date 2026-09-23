@@ -53,6 +53,12 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       Object.assign(state.panel.project, layout.panel.project);
       Object.assign(state.panel.operations, layout.panel.operations);
       Object.assign(state.panel.cellEditor, layout.panel.cellEditor);
+      // F10: Go's `LayoutService.Set` broadcasts `layoutChanged` to every window, sender included.
+      // A pause of WRITE_DEBOUNCE_MS or more mid-resize lets that echo land here while a newer
+      // local edit still sits unflushed in `pendingPatch` -- without reapplying it, the remote
+      // value briefly wins and the panel visibly snaps back until the next flush. Local always
+      // wins over a same-window echo of an older value.
+      applyLocal(pendingPatch);
     }
 
     let unsubscribeChanged: (() => void) | null = null;

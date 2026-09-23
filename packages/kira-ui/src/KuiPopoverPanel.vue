@@ -54,8 +54,12 @@ function close(): void {
   emit('close');
 }
 
-// P105 §5.2(b): backdrop is a purely visual, full-viewport layer now (`aria-hidden`) —
-// click-outside-closes moves to VueUse's `onClickOutside` on the popover itself.
+// P105 §5.2(b): backdrop is a purely visual, full-viewport layer now — click-outside-closes
+// moves to VueUse's `onClickOutside` on the popover itself.
+//
+// F4: P105's own aria-hidden="true" sat on this backdrop div below, an ancestor of the popover
+// content, not a sibling -- that hides the whole popover subtree (menus included) from assistive
+// tech. Dropped rather than replaced: the backdrop itself renders nothing accessibility-relevant.
 onClickOutside(popoverEl, close);
 
 // Capture phase, not bubble: a bubble-phase document listener only runs after the event has
@@ -91,7 +95,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="backdropEl" class="kui-popover-backdrop" :data-testid="backdropTestId" aria-hidden="true">
+  <div ref="backdropEl" class="kui-popover-backdrop" :data-testid="backdropTestId">
     <div
       ref="popoverEl"
       class="kui-popover"
