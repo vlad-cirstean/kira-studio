@@ -39,39 +39,86 @@ type runningOp struct {
 	connectionID *string
 }
 
-// eventSub pairs one Subscribe()r's channel with a mutex so deliver and close can never race —
-// notify.Emitter[T].Emit deliberately calls subscribers with its own lock released (to allow a
-// callback to itself Subscribe/Unsubscribe/Emit without deadlocking), which means a callback can
-// still be in flight after Unsubscribe returns. Closing ch from the unsubscribe func without this
-// guard is a send-on-closed-channel panic waiting to happen; this mutex is the fix, kept local to
-// each subscription rather than shared, so subscribers never contend with each other.
+// eventSub is F5's own lossless delivery queue for exactly one Subscribe()r. Delivery used to be a
+// non-blocking send into a fixed 32-slot buffer, dropping an event outright once it filled — on
+// the stated reasoning that "dropping one event is better than blocking every other subscriber".
+// oplog is the only production subscriber (main.go's `oplog.New(router.Host(), ...)` is the only
+// Host.Subscribe call site; internal/bridge's http.go/grpc.go only ever call RunOp, never
+// Subscribe), and it does a synchronous SQLite write plus a Wails emit per event — up to 64
+// concurrent ops (plus tree/dbmcp/http/grpc ops) can easily outpace that, so the stated reasoning
+// does not actually hold: there is no *other* subscriber a drop is protecting. A dropped op:end
+// leaves an op_log row stuck "running" forever; a dropped op:start produces the same phantom
+// "test"-kind record F3 fixed the vocabulary side of.
+//
+// deliver now only ever appends to an unbounded queue (guarded by mu) and wakes drain — it never
+// blocks and never drops. drain is the one dedicated goroutine that ever reads the queue or sends
+// on ch, so the class of bug the previous version's own mutex existed to prevent (Emit calling a
+// callback still in flight after Unsubscribe returns — notify.Emitter[T].Emit's own doc comment)
+// can no longer race a send against a close at all: deliver never touches ch, and close only ever
+// asks drain to finish its own queue and close ch itself, once, from that single goroutine.
 type eventSub struct {
+	ch   chan oplog.Event // consumer-facing; only drain ever sends on or closes this
+	wake chan struct{}    // 1-buffered: wakes drain when the queue goes non-empty or closes
+
 	mu     sync.Mutex
-	ch     chan oplog.Event
+	queue  []oplog.Event
 	closed bool
+}
+
+func newEventSub() *eventSub {
+	s := &eventSub{ch: make(chan oplog.Event), wake: make(chan struct{}, 1)}
+	go s.drain()
+	return s
 }
 
 func (s *eventSub) deliver(e oplog.Event) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.closed {
+		s.mu.Unlock()
 		return
 	}
+	s.queue = append(s.queue, e)
+	s.mu.Unlock()
+	s.signal()
+}
+
+func (s *eventSub) signal() {
 	select {
-	case s.ch <- e:
+	case s.wake <- struct{}{}:
 	default:
-		// A stalled subscriber's full buffer is skipped — dropping one event is better than
-		// blocking every other subscriber.
+	}
+}
+
+// drain pops and sends one event at a time, blocking on ch<-e for as long as the consumer takes —
+// exactly what makes delivery lossless: nothing here ever drops an event to avoid blocking,
+// because nothing else is waiting on this subscriber's own queue while it does. Once close has
+// been called, drain finishes whatever is still queued before closing ch, so an event accepted
+// before Stop was called is never lost at shutdown either.
+func (s *eventSub) drain() {
+	for {
+		s.mu.Lock()
+		if len(s.queue) == 0 {
+			closed := s.closed
+			s.mu.Unlock()
+			if closed {
+				close(s.ch)
+				return
+			}
+			<-s.wake
+			continue
+		}
+		e := s.queue[0]
+		s.queue = s.queue[1:]
+		s.mu.Unlock()
+		s.ch <- e
 	}
 }
 
 func (s *eventSub) close() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		s.closed = true
-		close(s.ch)
-	}
+	s.closed = true
+	s.mu.Unlock()
+	s.signal()
 }
 
 // Host is the Go analogue of scheduler/ops.ts's module-level running map plus control.ts's
@@ -297,7 +344,7 @@ func (h *Host) CancelOpsForConnection(connectionID, exceptOpID string) {
 // an unsubscribe func — the exact shape oplog.EventSource wants, since this Host is oplog's only
 // producer now (P58f D9; it used to be fanned together with enginehost.Host's own events).
 func (h *Host) Subscribe() (<-chan oplog.Event, func()) {
-	sub := &eventSub{ch: make(chan oplog.Event, 32)}
+	sub := newEventSub()
 	unsubscribe := h.events.Subscribe(sub.deliver)
 	return sub.ch, func() {
 		unsubscribe()

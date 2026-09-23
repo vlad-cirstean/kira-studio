@@ -2,7 +2,9 @@ package adapterhost
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -153,6 +155,41 @@ func TestCancelOp_LocalAbortThenAdapterCancel(t *testing.T) {
 	ok2, err2 := h.CancelOp(context.Background(), "op-2")
 	if err2 != nil || ok2 {
 		t.Fatalf("second CancelOp = %v, %v, want false, nil", ok2, err2)
+	}
+}
+
+// F5 (P108 Part 6): delivery used to be a non-blocking send into a fixed 32-slot buffer, silently
+// dropping an event outright once it filled — a dropped op:end leaves an op_log row stuck
+// "running" forever, and a dropped op:start produces the same phantom "test"-kind record F3 fixed
+// the vocabulary side of. This emits far more than that old buffer's own capacity before the
+// subscriber ever reads a single one (the exact shape a burst of concurrent ops produces — up to
+// 64 concurrent data ops, per session.go's own inflight cap, plus tree/dbmcp/http/grpc ops, easily
+// outpacing oplog's own synchronous SQLite write plus Wails emit per event) and confirms every one
+// is still eventually delivered, none dropped.
+func TestSubscribe_DeliversEveryEventEvenWhenFarPastTheOldFixedBufferSize(t *testing.T) {
+	h := NewHost(adapters.Deps{}, nil)
+	events, unsubscribe := h.Subscribe()
+	defer unsubscribe()
+
+	const n = 500 // well past the old fixed 32-slot buffer
+	for i := 0; i < n; i++ {
+		h.emitJSON(oplog.EventOpStart, opStartPayload{OpID: strconv.Itoa(i)})
+	}
+
+	received := make(map[string]bool, n)
+	for len(received) < n {
+		select {
+		case e := <-events:
+			var payload struct {
+				OpID string `json:"opId"`
+			}
+			if err := json.Unmarshal(e.Payload, &payload); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			received[payload.OpID] = true
+		case <-time.After(5 * time.Second):
+			t.Fatalf("received only %d/%d events before timing out — some were dropped", len(received), n)
+		}
 	}
 }
 
