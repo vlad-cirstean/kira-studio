@@ -2,8 +2,13 @@ package adapters
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
+
+// ErrConnSetClosed is Get's own error once CloseAll has run (finding F3): a "not connected" state
+// for whatever key was asked for, distinct from a real dial failure.
+var ErrConnSetClosed = errors.New("adapters: connection set is closed")
 
 // This file hoists the LRU pool with single-flight dial postgres/mysqlfamily/redis's own client.go
 // each implemented verbatim (P21 rounds 2/3's own fixes, ported adapter to adapter): one entry per
@@ -41,7 +46,11 @@ type ConnSetOptions[K comparable, C any] struct {
 type ConnSet[K comparable, C any] struct {
 	opts ConnSetOptions[K, C]
 
-	mu      sync.Mutex
+	mu sync.Mutex
+	// closed is set once by CloseAll (F3): Get refuses a new dial once true, and a dial already in
+	// flight when CloseAll ran closes its own freshly-opened entry instead of storing it, rather
+	// than leaking a connection CloseAll could not have known about.
+	closed  bool
 	conns   map[K]C
 	lru     []K
 	dialing map[K]*connSetDialInFlight
@@ -73,6 +82,11 @@ func NewConnSet[K comparable, C any](opts ConnSetOptions[K, C]) *ConnSet[K, C] {
 func (s *ConnSet[K, C]) Get(ctx context.Context, key K) (C, error) {
 	for {
 		s.mu.Lock()
+		if s.closed {
+			s.mu.Unlock()
+			var zero C
+			return zero, ErrConnSetClosed
+		}
 		if existing, ok := s.conns[key]; ok {
 			s.touchLocked(key)
 			s.mu.Unlock()
@@ -114,15 +128,40 @@ func (s *ConnSet[K, C]) Get(ctx context.Context, key K) (C, error) {
 
 		s.mu.Lock()
 		delete(s.dialing, key)
-		if err == nil {
+		closedNow := s.closed
+		if err == nil && !closedNow {
 			s.conns[key] = entry
 			s.touchLocked(key)
 		}
 		s.mu.Unlock()
 
 		close(waiter.done)
+
+		if err == nil && closedNow {
+			// CloseAll ran while this dial was in flight — CloseAll's own snapshot could not have
+			// included this entry (it was still in s.dialing, not s.conns, at that instant), so
+			// nothing else will ever close it. Close it now rather than leak it, and report the same
+			// "not connected" state Get itself would have returned had this dial not raced in.
+			s.opts.Close(ctx, entry)
+			var zero C
+			return zero, ErrConnSetClosed
+		}
 		return entry, err
 	}
+}
+
+// Current returns key's currently-live entry without dialing — ok is false when key has no open
+// entry right now (never opened, evicted, or the set is closed). Acquire's own caller re-checks its
+// already-locked entry against this after locking (F3): an LRU eviction's Close can run
+// concurrently with that lock attempt (both contend for the same entry-level lock), so the entry Get
+// handed back may no longer be the set's own live one for key by the time the lock actually succeeds
+// — retrying from Get instead of trusting a possibly-already-closed entry is the caller's own job,
+// this only supplies the up-to-date fact to check against.
+func (s *ConnSet[K, C]) Current(key K) (entry C, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry, ok = s.conns[key]
+	return entry, ok
 }
 
 func (s *ConnSet[K, C]) touchLocked(key K) {
@@ -166,6 +205,7 @@ func (s *ConnSet[K, C]) detachLRULocked() (victim C, hasVictim bool) {
 // comment: the same reasoning applies to shutdown, not just eviction).
 func (s *ConnSet[K, C]) CloseAll(ctx context.Context) {
 	s.mu.Lock()
+	s.closed = true
 	all := make([]C, 0, len(s.conns))
 	for _, e := range s.conns {
 		all = append(all, e)

@@ -22,14 +22,47 @@ var relationKinds = map[string]bool{"table": true, "view": true, "matview": true
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards handle/readOnly (F3): Connect/Disconnect write them from whatever goroutine
+	// adapterhost dispatches them on, concurrently with any in-flight op reading them — Cancel
+	// already locked its own read (below); Mutate/Execute/requireHandle did not, a real data race
+	// same class as postgres/adapter.go's own. The running-query bookkeeping lives in tracker's own
+	// lock (P107 T2-3), unrelated to this mu.
+	mu       sync.Mutex
 	handle   *Handle
 	readOnly bool
 
-	// mu guards handle only — the running-query bookkeeping lives in tracker's own lock (P107 T2-3).
-	mu sync.Mutex
-
 	// tracker's Q is the bare query_id string (D8), not a thread id or backend pid.
 	tracker adapters.QueryTracker[string]
+}
+
+// getHandle is every op's own locked read of a.handle (F3) — requireHandle's RequireConnected call
+// takes its result, never a.handle directly.
+func (a *Adapter) getHandle() *Handle {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.handle
+}
+
+// setConnected is Connect's own locked write (F3).
+func (a *Adapter) setConnected(handle *Handle) {
+	a.mu.Lock()
+	a.handle = handle
+	a.readOnly = handle.ReadOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.handle = nil
+	a.mu.Unlock()
+}
+
+// getReadOnly is Mutate's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
 }
 
 func (a *Adapter) Kind() string        { return "clickhouse" }
@@ -43,8 +76,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 	// P13 D1: assigned before the probe runs, not after it succeeds — Disconnect must reach the
 	// handle from the instant OpenClient returns.
-	a.handle = handle
-	a.readOnly = handle.ReadOnly
+	a.setConnected(handle)
 
 	rows, err := RunCatalogQuery[struct {
 		Version  string `json:"version"`
@@ -67,12 +99,18 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 }
 
 // Disconnect is index.ts's disconnect.
-func (a *Adapter) Disconnect(context.Context) error {
-	a.tracker.Drain()
-	if a.handle != nil {
-		a.handle.Client.CloseIdleConnections()
+func (a *Adapter) Disconnect(ctx context.Context) error {
+	// F4: cancel every query this adapter still tracks as running (KILL QUERY, this adapter's
+	// existing Cancel path) before Drain, whose own wait is now bounded by ctx rather than able to
+	// block this call for as long as the longest still-running query.
+	for _, opID := range a.tracker.Snapshot() {
+		_, _ = a.Cancel(ctx, opID)
 	}
-	a.handle = nil
+	a.tracker.Drain(ctx)
+	if handle := a.getHandle(); handle != nil {
+		handle.Client.CloseIdleConnections()
+	}
+	a.clearConnected()
 	return nil
 }
 
@@ -282,7 +320,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	seq := a.newOpSeq(op.OpID)
-	return mutate(ctx, handle, seq.next(a), op, a.trackerFor(op.OpID), a.readOnly, plan)
+	return mutate(ctx, handle, seq.next(a), op, a.trackerFor(op.OpID), a.getReadOnly(), plan)
 }
 
 // Execute is index.ts's execute.
@@ -312,9 +350,7 @@ func (a *Adapter) KeyTypes(context.Context, []model.NodePath, *adapters.OpCtx) (
 // own read-only flag.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	queryID, ok := a.tracker.PopRunning(opID)
-	a.mu.Lock()
-	handle := a.handle
-	a.mu.Unlock()
+	handle := a.getHandle()
 	if !ok || handle == nil {
 		return false, nil
 	}
@@ -333,5 +369,5 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 }
 
 func (a *Adapter) requireHandle() (*Handle, error) {
-	return adapters.RequireConnected(a.handle)
+	return adapters.RequireConnected(a.getHandle())
 }

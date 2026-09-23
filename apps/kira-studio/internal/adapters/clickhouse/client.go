@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -167,7 +168,18 @@ func parsePort(s string) (int, error) {
 	return n, nil
 }
 
-const httpClientTimeout = 60 * time.Second
+// dialTimeout/tlsHandshakeTimeout bound connection *setup* only (finding F5) — never a query's own
+// running time. http.Client's own Timeout field (removed here) covers the whole request including
+// reading the response body, so any query genuinely running longer than it failed client-side with
+// no KILL QUERY ever sent, breaking the Stop-button contract Postgres already honours via
+// statement_timeout=0 (per ClickHouse's own defaults the server keeps running a query after the
+// client gives up on it). Cancellation is ctx-driven instead (query.go's own
+// http.NewRequestWithContext, honoured natively), matching every other adapter's own contract; a
+// local abort sends KILL QUERY over a side request exactly like Cancel already does (D7/D8).
+const (
+	dialTimeout         = 10 * time.Second
+	tlsHandshakeTimeout = 10 * time.Second
+)
 
 // OpenClient is client.ts's openClient — B11/B7: MaxIdleConnsPerHost is at least 2 so Cancel's own
 // KILL QUERY request always has a free connection in the pool (caps.ts's own F7/F9 note: "a second
@@ -177,8 +189,12 @@ func OpenClient(cfg model.ResolvedConnectionConfig, log func(level, message stri
 	if err != nil {
 		return nil, err
 	}
-	transport := &http.Transport{MaxIdleConnsPerHost: 4}
-	client := &http.Client{Transport: transport, Timeout: httpClientTimeout}
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: 4,
+		DialContext:         (&net.Dialer{Timeout: dialTimeout}).DialContext,
+		TLSHandshakeTimeout: tlsHandshakeTimeout,
+	}
+	client := &http.Client{Transport: transport}
 	u := target.scheme + "://" + target.host + ":" + strconv.Itoa(target.port)
 	return &Handle{
 		Client: client, URL: u, Username: target.username, Password: target.password,

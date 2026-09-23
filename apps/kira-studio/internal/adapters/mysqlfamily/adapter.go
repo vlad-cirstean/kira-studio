@@ -21,15 +21,68 @@ type Adapter struct {
 	profile Profile
 	caps    adapters.Caps
 
+	// mu guards every field below (F3): Connect/Disconnect write connSet/cfg/primaryDatabase/
+	// readOnly from whatever goroutine adapterhost dispatches them on, concurrently with any
+	// in-flight op reading them (requireEntry's own RequireConnected(a.connSet), Mutate/Execute's own
+	// a.readOnly, Children's own a.primaryDatabase) — a real data race, not a theoretical one, same
+	// class as postgres/adapter.go's own (the running-query bookkeeping below is unrelated, tracker's
+	// own lock, P107 T2-3).
+	mu              sync.Mutex
 	connSet         *ConnSet
 	cfg             *model.ResolvedConnectionConfig
 	primaryDatabase string
 	readOnly        bool
 
-	// mu guards cfg only — the running-query bookkeeping lives in tracker's own lock (P107 T2-3).
-	mu sync.Mutex
-
 	tracker adapters.QueryTracker[RunningQuery]
+}
+
+// getConnSet is every op's own locked read of a.connSet (F3) — requireEntry's RequireConnected call
+// takes its result, never a.connSet directly.
+func (a *Adapter) getConnSet() *ConnSet {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.connSet
+}
+
+// setConnSet is Connect's own locked write of connSet/cfg together (F3) — P13 D1: assigned before
+// anything is opened, not after the probe succeeds.
+func (a *Adapter) setConnSet(connSet *ConnSet, cfg *model.ResolvedConnectionConfig) {
+	a.mu.Lock()
+	a.connSet = connSet
+	a.cfg = cfg
+	a.mu.Unlock()
+}
+
+// setConnected is Connect's own locked write of the two fields only a successful probe fills in
+// (F3).
+func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
+	a.mu.Lock()
+	a.primaryDatabase = primaryDatabase
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write, once CloseAll (a real network call, run with no
+// lock held) has returned (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.connSet = nil
+	a.primaryDatabase = ""
+	a.mu.Unlock()
+}
+
+// getPrimaryDatabase is Children's own locked read of a.primaryDatabase (F3).
+func (a *Adapter) getPrimaryDatabase() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.primaryDatabase
+}
+
+// getReadOnly is Mutate/Execute's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
 }
 
 // New constructs an Adapter for profile/caps — mariadb/adapter.go's and mysql/adapter.go's own
@@ -46,9 +99,7 @@ var mariadbVersionRE = regexp.MustCompile(`(?i)mariadb`)
 // Connect is index.ts's connect.
 func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
 	connSet := NewConnSet(cfg, a.profile, a.deps.Log)
-	// P13 D1: assigned before anything is opened, not after the probe succeeds.
-	a.connSet = connSet
-	a.cfg = &cfg
+	a.setConnSet(connSet, &cfg)
 
 	entry, release, err := connSet.Primary(ctx)
 	if err != nil {
@@ -87,8 +138,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 	release()
 
-	a.primaryDatabase = database.String
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(database.String, cfg.ReadOnly)
 
 	// D6: pointing the MySQL adapter at a MariaDB server (or vice versa) works — same driver, same
 	// wire protocol — so this is a warning, not a connect failure.
@@ -104,12 +154,17 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.tracker.Drain()
-	if a.connSet != nil {
-		a.connSet.CloseAll(ctx)
+	// F4: cancel every query this adapter still tracks as running (KILL QUERY over a side
+	// connection, this adapter's existing Cancel path) before Drain, whose own wait is now bounded
+	// by ctx rather than able to block this call for as long as the longest still-running query.
+	for _, opID := range a.tracker.Snapshot() {
+		_, _ = a.Cancel(ctx, opID)
 	}
-	a.connSet = nil
-	a.primaryDatabase = ""
+	a.tracker.Drain(ctx)
+	if connSet := a.getConnSet(); connSet != nil {
+		connSet.CloseAll(ctx)
+	}
+	a.clearConnected()
 	return nil
 }
 
@@ -117,7 +172,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 // called exactly once — it holds the per-connection lock connEntry's own doc comment describes,
 // for as long as the caller keeps entry (P21 round 2 performance finding 3).
 func (a *Adapter) requireEntry(ctx context.Context, database string) (Entry, func(), error) {
-	connSet, err := adapters.RequireConnected(a.connSet)
+	connSet, err := adapters.RequireConnected(a.getConnSet())
 	if err != nil {
 		return Entry{}, nil, err
 	}
@@ -134,7 +189,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 			return adapters.TreeChildren{}, err
 		}
 		defer release()
-		nodes, err := listDatabases(ctx, execFor(entry, op, a.trackerFor(op.OpID)), a.primaryDatabase)
+		nodes, err := listDatabases(ctx, execFor(entry, op, a.trackerFor(op.OpID)), a.getPrimaryDatabase())
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
@@ -340,7 +395,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	defer release()
-	return mutate(ctx, entry, op, a.trackerFor(op.OpID), a.readOnly, plan)
+	return mutate(ctx, entry, op, a.trackerFor(op.OpID), a.getReadOnly(), plan)
 }
 
 // Execute is index.ts's execute.
@@ -354,7 +409,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		return nil, err
 	}
 	defer release()
-	return execute(ctx, entry, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
+	return execute(ctx, entry, op, a.trackerFor(op.OpID), a.getReadOnly(), req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.

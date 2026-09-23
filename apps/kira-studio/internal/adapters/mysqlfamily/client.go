@@ -370,17 +370,27 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), 
 	if key == "" {
 		key = primaryKey
 	}
-	entry, err := s.inner.Get(ctx, key)
-	if err != nil {
-		return Entry{}, nil, err
+	for {
+		entry, err := s.inner.Get(ctx, key)
+		if err != nil {
+			return Entry{}, nil, err
+		}
+		entry.mu.Lock()
+		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
+		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
+		// Re-check that entry is still the set's own live entry for key before trusting it — retry
+		// from the top rather than hand back a connection that was just closed out from under it.
+		if current, ok := s.inner.Current(key); !ok || current != entry {
+			entry.mu.Unlock()
+			continue
+		}
+		return Entry{Conn: entry.conn, ThreadID: entry.threadID, entry: entry}, func() {
+			// F2: hold this connection's lock until every RunWithAbortRace goroutine started under this
+			// acquisition has actually finished touching entry.conn.
+			entry.inFlight.Wait()
+			entry.mu.Unlock()
+		}, nil
 	}
-	entry.mu.Lock()
-	return Entry{Conn: entry.conn, ThreadID: entry.threadID, entry: entry}, func() {
-		// F2: hold this connection's lock until every RunWithAbortRace goroutine started under this
-		// acquisition has actually finished touching entry.conn.
-		entry.inFlight.Wait()
-		entry.mu.Unlock()
-	}, nil
 }
 
 // Primary acquires the primary (no explicit database override) connection.

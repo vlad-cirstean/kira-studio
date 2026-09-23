@@ -23,11 +23,15 @@ func init() {
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards db/file/readOnly (F3) in addition to runningByOp below: Connect/Disconnect wrote
+	// them with no lock despite this comment's own earlier claim, racing runOnConn's own reads
+	// (a.db == nil, a.db.Conn(ctx)) and Mutate's a.readOnly read — a real data race, same class as
+	// postgres/mysqlfamily/clickhouse's own adapter.go.
+	mu       sync.Mutex
 	db       *sql.DB
 	file     string
 	readOnly bool
 
-	mu          sync.Mutex
 	runningByOp map[string]context.CancelFunc
 
 	// inFlight mirrors postgres's and mysqlfamily's own field of the same name: it counts
@@ -40,6 +44,37 @@ type Adapter struct {
 
 func (a *Adapter) Kind() string        { return "sqlite" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
+
+// getDB is runOnConn's own locked read of a.db (F3).
+func (a *Adapter) getDB() *sql.DB {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.db
+}
+
+// setConnected is Connect's own locked write of db/file/readOnly together (F3).
+func (a *Adapter) setConnected(db *sql.DB, file string, readOnly bool) {
+	a.mu.Lock()
+	a.db = db
+	a.file = file
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.db = nil
+	a.file = ""
+	a.mu.Unlock()
+}
+
+// getReadOnly is Mutate's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
 
 // Connect is index.ts's connect.
 func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
@@ -59,9 +94,7 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 
 	// P13 D1: assigned before anything is opened, not after the probe succeeds — the handle must
 	// be reachable by Disconnect from the instant sql.Open's own lazy dial could happen.
-	a.db = db
-	a.file = path
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(db, path, cfg.ReadOnly)
 
 	conn, err := db.Conn(context.Background())
 	if err != nil {
@@ -106,20 +139,46 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 }
 
 // Disconnect is index.ts's disconnect.
-func (a *Adapter) Disconnect(context.Context) error {
-	// Every runOnConn background goroutine still touching a connection must actually stop before
-	// the *sql.DB is closed (see inFlight's own doc comment).
-	a.inFlight.Wait()
-	if a.db != nil {
-		if err := a.db.Close(); err != nil {
-			a.deps.Log("warn", "sqlite disconnect: "+err.Error())
-		}
-	}
-	a.db = nil
-	a.file = ""
+func (a *Adapter) Disconnect(ctx context.Context) error {
+	// F4: cancel every still-running statement's own driverCtx first — a real, local
+	// sqlite3_interrupt via ctx cancellation (modernc.org/sqlite's own interruptOnDone), no network
+	// round trip needed here unlike postgres/mysqlfamily/clickhouse's own side-connection kill —
+	// then wait bounded by ctx rather than block this call for as long as the longest still-running
+	// query. Every runOnConn background goroutine still touching a connection must actually stop
+	// before the *sql.DB is closed (see inFlight's own doc comment): db.Close() and the rest of this
+	// cleanup only run once inFlight has actually reached zero, in a goroutine that keeps running
+	// past ctx's own deadline if cancelling every statement hasn't unblocked it by then, so a
+	// connection is never closed out from under a still-running goroutine even when this call
+	// itself already returned.
 	a.mu.Lock()
-	a.runningByOp = nil
+	cancels := make([]context.CancelFunc, 0, len(a.runningByOp))
+	for _, cancel := range a.runningByOp {
+		cancels = append(cancels, cancel)
+	}
 	a.mu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		a.inFlight.Wait()
+		if db := a.getDB(); db != nil {
+			if err := db.Close(); err != nil {
+				a.deps.Log("warn", "sqlite disconnect: "+err.Error())
+			}
+		}
+		a.clearConnected()
+		a.mu.Lock()
+		a.runningByOp = nil
+		a.mu.Unlock()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
 	return nil
 }
 
@@ -134,10 +193,11 @@ func (a *Adapter) Disconnect(context.Context) error {
 // instance instead, since their cancellation goes through a side connection, not sqlite3_interrupt).
 func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(context.Context, *sql.Conn) (T, error)) (T, error) {
 	var zero T
-	if a.db == nil {
+	db := a.getDB()
+	if db == nil {
 		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
 	}
-	conn, err := a.db.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		// P2 R1: SetMaxOpenConns(1) means a second op can genuinely queue here waiting for the
 		// sole connection — database/sql's own db.conn() returns exactly ctx.Err() when the wait
@@ -349,7 +409,7 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (model.MutationResult, error) {
-		return mutate(driverCtx, conn, op, a.readOnly, plan)
+		return mutate(driverCtx, conn, op, a.getReadOnly(), plan)
 	})
 }
 

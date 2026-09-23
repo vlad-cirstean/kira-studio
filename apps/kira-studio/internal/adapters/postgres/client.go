@@ -265,19 +265,30 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, f
 	if key == "" {
 		key = primaryKey
 	}
-	entry, err := s.inner.Get(ctx, key)
-	if err != nil {
-		return nil, nil, err
-	}
-	entry.mu.Lock()
-	return &trackedConn{Conn: entry.conn, entry: entry}, func() {
-			// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
-			// RunWithAbortRace goroutine started under this acquisition has actually finished
-			// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
-			// this wait short in practice, but it must never be skipped.
-			entry.inFlight.Wait()
+	for {
+		entry, err := s.inner.Get(ctx, key)
+		if err != nil {
+			return nil, nil, err
+		}
+		entry.mu.Lock()
+		// F3: an LRU eviction's own Close (adapters.ConnSet.Get's own doc comment) contends for this
+		// same entry.mu, so it may already have closed entry.conn by the time this Lock succeeds.
+		// Re-check that entry is still the set's own live entry for key before trusting it — retry
+		// from the top (a fresh Get, dialing again if nothing else raced in first) rather than hand
+		// back a connection that was just closed out from under it.
+		if current, ok := s.inner.Current(key); !ok || current != entry {
 			entry.mu.Unlock()
-		}, nil
+			continue
+		}
+		return &trackedConn{Conn: entry.conn, entry: entry}, func() {
+				// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
+				// RunWithAbortRace goroutine started under this acquisition has actually finished
+				// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
+				// this wait short in practice, but it must never be skipped.
+				entry.inFlight.Wait()
+				entry.mu.Unlock()
+			}, nil
+	}
 }
 
 // Primary acquires the primary (no explicit database override) connection.
