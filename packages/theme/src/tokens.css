@@ -224,6 +224,12 @@
      to paint underneath it), and a context menu outranks the autocomplete popup (the two used to
      tie at 200, so DOM order decided which won). Rungs are 50 apart so a surface can be inserted
      between two without renumbering the ladder. */
+  /* v1.9 tailwind-declines deep dive: promoted off `text-[#d9c47a]`/`text-[#a8c8ee]` literals
+     repeated across 30 call sites (`.strip-warn-text`/`.strip-note-text`, each file's own alert
+     tone class) — P104 §9 rule 5 had kept them as literal hex specifically because they weren't
+     --kira-* tokens yet, not because they shouldn't be; naming them here is that follow-through. */
+  --kira-warn-text: #d9c47a;
+  --kira-note-text: #a8c8ee;
   --kira-z-popover: 100;
   --kira-z-dialog: 200;
   --kira-z-menu: 300;
