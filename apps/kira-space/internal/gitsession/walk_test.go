@@ -11,14 +11,12 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGitWalk(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGitWalk is testx.SkipWithoutGit (P107 I2-28) — suffixed since stack_test.go's and
+// queries_test.go's own copies live in this same package and can't all share the bare name.
+var skipWithoutGitWalk = testx.SkipWithoutGit
 
 func initWalkRepo(t *testing.T, n int) string {
 	t.Helper()

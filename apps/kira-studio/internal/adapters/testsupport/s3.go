@@ -61,6 +61,9 @@ type S3Fixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f S3Fixture) ConnectionID() string { return f.Config.ID }
+
 var s3Memo fixture[S3Fixture]
 
 // StartS3 is support/s3.ts's startS3. Skips the test when Docker is unreachable.

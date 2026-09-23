@@ -124,7 +124,7 @@ func endsTransaction(stmt string) bool {
 }
 
 // scanQuote reports the end index (exclusive) of a quoted run opened by r[i] (one of `'`, `"`,
-// `` ` ``) — the same doubled-quote escaping rule every dialect here honours (`''`, `""`, `` `` ``
+// “ ` “) — the same doubled-quote escaping rule every dialect here honours (`”`, `""`, “ “ “
 // repeats the quote character as content rather than closing). Runs to len(r) — the caller's own
 // EOF — when unterminated, never past it.
 //
@@ -204,7 +204,7 @@ func runesEqual(a, b []rune) bool {
 // which a single non-nesting regexp pass cannot express, so this scans by rune and tracks depth
 // instead.
 //
-// Quote-aware (finding #1, M6): a `'`, `"`, `` ` `` or Postgres dollar-quote opened outside any
+// Quote-aware (finding #1, M6): a `'`, `"`, “ ` “ or Postgres dollar-quote opened outside any
 // comment is skipped over as one atomic run before comment markers are even considered inside it,
 // so `--`/`/*` appearing inside a string literal — e.g. `SELECT '/*' ; DROP TABLE users` — is never
 // mistaken for a real comment start. Before this, such a marker inside a quote was read as a

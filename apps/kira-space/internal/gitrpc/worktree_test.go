@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // These tests exercise the real Router.ForConn dispatch (D16) — the same convention reset_test.go
@@ -21,42 +18,14 @@ import (
 
 func worktreeSmokeGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
-		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	smokeGit(t, dir, nil, args...)
 }
 
 // worktreeSmokeConn opens dir with an optional prepareScript override — "" leaves the feature off,
 // matching D10's own default.
 func worktreeSmokeConn(t *testing.T, dir, prepareScript string) (Handlers, string) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-	runner := gitclient.NewExecRunner()
-	registry := gitsession.NewRegistry(runner)
-	registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
-		s := model.DefaultGitRepoSettings()
-		s.WorktreePrepareScript = prepareScript
-		return s, nil
-	}
-	t.Cleanup(registry.Close)
-	router := New(Deps{Runner: runner, Registry: registry, ServerVersion: "test"})
-	conn := gitsession.NewConn(gitsession.ConnID("worktree-rpc-test-conn"), "test-client", "test-label", nil)
-	t.Cleanup(conn.Close)
-	handlers := router.ForConn(conn)
-
-	summary, err := conn.Open(context.Background(), registry, "git", dir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	return handlers, summary.RepoID
+	return smokeConn(t, gitsession.ConnID("worktree-rpc-test-conn"), dir, smokeConnOpts{prepareScript: &prepareScript})
 }
 
 func initWorktreeSmokeRepo(t *testing.T) string {

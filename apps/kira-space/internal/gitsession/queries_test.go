@@ -7,16 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func skipWithoutGitQueries(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-}
+// skipWithoutGitQueries is testx.SkipWithoutGit (P107 I2-28) — suffixed, same package as
+// walk_test.go's and stack_test.go's own copies.
+var skipWithoutGitQueries = testx.SkipWithoutGit
 
 func runGitQ(t *testing.T, dir string, args ...string) {
 	t.Helper()
@@ -35,19 +32,7 @@ func runGitQ(t *testing.T, dir string, args ...string) {
 // returns the RepoEntry the query methods run against.
 func newQueriesTestEntry(t *testing.T, repoDir string) *RepoEntry {
 	t.Helper()
-	runner := gitclient.NewExecRunner()
-	registry := NewRegistry(runner)
-	t.Cleanup(registry.Close)
-	conn := NewConn(ConnID("queries-test-conn"), "test-client", "test-client-label", nil)
-	summary, err := conn.Open(context.Background(), registry, "git", repoDir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	t.Cleanup(conn.Close)
-	entry, ok := conn.Entry(summary.RepoID)
-	if !ok {
-		t.Fatal("conn.Entry: not held after Open")
-	}
+	_, entry := newTestEntry(t, ConnID("queries-test-conn"), repoDir, testEntryOpts{})
 	return entry
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 func ref(shortName, kind string, isHead bool) porcelain.RefRow {
@@ -199,9 +200,5 @@ func TestResolveBase(t *testing.T) {
 	}
 }
 
-func derefOrNil(s *string) any {
-	if s == nil {
-		return nil
-	}
-	return *s
-}
+// derefOrNil is testx.DerefOrNil (P107 I2-28).
+var derefOrNil = testx.DerefOrNil

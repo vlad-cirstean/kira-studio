@@ -186,8 +186,14 @@ func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx,
 	}
 
 	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, adapters.DispatchUpdateDeleteInsert(
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyUpdate(ctx, collection, op, rowOp) },
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyDelete(ctx, collection, op, rowOp) },
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyInsert(ctx, collection, op, rowOp) },
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyUpdate(ctx, collection, op, rowOp)
+		},
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyDelete(ctx, collection, op, rowOp)
+		},
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyInsert(ctx, collection, op, rowOp)
+		},
 	))
 }

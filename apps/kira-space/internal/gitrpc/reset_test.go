@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 )
@@ -26,35 +25,12 @@ import (
 
 func resetSmokeGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",
-		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",
-	)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	smokeGit(t, dir, nil, args...)
 }
 
 func resetSmokeConn(t *testing.T, dir string) (Handlers, string) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not on PATH")
-	}
-	runner := gitclient.NewExecRunner()
-	registry := gitsession.NewRegistry(runner)
-	t.Cleanup(registry.Close)
-	router := New(Deps{Runner: runner, Registry: registry, ServerVersion: "test"})
-	conn := gitsession.NewConn(gitsession.ConnID("reset-rpc-test-conn"), "test-client", "test-label", nil)
-	t.Cleanup(conn.Close)
-	handlers := router.ForConn(conn)
-
-	summary, err := conn.Open(context.Background(), registry, "git", dir)
-	if err != nil {
-		t.Fatalf("conn.Open: %v", err)
-	}
-	return handlers, summary.RepoID
+	return smokeConn(t, gitsession.ConnID("reset-rpc-test-conn"), dir, smokeConnOpts{})
 }
 
 var resetUndoLabelPattern = regexp.MustCompile(`^Reset \((soft|mixed|hard)\) to `)

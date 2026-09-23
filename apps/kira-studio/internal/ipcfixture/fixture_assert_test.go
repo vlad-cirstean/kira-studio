@@ -2,11 +2,15 @@ package ipcfixture
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // committedJSONFixture is one adapter's testdata/<adapter>.fixture.json: a JSON transcription of
@@ -16,6 +20,50 @@ import (
 type committedJSONFixture struct {
 	ControlSnapshots []ControlSnapshot `json:"controlSnapshots"`
 	PortSnapshots    []PortSnapshot    `json:"portSnapshots"`
+}
+
+// readFirstIDThenFilterToOne is clickhouse_test.go's and mysql_test.go's own shared shape (P107
+// I2-28): read tablePath's first page, pull the first row's id column, then re-read filtered to
+// `id = '<value>'` and assert exactly one row survives. Neither caller reuses readReq/tabular
+// afterward, so only the extracted id is returned.
+func readFirstIDThenFilterToOne(t *testing.T, rec *Recorder, connectionID, tablePath string) *string {
+	t.Helper()
+	readReq := adapterhost.ReadRequestWire{
+		OpID: "be-read-order-items", ConnectionID: connectionID, Path: tablePath,
+		PageSize: 100, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}
+	readResp := rec.DataRead(t, readReq, nil)
+	logical, err := DecodePage(readResp.Page)
+	if err != nil {
+		t.Fatalf("decode page: %v", err)
+	}
+	tabular, ok := logical.(LogicalTabularPage)
+	if !ok || len(tabular.Rows) == 0 {
+		t.Fatalf("expected a non-empty tabular page, got %+v", logical)
+	}
+	idColumnIndex := -1
+	for i, c := range tabular.Columns {
+		if c.Name == "id" {
+			idColumnIndex = i
+			break
+		}
+	}
+	if idColumnIndex < 0 {
+		t.Fatalf("expected an id column in %+v", tabular.Columns)
+	}
+	firstID := tabular.Rows[0][idColumnIndex]
+	if firstID == nil {
+		t.Fatal("expected a non-null id in the first row")
+	}
+
+	filteredReq := readReq
+	filteredReq.OpID = "be-read-order-items-filtered"
+	filteredReq.Filter = strp(fmt.Sprintf("`id` = '%s'", *firstID))
+	filteredResp := rec.DataRead(t, filteredReq, nil)
+	if filteredResp.Page.Rows() != 1 {
+		t.Fatalf("filtered read rows = %d, want 1", filteredResp.Page.Rows())
+	}
+	return firstID
 }
 
 func loadCommittedJSONFixture(t *testing.T, path string) committedJSONFixture {

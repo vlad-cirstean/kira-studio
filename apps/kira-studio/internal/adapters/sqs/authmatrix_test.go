@@ -8,7 +8,6 @@ package sqs_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,43 +19,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// clearAwsEnv is a Principal that unsets AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_PROFILE for
-// the duration of one subtest (t.Setenv-style auto-restore) — this sandbox's own outbound proxy
-// injects placeholder AWS_* credentials (CLAUDE.md), which would otherwise mask the "no
-// credentials anywhere" case §1.5a's transcript needs.
-var clearAwsEnv = &testsupport.Principal{
-	Name: "clear ambient AWS env",
-	Setup: func(t *testing.T, _ any) {
-		t.Helper()
-		for _, k := range []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"} {
-			old, had := os.LookupEnv(k)
-			_ = os.Unsetenv(k)
-			t.Cleanup(func() {
-				if had {
-					_ = os.Setenv(k, old)
-				}
-			})
-		}
-	},
-}
-
-// seedAmbientAwsEnv is clearAwsEnv's mirror: guarantees AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
-// are ambiently present for one subtest (t.Setenv, auto-restored). The two cases below need
-// ambient credentials to exist somewhere in the environment for LoadDefaultConfig to find (a lone
-// URI key never becomes a static credential, config.go:45's both-or-nothing) — this sandbox's own
-// outbound proxy happens to inject placeholder AWS_* env, which is what let these pass in-sandbox,
-// but a GitHub Actions runner has no such proxy: both failed there with a real EC2-IMDS lookup
-// error instead of the ambient chain finding anything. Setting the env directly makes the case
-// pass on its own merits everywhere, not on an incidental sandbox side effect (LocalStack accepts
-// any nonempty static credentials unconditionally, P25 §2.3, so the exact values don't matter).
-var seedAmbientAwsEnv = &testsupport.Principal{
-	Name: "seed ambient AWS env",
-	Setup: func(t *testing.T, _ any) {
-		t.Helper()
-		t.Setenv("AWS_ACCESS_KEY_ID", testsupport.LocalStackStaticAccessKey)
-		t.Setenv("AWS_SECRET_ACCESS_KEY", testsupport.LocalStackStaticSecret)
-	},
-}
+// clearAwsEnv/seedAmbientAwsEnv are testsupport.ClearAwsEnv/testsupport.SeedAmbientAwsEnv (P107
+// I2-28 — byte-identical to s3/authmatrix_test.go's own, moved to testsupport).
+var (
+	clearAwsEnv       = testsupport.ClearAwsEnv
+	seedAmbientAwsEnv = testsupport.SeedAmbientAwsEnv
+)
 
 func TestSqs_AuthMatrix(t *testing.T) {
 	testsupport.RequireMatrix(t)

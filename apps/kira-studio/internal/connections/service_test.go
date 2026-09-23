@@ -3,8 +3,6 @@ package connections_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"math"
 	"os"
 	"strings"
@@ -23,7 +21,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 func strPtr(s string) *string { return &s }
@@ -255,14 +254,8 @@ func mustCreate(t *testing.T, svc *connections.Service, in connections.Input) mo
 	return created
 }
 
-func asIpcErr(t *testing.T, err error) *ipcerr.Error {
-	t.Helper()
-	var ie *ipcerr.Error
-	if !errors.As(err, &ie) {
-		t.Fatalf("error %v (%T) is not an *ipcerr.Error", err, err)
-	}
-	return ie
-}
+// asIpcErr is testx.AsIpcErr (P107 I2-28).
+var asIpcErr = testx.AsIpcErr
 
 // TestPasswordThreeStateConvention pins Update's three-state password contract — nil leaves the
 // stored secret alone, "" clears it, non-empty replaces it — which a naive `if password != nil`

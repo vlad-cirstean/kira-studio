@@ -3,9 +3,10 @@ package keepawake
 import (
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 // TestCaffeinateArgvGolden asserts the spawn's exact argv, byte for byte — the same reasoning
@@ -24,23 +25,11 @@ func TestCaffeinateArgvGolden(t *testing.T) {
 	}
 }
 
-func processAlive(pid int) bool {
-	return syscall.Kill(pid, 0) == nil
-}
-
-func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatalf("condition not met within %s", timeout)
-	}
-}
+// processAlive/waitUntil are testx.ProcessAlive/testx.WaitUntil (P107 I2-28).
+var (
+	processAlive = testx.ProcessAlive
+	waitUntil    = testx.WaitUntil
+)
 
 // TestCaffeinateDriverLifecycle is the one test that catches "release does not actually kill it",
 // the leak this whole package exists to prevent — runnable on Linux because the driver is pure Go.

@@ -218,8 +218,14 @@ func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly
 	}
 
 	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, adapters.DispatchUpdateDeleteInsert(
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyUpdate(ctx, client, bucket, rowOp) },
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyDelete(ctx, client, bucket, rowOp) },
-		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyInsert(ctx, client, bucket, rowOp) },
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyUpdate(ctx, client, bucket, rowOp)
+		},
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyDelete(ctx, client, bucket, rowOp)
+		},
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
+			return applyInsert(ctx, client, bucket, rowOp)
+		},
 	))
 }

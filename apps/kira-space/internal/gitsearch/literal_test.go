@@ -7,10 +7,10 @@ import "testing"
 func TestLiteralMatcher_Probe10(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name    string
-		needle  string
+		name     string
+		needle   string
 		haystack string
-		want    bool
+		want     bool
 	}{
 		{"widget in 'the widget cache' matches", "widget", "the widget cache", true},
 		{"(#12 in 'fix (#123)' does not match", "(#12", "fix (#123)", false},

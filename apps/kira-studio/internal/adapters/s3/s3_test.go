@@ -48,9 +48,8 @@ func connectedAdapter(t *testing.T, fixture *testsupport.S3Fixture) adapters.Ada
 	return a
 }
 
-func nodePath(fixture *testsupport.S3Fixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(fixture.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *S3Fixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.S3Fixture]
 
 func bucketPath(fixture *testsupport.S3Fixture, name string) model.NodePath {
 	return nodePath(fixture, testsupport.Seg("bucket", name))
@@ -62,8 +61,11 @@ func objectPath(fixture *testsupport.S3Fixture, bucket, key string) model.NodePa
 	return nodePath(fixture, testsupport.Seg("bucket", bucket), testsupport.Seg("object", key))
 }
 
+// offsetRead is s3's own fixed-pageSize:10 shape (P107 I2-28) — sqs's and kafka's own
+// offsetRead(path, pageSize) is testsupport.OffsetRead directly; s3's never varies pageSize, so it
+// keeps its own 1-arg wrapper over it rather than passing a literal 10 at every call site.
 func offsetRead(path model.NodePath) adapters.ReadRequest {
-	return adapters.ReadRequest{Path: path, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0}}
+	return testsupport.OffsetRead(path, 10)
 }
 
 // fieldsOf is s3.spec.ts's fieldsOf, via testsupport.KVPairs — a KeyValuePage's field/value pairs

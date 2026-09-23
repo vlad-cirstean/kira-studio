@@ -46,6 +46,9 @@ type KafkaFixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f KafkaFixture) ConnectionID() string { return f.Config.ID }
+
 var kafkaMemo fixture[KafkaFixture]
 
 // StartKafka is support/kafka.ts's startKafka. Skips the test when Docker is unreachable.

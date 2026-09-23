@@ -61,6 +61,9 @@ type RedisFixture struct {
 	container testcontainers.Container
 }
 
+// ConnectionID satisfies hasConnectionID (P107 I2-28, FixtureNodePath's own constraint).
+func (f RedisFixture) ConnectionID() string { return f.Config.ID }
+
 var redisMemo fixture[RedisFixture]
 
 // StartRedis is support/redis.ts's startRedis. Skips the test when Docker is unreachable.

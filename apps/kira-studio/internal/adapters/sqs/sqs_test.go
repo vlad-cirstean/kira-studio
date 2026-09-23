@@ -50,17 +50,15 @@ func connectedAdapter(t *testing.T, fixture *testsupport.SqsFixture) adapters.Ad
 	return a
 }
 
-func nodePath(fixture *testsupport.SqsFixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(fixture.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *SqsFixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.SqsFixture]
 
 func queuePath(fixture *testsupport.SqsFixture, name string) model.NodePath {
 	return nodePath(fixture, testsupport.Seg("queue", name))
 }
 
-func offsetRead(path model.NodePath, pageSize int) adapters.ReadRequest {
-	return adapters.ReadRequest{Path: path, PageSize: pageSize, Cursor: model.PageCursor{Mode: "offset", Offset: 0}}
-}
+// offsetRead is testsupport.OffsetRead (P107 I2-28).
+var offsetRead = testsupport.OffsetRead
 
 // 1. connect / disconnect
 func TestSqs_ConnectDisconnect(t *testing.T) {

@@ -51,6 +51,44 @@ type Principal struct {
 	Setup func(t *testing.T, f any)
 }
 
+// ClearAwsEnv unsets AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN/AWS_PROFILE for one
+// subtest, auto-restored (P107 I2-28 — s3's and sqs's own authmatrix_test.go, byte-identical).
+// This sandbox's own outbound proxy injects placeholder AWS_* credentials (CLAUDE.md), which would
+// otherwise mask the "no credentials anywhere" case §1.5a's transcript needs.
+var ClearAwsEnv = &Principal{
+	Name: "clear ambient AWS env",
+	Setup: func(t *testing.T, _ any) {
+		t.Helper()
+		for _, k := range []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"} {
+			old, had := os.LookupEnv(k)
+			_ = os.Unsetenv(k)
+			t.Cleanup(func() {
+				if had {
+					_ = os.Setenv(k, old)
+				}
+			})
+		}
+	},
+}
+
+// SeedAmbientAwsEnv is ClearAwsEnv's mirror (P107 I2-28, same byte-identical pair): guarantees
+// AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are ambiently present for one subtest (t.Setenv,
+// auto-restored). Some fields-mode cases need ambient credentials to exist somewhere in the
+// environment for LoadDefaultConfig to find (a lone URI key never becomes a static credential,
+// config.go's own both-or-nothing) — this sandbox's own outbound proxy happens to inject
+// placeholder AWS_* env, which is what let those cases pass in-sandbox, but a GitHub Actions
+// runner has no such proxy and fails with a real EC2-IMDS lookup error instead. Setting the env
+// directly makes the case pass on its own merits everywhere (LocalStack accepts any nonempty
+// static credentials unconditionally, P25 §2.3, measured, so the exact values don't matter).
+var SeedAmbientAwsEnv = &Principal{
+	Name: "seed ambient AWS env",
+	Setup: func(t *testing.T, _ any) {
+		t.Helper()
+		t.Setenv("AWS_ACCESS_KEY_ID", LocalStackStaticAccessKey)
+		t.Setenv("AWS_SECRET_ACCESS_KEY", LocalStackStaticSecret)
+	},
+}
+
 // Outcome is what Connect must produce. Exactly one of Succeed and a Code assertion is meaningful:
 // when Succeed, FailWith/NotCode are ignored; when not, FailWith asserts the exact code and NotCode
 // asserts the failure is anything *but* that code (P25 §2.4 row 6's "a permission refusal must not

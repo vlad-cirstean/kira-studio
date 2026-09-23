@@ -311,7 +311,7 @@ type RelationalMutateDeps struct {
 	// catalog (never trusts a stale value the caller sent — same discipline the read path's
 	// resolveProjection uses), and reports the fully-qualified relation text mutate's SQL is built
 	// against, plus the qualifiedName ValidateMutationOps reports errors against.
-	Resolve func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error)
+	Resolve         func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error)
 	Quote           func(string) string
 	Placeholder     func(int) string
 	TypeClassFor    func(dataType string) page.TypeClass

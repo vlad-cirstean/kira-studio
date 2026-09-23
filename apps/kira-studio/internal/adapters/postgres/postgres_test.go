@@ -65,9 +65,8 @@ func connectedAdapter(t *testing.T, fixture *testsupport.PgFixture) adapters.Ada
 	return a
 }
 
-func nodePath(fixture *testsupport.PgFixture, segments ...model.PathSegment) model.NodePath {
-	return testsupport.NodePath(fixture.Config.ID, segments...)
-}
+// nodePath is testsupport.FixtureNodePath instantiated for *PgFixture (P107 I2-28).
+var nodePath = testsupport.FixtureNodePath[*testsupport.PgFixture]
 
 var (
 	seg          = testsupport.Seg

@@ -1,7 +1,6 @@
 package ipcfixture
 
 import (
-	"fmt"
 	"regexp"
 	"testing"
 
@@ -77,44 +76,10 @@ func TestFixture_MySQL(t *testing.T) {
 		t.Fatalf("expected at least one function-kind node under the database, got %+v", dbChildren.Nodes)
 	}
 
-	readReq := adapterhost.ReadRequestWire{
-		OpID: "be-read-order-items", ConnectionID: cfg.ID, Path: orderItemsNode.Path,
-		PageSize: 100, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-	}
-	readResp := rec.DataRead(t, readReq, nil)
-	logical, err := DecodePage(readResp.Page)
-	if err != nil {
-		t.Fatalf("decode page: %v", err)
-	}
-	tabular, ok := logical.(LogicalTabularPage)
-	if !ok || len(tabular.Rows) == 0 {
-		t.Fatalf("expected a non-empty tabular page, got %+v", logical)
-	}
-	idColumnIndex := -1
-	for i, c := range tabular.Columns {
-		if c.Name == "id" {
-			idColumnIndex = i
-			break
-		}
-	}
-	if idColumnIndex < 0 {
-		t.Fatalf("expected an id column in %+v", tabular.Columns)
-	}
-	firstID := tabular.Rows[0][idColumnIndex]
-	if firstID == nil {
-		t.Fatal("expected a non-null id in the first row")
-	}
-
 	// D17: a same-value filter narrows to exactly the row it came from — the load-bearing
 	// assertion is the request's own backtick-quoting (mysql's dialect, tested for real by the
 	// adapter's own unit suite; this layer only needs the value round-trip).
-	filteredReq := readReq
-	filteredReq.OpID = "be-read-order-items-filtered"
-	filteredReq.Filter = strp(fmt.Sprintf("`id` = '%s'", *firstID))
-	filteredResp := rec.DataRead(t, filteredReq, nil)
-	if filteredResp.Page.Rows() != 1 {
-		t.Fatalf("filtered read rows = %d, want 1", filteredResp.Page.Rows())
-	}
+	readFirstIDThenFilterToOne(t, rec, cfg.ID, orderItemsNode.Path)
 
 	// D17's other half: console is really SQL mode.
 	executeReq := adapterhost.ExecuteRequestWire{

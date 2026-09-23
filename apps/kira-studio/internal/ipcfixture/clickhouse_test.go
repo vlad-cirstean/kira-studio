@@ -9,7 +9,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/clickhouse"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/testsupport"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
 
@@ -70,41 +69,7 @@ func TestFixture_ClickHouse(t *testing.T) {
 		t.Fatalf("expected both a view-kind and a matview-kind node, got %+v", dbChildren.Nodes)
 	}
 
-	readReq := adapterhost.ReadRequestWire{
-		OpID: "be-read-order-items", ConnectionID: cfg.ID, Path: orderItemsNode.Path,
-		PageSize: 100, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
-	}
-	readResp := rec.DataRead(t, readReq, nil)
-	logical, err := DecodePage(readResp.Page)
-	if err != nil {
-		t.Fatalf("decode page: %v", err)
-	}
-	tabular, ok := logical.(LogicalTabularPage)
-	if !ok || len(tabular.Rows) == 0 {
-		t.Fatalf("expected a non-empty tabular page, got %+v", logical)
-	}
-	idColumnIndex := -1
-	for i, c := range tabular.Columns {
-		if c.Name == "id" {
-			idColumnIndex = i
-			break
-		}
-	}
-	if idColumnIndex < 0 {
-		t.Fatalf("expected an id column in %+v", tabular.Columns)
-	}
-	firstID := tabular.Rows[0][idColumnIndex]
-	if firstID == nil {
-		t.Fatal("expected a non-null id in the first row")
-	}
-
-	filteredReq := readReq
-	filteredReq.OpID = "be-read-order-items-filtered"
-	filteredReq.Filter = strp(fmt.Sprintf("`id` = '%s'", *firstID))
-	filteredResp := rec.DataRead(t, filteredReq, nil)
-	if filteredResp.Page.Rows() != 1 {
-		t.Fatalf("filtered read rows = %d, want 1", filteredResp.Page.Rows())
-	}
+	readFirstIDThenFilterToOne(t, rec, cfg.ID, orderItemsNode.Path)
 
 	definitionResult := rec.TreeDefinition(t, cfg.ID, orderItemsNode.Path, false, nil)
 	if !regexp.MustCompile(`MergeTree`).MatchString(fmt.Sprint(definitionResult.Definition.Statements)) {

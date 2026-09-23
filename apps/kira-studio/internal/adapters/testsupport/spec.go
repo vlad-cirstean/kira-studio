@@ -1,6 +1,7 @@
 package testsupport
 
 import (
+	"context"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -15,6 +16,86 @@ func Seg(kind, name string) model.PathSegment { return model.PathSegment{Kind: k
 // NodePath builds a model.NodePath for connectionID.
 func NodePath(connectionID string, segments ...model.PathSegment) model.NodePath {
 	return model.NodePath{ConnectionID: connectionID, Segments: segments}
+}
+
+// hasConnectionID is every per-adapter *Fixture type's own shared shape (P107 I2-28): a Config
+// field whose ID names the connection.
+type hasConnectionID interface {
+	ConnectionID() string
+}
+
+// FixtureNodePath is NodePath for a fixture (redis/sqs/postgres/kafka/mongo/s3's own
+// nodePath(fixture, segments...), P107 I2-28) — each caller instantiates it once as
+// `var nodePath = testsupport.FixtureNodePath[*testsupport.XFixture]`, so every existing call
+// site (nodePath(fixture, seg(...))) is untouched.
+func FixtureNodePath[F hasConnectionID](fixture F, segments ...model.PathSegment) model.NodePath {
+	return NodePath(fixture.ConnectionID(), segments...)
+}
+
+// OffsetRead builds an offset-mode adapters.ReadRequest for path — sqs's and kafka's own
+// offsetRead(path, pageSize) (P107 I2-28). s3's own offsetRead(path) fixes pageSize at 10 and
+// stays its own thin wrapper over this (its own file, own reasoning).
+func OffsetRead(path model.NodePath, pageSize int) adapters.ReadRequest {
+	return adapters.ReadRequest{Path: path, PageSize: pageSize, Cursor: model.PageCursor{Mode: "offset", Offset: 0}}
+}
+
+// InsertDeleteRoundTrip is mysqlfamily's and sqlite's own "mutate: insert then delete
+// round-trips" test body (P107 I2-28) — insert two rows, count, delete one by key, count again,
+// read the survivor back. path's own table must already exist and be empty; setup/cleanup (which
+// differs per adapter — mysqlfamily provisions the scratch table over a side DSN connection,
+// sqlite over the adapter's own Execute console) stays each caller's own.
+func InsertDeleteRoundTrip(t *testing.T, a adapters.Adapter, path model.NodePath) {
+	t.Helper()
+	ctx := context.Background()
+
+	insertPlan := model.MutationPlan{
+		Path: path,
+		Ops: []model.MutationRowOp{
+			{Kind: "insert", Values: model.RowValues{{Name: "id", Value: Strp("1")}, {Name: "name", Value: Strp("first")}}},
+			{Kind: "insert", Values: model.RowValues{{Name: "id", Value: Strp("2")}, {Name: "name", Value: Strp("second")}}},
+		},
+	}
+	if _, err := a.Mutate(ctx, insertPlan, adapters.NewOpCtx("op-insdel-1")); err != nil {
+		t.Fatalf("Mutate(insert): %v", err)
+	}
+	countAfterInsert, err := a.Count(ctx, adapters.CountRequest{Path: path}, adapters.NewOpCtx("op-insdel-2"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if countAfterInsert.Value != 2 {
+		t.Fatalf("Count after insert = %d, want 2", countAfterInsert.Value)
+	}
+
+	deletePlan := model.MutationPlan{
+		Path: path,
+		Ops:  []model.MutationRowOp{{Kind: "delete", Key: model.RowValues{{Name: "id", Value: Strp("1")}}}},
+	}
+	result, err := a.Mutate(ctx, deletePlan, adapters.NewOpCtx("op-insdel-3"))
+	if err != nil {
+		t.Fatalf("Mutate(delete): %v", err)
+	}
+	if result.AffectedRows != 1 {
+		t.Errorf("AffectedRows = %d, want 1", result.AffectedRows)
+	}
+	countAfterDelete, err := a.Count(ctx, adapters.CountRequest{Path: path}, adapters.NewOpCtx("op-insdel-4"))
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if countAfterDelete.Value != 1 {
+		t.Fatalf("Count after delete = %d, want 1", countAfterDelete.Value)
+	}
+
+	read, err := a.Read(ctx, adapters.ReadRequest{
+		Path: path, PageSize: 10, Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}, adapters.NewOpCtx("op-insdel-5"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	readPage := read.(page.TabularPage)
+	id := CellAt(t, readPage, 0, 0)
+	if id == nil || *id != "2" {
+		t.Errorf("surviving row id = %v, want 2", id)
+	}
 }
 
 // ChildNames extracts every node's Name from a Children() result, in order.

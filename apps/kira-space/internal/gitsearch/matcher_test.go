@@ -28,7 +28,7 @@ func TestMatchFields_FieldOrder(t *testing.T) {
 	t.Parallel()
 	m := mustCompile(t, Query{Text: "x"})
 	f := CommitFields{
-		SHA: "x0000000000000000000000000000000000000",
+		SHA:     "x0000000000000000000000000000000000000",
 		Subject: "x", Body: "x",
 		AuthorName: "x", AuthorEmail: "x",
 		CommitterName: "x", CommitterEmail: "x",

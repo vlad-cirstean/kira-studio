@@ -5,25 +5,15 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-func processAlive(pid int) bool {
-	return syscall.Kill(pid, 0) == nil
-}
-
-func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatalf("condition not met within %s", timeout)
-	}
-}
+// processAlive/waitUntil are testx.ProcessAlive/testx.WaitUntil (P107 I2-28).
+var (
+	processAlive = testx.ProcessAlive
+	waitUntil    = testx.WaitUntil
+)
 
 func entryPID(t *testing.T, s *Supervisor, connectionID string) int {
 	t.Helper()

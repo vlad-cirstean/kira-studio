@@ -7,19 +7,15 @@
 package internal_test
 
 import (
-	"os/exec"
-	"strings"
 	"testing"
+
+	"github.com/kirathecat/kira-studio/internal/layeringtest"
 )
 
 // modulePrefix strips down a fully-qualified package path (as `go list` prints it) to its
 // internal/-relative form, e.g. ".../apps/kira-studio/internal/adapters/kafka" ->
 // "internal/adapters/kafka".
 const modulePrefix = "github.com/kirathecat/kira-studio/apps/kira-studio/"
-
-func shortPkgName(full string) string {
-	return strings.TrimPrefix(full, modulePrefix)
-}
 
 // packagesExemptFromBridgeCheck are the packages that sit *at or above* internal/bridge in the
 // intended layering, so a bridge import from them is not a boundary violation: internal/bridge
@@ -46,42 +42,9 @@ var packagesExemptFromBridgeCheck = map[string]bool{
 // unchecked until someone remembered to add it here. This now enumerates every internal/*
 // package straight from `go list` and checks all of them except the small, named set of
 // transport/composition packages above, so a new domain package is covered automatically rather
-// than silently exempt by omission.
+// than silently exempt by omission. The runner itself is shared with Kira Space's own copy of
+// this test (P107 I2-28, internal/layeringtest.Run) — only modulePrefix and the exemption set
+// differ per app.
 func TestDomainPackagesDoNotImportBridge(t *testing.T) {
-	// The fully-qualified pattern, not a relative "./internal/...", because `go test` runs this
-	// from this package's own directory (internal/) — a relative "./internal/..." from inside
-	// internal/ itself resolves to a nonexistent internal/internal/.
-	listOut, err := exec.Command("go", "list", modulePrefix+"internal/...").CombinedOutput()
-	if err != nil {
-		t.Fatalf("go list %sinternal/...: %v\n%s", modulePrefix, err, listOut)
-	}
-	pkgs := strings.Fields(string(listOut))
-	if len(pkgs) < 10 {
-		// A sanity floor: if `go list` ever returns a near-empty set (a broken working
-		// directory, a build-tag misconfiguration), silently passing zero sub-tests would be
-		// worse than the hand-maintained list this replaced.
-		t.Fatalf("go list ./internal/... returned only %d packages, expected far more: %v", len(pkgs), pkgs)
-	}
-	checked := 0
-	for _, pkg := range pkgs {
-		short := shortPkgName(pkg)
-		if packagesExemptFromBridgeCheck[short] {
-			continue
-		}
-		checked++
-		t.Run(short, func(t *testing.T) {
-			out, err := exec.Command("go", "list", "-deps", pkg).CombinedOutput()
-			if err != nil {
-				t.Fatalf("go list -deps %s: %v\n%s", pkg, err, out)
-			}
-			for _, dep := range strings.Fields(string(out)) {
-				if strings.Contains(dep, "/internal/bridge") {
-					t.Fatalf("%s depends on %s — a domain package must not import the IPC transport layer (internal/bridge)", pkg, dep)
-				}
-			}
-		})
-	}
-	if checked == 0 {
-		t.Fatal("no non-exempt internal/* packages were checked — the exemption set has likely grown to swallow everything")
-	}
+	layeringtest.Run(t, modulePrefix, packagesExemptFromBridgeCheck)
 }
