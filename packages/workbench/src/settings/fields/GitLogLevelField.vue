@@ -1,0 +1,58 @@
+<script setup lang="ts">
+import type { GitLogLevel } from '@shared/domain/settings';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Label } from '@theme/components/ui/label';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+
+// I2-18: the git-log-level select (options, reset button) was byte-identical between kira-studio's
+// and kira-space's own AdvancedPane.vue; the helper text differs per app, so it stays app-side
+// through the default slot.
+const props = defineProps<{
+  advanced: { gitLogLevel: GitLogLevel };
+  isAtDefault: (section: 'advanced', key: 'gitLogLevel') => boolean;
+  resetLeaf: (section: 'advanced', key: 'gitLogLevel') => void;
+}>();
+
+function onGitLogLevelChange(e: Event): void {
+  props.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
+}
+</script>
+
+<template>
+  <Label class="field">
+    <div class="field-head">
+      <span>Git log level</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-advanced-gitLogLevel"
+              :disabled="isAtDefault('advanced', 'gitLogLevel')"
+              aria-label="Reset to default"
+              @click="resetLeaf('advanced', 'gitLogLevel')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </TooltipDisabledTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
+    </div>
+    <select
+      class="p-select bordered md"
+      data-testid="settings-git-log-level"
+      :value="advanced.gitLogLevel"
+      @change="onGitLogLevelChange"
+    >
+      <option value="off">Off</option>
+      <option value="error">Error</option>
+      <option value="warn">Warn</option>
+      <option value="info">Info</option>
+      <option value="debug">Debug</option>
+    </select>
+    <slot />
+  </Label>
+</template>

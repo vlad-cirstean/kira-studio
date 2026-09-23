@@ -10,10 +10,10 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
 import { computed, ref } from 'vue';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
-  type GitLogLevel,
   OP_LOG_RETENTION_DAYS_RANGE,
 } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
@@ -28,13 +28,6 @@ function onOpLogRetentionInput(e: Event): void {
 
 function onExpensiveQueryRowsInput(e: Event): void {
   props.draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
-}
-
-// P72 §9.2: kira-space's own diagnostic log verbosity, moved here from the per-repo
-// RepoSettingsDialog.vue's kiraVersion.log.level — genuinely installation-wide, not a per-repo
-// fact, so this is now the one control that sets it.
-function onGitLogLevelChange(e: Event): void {
-  props.draft.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
 }
 
 // P104 §2: TextField's number stepper -> ui/input-group recipe.
@@ -212,40 +205,8 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
       >
     </Label>
 
-    <Label class="field">
-      <div class="field-head">
-        <span>Git log level</span>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="settings-reset-advanced-gitLogLevel"
-                :disabled="isAtDefault('advanced', 'gitLogLevel')"
-                aria-label="Reset to default"
-                @click="resetLeaf('advanced', 'gitLogLevel')"
-              >
-                <CodiconIcon name="discard" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
-      </div>
-      <select
-        class="p-select bordered md"
-        data-testid="settings-git-log-level"
-        :value="draft.advanced.gitLogLevel"
-        @change="onGitLogLevelChange"
-      >
-        <option value="off">Off</option>
-        <option value="error">Error</option>
-        <option value="warn">Warn</option>
-        <option value="info">Info</option>
-        <option value="debug">Debug</option>
-      </select>
+    <GitLogLevelField :advanced="draft.advanced" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
       <span class="helper-text">Verbosity of kira-space's own diagnostic log, for every repository.</span>
-    </Label>
+    </GitLogLevelField>
   </div>
 </template>
