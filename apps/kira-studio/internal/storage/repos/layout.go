@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
 // LayoutRepo reads and writes the `ui_layout` table — same per-leaf-row shape as SettingsRepo,
@@ -43,11 +44,11 @@ func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, erro
 	}
 
 	result := model.DefaultLayout()
-	leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
-	leaf(stored, "panel.project.width", &result.Panel.Project.Width)
-	leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
-	leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
-	leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
+	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
+	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
+	appsettings.Leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
+	appsettings.Leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
+	appsettings.Leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
 	return result, nil
 }
 

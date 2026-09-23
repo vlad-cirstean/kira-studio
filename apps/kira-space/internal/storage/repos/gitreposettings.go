@@ -41,16 +41,16 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	if err != nil {
 		return model.GitRepoSettings{}, err
 	}
-	leafValid(stored, "graphPageSize", &result.GraphPageSize, func(v int) bool { return v >= 100 && v <= 50000 })
-	leafValid(stored, "graphScope", &result.GraphScope, model.ValidGraphScope)
-	leaf(stored, "stashShowInGraph", &result.StashShowInGraph)
-	leaf(stored, "stashIncludeUntracked", &result.StashIncludeUntracked)
-	leaf(stored, "reviewBaseCandidates", &result.ReviewBaseCandidates)
-	leafValid(stored, "pullStrategy", &result.PullStrategy, model.ValidPullStrategy)
-	leaf(stored, "githubEnabled", &result.GithubEnabled)
-	leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
-	leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
-	leafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
+	appsettings.LeafValid(stored, "graphPageSize", &result.GraphPageSize, func(v int) bool { return v >= 100 && v <= 50000 })
+	appsettings.LeafValid(stored, "graphScope", &result.GraphScope, model.ValidGraphScope)
+	appsettings.Leaf(stored, "stashShowInGraph", &result.StashShowInGraph)
+	appsettings.Leaf(stored, "stashIncludeUntracked", &result.StashIncludeUntracked)
+	appsettings.Leaf(stored, "reviewBaseCandidates", &result.ReviewBaseCandidates)
+	appsettings.LeafValid(stored, "pullStrategy", &result.PullStrategy, model.ValidPullStrategy)
+	appsettings.Leaf(stored, "githubEnabled", &result.GithubEnabled)
+	appsettings.Leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
+	appsettings.Leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
+	appsettings.LeafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
 
 	return result, nil
 }

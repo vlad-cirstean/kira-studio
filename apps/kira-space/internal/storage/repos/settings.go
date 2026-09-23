@@ -54,7 +54,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result := model.DefaultSettings()
 	result.Appearance = appsettings.ReadAppearance(stored)
 	result.Git = appsettings.ReadGit(stored)
-	leafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
+	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
 }
 

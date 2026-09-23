@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
 // LayoutRepo reads and writes the `ui_layout` table — Kira Studio's own LayoutRepo, trimmed to
@@ -39,8 +40,8 @@ func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, erro
 	}
 
 	result := model.DefaultLayout()
-	leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
-	leaf(stored, "panel.project.width", &result.Panel.Project.Width)
+	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
+	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
 	return result, nil
 }
 
