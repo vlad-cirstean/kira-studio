@@ -22,13 +22,17 @@ const DefaultSearchLimit = gitsearch.DefaultLimit
 // graph.loadMore/graph.stream already do when no walk has been opened yet (§10.8), so a client
 // that calls search.run before ever touching the graph still gets a real answer over the same rev
 // set the graph would show.
+// handleSearchRun stays on its own hand-rolled dispatch (P107 I2-13), same reason as graph.go's
+// own four handlers just above it in the doc: it resolves through c.Walk, not entryFor, and lazily
+// opens the walk rather than erroring on an unheld repo. Only the plain "repoId is required" check
+// is shared, via requireNonEmpty.
 func (r *Router) handleSearchRun(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 	var p SearchRunParams
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, ipcerr.BadRequest("gitrpc: search.run: invalid params")
 	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: search.run: repoId is required")
+	if err := requireNonEmpty("search.run", "repoId", p.RepoID); err != nil {
+		return nil, err
 	}
 	p.RepoID = gitpath.CleanNFC(p.RepoID) // G31 round-2 architecture/security review, finding #4.
 

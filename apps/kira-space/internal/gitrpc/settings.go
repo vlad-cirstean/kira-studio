@@ -6,8 +6,8 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // repoSettingsSnapshotFrom projects storage/model.GitRepoSettings onto the wire's own dotted-key
@@ -64,18 +64,18 @@ func (p RepoSettingsPatchWire) toModel() model.GitRepoSettingsPatch {
 }
 
 func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p RepoSettingsGetParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: repoSettings.get: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: repoSettings.get: repoId is required")
-	}
-	s, err := r.deps.Registry.RepoSettingsGet(p.RepoID)
-	if err != nil {
-		return nil, ipcerr.New("E_INTERNAL", "gitrpc: repoSettings.get: "+err.Error())
-	}
-	return repoSettingsSnapshotFrom(s), nil
+	return handleCall("repoSettings.get", params,
+		func(p RepoSettingsGetParams) error {
+			return requireNonEmpty("repoSettings.get", "repoId", p.RepoID)
+		},
+		func(p RepoSettingsGetParams) (RepoSettingsSnapshot, error) {
+			s, err := r.deps.Registry.RepoSettingsGet(p.RepoID)
+			if err != nil {
+				return RepoSettingsSnapshot{}, ipcerr.New("E_INTERNAL", "gitrpc: repoSettings.get: "+err.Error())
+			}
+			return repoSettingsSnapshotFrom(s), nil
+		},
+	)
 }
 
 // handleRepoSettingsSet writes the patch, then emits repoSettings.changed to EVERY currently
@@ -85,20 +85,20 @@ func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, pa
 // passed, even for a log.level-only patch; the storage layer is what already made that write
 // visible to every other repo.
 func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p RepoSettingsSetParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: repoSettings.set: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: repoSettings.set: repoId is required")
-	}
-	s, err := r.deps.Registry.RepoSettingsSet(p.RepoID, p.Patch.toModel())
-	if err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: repoSettings.set: " + err.Error())
-	}
-	snapshot := repoSettingsSnapshotFrom(s)
-	r.repoSettingsChanged.Emit(RepoSettingsChangedPayload{RepoID: p.RepoID, Settings: snapshot})
-	return snapshot, nil
+	return handleCall("repoSettings.set", params,
+		func(p RepoSettingsSetParams) error {
+			return requireNonEmpty("repoSettings.set", "repoId", p.RepoID)
+		},
+		func(p RepoSettingsSetParams) (RepoSettingsSnapshot, error) {
+			s, err := r.deps.Registry.RepoSettingsSet(p.RepoID, p.Patch.toModel())
+			if err != nil {
+				return RepoSettingsSnapshot{}, ipcerr.BadRequest("gitrpc: repoSettings.set: " + err.Error())
+			}
+			snapshot := repoSettingsSnapshotFrom(s)
+			r.repoSettingsChanged.Emit(RepoSettingsChangedPayload{RepoID: p.RepoID, Settings: snapshot})
+			return snapshot, nil
+		},
+	)
 }
 
 // handleSettingsSetGitPath is G18 D11's own migration leg: writes kiraSpace.git.path's migrated
@@ -107,20 +107,22 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 // store (D15). Extension-only — proxyHandlers.ts never forwards a webview call here (the same
 // posture credential.provide's own doc comment states for a different reason).
 func (r *Router) handleSettingsSetGitPath(_ context.Context, params json.RawMessage) (any, error) {
-	var p SettingsSetGitPathParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: settings.setGitPath: invalid params")
-	}
-	if r.deps.SetGitPath == nil {
-		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: not wired")
-	}
-	// G27 D5d: a client-supplied directory parameter (D2 tier 1) -- normalized when non-empty; ""
-	// (clear the override, fall back to auto-discovery) stays "" rather than becoming ".".
-	if p.GitPath != "" {
-		p.GitPath = gitpath.CleanNFC(p.GitPath)
-	}
-	if err := r.deps.SetGitPath(p.GitPath); err != nil {
-		return nil, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: "+err.Error())
-	}
-	return struct{}{}, nil
+	return handleCall("settings.setGitPath", params, nil,
+		func(p SettingsSetGitPathParams) (struct{}, error) {
+			if r.deps.SetGitPath == nil {
+				return struct{}{}, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: not wired")
+			}
+			// G27 D5d: a client-supplied directory parameter (D2 tier 1) -- normalized when
+			// non-empty; "" (clear the override, fall back to auto-discovery) stays "" rather than
+			// becoming ".".
+			gitPath := p.GitPath
+			if gitPath != "" {
+				gitPath = gitpath.CleanNFC(gitPath)
+			}
+			if err := r.deps.SetGitPath(gitPath); err != nil {
+				return struct{}{}, ipcerr.New("E_INTERNAL", "gitrpc: settings.setGitPath: "+err.Error())
+			}
+			return struct{}{}, nil
+		},
+	)
 }

@@ -19,7 +19,9 @@ import (
 // unlike reset_test.go's flow (preflight.reset/op.run/undo.peek), which never reaches Discovery.
 type alwaysGitLocator struct{}
 
-func (alwaysGitLocator) Locate(_ string) (string, []string, bool) { return "git", []string{"git"}, true }
+func (alwaysGitLocator) Locate(_ string) (string, []string, bool) {
+	return "git", []string{"git"}, true
+}
 
 // searchSmokeConn is resetSmokeConn's own shape plus a working Discovery — search.run's handler
 // needs one to resolve the gitPath it hands to c.Walk, where reset/preflight/op.run never do.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
@@ -26,28 +27,27 @@ func validRefArg(field, value string) error {
 }
 
 func (r *Router) handleReviewResolveBase(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p ReviewResolveBaseParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: review.resolveBase: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: review.resolveBase: repoId is required")
-	}
-	if err := validRefArg("branch", p.Branch); err != nil {
-		return nil, err
-	}
-	if p.Base != nil {
-		if err := validRefArg("base", *p.Base); err != nil {
-			return nil, err
-		}
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	result, err := entry.ResolveReviewBase(ctx, p.Branch, p.Base, p.BaseCandidates)
-	if err != nil {
-		return nil, mapGitError(err)
-	}
-	return result, nil
+	return handleRepoCall(ctx, c, "review.resolveBase", params,
+		func(p ReviewResolveBaseParams) (string, error) {
+			if err := requireNonEmpty("review.resolveBase", "repoId", p.RepoID); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			if p.Base != nil {
+				if err := validRefArg("base", *p.Base); err != nil {
+					return "", err
+				}
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewResolveBaseParams) (gitreview.BaseResolution, error) {
+			result, err := entry.ResolveReviewBase(ctx, p.Branch, p.Base, p.BaseCandidates)
+			if err != nil {
+				return gitreview.BaseResolution{}, mapGitError(err)
+			}
+			return result, nil
+		},
+	)
 }
