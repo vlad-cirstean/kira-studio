@@ -574,7 +574,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
     <div
       v-if="hoverLines"
       ref="hoverPanelRef"
-      class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-[360px] px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
+      class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
       role="tooltip"
       data-testid="autocomplete-hover"
       :style="hoverStyle ?? undefined"

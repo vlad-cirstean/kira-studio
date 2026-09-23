@@ -501,7 +501,7 @@ function onSequenceStartChange(index: number, start: number): void {
               <span class="inline-flex items-center gap-1 font-data text-kira-xs text-info">
                 <span class="min-w-[7ch] text-right">—</span>
                 <span
-                  class="h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-t-accent border-r-transparent border-b-accent border-l-accent animate-[spin_0.7s_linear_infinite]"
+                  class="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-t-accent border-r-transparent border-b-accent border-l-accent animate-[spin_0.7s_linear_infinite]"
                 />
               </span>
             </TooltipTrigger>
@@ -549,7 +549,7 @@ function onSequenceStartChange(index: number, start: number): void {
 }
 
 .recipe-table {
-  @apply flex flex-col overflow-y-auto max-h-[260px];
+  @apply flex flex-col overflow-y-auto max-h-64;
   gap: var(--kira-s-1);
 }
 
@@ -582,7 +582,7 @@ function onSequenceStartChange(index: number, start: number): void {
 }
 
 .preview-body {
-  @apply h-[200px];
+  @apply h-52;
   margin-top: var(--kira-s-2);
 }
 

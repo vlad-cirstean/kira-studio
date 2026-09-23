@@ -552,7 +552,7 @@ const statusLine = computed(() => {
               </Tooltip>
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
-            <PopoverContent align="start" class="w-[200px] gap-0 p-0" data-testid="cell-editor-generate-popover">
+            <PopoverContent align="start" class="w-52 gap-0 p-0" data-testid="cell-editor-generate-popover">
               <div class="generate-menu">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
@@ -709,7 +709,7 @@ const statusLine = computed(() => {
    appearance:base-select/::picker(select)/option rules are select-only and simply don't match a
    <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
-  @apply max-w-[160px] font-[family-name:var(--kira-font-ui)];
+  @apply max-w-40 font-[family-name:var(--kira-font-ui)];
 }
 
 .format-select-label {
@@ -723,7 +723,7 @@ const statusLine = computed(() => {
 /* The message chip (formatProblem) truncates the same way status-badge does — the squiggly
    underline in the editor below and this chip's own tooltip both carry the untruncated text. */
 .invalid-chip {
-  @apply max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply max-w-56 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .generate-anchor {
@@ -744,7 +744,7 @@ const statusLine = computed(() => {
    (title carries the full text) rather than growing unbounded and pushing the trailing
    read-only chip around. */
 .status-badge {
-  @apply max-w-[220px] overflow-hidden text-ellipsis;
+  @apply max-w-56 overflow-hidden text-ellipsis;
 }
 
 .editor-body {

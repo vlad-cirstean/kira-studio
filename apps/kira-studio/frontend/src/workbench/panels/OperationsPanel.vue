@@ -357,7 +357,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 .ops-columns {
   /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
      size, case and letter-spacing alone, matching .p-panel-head's own section-label idiom. */
-  @apply shrink-0 uppercase tracking-[0.05em];
+  @apply shrink-0 uppercase tracking-wider;
   height: var(--kira-h-xs);
   color: var(--kira-fg-muted);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
@@ -390,7 +390,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .chip {
-  @apply w-2 h-2 shrink-0 rounded-[2px];
+  @apply w-2 h-2 shrink-0 rounded-sm;
 }
 
 .truncate {

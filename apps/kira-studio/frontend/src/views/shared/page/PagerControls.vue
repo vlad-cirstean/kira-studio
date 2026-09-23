@@ -163,7 +163,7 @@ function onJump(e: Event): void {
 }
 
 .page-input {
-  @apply w-[46px];
+  @apply w-12;
 }
 
 .page-input :deep(input) {

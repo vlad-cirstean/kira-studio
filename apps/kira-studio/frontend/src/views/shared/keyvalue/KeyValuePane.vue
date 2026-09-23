@@ -764,7 +764,7 @@ onUnmounted(() => {
         >
           <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
           <span
-            class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+            class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
             :class="{
               'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
               'border-error': runState.status === 'error',
@@ -898,7 +898,7 @@ onUnmounted(() => {
               </Tooltip>
               <PopoverAnchor :reference="addAnchorRef ?? undefined" />
             </div>
-            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-add-popover">
+            <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Add key (string value)</div>
                 <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
@@ -941,7 +941,7 @@ onUnmounted(() => {
               </Tooltip>
               <PopoverAnchor :reference="editAnchorRef ?? undefined" />
             </div>
-            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-edit-popover">
+            <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
                 <Input
@@ -1219,7 +1219,7 @@ onUnmounted(() => {
 }
 
 .kv-col-field {
-  @apply w-[220px] shrink-0;
+  @apply w-56 shrink-0;
 }
 
 .kv-col-value {

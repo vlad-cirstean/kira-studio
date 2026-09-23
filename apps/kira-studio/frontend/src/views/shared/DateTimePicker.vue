@@ -335,7 +335,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="23"
-        class="w-[52px]"
+        class="w-14"
         data-testid="datetime-picker-hour"
       />
       <span class="dtp-clock-sep">:</span>
@@ -344,7 +344,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="59"
-        class="w-[52px]"
+        class="w-14"
         data-testid="datetime-picker-minute"
       />
       <span class="dtp-clock-sep">:</span>
@@ -353,7 +353,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="59"
-        class="w-[52px]"
+        class="w-14"
         data-testid="datetime-picker-second"
       />
       <Tooltip>

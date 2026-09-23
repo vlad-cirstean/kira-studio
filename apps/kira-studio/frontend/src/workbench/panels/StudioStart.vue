@@ -127,14 +127,14 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .start-inner.first-run {
-  @apply w-[360px] flex flex-col items-center text-center;
+  @apply w-96 flex flex-col items-center text-center;
   gap: var(--kira-s-4);
 }
 
 .start-title {
   /* P24 D31: no bold text anywhere in the app — --kira-t-xl (the scale's largest step) already
      carries the emphasis a first-run heading needs. */
-  @apply tracking-[-0.01em];
+  @apply tracking-normal;
   font-size: var(--kira-t-xl);
   color: var(--kira-fg);
 }
@@ -150,7 +150,7 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .col-label {
-  @apply uppercase tracking-[0.06em];
+  @apply uppercase tracking-wider;
   font-size: var(--kira-t-sm);
   margin-bottom: var(--kira-s-3);
   margin-top: var(--kira-s-6);
@@ -174,7 +174,7 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .rail-dot {
-  @apply w-0.5 h-[13px] rounded-[1px] shrink-0;
+  @apply w-0.5 h-3.5 rounded-[1px] shrink-0;
 }
 
 .entry-path {

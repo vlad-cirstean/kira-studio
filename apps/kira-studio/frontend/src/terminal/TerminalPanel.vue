@@ -137,7 +137,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 <template>
   <div data-testid="terminal-panel" class="terminal-panel">
     <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, search)">
-      <div class="p-panel-head h-[34px]">
+      <div class="p-panel-head h-bar">
         <span class="panel-title">Quick commands</span>
         <Tooltip>
           <TooltipTrigger as-child>

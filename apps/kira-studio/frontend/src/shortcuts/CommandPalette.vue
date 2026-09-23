@@ -36,7 +36,7 @@ function onKeydown(e: KeyboardEvent): void {
     <div class="palette p-float" data-testid="command-palette" @click.stop>
       <Command class="rounded-none! p-0!" @keydown="onKeydown">
         <CommandInput data-testid="command-palette-input" placeholder="Type a command…" />
-        <CommandList class="max-h-[300px]">
+        <CommandList class="max-h-72">
           <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
           <CommandItem
             v-for="command in paletteStore.paletteCommands"

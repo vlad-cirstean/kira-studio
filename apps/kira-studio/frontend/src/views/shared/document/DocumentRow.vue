@@ -105,6 +105,6 @@ defineEmits<{ toggle: []; select: [] }>();
 }
 
 .doc-id {
-  @apply shrink-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)];
+  @apply shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)];
 }
 </style>
