@@ -130,6 +130,13 @@ func (in Input) validateMode() error {
 		if in.URI == nil || strings.TrimSpace(*in.URI) == "" {
 			return ipcerr.BadRequest("A connection URI is required.")
 		}
+		// F3 (P108 Part 3): a password containing a raw '/', '?' or '#' defeats findAuthority's
+		// own delimiter scan, so the detected password is nil and the whole URI — real password
+		// included — is stored and returned unencrypted. Reject rather than silently store it.
+		if uriHasAmbiguousPassword(*in.URI) {
+			return ipcerr.BadRequest("The URI's password contains a character (/, ? or #) that " +
+				"makes it ambiguous — percent-encode special characters in the password.")
+		}
 	}
 	return nil
 }

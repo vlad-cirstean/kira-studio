@@ -85,5 +85,55 @@ func findAuthority(uri string) (start, end int, ok bool) {
 	return start, end, true
 }
 
+// uriHasAmbiguousPassword detects a URI-mode password containing a raw (unencoded) /, ? or # —
+// F3, P108 Part 3. findAuthority ends the authority at the first such character after "://", so
+// e.g. "postgres://u:pa/ss@h/db" detects an authority of "u:pa" (no '@' in it, so
+// stripURIPassword returns a nil password) while the URI's real '@' sits past that point — the
+// full URI, raw password included, then gets stored as-is in connections.uri and returned by
+// List, breaking the no-password-in-List guarantee.
+//
+// Heuristic: an '@' exists after the first /, ? or # following "://", AND the segment before
+// that delimiter (what findAuthority mistook for the whole authority) contains ':', AND the text
+// after that ':' is not an all-digit port — exactly the shape a genuine "host:port" (with no
+// userinfo, and so no password, at all) never has. A password properly percent-encoded (the fix
+// validateMode's own error message asks for) contains no raw delimiter and is never flagged.
+func uriHasAmbiguousPassword(uri string) bool {
+	idx := strings.Index(uri, "://")
+	if idx < 0 {
+		return false
+	}
+	rest := uri[idx+3:]
+	delim := strings.IndexAny(rest, "/?#")
+	if delim < 0 {
+		return false
+	}
+	before, after := rest[:delim], rest[delim:]
+	if !strings.Contains(after, "@") {
+		return false
+	}
+	colon := strings.IndexByte(before, ':')
+	if colon < 0 {
+		return false
+	}
+	return !isAllDigits(before[colon+1:])
+}
+
+// isAllDigits reports whether s is non-empty and every byte is an ASCII digit — a real port
+// number, never a password fragment (which would need a decimal point, letter or symbol to be a
+// realistic credential and still pass this check only by coincidence — an all-numeric password is
+// the one case this heuristic cannot distinguish from a port, and is left as a rare false
+// negative rather than rejecting every all-digit password outright).
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // encodeURIComponent/decodeURIComponent live in internal/storage/model (model/uriescape.go),
 // shared with internal/tree's DecodePath — see that file's doc comment for why.
