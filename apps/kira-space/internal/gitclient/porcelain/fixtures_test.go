@@ -756,6 +756,21 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "mergeTree/conflict.bin", captureRawAllowExit(t, b.dir, porcelain.MergeTreeArgs(head, other, base), 0, 1))
 	}
 
+	// --- mergeTree/conflictQuotedPath.bin (F15): the conflicting path itself contains a literal
+	// double quote — under the default LF framing this comes back C-quoted ("f\".txt" style);
+	// -z's own NUL framing must report it verbatim instead. ---
+	{
+		b := newRepoBuilder(t)
+		name := `f".txt`
+		base := b.commit(name, "line1\nline2\nline3\n", "base")
+		b.branch("mt-q")
+		b.checkout("mt-q")
+		other := b.commit(name, "line1\nCHANGED-B\nline3\n", "b change")
+		b.checkout("main")
+		head := b.commit(name, "line1\nCHANGED-MAIN\nline3\n", "main change")
+		writeFixture(t, "mergeTree/conflictQuotedPath.bin", captureRawAllowExit(t, b.dir, porcelain.MergeTreeArgs(head, other, base), 0, 1))
+	}
+
 	// --- stash/twoEntry: a two-entry stack, one pushed with -u (an untracked file alongside a
 	// tracked change), one without — G17 D3/probe 12's own two-numstat-block-plus-zero-block shape
 	// (a pure-untracked entry would produce zero numstat records at all; this scenario's own

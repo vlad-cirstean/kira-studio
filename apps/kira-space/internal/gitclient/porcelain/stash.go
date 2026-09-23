@@ -131,6 +131,50 @@ func isStackStashHeader(rec []byte) bool {
 	return bytes.HasPrefix(rec, []byte("stash@{"))
 }
 
+// isRenameNumstatRecord reports whether rec is a rename's own numstat header — %x1f is never
+// involved here, this is diff-tree's own tab-separated "additions\tdeletions\tpath" numstat shape
+// (ParseNumstatRecords' own framing) — with an EMPTY path field, meaning the next two records are
+// its originalPath/path pair, not ordinary numstat continuations. first strips the leading "\n"
+// probe 12's own log-shaped framing note describes (present only on the very first numstat record
+// of a header's own diffstat block) before checking, since that record is otherwise
+// indistinguishable in shape from any other.
+func isRenameNumstatRecord(rec []byte, first bool) bool {
+	if first {
+		rec = bytes.TrimPrefix(rec, []byte("\n"))
+	}
+	fields := SplitLimitedFields(rec, '\t', 3)
+	return len(fields) == 3 && len(fields[2]) == 0
+}
+
+// collectNumstatRecs gathers one header's own diffstat block — every record from i up to (but not
+// including) the next header — and returns it along with the index to resume the outer walk from.
+// A rename's own two path records are consumed structurally, by position (isRenameNumstatRecord),
+// never tested against isHeader (F14): a renamed file whose own name happens to be header-shaped
+// (literally "stash@{0}", or a bare 40-hex-character filename for the global bucket's own
+// isGlobalStashHeader) would otherwise be mistaken for the next entry's header, misframing the
+// list. Extracted out of parseStashRecords to keep that function's own cognitive complexity in
+// check, no behaviour change.
+func collectNumstatRecs(recs [][]byte, i int, isHeader func([]byte) bool) ([][]byte, int) {
+	var numstatRecs [][]byte
+	for i < len(recs) {
+		rec := recs[i]
+		if isRenameNumstatRecord(rec, len(numstatRecs) == 0) {
+			if i+2 >= len(recs) {
+				break // let ParseNumstatRecords report the truncated-rename error below.
+			}
+			numstatRecs = append(numstatRecs, rec, recs[i+1], recs[i+2])
+			i += 3
+			continue
+		}
+		if isHeader(rec) {
+			break
+		}
+		numstatRecs = append(numstatRecs, rec)
+		i++
+	}
+	return numstatRecs, i
+}
+
 // parseStashRecords is ParseStashList's own record walk (probe 12), extracted verbatim (G28 D9,
 // no behaviour change) so ParseGlobalStashList can reuse it rather than hand-maintaining a second
 // copy of one of this package's more subtle parsers (the leading "\n" on the first numstat record,
@@ -184,11 +228,8 @@ func parseStashRecords(
 		}
 
 		i++
-		var numstatRecs [][]byte
-		for i < len(recs) && !isHeader(recs[i]) {
-			numstatRecs = append(numstatRecs, recs[i])
-			i++
-		}
+		numstatRecs, resumeAt := collectNumstatRecs(recs, i, isHeader)
+		i = resumeAt
 		if len(numstatRecs) > 0 {
 			numstatRecs[0] = bytes.TrimPrefix(numstatRecs[0], []byte("\n"))
 		}

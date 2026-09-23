@@ -188,6 +188,37 @@ func TestParseStashList_MalformedHeader(t *testing.T) {
 	}
 }
 
+// TestParseStashList_RenamePathNeverMisdetectedAsHeader is F14's own regression guard, the stack
+// side of TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader: a rename's own bare
+// renamed-to path record literally reads "stash@{0}" — isStackStashHeader's own prefix match would
+// otherwise mistake it for the next entry's header, splitting one rename into a phantom extra
+// "entry" and losing the real second entry entirely.
+func TestParseStashList_RenamePathNeverMisdetectedAsHeader(t *testing.T) {
+	t.Parallel()
+	sha1, sha2 := hex('a'), hex('e')
+	base := hex('b')
+
+	raw := []byte(
+		"stash@{0}" + "\x1f" + sha1 + "\x1f" + base + "\x1f" + "1690000000" + "\x1f" + "On main: rename\x00" +
+			"\n1\t1\t\x00" + "old.txt\x00" + "stash@{0}\x00" +
+			"stash@{1}" + "\x1f" + sha2 + "\x1f" + base + "\x1f" + "1690000001" + "\x1f" + "On main: two\x00",
+	)
+
+	entries, err := porcelain.ParseStashList(raw, nil)
+	if err != nil {
+		t.Fatalf("ParseStashList: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2 (the renamed-to path must not be misdetected as a header): %+v", len(entries), entries)
+	}
+	if entries[0].Sha != sha1 || entries[0].FileCount != 1 {
+		t.Fatalf("entries[0] = %+v, want sha %q with FileCount 1 (the one rename)", entries[0], sha1)
+	}
+	if entries[1].Sha != sha2 || entries[1].Index != 1 {
+		t.Fatalf("entries[1] = %+v, want sha %q at Index 1", entries[1], sha2)
+	}
+}
+
 func TestGlobalStashLogArgs(t *testing.T) {
 	t.Parallel()
 	got := porcelain.GlobalStashLogArgs([]string{"sha1", "sha2"})
@@ -316,6 +347,41 @@ func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testin
 	}
 	if entries[0].Sha != sha1 || entries[0].FileCount != 1 {
 		t.Fatalf("entries[0] = %+v, want sha %q with FileCount 1", entries[0], sha1)
+	}
+	if entries[1].Sha != sha2 || entries[1].FileCount != 0 {
+		t.Fatalf("entries[1] = %+v, want sha %q with FileCount 0", entries[1], sha2)
+	}
+}
+
+// TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader is F14's own regression guard: a
+// rename's own numstat framing is THREE records — "add\tdel\t" (empty path field), then
+// originalPath, then path, both of the latter completely bare (no tabs at all). If either bare
+// path record happens to BE header-shaped (here, a renamed file's own NEW name is exactly 40 hex
+// characters — isGlobalStashHeader's own unambiguity claim), the old content-sniffing loop misread
+// it as the next entry's header, splitting one rename into a phantom extra "entry" and losing the
+// real second entry entirely.
+func TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader(t *testing.T) {
+	t.Parallel()
+	sha1 := hex('a')
+	base := hex('b')
+	renamedTo := hex('f') // the RENAMED-TO path is itself 40 hex characters.
+	sha2 := hex('e')
+
+	raw := []byte(
+		sha1 + "\x1f" + sha1 + "\x1f" + base + "\x1f" + "1690000000" + "\x1f" + "On main: rename\x00" +
+			"\n1\t1\t\x00" + "old-name.txt\x00" + renamedTo + "\x00" +
+			sha2 + "\x1f" + sha2 + "\x1f" + base + "\x1f" + "1690000001" + "\x1f" + "On main: two\x00",
+	)
+
+	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
+	if err != nil {
+		t.Fatalf("ParseGlobalStashList: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2 (the renamed-to path must not be misdetected as a header): %+v", len(entries), entries)
+	}
+	if entries[0].Sha != sha1 || entries[0].FileCount != 1 {
+		t.Fatalf("entries[0] = %+v, want sha %q with FileCount 1 (the one rename)", entries[0], sha1)
 	}
 	if entries[1].Sha != sha2 || entries[1].FileCount != 0 {
 		t.Fatalf("entries[1] = %+v, want sha %q with FileCount 0", entries[1], sha2)

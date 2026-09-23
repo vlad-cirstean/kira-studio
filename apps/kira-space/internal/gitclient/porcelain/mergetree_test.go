@@ -9,7 +9,7 @@ import (
 func TestMergeTreeArgs(t *testing.T) {
 	t.Parallel()
 	got := porcelain.MergeTreeArgs("HEAD", "topic", "")
-	want := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "HEAD", "topic"}
+	want := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "-z", "HEAD", "topic"}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -20,7 +20,7 @@ func TestMergeTreeArgs(t *testing.T) {
 	}
 
 	withBase := porcelain.MergeTreeArgs("HEAD", "c^1", "c")
-	wantBase := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "--merge-base=c", "HEAD", "c^1"}
+	wantBase := []string{"merge-tree", "--write-tree", "--messages", "--name-only", "-z", "--merge-base=c", "HEAD", "c^1"}
 	if len(withBase) != len(wantBase) {
 		t.Fatalf("got %v, want %v", withBase, wantBase)
 	}
@@ -59,6 +59,27 @@ func TestParseMergeTreeOutput_Conflicts(t *testing.T) {
 	}
 	if len(pred.Messages) == 0 {
 		t.Fatal("want at least one message block (Auto-merging/CONFLICT lines)")
+	}
+}
+
+// TestParseMergeTreeOutput_ConflictPathWithQuoteCharacter is F15's own regression guard: a
+// conflicting path containing a double quote comes back C-quoted under the default LF framing
+// (verified against real git 2.43) — -z's own NUL framing must report it verbatim instead.
+func TestParseMergeTreeOutput_ConflictPathWithQuoteCharacter(t *testing.T) {
+	t.Parallel()
+	pred, err := porcelain.ParseMergeTreeOutput(readDiffFixture(t, "mergeTree/conflictQuotedPath.bin"), 1)
+	if err != nil {
+		t.Fatalf("ParseMergeTreeOutput: %v", err)
+	}
+	if pred.Kind != "conflicts" {
+		t.Fatalf("pred = %+v", pred)
+	}
+	want := `f".txt`
+	if len(pred.Paths) != 1 || pred.Paths[0] != want {
+		t.Fatalf("paths = %v, want [%q] verbatim, not C-quoted", pred.Paths, want)
+	}
+	if len(pred.Messages) == 0 {
+		t.Fatal("want at least one message")
 	}
 }
 
