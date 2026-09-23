@@ -51,6 +51,7 @@ import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
+import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import CookiesPane from './CookiesPane.vue';
 import { useCookiesStore } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
@@ -192,31 +193,22 @@ const saved = computed(() => collectionsStore.savedRequestFor(props.tab.state.it
 const dirty = computed(() => isDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
-// P71 §3.2: an incognito tab has no route into a persisting editor — Save/Save as… no-op, and the
-// #head-trailing button (below) is disabled with a tooltip naming why. This early return also
-// covers registerCommand('api.save', onSave) and the command palette entry it registers.
-function onSave(): void {
-  if (incognito.value) return;
-  const itemId = props.tab.state.itemId;
-  if (!itemId || !saved.value) {
-    onSaveAs();
-    return;
-  }
-  void collectionsStore.saveRequest(
-    itemId,
-    props.tab.state.name || title.value,
-    toSavedRequest(props.tab.state),
-  );
-}
-
-function onSaveAs(): void {
-  if (incognito.value) return;
-  collectionsStore.openSaveDialog(
-    props.tab.id,
-    props.tab.state.name || title.value,
-    toSavedRequest(props.tab.state),
-  );
-}
+// P71 §3.2/P107 T1-16: an incognito tab has no route into a persisting editor — Save/Save as…
+// no-op, and the #head-trailing button (below) is disabled with a tooltip naming why. This early
+// return also covers registerCommand('api.save', onSave) and the command palette entry it
+// registers. See views/shared/request/useRequestTabSave.ts.
+// onSaveAs is only ever reached from onSave's own no-saved-row fallback — no separate UI trigger
+// in this view, so it isn't destructured here.
+const { onSave } = useRequestTabSave({
+  tabId: () => props.tab.id,
+  incognito: () => incognito.value,
+  itemId: () => props.tab.state.itemId,
+  saved: () => saved.value,
+  name: () => props.tab.state.name || title.value,
+  toSaved: () => toSavedRequest(props.tab.state),
+  save: (itemId, name, body) => collectionsStore.saveRequest(itemId, name, body),
+  openSaveDialog: (tabId, name, body) => collectionsStore.openSaveDialog(tabId, name, body),
+});
 
 function onSend(): void {
   void httpRequestViewStore.send(props.tab.id);
