@@ -44,8 +44,8 @@ fi
 
 # --- S6: the packaged frontend bundle does not carry the Playwright debug hooks ----------------
 # P29 F1/§2.1's trap: build/Taskfile.yml's build:frontend task fingerprints its `sources` (frontend
-# excluding node_modules/dist), not `dist` itself, so `bun run test:ui` (build:test, hooks on) then
-# `bun run package` with no intervening source edit would otherwise let Task's up-to-date check
+# excluding node_modules/dist), not `dist` itself, so `bun run test:ui:studio` (build:test:studio, hooks on) then
+# `bun run package:studio` with no intervening source edit would otherwise let Task's up-to-date check
 # skip the rebuild and embed the hooks-enabled bundle. Checked against frontend/dist rather than
 # the .app bundle so this also runs on Linux and before packaging.
 # __kiraScrollTrace is deliberately excluded — its console.warn string literal survives in
@@ -54,10 +54,10 @@ fi
 if [ -d apps/kira-studio/frontend/dist/assets ]; then
   if grep -lE '__kiraCount|__kiraCacheStats|__kiraRetention|__kiraRetainedBytes|__kiraTreeConnectionIds' \
       apps/kira-studio/frontend/dist/assets/*.js >/dev/null 2>&1; then
-    fail "debug hooks in packaged bundle" "frontend/dist/assets/*.js carries the Playwright debug hooks — rebuild with 'bun run build', not 'build:test'"
+    fail "debug hooks in packaged bundle" "frontend/dist/assets/*.js carries the Playwright debug hooks — rebuild with 'bun run build:studio', not 'build:test:studio'"
   fi
 else
-  note "skipped S6 — apps/kira-studio/frontend/dist/assets not present (run 'bun run build' first)"
+  note "skipped S6 — apps/kira-studio/frontend/dist/assets not present (run 'bun run build:studio' first)"
 fi
 
 # --- S7: no un-gated debug global in main.ts ----------------------------------------------------
@@ -151,7 +151,7 @@ DMG="apps/kira-studio/bin/Kira Studio.dmg"
 # P100 Part 3: no A6 here — Kira Studio's bundle no longer carries a .vsix (that moved to Kira
 # Space's own bundle, checked separately below).
 if [ ! -d "$APP" ]; then
-  note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package' first)"
+  note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package:studio' first)"
 else
   # A1: ad-hoc signature (P58f: back to the single-target check — no vendored node binary, no
   # nested executable, left to sign independently before the whole bundle is deep-signed).
@@ -206,7 +206,7 @@ fi
 
 # --- A4/N3: the shipped .dmg (only if it exists) -----------------------------------------------
 if [ ! -f "$DMG" ]; then
-  note "skipped A4/N3 — \"$DMG\" not present (run 'bun run package' first)"
+  note "skipped A4/N3 — \"$DMG\" not present (run 'bun run package:studio' first)"
 elif ! command -v codesign >/dev/null 2>&1; then
   note "skipped A4/N3 — codesign not available on this runner"
 else

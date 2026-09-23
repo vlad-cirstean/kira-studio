@@ -47,7 +47,7 @@ async function acquireBuildLock(): Promise<() => Promise<void>> {
 
 // Build prerequisites, all idempotent (P57-e2e-revisit.md §8/§10): `scripts/setup.sh` (pinned
 // wails3, generated bindings — no vendored Node runtime or bundled engine to check for since P58f)
-// plus `bun run build:test` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
+// plus `bun run build:test:studio` (apps/kira-studio/frontend/dist, which main.go's `//go:embed
 // all:frontend/dist` picks up — the hooks-enabled build, same as test:ui/test:ipc:fe, P29 F1),
 // then the one step that script doesn't do — `go build -tags server`. Memoized per worker process
 // so a spec file with multiple tests builds once, not once per test.

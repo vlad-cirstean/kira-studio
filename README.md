@@ -212,10 +212,10 @@ There's no release yet, so installing means building it yourself:
 ```sh
 git clone <repo-url>
 cd kira-studio
-bun run package
+bun run package:studio
 ```
 
-`bun run package` (like `bun run dev` below) installs everything it needs on its own first —
+`bun run package:studio` (like `bun run dev:studio` below) installs everything it needs on its own first —
 the Bun workspace, the Go module, and the pinned `wails3` CLI — so a fresh clone needs nothing
 run beforehand. To do that install step on its own (e.g. to warm up a machine before writing
 code), run `bun run setup`.
@@ -238,30 +238,30 @@ verification checklist. To build Kira Space instead (the git tooling that used t
 ## Development
 
 ```sh
-bun run dev        # installs everything needed, then `wails3 task dev` — native window, HMR
+bun run dev:studio  # installs everything needed, then `wails3 task dev` — native window, HMR
 ```
 
 | Script | What it does |
 |---|---|
-| `bun run setup` | `scripts/setup.sh` — `bun install` + `go mod download`, then installs the pinned `wails3` CLI and regenerates bindings if either has drifted. Runs automatically as `predev`/`prepackage`; call it directly to install without building or running anything. |
-| `bun run dev` | `cd apps/kira-studio && wails3 task dev` (`predev` runs `bun run setup` first; the Wails task's own dev-mode config runs a blocking `common:build:frontend` for the embedded bundle, then `common:dev:frontend` in the background for HMR) |
-| `bun run build` | Production Vue build into `apps/kira-studio/frontend/dist` |
+| `bun run setup` | `scripts/setup.sh` — `bun install` + `go mod download`, then installs the pinned `wails3` CLI and regenerates bindings if either has drifted. Runs automatically as `predev:studio`/`prepackage:studio`; call it directly to install without building or running anything. |
+| `bun run dev:studio` | `cd apps/kira-studio && wails3 task dev` (`predev:studio` runs `bun run setup` first; the Wails task's own dev-mode config runs a blocking `common:build:frontend` for the embedded bundle, then `common:dev:frontend` in the background for HMR) |
+| `bun run build:studio` | Production Vue build into `apps/kira-studio/frontend/dist` |
 | `bun run lint` | Biome check |
 | `bun run format` | Biome check + write |
 | `bun run typecheck` | Runs eight splits in parallel, covering both this app and Kira Space — the four below are this app's own; Kira Space's own four (`typecheck:space-web`, `typecheck:space-tests`, `typecheck:space-unit`, `typecheck:git`) are documented in [`apps/kira-space/README.md`](apps/kira-space/README.md) |
-| `bun run typecheck:tests` | `packages/shared` plus every `apps/kira-studio/tests/` tier and `playwright.config.ts` (native TypeScript, `tsgo`) |
-| `bun run typecheck:web` | `apps/kira-studio/frontend/src`, including `.vue` files, plus `packages/shared` (`vue-tsc`) |
-| `bun run typecheck:unit` | `apps/kira-studio/tests/unit` (`tsgo`) |
-| `bun run typecheck:api-core` | `packages/api-core` (`tsgo`) |
+| `bun run typecheck:tests:studio` | `packages/shared` plus every `apps/kira-studio/tests/` tier and `playwright.config.ts` (native TypeScript, `tsgo`) |
+| `bun run typecheck:web:studio` | `apps/kira-studio/frontend/src`, including `.vue` files, plus `packages/shared` (`vue-tsc`) |
+| `bun run typecheck:unit:studio` | `apps/kira-studio/tests/unit` (`tsgo`) |
+| `bun run typecheck:api-core:studio` | `packages/api-core` (`tsgo`) |
 | `bun run test:unit` | Unit suite for **both apps** — `apps/kira-studio/tests/unit`, `apps/kira-space/tests/unit`, and the in-source specs under `packages/{api-core,git-core,git-ipc,git-ui,kira-ui}` and `apps/kira-space-vscode/src`. No external resource, finishes in about a second |
-| `bun run test:ui` | Builds, then runs Playwright (WebKit) against this app's own built bundle with both wire planes mocked |
-| `bun run test:ipc:fe` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
+| `bun run test:ui:studio` | Builds, then runs Playwright (WebKit) against this app's own built bundle with both wire planes mocked |
+| `bun run test:ipc:fe:studio` | Frontend half of the IPC-boundary suite — real rendered UI, mocked IPC (see below) |
 | `bun run test:go` | The Go test suite (`go test ./...`) — covers both apps, since they're one Go module |
-| `bun run test:e2e-real` | Builds, then runs the full-stack wiring suite against a real `-tags server` Go binary (see Tests below) |
+| `bun run test:e2e-real:studio` | Builds, then runs the full-stack wiring suite against a real `-tags server` Go binary (see Tests below) |
 | `bun run test:compat` | `scripts/db-compat.sh` — the same per-engine conformance suite against each kind's oldest and newest supported server image, on demand, not part of CI |
 | `bun run test:matrix` | `scripts/test-matrix.sh` — each adapter's full auth/config permutation matrix, on demand, not part of CI |
 | `bun run generate:wire` | `scripts/generate-wire.sh` — regenerates the Go and TypeScript FlatBuffers code from `wire.fbs`; not part of a normal build |
-| `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`). Carries no `.vsix` — see [`apps/kira-space/README.md`](apps/kira-space/README.md) for `package:space`, which does |
+| `bun run package:studio` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage:studio` runs `bun run setup` first, same as `dev:studio`). Carries no `.vsix` — see [`apps/kira-space/README.md`](apps/kira-space/README.md) for `package:space`, which does |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior, for both apps' bundles |
 
 **App data:** the app keeps `kira.db`, `logs/`, and the database MCP server's own token
@@ -287,14 +287,14 @@ Space's own test tiers, including the extension's webview suite, are documented 
   container or a real window process. No external resource needed; finishes in about a second.
   Sparse by design — added only where a unit test is a better fit than the UI coverage below,
   never as a substitute for it.
-- **`bun run test:ui`** — Playwright against the built bundle, real WebKit, with both wire planes
+- **`bun run test:ui:studio`** — Playwright against the built bundle, real WebKit, with both wire planes
   (control and data) mocked. Builds first.
-- **`bun run test:ipc:fe`** — the frontend half of the per-adapter IPC-boundary suite (see
+- **`bun run test:ipc:fe:studio`** — the frontend half of the per-adapter IPC-boundary suite (see
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Testing section): real rendered UI, mocked IPC.
   The backend half is Go (`apps/kira-studio/internal/ipcfixture`), run via `bun run test:go` with
   `KIRA_IPC_FIXTURES=write` to regenerate the fixture modules both halves read.
 - **`apps/kira-studio/tests/e2e-real/`** — four specs against a real `-tags server` Go binary, run
-  via `bun run test:e2e-real`, which deliberately launches Playwright through plain Node rather than
+  via `bun run test:e2e-real:studio`, which deliberately launches Playwright through plain Node rather than
   `bunx` (`node node_modules/.bin/playwright test --project=e2e-real`) — see
   `docs/DEV_ENVIRONMENT.md`'s Docker section for why.
 - **`bun run test:go`** — the Go test suite (`go test ./...`), covering both this app and Kira

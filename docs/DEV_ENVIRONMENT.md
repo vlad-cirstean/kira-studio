@@ -81,7 +81,7 @@ See `docs/ARCHITECTURE.md`'s Testing section for what this tier is and why its f
 rather than hand-written. This section is only about running it here.
 
 - **Neither half needs `xvfb`** — no Electron, no native window anywhere in the repo. The frontend
-  half (`bun run test:ipc:fe`) drives headless Chromium against a static file server, the same way
+  half (`bun run test:ipc:fe:studio`) drives headless Chromium against a static file server, the same way
   `tests/ui/` does.
 - **The backend half is Go, not a bundled TypeScript spec** — no esbuild step, no vendored Node
   runtime. `apps/kira-studio/internal/ipcfixture`'s per-adapter Go test (`clickhouse_test.go`,
@@ -125,7 +125,7 @@ See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design fac
   still reads it directly.
 - `apps/kira-studio/tests/e2e-real/sqlite-real.spec.ts` runs unconditionally, Docker-free by design
   — a real `-tags server` Go binary, every adapter served in-process, and a real temp-file database
-  driven by a plain Playwright tab. Prerequisites (`scripts/setup.sh`, `bun run build`, and
+  driven by a plain Playwright tab. Prerequisites (`scripts/setup.sh`, `bun run build:studio`, and
   `go build -tags server`) are memoized per worker process by
   `apps/kira-studio/tests/e2e-real/fixtures.ts`'s `buildPrerequisites()`.
 
@@ -134,7 +134,7 @@ See `docs/ARCHITECTURE.md`'s ClickHouse section for the adapter's own design fac
 See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the envelope. Here:
 
 - **There is no Linux keychain backend at all** (no `gnome-keyring`/`kwallet` probing) — set
-  `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev`, the Go binary directly, or
+  `KIRA_INSECURE_SECRETS=1` before launching the app (`bun run dev:studio`, the Go binary directly, or
   `t.Setenv("KIRA_INSECURE_SECRETS", "1")` in a Go test) on any Linux box to opt into the dev-only
   fallback. `apps/kira-studio/tests/e2e-real/`'s fixture sets it for every real-backend test.
 - Without it, Linux secret storage is **unavailable** — a password-bearing save fails visibly
@@ -162,7 +162,7 @@ historical prose.
   Never `KIRA_HOME` (Kira Studio's own env var) — the two apps' homes are fully separate as of
   P100, so setting the wrong one silently talks to the wrong app's storage, or none at all.
 - **`bun run dev:space` runs Kira Space's own dev loop** (`cd apps/kira-space && wails3 task dev`)
-  — a separate native window/process from `bun run dev`'s Kira Studio, on its own Vite dev-server
+  — a separate native window/process from `bun run dev:studio`'s Kira Studio, on its own Vite dev-server
   port (9246, beside Kira Studio's 9245) so both can run at once without colliding.
 - **The perf probes are opt-in and assert nothing.**
   `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-studio/internal/gitsock/ -v`
@@ -364,7 +364,7 @@ This server exists only inside the app process: `apps/kira-studio/cmd/` holds on
 `package.json` has no `mcp:*` script for it.
 
 - **No headless binary and no `bun run mcp:*` script exists for it.** The only ways to reach it here
-  are `bun run dev` (needs a GUI this container does not have) or a `go build -tags server` boot
+  are `bun run dev:studio` (needs a GUI this container does not have) or a `go build -tags server` boot
   proof — the same `//go:build server` route documented above for the bound-call surface. M5's own
   verification did exactly that and drove a real `dbmcp` endpoint with `curl`.
 - Its token is `${KIRA_HOME}/mcp-db-token.json` — no repo slug, one per `KIRA_HOME`

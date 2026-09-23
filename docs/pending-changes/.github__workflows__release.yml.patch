@@ -1,13 +1,11 @@
-Note: P100 Part 3 — retargets the version-stamp step off apps/kira-studio-vscode (renamed to kira-space-vscode) and adds a release-space job producing/uploading Kira Space.dmg onto the same draft release; apply with 'git apply' against .github/workflows/release.yml, then delete this file.
+Note: P100 Part 3 — retargets the version-stamp step off apps/kira-studio-vscode (renamed to kira-space-vscode) and adds a release-space job producing/uploading Kira Space.dmg onto the same draft release. P106 — renames the "release" job's own `bun run package` invocation (Kira Studio's) to `bun run package:studio`, its now-explicit name. Apply with 'git apply' against .github/workflows/release.yml, then delete this file.
 
-diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
-index af49910..693d971 100644
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
-@@ -94,13 +94,9 @@ jobs:
+@@ -94,13 +94,9 @@
            test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
            echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
- 
+
 -          # G10 D21: the extension manifest's own version, kept in lockstep with config.yml's — S9
 -          # asserts the two agree. Anchored to the top-level "version" key at two-space indent, the
 -          # same idiom as the config.yml rewrite above.
@@ -18,10 +16,22 @@ index af49910..693d971 100644
 +          # P100 Part 3: the vscode extension moved to apps/kira-space-vscode and packages into
 +          # Kira Space's own bundle now (apps/kira-space/build/Taskfile.yml's build:vsix) — Kira
 +          # Studio no longer bundles or version-stamps it. See the release-space job below.
- 
+
        - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
          run: sh scripts/setup.sh
-@@ -185,3 +181,98 @@ jobs:
+@@ -108,9 +104,9 @@
+       - run: bun run lint
+       - run: bun run typecheck
+
+-      - run: bun run package
++      - run: bun run package:studio
+
+-      # P10: `bun run package` already produced and signed the .dmg — this only gives it the
++      # P10: `bun run package:studio` already produced and signed the .dmg — this only gives it the
+       # platform-qualified name the release asset carries.
+       - name: Name the signed disk image for distribution
+         run: cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
+@@ -185,3 +181,98 @@
            name: kira-studio-macos-arm64
            path: kira-studio-macos-arm64.dmg
            retention-days: 14

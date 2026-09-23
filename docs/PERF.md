@@ -262,7 +262,7 @@ this environment has never been able to produce (`docs/v1.1/WEBVIEW-SCROLL-MEMOR
 the process; this probe lives inside the page and lets the human supply the momentum instead). It's
 reachable from a dev build's View → Open DevTools (`internal/shell/menutemplate.go`). Protocol:
 
-1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density.
+1. `bun run dev:studio`, open a 50 000+-row table at page size 10 000, comfortable density.
 2. Web Inspector → Console → `__kiraScrollTrace.start()`.
 3. One hard two-finger flick, let momentum die out.
 4. `copy(JSON.stringify(__kiraScrollTrace.stop()))` — report `summary.pxPerFrame` (the first real
@@ -327,7 +327,7 @@ the evidence for that cutover; steps 1-5's two-engine comparison itself is histo
 re-run. Step 6's `window.__kiraGridTuning` A/B, and every A/B further down this section, still work
 standalone and are rewritten below to drop the now-dead engine-switch step. **Run any of them from a
 build where the hooks are actually compiled in** (P29 F1 gates `window.__kira*` behind
-`__KIRA_DEBUG_HOOKS__`): `bun run dev` (`wails3 task dev`)'s Vite dev server, or a native build via
+`__KIRA_DEBUG_HOOKS__`): `bun run dev:studio` (`wails3 task dev`)'s Vite dev server, or a native build via
 `build:dev`/`build:test` — **never** a packaged `.dmg`, where they're gone by design.
 
 **What this section isn't: it doesn't say the fast-scroll lag is fixed.** Pass A
@@ -358,7 +358,7 @@ this section's head).** This is §2.1a's own protocol (above), doubled: run it o
 incumbent grid, once against the spike, same window size, same table, same page size, same hard
 two-finger flick.
 
-1. `bun run dev`, open a 50 000+-row table at page size 10 000, comfortable density — exactly §2.1a
+1. `bun run dev:studio`, open a 50 000+-row table at page size 10 000, comfortable density — exactly §2.1a
    step 1.
 2. Web Inspector → Console → `__kiraScrollTrace.start()`, one hard two-finger flick, let momentum
    die, `copy(JSON.stringify(__kiraScrollTrace.stop()))`. This is the **incumbent** run — do it
@@ -389,7 +389,7 @@ directly. That's what read on macOS as "that fluid velocity sensitive mac scroll
 this app's own velocity/runway logic are unaffected, since both already run off native `scroll`, not
 off SlickGrid's wheel-specific internals.
 
-**Bundle size, measured in this session** (`bun run build`, before/after this phase's own C2/C5,
+**Bundle size, measured in this session** (`bun run build:studio`, before/after this phase's own C2/C5,
 gzip): the launch chunk grew from **353.31 KB to 397.64 KB** (**+44.33 KB**), and the CSS asset from
 21.75 KB to 22.90 KB (**+1.15 KB**) — **+45.48 KB total**, against the plan's own **≤45 000 B**
 ceiling (§7.4(a) item 7) and its **~42 KB JS / ~1.3 KB CSS** projection (F9). This is **~480 B (about
@@ -1302,7 +1302,7 @@ re-measured this session; none is carried over from the plan doc).
 **Method — same as F1's, restated because it matters every time this number is quoted.** No macOS
 hardware here (§2.3/§2.4 already established WebKitGTK isn't a stand-in for WKWebView), and
 `tests/ui`'s own WebKit tier has no `performance.memory`/CDP heap domain. Every megabyte figure
-below is the real production bundle (`bun run build`), booted in **Chromium** against `tests/ui`'s
+below is the real production bundle (`bun run build:studio`), booted in **Chromium** against `tests/ui`'s
 own mock fixtures (browser-agnostic — a temporary Playwright config, `browserName: 'chromium'`,
 deleted after each run, nothing measurement-only committed), heap read via `HeapProfiler.enable` →
 `HeapProfiler.collectGarbage` x2 → `Runtime.getHeapUsage`. **This is V8, not the JavaScriptCore the
@@ -1407,7 +1407,7 @@ P18's own plan doc (`docs/v1.1/plans/P18-sql-language-server-explain.md` §7.5) 
 `dist/assets/index-*.js` and the `sql-formatter` chunk were both unchanged in size. True at the
 time, but P18 did land real, eagerly-bundled app code for the EXPLAIN feature itself
 (`ExplainResultView.vue` + five plan parsers + supporting modules) — P12 round 1's own performance
-review caught the claim going stale and this re-measures it (`bun run build`, current HEAD, after
+review caught the claim going stale and this re-measures it (`bun run build:studio`, current HEAD, after
 every fix that review's findings needed):
 
 - `index-*.js`: **1,117,138 B raw / 356,081 B gzip** — up from P15's own recorded
@@ -1422,7 +1422,7 @@ No dependency leaked into the main chunk; the growth is real app code, not a reg
 
 ### 2.11 P19 — bundle re-measured under Vite 8/Rolldown; a Green Tea GC caveat on every Go-side RSS/CPU figure above
 
-**Bundle (`bun run build`, current HEAD, Vite 8.2.2/Rolldown):**
+**Bundle (`bun run build:studio`, current HEAD, Vite 8.2.2/Rolldown):**
 
 - `index-*.js`: **1,115,370 B raw / 351.14 KB gzip** — down slightly from §2.10's Rollup+esbuild
   figure (1,117,138 B / 356,081 B gzip), noise-level and not attributed to Rolldown specifically;
@@ -1463,7 +1463,7 @@ confirms the wall-clock ones too.
 
 ### 2.12 P21 — bundle re-measured at the close of the v1.1 chapter; §2.11 confirmed still current
 
-**Bundle (`bun run build`, `62c7e84`, Vite 8.2.2/Rolldown, 631 modules):**
+**Bundle (`bun run build:studio`, `62c7e84`, Vite 8.2.2/Rolldown, 631 modules):**
 
 - `index-*.js`: **1,115,990 B raw / 351.31 KB gzip** — +620 B / +0.17 KB gzip against §2.11
   (+0.06%), noise at this scale: P12 rounds 1-2's own frontend fixes landed between §2.11's capture
@@ -1563,7 +1563,7 @@ here. **Rewritten for the Wails/Go bundle at P57 M8**: the steps below are a
 re-pointed procedure, not a re-measurement — nothing in this section has been executed on real
 hardware since the migration, and no number in this file changed as a result of the rewrite.
 
-**The bundle these procedures run against.** `bun run package` (`cd apps/kira-studio && wails3 task
+**The bundle these procedures run against.** `bun run package:studio` (`cd apps/kira-studio && wails3 task
 darwin:package:dmg`, then `scripts/sign-bundle.sh`; see `docs/PACKAGING.md`) produces both
 **`apps/kira-studio/bin/Kira Studio.app`** and, around it, **`Kira Studio.dmg`** — the shipped
 artifact as of P10. electron-builder's `dist/mac-arm64/` output, its `app.asar` and its
@@ -1573,7 +1573,7 @@ natively inside the one Go binary. The only measurement-relevant path inside the
 `Contents/MacOS/Kira Studio` itself.
 
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
-1. `bun run package`.
+1. `bun run package:studio`.
 2. Launch `apps/kira-studio/bin/Kira Studio.app` 3 times via Finder or `open`, discarding the first
    (Gatekeeper's quarantine scan of an ad-hoc-signed bundle on first launch isn't the app's cost).
    Launch it the way a user would rather than `exec`ing the binary — §2.4's own methodology note
@@ -1691,7 +1691,7 @@ this container, 4 cores, no Docker (container-backed cases self-skip — see `do
 P1-test-suite-speed.md` §0/§1 for the full method). CI's own container-tests/ui numbers still need
 a real run to confirm — not re-measured here.
 
-**`bun run test:ui` (`ui` + `ui-timing` projects, 252 tests), measured live in v1.4 P6's own
+**`bun run test:ui:studio` (`ui` + `ui-timing` projects, 252 tests), measured live in v1.4 P6's own
 session** — the number P1 itself left open (its §5 above: "no working frontend build in this
 container to run Playwright against"; this session has one from P4/P5's own work): **5m4s wall
 clock** (4 cores, no Docker, real WebKit via `bunx playwright install webkit`), 252/252 passed. `time`

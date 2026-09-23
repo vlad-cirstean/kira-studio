@@ -62,7 +62,7 @@ export default defineConfig({
     // slick-grid.spec.ts's own two "150ms sandbox gate" tests (P22 Pass B C6/C12 T7) carry the same
     // kind of real-millisecond wall-clock bound, in a file the plan's own prototype measurement
     // found stable at 4 workers — re-measured directly in this environment, it is not: a 157ms
-    // reading against the 150ms bound, on the second of two full `bun run test:ui` runs. Pulled out
+    // reading against the 150ms bound, on the second of two full `bun run test:ui:studio` runs. Pulled out
     // by title (`grep`/`grepInvert`, not a file move) rather than the whole 110s file, since the
     // other 15 tests in it carry no wall-clock assertion of their own and gain nothing from running
     // serially.
