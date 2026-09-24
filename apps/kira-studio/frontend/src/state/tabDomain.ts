@@ -76,16 +76,20 @@ export const STUDIO_TAB_KIND_MODE: Record<StudioTabKind, TabScope> = {
   terminal: 'repo',
 };
 
+// P108 Part 12 F14: every field defaulted, matching defaultDataTabState's own values below and
+// the convention documentTabStateSchema/streamTabStateSchema/browseTabStateSchema already use — a
+// row saved before a field existed used to fail safeParse outright on that one missing field,
+// falling back to raw, unvalidated state (createTabsStore.ts's own hydrateTabs).
 export const dataTabStateSchema = /*#__PURE__*/ z.object({
-  pageSize: pageSizeSchema,
-  pageIndex: z.number().int().min(0), // what the pager shows; offset = pageIndex * pageSize
-  filter: z.string().nullable(),
-  sort: sortSpecSchema.nullable(),
-  projection: /*#__PURE__*/ z.array(z.string()).nullable(),
-  columnWidths: /*#__PURE__*/ z.record(z.string(), z.number()),
-  columnOrder: /*#__PURE__*/ z.array(z.string()).nullable(),
-  scrollTop: z.number(),
-  scrollLeft: z.number(),
+  pageSize: pageSizeSchema.default(100),
+  pageIndex: z.number().int().min(0).default(0), // what the pager shows; offset = pageIndex * pageSize
+  filter: z.string().nullable().default(null),
+  sort: sortSpecSchema.nullable().default(null),
+  projection: /*#__PURE__*/ z.array(z.string()).nullable().default(null),
+  columnWidths: /*#__PURE__*/ z.record(z.string(), z.number()).default({}),
+  columnOrder: /*#__PURE__*/ z.array(z.string()).nullable().default(null),
+  scrollTop: z.number().default(0),
+  scrollLeft: z.number().default(0),
 });
 export type DataTabState = z.infer<typeof dataTabStateSchema>;
 

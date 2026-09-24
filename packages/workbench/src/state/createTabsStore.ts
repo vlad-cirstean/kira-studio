@@ -41,6 +41,8 @@ interface KindLookup<R> {
   readonly [kind: string]: {
     pinned?: true;
     dropResources(tabId: string): void;
+    /** P108 Part 12 F14: hydrateTabs' own reset-on-unparseable fallback. */
+    defaultState(): unknown;
     parseState(raw: unknown): unknown | null;
     duplicateState(tab: R): unknown;
   };
@@ -250,8 +252,17 @@ export function createTabsStore<
     async function hydrateTabs(): Promise<void> {
       const raw = await host.control.tabsList();
       const tabs = raw.map((t) => {
-        const parsed = host.kinds[t.kind]?.parseState(t.state);
-        return parsed ? ({ ...t, state: parsed } as R) : t;
+        const kind = host.kinds[t.kind];
+        const parsed = kind?.parseState(t.state);
+        if (parsed) return { ...t, state: parsed } as R;
+        // P108 Part 12 F14: every per-kind schema's later fields now carry their own
+        // `.default(...)` (tabDomain.ts), so a row only reaches here when it fails on a field the
+        // schema still requires — genuinely corrupt state, not merely an old row predating a
+        // field. Reset to this kind's own defaultState() instead of keeping the unparsed raw
+        // state: a data tab's grid used to compute `pageIndex * pageSize` as NaN off a missing
+        // `pageIndex`, and DataToolbar.vue's `columnOrder !== null` check treated `undefined` as a
+        // custom order rather than "no custom order set".
+        return kind ? ({ ...t, state: kind.defaultState() } as R) : t;
       });
       tabsState.tabs = tabs;
 

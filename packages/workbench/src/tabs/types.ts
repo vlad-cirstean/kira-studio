@@ -23,8 +23,10 @@ export interface TabKindDef<
   defaultState(): Extract<R, { kind: K }>['state'];
   /** A restored record's raw `state`, normalized through this kind's own schema — the one place
    *  every per-kind `*TabStateSchema`'s `.default()` actually fires. `null` means "not
-   *  parseable", and the caller (hydrateTabs) keeps what was stored, merge-only, never resetting
-   *  to defaultState(). */
+   *  parseable" — every field the schema knows about is missing or malformed, since a schema
+   *  whose later fields all carry `.default(...)` (P108 Part 12 F14) already tolerates a row
+   *  missing just those. The caller (hydrateTabs) resets that row to `defaultState()` rather than
+   *  keeping the unparsed, untrusted raw state. */
   parseState(raw: unknown): Extract<R, { kind: K }>['state'] | null;
   /** "Same target, fresh default state" for most kinds — some keep one field from the source. */
   duplicateState(tab: Extract<R, { kind: K }>): Extract<R, { kind: K }>['state'];
