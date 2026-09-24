@@ -33,8 +33,9 @@
 // the whole tab on the very first grid interaction after opening the Operations panel, every time.
 // The project panel keeps `sizeUnit="px"` — it's the outer, rarely-resized group here again, the
 // exact shape already proven safe.
+import { ResizableHandle } from '@theme/components/ui/resizable';
 import { useElementSize } from '@vueuse/core';
-import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
+import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, useSlots, useTemplateRef, watch } from 'vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
@@ -145,9 +146,13 @@ function onOpsResize(percent: number): void {
       >
         <slot name="panel" />
       </SplitterPanel>
-      <SplitterResizeHandle
+      <!-- P110 B32: ResizableHandle's own shared defaults add the P16 divider look (a static
+           shadow line, cleared on hover/drag) that this handle never had -- overridden back to
+           2px/no-shadow here to keep today's exact appearance; everything else (bg-transparent,
+           hover:/drag:bg-focus, cursor) already matches the shared default byte-for-byte. -->
+      <ResizableHandle
         v-if="projectVisible"
-        class="w-0.5 shrink-0 cursor-col-resize bg-transparent hover:bg-focus data-[state=drag]:bg-focus"
+        class="data-[orientation=horizontal]:w-0.5 data-[orientation=horizontal]:shadow-none"
         :hit-area-margins="{ coarse: 8, fine: 4 }"
       />
 
@@ -162,9 +167,11 @@ function onOpsResize(percent: number): void {
                 <slot name="main"><MainView /></slot>
               </div>
             </SplitterPanel>
-            <SplitterResizeHandle
+            <!-- Same override as the project handle above (its own comment), mirrored for the
+                 vertical orientation. -->
+            <ResizableHandle
               v-if="opsVisible"
-              class="h-0.5 shrink-0 cursor-row-resize bg-transparent hover:bg-focus data-[state=drag]:bg-focus"
+              class="data-[orientation=vertical]:h-0.5 data-[orientation=vertical]:shadow-none"
               :hit-area-margins="{ coarse: 8, fine: 4 }"
             />
             <SplitterPanel

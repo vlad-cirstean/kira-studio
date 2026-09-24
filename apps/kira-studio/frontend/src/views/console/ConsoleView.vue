@@ -8,6 +8,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
+import { ResizableHandle } from '@theme/components/ui/resizable';
 import {
   Tooltip,
   TooltipContent,
@@ -18,7 +19,7 @@ import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
-import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
+import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
@@ -1034,7 +1035,7 @@ const statusLine = computed(() => {
       </SplitterPanel>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
-      <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
       </SplitterGroup>
   </div>
@@ -1058,18 +1059,9 @@ const statusLine = computed(() => {
   @apply flex flex-col min-h-0;
 }
 
-/* Reproduces PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow,
-   cleared on hover/drag, --kira-focus fill taking over instead) — same pattern as
-   DataView.vue/KeyValuePane.vue's own .cell-splitter. cell-editor.spec.ts polls this class's
-   box-shadow. */
-.cell-splitter {
-  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
-  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
-}
-.cell-splitter:hover,
-.cell-splitter[data-state='drag'] {
-  box-shadow: none;
-}
+/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
+   `.cell-splitter` is now a bare marker class, kept only because cell-editor.spec.ts polls its
+   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
 
 .saved-anchor {
   @apply relative;

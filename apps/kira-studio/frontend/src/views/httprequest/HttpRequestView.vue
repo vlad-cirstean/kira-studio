@@ -24,6 +24,7 @@ import {
   InputGroupInput,
 } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
+import { ResizableHandle } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
   Tooltip,
@@ -35,7 +36,7 @@ import { connColorVar } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
+import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
@@ -827,7 +828,7 @@ onUnmounted(() => {
         />
       </SplitterPanel>
 
-      <SplitterResizeHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+      <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
       <SplitterPanel class="response-pane-slot" data-testid="http-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
@@ -867,22 +868,11 @@ onUnmounted(() => {
   @apply flex min-h-0 flex-col overflow-hidden;
 }
 
-/* P104 §3.3: reka's SplitterResizeHandle carries no divider styling of its own — this reproduces
-   PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow, cleared on
-   hover/drag, --kira-focus fill taking over instead). Mirrors views/shared/celleditor/
-   CellEditorDock.vue's own .cell-splitter comment: the workbench grid gives a splitter its size
-   from a gap row; inside a view there is no gap band, so the track carries its own explicit
-   height. P22 D13 (F22): the request/response boundary used to be 4px of nothing until the
-   pointer crossed it. http-request.spec.ts/grpc-request.spec.ts poll `.request-splitter`'s
-   box-shadow — kept as a marker class. */
-.request-splitter {
-  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
-  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
-}
-.request-splitter:hover,
-.request-splitter[data-state='drag'] {
-  box-shadow: none;
-}
+/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
+   `.request-splitter` is now a bare marker class, kept because http-request.spec.ts/
+   grpc-request.spec.ts poll its box-shadow via getComputedStyle (no rule of its own attaches to
+   the name any more). P22 D13 (F22): the request/response boundary used to be 4px of nothing
+   until the pointer crossed it -- this is why the handle carries an explicit height at all. */
 
 .dirty-mark {
   @apply text-warn leading-none text-kira-lg;

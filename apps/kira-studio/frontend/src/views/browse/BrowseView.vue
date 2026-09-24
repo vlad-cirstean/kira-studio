@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert'
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { ResizableHandle } from '@theme/components/ui/resizable';
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +16,7 @@ import { connColorVar } from '@theme/connColor';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useVirtualRows } from '@workbench/util/virtualRows';
-import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
+import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -551,7 +552,7 @@ onMounted(() => {
           </div>
         </SplitterPanel>
 
-        <SplitterResizeHandle class="browse-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
+        <ResizableHandle :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
         <SplitterPanel class="detail-pane" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
@@ -611,18 +612,9 @@ onMounted(() => {
   @apply min-w-0 flex flex-col min-h-0;
 }
 
-/* P104 §3.3: reka's SplitterResizeHandle carries no divider styling of its own — this reproduces
-   PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow, cleared on
-   hover/drag, --kira-focus fill taking over instead), mirroring HttpRequestView.vue's own
-   .request-splitter for the horizontal (col-resize) case. */
-.browse-splitter {
-  @apply shrink-0 w-1 cursor-col-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
-  box-shadow: inset calc(var(--kira-border-width) * -1) 0 0 0 var(--kira-border);
-}
-.browse-splitter:hover,
-.browse-splitter[data-state='drag'] {
-  box-shadow: none;
-}
+/* P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
+   ResizableHandle.vue's own shared component -- no test polls this handle by class, so the
+   marker class itself is dropped too, not just its rule. */
 
 .body-panel {
   @apply flex-1 min-h-0 border-0 rounded-none;
