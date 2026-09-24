@@ -206,9 +206,7 @@ function editEnvironmentVariables(): void {
   @apply flex flex-col gap-0.5 overflow-y-auto p-1;
 }
 
-.empty-state {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
+/* P110 B34: `.empty-state` moved to base.css's own `@utility empty-state` (15-file duplicate). */
 
 /* P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover has no use
    for (handle, secret toggle, history, remove) — name, value, scope, description, in the DOM

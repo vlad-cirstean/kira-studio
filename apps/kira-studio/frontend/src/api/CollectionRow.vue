@@ -199,15 +199,11 @@ function onKeydown(e: KeyboardEvent): void {
   @apply bg-select;
 }
 
-/* mutations.spec.ts/fake-data.spec.ts/tree.spec.ts select `.twisty` directly — kept as a marker
-   class. */
-.twisty {
-  @apply flex h-3.5 w-3.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground;
-}
-
-.twisty.invisible {
-  @apply invisible;
-}
+/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as RepoTreeRow.vue's
+   own rule) -- mutations.spec.ts/fake-data.spec.ts/tree.spec.ts still select `.twisty` directly,
+   the name stays. `.twisty.invisible` dropped: it applied nothing beyond Tailwind's own bare
+   `.invisible` utility already does on the same element (:class="{ invisible: !row.hasChildren
+   }"). */
 
 .node-icon {
   @apply shrink-0 text-muted-foreground;

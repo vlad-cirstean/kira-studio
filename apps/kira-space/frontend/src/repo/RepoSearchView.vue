@@ -259,7 +259,5 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
   @apply flex-1 min-h-0;
 }
 
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
 </style>

@@ -432,9 +432,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   @apply flex-1 min-h-0;
 }
 
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared duplicate). */
 
 .ops-row {
   @apply cursor-pointer select-text;

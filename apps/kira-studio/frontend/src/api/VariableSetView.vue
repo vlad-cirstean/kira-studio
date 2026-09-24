@@ -614,7 +614,10 @@ function onBulkClose(): void {
                 <span
                   aria-hidden="true"
                   class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color, none: color === 'none' }"
+                  :class="{
+                    'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color,
+                    'swatch-none': color === 'none',
+                  }"
                   :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
                   >&nbsp;</span>
               </label>
@@ -670,18 +673,9 @@ function onBulkClose(): void {
   @apply flex h-full min-h-0 flex-col;
 }
 
-/* Inlined from the old hand-rolled color picker (P104 §3): the "no colour" swatch's diagonal
-   slash, never a 13th hue standing in for "nothing chosen". */
-.swatch.none {
-  border: 1.5px solid var(--kira-fg-muted);
-  background: linear-gradient(
-    to top right,
-    transparent calc(50% - 0.75px),
-    var(--kira-fg-muted) calc(50% - 0.75px),
-    var(--kira-fg-muted) calc(50% + 0.75px),
-    transparent calc(50% + 0.75px)
-  );
-}
+/* P110 B34: the "none" swatch's diagonal-slash rule moved to base.css's own `@utility swatch-none`
+   (built at B6, wired up here) -- shared byte-for-byte across this file/ConnectionDialog.vue/
+   ScriptsPane.vue, no per-file copy left. */
 
 .env-fields {
   /* P28 D16(b): flex-end, not center — each labelled field is now a two-row column, and centering
@@ -705,7 +699,5 @@ function onBulkClose(): void {
   @apply grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm;
 }
 
-.empty-state {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
+/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

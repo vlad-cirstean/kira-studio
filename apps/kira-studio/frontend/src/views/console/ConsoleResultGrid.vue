@@ -415,8 +415,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           <div
             class="cell kv-field"
             :class="{
-              'search-match': isSearchMatch(rowIndices[vi.index]!, 0),
-              'search-match-current': isCurrentSearchMatch(rowIndices[vi.index]!, 0),
+              'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
+              'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                rowIndices[vi.index]!,
+                0,
+              ),
             }"
           >
             {{ kvRowAt(rowIndices[vi.index]!).field }}
@@ -424,8 +427,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           <div
             class="cell kv-value"
             :class="{
-              'search-match': isSearchMatch(rowIndices[vi.index]!, 1),
-              'search-match-current': isCurrentSearchMatch(rowIndices[vi.index]!, 1),
+              'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
+              'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                rowIndices[vi.index]!,
+                1,
+              ),
             }"
           >
             {{ kvRowAt(rowIndices[vi.index]!).value }}
@@ -451,9 +457,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
   @apply flex-1 min-h-0;
 }
 
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
 
 .row {
   @apply flex border-b border-border w-[var(--total-width)];
@@ -473,15 +477,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
   @apply bg-hover;
 }
 
-/* P40 D10: same tokens grid/keyvalue's own search highlighting uses. */
-.search-match {
-  background: var(--kira-search-match);
-}
-
-.search-match-current {
-  background: var(--kira-search-match-current);
-  @apply text-bg;
-}
+/* P40 D10: same tokens grid/keyvalue's own search highlighting uses.
+   P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own any more --
+   bare marker classes, the tint/text-colour is `bg-search-match[-current] text-bg` alongside on
+   the same element (--color-search-match[-current] already @theme-registered, base.css). */
 
 .no-rows {
   @apply h-full flex items-center justify-center text-muted-foreground text-kira-sm;

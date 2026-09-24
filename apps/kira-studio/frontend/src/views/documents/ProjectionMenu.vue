@@ -112,27 +112,10 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.columns-menu-inner {
-  @apply max-h-80 flex flex-col;
-}
-
-.columns-menu-header {
-  @apply flex gap-1 border-b border-border p-1;
-}
-
-.columns-menu-loading {
-  @apply p-2;
-}
-
-.columns-menu-list {
-  @apply overflow-y-auto p-0.5;
-}
-
+/* P110 B34: `.columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` moved to base.css's own
+   `@utility` set, shared byte-for-byte with ColumnsMenu.vue. `.columns-menu-item` stays here:
+   no gap-1 (this list has no inline drag-handle icon, unlike ColumnsMenu.vue's own item). */
 .columns-menu-item {
   @apply cursor-pointer;
-}
-
-.columns-menu-footer {
-  @apply px-1.5 pb-1.5;
 }
 </style>

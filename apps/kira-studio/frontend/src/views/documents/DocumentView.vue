@@ -1243,9 +1243,7 @@ onUnmounted(() => {
   @apply h-full;
 }
 
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
 
 /* P48 F10-F12: the row shell and its head (.doc-row/.doc-head and friends, .expand-toggle,
    .doc-id) now live in views/shared/document/DocumentRow.vue — this view only styles its own

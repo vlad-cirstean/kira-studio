@@ -139,11 +139,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
   @apply h-full;
 }
 
-.sticky-row {
-  @apply absolute left-0 right-0 bg-bg z-1;
-}
-
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.sticky-row`/`.virtual-row` moved to base.css's own `@utility` pair (shared
+   duplicates across CollectionsTree/ProjectTree/RepoFileTree and 9 virtualized-row files
+   respectively). */
 </style>

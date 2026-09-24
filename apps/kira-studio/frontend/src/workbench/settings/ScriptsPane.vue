@@ -186,7 +186,10 @@ async function onAddScript(): Promise<void> {
                   <span
                     aria-hidden="true"
                     class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                    :class="{ 'outline outline-2 outline-offset-2 outline-fg': script.color === color, none: color === 'none' }"
+                    :class="{
+                      'outline outline-2 outline-offset-2 outline-fg': script.color === color,
+                      'swatch-none': color === 'none',
+                    }"
                     :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
                     >&nbsp;</span>
                 </label>
@@ -265,7 +268,10 @@ async function onAddScript(): Promise<void> {
                 <span
                   aria-hidden="true"
                   class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color, none: color === 'none' }"
+                  :class="{
+                    'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color,
+                    'swatch-none': color === 'none',
+                  }"
                   :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
                   >&nbsp;</span>
               </label>
@@ -304,18 +310,3 @@ async function onAddScript(): Promise<void> {
     }}</FieldError>
   </div>
 </template>
-
-<style scoped>
-/* P104 §3: ColorPicker's own "none" swatch -- a diagonal slash, never a 13th hue standing in for
-   "nothing chosen" (its own comment, ported verbatim). */
-.swatch.none {
-  border: 1.5px solid var(--kira-fg-muted);
-  background: linear-gradient(
-    to top right,
-    transparent calc(50% - 0.75px),
-    var(--kira-fg-muted) calc(50% - 0.75px),
-    var(--kira-fg-muted) calc(50% + 0.75px),
-    transparent calc(50% + 0.75px)
-  );
-}
-</style>

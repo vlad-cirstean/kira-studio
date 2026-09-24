@@ -114,13 +114,10 @@ function onKeydown(e: KeyboardEvent): void {
   @apply bg-select;
 }
 
-.twisty {
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5;
-}
-
-.twisty.invisible {
-  @apply invisible;
-}
+/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as CollectionRow.vue's
+   own rule). `.twisty.invisible` dropped: it applied nothing beyond Tailwind's own bare
+   `.invisible` utility already does on the same element (:class="{ invisible: !row.hasChildren
+   }"). */
 
 /* P67b §6.2: 16x16, matching VS Code's own explorer icon box (FileTree.vue's own
    .kv-file-tree-icon, ported verbatim) — was a bare 13px codicon glyph with no box at all. The

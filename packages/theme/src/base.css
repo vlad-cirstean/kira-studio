@@ -162,6 +162,113 @@
   --wails-draggable: none;
 }
 
+/* P110 B34: a virtualized row/item wrapper's own absolute-positioning shape -- byte-identical
+   `@apply absolute top-0 left-0 w-full;` copied across 9 files (BrowseView/StreamView/
+   DocumentView/ConsoleResultGrid/ProjectTree/RepoFileTree/RepoSearchView/OperationsPanel/
+   CollectionsTree). */
+@utility virtual-row {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 100%;
+}
+
+/* A virtualized tree/list's own sticky occluder row -- position/z-index/background copied
+   identically (mixed @apply/raw forms) across CollectionsTree/ProjectTree/RepoFileTree, each
+   with the comment "opaque and full-width so it fully occludes whatever real row has scrolled up
+   behind it" (P28 D2). */
+@utility sticky-row {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  z-index: 1;
+  background-color: var(--color-bg);
+}
+
+/* The "nothing here yet" panel shape -- byte-identical across 15 files (KeyValuePane,
+   RawExchangePane, CookiesPane, ResponseHistoryList, both request kinds' ResponsePane,
+   TimelinePane, SchemaBrowser, CallHistoryList, VariableHistoryMenu, VariablesOverviewPanel,
+   VariableSetView, EnvironmentsView, CollectionsPanel, DynamicValuesDialog). api-ui-consistency.
+   spec.ts polls `.empty-state` by class, so the name stays. */
+@utility empty-state {
+  display: flex;
+  min-height: 0px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing) * 2);
+  border-style: var(--tw-border-style);
+  border-width: 0px;
+  background-color: transparent;
+  text-align: center;
+}
+
+/* The gRPC empty-state's own icon/title dress-up -- identical across ResponsePane/SchemaBrowser/
+   CallHistoryList (grpcrequest/**). Values real-compile-verified against `text-subtle`/
+   `text-muted-foreground text-kira-md font-normal` (the classes each file's own rule `@apply`ed). */
+@utility empty-state-icon {
+  color: var(--color-subtle);
+}
+@utility empty-state-title {
+  font-size: var(--text-kira-md);
+  color: var(--muted-foreground);
+  --tw-font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-normal);
+}
+
+/* A tree row's own disclosure-triangle button -- same utility set (order aside) in
+   CollectionRow.vue/RepoTreeRow.vue. `.twisty.invisible` (both files) applied nothing beyond
+   Tailwind's own bare `.invisible` utility already does -- dropped rather than ported.
+   project/TreeRow.vue's own `.twisty` (raw declarations, not yet Tailwind) and
+   RepoSearchRow.vue's (no cursor-pointer -- a real, deliberate difference) are left alone, out
+   of scope here (B35/B37's own raw-declaration passes own those files). */
+@utility twisty {
+  display: flex;
+  height: calc(var(--spacing) * 3.5);
+  width: calc(var(--spacing) * 3.5);
+  flex-shrink: 0;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-style: var(--tw-border-style);
+  border-width: 0px;
+  background-color: transparent;
+  padding: 0px;
+  color: var(--muted-foreground);
+}
+
+/* ColumnsMenu.vue/ProjectionMenu.vue's shared popover shell -- byte-identical (as utility sets)
+   in both files, even though the plan's own extraction gate ("only if the two templates are
+   truly the same") is not met: ColumnsMenu.vue's own list is drag-reorderable with a PK lock,
+   ProjectionMenu.vue's is a plain checkbox list, so no shared component. `.columns-menu-item`
+   (gap-1 on ColumnsMenu.vue only, for its inline drag-handle icon) and ColumnsMenu.vue's own
+   `.is-dragging`/`.drag-handle` stay per-file -- a real difference, not copy-paste drift. */
+@utility columns-menu-inner {
+  max-height: calc(var(--spacing) * 80);
+  display: flex;
+  flex-direction: column;
+}
+@utility columns-menu-header {
+  display: flex;
+  border-bottom-style: var(--tw-border-style);
+  border-bottom-width: 1px;
+  border-color: var(--border);
+  gap: var(--spacing);
+  padding: var(--spacing);
+}
+@utility columns-menu-loading {
+  padding: calc(var(--spacing) * 2);
+}
+@utility columns-menu-list {
+  overflow-y: auto;
+  padding: calc(var(--spacing) * 0.5);
+}
+@utility columns-menu-footer {
+  padding-inline: calc(var(--spacing) * 1.5);
+  padding-bottom: calc(var(--spacing) * 1.5);
+}
+
 html,
 body,
 #app {

@@ -228,14 +228,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
   @apply flex-1 min-h-0;
 }
 
-/* Positioned relative to the zero-height .virtual-list-sticky (position: sticky), matching
-   ProjectTree.vue's own sticky row — opaque and full-width so it fully occludes whatever real row
-   has scrolled up behind it. */
-.sticky-row {
-  @apply absolute left-0 right-0 z-1 bg-bg;
-}
-
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* Positioned relative to the zero-height .virtual-list-sticky (position: sticky) -- P110 B34:
+   `.sticky-row`/`.virtual-row` moved to base.css's own `@utility` pair (shared duplicates across
+   CollectionsTree/ProjectTree/RepoFileTree and 9 virtualized-row files respectively). */
 </style>

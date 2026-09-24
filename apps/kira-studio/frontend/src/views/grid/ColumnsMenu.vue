@@ -156,22 +156,9 @@ onBeforeUnmount(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.columns-menu-inner {
-  @apply max-h-80 flex flex-col;
-}
-
-.columns-menu-header {
-  @apply flex border-b border-border gap-1 p-1;
-}
-
-.columns-menu-loading {
-  @apply p-2;
-}
-
-.columns-menu-list {
-  @apply overflow-y-auto p-0.5;
-}
-
+/* P110 B34: `.columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` moved to base.css's own
+   `@utility` set, shared byte-for-byte with ProjectionMenu.vue. `.columns-menu-item` stays here
+   (its own gap-1, for the inline drag-handle icon ProjectionMenu.vue's item has none of). */
 .columns-menu-item {
   @apply cursor-pointer gap-1;
 }
@@ -182,9 +169,5 @@ onBeforeUnmount(() => {
 
 .drag-handle {
   @apply flex items-center shrink-0 text-subtle cursor-grab;
-}
-
-.columns-menu-footer {
-  @apply px-1.5 pb-1.5;
 }
 </style>

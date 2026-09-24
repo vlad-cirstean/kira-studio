@@ -1138,8 +1138,11 @@ onUnmounted(() => {
                       <div
                         class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-field"
                         :class="{
-                          'search-match': isSearchMatch(entry.i, 'field'),
-                          'search-match-current': isCurrentSearchMatch(entry.i, 'field'),
+                          'search-match bg-search-match': isSearchMatch(entry.i, 'field'),
+                          'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                            entry.i,
+                            'field',
+                          ),
                         }"
                         data-testid="keyvalue-field"
                       >
@@ -1153,8 +1156,11 @@ onUnmounted(() => {
                       <div
                         class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-value"
                         :class="{
-                          'search-match': isSearchMatch(entry.i, 'value'),
-                          'search-match-current': isCurrentSearchMatch(entry.i, 'value'),
+                          'search-match bg-search-match': isSearchMatch(entry.i, 'value'),
+                          'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                            entry.i,
+                            'value',
+                          ),
                         }"
                         data-testid="keyvalue-value"
                       >
@@ -1249,14 +1255,11 @@ onUnmounted(() => {
   @apply bg-hover;
 }
 
-.search-match {
-  background: var(--kira-search-match);
-}
-
-.search-match-current {
-  background: var(--kira-search-match-current);
-  @apply text-bg;
-}
+/* P110 B34: `.search-match`/`.search-match-current` carry no rule of their own here any more --
+   kept as bare marker classes (the shared vocabulary name cellClass.ts/DocumentRow.vue/
+   ConsoleResultGrid.vue also use). The actual tint/text-colour is `bg-search-match[-current]
+   text-bg` alongside on the same element (--color-search-match[-current] already @theme-registered,
+   base.css -- no new utility needed). */
 
 .edit-anchor,
 .add-anchor {
@@ -1279,7 +1282,5 @@ onUnmounted(() => {
   @apply text-error;
 }
 
-.empty-state {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
+/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

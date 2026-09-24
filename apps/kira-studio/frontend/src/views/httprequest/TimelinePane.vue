@@ -405,7 +405,5 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
   @apply inline-block h-2 w-2 rounded-kira-sm;
 }
 
-.empty-state {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
+/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

@@ -309,13 +309,6 @@ function selectMethod(service: string, method: string): void {
   @apply text-kira-sm;
 }
 
-.empty-state {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-.empty-state-icon {
-  @apply text-subtle;
-}
-.empty-state-title {
-  @apply text-kira-md text-muted-foreground font-normal;
-}
+/* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared
+   across ResponsePane/SchemaBrowser/CallHistoryList, `.empty-state` a 15-file duplicate). */
 </style>

@@ -1327,9 +1327,7 @@ onUnmounted(() => {
   @apply flex-1 min-h-0 overflow-auto;
 }
 
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
 
 .stream-row {
   /* P49 F7/D5: previously unset (sized off whatever text a cell happened to hold) — now fixed,
@@ -1346,7 +1344,12 @@ onUnmounted(() => {
 }
 
 /* P31 D21: adopts the same color-mix tint / solid-current pair as KeyValueView.vue (and the
-   deleted DataGrid.vue), replacing the inset bar so all four search-capable views agree. */
+   deleted DataGrid.vue), replacing the inset bar so all four search-capable views agree.
+   P110 B34: NOT converted to a template-level `bg-search-match[-current]` utility class like its
+   3 siblings (KeyValuePane/DocumentRow/ConsoleResultGrid) -- `.stream-row:hover`/`.stream-row.
+   selected` above tie this rule's own specificity exactly, so today's unlayered same-block source
+   order (this rule wins on overlap) would flip to the *utility losing* to hover/selected if moved
+   out of this unlayered block. Left as its own raw-declaration rule for B37's own pass instead. */
 .stream-row.search-match {
   background: var(--kira-search-match);
 }

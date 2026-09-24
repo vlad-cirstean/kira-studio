@@ -38,8 +38,8 @@ function onHeadKeydown(e: KeyboardEvent): void {
     :class="{
       open: expanded,
       selected,
-      'search-match': searchMatch,
-      'search-match-current': searchMatchCurrent,
+      'search-match bg-search-match': searchMatch,
+      'search-match-current bg-search-match-current': searchMatchCurrent,
     }"
     :data-id="view.id"
   >
@@ -109,14 +109,12 @@ function onHeadKeydown(e: KeyboardEvent): void {
 /* P31 D20: the same color-mix tint / solid-current pair KeyValueView.vue uses (and the deleted
    DataGrid.vue used) —
    a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
-   still reads through it) since a document match has no single cell to point at. */
-.doc-row.search-match {
-  background: var(--kira-search-match);
-}
-
-.doc-row.search-match-current {
-  background: var(--kira-search-match-current);
-}
+   still reads through it) since a document match has no single cell to point at.
+   P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own any more --
+   bare marker classes now, the tint itself is `bg-search-match[-current]` alongside them
+   (--color-search-match[-current] already @theme-registered, base.css). Deliberately no `text-bg`
+   here (unlike KeyValuePane.vue/ConsoleResultGrid.vue's own -current pairing): this row's current-
+   match state was never given a text-colour change, only the background -- kept exact. */
 
 .expand-toggle {
   @apply flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground;
