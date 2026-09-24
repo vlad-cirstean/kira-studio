@@ -118,8 +118,12 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 		return "", "", "", false // row 6
 	}
 
-	// Row 7: pairingRequired, then §3.1.2's own follow-up table.
+	// Row 7: pairingRequired, then §3.1.2's own follow-up table. requestID is captured from
+	// onEnqueued so an Approved outcome can claim this connection's own share of the token the
+	// broker minted (F6) — TakeApprovedToken is keyed by it.
+	var requestID string
 	outcome := deps.Broker.Request(clientID, label, func(req PairingRequest) {
+		requestID = req.RequestID
 		sendHandshake(c, handshakeResponse{
 			Kind: "pairingRequired", RequestID: req.RequestID,
 			ExpiresInMs: int(pairingTimeout / time.Millisecond),
@@ -128,7 +132,14 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 
 	switch outcome {
 	case PairingApproved:
-		ok = finishPairing(c, deps, clientID, sessionID, label)
+		tok, tokenOK := deps.Broker.TakeApprovedToken(requestID)
+		if !tokenOK {
+			// Broker.answer always mints (or degrades to Denied) before resolving Approved — this
+			// is unreachable in practice, but fail closed rather than pair with no token to hand.
+			sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
+			return "", "", "", false
+		}
+		ok = finishPairing(c, deps, clientID, sessionID, label, tok)
 		if !ok {
 			return "", "", "", false
 		}
@@ -142,18 +153,14 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	}
 }
 
-// finishPairing mints a token and inserts the row *before* sending "paired" (§3.1.2: the reverse
-// order can hand out a token no row backs, which reads as a silent pairing loop to the user).
-func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label string) bool {
-	plain, hash, salt, err := mintToken()
-	if err != nil {
-		slog.Warn("gitsock: mint token", "scope", "gitsock", "client", clientID, "err", err)
-		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
-		return false
-	}
+// finishPairing inserts the row *before* sending "paired" (§3.1.2: the reverse order can hand out
+// a token no row backs, which reads as a silent pairing loop to the user). tok is the single token
+// Broker.Approve already minted for this whole approval decision (F6) — shared verbatim by every
+// sibling window of the same clientID, never minted again here.
+func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label string, tok approvedToken) bool {
 	now := deps.Now().UnixMilli()
 	row := repos.GitClientRow{
-		ID: clientID, Label: label, TokenHash: hash, TokenSalt: salt,
+		ID: clientID, Label: label, TokenHash: tok.hash, TokenSalt: tok.salt,
 		CreatedAt: now, LastSeenAt: now,
 	}
 	if err := deps.Clients.UpsertOnPair(row); err != nil {
@@ -165,7 +172,7 @@ func finishPairing(c *conn, deps handshakeDeps, clientID, sessionID, label strin
 	if deps.ClientsChanged != nil {
 		deps.ClientsChanged()
 	}
-	if err := sendHandshake(c, handshakeResponse{Kind: "paired", Token: plain}); err != nil {
+	if err := sendHandshake(c, handshakeResponse{Kind: "paired", Token: tok.plain}); err != nil {
 		return false
 	}
 	sendHandshake(c, handshakeResponse{

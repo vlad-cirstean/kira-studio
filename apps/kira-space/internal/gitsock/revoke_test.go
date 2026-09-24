@@ -13,6 +13,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
 
 // §3.7's own M5: revoke while a connection holds each of the four things a connection can hold,
@@ -301,5 +303,101 @@ func TestRevoke_DoesNotDisturbAnotherClient(t *testing.T) {
 	kind3, _ := client3.hello("revoke-other-b", "revoke test", &tokenB)
 	if kind3 != "ready" {
 		t.Fatalf("B's OWN token after A's revoke = %q, want ready (untouched)", kind3)
+	}
+}
+
+// racingRevokeStore wraps a real TrustStore and reports clientID as revoked starting from its
+// (revokeAfter+1)th ByID call — deterministically reproducing F5's own race window (a Revoke
+// landing between verifyClientToken's check and handleConn's addConn) instead of timing a real
+// one. See the test below for exactly which call that needs to be.
+type racingRevokeStore struct {
+	TrustStore
+	mu          sync.Mutex
+	calls       int
+	revokeAfter int
+	clientID    string
+}
+
+func (s *racingRevokeStore) ByID(id string) (repos.GitClientRow, bool, error) {
+	row, found, err := s.TrustStore.ByID(id)
+	if err != nil || !found || id != s.clientID {
+		return row, found, err
+	}
+	s.mu.Lock()
+	s.calls++
+	call := s.calls
+	s.mu.Unlock()
+	if call > s.revokeAfter {
+		revokedAt := int64(1)
+		row.RevokedAt = &revokedAt
+	}
+	return row, found, err
+}
+
+// TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken is P108 Part 17 review F5's
+// own regression guard: a connection can pass verifyClientToken (token was valid at that instant),
+// then reach addConn AFTER Revoke's own DB write and s.conns snapshot/delete for that client id has
+// already happened — admitted with what is now a revoked token, and nothing re-checked revocation
+// for the rest of that connection's life before this fix. Proves the post-admission re-check
+// closes such a connection right away instead of serving it.
+//
+// The wrapped store is installed at construction, before Start() ever runs — never by mutating a
+// live server's deps.Clients, which every already-accepted connection's own handleConn goroutine
+// reads unguarded (that field is fixed for the server's whole life in production, main.go wires it
+// once; mutating it after Start() would be a test-only data race, not a real one).
+func TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken(t *testing.T) {
+	t.Parallel()
+	kiraHome := t.TempDir()
+	db, err := storage.OpenAt(kiraHome)
+	if err != nil {
+		t.Fatalf("storage.OpenAt: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	repositories, err := repos.New(db.DB)
+	if err != nil {
+		t.Fatalf("repos.New: %v", err)
+	}
+	t.Cleanup(func() { _ = repositories.Close() })
+
+	gitRunner := gitclient.NewExecRunner()
+	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
+	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
+	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
+
+	server := New(Deps{
+		SocketPath: filepath.Join(kiraHome, "git.sock"),
+		LockPath:   filepath.Join(kiraHome, "git.sock.lock"),
+		Clients: &racingRevokeStore{
+			TrustStore: repositories.GitClients, clientID: "revoke-toctou",
+			// 2 calls pass clean: the fresh-pairing dial's own post-admission check (call 1), then
+			// the reconnect's verifyClientToken check (call 2, which must still see a valid,
+			// not-yet-revoked row — the race this test models starts strictly AFTER that check).
+			// The 3rd call — the reconnect's OWN post-admission re-check, this fix's whole point —
+			// is the one that must observe the row as revoked.
+			revokeAfter: 2,
+		},
+		Registry:   gitRegistry,
+		Router: gitrpc.New(gitrpc.Deps{
+			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: "test-version",
+		}),
+		ServerVersion: "test-version",
+		Now:           time.Now,
+	})
+	if err := server.Start(); err != nil {
+		t.Fatalf("server.Start: %v", err)
+	}
+	t.Cleanup(func() { _ = server.Close() })
+	sockPath := filepath.Join(kiraHome, "git.sock")
+
+	_, token := pairFreshWithToken(t, server, sockPath, "revoke-toctou")
+
+	client2 := dialTestClient(t, sockPath)
+	kind, _ := client2.hello("revoke-toctou", "revoke test", &token)
+	if kind != "ready" {
+		t.Fatalf("reconnect with a still-valid-at-the-time token = %q, want ready (the race window is AFTER admission's own token check, not at it)", kind)
+	}
+	if _, err := readFrame(client2.r); err == nil {
+		t.Fatal("expected the connection admitted with a since-revoked token to be closed by the post-admission re-check, not served")
 	}
 }

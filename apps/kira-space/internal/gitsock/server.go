@@ -156,7 +156,9 @@ func (s *Server) acceptLoop() {
 		if err != nil {
 			return // listener closed by Close() — normal shutdown.
 		}
-		s.trackConn(nc)
+		if !s.trackConn(nc) {
+			continue // Close() already flipped s.listening — refused, never counted in wg.
+		}
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
@@ -166,10 +168,22 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-func (s *Server) trackConn(nc net.Conn) {
+// trackConn reports whether nc was actually admitted. F4(a): Accept can return just before
+// Close's own ln.Close() runs; if this call happened after Close already flipped s.listening
+// (under the same lock Close takes before snapshotting allConns), the connection is refused and
+// closed immediately instead of being silently left out of that snapshot — which used to leave it
+// unclosed, blocking Close's own wg.Wait() forever on a connection whose handleConn goroutine was
+// already counted in wg.
+func (s *Server) trackConn(nc net.Conn) bool {
 	s.mu.Lock()
+	if !s.listening {
+		s.mu.Unlock()
+		_ = nc.Close()
+		return false
+	}
 	s.allConns[nc] = struct{}{}
 	s.mu.Unlock()
+	return true
 }
 
 func (s *Server) untrackConn(nc net.Conn) {
@@ -200,6 +214,24 @@ func (s *Server) handleConn(nc net.Conn) {
 
 	s.addConn(clientID, nc)
 	defer s.removeConn(clientID, nc)
+
+	// F5: verifyClientToken's own check (inside runHandshake, above) ran before addConn — a
+	// Revoke landing in the exact window between that check passing and addConn succeeding above
+	// would otherwise go unnoticed for this connection's entire life, since nothing re-checks
+	// revocation after admission. Revoke always writes the DB before it touches s.conns (Revoke's
+	// own doc comment), so re-reading here, right after addConn, is guaranteed to observe a
+	// revocation that completed anywhere before this point — closing the TOCTOU window rather than
+	// merely narrowing it.
+	row, found, err := s.deps.Clients.ByID(clientID)
+	if err != nil {
+		// Fail closed, matching verifyClientToken's own posture (D6): a lookup that cannot say
+		// "not revoked" is treated the same as a revoked one, never silently treated as clean.
+		slog.Warn("gitsock: post-admission revocation check", "scope", "gitsock", "client", clientID, "err", err)
+		return
+	}
+	if found && row.RevokedAt != nil {
+		return
+	}
 
 	// gconn.Emit is filled in once sess exists (below) — ForConn's closures capture gconn itself,
 	// not a snapshot of its Emit field, so this ordering is safe: nothing calls Emit before Serve
@@ -275,10 +307,13 @@ func (s *Server) Close() error {
 	close(s.closeCh)
 	s.mu.Unlock()
 
-	// Stop accepting before gathering the live-connection snapshot below — narrows (does not fully
-	// eliminate; Accept() can still return successfully a moment before this call lands, same as
-	// any accept-loop shutdown) the window in which a brand new connection could be missed by the
-	// snapshot and left unclosed.
+	// Stop accepting before gathering the live-connection snapshot below. Accept() can still
+	// return successfully a moment before this call lands, same as any accept-loop shutdown, but
+	// trackConn's own s.listening check (F4(a)) now makes that fully deterministic rather than
+	// merely narrowing the window: s.listening was already flipped false under s.mu above, before
+	// ln.Close() or the snapshot below ever run, so any trackConn call landing after that point
+	// observes it and refuses the connection outright instead of silently entering allConns after
+	// the snapshot was already taken.
 	var err error
 	if ln != nil {
 		err = ln.Close()

@@ -1,6 +1,7 @@
 package gitsock
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -192,6 +193,37 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	}
 }
 
+// TestBroker_RequestAfterShutdownIsDeniedImmediately is P108 Part 17 review F4(b)'s own regression
+// guard: a handshake that already read hello but reaches Request only after Shutdown has already
+// cleared the queue used to enqueue a fresh entry and block forever on <-entry.result —
+// expireLoop has already exited by the time Shutdown runs (its closeCh is closed) so nothing would
+// ever resolve it, and closing the underlying net.Conn does nothing to unblock a plain channel
+// receive either.
+func TestBroker_RequestAfterShutdownIsDeniedImmediately(t *testing.T) {
+	t.Parallel()
+	clock := newFakeClock()
+	b := NewBroker(clock.Now)
+	b.Shutdown()
+
+	done := make(chan PairingOutcome, 1)
+	go func() {
+		done <- b.Request("client-a", "label", nil)
+	}()
+
+	select {
+	case out := <-done:
+		if out != PairingDenied {
+			t.Fatalf("Request after Shutdown: got %v, want PairingDenied", out)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Request after Shutdown never returned — it enqueued a fresh entry nothing will ever resolve")
+	}
+
+	if snap := b.Pending(); snap.Queued != 0 {
+		t.Fatalf("Queued after a post-Shutdown Request = %d, want 0 (never enqueued)", snap.Queued)
+	}
+}
+
 func recvOrTimeout(t *testing.T, ch chan PairingOutcome) PairingOutcome {
 	t.Helper()
 	select {
@@ -357,6 +389,74 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 	}
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
 		t.Fatalf("after purging client-a: got %+v, want head=client-b queued=1", snap)
+	}
+	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
+		t.Fatalf("deny reqB: got %v", got)
+	}
+	<-doneB
+}
+
+// TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSameToken is F6's own
+// regression guard, mirroring TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient's
+// shape for the Approve path: one VS Code install shares one clientId and one shared
+// context.secrets token store across every open window, so Approve resolving only the ONE entry
+// named by requestID used to leave sibling windows' own queued requests unresolved — each would
+// later mint and store ITS OWN token independently, racing the others against the same
+// trust-store row. This proves approving one request from a client also resolves every other
+// request already queued from that SAME client, as approved, sharing the IDENTICAL token — while
+// leaving an unrelated client's own queued request untouched.
+func TestBroker_ApproveResolvesEveryOtherQueuedRequestFromTheSameClientWithTheSameToken(t *testing.T) {
+	t.Parallel()
+	clock := newFakeClock()
+	b := NewBroker(clock.Now)
+
+	enqueue := func(clientID string) (PairingRequest, chan PairingOutcome) {
+		enqueued := make(chan PairingRequest, 1)
+		done := make(chan PairingOutcome, 1)
+		go func() {
+			done <- b.Request(clientID, "label", func(req PairingRequest) { enqueued <- req })
+		}()
+		return <-enqueued, done
+	}
+
+	reqA1, doneA1 := enqueue("client-a") // presented head.
+	reqA2, doneA2 := enqueue("client-a") // a second connection from the SAME client, queued behind it.
+	reqB, doneB := enqueue("client-b")   // an unrelated client, queued behind both of A's.
+
+	if snap := b.Pending(); snap.Queued != 3 {
+		t.Fatalf("Queued = %d, want 3", snap.Queued)
+	}
+
+	if got := b.Approve(reqA1.RequestID); got != PairingActionResolved {
+		t.Fatalf("approve reqA1: got %v", got)
+	}
+	if out := recvOrTimeout(t, doneA1); out != PairingApproved {
+		t.Fatalf("reqA1 outcome: got %v", out)
+	}
+	if out := recvOrTimeout(t, doneA2); out != PairingApproved {
+		t.Fatalf("reqA2 outcome: got %v, want PairingApproved — a client's OTHER queued request must be approved alongside it", out)
+	}
+
+	tokA1, okA1 := b.TakeApprovedToken(reqA1.RequestID)
+	if !okA1 {
+		t.Fatal("TakeApprovedToken(reqA1): ok = false, want a token minted for the approved head")
+	}
+	tokA2, okA2 := b.TakeApprovedToken(reqA2.RequestID)
+	if !okA2 {
+		t.Fatal("TakeApprovedToken(reqA2): ok = false, want a token minted for the approved sibling")
+	}
+	if tokA1.plain == "" || !reflect.DeepEqual(tokA1, tokA2) {
+		t.Fatalf("sibling tokens: reqA1=%+v reqA2=%+v, want identical non-empty tokens shared across both windows", tokA1, tokA2)
+	}
+
+	// client-b's own request must be entirely unaffected: still queued, still pending.
+	select {
+	case out := <-doneB:
+		t.Fatalf("client-b's own request resolved (%v) — it must not be touched by client-a's approval", out)
+	default:
+	}
+	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "client-b" || snap.Queued != 1 {
+		t.Fatalf("after resolving client-a: got %+v, want head=client-b queued=1", snap)
 	}
 	if got := b.Deny(reqB.RequestID); got != PairingActionResolved {
 		t.Fatalf("deny reqB: got %v", got)
