@@ -2039,7 +2039,7 @@ onBeforeUnmount(() => {
           <div
             v-if="forceDeleteRefCandidate"
             ref="forceDeletePanelEl"
-            class="kv-branch-force-delete kv:fixed kv:z-[var(--kui-z-popover,20)] kv:border kv:border-panel-border kv:rounded-sm kv:shadow-widget"
+            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-xs kv:fixed kv:z-[var(--kui-z-popover,20)] kv:border kv:border-panel-border kv:rounded-sm kv:shadow-widget"
             :style="forceDeletePanelStyle"
           >
             <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>

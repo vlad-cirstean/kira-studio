@@ -576,26 +576,30 @@ watch(visibleBranchNames, (names) => {
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-branch-picker">
+  <div ref="rootEl" class="kv:relative">
     <!-- G34 D5/D14: a real `KuiButton` — `closeForCheckout()`'s own W20 fix below calls real
          `.focus()` on `triggerEl` before a dialog opens, and `KuiButton` now exposes that. -->
     <KuiButton
       ref="triggerEl"
-      class="kv-branch-trigger"
+      class="kv-branch-trigger kv:max-w-50"
       aria-haspopup="true"
       :aria-expanded="isOpen"
       v-kui-tooltip="refs.head.value?.kind === 'detached' ? refs.head.value.sha : triggerLabel"
       @click="toggle"
     >
       <span class="codicon codicon-git-branch" aria-hidden="true"></span>
-      <span class="kv-branch-trigger-label">{{ triggerLabel }}</span>
+      <span class="kv:truncate">{{ triggerLabel }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </KuiButton>
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="380" @close="close">
-    <div class="kv-branch-panel" role="dialog" :aria-label="`${TAB_LABELS[activeTab]} picker`">
+    <div
+      class="kv:flex kv:flex-col kv:min-h-0 kv:max-h-[min(520px,var(--kui-float-max-h,520px))] kv:max-w-[var(--kui-float-max-w,380px)]"
+      role="dialog"
+      :aria-label="`${TAB_LABELS[activeTab]} picker`"
+    >
       <KuiSegmented
-        class="kv-branch-tabs"
+        class="kv-branch-tabs kv:mx-1 kv:mt-1 kv:mb-0"
         :options="tabOptions"
         :model-value="activeTab"
         ariaLabel="Picker section"
@@ -603,7 +607,7 @@ watch(visibleBranchNames, (names) => {
       />
       <KuiSearchInput
         ref="filterEl"
-        class="kv-branch-filter"
+        class="kv:m-1"
         v-model="filter"
         :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
         :ariaLabel="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
@@ -612,23 +616,23 @@ watch(visibleBranchNames, (names) => {
 
       <div
         ref="rowsScrollEl"
-        class="kv-branch-panel-scroll"
+        class="kv:overflow-y-auto kv:min-h-0"
         :aria-label="TAB_LABELS[activeTab]"
       >
         <template v-if="activeTab === 'branches'">
-        <section class="kv-branch-section" aria-label="Branches">
+        <section aria-label="Branches">
           <div class="kv-branch-section-title">Branches</div>
           <div
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
             class="kv-branch-row"
-            :class="{ 'kv-branch-row--current': row.isHead }"
+            :class="{ 'kv:font-semibold': row.isHead }"
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
             <template v-if="renaming?.name === row.shortName">
               <KuiTextInput
-                class="kv-branch-rename-input"
+                class="kv:flex-1"
                 v-model="renaming.value"
                 ariaLabel="Rename branch"
                 @keydown.enter="submitRename"
@@ -641,7 +645,7 @@ watch(visibleBranchNames, (names) => {
             <template v-else>
               <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main']" @click="checkoutBranch(row)">
                 <span
-                  class="kv-branch-current-dot"
+                  class="kv:w-2.5 kv:text-focus"
                   :role="row.isHead ? 'img' : undefined"
                   :aria-label="row.isHead ? 'current branch' : undefined"
                   :aria-hidden="!row.isHead"
@@ -663,10 +667,14 @@ watch(visibleBranchNames, (names) => {
                   v-kui-tooltip="prTooltip(row.shortName)"
                   >#{{ prFor(row.shortName)!.number }}</span
                 >
-                <span v-if="row.checkedOutIn" class="kv-branch-badge" v-kui-tooltip="`Checked out in ${row.checkedOutIn}`">
+                <span
+                  v-if="row.checkedOutIn"
+                  class="kv:text-[0.8em] kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted"
+                  v-kui-tooltip="`Checked out in ${row.checkedOutIn}`"
+                >
                   worktree
                 </span>
-                <span v-if="formatTrack(row.track)" class="kv-branch-track">{{ formatTrack(row.track) }}</span>
+                <span v-if="formatTrack(row.track)" class="kv:text-xs kv:text-muted">{{ formatTrack(row.track) }}</span>
               </KuiButton>
               <KuiButton
                 variant="icon"
@@ -679,7 +687,10 @@ watch(visibleBranchNames, (names) => {
               </KuiButton>
             </template>
           </div>
-          <div v-if="forceDeleteCandidate" class="kv-branch-force-delete">
+          <div
+            v-if="forceDeleteCandidate"
+            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-xs"
+          >
             <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
             <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
             <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
@@ -695,7 +706,7 @@ watch(visibleBranchNames, (names) => {
           <div v-if="model.branchesLocal.visible.length === 0" class="kv-branch-empty">No branches</div>
         </section>
 
-        <section class="kv-branch-section" aria-label="Remote branches">
+        <section aria-label="Remote branches">
           <div class="kv-branch-section-title">Remote branches</div>
           <div
             v-for="row in model.branchesRemote.visible"
@@ -710,7 +721,7 @@ watch(visibleBranchNames, (names) => {
               @click="checkoutRemote(row)"
             >
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
-              <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
+              <span class="kv:text-xs kv:text-muted">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
             <KuiButton
               variant="icon"
@@ -823,49 +834,11 @@ watch(visibleBranchNames, (names) => {
 </template>
 
 <style>
-.kv-branch-picker {
-  position: relative;
-}
-
-/* G34 D14: everything but `max-width` is gone — the default `KuiButton` box is now this exact
-   shape (the raw `<button>` this class used to style became a real `KuiButton`, D5). */
-.kv-branch-trigger {
-  max-width: 200px;
-}
-
-.kv-branch-trigger-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* G20 D5: positioning (absolute/z-index/width) and chrome (background/border/shadow) move onto
-   KuiPopoverPanel's own `.kui-popover` — this is now just the content's own internal layout.
-   P77 §12: the two `--kui-float-max-*` vars are `floatingPosition.ts`'s own opt-in size cap
-   (written by `size()` on every `KuiPopoverPanel`, read by nobody until now) — this is what makes
-   the wider 380px panel (`:width` above) safe inside a narrow VS Code webview: `shift()` already
-   keeps the surface inside the viewport, and this cap keeps its *content* from overflowing when
-   the panel is genuinely wider than the space. */
-.kv-branch-panel {
-  max-height: min(520px, var(--kui-float-max-h, 520px));
-  max-width: var(--kui-float-max-w, 380px);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.kv-branch-tabs {
-  margin: var(--kv-s-2) var(--kv-s-2) 0;
-}
-
-.kv-branch-filter {
-  margin: var(--kv-s-2);
-}
-
-.kv-branch-panel-scroll {
-  overflow-y: auto;
-  min-height: 0;
-}
+/* P110 A17: every rule this file used to own alone is converted (kv: utilities in the template
+   above). What's left below is shared with TagList/StashList/StashRows/WorktreeList/StackList/
+   GlobalStashList (A18) — converting BranchPicker's own usage now would just add utilities that
+   still lose to these unlayered rules (§1.3), so both the rules and every consumer's own class
+   attribute stay untouched until A18 converts the last consumer and deletes this block. */
 
 /* G34 D14: takes P110 A5's `KuiMenuList.vue` own heading treatment — the same section-label look
    every menu in the app now uses. */
@@ -888,10 +861,6 @@ watch(visibleBranchNames, (names) => {
   padding: 0 var(--kv-s-2);
 }
 
-.kv-branch-row--current {
-  font-weight: 600;
-}
-
 /* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template onto
    `KuiButton`'s own `min-h-kui-control` base — a min-height needs no override to let this row grow
    past it) — this class keeps only what's specific to this row inside `.kv-branch-row`'s own flex
@@ -902,44 +871,12 @@ watch(visibleBranchNames, (names) => {
   text-align: left;
 }
 
-.kv-branch-current-dot {
-  width: 0.9em;
-  color: var(--kv-focus-border);
-}
-
 .kv-branch-row-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.kv-branch-badge {
-  font-size: 0.8em;
-  padding: 0 var(--kv-s-1);
-  border: 1px dashed var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  color: var(--kv-description-fg);
-}
-
-.kv-branch-track {
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-branch-remote-action {
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-/* G34 D14: `.kv-icon-button` (this component's own global rule, also consumed by seven other
-   components) is gone — `variant="icon"` is now the shared shape every one of those adopts. */
-
-/* G34 D14: only the growable width survives — `.kui-text-input`'s own chrome (background/border/
-   padding/radius) replaces the rest now that this is a real `KuiTextInput`. */
-.kv-branch-rename-input {
-  flex: 1;
 }
 
 .kv-branch-empty {
@@ -964,14 +901,5 @@ watch(visibleBranchNames, (names) => {
 .kv-branch-more-button:hover {
   color: var(--kv-app-fg);
   text-decoration: underline;
-}
-
-.kv-branch-force-delete {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-4);
-  background: var(--kv-overlay-bg);
-  font-size: 0.85em;
 }
 </style>

@@ -238,11 +238,11 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-search-box-root">
-    <div class="kv-search-box">
+  <div ref="rootEl" class="kv:relative kv:flex-1 kv:min-w-0">
+    <div class="kv:flex kv:items-center kv:gap-1">
       <KuiSearchInput
         ref="searchInputRef"
-        class="kv-search-field"
+        class="kv:flex-1 kv:min-w-0"
         :model-value="search.text.value"
         placeholder="Search"
         ariaLabel="Search"
@@ -257,10 +257,10 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         @update:model-value="onInput"
         @keydown="onKeydown"
       />
-      <section class="kv-search-toggles" aria-label="Search options">
+      <section class="kv:flex kv:gap-0.25" aria-label="Search options">
         <KuiButton
           icon="codicon-case-sensitive"
-          class="kv-search-toggle"
+          class="kv:text-muted kv:text-xs"
           :active="search.caseSensitive.value"
           :aria-pressed="search.caseSensitive.value"
           v-kui-tooltip="'Match case'"
@@ -270,7 +270,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-whole-word"
-          class="kv-search-toggle"
+          class="kv:text-muted kv:text-xs"
           :active="search.wholeWord.value"
           :aria-pressed="search.wholeWord.value"
           v-kui-tooltip="'Match whole word'"
@@ -280,7 +280,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-regex"
-          class="kv-search-toggle"
+          class="kv:text-muted kv:text-xs"
           :active="search.regex.value"
           :aria-pressed="search.regex.value"
           v-kui-tooltip="'Use regular expression'"
@@ -290,18 +290,17 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
       </section>
       <KuiSelect
-        class="kv-search-scope"
+        class="kv:text-xs"
         ariaLabel="Search scope"
         data-testid="search-scope"
         :model-value="search.scope.value"
         :options="scopeOptions"
         @update:model-value="onScopeChange"
       />
-      <span v-if="countLabel" class="kv-search-count" data-testid="search-count">{{ countLabel }}</span>
+      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted kv:text-xs kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"
-        class="kv-search-close"
         v-kui-tooltip="'Close search'"
         aria-label="Close search"
         data-testid="search-close-button"
@@ -312,7 +311,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
       v-if="search.error.value"
       :id="ERROR_ID"
       ref="errorEl"
-      class="kv-search-error"
+      class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:max-w-[var(--kui-float-max-w,none)] kv:py-0.5 kv:px-1 kv:bg-panel kv:text-error kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float kv:text-xs"
       role="alert"
       data-testid="search-error"
       :style="errorStyle"
@@ -333,68 +332,3 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
   </div>
 </template>
 
-<style>
-.kv-search-box-root {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-/* G-UX D9 (item 9): the bespoke pill shell (its own border/background/height) is gone — the row
-   this mounts inside (App.vue's .kv-search-row) supplies the chrome now, and this is just the
-   flex layout for the row's own children. */
-.kv-search-box {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-}
-
-/* Grows to the row's own width instead of a hard 160px — P110 A4's `KuiSearchInput.vue` wrapper
-   is `kv:inline-flex` with no explicit width of its own, so `flex: 1` here is what makes it fill
-   the remaining row space; `min-width: 0` is the usual flex-item guard against its content's own
-   intrinsic width winning instead. */
-.kv-search-field {
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-search-toggles {
-  display: flex;
-  gap: 1px;
-}
-
-/* G-UX D9: the bespoke width:20px/height:18px override is gone — KuiButton's own --kui-control-h
-   sizing now, matching every other icon toggle in the app. G34 D15: font-size -> --kv-t-xs, the
-   same secondary-text tier `-count`/`-scope` already used. */
-.kv-search-toggle {
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs);
-}
-
-.kv-search-scope {
-  font-size: var(--kv-t-xs);
-}
-
-.kv-search-count {
-  padding: 0 var(--kv-s-1);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs);
-  white-space: nowrap;
-}
-
-/* G34 D15: the floating-surface triple every other menu/popover/tooltip in the app now uses —
-   the panel radius tier (not the interactive-control one), a stronger border, and the real
-   floating-surface shadow instead of a flatter ad hoc one. */
-.kv-search-error {
-  position: fixed;
-  z-index: var(--kui-z-popover, 20);
-  max-width: var(--kui-float-max-w, none);
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-error-fg);
-  border: var(--kv-border-width) solid var(--kv-border-strong);
-  border-radius: var(--kv-radius-panel);
-  box-shadow: var(--kv-shadow-dialog) var(--kv-widget-shadow);
-  font-size: var(--kv-t-xs);
-}
-</style>

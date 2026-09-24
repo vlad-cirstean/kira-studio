@@ -13,7 +13,7 @@
  * element that actually holds focus throughout — not here; this file only reflects
  * `highlightedId` back as `aria-selected` and forwards a click as `select`.
  */
-import { computeFloatPosition, KuiButton, kuiRowVariants } from "@kira/kira-ui";
+import { cn, computeFloatPosition, KuiButton, kuiRowVariants } from "@kira/kira-ui";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { formatRelativeDate } from "./dateFormat.ts";
 import { SEARCH_LISTBOX_ID } from "./searchListboxId.ts";
@@ -62,30 +62,50 @@ async function reposition(): Promise<void> {
 }
 
 onMounted(() => void reposition());
+
+/** P110 A17: `.kv-search-option`'s own gap/px are already exactly `kuiRowVariants()`'s own
+ *  `gap-kui-2`/`px-kui-3` — `--kui-space-2`/`--kui-space-3` bridge to the same `--kv-s-2`/`--kv-s-3`
+ *  values (`kui-bridge.css`). Only the vertical padding and the "active" (keyboard-highlighted,
+ *  not a real `:hover`) background need adding — through `cn()` since `kv:px-2` below replaces
+ *  the variant's own `px-kui-3` (different value, same property; §1.3). */
+function optionClass(option: SearchOption): string {
+  return cn(
+    kuiRowVariants(),
+    'kv:px-2 kv:py-0.5',
+    option.id === props.highlightedId ? 'kv:bg-hover' : '',
+  );
+}
 </script>
 
 <template>
-  <div ref="resultsEl" class="kv-search-results" data-testid="search-results" :style="resultsStyle">
+  <div
+    ref="resultsEl"
+    class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:w-105 kv:max-h-90 kv:overflow-y-auto kv:py-0.5 kv:bg-panel kv:text-fg kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float"
+    data-testid="search-results"
+    :style="resultsStyle"
+  >
     <!-- ARIA's listbox role only permits `option`/`group` children (`aria-required-children`) —
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
     <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
-      <div v-if="searching" class="kv-search-status" data-testid="search-status">Searching…</div>
+      <div
+        v-if="searching"
+        class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs"
+        data-testid="search-status"
+      >
+        Searching…
+      </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="kv-search-section-title">
-          {{ section.title }} <span class="kv-search-section-count">({{ section.options.length }})</span>
+        <div class="kv:py-0.5 kv:px-2 kv:text-xs kv:font-semibold kv:text-muted">
+          {{ section.title }} <span class="kv:font-normal">({{ section.options.length }})</span>
         </div>
 
         <template v-for="option in section.options" :key="option.id">
           <div
             :id="option.id"
             role="option"
-            :class="[
-              kuiRowVariants(),
-              'kv-search-option',
-              { 'kv-search-option--active': option.id === highlightedId },
-            ]"
+            :class="optionClass(option)"
             :aria-selected="option.id === highlightedId"
             tabindex="-1"
             @click="emit('select', option)"
@@ -102,41 +122,59 @@ onMounted(() => void reposition());
                 }"
                 aria-hidden="true"
               ></span>
-              <span class="kv-search-option-main">{{ option.hit.ref.shortName }}</span>
-              <span v-if="fieldLabel(option.hit.fields)" class="kv-search-option-field">
+              <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.ref.shortName }}</span>
+              <span
+                v-if="fieldLabel(option.hit.fields)"
+                class="kv:px-0.5 kv:text-muted kv:text-xs kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+              >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
             </template>
             <template v-else>
-              <span class="kv-search-option-sha">{{ option.hit.sha.slice(0, 7) }}</span>
-              <span class="kv-search-option-main">{{ option.hit.subject }}</span>
-              <span class="kv-search-option-author">{{ option.hit.authorName }}</span>
-              <span class="kv-search-option-date">{{ formatRelativeDate(option.hit.authorTime) }}</span>
-              <span v-if="fieldLabel(option.hit.fields)" class="kv-search-option-field">
+              <span class="kv:font-data kv:text-muted">{{ option.hit.sha.slice(0, 7) }}</span>
+              <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.subject }}</span>
+              <span class="kv:text-muted kv:text-xs">{{ option.hit.authorName }}</span>
+              <span class="kv:text-muted kv:text-xs">{{ formatRelativeDate(option.hit.authorTime) }}</span>
+              <span
+                v-if="fieldLabel(option.hit.fields)"
+                class="kv:px-0.5 kv:text-muted kv:text-xs kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+              >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="kv-search-more">
+        <div v-if="section.hiddenCount > 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">
           {{ section.hiddenCount }} more — refine your search
         </div>
       </template>
 
-      <div v-if="isEmpty" class="kv-search-empty">No results</div>
+      <div v-if="isEmpty" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">No results</div>
     </div>
 
-    <div v-if="tailStale" class="kv-search-hint" data-testid="search-tail-stale">
+    <div
+      v-if="tailStale"
+      class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs"
+      data-testid="search-tail-stale"
+    >
       Refs changed since this search ran
     </div>
-    <div v-if="model.loadedFooter" class="kv-search-footer">{{ model.loadedFooter }}</div>
-    <div v-if="model.tailFooter" class="kv-search-footer">{{ model.tailFooter }}</div>
-    <div v-if="model.tailNotice" class="kv-search-footer" data-testid="search-tail-notice">
+    <div v-if="model.loadedFooter" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">
+      {{ model.loadedFooter }}
+    </div>
+    <div v-if="model.tailFooter" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">
+      {{ model.tailFooter }}
+    </div>
+    <div
+      v-if="model.tailNotice"
+      class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs"
+      data-testid="search-tail-notice"
+    >
       {{ model.tailNotice }}
     </div>
     <KuiButton
       v-if="showBodySearchAffordance"
-      class="kv-search-body-button"
+      class="kv:block kv:w-full kv:text-left"
       data-testid="search-body-button"
       @click="emit('runBodySearch')"
     >
@@ -144,94 +182,3 @@ onMounted(() => void reposition());
     </KuiButton>
   </div>
 </template>
-
-<style>
-/* G20 D5: real flip/shift positioning (see the script's own doc comment for why this is
-   positioned directly rather than through KuiPopoverPanel, unlike the other 6 dropdowns). */
-.kv-search-results {
-  position: fixed;
-  z-index: var(--kui-z-popover, 20);
-  width: 420px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding: var(--kv-s-1) 0;
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  /* G34 D15: the floating-surface triple every other menu/popover/tooltip in the app now uses. */
-  border: var(--kv-border-width) solid var(--kv-border-strong);
-  border-radius: var(--kv-radius-panel);
-  box-shadow: var(--kv-shadow-dialog) var(--kv-widget-shadow);
-}
-
-.kv-search-status {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-.kv-search-section-title {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  font-size: 0.85em;
-  font-weight: 600;
-  color: var(--kv-description-fg);
-}
-
-.kv-search-section-count {
-  font-weight: 400;
-}
-
-.kv-search-option {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-1) var(--kv-s-4);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.kv-search-option:hover,
-.kv-search-option--active {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-search-option-main {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kv-search-option-sha {
-  font-family: var(--kv-mono-font-family);
-  color: var(--kv-description-fg);
-}
-
-.kv-search-option-author,
-.kv-search-option-date {
-  color: var(--kv-description-fg);
-  font-size: 0.9em;
-}
-
-.kv-search-option-field {
-  padding: 0 var(--kv-s-1);
-  color: var(--kv-description-fg);
-  font-size: 0.8em;
-  border: 1px dashed var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-}
-
-.kv-search-more,
-.kv-search-empty,
-.kv-search-hint,
-.kv-search-footer {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-.kv-search-body-button {
-  display: block;
-  width: 100%;
-  text-align: left;
-}
-</style>
