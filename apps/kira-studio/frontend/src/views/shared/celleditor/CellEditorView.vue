@@ -206,9 +206,21 @@ let lastValue: string | null = null;
 // format override recomputes `effectiveFormat`/`language` above without touching this watch.
 watch(
   selectedCell,
-  (c) => {
+  (c, prevCell) => {
     const key = cellKey(c);
     if (key === lastKey && c.value === lastValue) return;
+    // F17 (P108 Part 10): mirrors onEditorBlur/onBeforeUnmount/onEditorKeydown's own "stage on
+    // leave" rule — reseeding used to silently discard a dirty (unsaved) buffer whenever the
+    // selected cell changed, or a background republish of the same cell changed its value (F1).
+    if (
+      isDirty.value &&
+      prevCell &&
+      !viewerMode.value &&
+      prevCell.onEdit &&
+      cellEditorFormatStore.readOnlyReasonFor(prevCell) === null
+    ) {
+      prevCell.onEdit(doc.value);
+    }
     lastKey = key;
     lastValue = c.value;
     buffer.reseed();
