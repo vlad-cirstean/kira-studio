@@ -1,0 +1,59 @@
+/*
+ * P110 A2: kira-ui's own Tailwind v4 theme partial — imported by any host's prefixed Tailwind
+ * root (today: `packages/git-ui/src/theme/tailwind.css`, via `@source`) so `Kui*` components can
+ * be written as `cva` variants against `kv:` utilities without ever referencing `--kv-*`/
+ * `--kira-*` directly, mirroring `theme/controls.css`'s own charter (G19 D3, that file's own doc
+ * comment) — every name below is `--kui-*`, this package's semantic vocabulary, never a host
+ * token.
+ *
+ * `@theme inline reference`: same reasoning as `tailwind.css` (git-ui, A1) — `reference` skips
+ * declaring these as real theme variables (this file has no `--kui-*` values of its own to
+ * declare; a host's `kui-bridge.css` already does), and `inline` substitutes each mapped value
+ * straight into the utilities that use it rather than pointing at an undeclared theme variable.
+ *
+ * Every fallback below is the exact literal `theme/controls.css` already carries for that
+ * property today (same design goal that file's own header states: "a host that has not loaded a
+ * bridge still renders something reasonable"). Where controls.css uses two different literal
+ * fallbacks for the same custom property (`--kui-control-h-sm`: 18px at one call site, 14px at
+ * two others — a pre-existing inconsistency, not introduced here), the majority value is kept;
+ * it only matters for a host with no bridge loaded, which does not exist today (git-ui and Kira
+ * Space both always load one).
+ */
+@theme inline reference {
+  --color-kui-fg: var(--kui-fg, inherit);
+  --color-kui-fg-muted: var(--kui-fg-muted, currentColor);
+  --color-kui-fg-subtle: var(--kui-fg-subtle, var(--kui-fg-muted, currentColor));
+  --color-kui-bg-panel: var(--kui-bg-panel, canvas);
+  --color-kui-bg-input: var(--kui-bg-input, transparent);
+  --color-kui-border: var(--kui-border, transparent);
+  --color-kui-border-strong: var(--kui-border-strong, transparent);
+  --color-kui-hover: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
+  --color-kui-active: var(--kui-active-bg, var(--kui-hover-bg, rgba(128, 128, 128, 0.15)));
+  --color-kui-selected: var(--kui-selected-bg, var(--kui-hover-bg, rgba(128, 128, 128, 0.15)));
+  --color-kui-selected-fg: var(--kui-selected-fg, inherit);
+  --color-kui-danger-fg: var(--kui-danger-fg, var(--kui-fg, inherit));
+  --color-kui-focus-border: var(--kui-focus-border, currentColor);
+  --color-kui-button: var(--kui-button-bg, var(--kui-selected-bg));
+  --color-kui-button-fg: var(--kui-button-fg, var(--kui-selected-fg));
+  --color-kui-button-hover: var(--kui-button-hover-bg, var(--kui-button-bg, var(--kui-selected-bg)));
+  --color-kui-overlay: var(--kui-overlay-bg, rgba(0, 0, 0, 0.5));
+
+  --text-kui-xs: var(--kui-font-size-xs, 0.85em);
+  --text-kui-sm: var(--kui-font-size-sm, inherit);
+  --text-kui-base: var(--kui-font-size, inherit);
+
+  --radius-kui: var(--kui-radius, 4px);
+  --radius-kui-float: var(--kui-radius-float, 6px);
+
+  --shadow-kui-float: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
+
+  --spacing-kui-1: var(--kui-space-1, 2px);
+  --spacing-kui-2: var(--kui-space-2, 4px);
+  --spacing-kui-3: var(--kui-space-3, 6px);
+  --spacing-kui-4: var(--kui-space-4, 8px);
+  --spacing-kui-5: var(--kui-space-5, 12px);
+  --spacing-kui-6: var(--kui-space-6, 16px);
+  --spacing-kui-control: var(--kui-control-h, 22px);
+  --spacing-kui-control-sm: var(--kui-control-h-sm, 14px);
+  --spacing-kui-icon-box: var(--kui-icon-box, 16px);
+}

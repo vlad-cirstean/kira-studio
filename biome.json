@@ -17,7 +17,8 @@
       "!packages/shared/protocol/wire.ts",
       "!packages/shared/protocol/wire",
       "!packages/git-ipc/src/generated",
-      "!packages/git-ui/src/theme/tailwind.css"
+      "!packages/git-ui/src/theme/tailwind.css",
+      "!packages/kira-ui/src/theme/tailwind-theme.css"
     ]
   },
   "formatter": {

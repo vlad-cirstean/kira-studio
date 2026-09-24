@@ -1,6 +1,7 @@
 /** `packages/kira-ui`'s public surface (G19 D3) — `@kira/kira-ui`'s own `./src/index.ts`,
  *  matching every other workspace package's convention. */
 
+export { cn } from './cn.ts';
 export type { MenuItem, MenuSection } from './contextMenuModel.ts';
 export { enabledNeighbour, firstEnabled, flattenItems } from './contextMenuModel.ts';
 export type { FloatOptions, ReferenceElement } from './floatingPosition.ts';

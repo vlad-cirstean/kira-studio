@@ -137,3 +137,10 @@
   --spacing-row-comfortable: var(--kv-row-height-comfortable);
   --spacing-tree-indent: var(--kv-tree-indent);
 }
+
+/* P110 A2: kira-ui's own theme partial — maps its `--kui-*` vocabulary onto `--color-kui-*`/
+   `--spacing-kui-*`/etc. so `Kui*` components can use `kv:` utilities under this same prefixed
+   build without ever depending on git-ui's own token names. Imported after the block above, not
+   before: its own namespace resets (`--color-*: initial` etc.) apply to every `@theme` block
+   processed so far, so an import placed earlier would have its mappings wiped by them. */
+@import "@kira/kira-ui/theme/tailwind-theme.css";
