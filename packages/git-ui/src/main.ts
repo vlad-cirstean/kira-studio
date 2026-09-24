@@ -108,15 +108,27 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
   const graphVisible = shallowRef(true);
   app.provide(GRAPH_VISIBLE_KEY, graphVisible);
-  // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule
-  // are useless apart, and they live in two files because the class must follow whatever
-  // container the host hands us, not a naming convention two packages have to agree on.
-  container.classList.add('kv-mount-root');
+  // G16 D1/D2 (P110 A19): the document-level height chain, converted from app-shell.css's bare
+  // `html, body` selector to classes applied here rather than in the extension host's emitted
+  // document (`webviewDocument.ts`) — that file lives in `apps/kira-space-vscode/src`, outside
+  // `theme/tailwind.css`'s own `@source` scan (`packages/git-ui/src`/`kira-ui/src` only), so a
+  // class literal there would never compile. `mount()` already owns this chain (this file's own
+  // original doc comment: "a document-owning bootstrap, not a widget factory"); JS classes here
+  // are the same ownership, not a new one. Never removed on unmount: `html`/`body` are the
+  // document's own elements, not scoped to any one mount — the same permanence the CSS rule had.
+  document.documentElement.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
+  document.body.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
+  // The other half of the chain — the class and the rule are useless apart, and they live in two
+  // places because the class must follow whatever container the host hands us, not a naming
+  // convention two packages have to agree on. `kv-mount-root` itself now carries no CSS of its
+  // own (P110 A19) — kept as a bare selector hook for app-shell.css's own checkbox pseudo-element
+  // rules (`.kv-mount-root input[type="checkbox"]`, which stay CSS per the plan).
+  container.classList.add('kv-mount-root', 'kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
   app.mount(container);
   return {
     unmount(): void {
       app.unmount();
-      container.classList.remove('kv-mount-root');
+      container.classList.remove('kv-mount-root', 'kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
     },
     setVisible(visible: boolean): void {
       graphVisible.value = visible;
