@@ -123,6 +123,18 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
 
   const pendingLoads = new Set<string>();
 
+  // P108 Part 12 F5: bumped by dropSchemaColumns, per connection — the ConsoleView.vue watch below
+  // reads it as a third source so an invalidation actually re-triggers a fetch. `byContainer[key]`
+  // alone can't do that: the watch's own source is (connectionId, containerPath), neither of which
+  // changes on invalidation, so a plain-object drop with no reactive signal left nothing to re-run
+  // ensureSchemaColumns until the tab remounted.
+  const generation = reactive<Record<string, number>>({});
+
+  /** Read by ConsoleView.vue's own warm-on-container watch (F5) — see `generation` above. */
+  function generationFor(connectionId: string): number {
+    return generation[connectionId] ?? 0;
+  }
+
   /** Idempotent, single-flight, fire-and-forget. Called on tab activation; never from a
    *  CompletionSource, never on a keystroke (D5). Resolves from the Go-side cache with no
    *  connection when one is cached (P22c F7), and is a no-op when the container is already loaded
@@ -187,6 +199,7 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
    *  this, only a reconnect ever reached this store — a tree Refresh dropped the Go-side cache but
    *  left completion/diagnostics/hover offering the previous column set until the next reconnect). */
   function dropSchemaColumns(connectionId: string, containerPath?: string): void {
+    generation[connectionId] = (generation[connectionId] ?? 0) + 1;
     if (containerPath !== undefined) {
       delete state.byContainer[rowKey(connectionId, containerPath)];
       return;
@@ -215,5 +228,6 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
     effectiveSchema,
     dropSchemaColumns,
     initSchemaColumnsSync,
+    generationFor,
   };
 });

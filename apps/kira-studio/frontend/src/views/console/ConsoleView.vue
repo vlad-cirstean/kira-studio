@@ -156,8 +156,19 @@ const containerPath = computed(() =>
 // P22c D3/D5: warms this container's cached columns once per (connection, container) — a view's
 // own lifecycle hook, never a CompletionSource, never on a keystroke. Resolves from the Go-side
 // cache with no connection when one is cached (F7); a no-op when already loaded or in flight.
+//
+// P108 Part 12 F5: `generationFor` is the third source — a reconnect or tree Refresh drops the
+// cached entry (schemaColumns.ts's dropSchemaColumns) with no change to connectionId/containerPath,
+// so without it this watch never re-fired and a mounted console's completion stayed empty until
+// the tab remounted. ensureSchemaColumns is still the no-op it always was for every OTHER
+// generation bump (an unrelated connection's invalidation, or this one's entry already refetched).
 watch(
-  () => [props.tab.connectionId, containerPath.value] as const,
+  () =>
+    [
+      props.tab.connectionId,
+      containerPath.value,
+      props.tab.connectionId ? schemaColumnsStore.generationFor(props.tab.connectionId) : 0,
+    ] as const,
   ([connectionId, path]) => {
     if (connectionId && path) void schemaColumnsStore.ensureSchemaColumns(connectionId, path);
   },
