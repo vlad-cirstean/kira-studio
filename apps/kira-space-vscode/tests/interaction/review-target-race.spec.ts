@@ -3,6 +3,7 @@ import {
   buildFakeHostInitScript,
   FAKE_BRANCH,
   FAKE_REPO_ID,
+  type FakeReviewHostWindow,
   OTHER_REPO_ID,
 } from './support/fakeReviewHost.ts';
 import { type InteractionServer, startInteractionServer } from './support/server.ts';
@@ -37,12 +38,15 @@ test.describe('ReviewView bootstrap vs. a review.target push (P108 F6)', () => {
     await page.goto(`${server.url}/review`);
 
     // bootstrap() has reached its `repo.list` await and is holding for this test's own release.
-    await page.waitForFunction(() => typeof (window as any).__resolveRepoList === 'function');
+    await page.waitForFunction(
+      () => typeof (window as unknown as FakeReviewHostWindow).__resolveRepoList === 'function',
+    );
 
     // The push lands first, resolving entirely (applyTarget + its own review.resolveBase round
     // trip) while repo.list is still pending.
     await page.evaluate(
-      ([repoId, branch]) => (window as any).__emitReviewTarget(repoId, branch),
+      ([repoId, branch]) =>
+        (window as unknown as FakeReviewHostWindow).__emitReviewTarget(repoId, branch),
       [FAKE_REPO_ID, FAKE_BRANCH],
     );
     const branchName = page.locator('[data-testid="review-branch-name"]');
@@ -50,7 +54,7 @@ test.describe('ReviewView bootstrap vs. a review.target push (P108 F6)', () => {
 
     // Only now does repo.list resolve, naming a DIFFERENT repo as the workspace's own active one.
     await page.evaluate(
-      (otherRepoId) => (window as any).__resolveRepoList(otherRepoId),
+      (otherRepoId) => (window as unknown as FakeReviewHostWindow).__resolveRepoList?.(otherRepoId),
       OTHER_REPO_ID,
     );
 
@@ -59,7 +63,9 @@ test.describe('ReviewView bootstrap vs. a review.target push (P108 F6)', () => {
     await page.waitForTimeout(200);
 
     await expect(branchName).toHaveText(FAKE_BRANCH);
-    const refsListCalls = await page.evaluate(() => (window as any).__refsListCalls);
+    const refsListCalls = await page.evaluate(
+      () => (window as unknown as FakeReviewHostWindow).__refsListCalls,
+    );
     // Every refs.list call named FAKE_REPO_ID (the pushed target) — never OTHER_REPO_ID (the
     // workspace's own default the fix must not fall back to once a push already won).
     expect(refsListCalls.some((p: { repoId: string }) => p.repoId === OTHER_REPO_ID)).toBe(false);

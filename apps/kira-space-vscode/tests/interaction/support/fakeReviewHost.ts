@@ -19,6 +19,16 @@ import type { PackedCommitChunk } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
+/** P108 Part 20 F11: the three `window` globals `buildFakeHostInitScript` installs below when
+ *  `repoListDeferred` is set (P108 F6's own trio) — named once here so
+ *  `review-target-race.spec.ts` casts `window` through one interface instead of four separate
+ *  `window as any`s. */
+export interface FakeReviewHostWindow {
+  __resolveRepoList?: (activeRepoId: string | null) => void;
+  __emitReviewTarget: (repoId: string, branch: string) => void;
+  __refsListCalls: ReadonlyArray<{ repoId: string }>;
+}
+
 export const FAKE_REPO_ID = '/fake/repo';
 export const FAKE_BRANCH = 'feature/example';
 const FAKE_BASE = 'main';
