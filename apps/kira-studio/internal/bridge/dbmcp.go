@@ -8,10 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // dbMcpServerName is the one name every Install call registers under — internal/dbmcp's own
@@ -53,6 +53,11 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 	s.embedded = embeddedService[*dbmcp.Server, DbMcpStatus]{
 		startFn: func(mint bool) (*dbmcp.Server, error) {
 			home := config.KiraHome()
+			// The headersHelper script's own content depends only on the token file's path, never
+			// its live value — ensure it once per start (F2), not on every statusFn/Install call.
+			if _, err := mcpinstall.EnsureHeaderHelperScript(home, mcpauth.HelperTokenPathNamed(home, dbMcpTokenName)); err != nil {
+				return nil, err
+			}
 			srv, err := dbmcp.New(dbmcp.Config{
 				Home:             home,
 				Token:            dbMcpTokenProviderFor(home, mint),
@@ -96,8 +101,9 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 			st.Running = true
 			// Command is "" whenever no plaintext is currently held (an app restart with the
 			// setting already on) — the Database MCP section shows a Regenerate action instead.
-			if plain, minted := srv.Token(); minted {
-				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), plain)
+			if _, minted := srv.Token(); minted {
+				helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
+				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), helperPath)
 			}
 			if exp := srv.TokenExpiry(); !exp.IsZero() {
 				st.ExpiresAt = exp.Format(time.RFC3339)
@@ -134,8 +140,19 @@ func (s *DbMcpService) Status() DbMcpStatus {
 func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 	return func() (mcpauth.Record, string, bool, error) {
 		path := mcpauth.PathNamed(home, dbMcpTokenName)
+		helperPath := mcpauth.HelperTokenPathNamed(home, dbMcpTokenName)
 		if !mint {
 			plain, rec, minted, err := mcpauth.LoadOrMintTTL(path, mcpauth.TTL)
+			// A fresh plaintext (minted, or the one-shot zero-ExpiresAt stamp — neither of which
+			// LoadOrMintTTL distinguishes in its own return shape) only exists here when minted is
+			// true (LoadOrMintTTL's own doc: plain is "" whenever it did not mint). The helper
+			// script's own mirror file needs updating only then — a plain load leaves it untouched,
+			// already holding the correct current value from the last mint (F2).
+			if err == nil && minted {
+				if serr := mcpauth.SaveHelperToken(helperPath, plain); serr != nil {
+					return rec, plain, minted, serr
+				}
+			}
 			return rec, plain, minted, err
 		}
 		plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
@@ -143,6 +160,9 @@ func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 			return mcpauth.Record{}, "", false, err
 		}
 		if err := mcpauth.Save(path, rec); err != nil {
+			return mcpauth.Record{}, "", false, err
+		}
+		if err := mcpauth.SaveHelperToken(helperPath, plain); err != nil {
 			return mcpauth.Record{}, "", false, err
 		}
 		return rec, plain, true, nil
@@ -234,6 +254,12 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 		slog.Warn("db mcp: persist regenerated token", "scope", "dbmcp", "err", err)
 		return s.embedded.statusLocked()
 	}
+	// The helper script's own live source (F2) — rotation is exactly rewriting this file, no
+	// re-registration, so a stale mirror here would defeat the whole point of Regenerate.
+	if err := mcpauth.SaveHelperToken(mcpauth.HelperTokenPathNamed(config.KiraHome(), dbMcpTokenName), plain); err != nil {
+		slog.Warn("db mcp: persist regenerated helper token", "scope", "dbmcp", "err", err)
+		return s.embedded.statusLocked()
+	}
 	s.embedded.server.SetToken(rec, plain)
 	return s.embedded.statusLocked()
 }
@@ -260,11 +286,12 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	if s.embedded.server == nil {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	plain, minted := s.embedded.server.Token()
+	_, minted := s.embedded.server.Token()
 	if !minted {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.embedded.server.URL(), plain))
+	helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
+	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.embedded.server.URL(), helperPath))
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own

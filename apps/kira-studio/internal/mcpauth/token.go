@@ -27,7 +27,9 @@ import (
 // TTL is every token's fixed lifetime, applied uniformly to both servers (M1 §2.1).
 const TTL = 7 * 24 * time.Hour
 
-// Record is the at-rest shape: hash+salt only, the plaintext is never written to disk (D8).
+// Record is the at-rest shape: hash+salt only, the plaintext is never written to disk (D8) as
+// THIS record — HelperTokenPathNamed/SaveHelperToken below are a separate, deliberately scoped
+// exception (P108 Part 7 F2), a different file for a different purpose, never this one.
 // ExpiresAt's zero value means "no expiry recorded yet" — exactly what every pre-M1 file on disk
 // already means, so a stamp-on-load (LoadOrMintTTL) can apply the property retroactively with no
 // migration and no file-format version (M1 §2.1/§2.4).
@@ -111,6 +113,23 @@ func PathNamed(home, name string) string {
 	return filepath.Join(home, name+"-token.json")
 }
 
+// HelperTokenPathNamed returns name's plaintext headersHelper mirror file location under home — a
+// deliberate, scoped exception to this package's own hash-only-at-rest rule above (D8), added for
+// P108 Part 7 F2: Claude Code's own `headersHelper` mechanism (verified against the installed CLI,
+// 2.1.280 — undocumented in `--help` but real: it runs a local command and parses its stdout as a
+// JSON object of header values) lets `mcpinstall` register this server without ever putting the
+// bearer token on that process's own argv, but the helper script it writes has to read the LIVE
+// plaintext from somewhere at connection time, including well after a restart mid-token-life, when
+// the hash-only Record above no longer carries a recoverable plaintext at all. This file exists
+// only for that helper script to read — 0600 (SaveHelperToken), never read back by this app itself
+// — narrowing the exposure from D8's original threat (nothing on disk, anywhere) to "readable by
+// this OS user account, same as every other local process already running as it", which is the
+// same posture agenthooks' own 0700 socket directory already takes, and strictly better than the
+// argv exposure it replaces (readable by every local uid via /proc, and by exec-event EDR logging).
+func HelperTokenPathNamed(home, name string) string {
+	return filepath.Join(home, name+"-header.token")
+}
+
 // Load reads path's Record. A missing file returns ok=false with no error — there is nothing wrong
 // with a server instance that has never been enabled or started before.
 func Load(path string) (Record, bool, error) {
@@ -143,6 +162,25 @@ func Save(path string, rec Record) error {
 	if err != nil {
 		return fmt.Errorf("mcpauth: encode %s: %w", path, err)
 	}
+	return atomicWrite0600(path, data)
+}
+
+// SaveHelperToken persists plain to path (HelperTokenPathNamed's own path), mode 0600, atomically
+// — the same temp-file-plus-rename discipline Save uses, so a reader (the headersHelper script)
+// never observes a truncated file mid-write. Call this every time a fresh plaintext is minted
+// (dbMcpTokenProviderFor's mint branch, Regenerate) — never on a load-only path, where this file
+// already holds the correct value from the last mint and needs no update.
+func SaveHelperToken(path, plain string) error {
+	return atomicWrite0600(path, []byte(plain))
+}
+
+// atomicWrite0600 is Save/SaveHelperToken's own shared temp-file-plus-rename write, mode 0600.
+// Rename is atomic on both target platforms (POSIX same-filesystem rename; this repo's own
+// KIRA_HOME layout keeps the temp file alongside the real one, so it is), so a reader only ever
+// sees the old complete file or the new complete file, never a partial one — a crash or a full disk
+// mid-write must not leave a file its own reader (json.Unmarshal for a Record, a shell `cat` for a
+// helper token) then fails to parse.
+func atomicWrite0600(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("mcpauth: mkdir %s: %w", dir, err)
@@ -207,4 +245,3 @@ func LoadOrMintTTL(path string, ttl time.Duration) (plain string, rec Record, mi
 	}
 	return plain, rec, true, nil
 }
-
