@@ -39,6 +39,7 @@ import {
   parseDelimited,
   type RowSnapshot,
   rowsToTsv,
+  tsvField,
 } from '../shared/clipboardFormats';
 import {
   alignmentFor,
@@ -1788,8 +1789,10 @@ function onCopy(): void {
   const p = getPage(props.tabId);
   if (!sel || !p) return;
   if (sel.kind === 'cell') {
+    // F5 (P108 Part 10): through tsvField, same as every other copy kind below — a single-cell
+    // copy and a one-cell range copy of the same cell must produce the same clipboard text.
     const dc = displayCell(sel.row, sel.col);
-    void copyText(dc.isNull ? '' : dc.text);
+    void copyText(dc.isNull ? '' : tsvField(dc.text));
     return;
   }
   if (sel.kind === 'range') {

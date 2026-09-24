@@ -11,6 +11,7 @@ import {
   rowsToInsert,
   rowsToJson,
   rowsToTsv,
+  tsvField,
 } from '../shared/clipboardFormats';
 import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import { requestCellFocus } from './focusRequest';
@@ -276,7 +277,10 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       // behavior branches on selection kind (cell/range/row/column) in a way one menu row can't
       // express, so this is tagged for its printed key without being dispatched through here.
       shortcut: 'grid.copy',
-      run: () => copyText(ctx.isNull ? '' : ctx.text),
+      // F5 (P108 Part 10): through tsvField, same as SlickGridHost.vue's own onCopy cell-kind
+      // branch — the same "copy this one cell" action must produce the same clipboard text
+      // regardless of which of the two paths (keyboard vs. this menu item) ran it.
+      run: () => copyText(ctx.isNull ? '' : tsvField(ctx.text)),
     },
     {
       type: 'item',

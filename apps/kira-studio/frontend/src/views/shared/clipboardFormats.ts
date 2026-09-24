@@ -28,10 +28,20 @@ function neutralizeFormulaPrefix(value: string): string {
 // `"` doubled, exactly CSV's own rule (csvField below). Without this, a `text` column holding an
 // embedded tab or newline shifted every subsequent column (tab) or split one row into two
 // (newline) on paste back into this app's own grid — copy→paste corrupted the very data it copied.
-function tsvField(value: string): string {
-  const guarded = neutralizeFormulaPrefix(value);
-  if (/["\t\n\r]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
-  return guarded;
+//
+// F5 (P108 Part 10): no longer calls neutralizeFormulaPrefix. Plain Copy (this format) is not an
+// explicit spreadsheet-bound export — CWE-1236's mitigation belongs on csvField below (Copy as
+// CSV) and rowsToInsert, formats a user chooses specifically to hand to a spreadsheet or run as
+// SQL. Applying it here too meant a plain range/row/column copy of `-5` wrote `'-5` to the
+// clipboard, and pasting that back into this app's own grid staged the literal `'-5` — this app's
+// own grid is not a spreadsheet formula engine, so there was nothing here for the mitigation to
+// protect against, only self-inflicted corruption of the very data Copy claims to preserve.
+// Exported so a single-cell copy (SlickGridHost.vue's onCopy, menu.ts's cellMenu Copy) can go
+// through the same quoting rule every other copy already does — the fix for "single cell copy and
+// one-cell range copy must produce the same text".
+export function tsvField(value: string): string {
+  if (/["\t\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
 }
 
 export function rowsToTsv(rows: RowSnapshot[]): string {
@@ -126,11 +136,21 @@ export function rowsToInsert(
   return `${truncatedNote}INSERT INTO ${qualifiedName} (${columnList})\nVALUES\n${valueLines.join(',\n')};`;
 }
 
-/** TSV if `text` contains a tab character, else CSV (quoted-field aware). */
+/** TSV if `text` contains a tab character; one single value if it has neither a tab nor a newline;
+ *  otherwise CSV (quoted-field aware).
+ *
+ *  F5 (P108 Part 10): the "one single value" case is new. Before it, any clipboard text with no
+ *  tab fell through to parseCsv regardless of source — a single cell copied from this app itself
+ *  (`Main St, Apt 4`, `[1,2]`) split on commas into two+ columns and, for a multi-line value,
+ *  split into rows. A single-cell copy/paste round trip must reproduce the one value it copied,
+ *  not reparse it as delimited data no tab or newline ever signaled. */
 export function parseDelimited(text: string): string[][] {
   const normalized = text.replace(/\r\n/g, '\n');
   if (normalized.includes('\t')) {
     return parseDelimitedText(normalized, '\t');
+  }
+  if (!normalized.includes('\n')) {
+    return [[normalized]];
   }
   return parseCsv(normalized);
 }
