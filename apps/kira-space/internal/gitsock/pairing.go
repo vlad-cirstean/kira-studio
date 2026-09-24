@@ -294,6 +294,28 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, isDeny bool) P
 	return PairingActionResolved
 }
 
+// Cancel removes requestID from the queue, if it is still there, and resolves it PairingAborted
+// (F12) — the requester itself disconnected while its decision was still pending (window closed,
+// extension reload). Without this, the entry stays queued and presentable until its own
+// pairingTimeout deadline, and an Approve landing in that window mints a trusted git_clients row
+// for a connection nobody holds any more. A no-op — no send, no emit — if requestID was already
+// resolved (approved/denied/expired) by the time this runs: queue.Remove reports that with ok
+// false, exactly like answer's and ExpireOverdue's own already-resolved guards.
+func (b *Broker) Cancel(requestID string) {
+	b.mu.Lock()
+	entry, ok := b.queue.Remove(requestID)
+	if !ok {
+		b.mu.Unlock()
+		return
+	}
+	snap := b.snapshotLocked()
+	seq := b.emitter.NextSeq()
+	b.mu.Unlock()
+
+	entry.result <- PairingAborted
+	b.emitter.Emit(seq, snap)
+}
+
 // TakeApprovedToken returns (and forgets) the token Approve minted for requestID — the single
 // token shared by the whole approval decision (F6: the presented head and every sibling request
 // from the same clientID). ok is false when nothing was ever stored for this id: a Denied or

@@ -128,15 +128,23 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 
 	// Row 7: pairingRequired, then §3.1.2's own follow-up table. requestID is captured from
 	// onEnqueued so an Approved outcome can claim this connection's own share of the token the
-	// broker minted (F6) — TakeApprovedToken is keyed by it.
+	// broker minted (F6) — TakeApprovedToken is keyed by it. F12: a watcher goroutine starts
+	// watching this connection for a disconnect the moment the request is enqueued, so a requester
+	// that goes away mid-wait (window closed, extension reload) has its entry cancelled instead of
+	// sitting in the queue, presentable, until Approve mints a token nobody holds.
 	var requestID string
+	var watchDone chan struct{}
 	outcome := deps.Broker.Request(clientID, label, func(req PairingRequest) {
 		requestID = req.RequestID
 		sendHandshake(c, handshakeResponse{
 			Kind: "pairingRequired", RequestID: req.RequestID,
 			ExpiresInMs: int(pairingTimeout / time.Millisecond),
 		})
+		watchDone = watchDisconnect(c, deps.Broker, req.RequestID)
 	})
+	if watchDone != nil {
+		stopWatch(c, watchDone)
+	}
 
 	switch outcome {
 	case PairingApproved:
@@ -164,6 +172,38 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "timeout"})
 		return "", "", "", false
 	}
+}
+
+// watchDisconnect starts the goroutine F12 needs: a blocking 1-byte Peek of c's own bufio.Reader,
+// running for as long as requestID sits in the broker's queue awaiting a decision. Peek never
+// consumes a byte — the handshake protocol expects nothing further from the client before a
+// decision arrives, so this only ever unblocks on a real read error (EOF, reset) or on stopWatch's
+// own forced deadline below. Either way it cancels the request; Broker.Cancel is a no-op if the
+// request was already resolved by the time it runs, so a spurious cancel from stopWatch's forced
+// deadline racing a real decision costs nothing. The returned channel closes once the Peek call
+// has returned, so stopWatch can wait for this goroutine to be fully done with c before anything
+// else reads from it.
+func watchDisconnect(c *conn, broker *Broker, requestID string) chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, err := c.r.Peek(1); err != nil {
+			broker.Cancel(requestID)
+		}
+	}()
+	return done
+}
+
+// stopWatch retires watchDisconnect's goroutine once the pairing outcome is already known, in the
+// exact order F12's review requires: set a deadline already in the past, so the goroutine's
+// in-flight (or about-to-start) Peek returns immediately rather than blocking further; wait for
+// that goroutine to actually exit, so nothing else touches c.r while it might still be mid-Peek;
+// only then clear the deadline, before c is handed to Serve (or closed) — a deadline left in place
+// would wrongly time out the connection's very first read once Serve takes over.
+func stopWatch(c *conn, done chan struct{}) {
+	_ = c.nc.SetReadDeadline(time.Unix(0, 0))
+	<-done
+	_ = c.nc.SetReadDeadline(time.Time{})
 }
 
 // finishPairing inserts the row *before* sending "paired" (§3.1.2: the reverse order can hand out

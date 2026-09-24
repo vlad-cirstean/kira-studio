@@ -413,3 +413,48 @@ func TestHandshake_Row7_PairingTimeout(t *testing.T) {
 		t.Fatal("timeout must not start a cooldown")
 	}
 }
+
+// TestHandshake_Row7_DisconnectDuringWaitCancelsEntry is F12's own regression guard: a requester
+// that disconnects while its pairing decision is still pending (window closed, extension reload)
+// must have its entry removed from the broker's queue, not left there for a stale Approve to mint
+// a token nobody holds.
+func TestHandshake_Row7_DisconnectDuringWaitCancelsEntry(t *testing.T) {
+	t.Parallel()
+	client, server := net.Pipe()
+	broker := NewBroker(time.Now)
+	deps := testHandshakeDeps(newFakeTrustStore(), broker, time.Now)
+
+	done := make(chan bool, 1)
+	go func() {
+		_, _, _, ok := runHandshake(newConn(server), deps)
+		done <- ok
+	}()
+	clientSend(t, client, helloFrame{
+		Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion,
+		Client: helloClient{ID: "c1"},
+	})
+	r := bufio.NewReader(client)
+	pending := clientReceive(t, r)
+	if pending.Kind != "pairingRequired" || pending.RequestID == "" {
+		t.Fatalf("got %+v", pending)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("client.Close: %v", err)
+	}
+
+	if ok := <-done; ok {
+		t.Fatal("want ok=false after the requester disconnected mid-wait")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && broker.Pending().Pending != nil {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if broker.Pending().Pending != nil {
+		t.Fatal("entry still queued after the requester disconnected")
+	}
+	if got := broker.Approve(pending.RequestID); got != PairingActionAlreadyResolved {
+		t.Fatalf("approve after disconnect: got %v, want AlreadyResolved (nothing left to approve)", got)
+	}
+}
