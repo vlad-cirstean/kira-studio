@@ -894,7 +894,7 @@ onUnmounted(() => {
           >
             <span
               class="shrink-0 text-kira-xs"
-              :class="tab.state.offsetFilter ? 'text-state-on' : 'text-fg-muted'"
+              :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
               >offset</span
             >
             <Input
@@ -967,7 +967,7 @@ onUnmounted(() => {
                 >
                   <span
                     class="shrink-0 text-kira-xs"
-                    :class="tab.state.timestampFilter ? 'text-state-on' : 'text-fg-muted'"
+                    :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
                     >since</span
                   >
                   <Input

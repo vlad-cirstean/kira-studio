@@ -663,7 +663,7 @@ const preconnectText = computed({
     <template v-if="step === 'engine'">
       <div class="p-dialog-body engine-body">
         <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-field px-2">
-          <CodiconIcon name="search" :size="13" class="shrink-0 text-fg-muted" />
+          <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
           <Input
             v-model="engineSearch"
             placeholder="Search engines"
