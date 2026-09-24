@@ -46,13 +46,36 @@ export class BridgeClient {
 
   readonly #transport: Transport;
   #initPromise: Promise<ResultOf<'app.init'>> | undefined;
+  #lastConnectionKind: HostConnectionState['kind'] | undefined;
+  readonly #reconnectHandlers = new Set<() => void>();
 
   constructor(transport: Transport, initialHostConnection?: HostConnectionState) {
     this.#transport = transport;
     this.hostConnection = shallowRef(initialHostConnection);
+    this.#lastConnectionKind = initialHostConnection?.kind;
     this.#transport.on('connection.changed', (payload) => {
+      // F2: a non-'connected' -> 'connected' transition, not the seeded initial value (that is
+      // cold boot, already handled by bootstrap()) and not 'connected' -> 'connected' (a no-op
+      // re-push, if the host ever sends one). The server's new `Conn` behind a reconnect holds no
+      // repo and no walk — every `state/*.ts` class that held one needs to know to re-establish
+      // it, which is what `onReconnect` below is for.
+      const wasConnected = this.#lastConnectionKind === 'connected';
       this.hostConnection.value = payload.state;
+      this.#lastConnectionKind = payload.state.kind;
+      if (!wasConnected && payload.state.kind === 'connected') {
+        for (const handler of this.#reconnectHandlers) handler();
+      }
     });
+  }
+
+  /** F2: registers a handler for "the host's socket just reconnected" (see the constructor's own
+   *  doc comment for exactly which transition that is) — `App.vue`/`ReviewView.vue`'s own hook to
+   *  re-open whatever repo they held and re-run the same fan-out a fresh `repo.open` triggers,
+   *  since every request against the old `repoId` otherwise fails `ErrRepoNotHeld` forever.
+   *  Returns an unsubscribe function, mirroring `on`. */
+  onReconnect(handler: () => void): () => void {
+    this.#reconnectHandlers.add(handler);
+    return () => this.#reconnectHandlers.delete(handler);
   }
 
   /** Performs the `app.init` handshake exactly once *per success*, however many callers ask for

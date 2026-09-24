@@ -432,23 +432,48 @@ watch(
   },
 );
 
-watch(
-  () => repoState.value?.activeRepo.value?.repoId,
-  (repoId) => {
-    detailState.setRepoId(repoId);
-    refsState.setRepoId(repoId);
-    opsState.setRepoId(repoId);
-    stashState.setRepoId(repoId);
-    workingState.setRepoId(repoId);
-    worktreeState.setRepoId(repoId);
-    searchState.setRepoId(repoId);
-    repoSettingsState.setRepoId(repoId);
-    prState.setRepoId(repoId);
-    // G26: after prState (StackState.reload calls prState.ensureSnapshot, F13).
-    stackState.setRepoId(repoId);
-  },
-  { immediate: true },
-);
+/** F2: extracted so the reconnect handler below (`handleReconnect`) can re-run this fan-out
+ *  explicitly — a reconnect almost always re-opens the *same* `repoId`, so the `watch` below
+ *  (keyed on `repoId` identity) never re-fires on its own, even though every one of these states
+ *  needs to drop whatever it cached against the old, now-dead connection and re-fetch fresh. */
+function applyRepoIdToStates(repoId: string | undefined): void {
+  detailState.setRepoId(repoId);
+  refsState.setRepoId(repoId);
+  opsState.setRepoId(repoId);
+  stashState.setRepoId(repoId);
+  workingState.setRepoId(repoId);
+  worktreeState.setRepoId(repoId);
+  searchState.setRepoId(repoId);
+  repoSettingsState.setRepoId(repoId);
+  prState.setRepoId(repoId);
+  // G26: after prState (StackState.reload calls prState.ensureSnapshot, F13).
+  stackState.setRepoId(repoId);
+}
+
+watch(() => repoState.value?.activeRepo.value?.repoId, applyRepoIdToStates, { immediate: true });
+
+/** F2: the host's socket just reconnected (`BridgeClient.onReconnect`'s own doc comment) — the
+ *  server's new `Conn` holds no repo, so every request against the currently-held `repoId` would
+ *  otherwise fail `ErrRepoNotHeld` forever and leave the graph/status/refs/review frozen on
+ *  stale data. Re-opens the same root path (a no-op-shaped, always-safe call — `repo.open` is
+ *  what a fresh mount already does) and runs the exact reset+reopen `handleRepoOpened` runs for
+ *  a brand new open, then explicitly re-seeds every other state (`applyRepoIdToStates` above),
+ *  since `repoId` itself is (almost always) unchanged. A repo that no longer opens (deleted,
+ *  moved) is left as-is — same as any other `repo.open` failure elsewhere in this file, nothing
+ *  new to handle here. */
+async function handleReconnect(): Promise<void> {
+  const repo = repoState.value;
+  const active = repo?.activeRepo.value;
+  if (!repo || !active) return;
+  const outcome = await repo.open(active.root);
+  if (outcome.kind !== 'ok') return;
+  await handleRepoOpened(outcome.repo.repoId);
+  applyRepoIdToStates(outcome.repo.repoId);
+}
+
+const unsubscribeReconnect = bridge.onReconnect(() => {
+  void handleReconnect();
+});
 
 watch(detailState.announcement, (text) => {
   liveAnnouncement.value = text;
@@ -1586,6 +1611,7 @@ onBeforeUnmount(() => {
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   stopTooltips?.();
   unsubscribeUiAction();
+  unsubscribeReconnect();
   graphView.dispose();
   refsState.dispose();
   opsState.dispose();

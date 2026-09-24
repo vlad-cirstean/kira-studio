@@ -104,10 +104,33 @@ watch(repoId, (id) => refsState.setRepoId(id));
 
 let unsubscribeTarget: (() => void) | undefined;
 let unsubscribeUiAction: (() => void) | undefined;
+let unsubscribeReconnect: (() => void) | undefined;
 
 async function applyTarget(nextRepoId: string, branch: string): Promise<void> {
   repoId.value = nextRepoId;
   await review.value?.setTarget(nextRepoId, branch);
+}
+
+/** F2: the host's socket just reconnected (`BridgeClient.onReconnect`'s own doc comment) — the
+ *  server's new `Conn` holds no repo and no walk, so every request against the currently-held
+ *  `repoId` would otherwise fail `ErrRepoNotHeld` forever and leave this whole sidebar frozen. A
+ *  no-op with no review target open yet (nothing held to re-establish). `applyTarget` re-runs
+ *  `setTarget` against the *same* branch, which re-resolves the base and re-streams the range
+ *  from scratch against the new connection; a manually-chosen base (an `'override'` resolution)
+ *  is re-applied after, mirroring `resumeSession`'s own `baseOverride` restore. `repoId` itself
+ *  is unchanged, so `refsState`'s own `watch(repoId, ...)` above never re-fires on its own —
+ *  re-seeded explicitly here, same as `App.vue`'s `applyRepoIdToStates`. */
+async function handleReconnect(): Promise<void> {
+  const id = repoId.value;
+  const branch = review.value?.branch.value;
+  if (!id || !branch) return;
+  const overrideBase =
+    review.value?.resolution.value?.reason === 'override'
+      ? review.value.resolution.value.base
+      : undefined;
+  await applyTarget(id, branch);
+  if (overrideBase) await review.value?.setBase(overrideBase);
+  refsState.setRepoId(id);
 }
 
 async function bootstrap(): Promise<void> {
@@ -125,6 +148,9 @@ async function bootstrap(): Promise<void> {
   // currently open in the Files pane, or announces there is none to toggle.
   unsubscribeUiAction = bridge.on('ui.action', (event) => {
     onUiAction(event.action);
+  });
+  unsubscribeReconnect = bridge.onReconnect(() => {
+    void handleReconnect();
   });
 
   if (props.target) {
@@ -400,6 +426,7 @@ function retryBootstrap(): void {
 onBeforeUnmount(() => {
   unsubscribeTarget?.();
   unsubscribeUiAction?.();
+  unsubscribeReconnect?.();
   review.value?.dispose();
   reviewFiles.value?.dispose();
   reviewComments.value?.dispose();
