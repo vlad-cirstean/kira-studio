@@ -257,7 +257,7 @@ onUnmounted(() => {
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <span
-      class="icon-box"
+      class="size-4 flex items-center justify-center shrink-0"
       :class="errorMessage ? 'text-error' : 'text-muted-foreground'"
     >
       <CodiconIcon name="search" :size="13" />

@@ -496,7 +496,7 @@ onUnmounted(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span class="icon-box"><CodiconIcon name="globe" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
       <span class="p-view-target" data-testid="http-request-target">{{ title }}</span>
       <span class="p-chip p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</span>
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,

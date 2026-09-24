@@ -45,7 +45,7 @@ const statusTitle = computed(() => {
 const railColor = computed(() => connectionsStore.connectionRecord(props.row.connectionId)?.color);
 
 // The connection row's own kind ("postgres", "mongodb", ...), shown as a badge
-// instead of a second icon — the state dot already occupies the icon-box slot.
+// instead of a second icon — the state dot already occupies the icon slot.
 const connectionKind = computed(() => {
   if (props.row.kind !== 'connection') return undefined;
   return connectionsStore.connectionRecord(props.row.connectionId)?.kind;
@@ -145,7 +145,7 @@ function onKeydown(e: KeyboardEvent): void {
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
 
-    <span v-if="row.kind === 'connection'" class="icon-box">
+    <span v-if="row.kind === 'connection'" class="size-4 flex items-center justify-center shrink-0">
       <Tooltip :disabled="!statusTitle">
         <TooltipTrigger as-child>
           <span class="status-dot" :data-status="row.status" />
@@ -153,7 +153,7 @@ function onKeydown(e: KeyboardEvent): void {
         <TooltipContent v-if="statusTitle">{{ statusTitle }}</TooltipContent>
       </Tooltip>
     </span>
-    <span v-if="connectionKind" class="icon-box">
+    <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
       <EngineIcon :kind="connectionKind" :size="13" />
     </span>
     <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="node-icon" />

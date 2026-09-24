@@ -604,7 +604,7 @@ const preconnectText = computed({
     >
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
       <DialogHeader v-if="step === 'engine'" class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <span class="icon-box text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
+        <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
         <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
         <span class="title-mid ml-auto">
           <span v-if="!isEdit" class="steps">

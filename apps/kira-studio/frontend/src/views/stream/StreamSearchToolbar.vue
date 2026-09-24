@@ -101,7 +101,7 @@ onUnmounted(() => {
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
   <div ref="rootEl" class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar">
-    <span class="icon-box text-muted-foreground"><CodiconIcon name="search" :size="13" /></span>
+    <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
       <Input
         ref="searchInput"

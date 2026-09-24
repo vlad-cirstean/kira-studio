@@ -202,8 +202,8 @@ function onCloseSearch(): void {
   <div class="data-view">
     <div class="p-view-head">
       <span v-if="railColor !== undefined" class="p-conn-dot" :class="{ none: !railColor }" :style="{ '--kira-rail': connColorVar(railColor) }" />
-      <span v-if="connRecord?.kind" class="icon-box"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
-      <span class="icon-box" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
       <span class="p-view-target" data-testid="grid-target">
         <span v-if="pathPrefix" class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
       </span>

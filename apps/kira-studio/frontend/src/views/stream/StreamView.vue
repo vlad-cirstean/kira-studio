@@ -631,10 +631,10 @@ onUnmounted(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span v-if="connRecord?.kind" class="icon-box">
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
-      <span class="icon-box" :style="{ color: iconColor }">
+      <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
         <CodiconIcon name="broadcast" :size="13" />
       </span>
       <span class="p-view-target"

@@ -232,8 +232,8 @@ const breadcrumb = computed(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span v-if="connRecord?.kind" class="icon-box"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
-      <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
       <span class="p-view-target" data-testid="definition-target">
         <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
       </span>
@@ -333,7 +333,7 @@ const breadcrumb = computed(() => {
       class="p-strip note"
       data-testid="definition-notes"
     >
-      <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
       <ul class="notes-list">
         <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
       </ul>

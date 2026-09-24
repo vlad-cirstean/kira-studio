@@ -4,15 +4,6 @@
    button/input/row/toolbar. Ported 1:1 from parts/_style.css's P1-P12 and its
    named LAWs — see that file for the rationale behind each measurement. */
 
-.icon-box {
-  width: var(--kira-icon-box);
-  height: var(--kira-icon-box);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
 /* ---------- P2 text button ---------- */
 .p-btn {
   height: var(--kira-control-h);

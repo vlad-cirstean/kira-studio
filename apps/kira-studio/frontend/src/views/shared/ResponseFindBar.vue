@@ -135,7 +135,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <div ref="rootEl" class="response-find-bar p-toolbar" data-testid="http-find-bar">
-    <span class="icon-box text-muted-foreground">
+    <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground">
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="find-input">

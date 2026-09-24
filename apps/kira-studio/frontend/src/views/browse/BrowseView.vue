@@ -294,10 +294,10 @@ onMounted(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span v-if="connRecord?.kind" class="icon-box">
+      <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connRecord.kind" :size="13" />
       </span>
-      <span class="icon-box">
+      <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon :name="headerIcon" :size="13" />
       </span>
       <span class="p-view-target" data-testid="browse-target"
@@ -519,7 +519,7 @@ onMounted(() => {
                   <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
                        has arrived (redisTypeIcon falls back to the generic key glyph otherwise —
                        never a wrong type). S3 objects and every container kind are unaffected. -->
-                  <span class="icon-box text-muted-foreground"
+                  <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"
                     ><CodiconIcon
                       :name="
                         filteredNodes[vi.index]?.kind === 'key'

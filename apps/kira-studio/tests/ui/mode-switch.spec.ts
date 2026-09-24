@@ -204,8 +204,8 @@ test('switching mode reaches windowsSetMode eventually, never synchronously (P22
   expect(setModeCalls()[1]?.args).toMatchObject({ mode: 'api' });
 });
 
-// P18 D15/F18 built the box-level fix (a real .icon-box and a real <span> label, both real flex
-// items with a measurable rect) and a guard that held *by construction*: a fixed-size .icon-box
+// P18 D15/F18 built the box-level fix (a real fixed-size icon box and a real <span> label, both
+// real flex items with a measurable rect) and a guard that held *by construction*: the icon box
 // centres each glyph's own advance, not its ink, so the guard could never see the two things a
 // user actually reads — F8/F9 name this as the reason the same complaint came back a third time.
 // P22 D5 replaces both of that guard's assertions with an ink measurement: screenshot the icon
@@ -232,8 +232,8 @@ async function inkBounds(
     if (!ctx) throw new Error('mode-tab ink measurement: no 2d context');
     ctx.drawImage(img, 0, 0);
     const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // The crop's own corner pixel is its background — .icon-box and .mode-label paint no fill of
-    // their own, so this is whatever sits behind them (the tab's own ground either way).
+    // The crop's own corner pixel is its background — the icon box and .mode-label paint no fill
+    // of their own, so this is whatever sits behind them (the tab's own ground either way).
     const bg = [data[0], data[1], data[2]];
     const THRESHOLD = 24; // per-channel delta that counts as "ink", tolerant of anti-aliasing
     let minX = Number.POSITIVE_INFINITY;
@@ -273,7 +273,7 @@ async function modeTabInk(
   mode: 'studio' | 'api' | 'terminal',
 ): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
   const tab = modeTab(page, mode);
-  const iconBoxLocator = tab.locator('.icon-box');
+  const iconBoxLocator = tab.locator('[data-testid="mode-tab-icon"]');
   const iconBox = await iconBoxLocator.boundingBox();
   const iconInk = await inkBounds(iconBoxLocator);
   const labelInk = await inkBounds(tab.locator('.mode-label'));
@@ -283,7 +283,7 @@ async function modeTabInk(
   return {
     iconCentreY: (iconInk.top + iconInk.bottom) / 2,
     labelCentreY: (labelInk.top + labelInk.bottom) / 2,
-    // The .icon-box's own trailing edge to the glyph's own rightmost ink — how much of the box a
+    // The icon box's own trailing edge to the glyph's own rightmost ink — how much of the box a
     // rendered-at-native-size glyph actually fills, the direct, verifiable claim D6(a) makes
     // ("the codicon's own 16-unit design grid and its 16px slot coincide"). At 13px-in-16px this
     // always carried (16-13)/2 = 1.5px of pure box slack *in addition to* the glyph's own side

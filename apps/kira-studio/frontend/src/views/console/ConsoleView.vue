@@ -639,10 +639,10 @@ const statusLine = computed(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span v-if="connectionKind" class="icon-box">
+      <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
         <EngineIcon :kind="connectionKind" :size="13" />
       </span>
-      <span class="icon-box">
+      <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="terminal" :size="13" />
       </span>
       <span class="p-view-target" data-testid="console-target">{{

@@ -59,7 +59,7 @@ async function submit(): Promise<void> {
 <template>
   <div class="compose-inner">
     <div class="compose-header flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-      <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
       <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
       <Tooltip>
         <TooltipTrigger as-child>

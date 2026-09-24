@@ -508,7 +508,7 @@ const statusLine = computed(() => {
          rides along in the target text itself (cell-editor-target's toContainText assertions
          don't care about styling). -->
     <div class="p-view-head">
-      <span class="icon-box">
+      <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="symbol-string" :size="13" />
       </span>
       <span class="p-view-target" data-testid="cell-editor-target"

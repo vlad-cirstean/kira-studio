@@ -143,7 +143,7 @@ async function onConfirm(): Promise<void> {
       class="flex flex-col p-0 gap-0 w-180 h-140"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <span class="icon-box text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
+        <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
         <DialogTitle class="text-kira-lg font-normal">{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
         <DialogClose as-child>
           <Button
@@ -229,7 +229,7 @@ async function onConfirm(): Promise<void> {
           <span v-if="row.warnings.length > 0" class="ds-warnings">
             <Tooltip v-for="w in row.warnings" :key="w">
               <TooltipTrigger as-child>
-                <span class="icon-box text-subtle">
+                <span class="size-4 flex items-center justify-center shrink-0 text-subtle">
                   <CodiconIcon name="warning" :size="12" />
                 </span>
               </TooltipTrigger>

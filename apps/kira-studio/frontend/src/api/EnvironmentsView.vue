@@ -234,7 +234,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span class="icon-box"><CodiconIcon name="server-environment" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="server-environment" :size="13" /></span>
       <span class="p-view-target" data-testid="environments-target">Environments</span>
       <span class="ml-auto flex items-center gap-1" />
     </div>

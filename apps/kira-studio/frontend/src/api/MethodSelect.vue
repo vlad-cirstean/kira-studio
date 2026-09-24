@@ -58,7 +58,7 @@ function select(method: HttpMethod): void {
           @click="select(m)"
         >
           <span class="label">{{ m }}</span>
-          <span class="icon-box">
+          <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="m === props.modelValue" name="check" :size="13" />
           </span>
         </button>

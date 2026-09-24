@@ -172,7 +172,7 @@ async function saveCurrent(): Promise<void> {
     <template #footer>
       <Separator class="my-1" />
       <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
-        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
         Save current filter…
       </button>
       <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent

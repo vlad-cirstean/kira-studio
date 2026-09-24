@@ -285,7 +285,7 @@ onUnmounted(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
+      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="symbol-interface" :size="13" /></span>
       <span class="p-view-target" data-testid="grpc-request-target">{{ title }}</span>
       <span v-if="tab.state.service && tab.state.method" class="p-chip info" data-testid="grpc-method-chip">
         {{ tab.state.service }}/{{ tab.state.method }}

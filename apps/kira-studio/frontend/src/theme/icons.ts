@@ -163,7 +163,7 @@ export function columnTypeIcon(dataType: string): string {
   return CATEGORY_ICON[columnTypeCategory(dataType)];
 }
 
-// P63 §4.2: a per-type glyph for a Browse row's icon-box, matching columnTypeIcon's own shape —
+// P63 §4.2: a per-type glyph for a Browse row's icon slot, matching columnTypeIcon's own shape —
 // the six real redis types (RedisInsight's own vocabulary, minus ReJSON: this app has no
 // JSON-module support). No colour: §4.2's own reasoning is that these are container/structure
 // classes, the exact family P9/P46-7's own CATEGORY_COLOR already paints plain (json/array/binary/

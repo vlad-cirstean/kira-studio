@@ -101,7 +101,7 @@ function manage(): void {
         >
           <span class="p-conn-dot none" />
           <span class="label">No environment</span>
-          <span class="icon-box">
+          <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="activeEnvironmentId === ''" name="check" :size="13" />
           </span>
         </button>
@@ -120,7 +120,7 @@ function manage(): void {
             :style="{ '--kira-rail': connColorVar(env.color) }"
           />
           <span class="label">{{ env.name }}</span>
-          <span class="icon-box">
+          <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="env.id === activeEnvironmentId" name="check" :size="13" />
           </span>
         </button>

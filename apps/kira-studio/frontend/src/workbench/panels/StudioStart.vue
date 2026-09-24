@@ -61,7 +61,7 @@ function openRecent(entry: RecentTableEntry): void {
       </div>
       <span class="first-run-actions">
         <button type="button" class="p-dlgbtn primary" @click="connectionDialogStore.openCreateDialog">
-          <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+          <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
           New connection
         </button>
         <button
@@ -70,7 +70,7 @@ function openRecent(entry: RecentTableEntry): void {
           data-testid="first-run-import-datagrip"
           @click="datagripImportStore.pickAndScanDataGripProject"
         >
-          <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
+          <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
           Import from DataGrip
         </button>
       </span>
@@ -97,7 +97,7 @@ function openRecent(entry: RecentTableEntry): void {
               class="rail-dot"
               :style="{ background: connColorVar(connectionFor(entry)?.color) ?? 'none' }"
             />
-            <span class="icon-box" :style="{ color: iconColorFor(entry) }">
+            <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColorFor(entry) }">
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="entry-path">{{ entry.path }}</span>

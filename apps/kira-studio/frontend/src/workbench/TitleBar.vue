@@ -71,7 +71,11 @@ const keepAwakeTooltip = computed(() => {
       >
         <!-- P22 D6: rendered at the icon's own 16px design size (--kira-icon-box) — the glyph fills
              its box instead of leaving per-glyph advance slack at 13px (F9(a)). Mode-tab-local. -->
-        <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="16" /></span>
+        <span
+          class="size-4 flex items-center justify-center shrink-0 leading-[var(--kira-control-inline-h)]"
+          data-testid="mode-tab-icon"
+          ><CodiconIcon :name="MODES[mode].icon" :size="16"
+        /></span>
         <span class="mode-label">{{ MODES[mode].label }}</span>
       </button>
     </div>
@@ -183,16 +187,14 @@ const keepAwakeTooltip = computed(() => {
   padding: 0 var(--kira-s-5);
   gap: var(--kira-s-2);
 }
-/* P18 D15/F18: the icon sits in a real .icon-box (AppButton.vue's own stated law — "icons never
-   float unboxed next to text") and the label in a real <span>, both real flex items. */
-.mode-tab .icon-box,
+/* P18 D15/F18: the icon sits in a real box (AppButton.vue's own stated law — "icons never
+   float unboxed next to text", P110 B20's utilities on the element itself) and the label in a
+   real <span>, both real flex items. The icon's own line-height is set inline (leading-[…]
+   above); the residual sub-pixel optical nudge the same comment used to carry here was always
+   translateY(var(--kira-icon-optical-y, 0px)) with the var never set elsewhere -- a permanent
+   no-op (D5's own ink measurement found nothing left to correct), dropped rather than ported. */
 .mode-tab .mode-label {
   line-height: var(--kira-control-inline-h);
-}
-/* A residual sub-pixel optical offset a shared line-height can't absorb would be nudged here — 0
-   today (D5's own ink measurement found nothing left to correct). */
-.mode-tab .icon-box {
-  transform: translateY(var(--kira-icon-optical-y, 0px));
 }
 .mode-tab:hover:not(.is-active) {
   background: var(--kira-hover);
