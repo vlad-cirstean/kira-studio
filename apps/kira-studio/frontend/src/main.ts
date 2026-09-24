@@ -5,6 +5,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { initApiDataSync } from './api/state/apiQueries';
+import BootFailure from './BootFailure.vue';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { useTreeStore } from './project/state/tree';
@@ -290,7 +291,7 @@ if (__KIRA_DEBUG_HOOKS__) {
   window.__kiraTreeConnectionIds = () => Array.from(useTreeStore().knownConnectionIds());
 }
 
-async function bootstrap(): Promise<void> {
+async function mountShell(): Promise<void> {
   // P112: live before any query exists, whether or not the Api panel ever mounts — needs no data,
   // so it runs synchronously before the Promise.all below rather than joining it.
   initApiDataSync();
@@ -363,6 +364,27 @@ async function bootstrap(): Promise<void> {
   // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
   // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.
   useAppUpdateStore().initAppUpdate();
+}
+
+// P108 Part 12 F13: mountShell's own hydrates (modeStore.hydrateMode's windowsEnsure call and every
+// entry in the Promise.all above) can reject — a DB error, or a busy DB. Left uncaught, that
+// rejection skipped app.mount entirely: a permanently blank window, logged only as an unhandled
+// rejection in the webview console. Same fix as apps/kira-space's own main.ts (P100 Part 2 F2):
+// catch it and mount BootFailure instead, with a Retry that re-runs the whole sequence.
+async function bootstrap(): Promise<void> {
+  try {
+    await mountShell();
+  } catch (err) {
+    console.error('bootstrap: failed to hydrate/mount the shell', err);
+    const failureApp = createApp(BootFailure, {
+      message: err instanceof Error ? err.message : String(err),
+      onRetry: () => {
+        failureApp.unmount();
+        void bootstrap();
+      },
+    });
+    failureApp.mount('#app');
+  }
 }
 
 void bootstrap();

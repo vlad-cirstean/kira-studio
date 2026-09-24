@@ -30,10 +30,27 @@ const MODE_WRITE_DEBOUNCE_MS = 150;
 export const useModeStore = defineStore('mode', () => {
   const state = reactive({ active: 'studio' as AppMode });
 
-  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be.
-  const scheduleModeWrite = useDebounceFn(() => {
+  function writeMode(): void {
     void control.windowsSetMode(state.active);
-  }, MODE_WRITE_DEBOUNCE_MS);
+  }
+
+  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be.
+  const scheduleModeWrite = useDebounceFn(writeMode, MODE_WRITE_DEBOUNCE_MS);
+
+  // P108 Part 12 F13: a mode change within MODE_WRITE_DEBOUNCE_MS of the window closing used to be
+  // lost outright — nothing here ever flushed the pending debounced write before close. Same fix,
+  // same seam, as createTabsStore.ts's own flushPendingTabState: control.onFlushBeforeClose/
+  // onWindowFlushBeforeClose are the native "about to close/quit" signals Go already blocks the
+  // close on (internal/shell/closeflush.go), reliable across both the quit-handshake and
+  // per-window-close paths — unlike a browser `beforeunload`, which this app's own Hide()-instead-
+  // of-Close() path for the last window (closeflush.go's own doc comment) never even fires,
+  // since Hide() never navigates or unloads the page at all.
+  function flushModeWrite(): void {
+    scheduleModeWrite.cancel();
+    writeMode();
+  }
+  control.onFlushBeforeClose(flushModeWrite);
+  control.onWindowFlushBeforeClose(flushModeWrite);
 
   /** Called once at boot (main.ts's bootstrap, alongside hydrateLayout/hydrateSettings/…), before
    *  the app ever renders — sets the window's own persisted mode without going through `setMode`
