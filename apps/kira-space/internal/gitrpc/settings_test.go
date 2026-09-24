@@ -125,13 +125,13 @@ func TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow(t *testin
 
 	var mu sync.Mutex
 	var changedRepoID string
-	conn.Emit = func(method string, payload any) {
+	conn.SetEmit(func(method string, payload any) {
 		if method == "repoSettings.changed" {
 			mu.Lock()
 			changedRepoID = payload.(RepoSettingsChangedPayload).RepoID
 			mu.Unlock()
 		}
-	}
+	})
 	handlers := router.ForConn(conn)
 
 	setParams, err := json.Marshal(map[string]any{
@@ -252,16 +252,16 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	var gotA, gotB changedEventCollector
 	handlersA := router.ForConn(connA)
 	handlersB := router.ForConn(connB)
-	connA.Emit = func(method string, payload any) {
+	connA.SetEmit(func(method string, payload any) {
 		if method == "repoSettings.changed" {
 			gotA.record(payload.(RepoSettingsChangedPayload))
 		}
-	}
-	connB.Emit = func(method string, payload any) {
+	})
+	connB.SetEmit(func(method string, payload any) {
 		if method == "repoSettings.changed" {
 			gotB.record(payload.(RepoSettingsChangedPayload))
 		}
-	}
+	})
 
 	// A sets log.level on repo A; both connections must be told, even though connB never opened
 	// (or even heard of) repo A — the RPC layer never filters repoSettings.changed recipients by
@@ -336,17 +336,17 @@ func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
 	handlersOther := router.ForConn(other)
 
 	block := make(chan struct{}) // never closed -- simulates a client that never drains its socket.
-	wedged.Emit = func(method string, _ any) {
+	wedged.SetEmit(func(method string, _ any) {
 		if method == "repoSettings.changed" {
 			<-block
 		}
-	}
+	})
 	var gotOther changedEventCollector
-	other.Emit = func(method string, payload any) {
+	other.SetEmit(func(method string, payload any) {
 		if method == "repoSettings.changed" {
 			gotOther.record(payload.(RepoSettingsChangedPayload))
 		}
-	}
+	})
 
 	done := make(chan error, 1)
 	go func() {

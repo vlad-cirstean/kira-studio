@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/kirathecat/kira-studio/internal/rpcstream"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/rpcstream"
 )
 
 // GitStreamName is the second named stream (docs/v1.5/plans/C10-git-graph-native.md §3.2) —
@@ -223,6 +223,6 @@ func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
 		Stream:          allowedStream(handlers.Stream),
 		MaxFrameBytes:   maxGitStreamFrameBytes,
 	})
-	gconn.Emit = sess.Emit
+	gconn.SetEmit(sess.Emit)
 	sess.Serve()
 }

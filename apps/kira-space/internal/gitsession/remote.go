@@ -351,7 +351,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	defer e.invalidateAfterWrite()
 
 	progressEmit := func(p gitops.Progress) {
-		if conn == nil || conn.Emit == nil {
+		if conn == nil {
 			return
 		}
 		conn.Emit("remote.progress", RemoteProgress{

@@ -71,11 +71,14 @@ func New(deps Deps) *Router { return &Router{deps: deps} }
 //
 // G18 D7: also subscribes c to repoSettingsChanged for the life of the connection — unsubscribed
 // via c.Done() rather than repo.close, since repoSettings.changed is not scoped to any one repo
-// being held open (log.level, in particular, is instance-wide). The nil check mirrors entry.go's
-// own Subscribe callback: c.Emit is not assigned until just after ForConn returns (gitsock's own
-// handleConn), so an event landing in that narrow window is silently dropped rather than panicking
-// on a nil func — never observable in practice, since nothing can call repoSettings.set before
-// this connection's own Handlers exist to dispatch it.
+// being held open (log.level, in particular, is instance-wide). c.Emit (gitsession.Conn) is a
+// mutex-guarded accessor, not a bare field (P108 Part 17 review F9) — c.SetEmit is not called until
+// just after ForConn returns (gitsock's own handleConn), so an event landing in that narrow window
+// safely no-ops rather than racing gitsession.Conn's own unguarded field the way it used to: an
+// event here is never this connection's OWN repoSettings.set (nothing can call it before this
+// connection's own Handlers exist to dispatch it), but it CAN be a different, already-connected
+// client's repoSettings.set landing in settingsQueue while this connection is still mid-construction
+// — exactly the race emitMu closes.
 //
 // G32 round-3 architecture/security review, finding #5: notify.Emitter.Emit (notify.go) calls
 // every subscriber SEQUENTIALLY, on the calling repoSettings.set request's own goroutine.
@@ -114,9 +117,7 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 		for {
 			select {
 			case payload := <-settingsQueue:
-				if c.Emit != nil {
-					c.Emit("repoSettings.changed", payload)
-				}
+				c.Emit("repoSettings.changed", payload)
 			case <-c.Done():
 				return
 			}

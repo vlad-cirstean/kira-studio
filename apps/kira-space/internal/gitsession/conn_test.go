@@ -445,3 +445,52 @@ func TestRegistry_ReconcileAutoFetch_NeverArmsAQuietOnlyEntry(t *testing.T) {
 		t.Fatal("a repository joined by a real (non-quiet) Conn must become eligible for auto-fetch arming")
 	}
 }
+
+// TestConn_EmitSetEmitConcurrentAccessIsRace_Free is P108 Part 17 review F9's own regression
+// guard: gitsock's handleConn and bridge's ServeGitStream both construct a Conn with no Emit yet,
+// start a goroutine that can call Emit (gitrpc.Router.ForConn's own repoSettings.changed
+// forwarding goroutine, started as soon as ForConn is called) before their own SetEmit call
+// installs the real function moments later — an unguarded bare field there is a genuine read/write
+// data race under the Go memory model, caught here directly rather than via the much harder to
+// reproduce cross-connection timing `go test -race` would otherwise need. Confirmed to fail (race
+// detected) against the pre-fix bare-field version of Conn.Emit.
+func TestConn_EmitSetEmitConcurrentAccessIsRaceFree(t *testing.T) {
+	c := NewConn("race-conn", "client-1", "label", nil)
+
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	stop := make(chan struct{})
+
+	// The forwarding goroutine's own read — a tight loop, started concurrently with (not before)
+	// the SetEmit write below, so the two genuinely overlap rather than one finishing first by
+	// scheduling luck.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-start
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				c.Emit("repoSettings.changed", nil)
+			}
+		}
+	}()
+
+	// The "sess exists now" write, on its own goroutine too — gitsock's real handleConn/bridge's
+	// ServeGitStream call SetEmit from a different point in the same connection's own setup, not
+	// from whatever goroutine ForConn's forwarding loop runs on, so this mirrors that separation
+	// rather than serializing the two through the test's own single goroutine.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-start
+		c.SetEmit(func(string, any) {})
+	}()
+
+	close(start)
+	time.Sleep(5 * time.Millisecond) // let both goroutines actually race for a bit.
+	close(stop)
+	wg.Wait()
+}

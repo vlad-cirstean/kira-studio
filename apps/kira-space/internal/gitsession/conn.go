@@ -48,7 +48,17 @@ type Conn struct {
 	// (F11), threaded through so the undo slot can attribute a record to "this window" for every
 	// OTHER connection's reader (D7's SnapshotFor).
 	ClientLabel string
-	Emit        func(method string, payload any)
+
+	// emitMu guards emitFn (P108 Part 17 review F9): gitrpc.Router.ForConn's own
+	// repoSettings.changed forwarding goroutine starts as soon as ForConn is called — before
+	// gitsock's handleConn/bridge's ServeGitStream reach their own "gconn.SetEmit(sess.Emit)" line
+	// — so a bare, unguarded field here was a genuine read/write data race under the Go memory
+	// model (another connection's concurrent repoSettings.set could deliver its notification right
+	// inside that window). The nil-check every call site used to do individually now lives once,
+	// inside Emit itself. Call SetEmit to install it, Emit to call it — never read/write emitFn
+	// directly from outside this file.
+	emitMu sync.RWMutex
+	emitFn func(method string, payload any)
 
 	// noAutoFetch is C13-10's own opt-out: the native git-graph mount's own Conn (bridge/
 	// gitstream.go's ServeGitStream) sets this before serving any request, so its own repo.open
@@ -89,9 +99,30 @@ type Conn struct {
 // NewConn constructs a Conn with an empty hold set.
 func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, payload any)) *Conn {
 	return &Conn{
-		ID: id, ClientID: clientID, ClientLabel: clientLabel, Emit: emit,
+		ID: id, ClientID: clientID, ClientLabel: clientLabel, emitFn: emit,
 		held: make(map[string]*hold), walks: make(map[string]*walkPair),
 		done: make(chan struct{}), creds: make(map[string]chan string),
+	}
+}
+
+// SetEmit installs (or replaces) this connection's Emit function — gitsock's handleConn and
+// bridge's ServeGitStream both call this once, right after their own rpcstream.Session exists,
+// exactly where they used to assign the bare field directly (F9's own doc comment on emitMu).
+func (c *Conn) SetEmit(fn func(method string, payload any)) {
+	c.emitMu.Lock()
+	c.emitFn = fn
+	c.emitMu.Unlock()
+}
+
+// Emit calls this connection's currently installed Emit function, silently doing nothing if none
+// is installed yet — every call site used to repeat that "check for nil, then call" pattern
+// itself, directly against the bare field this method replaces.
+func (c *Conn) Emit(method string, payload any) {
+	c.emitMu.RLock()
+	fn := c.emitFn
+	c.emitMu.RUnlock()
+	if fn != nil {
+		fn(method, payload)
 	}
 }
 
@@ -137,11 +168,9 @@ func (c *Conn) AskCredential(ctx context.Context, req gitaskpass.Request) (strin
 		c.credMu.Unlock()
 	}()
 
-	if c.Emit != nil {
-		c.Emit("credential.request", credentialRequestPayload{
-			RequestID: id, RepoID: req.RepoID, Prompt: req.Prompt, Masked: req.Masked,
-		})
-	}
+	c.Emit("credential.request", credentialRequestPayload{
+		RequestID: id, RepoID: req.RepoID, Prompt: req.Prompt, Masked: req.Masked,
+	})
 
 	select {
 	case secret, ok := <-ch:
@@ -215,9 +244,7 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 		if ev.Kind == string(gitclient.SignalRefsChanged) {
 			c.markWalksStale(ev.RepoID)
 		}
-		if c.Emit != nil {
-			c.Emit("repo.changed", ev)
-		}
+		c.Emit("repo.changed", ev)
 	})
 
 	c.mu.Lock()

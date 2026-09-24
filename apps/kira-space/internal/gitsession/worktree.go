@@ -508,7 +508,7 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	}
 
 	onBatch := func(lines []gitprepare.Line) {
-		if conn == nil || conn.Emit == nil {
+		if conn == nil {
 			return
 		}
 		conn.Emit("worktree.progress", WorktreeProgress{RepoID: e.Summary.RepoID, Lines: wireLines(lines)})

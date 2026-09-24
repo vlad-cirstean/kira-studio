@@ -811,7 +811,7 @@ func (e *RepoEntry) runRestackPlan(opCtx, ctx context.Context, conn *Conn, plan 
 			return restacked, res, err, true
 		}
 
-		if conn != nil && conn.Emit != nil {
+		if conn != nil {
 			conn.Emit("stack.progress", RestackProgress{RepoID: e.Summary.RepoID, Branch: entry.Branch, Index: i + 1, Total: len(plan)})
 		}
 

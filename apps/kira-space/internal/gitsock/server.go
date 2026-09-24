@@ -233,9 +233,11 @@ func (s *Server) handleConn(nc net.Conn) {
 		return
 	}
 
-	// gconn.Emit is filled in once sess exists (below) — ForConn's closures capture gconn itself,
-	// not a snapshot of its Emit field, so this ordering is safe: nothing calls Emit before Serve
-	// starts dispatching requests.
+	// gconn's Emit is installed once sess exists (below), via SetEmit — a mutex-guarded accessor,
+	// not a bare field (P108 Part 17 review F9): ForConn's own repoSettings.changed forwarding
+	// goroutine starts as soon as ForConn is called, before this SetEmit call runs, and could
+	// otherwise race a concurrent read from another connection's own repoSettings.set landing in
+	// this connection's mailbox in that exact window.
 	gconn := gitsession.NewConn(gitsession.ConnID(sessionID), clientID, label, nil)
 	defer gconn.Close()
 
@@ -246,7 +248,7 @@ func (s *Server) handleConn(nc net.Conn) {
 		Stream:          handlers.Stream,
 		MaxFrameBytes:   maxFrameBytes,
 	})
-	gconn.Emit = sess.Emit
+	gconn.SetEmit(sess.Emit)
 	sess.Serve()
 }
 
