@@ -392,6 +392,38 @@
     ]
   },
   {
+    "name": "P108 F14: base64decode rejects a value with stray non-canonical padding, matching atob",
+    "template": "{{token | base64decode}}",
+    "values": {
+      "token": "YQ="
+    },
+    "secrets": [],
+    "want": "{{token | base64decode}}",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "unknown",
+        "pipeline": ["base64decode"]
+      }
+    ]
+  },
+  {
+    "name": "P108 F14: base64decode accepts canonical single-character padding, matching atob",
+    "template": "{{token | base64decode}}",
+    "values": {
+      "token": "aGk="
+    },
+    "secrets": [],
+    "want": "hi",
+    "refs": [
+      {
+        "name": "token",
+        "kind": "resolved",
+        "pipeline": ["base64decode"]
+      }
+    ]
+  },
+  {
     "name": "F4/P21 round 1: urldecode of a byte sequence that isn't valid UTF-8 fails on both sides",
     "template": "{{token | urldecode}}",
     "values": {

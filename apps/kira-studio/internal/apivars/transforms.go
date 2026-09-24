@@ -43,12 +43,14 @@ var (
 )
 
 // forgivingBase64Decode mirrors the WHATWG "forgiving-base64" algorithm browsers' own atob()
-// implements (P21 round 1 finding F4): base64.StdEncoding.DecodeString alone rejects an unpadded
-// string ("YQ" for "a") or one with embedded whitespace, both of which atob accepts — so the same
-// {{name | base64decode}} pipe transformed a value differently depending on whether the variable
-// happened to be marked secret (stage 1, TS/atob) or not (stage 2, Go). ASCII whitespace is
-// stripped first, then the remainder is padded out to a multiple of 4 (a length of 1 mod 4 has no
-// valid padding and is rejected, matching the WHATWG algorithm exactly).
+// implements (P21 round 1 finding F4, corrected by P108 F14): ASCII whitespace is stripped first;
+// then, ONLY when the remaining length is a multiple of 4, up to 2 trailing '=' characters are
+// stripped; a remaining length of 1 mod 4 has no valid padding and is rejected; any '=' still
+// present past that point (not a multiple of 4, or more than 2 trailing) is illegal and rejected
+// too — unconditionally padding out to a multiple of 4 (the old approach) silently accepted a
+// string like "YQ=" (length 3, one stray '=') that atob correctly rejects, so the same
+// {{name | base64decode}} pipe disagreed between stage 1 (TS/atob) and stage 2 (Go) whenever the
+// input carried non-canonical padding.
 func forgivingBase64Decode(s string) ([]byte, error) {
 	var b strings.Builder
 	b.Grow(len(s))
@@ -60,15 +62,20 @@ func forgivingBase64Decode(s string) ([]byte, error) {
 		b.WriteRune(r)
 	}
 	stripped := b.String()
-	switch len(stripped) % 4 {
-	case 1:
-		return nil, errors.New("apivars: invalid base64 length")
-	case 2:
-		stripped += "=="
-	case 3:
-		stripped += "="
+	if len(stripped)%4 == 0 {
+		trimmed := strings.TrimRight(stripped, "=")
+		if len(stripped)-len(trimmed) > 2 {
+			return nil, errors.New("apivars: invalid base64 padding")
+		}
+		stripped = trimmed
 	}
-	return base64.StdEncoding.DecodeString(stripped)
+	if len(stripped)%4 == 1 {
+		return nil, errors.New("apivars: invalid base64 length")
+	}
+	if strings.ContainsRune(stripped, '=') {
+		return nil, errors.New("apivars: invalid base64 padding")
+	}
+	return base64.RawStdEncoding.DecodeString(stripped)
 }
 
 // applyTransform is one step of ApplyPipeline. D7's table: base64/base64decode round-trip
