@@ -149,13 +149,6 @@ export const useGridViewStore = defineStore('gridView', () => {
     const tab = useTabsStore().findDataTab(tabId);
     if (!tab?.connectionId) return;
     const rt = ensureRuntime(tabId);
-    // D3: a pending-change set is scoped to the page it was staged against — paging, filtering,
-    // sorting or refreshing all replace that page, so whatever was staged no longer identifies
-    // anything real and must not silently reappear against different rows.
-    usePendingChangesStore().clearPending(tabId);
-    // F1: this tab's own load (the user's own refresh, or any of the setters below) always
-    // supersedes whatever made the page stale — never left set past the very load that resolves it.
-    rt.pageStale = false;
 
     const effectiveCursor: PageCursor = cursor ?? {
       mode: 'offset',
@@ -188,6 +181,16 @@ export const useGridViewStore = defineStore('gridView', () => {
       tabNoun: 'data tab',
       apply: (page) => {
         setPage(tabId, page);
+        // F2 (P108 Part 10): D3's own rationale — a pending-change set is scoped to the page it was
+        // staged against — only holds once a *new* page has actually landed. Clearing this
+        // unconditionally before the read (as this used to) meant a failed, cancelled or superseded
+        // load also dropped it, leaving the still-displayed old page's staged edits gone for no
+        // reason: setPage above never ran, so nothing about "the page was replaced" was true yet.
+        usePendingChangesStore().clearPending(tabId);
+        // F1: this tab's own successful load always supersedes whatever made the page stale — never
+        // left set past the very load that resolves it. A failed/cancelled load leaves it as-is: the
+        // page on screen is still the one that went stale.
+        rt.pageStale = false;
         rt.status = 'idle';
         rt.opId = null;
         rt.hasMore = page.position.hasMore;
