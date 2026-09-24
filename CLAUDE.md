@@ -83,6 +83,20 @@ duplicated here; this file only points at them.
   unused scaffolding — goes back to a subagent to fix, same phase, same number. Never accept a
   partial result and move on, and never silently re-scope the ask down to match what was
   delivered; only the user narrows their own request.
+- **Everything must be resumable from disk alone — a subagent or the orchestrating session can
+  halt at any point, mid-phase, with no warning.** A crash, a rate limit, a kill, a context cutoff:
+  none of these are edge cases to plan around later, they are the normal operating condition every
+  step must already survive. So state the next step depends on never lives only in a subagent's own
+  conversation — a review's findings, an audit's list, anything a later subagent or the
+  orchestrating session will need — it gets written to a file as its own step, on its own commit if
+  the repo's tracking it, before or as part of any handoff, never held back for a single later
+  subagent to fold into a closing summary. Concretely: a review subagent writes its findings to a
+  file under the current chapter's `plans/` before a fixer ever starts (never just a conversational
+  handback the fixer is trusted to remember); a fixer commits each finding's fix as its own commit
+  as it lands, not batched for one commit at the end. If a run is interrupted, what actually landed
+  (commits, findings files, plans) must be enough to see exactly where it stopped and pick back up
+  — never a state where recovering means re-deriving work an interrupted subagent already did but
+  never wrote down.
 - **A failing test, lint finding, typecheck error, or any other code-quality/hook check gets fixed
   on the spot, pre-existing or not.** "Pre-existing" justifies skipping root-cause investigation of
   whether *this phase* caused it, never skipping the fix itself. Confirm it predates the phase (e.g.
