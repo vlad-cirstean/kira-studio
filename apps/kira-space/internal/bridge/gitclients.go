@@ -16,12 +16,14 @@ import (
 // types, and only the ones it actually renders.
 type GitSock interface {
 	Revoke(clientID string) error
+	OnClientsChanged(fn func([]model.GitClient)) (unsubscribe func())
 }
 
 type GitBroker interface {
 	Pending() gitsock.PairingSnapshot
 	Approve(requestID string) gitsock.PairingActionResult
 	Deny(requestID string) gitsock.PairingActionResult
+	Subscribe(fn func(gitsock.PairingSnapshot)) (unsubscribe func())
 }
 
 // GitVsix is G10 D14's own seam over internal/gitvsix — the same "declare the interface where
@@ -94,6 +96,25 @@ func toWireSnapshot(snap gitsock.PairingSnapshot) GitPairingSnapshot {
 
 func (s *GitClientsService) PendingPairing() GitPairingSnapshot {
 	return toWireSnapshot(s.Broker.Pending())
+}
+
+// AttachPush wires gitsock's two change feeds (Broker.Subscribe, Sock.OnClientsChanged) onto this
+// service's own two push channels (ChannelGitPairing/ChannelGitClientsChanged), each payload run
+// through the same wire projection the request/response methods above use. Kept here rather than
+// in main.go so gitsock's own types (PairingSnapshot) stay out of it — this file's existing
+// interface-at-consumer precedent (GitSock/GitBroker above). Call once at startup, after the
+// service is constructed; the returned unsubscribe runs in teardown, before gitSock.Close().
+func (s *GitClientsService) AttachPush() (unsubscribe func()) {
+	unPairing := s.Broker.Subscribe(func(snap gitsock.PairingSnapshot) {
+		s.Deps.Events.Emit(ChannelGitPairing, toWireSnapshot(snap))
+	})
+	unClients := s.Sock.OnClientsChanged(func(clients []model.GitClient) {
+		s.Deps.Events.Emit(ChannelGitClientsChanged, clients)
+	})
+	return func() {
+		unPairing()
+		unClients()
+	}
 }
 
 // GitPairingActionResult is gitsock.PairingActionResult's wire projection — a string enum reads

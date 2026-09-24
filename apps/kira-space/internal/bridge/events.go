@@ -9,9 +9,9 @@ import "github.com/kirathecat/kira-studio/internal/appevent"
 const ChannelCodeSearch = appevent.ChannelCodeSearch
 
 // ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels — the pairing
-// prompt's live queue snapshot, and the Connected editors pane's list. P100 Part 2's own
-// frontend/main.go work is what actually subscribes gitsock's OnPairingChanged/OnClientsChanged
-// and pushes through these.
+// prompt's live queue snapshot, and the Connected editors pane's list. GitClientsService.AttachPush
+// (gitclients.go) subscribes gitsock's Broker.Subscribe/OnClientsChanged and pushes through these;
+// main.go calls it once at startup.
 const (
 	ChannelGitPairing        = "kira:git:pairing"
 	ChannelGitClientsChanged = "kira:git:clients"

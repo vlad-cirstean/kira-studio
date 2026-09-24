@@ -45,9 +45,9 @@ var assets embed.FS
 // CodeWorkspaceService, the git stream registration, GitHubService) -> the menu -> the startup
 // window list, opened -> app.Run(). No adapters, no connections, no HTTP/gRPC, no DB MCP, no
 // terminal, no keep-awake, no Claude Code hooks, no update checker, no system notifications for
-// pairing requests (gitsock.OnPairingChanged is wired by nothing yet — Part 2's own frontend is
-// what gives the pairing prompt/Connected-editors pane somewhere to push to) — none of that is
-// this app's own module.
+// pairing requests — none of that is this app's own module. gitClientsSvc.AttachPush() wires
+// gitsock's pairing/clients-changed feeds onto the two push channels the pairing prompt and
+// Connected-editors pane read (P108 Part 20 F1).
 func main() {
 	// Askpass shim, before anything Wails-related runs, so it can never accidentally start a
 	// window — Kira Studio's own main.go:83, deleted there in this same phase's cleanup commit.
@@ -113,6 +113,7 @@ func main() {
 	gitClientsSvc := &bridge.GitClientsService{
 		Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
 	}
+	detachGitPush := gitClientsSvc.AttachPush()
 	gitHubSvc := &bridge.GitHubService{Deps: deps, Browser: browserOpener}
 	linkSvc := &bridge.LinkService{Browser: browserOpener}
 	settingsSvc := &bridge.SettingsService{Deps: deps}
@@ -134,6 +135,7 @@ func main() {
 	})
 	teardown := sync.OnceFunc(func() {
 		terminalSvc.Shutdown()
+		detachGitPush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
