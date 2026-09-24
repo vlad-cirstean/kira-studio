@@ -127,6 +127,9 @@ type Service struct {
 	mu       sync.Mutex
 	states   map[string]model.ConnectionState
 	inFlight map[string]*attempt
+	// closed is set once by Shutdown (F13, P108 Part 7): every Connect arriving after refuses
+	// outright rather than racing a StopAll that has already taken its own snapshot of what to kill.
+	closed bool
 
 	stateChanged        notify.Emitter[model.ConnectionState]
 	metadataInvalidated notify.Emitter[string]
@@ -147,8 +150,36 @@ func (s *Service) Start() {
 	s.deps.Preconnect.OnExit(s.onPreconnectExit)
 }
 
-// Shutdown kills every live pre-connect process. Called from main's before-quit.
+// Shutdown refuses every Connect from here on, cancels and waits out every attempt already
+// in-flight, then kills every live pre-connect process. Called from main's before-quit (F13,
+// P108 Part 7, ordered after DB MCP/agenthooks are already stopped there).
+//
+// Preconnect.StopAll only kills what is already tracked in its own entries map — an attempt whose
+// Preconnect.Start call is still inside the settle window is not tracked yet at all (supervisor.go's
+// own doc comment on entry), so a StopAll that ran while such an attempt was still settling would
+// leave its sidecar to start being tracked moments later, orphaned, with nothing left running that
+// will ever kill it. Cancelling every in-flight attempt's ctx first and waiting for each one's
+// doConnect to actually return closes that gap: a cancelled Start either aborts within the settle
+// window (supervisor's own ctx.Done() branch, never reaching s.entries) or, if it already lost that
+// race and got tracked, is torn down by finalizeAbortedAttempt's own Preconnect.Stop(id) once
+// attemptConnect notices ctx.Err() — either way, by the time every attempt's done channel closes,
+// nothing this service itself started is still outside StopAll's final snapshot.
 func (s *Service) Shutdown() {
+	s.mu.Lock()
+	s.closed = true
+	attempts := make([]*attempt, 0, len(s.inFlight))
+	for _, a := range s.inFlight {
+		attempts = append(attempts, a)
+	}
+	s.mu.Unlock()
+
+	for _, a := range attempts {
+		a.cancel()
+	}
+	for _, a := range attempts {
+		<-a.done
+	}
+
 	s.deps.Preconnect.StopAll()
 }
 
@@ -596,9 +627,14 @@ func (s *Service) Test(in Input, existingID string) TestResult {
 // Connect deduplicates concurrent calls for the same id (D11): every caller that arrives while an
 // attempt is already running gets that same attempt's result instead of starting a second one.
 // F4 (P108 Part 3): the attempt's own ctx is cancelled by Disconnect/Remove (cancelInFlight) if
-// either races ahead of it — threaded through to attemptConnect below.
+// either races ahead of it — threaded through to attemptConnect below. F13 (P108 Part 7): refuses
+// outright once Shutdown has run — see Shutdown's own doc comment for why.
 func (s *Service) Connect(id string) (model.ConnectionState, error) {
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return model.ConnectionState{}, ipcerr.Internal("connections service is shutting down")
+	}
 	if a, ok := s.inFlight[id]; ok {
 		s.mu.Unlock()
 		<-a.done

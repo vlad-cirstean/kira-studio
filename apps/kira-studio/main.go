@@ -466,9 +466,14 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 	teardown := sync.OnceFunc(func() {
 		eventsDetach()
 		oplogWiring.Stop()
-		connectionsSvc.Shutdown()
+		// F13 (P108 Part 7): DB MCP and agenthooks stop before connectionsSvc.Shutdown(), not
+		// after — each stop blocks until its own in-flight handlers return (DbMcpService's stopFn
+		// abandons parked approvals then waits out closeHTTP's graceful drain), so no run_query (or
+		// hook) can still be mid-flight, dialing a preconnect target on demand, once Shutdown below
+		// starts tearing preconnect down.
 		bridge.StopDbMcp(dbMcpSvc)
 		bridge.StopAgentHooks(agentHooksSvc)
+		connectionsSvc.Shutdown()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
 		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.

@@ -627,6 +627,64 @@ func TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry(t *t
 	}
 }
 
+// TestConnectRefusesAfterShutdown is F13 (P108 Part 7): once Shutdown has run, every later Connect
+// must refuse outright rather than starting a new attempt behind a supervisor that has already been
+// told to stop everything.
+func TestConnectRefusesAfterShutdown(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("conn"))
+
+	h.svc.Shutdown()
+
+	if _, err := h.svc.Connect(created.ID); err == nil {
+		t.Fatal("Connect succeeded after Shutdown, want a refusal")
+	}
+}
+
+// TestShutdownWaitsOutInFlightConnectBeforeStoppingPreconnect is F13 (P108 Part 7): Preconnect.
+// StopAll only kills what is already tracked in its own entries map — an attempt whose
+// Preconnect.Start call is still inside the settle window is not tracked yet at all
+// (preconnect/supervisor.go's own doc comment on entry). Shutdown must cancel every in-flight
+// attempt and wait for it to actually unwind before calling StopAll, not race ahead of it — a
+// StopAll that ran first could miss an attempt that only gets tracked moments later, orphaning it.
+func TestShutdownWaitsOutInFlightConnectBeforeStoppingPreconnect(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+
+	connectDone := make(chan struct{})
+	go func() {
+		_, _ = h.svc.Connect(created.ID)
+		close(connectDone)
+	}()
+
+	// TestInFlightConnectDedupe's own precedent: give Connect time to reach the blocked
+	// Backend.Connect call before racing Shutdown against it.
+	time.Sleep(200 * time.Millisecond)
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		h.svc.Shutdown()
+		close(shutdownDone)
+	}()
+
+	select {
+	case <-shutdownDone:
+		t.Fatal("Shutdown returned while the in-flight Connect was still blocked on Backend.Connect — it must wait for the attempt to unwind before calling Preconnect.StopAll")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	h.backend.releaseSlow()
+	<-connectDone
+	<-shutdownDone
+
+	if got := h.svc.StateOf(created.ID).Status; got == "connected" {
+		t.Fatalf("StateOf after Shutdown = %q, want the cancelled attempt to never finalize as connected", got)
+	}
+	if _, err := h.svc.Connect(created.ID); err == nil {
+		t.Fatal("Connect succeeded after Shutdown, want a refusal")
+	}
+}
+
 // TestTestValidatesInputBeforeProbing is a regression test for the P2 R1 finding where Test was
 // the one Input-accepting entry point (unlike Create/Update) that never called Validate() —  a
 // port outside 1-65535 reached the backend unchecked, and postgres/client.go's own
