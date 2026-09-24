@@ -275,4 +275,52 @@ describe('eachMatch (P44 F45)', () => {
       [3, 3],
     ]);
   });
+
+  // F16 (P108 Part 10): eachMatch's own text-length cap — the partial ReDoS mitigation for a
+  // user-authored regex against untrusted, unbounded cell content.
+  describe('maxLength (F16, P108 Part 10)', () => {
+    test('11. omitted maxLength scans the full text, unchanged behavior', () => {
+      const hits: [number, number][] = [];
+      eachMatch(/a/g, 'aaaaa', (start, end) => hits.push([start, end]));
+      expect(hits).toEqual([
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 4],
+        [4, 5],
+      ]);
+    });
+
+    test('12. maxLength shorter than the text only matches within the truncated prefix', () => {
+      const hits: [number, number][] = [];
+      eachMatch(/a/g, 'aaaaa', (start, end) => hits.push([start, end]), 3);
+      expect(hits).toEqual([
+        [0, 1],
+        [1, 2],
+        [2, 3],
+      ]);
+    });
+
+    test("13. maxLength at or beyond the text's own length is a no-op cap — every match still found", () => {
+      const hits: [number, number][] = [];
+      eachMatch(/a/g, 'aaa', (start, end) => hits.push([start, end]), 3);
+      expect(hits).toEqual([
+        [0, 1],
+        [1, 2],
+        [2, 3],
+      ]);
+      const hitsLonger: [number, number][] = [];
+      eachMatch(/a/g, 'aaa', (start, end) => hitsLonger.push([start, end]), 100);
+      expect(hitsLonger).toEqual(hits);
+    });
+
+    test('14. a catastrophic-backtracking pattern against text past the cap returns quickly instead of hanging', () => {
+      const longText = `${'a'.repeat(50)}!`; // no trailing 'b' — worst case for (a+)+b
+      const start = performance.now();
+      const hits: [number, number][] = [];
+      eachMatch(/(a+)+b/g, longText, (s, e) => hits.push([s, e]), 20);
+      expect(performance.now() - start).toBeLessThan(1000);
+      expect(hits).toEqual([]);
+    });
+  });
 });

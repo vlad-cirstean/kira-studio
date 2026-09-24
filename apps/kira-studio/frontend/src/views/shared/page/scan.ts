@@ -58,21 +58,38 @@ function compilePattern(q: SearchQuery): RegExp {
   return compileSearchPattern(q.text, q);
 }
 
+// F16 (P108 Part 10): a user regex with a nested quantifier (e.g. `(a+)+$`) exhibits catastrophic
+// backtracking against one long cell — chunking bounds rows *between* animation frames, not the
+// single `exec` call already in flight, so the main thread blocks with no escape (Stop can't run
+// either, since the event loop it needs is what's blocked). A full fix moves regex-mode scanning
+// into a worker with its own per-scan timeout; this constant is the documented, cheaper partial
+// mitigation instead — capping how much text a regex-mode scan runs against per cell bounds the
+// worst case blocking duration for any single `exec`, without eliminating the risk entirely. A
+// literal/whole-word search (SearchQuery.regex: false) compiles to escapeRegExp's own output,
+// which has no user-controlled quantifiers to backtrack on, so only regex-mode scans apply it —
+// grid/search.ts and keyvalue/search.ts's own runSearch pass it conditionally on `q.regex`.
+export const REGEX_SCAN_TEXT_CAP = 10_000;
+
 /** Walks every match of `pattern` in `text`, calling `emit(start, end)` for each — the zero-width
  *  match guard (a pattern like `x*` or `(?:)` that can match an empty string) that
  *  grid/documents/keyvalue's per-row scan bodies each wrote out identically. `pattern.lastIndex`
- *  is reset first so a shared RegExp scans from the start. */
+ *  is reset first so a shared RegExp scans from the start. `maxLength`, when given, truncates
+ *  `text` before scanning (F16's partial ReDoS mitigation, REGEX_SCAN_TEXT_CAP above) — omitted by
+ *  every caller not passing a user-authored regex against untrusted cell content. */
 export function eachMatch(
   pattern: RegExp,
   text: string,
   emit: (start: number, end: number) => void,
+  maxLength?: number,
 ): void {
+  const scanned =
+    maxLength !== undefined && text.length > maxLength ? text.slice(0, maxLength) : text;
   pattern.lastIndex = 0;
-  let m = pattern.exec(text);
+  let m = pattern.exec(scanned);
   while (m) {
     emit(m.index, m.index + m[0].length);
     if (m[0].length === 0) pattern.lastIndex++; // never loop forever on a zero-width match
-    m = pattern.exec(text);
+    m = pattern.exec(scanned);
   }
 }
 
@@ -198,10 +215,13 @@ export function runPageScan<M, Pg extends { rowCount: number }>(
 
 /** P48 F9: the tabular per-row scan body grid/search.ts and console/search.ts's tabular branch
  *  each wrote out — every column, skipping a null cell. `make` builds the caller's own Match
- *  shape from the (row, col, start, end) the scan found. */
+ *  shape from the (row, col, start, end) the scan found. `regexTextCap` (F16), when given, is
+ *  forwarded to eachMatch's own `maxLength` — a caller scanning with a user-authored regex passes
+ *  REGEX_SCAN_TEXT_CAP; a literal/whole-word caller omits it. */
 export function tabularRowScanner<M>(
   page: Pick<TabularPage, 'columns' | 'chunks'>,
   make: (row: number, col: number, start: number, end: number) => M,
+  regexTextCap?: number,
 ): (row: number, pattern: RegExp, out: M[]) => void {
   const decoder = new TextDecoder();
   const colCount = page.columns.length;
@@ -211,7 +231,7 @@ export function tabularRowScanner<M>(
       const chunk = chunks[col];
       if (isNull(chunk, row)) continue;
       const text = cellText(chunk, row, decoder);
-      eachMatch(pattern, text, (start, end) => out.push(make(row, col, start, end)));
+      eachMatch(pattern, text, (start, end) => out.push(make(row, col, start, end)), regexTextCap);
     }
   };
 }
@@ -220,17 +240,30 @@ export function tabularRowScanner<M>(
  *  branch each wrote out, differing only in whether `col` is spelled `'field'|'value'` or `0|1`
  *  — `cols` supplies whichever pair the caller's own Match shape uses. Neither chunk is ever
  *  null by construction (KeyValuePageBuilder.push takes plain strings), so — unlike
- *  tabularRowScanner — there is no isNull check to share. */
+ *  tabularRowScanner — there is no isNull check to share. `regexTextCap` (F16): same as
+ *  tabularRowScanner's own — forwarded to eachMatch's `maxLength`, omitted for a literal/
+ *  whole-word scan. */
 export function keyValueRowScanner<M, C>(
   page: { fields: TextColumnChunk; values: TextColumnChunk },
   cols: [C, C],
   make: (row: number, col: C, start: number, end: number) => M,
+  regexTextCap?: number,
 ): (row: number, pattern: RegExp, out: M[]) => void {
   const decoder = new TextDecoder();
   return (row, pattern, out) => {
     const fieldText = cellText(page.fields, row, decoder);
-    eachMatch(pattern, fieldText, (start, end) => out.push(make(row, cols[0], start, end)));
+    eachMatch(
+      pattern,
+      fieldText,
+      (start, end) => out.push(make(row, cols[0], start, end)),
+      regexTextCap,
+    );
     const valueText = cellText(page.values, row, decoder);
-    eachMatch(pattern, valueText, (start, end) => out.push(make(row, cols[1], start, end)));
+    eachMatch(
+      pattern,
+      valueText,
+      (start, end) => out.push(make(row, cols[1], start, end)),
+      regexTextCap,
+    );
   };
 }

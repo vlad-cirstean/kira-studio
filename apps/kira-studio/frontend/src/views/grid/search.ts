@@ -1,5 +1,6 @@
 import {
   chunkRowsForColumns,
+  REGEX_SCAN_TEXT_CAP,
   runPageScan,
   type SearchHandle,
   type SearchQuery,
@@ -29,7 +30,15 @@ function runSearch(
   return runPageScan(
     page,
     tabId,
-    (p) => tabularRowScanner(p, (row, col, start, end) => ({ row, col, start, end })),
+    // F16 (P108 Part 10): a user regex runs against untrusted cell content — cap the text length
+    // scanned per cell, the documented partial ReDoS mitigation (scan.ts's own REGEX_SCAN_TEXT_CAP
+    // comment). A literal/whole-word search has no user-controlled quantifiers to backtrack on.
+    (p) =>
+      tabularRowScanner(
+        p,
+        (row, col, start, end) => ({ row, col, start, end }),
+        q.regex ? REGEX_SCAN_TEXT_CAP : undefined,
+      ),
     q,
     onProgress,
     // P21 round 3 performance finding 1: a cell-based chunk budget, not a flat 2 000 rows — see

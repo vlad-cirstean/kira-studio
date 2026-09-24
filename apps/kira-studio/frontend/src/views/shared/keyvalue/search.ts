@@ -1,4 +1,10 @@
-import { keyValueRowScanner, runPageScan, type SearchHandle, type SearchQuery } from '../page/scan';
+import {
+  keyValueRowScanner,
+  REGEX_SCAN_TEXT_CAP,
+  runPageScan,
+  type SearchHandle,
+  type SearchQuery,
+} from '../page/scan';
 import { createPageSearch } from '../page/search';
 import { getPage, pageVersion } from './page';
 
@@ -31,13 +37,20 @@ function runSearch(
   return runPageScan(
     page,
     tabId,
+    // F16 (P108 Part 10): same partial ReDoS mitigation as grid/search.ts — capped only for a
+    // user-authored regex, never for a literal/whole-word scan.
     (p) =>
-      keyValueRowScanner(p, ['field', 'value'], (row, col, start, end) => ({
-        row,
-        col,
-        start,
-        end,
-      })),
+      keyValueRowScanner(
+        p,
+        ['field', 'value'],
+        (row, col, start, end) => ({
+          row,
+          col,
+          start,
+          end,
+        }),
+        q.regex ? REGEX_SCAN_TEXT_CAP : undefined,
+      ),
     q,
     onProgress,
   );
