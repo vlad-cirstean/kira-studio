@@ -144,6 +144,9 @@ func main() {
 				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
 			}
 		}
+		// F5: stops every open codeworkspace.Session (cat-file pairs, in-flight searches) — before
+		// repositories.Close(), since a running search still reads settings through Deps.Repos.
+		codeWorkspaceSvc.Shutdown()
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
