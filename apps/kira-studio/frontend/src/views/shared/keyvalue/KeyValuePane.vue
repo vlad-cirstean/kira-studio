@@ -923,7 +923,7 @@ onUnmounted(() => {
                   @keydown.enter="submitAdd"
                   @keydown.escape="closeAdd"
                 />
-                <div v-if="addError" class="p-xs popover-error" data-testid="keyvalue-add-error">
+                <div v-if="addError" class="text-kira-xs popover-error" data-testid="keyvalue-add-error">
                   {{ addError }}
                 </div>
                 <div class="popover-actions">
@@ -964,7 +964,7 @@ onUnmounted(() => {
                   @keydown.enter="saveEdit"
                   @keydown.escape="closeEdit"
                 />
-                <div v-if="editError" class="p-xs popover-error" data-testid="keyvalue-edit-error">
+                <div v-if="editError" class="text-kira-xs popover-error" data-testid="keyvalue-edit-error">
                   {{ editError }}
                 </div>
                 <div class="popover-actions">

@@ -90,7 +90,7 @@ async function onClear(): Promise<void> {
 <template>
   <div class="history-pane" data-testid="grpc-history-list">
     <div class="history-toolbar p-toolbar">
-      <span class="p-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
+      <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
       <span class="p-push" />
       <Button
         variant="toolbar"
@@ -160,10 +160,10 @@ async function onClear(): Promise<void> {
           </TooltipTrigger>
           <TooltipContent>{{ grpcCodeHint(entry.code) }}</TooltipContent>
         </Tooltip>
-        <span class="p-xs font-data">{{ entry.method }}</span>
+        <span class="text-kira-xs font-data">{{ entry.method }}</span>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="p-xs text-subtle">{{ formatRelative(entry.calledAt) }}</span>
+            <span class="text-kira-xs text-subtle">{{ formatRelative(entry.calledAt) }}</span>
           </TooltipTrigger>
           <TooltipContent>{{ entry.calledAt }}</TooltipContent>
         </Tooltip>
@@ -185,7 +185,7 @@ async function onClear(): Promise<void> {
       </div>
     </div>
 
-    <div v-if="atCap" class="p-xs text-subtle history-cap-note" data-testid="grpc-history-cap-note">
+    <div v-if="atCap" class="text-kira-xs text-subtle history-cap-note" data-testid="grpc-history-cap-note">
       Only the last {{ GRPC_HISTORY_PER_SCOPE_LIMIT }} are kept — older calls are removed
       automatically.
     </div>

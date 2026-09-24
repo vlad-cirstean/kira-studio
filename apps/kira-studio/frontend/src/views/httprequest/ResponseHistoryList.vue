@@ -114,7 +114,7 @@ async function onClear(): Promise<void> {
 <template>
   <div class="history-pane" data-testid="http-history-list">
     <div class="history-toolbar p-toolbar">
-      <span class="p-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
+      <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
       <span class="p-push" />
       <Button
         variant="toolbar"
@@ -140,7 +140,7 @@ async function onClear(): Promise<void> {
     <Alert v-if="entries.length === 0" class="empty-state" data-testid="http-history-empty">
       <CodiconIcon name="history" :size="24" class="text-subtle" />
       <AlertTitle class="text-kira-md text-muted-foreground font-normal">No past responses yet</AlertTitle>
-      <span class="p-xs text-subtle scratch-note">
+      <span class="text-kira-xs text-subtle scratch-note">
         <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
         <template v-else>
           Sending this request will record one.
@@ -203,7 +203,7 @@ async function onClear(): Promise<void> {
           <div class="history-row-line">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="p-xs text-subtle history-time">{{ formatRelative(entry.sentAt) }}</span>
+                <span class="text-kira-xs text-subtle history-time">{{ formatRelative(entry.sentAt) }}</span>
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
@@ -214,9 +214,9 @@ async function onClear(): Promise<void> {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="p-xs text-subtle">{{ entry.elapsedMs }} ms</span>
-            <span class="p-xs text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
-            <span v-if="entry.environment" class="p-xs text-subtle">{{ entry.environment }}</span>
+            <span class="text-kira-xs text-subtle">{{ entry.elapsedMs }} ms</span>
+            <span class="text-kira-xs text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
+            <span v-if="entry.environment" class="text-kira-xs text-subtle">{{ entry.environment }}</span>
             <span class="p-push" />
             <Tooltip>
               <TooltipTrigger as-child>
@@ -233,12 +233,12 @@ async function onClear(): Promise<void> {
               <TooltipContent>Delete</TooltipContent>
             </Tooltip>
           </div>
-          <div v-if="showUrl(i)" class="p-xs text-subtle history-url">{{ entry.url }}</div>
+          <div v-if="showUrl(i)" class="text-kira-xs text-subtle history-url">{{ entry.url }}</div>
         </div>
       </div>
     </div>
 
-    <div v-if="atCap" class="p-xs text-subtle history-cap-note" data-testid="http-history-cap-note">
+    <div v-if="atCap" class="text-kira-xs text-subtle history-cap-note" data-testid="http-history-cap-note">
       Only the last {{ HISTORY_PER_SCOPE_LIMIT }} are kept — older responses are removed
       automatically.
     </div>

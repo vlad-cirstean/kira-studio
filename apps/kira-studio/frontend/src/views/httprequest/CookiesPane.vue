@@ -124,7 +124,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       </div>
       <span
         v-if="filter.trim()"
-        class="p-xs subtle cookies-count"
+        class="text-kira-xs subtle cookies-count"
         data-testid="http-cookies-filtered-count"
       >
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies

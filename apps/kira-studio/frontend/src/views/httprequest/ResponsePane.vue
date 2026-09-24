@@ -320,7 +320,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="p-xs text-subtle pane-jump-link"
+              class="text-kira-xs text-subtle pane-jump-link"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
@@ -329,7 +329,7 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>See where the time went</TooltipContent>
         </Tooltip>
-        <span class="p-xs text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
+        <span class="text-kira-xs text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <ToggleGroup
           v-if="tab.state.responsePane === 'body' && prettyFormat"
           type="single"
@@ -429,7 +429,7 @@ onUnmounted(() => {
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="p-xs text-subtle redirect-caption pane-jump-link"
+          class="text-kira-xs text-subtle redirect-caption pane-jump-link"
           data-testid="http-redirects"
           @click="viewTimeline"
         >
@@ -457,7 +457,7 @@ onUnmounted(() => {
         </InputGroup>
         <span
           v-if="headerFilter.trim()"
-          class="p-xs subtle response-headers-count"
+          class="text-kira-xs subtle response-headers-count"
           data-testid="http-response-headers-count"
         >
           {{ filteredHeaders.length }} of {{ response.headers.length }} headers

@@ -295,8 +295,8 @@ onUnmounted(() => {
           {{ codeName }} ({{ code }})
         </span>
         <span class="p-push" />
-        <span class="p-xs text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
-        <span class="p-xs text-subtle" data-testid="grpc-message-summary">
+        <span class="text-kira-xs text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
+        <span class="text-kira-xs text-subtle" data-testid="grpc-message-summary">
           {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
         </span>
       </template>
@@ -337,7 +337,7 @@ onUnmounted(() => {
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->
-    <div v-if="statusMessage" class="p-xs text-subtle status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
+    <div v-if="statusMessage" class="text-kira-xs text-subtle status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
     <Alert v-if="viewing" variant="note" data-testid="grpc-history-band">
       <AlertDescription class="flex items-center gap-3">
@@ -396,20 +396,20 @@ onUnmounted(() => {
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
     <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
       <div class="metadata-group">
-        <div class="metadata-group-title p-xs text-muted-foreground">Header</div>
+        <div class="metadata-group-title text-kira-xs text-muted-foreground">Header</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
           <span class="p-kv-name font-data">{{ h.name }}</span>
           <span class="p-kv-value font-data">{{ h.value }}</span>
         </div>
-        <div v-if="header.length === 0" class="p-xs text-subtle">No header metadata</div>
+        <div v-if="header.length === 0" class="text-kira-xs text-subtle">No header metadata</div>
       </div>
       <div class="metadata-group">
-        <div class="metadata-group-title p-xs text-muted-foreground">Trailer</div>
+        <div class="metadata-group-title text-kira-xs text-muted-foreground">Trailer</div>
         <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
           <span class="p-kv-name font-data">{{ t.name }}</span>
           <span class="p-kv-value font-data">{{ t.value }}</span>
         </div>
-        <div v-if="trailer.length === 0" class="p-xs text-subtle">No trailer metadata</div>
+        <div v-if="trailer.length === 0" class="text-kira-xs text-subtle">No trailer metadata</div>
       </div>
     </div>
     <div v-else class="message-list" data-testid="grpc-message-list">
@@ -428,8 +428,8 @@ onUnmounted(() => {
             :style="{ transform: `translateY(${entry.row.start}px)` }"
           >
             <button type="button" class="message-header" @click="toggleExpanded(entry.m.seq)">
-              <span class="p-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
-              <span class="p-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
+              <span class="text-kira-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
+              <span class="text-kira-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
                 <TooltipTrigger as-child>
                   <CodiconIcon
@@ -441,7 +441,7 @@ onUnmounted(() => {
                 <TooltipContent>Stored copy cut at 64 KB — not the full message</TooltipContent>
               </Tooltip>
               <span class="p-push" />
-              <span class="p-xs text-subtle">#{{ entry.m.seq }}</span>
+              <span class="text-kira-xs text-subtle">#{{ entry.m.seq }}</span>
             </button>
             <div v-if="expanded.has(entry.m.seq)" class="message-detail">
               <MonacoHost

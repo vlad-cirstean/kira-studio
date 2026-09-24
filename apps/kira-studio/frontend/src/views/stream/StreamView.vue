@@ -1259,7 +1259,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.body }}
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
-                      <span class="p-xs text-muted-foreground">(truncated)</span>
+                      <span class="text-kira-xs text-muted-foreground">(truncated)</span>
                     </TooltipTrigger>
                     <TooltipContent>body truncated</TooltipContent>
                   </Tooltip>

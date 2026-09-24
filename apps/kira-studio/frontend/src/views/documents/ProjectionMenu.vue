@@ -102,7 +102,7 @@ onUnmounted(() => {
       </Label>
     </div>
     <Separator class="my-1" />
-    <div class="columns-menu-footer p-xs text-subtle" data-testid="document-projection-menu-footer">
+    <div class="columns-menu-footer text-kira-xs text-subtle" data-testid="document-projection-menu-footer">
       {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
       loaded page; `_id` is always returned.
     </div>

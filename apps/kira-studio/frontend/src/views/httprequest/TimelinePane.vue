@@ -169,7 +169,7 @@ function residueNote(hop: HttpTimelineHop): string {
 // D11: a "note" that fires on the common case (a reused connection is the common case) is a
 // caption, not a full-width tinted banner — up to five MessageStrips per hop could push ~180px
 // of banner between a 10px bar and the next hop's caption. Same four sentences, same order, same
-// testids — now p-xs dim caption lines instead of .p-strip banners.
+// testids — now text-kira-xs dim caption lines instead of .p-strip banners.
 interface HopNote {
   testid: string;
   text: string;
@@ -212,10 +212,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </Alert>
 
       <div v-if="!failedTimeline" class="timeline-summary-row">
-        <div class="p-xs text-subtle timeline-summary" data-testid="http-timeline-summary">
+        <div class="text-kira-xs text-subtle timeline-summary" data-testid="http-timeline-summary">
           {{ summary }}
         </div>
-        <div class="timeline-legend p-xs text-subtle" data-testid="http-timeline-legend">
+        <div class="timeline-legend text-kira-xs text-subtle" data-testid="http-timeline-legend">
           <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="legend-item">
             <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
           </span>
@@ -259,7 +259,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </div>
           </div>
 
-          <div class="hop-phases p-xs text-subtle">
+          <div class="hop-phases text-kira-xs text-subtle">
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
@@ -275,12 +275,12 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </template>
           </div>
 
-          <div v-if="hopNotes(hop).length > 0" class="hop-notes p-xs text-subtle">
+          <div v-if="hopNotes(hop).length > 0" class="hop-notes text-kira-xs text-subtle">
             <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
           </div>
 
           <details v-if="hop.headers && hop.headers.length > 0" class="p-disclosure hop-headers">
-            <summary class="p-xs text-subtle">Response headers</summary>
+            <summary class="text-kira-xs text-subtle">Response headers</summary>
             <div v-for="(h, i) in hop.headers" :key="i" class="p-kv-row hop-header-row">
               <span class="p-kv-name font-data">{{ h.name }}</span>
               <span class="p-kv-value font-data">{{ h.value }}</span>
@@ -290,7 +290,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
             class="p-disclosure hop-headers"
           >
-            <summary class="p-xs text-subtle">Response headers</summary>
+            <summary class="text-kira-xs text-subtle">Response headers</summary>
             <div v-for="(h, i) in response!.headers" :key="i" class="p-kv-row hop-header-row">
               <span class="p-kv-name font-data">{{ h.name }}</span>
               <span class="p-kv-value font-data">{{ h.value }}</span>

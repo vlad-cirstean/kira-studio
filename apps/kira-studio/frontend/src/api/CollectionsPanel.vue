@@ -233,7 +233,7 @@ onUnmounted(() => {
       <Alert class="empty-state" data-testid="collections-empty">
         <CodiconIcon name="folder-library" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md text-muted-foreground font-normal">No collections yet</AlertTitle>
-        <span class="p-xs text-subtle side-empty-text"
+        <span class="text-kira-xs text-subtle side-empty-text"
           >Create one from the <b>+</b> above, or import a Postman collection.</span
         >
       </Alert>

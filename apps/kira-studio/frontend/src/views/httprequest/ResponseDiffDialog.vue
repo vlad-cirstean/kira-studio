@@ -241,14 +241,14 @@ onUnmounted(() => {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto flex-1 min-h-0">
-    <div v-if="loadingSnapshots" class="diff-status p-xs text-subtle">Loading…</div>
+    <div v-if="loadingSnapshots" class="diff-status text-kira-xs text-subtle">Loading…</div>
     <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="diff-body">
       <div class="diff-summary" data-testid="http-diff-summary">
         <div class="diff-summary-side">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="p-xs text-subtle diff-summary-time">{{ formatRelative(snapA.entry.sentAt) }}</span>
+              <span class="text-kira-xs text-subtle diff-summary-time">{{ formatRelative(snapA.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapA.entry.sentAt }}</TooltipContent>
           </Tooltip>
@@ -261,15 +261,15 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="p-xs text-subtle">{{ snapA.entry.elapsedMs }} ms</span>
-            <span class="p-xs text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
+            <span class="text-kira-xs text-subtle">{{ snapA.entry.elapsedMs }} ms</span>
+            <span class="text-kira-xs text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
           </div>
         </div>
         <span class="diff-arrow">→</span>
         <div class="diff-summary-side">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="p-xs text-subtle diff-summary-time">{{ formatRelative(snapB.entry.sentAt) }}</span>
+              <span class="text-kira-xs text-subtle diff-summary-time">{{ formatRelative(snapB.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapB.entry.sentAt }}</TooltipContent>
           </Tooltip>
@@ -282,14 +282,14 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="p-xs text-subtle">{{ snapB.entry.elapsedMs }} ms</span>
-            <span class="p-xs text-subtle">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
+            <span class="text-kira-xs text-subtle">{{ snapB.entry.elapsedMs }} ms</span>
+            <span class="text-kira-xs text-subtle">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
           </div>
         </div>
       </div>
 
       <div class="diff-headers" data-testid="http-diff-headers">
-        <div class="diff-header-row diff-header-head p-xs text-subtle">
+        <div class="diff-header-row diff-header-head text-kira-xs text-subtle">
           <span></span>
           <span></span>
           <span>before</span>
@@ -302,20 +302,20 @@ onUnmounted(() => {
           :class="row.status"
           data-testid="http-diff-header-row"
         >
-          <span class="diff-header-status p-xs">{{ row.status }}</span>
+          <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
           <span class="font-data diff-header-name">{{ row.name }}</span>
           <span class="font-data diff-header-value">{{ row.a ?? '—' }}</span>
           <span class="font-data diff-header-value">{{ row.b ?? '—' }}</span>
         </div>
         <details v-if="unchangedHeaderRows.length > 0" class="p-disclosure diff-header-unchanged">
-          <summary class="p-xs text-subtle">{{ unchangedHeaderRows.length }} unchanged</summary>
+          <summary class="text-kira-xs text-subtle">{{ unchangedHeaderRows.length }} unchanged</summary>
           <div
             v-for="row in unchangedHeaderRows"
             :key="row.name"
             class="diff-header-row unchanged"
             data-testid="http-diff-header-row-unchanged"
           >
-            <span class="diff-header-status p-xs">{{ row.status }}</span>
+            <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
             <span class="font-data diff-header-name">{{ row.name }}</span>
             <span class="font-data diff-header-value">{{ row.a }}</span>
             <span class="font-data diff-header-value">{{ row.b }}</span>
@@ -329,10 +329,10 @@ onUnmounted(() => {
         </AlertDescription>
       </Alert>
       <template v-else>
-        <div v-if="!commonFormat" class="p-xs text-subtle diff-raw-note">
+        <div v-if="!commonFormat" class="text-kira-xs text-subtle diff-raw-note">
           Comparing raw bytes — the two bodies aren't both JSON or both XML.
         </div>
-        <div v-if="mergeLoading" class="diff-status p-xs text-subtle">Loading the compare view…</div>
+        <div v-if="mergeLoading" class="diff-status text-kira-xs text-subtle">Loading the compare view…</div>
         <div ref="mergeHostRef" class="diff-merge-host" data-testid="http-diff-merge"></div>
       </template>
     </div>

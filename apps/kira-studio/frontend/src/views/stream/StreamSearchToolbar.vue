@@ -157,7 +157,7 @@ onUnmounted(() => {
       </Tooltip>
     </div>
     <div class="sep" />
-    <span class="p-xs text-subtle" data-testid="stream-search-scope">
+    <span class="text-kira-xs text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
         showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
       </template>
