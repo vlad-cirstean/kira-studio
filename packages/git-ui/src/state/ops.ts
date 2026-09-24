@@ -318,13 +318,13 @@ export class OpsState {
     // about `refsChanged`, this refreshes on both event kinds.
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
-      void this.refreshStatus();
+      void this.refreshStatus().catch((error) => this.#logBackgroundError('refreshStatus', error));
       // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
       // repo (another webview, the native app, a review view). An op run from one of those
       // replaces the slot; without this, this surface kept showing its own stale slot and got
       // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
       // switch), which never observes another surface's write.
-      void this.refreshUndo();
+      void this.refreshUndo().catch((error) => this.#logBackgroundError('refreshUndo', error));
     });
     this.#unsubscribeProgress = bridge.on('remote.progress', (event) => {
       if (this.#repoId !== event.repoId) return;
@@ -374,8 +374,17 @@ export class OpsState {
       this.undoSlot.value = null;
       return;
     }
-    void this.refreshStatus();
-    void this.refreshUndo();
+    void this.refreshStatus().catch((error) => this.#logBackgroundError('refreshStatus', error));
+    void this.refreshUndo().catch((error) => this.#logBackgroundError('refreshUndo', error));
+  }
+
+  /** F10: a `void this.refreshX()`-shaped call (every call site in this class is one — nothing
+   *  external ever awaits these directly) has no caller left to hand a rejection to; logging once
+   *  here is what stands between a disconnect/git error and a silent unhandled rejection with the
+   *  view left showing stale data forever. The methods themselves are unchanged and still throw
+   *  for any future caller that does await them directly. */
+  #logBackgroundError(context: string, error: unknown): void {
+    console.error(`OpsState: ${context} failed`, error);
   }
 
   /** F6: settles every pending confirm dialog and pull prompt with its own cancel value — shared

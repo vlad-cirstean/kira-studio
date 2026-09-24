@@ -40,7 +40,7 @@ export class WorktreeState {
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (event.kind !== 'refsChanged') return;
-      void this.reload();
+      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
     });
   }
 
@@ -53,7 +53,15 @@ export class WorktreeState {
       this.entries.value = [];
       return;
     }
-    void this.reload();
+    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+  }
+
+  /** F10: a `void this.reload()`-shaped call (every call site in this class is one) has no caller
+   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
+   *  error and a silent unhandled rejection with the view left showing stale worktrees forever.
+   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
+  #logBackgroundError(context: string, error: unknown): void {
+    console.error(`WorktreeState: ${context} failed`, error);
   }
 
   async reload(): Promise<void> {

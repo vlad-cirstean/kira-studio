@@ -70,7 +70,15 @@ export class RepoSettingsState {
       this.settings.value = defaultRepoSettingsSnapshot();
       return;
     }
-    void this.reload();
+    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+  }
+
+  /** F10: a `void this.reload()`-shaped call (the only call site in this class) has no caller
+   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
+   *  error and a silent unhandled rejection with the dialog left showing stale settings forever.
+   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
+  #logBackgroundError(context: string, error: unknown): void {
+    console.error(`RepoSettingsState: ${context} failed`, error);
   }
 
   async reload(): Promise<void> {

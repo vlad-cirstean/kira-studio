@@ -77,8 +77,8 @@ export class StashState {
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (event.kind !== 'refsChanged') return;
-      void this.reload();
-      void this.reloadGlobal();
+      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+      void this.reloadGlobal().catch((error) => this.#logBackgroundError('reloadGlobal', error));
     });
   }
 
@@ -94,8 +94,17 @@ export class StashState {
     this.selectedSha.value = null;
     this.changes.value = undefined;
     this.error.value = undefined;
-    void this.reload();
-    void this.reloadGlobal();
+    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+    void this.reloadGlobal().catch((error) => this.#logBackgroundError('reloadGlobal', error));
+  }
+
+  /** F10: a `void this.reload()`/`reloadGlobal()`-shaped call (every call site in this class is
+   *  one) has no caller left to hand a rejection to — logging once here is what stands between a
+   *  disconnect/git error and a silent unhandled rejection with the view left showing a stale
+   *  stash stack forever. Neither method itself is changed — still throws for any future caller
+   *  that awaits it directly. */
+  #logBackgroundError(context: string, error: unknown): void {
+    console.error(`StashState: ${context} failed`, error);
   }
 
   async reload(): Promise<void> {

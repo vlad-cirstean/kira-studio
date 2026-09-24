@@ -66,7 +66,7 @@ export class StackState {
     this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (event.kind !== 'refsChanged') return;
-      void this.reload();
+      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
     });
     this.#unsubscribeProgress = bridge.on('stack.progress', (event) => {
       if (this.#repoId !== event.repoId) return;
@@ -87,7 +87,15 @@ export class StackState {
       this.generation.value++;
       return;
     }
-    void this.reload();
+    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+  }
+
+  /** F10: a `void this.reload()`-shaped call (every call site in this class is one) has no caller
+   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
+   *  error and a silent unhandled rejection with the view left showing stale data forever.
+   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
+  #logBackgroundError(context: string, error: unknown): void {
+    console.error(`StackState: ${context} failed`, error);
   }
 
   async reload(): Promise<void> {
@@ -131,7 +139,9 @@ export class StackState {
       return await this.#bridge.request('stack.restack', { repoId, branch });
     } finally {
       this.restacking.value = false;
-      if (this.#repoId === repoId) void this.reload();
+      if (this.#repoId === repoId) {
+        void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+      }
     }
   }
 

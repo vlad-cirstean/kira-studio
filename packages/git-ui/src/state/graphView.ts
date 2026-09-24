@@ -408,6 +408,12 @@ export class GraphViewState {
       // `refsChanged`), but `MarkRefresh`/`MarkStale` are not the same guarantee — reusing the
       // one refresh path is worth the one extra ~1ms request (D10).
       await this.refresh();
+    } catch (error) {
+      // F10: `#scheduleAutoRefresh`'s own `void this.#runAutoRefresh()` has no caller left to hand
+      // a rejection to — logging here, not in `refresh()` itself, is what stands between a
+      // disconnect/git error on an auto-refresh and a silent unhandled rejection, while any future
+      // direct caller of `refresh()` still sees it thrown.
+      console.error('graphView: #runAutoRefresh failed', error);
     } finally {
       this.autoRefreshing.value = false;
       this.#lastAutoRefreshAt = Date.now();
