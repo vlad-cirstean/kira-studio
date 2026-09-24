@@ -2475,7 +2475,14 @@ where it does:
 - **App-wide:** connections and their live state, settings, the op log, all three cache tiers, the
   metrics readout, the keychain, pre-connect supervision, and panel layout — each a property of the
   one process and the one database (this section's own "One process for all connections"), so a
-  per-window copy would be invented divergence, not a fix. The local-authentication grace grant
+  per-window copy would be invented divergence, not a fix. The API panel's own collections tree,
+  saved requests, variables and environments (`apps/kira-studio/frontend/src/api/state/`) are on
+  this side too (P112): one SQLite store behind every window, broadcast on every mutation via
+  `kira:api:dataChanged` (`Emit`, not `EmitTo`), and cached on the renderer side as TanStack Query
+  entries with `staleTime: Infinity` that the broadcast invalidates — the same
+  fetch-once/invalidate-on-push shape `kira:schema:changed` already established for the schema
+  cache, generalised to a batch of `{kind, ...scope}` changes per event rather than one flat
+  channel per resource. The local-authentication grace grant
   (P14) sits on this side of the line too — it authenticates the machine's owner, not a workbench —
   but the *action* it gates stays per-window: each window's edit dialog still requires its own
   explicit *Show password* press, which just succeeds without a prompt while a grant is live.
@@ -2503,7 +2510,7 @@ tabs included, exactly as a single-window session always has.
 own event transport fans every `app.Event.Emit` out to all windows — correct for a connection-state
 change or a settings update, wrong for a menu command, which Electron always sent to
 `BrowserWindow.getFocusedWindow()` only. `appcore.Emitter` has three delivery shapes over the same
-`DispatchWailsEvent` primitive: `Emit` (broadcast — the six state-change channels, and the quit
+`DispatchWailsEvent` primitive: `Emit` (broadcast — the seven state-change channels, and the quit
 handshake's own flush-before-close signal, which every window must answer), `EmitTo(windowKey, …)`
 (exactly one window by key — the per-window close-flush handshake), and `EmitFocused` (exactly the
 key/focused window — the menu's twelve signal channels, `bridge.Events.Signal`'s successor to
