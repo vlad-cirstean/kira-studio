@@ -4462,6 +4462,119 @@ repo-wide `biome check .` failure in the other fixer's own in-progress files res
 via `ps aux`/`git status --short` before acting, polled via `Monitor` rather than a fixed sleep,
 neither file touched or reverted) before landing. No commit pollution occurred on either side.
 
+## P108 Part 20 result
+
+Reviewed per `plans/P108-part20-findings.md` (Opus reviewer, no fixing) — chunk B8, "Kira Space
+hosts": `apps/kira-space/` internals plus the whole `apps/kira-space-vscode/` VS Code extension. 12
+findings total. One Sonnet fixer landed one commit per finding, F1-F12 in order, none dismissed or
+deferred.
+
+- **F1 (no Go emitter for `kira:git:pairing`/`kira:git:clients`) — `7b31110`.** `gitsock.Server`'s
+  `OnPairingChanged`/`OnClientsChanged` had zero Go subscribers. Added `GitClientsService.AttachPush`
+  (`internal/bridge/gitclients.go`), wired into `main.go` alongside the existing
+  `Deps.Events.Emit`-based push-channel precedent; detached in teardown. Regression test added
+  (`gitclients_test.go`'s `TestGitClientsService_AttachPush`).
+- **F2 (a failed frontend hydrate left a permanently blank window) — `80c2c97`.** `main.ts` now
+  mounts a `BootFailure.vue` island with Retry on any hydrate rejection, split essential
+  (`Promise.all`) from non-essential (`Promise.allSettled`: gitClients/terminals) hydrates so one
+  optional store can't block the whole shell.
+- **F3 (`transport.ts`'s late async `onClose` could evict a newer shared client) — `5f57364`.**
+  Captured the transport identity at creation; `onClose` now deletes the map entry only when it
+  still points at the transport that fired it. Removed the dead, write-only
+  `localEmittersByCodeRepoId` map. Regression test added
+  (`tests/unit/git-transport-late-close.spec.ts`), confirmed to fail against the pre-fix
+  unconditional-delete code (reverted temporarily, restored after confirming) before confirming it
+  passes post-fix.
+- **F4 (`codeworkspace.Session` had no closed guard) — `9b72cd4`.** Added `closed bool` under the
+  session's own mutex and `ErrSessionClosed`; `catfileSession()` now returns it instead of spawning a
+  fresh, never-closed cat-file pair on an already-closed session, and `BeginSearch()` returns an
+  already-cancelled context instead of one `CancelSearch` could never reach. Regression tests added
+  (`session_test.go`, 4 cases), run with `-race`.
+- **F5 (`CodeWorkspaceService.Shutdown` never called from teardown) — `8c60f8d`.** Wired into
+  `main.go`'s teardown, before `repositories.Close()` (a running search still reads settings through
+  `Deps.Repos`).
+- **F6 (`gitsession.Registry.Close` skipped when `gitsock.Server.Close()` early-returns) —
+  `65ee8e5`.** `main.go`'s teardown now calls `gitRegistry.Close()` unconditionally, after
+  `gitSock.Close()` — verified idempotent (`Registry.Close`/`gitreview.Store.Close` both are)
+  before making the call unconditional.
+- **F7 (no single-instance guard; a second launch shared `kira.db` silently) — `37b51f2`.** Exported
+  `gitsock.AcquireLock`; `main.go` now acquires a distinct `app.lock` file before `storage.Open`,
+  exiting cleanly (`os.Exit(0)`) when another instance already owns the home — a different lock file
+  from `git.sock.lock` deliberately, since flock is scoped to the open file description, not the
+  process (reusing the same path would make `gitsock.Server.Start`'s own later `AcquireLock` call, in
+  the same process, see its own first instance as "another instance"). Added
+  `startupfail.StepInstanceLock` for the one real-error path, following the existing `Step`/`Classify`
+  pattern.
+- **F8 (`.vsix` shipped `tests/**` and `playwright.config.ts`) — `367dccf`.** Added `tests/**`,
+  `playwright.config.ts`, `test-results/**`, `playwright-report/**` to `.vscodeignore`. Verified with
+  `vsce ls --no-dependencies`: only `package.json`, `README.md`, `LICENSE`, `resources/**`,
+  `dist/**` remain.
+- **F9 (`build:vsix` `sources` omitted real build inputs) — `691cd6f`.** Added
+  `packages/git-ui/vite.config.ts`, `apps/kira-space-vscode/README.md` and `bun.lock` to the
+  Taskfile's `sources` list.
+- **F10 (Remote-SSH workspaces sat in "connecting…" forever) — `8db8d43`.** `ConnectionManager` now
+  checks `vscode.env.remoteName` at construction and skips the dial loop entirely, going straight to
+  a new `denied` reason (`'remote'`) with a distinct message; `retry()` no-ops for that reason.
+  Exported `connection.ts`'s `socketPath()` and used it everywhere the status bar/command previously
+  hardcoded the literal `~/.kira-space/git.sock`.
+- **F11 (4 biome `noExplicitAny` warnings in `review-target-race.spec.ts`) — `7e3a7a4`.** Exported a
+  `FakeReviewHostWindow` interface from `fakeReviewHost.ts` naming the three window globals; the spec
+  now casts `window as unknown as FakeReviewHostWindow` at all four sites. `bunx biome lint` on both
+  files: 0 warnings.
+- **F12 (`ReadFile`/`scanFile` size gate was stat-then-read, TOCTOU) — `17387b8`.** Both now check
+  `Mode().IsRegular()` on the pre-open `os.Stat`, before `os.Open` is ever called, then read through
+  `io.LimitReader`. Verified directly against Go's own runtime (a real `mkfifo`, via `go run`) that
+  `os.Open` — not `os.Stat` — is what blocks opening a FIFO with no writer, so an "open once, then
+  stat the descriptor" ordering (a literal reading of the findings doc's own fix note) would not
+  actually have closed the hang; checking on the pre-open stat is the only ordering that does.
+  Regression tests added (`TestReadFile_FIFO_ReturnsMissingWithoutHanging`,
+  `TestScanFile_FIFO_SkippedWithoutHanging`), each racing a real `mkfifo` against a 2s timeout,
+  confirmed to fail (hang out to the full 2s) against the pre-fix ordering before confirming they
+  pass post-fix.
+
+**Nothing dismissed.** All 12 findings matched real, reachable code; every fix landed as specified,
+none narrowed in scope. The findings doc's own "Examined, nothing real" section (allowlist drift,
+double-dispose, `migrateLegacySettings` idempotency, webview CSP, `KIRA_REPO`, `RpcServer` swap,
+no-op close, `0.0.0` version, storage, `proxyHandlers`, symlink escape) was left untouched, as
+instructed — none of those are findings.
+
+**Regression tests.** Added for F1 (event wiring), F3 (identity-check race), F4 (closed-guard race,
+run with `-race`) and F12 (FIFO-open-blocking hang, both `files.go` and `search.go`) — each
+genuinely concurrency/race/hang-shaped per `CLAUDE.md`'s own unit-test bar, each confirmed to fail
+against the pre-fix code before confirming it passes post-fix. Skipped for F2 (a wiring/mount
+change), F5/F6/F9 (teardown/build-input wiring), F7 (an `os.Exit(0)` call with no seam to intercept,
+and flock mechanics already covered by `gitsock`'s own suite), F8 (a `.vscodeignore` list) and F11
+(a type-only change, no behavior differs) — none is parser/cache/crypto/concurrency-shaped
+complexity warranting a dedicated test.
+
+**Concurrency, disclosed.** This chunk's own fixer ran in the same shared (non-worktree) checkout
+as the concurrent Part 10/11 (Studio grid/shared-view) fixer throughout, disjoint files on both
+sides. One `.git/index.lock` wait (before F11's own commit), resolved by polling until clear and
+retrying — never `--no-verify` or a destructive git operation. No commit pollution on either side.
+
+**Verification, run for real, after every finding landed:**
+
+- `go build ./...`: clean, exit 0, whole repo.
+- `go test ./...`: every package with tests passes, whole repo (`gitsock` at 23s including its real
+  flock/socket integration tests; `codeworkspace` — this chunk's own new tests — also run with
+  `-race`, clean).
+- `bun run lint` (`biome check .` + `scripts/check-tokens.sh`): 0 warnings, 0 errors, whole repo —
+  confirms F11 removed the only outstanding lint findings anywhere in the tree.
+- `bun run typecheck` (the full parallel `typecheck:*` split across both apps and every package):
+  exit 0.
+- `bun run test:unit`: 1584 pass, 0 fail, across 168 files.
+- Every commit above ran `.githooks/pre-commit` for real (biome + `check-tokens.sh` + the full
+  parallel `typecheck:*` split) and passed clean — `--no-verify` never used.
+
+**Stream B closed.** This is Part 20, stream B's own position 8 of 8 (per the Part 1 pre-plan row:
+"stream B — Kira Space, opened by the shared frontend base — is Parts 13-20") and the last chunk in
+that stream. Every part of `apps/kira-space*` and `packages/git-*` has now been reviewed end to end
+across all eight of stream B's own chunks: Part 13 (shared frontend base), Part 14 (Space git
+process layer), Part 15 (Space git preflight/ops/review/search/graph store), Part 16 (Space git
+session), Part 17 (Space git RPC/socket server/`git-ipc` contract), Part 18 (`git-core`/`git-ui`
+logic), Part 19 (`git-ui` components), and this Part 20 (Kira Space hosts — the desktop app and the
+VS Code extension).
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
