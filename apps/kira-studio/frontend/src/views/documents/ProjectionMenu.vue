@@ -8,6 +8,7 @@ import { Separator } from '@theme/components/ui/separator';
 import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { fieldNamesOnPage } from './page';
+import { nextDocumentProjectionOnClose } from './projection';
 import { useDocumentViewStore } from './state';
 
 // Mirrors views/grid/ColumnsMenu.vue's UI pattern exactly (same header buttons, same list, same
@@ -28,16 +29,33 @@ function currentProjection(): string[] | null {
   return useTabsStore().findDocumentTab(props.tabId)?.state.projection ?? null;
 }
 
-const selected = ref<Set<string>>(new Set(currentProjection() ?? fieldNames));
+// P108 Part 11 F6: the projection the menu opened with, kept apart from `selected` (which the
+// checkboxes mutate) so an untouched close can tell "nothing changed" from "the user chose the
+// same fields All would" — see onUnmounted below. Note fieldNames is itself the *already
+// projected* page's own field set, so it can legitimately equal the active projection exactly
+// (a projection to [a, b] leaves the page showing only _id, a, b) — that equality is not, on its
+// own, evidence the user wants "everything".
+const initialProjection = currentProjection();
+const initialSelected = new Set(initialProjection ?? fieldNames);
+const selected = ref<Set<string>>(new Set(initialSelected));
+
+// F6: "everything" is only ever what an explicit All press means, never inferred from `selected`
+// happening to match fieldNames.length by coincidence (the projected-page-equals-its-own-
+// projection case above). Toggling a single checkbox, or None, is never "everything" either, even
+// if a toggle-back-on later makes the set match fieldNames again.
+let explicitAll = false;
 
 function toggle(name: string): void {
+  explicitAll = false;
   if (selected.value.has(name)) selected.value.delete(name);
   else selected.value.add(name);
 }
 function selectAll(): void {
+  explicitAll = true;
   selected.value = new Set(fieldNames);
 }
 function selectNone(): void {
+  explicitAll = false;
   selected.value = new Set();
 }
 
@@ -46,8 +64,14 @@ function selectNone(): void {
 // component's content on close for every reason (outside click, Escape, or the toolbar toggle
 // button), the same set PopoverPanel's own hand-rolled backdrop+Escape handling covered.
 onUnmounted(() => {
-  const isEverything = selected.value.size === fieldNames.length;
-  documentViewStore.setProjection(props.tabId, isEverything ? null : [...selected.value]);
+  const next = nextDocumentProjectionOnClose(
+    selected.value,
+    initialSelected,
+    fieldNames.length,
+    explicitAll,
+  );
+  if (next === undefined) return;
+  documentViewStore.setProjection(props.tabId, next);
 });
 </script>
 
