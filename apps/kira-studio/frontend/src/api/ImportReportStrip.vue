@@ -10,9 +10,9 @@ const collectionsStore = useCollectionsStore();
 
 // P4 D12: the import report is part of the feature, not decoration. Every warning kind is a case
 // where the app quietly does something other than what the file said — a script that is kept but
-// never run, an auth block that is kept but never applied, a GraphQL body imported as JSON, a file
-// referenced by a name from another machine — and the alternative to saying so here is letting the
-// user find out from a 401 or an E_BAD_REQUEST minutes later.
+// never run, an auth block whose values are dropped and never applied, a GraphQL body imported as
+// JSON, a file referenced by a name from another machine — and the alternative to saying so here
+// is letting the user find out from a 401 or an E_BAD_REQUEST minutes later.
 //
 // A pre-import preview dialog was considered and declined: it is a second UI for an operation that
 // is almost never wrong, and the report after the fact carries the same information at a tenth of
