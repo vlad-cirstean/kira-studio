@@ -1,0 +1,139 @@
+/*
+ * P110 A1: git-ui's own prefixed Tailwind v4 root. git-ui mounts into Kira Space's document
+ * (main.ts), which compiles its own unprefixed Tailwind root — two roots sharing one document
+ * would duplicate/collide on unprefixed utility names, so every utility this package's templates
+ * use reads `kv:...`. `source(none)` + the explicit `@source` lines below scan only this package
+ * and `@kira/kira-ui` (never the host app).
+ *
+ * No preflight: the VS Code webview relies on its own platform defaults, and Kira Space already
+ * ships its own preflight from its own Tailwind root.
+ *
+ * `@theme inline reference` emits no CSS custom properties of its own (`inline` writes each
+ * mapped var() straight into the utilities that use it; `reference` skips emitting the theme
+ * layer's variable declarations) — required here because, under the `kv` prefix, an ordinary
+ * `@theme` would emit its own `--kv-*` names and collide with this package's already-existing
+ * `--kv-*` token layer (theme/vscode-tokens.css, theme/kira-structure.css), creating
+ * self-reference cycles (e.g. `--kv-font-data: var(--kv-font-data)`).
+ *
+ * Namespace resets (`--color-*: initial` etc.) clear Tailwind's own default palette/scale first,
+ * so only the mappings below exist as theme entries — an unmapped default (e.g. `kv:text-red-500`)
+ * generates nothing rather than silently keeping Tailwind's stock red.
+ *
+ * `--spacing: 4px` is Tailwind's own default and is kept, not overridden: git-ui's `--kv-s-1..6`
+ * scale (2/4/6/8/12/16px) already equals the default spacing scale's own steps
+ * (0.5/1/1.5/2/3/4 => 2/4/6/8/12/16px), so `kv:p-2`/`kv:gap-1.5`/etc. (rung 1, §1.1) need no
+ * mapping at all.
+ *
+ * Every mapping below backs a token this package's templates actually reference (verified by
+ * grepping every `--kv-*` use across `packages/git-ui/src` before writing this file) — §1.1 rung 3
+ * discipline applied to a from-scratch build, not a per-commit token add.
+ */
+@import "tailwindcss/theme" layer(theme) prefix(kv);
+@import "tailwindcss/utilities" layer(utilities) prefix(kv) source(none);
+@source "../";
+@source "../../../kira-ui/src";
+
+@theme inline reference {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --spacing: 4px;
+
+  /* Surfaces / structure */
+  --color-fg: var(--kv-app-fg);
+  --color-bg: var(--kv-app-bg);
+  --color-panel: var(--kv-panel-bg);
+  --color-panel-border: var(--kv-panel-border);
+  --color-field: var(--kv-input-bg);
+  --color-field-border: var(--kv-input-border);
+  --color-border-strong: var(--kv-border-strong);
+  --color-toolbar: var(--kv-toolbar-bg);
+  --color-toolbar-border: var(--kv-toolbar-border);
+  --color-focus: var(--kv-focus-border);
+  --color-muted: var(--kv-description-fg);
+  --color-error: var(--kv-error-fg);
+  --color-overlay: var(--kv-overlay-bg);
+  --color-search-match: var(--kv-search-match-bg);
+  --color-scrollbar-thumb: var(--kv-scrollbar-thumb-bg);
+  --color-scrollbar-thumb-hover: var(--kv-scrollbar-thumb-hover-bg);
+  --color-line-highlight: var(--kv-line-highlight-bg);
+
+  /* Buttons */
+  --color-button: var(--kv-button-bg);
+  --color-button-fg: var(--kv-button-fg);
+  --color-button-hover: var(--kv-button-hover-bg);
+  --color-button-secondary: var(--kv-button-secondary-bg);
+  --color-button-secondary-fg: var(--kv-button-secondary-fg);
+
+  /* Rows */
+  --color-row-fg: var(--kv-row-fg);
+  --color-hover: var(--kv-row-hover-bg);
+  --color-selected: var(--kv-row-selected-bg);
+  --color-selected-fg: var(--kv-row-selected-fg);
+  --color-inactive-selected: var(--kv-row-inactive-selected-bg);
+
+  /* Diff / status */
+  --color-diff-added: var(--kv-diff-added-fg);
+  --color-diff-modified: var(--kv-diff-modified-fg);
+  --color-diff-deleted: var(--kv-diff-deleted-fg);
+  --color-diff-renamed: var(--kv-diff-renamed-fg);
+  --color-diff-conflict: var(--kv-diff-conflict-fg);
+  --color-diff-copied: var(--kv-diff-copied-fg);
+  --color-diff-typechanged: var(--kv-diff-typechanged-fg);
+  --color-diff-unmerged: var(--kv-diff-unmerged-fg);
+  --color-diff-inserted-bg: var(--kv-diff-inserted-bg);
+  --color-diff-removed-bg: var(--kv-diff-removed-bg);
+
+  /* Badges */
+  --color-badge: var(--kv-badge-bg);
+  --color-badge-fg: var(--kv-badge-fg);
+  --color-badge-local: var(--kv-badge-local-bg);
+  --color-badge-remote: var(--kv-badge-remote-fg);
+  --color-badge-tag: var(--kv-badge-tag-fg);
+  --color-badge-stash: var(--kv-badge-stash-fg);
+  --color-badge-stash-border: var(--kv-badge-stash-border);
+  --color-badge-pr-open: var(--kv-badge-pr-open-fg);
+  --color-badge-pr-draft: var(--kv-badge-pr-draft-fg);
+  --color-badge-pr-merged: var(--kv-badge-pr-merged-fg);
+  --color-badge-pr-closed: var(--kv-badge-pr-closed-fg);
+  --color-badge-branch-stacked-border: var(--kv-badge-branch-stacked-border);
+  --color-stack-stale: var(--kv-stack-stale-bg);
+  --color-stack-stale-fg: var(--kv-stack-stale-fg);
+  --color-stash-origin: var(--kv-stash-origin-bg);
+  --color-stash-origin-fg: var(--kv-stash-origin-fg);
+  --color-stash-auto: var(--kv-stash-auto-bg);
+  --color-stash-auto-fg: var(--kv-stash-auto-fg);
+
+  /* Text */
+  --text-xs: var(--kv-t-xs);
+  --text-sm: var(--kv-t-sm);
+  --text-base: var(--kv-t-md);
+  --text-lg: var(--kv-t-lg);
+
+  /* Fonts */
+  --font-data: var(--kv-font-data);
+  --font-ui: var(--kv-font-ui);
+
+  /* Radius */
+  --radius-sm: var(--kv-radius-sm);
+  --radius-lg: var(--kv-radius-panel);
+
+  /* Shadow — geometry composed with the widget-shadow colour, same as this package's own
+     precedent (kira-structure.css's doc comment; kui-bridge.css's --kui-shadow-float). */
+  --shadow-float: var(--kv-shadow-dialog) var(--kv-widget-shadow);
+
+  /* Non-scale spacing: control/row/bar heights and icon box are calc()-derived from the host's
+     live --vscode-font-size, not a fixed step on the default scale (§1.1 rung 2/3). */
+  --spacing-control: var(--kv-control-h);
+  --spacing-control-lg: var(--kv-control-h-lg);
+  --spacing-control-sm: var(--kv-control-h-sm);
+  --spacing-control-inline: var(--kv-control-inline-h);
+  --spacing-bar: var(--kv-bar-h);
+  --spacing-icon-box: var(--kv-icon-box);
+  --spacing-row: var(--kv-row-height);
+  --spacing-row-compact: var(--kv-row-height-compact);
+  --spacing-row-comfortable: var(--kv-row-height-comfortable);
+  --spacing-tree-indent: var(--kv-tree-indent);
+}

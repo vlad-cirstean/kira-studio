@@ -15,6 +15,7 @@
  * behavioural gain.
  */
 import { resolve } from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
@@ -24,7 +25,9 @@ const vscodeApp = resolve(repoRoot, 'apps', 'kira-space-vscode');
 export default defineConfig({
   root: repoRoot,
   base: './',
-  plugins: [vue()],
+  // P110 A1: compiles GU/theme/tailwind.css's `kv:`-prefixed root, scanning packages/git-ui and
+  // packages/kira-ui only (that file's own @source lines).
+  plugins: [vue(), tailwindcss()],
   build: {
     outDir: resolve(vscodeApp, 'dist', 'ui'),
     emptyOutDir: true,

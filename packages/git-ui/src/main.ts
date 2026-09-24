@@ -6,6 +6,9 @@ import ReviewView from './components/review/ReviewView.vue';
 import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import type { ReviewTarget } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
+// P110 A1: the prefixed Tailwind build (theme + utilities under `kv:`). Imported first so its
+// `@theme inline reference` mappings are available to every utility class generated below.
+import './theme/tailwind.css';
 // G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
 // every other stylesheet layers onto.
 import './theme/app-shell.css';
