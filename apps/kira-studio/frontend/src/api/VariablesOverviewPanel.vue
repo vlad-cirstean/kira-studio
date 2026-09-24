@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -135,25 +136,25 @@ function editEnvironmentVariables(): void {
             </TooltipTrigger>
             <TooltipContent>Copy</TooltipContent>
           </Tooltip>
-          <span v-if="row.isSecret" class="p-chip warn" data-testid="variables-overview-secret">secret</span>
+          <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">secret</Badge>
           <span v-else class="overview-value" data-testid="variables-overview-value">{{ row.value }}</span>
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>
-              <span
-                class="p-chip scope-chip"
-                :class="row.scope"
+              <Badge
+                class="justify-self-start"
+                :variant="row.scope === 'environment' ? 'info' : 'default'"
                 data-testid="variables-overview-scope"
-                >{{ row.scope }}</span
+                >{{ row.scope }}</Badge
               >
             </TooltipTrigger>
             <TooltipContent>Shadowed by an environment variable of the same name</TooltipContent>
           </Tooltip>
-          <span
+          <Badge
             v-else
-            class="p-chip scope-chip"
-            :class="row.scope"
+            class="justify-self-start"
+            :variant="row.scope === 'environment' ? 'info' : 'default'"
             data-testid="variables-overview-scope"
-            >{{ row.scope }}</span
+            >{{ row.scope }}</Badge
           >
           <span v-if="row.description" class="overview-description" data-testid="variables-overview-description">{{
             row.description
@@ -233,14 +234,6 @@ function editEnvironmentVariables(): void {
 
 .overview-description {
   @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-xs;
-}
-
-.scope-chip {
-  @apply justify-self-start bg-field text-muted-foreground;
-}
-.scope-chip.environment {
-  background: rgba(55, 148, 255, 0.16);
-  @apply text-info;
 }
 
 .overview-footer {

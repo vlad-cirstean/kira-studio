@@ -15,6 +15,7 @@ import {
 } from '@kira/api-core';
 import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   InputGroup,
@@ -498,7 +499,7 @@ onUnmounted(() => {
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
       <span class="p-view-target" data-testid="http-request-target">{{ title }}</span>
-      <span class="p-chip p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</span>
+      <Badge variant="chip" class="p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
            which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
@@ -510,14 +511,14 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <span class="p-chip warn" data-testid="http-unresolved-chip">{{ unresolvedRefs.length }} unresolved</span>
+          <Badge variant="warn" data-testid="http-unresolved-chip">{{ unresolvedRefs.length }} unresolved</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: the view head's own incognito chip, beside the tab strip's icon. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <span class="p-chip" data-testid="http-incognito-chip">Incognito</span>
+          <Badge variant="chip" data-testid="http-incognito-chip">Incognito</Badge>
         </TooltipTrigger>
         <TooltipContent>Nothing from this tab is saved</TooltipContent>
       </Tooltip>
@@ -588,9 +589,9 @@ onUnmounted(() => {
       <!-- P90 §2.6: same inline chip shape the incognito chip above (view-head) uses. -->
       <Tooltip v-if="!effectiveSslVerify">
         <TooltipTrigger as-child>
-          <span class="p-chip warn" data-testid="http-ssl-verify-off-chip">
+          <Badge variant="warn" data-testid="http-ssl-verify-off-chip">
             <CodiconIcon name="unverified" />
-          </span>
+          </Badge>
         </TooltipTrigger>
         <TooltipContent>Certificate verification is off for this request</TooltipContent>
       </Tooltip>

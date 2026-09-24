@@ -2,6 +2,7 @@
 import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
@@ -140,17 +141,17 @@ function onKeydown(e: KeyboardEvent): void {
       <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
 
-    <span
+    <Badge
       v-if="row.kind === 'request' && row.protocol === 'grpc'"
-      class="p-chip method"
-      :class="grpcMethodClass(row.method)"
+      class="method"
+      :variant="grpcMethodClass(row.method)"
       data-testid="grpc-collection-chip"
     >
       gRPC
-    </span>
-    <span v-else-if="row.kind === 'request'" class="p-chip method p-method" :class="httpMethodToken(row.method)">{{
+    </Badge>
+    <Badge v-else-if="row.kind === 'request'" variant="chip" class="method p-method" :class="httpMethodToken(row.method)">{{
       row.method
-    }}</span>
+    }}</Badge>
     <CodiconIcon v-else :name="icon" :size="13" class="node-icon" />
 
     <!-- D13: inline rename doubles as the naming step for all three creation paths, so there is

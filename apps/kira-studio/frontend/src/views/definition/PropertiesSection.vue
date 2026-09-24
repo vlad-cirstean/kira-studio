@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DefinitionSection } from '@shared/domain/definition';
+import { Badge } from '@theme/components/ui/badge';
 
 // P23 D6/D5/D9: one `definition.sections[]` entry — a Kafka topic's Partitions/Configuration, a
 // consumer group's Group/Members/Committed offsets, an SQS queue's Attributes. Same section chrome
@@ -14,7 +15,7 @@ defineProps<{
   <section class="def-section" data-testid="definition-properties" :data-title="section.title">
     <header class="def-section-head">
       <span class="def-section-title">{{ section.title }}</span>
-      <span class="p-badge">{{ section.rows.length }}</span>
+      <Badge>{{ section.rows.length }}</Badge>
     </header>
 
     <p v-if="section.rows.length === 0" class="def-empty">Nothing to show.</p>

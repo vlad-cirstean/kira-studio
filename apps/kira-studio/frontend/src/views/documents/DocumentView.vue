@@ -4,6 +4,7 @@ import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
@@ -298,8 +299,9 @@ const projectionOpen = ref(false);
 // idiom (GitPanel.vue's promptInput) rather than a dedicated forwardRef/exposed handle.
 const projectionTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
-// P16 design system's p-badge on the Columns button (DataToolbar.vue's own `columnCountLabel`
-// precedent) — narrowed to "fields seen so far" since a document collection has no fixed total.
+// P16 design system's count Badge on the Columns button (DataToolbar.vue's own
+// `columnCountLabel` precedent) — narrowed to "fields seen so far" since a document collection
+// has no fixed total.
 const projectionCountLabel = computed(() => {
   void pageVersion.n;
   const total = fieldNamesOnPage(props.tab.id).length;
@@ -665,7 +667,7 @@ onUnmounted(() => {
         ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
         >{{ targetTail?.name ?? tab.path }}</span
       >
-      <span class="p-badge">collection</span>
+      <Badge>collection</Badge>
       <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
@@ -1098,7 +1100,7 @@ onUnmounted(() => {
               <template #actions>
                 <span class="doc-head-spacer"></span>
                 <div class="doc-row-actions">
-                  <span v-if="editingRow === rows[vi.index]" class="p-chip warn">editing</span>
+                  <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <TooltipDisabledTrigger>

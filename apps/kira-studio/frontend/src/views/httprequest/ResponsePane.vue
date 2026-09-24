@@ -2,6 +2,7 @@
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   InputGroup,
@@ -309,9 +310,9 @@ onUnmounted(() => {
       <template v-if="response">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+            <Badge :variant="statusClass(response.status)" data-testid="http-status">
               {{ response.status }} {{ response.statusText }}
-            </span>
+            </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ hint }}</TooltipContent>
         </Tooltip>

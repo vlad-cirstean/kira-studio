@@ -8,6 +8,7 @@ import {
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -285,15 +286,15 @@ onUnmounted(() => {
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>
-            <span class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
+            <Badge :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
               {{ codeName }} ({{ code }})
-            </span>
+            </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ codeHint }}</TooltipContent>
         </Tooltip>
-        <span v-else class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
+        <Badge v-else :variant="grpcCodeClass(code)" data-testid="grpc-status-chip">
           {{ codeName }} ({{ code }})
-        </span>
+        </Badge>
         <span class="ml-auto" />
         <span class="text-kira-xs text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
         <span class="text-kira-xs text-subtle" data-testid="grpc-message-summary">

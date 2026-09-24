@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { computed } from 'vue';
@@ -171,7 +172,7 @@ function onKeydown(e: KeyboardEvent): void {
     </Tooltip>
 
     <span v-if="row.badges?.length" class="badges">
-      <span v-for="badge in row.badges" :key="badge" class="p-count">{{ badge }}</span>
+      <Badge v-for="badge in row.badges" :key="badge" variant="count">{{ badge }}</Badge>
     </span>
 
     <ErrorPopover v-if="row.error" :message="row.error" />

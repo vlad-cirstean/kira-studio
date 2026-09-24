@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { DocumentRowView } from './rows';
 
@@ -60,11 +61,11 @@ function onHeadKeydown(e: KeyboardEvent): void {
         <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
       </button>
       <span class="doc-id" data-testid="document-id">{{ view.idLabel }}</span>
-      <span class="p-badge" data-testid="document-field-count">{{ view.fieldCount }} fields</span>
-      <span class="p-badge" data-testid="document-byte-badge">{{ view.byteLabel }}</span>
+      <Badge data-testid="document-field-count">{{ view.fieldCount }} fields</Badge>
+      <Badge data-testid="document-byte-badge">{{ view.byteLabel }}</Badge>
       <Tooltip v-if="view.isTruncated">
         <TooltipTrigger as-child>
-          <span class="p-badge warn" data-testid="document-truncated">truncated</span>
+          <Badge variant="warn" data-testid="document-truncated">truncated</Badge>
         </TooltipTrigger>
         <TooltipContent>value truncated</TooltipContent>
       </Tooltip>

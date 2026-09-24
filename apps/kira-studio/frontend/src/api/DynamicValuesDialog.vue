@@ -2,6 +2,7 @@
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
@@ -116,9 +117,9 @@ function close(): void {
             <code class="reference" data-testid="dynamic-values-reference">{{
               reference(entry.name)
             }}</code>
-            <span class="p-chip info sample" data-testid="dynamic-values-sample">{{
+            <Badge variant="info" class="sample" data-testid="dynamic-values-sample">{{
               samples[entry.name] ?? ''
-            }}</span>
+            }}</Badge>
           </button>
         </TooltipTrigger>
         <TooltipContent>Copy</TooltipContent>

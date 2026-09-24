@@ -6,6 +6,7 @@ import {
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import {
@@ -207,10 +208,10 @@ async function onClear(): Promise<void> {
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
-            <span class="p-chip p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</span>
+            <Badge variant="chip" class="p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</Badge>
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="p-chip" :class="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</span>
+                <Badge :variant="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>

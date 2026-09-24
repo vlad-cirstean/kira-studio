@@ -2,6 +2,7 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import {
@@ -516,23 +517,23 @@ const statusLine = computed(() => {
       >
       <Tooltip v-if="dataTypeHint">
         <TooltipTrigger as-child>
-          <span class="p-badge" :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</span>
+          <Badge :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ dataTypeHint }}</TooltipContent>
       </Tooltip>
-      <span v-else class="p-badge" :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</span>
-      <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
-      <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
-      <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
+      <Badge v-else :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</Badge>
+      <Badge v-if="isNullValue" variant="info" data-testid="cell-editor-badge-null">NULL</Badge>
+      <Badge v-if="isEmptyValue" variant="info" data-testid="cell-editor-badge-empty">empty</Badge>
+      <Badge v-if="isTruncatedValue" variant="warn" data-testid="cell-editor-badge-truncated">truncated</Badge>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="p-badge status-badge" data-testid="cell-editor-status">{{ statusLine }}</span>
+          <Badge class="max-w-56 overflow-hidden text-ellipsis" data-testid="cell-editor-status">{{ statusLine }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ statusLine }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="formatProblem">
         <TooltipTrigger as-child>
-          <span class="p-chip err invalid-chip" data-testid="cell-editor-invalid">{{ formatProblem.message }}</span>
+          <Badge variant="err" class="max-w-56 overflow-hidden text-ellipsis whitespace-nowrap" data-testid="cell-editor-invalid">{{ formatProblem.message }}</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ formatProblem.message }}</TooltipContent>
       </Tooltip>
@@ -609,17 +610,17 @@ const statusLine = computed(() => {
       <span class="ml-auto flex items-center gap-1">
         <Tooltip v-if="readOnlyReason && readOnlyChipTitle">
           <TooltipTrigger as-child>
-            <span class="p-chip warn">
+            <Badge variant="warn">
               <CodiconIcon name="lock" :size="13" />
               {{ readOnlyChipText }}
-            </span>
+            </Badge>
           </TooltipTrigger>
           <TooltipContent>{{ readOnlyChipTitle }}</TooltipContent>
         </Tooltip>
-        <span v-else-if="readOnlyReason" class="p-chip warn">
+        <Badge v-else-if="readOnlyReason" variant="warn">
           <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
-        </span>
+        </Badge>
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -751,12 +752,6 @@ const statusLine = computed(() => {
   @apply cursor-default text-disabled;
 }
 
-/* The message chip (formatProblem) truncates the same way status-badge does — the squiggly
-   underline in the editor below and this chip's own tooltip both carry the untruncated text. */
-.invalid-chip {
-  @apply max-w-56 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
 .generate-anchor {
   @apply relative shrink-0;
 }
@@ -767,15 +762,6 @@ const statusLine = computed(() => {
 
 .generate-item {
   @apply w-full border-0 bg-transparent text-left font-[family-name:var(--kira-font-ui)];
-}
-
-/* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation
-   note / beautify failure) now lives in the header as a badge — LAW: no editor status line,
-   everything it used to say already exists in the view header. Still truncates with an ellipsis
-   (title carries the full text) rather than growing unbounded and pushing the trailing
-   read-only chip around. */
-.status-badge {
-  @apply max-w-56 overflow-hidden text-ellipsis;
 }
 
 .editor-body {

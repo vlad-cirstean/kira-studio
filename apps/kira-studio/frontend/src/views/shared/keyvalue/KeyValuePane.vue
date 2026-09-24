@@ -39,6 +39,7 @@ import {
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
@@ -800,7 +801,7 @@ onUnmounted(() => {
     </Alert>
     <template v-else>
       <div v-if="page" class="p-toolbar kv-badges" data-testid="keyvalue-badges">
-        <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
+        <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
         <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
              not real information. Memory/size (P33 D5) is real for both: read.ts now sets
@@ -808,13 +809,13 @@ onUnmounted(() => {
         <template v-if="!isSingleObjectPage">
           <!-- TTL is styled as a warning chip, not a neutral badge: a key that is about to
                vanish should look like one (see the mockup's KeyValue.html). -->
-          <span class="p-chip" :class="{ warn: page.ttlMs !== null }" data-testid="keyvalue-ttl">
+          <Badge :variant="page.ttlMs !== null ? 'warn' : 'chip'" data-testid="keyvalue-ttl">
             <CodiconIcon name="history" :size="13" />
             {{ page.ttlMs !== null ? `expires in ${ttlText(page.ttlMs)}` : 'no expiry' }}
-          </span>
+          </Badge>
         </template>
-        <span class="p-badge" data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</span>
-        <span v-if="connRecord" class="p-badge">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</span>
+        <Badge data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
+        <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
       </div>
 
       <div class="p-toolbar last kv-toolbar" data-testid="keyvalue-toolbar">
@@ -1159,7 +1160,7 @@ onUnmounted(() => {
                         {{ rowAt(entry.i)?.value }}
                         <Tooltip v-if="rowAt(entry.i)?.isTruncated">
                           <TooltipTrigger as-child>
-                            <span class="p-chip truncated-chip">truncated</span>
+                            <Badge variant="chip" class="bg-field text-subtle ml-1.5 shrink-0">truncated</Badge>
                           </TooltipTrigger>
                           <TooltipContent>value truncated</TooltipContent>
                         </Tooltip>
@@ -1255,10 +1256,6 @@ onUnmounted(() => {
 
 .kv-row:hover {
   @apply bg-hover;
-}
-
-.truncated-chip {
-  @apply shrink-0 bg-field text-subtle ml-1.5;
 }
 
 .search-match {

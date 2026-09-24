@@ -3,6 +3,7 @@ import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -255,9 +256,9 @@ onUnmounted(() => {
           <div class="diff-summary-col">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="p-chip" :class="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
+                <Badge :variant="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
                   {{ snapA.entry.status }} {{ snapA.entry.statusText }}
-                </span>
+                </Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
             </Tooltip>
@@ -276,9 +277,9 @@ onUnmounted(() => {
           <div class="diff-summary-col">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="p-chip" :class="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
+                <Badge :variant="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
                   {{ snapB.entry.status }} {{ snapB.entry.statusText }}
-                </span>
+                </Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
             </Tooltip>

@@ -2,6 +2,7 @@
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import {
@@ -207,18 +208,18 @@ function onCloseSearch(): void {
       <span class="p-view-target" data-testid="grid-target">
         <span v-if="pathPrefix" class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
       </span>
-      <span v-if="targetTail?.kind" class="p-badge" data-testid="grid-kind-badge">{{ targetTail.kind }}</span>
-      <span v-if="columnCount !== null" class="p-badge" data-testid="grid-column-count-badge"
-        >{{ columnCount }} columns</span
+      <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{ targetTail.kind }}</Badge>
+      <Badge v-if="columnCount !== null" data-testid="grid-column-count-badge"
+        >{{ columnCount }} columns</Badge
       >
-      <span class="p-badge" data-testid="grid-writable-badge">{{
+      <Badge data-testid="grid-writable-badge">{{
         effectivelyWritable ? 'read-write' : 'read-only'
-      }}</span>
-      <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
-        >Σ {{ rt.count.value.toLocaleString() }} rows</span
+      }}</Badge>
+      <Badge v-if="rt?.count" data-testid="grid-row-count-badge"
+        >Σ {{ rt.count.value.toLocaleString() }} rows</Badge
       >
       <span class="ml-auto flex items-center gap-1">
-        <span v-if="primaryKeyLabel" class="p-chip info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</span>
+        <Badge v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
       </span>
     </div>
 
@@ -282,8 +283,8 @@ function onCloseSearch(): void {
            group. -->
       <div class="group">
         <template v-if="tabHasPending">
-          <span class="p-chip warn"
-            >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span
+          <Badge variant="warn"
+            >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
             <div ref="previewAnchorRef" class="preview-anchor">

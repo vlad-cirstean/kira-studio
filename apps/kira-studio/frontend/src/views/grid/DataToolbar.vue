@@ -176,9 +176,9 @@ function onGenerateData(): void {
 const columnsOpen = ref(false);
 const columnsAnchorRef = ref<HTMLElement | null>(null);
 
-// P16 design system's p-badge on the Columns button: "selected / total" — both counts already
-// live on data this component reads anyway (the projection list and the describe-derived meta),
-// so this is a display-only derivation, not a new data source.
+// P16 design system's count Badge on the Columns button: "selected / total" — both counts
+// already live on data this component reads anyway (the projection list and the
+// describe-derived meta), so this is a display-only derivation, not a new data source.
 const columnCountLabel = computed(() => {
   const total = rt.value?.meta?.columns.length;
   if (!total) return null;
@@ -442,8 +442,8 @@ function onDeleteRow(): void {
 @reference "@theme/base.css";
 
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
-   p-seg, p-input, p-chip, p-count) — the pager's own layout/page-jump-input styling lives in
-   PagerControls.vue now; only the columns anchor's positioning is left here. */
+   p-seg, p-input, plus the Badge component) — the pager's own layout/page-jump-input styling
+   lives in PagerControls.vue now; only the columns anchor's positioning is left here. */
 
 .columns-anchor {
   @apply relative;

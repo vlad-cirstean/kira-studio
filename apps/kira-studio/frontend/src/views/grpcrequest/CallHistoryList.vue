@@ -6,6 +6,7 @@ import {
 } from '@shared/domain/grpc-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   InputGroup,
@@ -156,7 +157,7 @@ async function onClear(): Promise<void> {
       >
         <Tooltip>
           <TooltipTrigger as-child>
-            <span class="p-chip" :class="grpcCodeClass(entry.code)">{{ entry.codeName }}</span>
+            <Badge :variant="grpcCodeClass(entry.code)">{{ entry.codeName }}</Badge>
           </TooltipTrigger>
           <TooltipContent>{{ grpcCodeHint(entry.code) }}</TooltipContent>
         </Tooltip>

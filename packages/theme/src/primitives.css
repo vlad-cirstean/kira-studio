@@ -415,74 +415,20 @@
   background: var(--kira-select);
 }
 
-/* ---------- P9 badge / count / chip ---------- */
-.p-badge {
-  height: var(--kira-control-h-sm);
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-xs);
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.p-count {
-  min-width: var(--kira-control-h-sm);
-  height: var(--kira-control-h-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  border-radius: var(--kira-radius-pill);
-  background: var(--kira-badge);
-  color: #f0f0f0;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-xs);
-  flex-shrink: 0;
-}
-.p-chip {
-  height: var(--kira-control-h-sm);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-pill);
-  font-size: var(--kira-t-xs);
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.p-chip.warn {
-  background: rgba(204, 167, 0, 0.16);
-  color: var(--kira-warn);
-}
-.p-chip.err {
-  background: rgba(241, 76, 76, 0.16);
-  color: var(--kira-error);
-}
-.p-chip.ok {
-  background: rgba(35, 209, 139, 0.14);
-  color: var(--kira-ok);
-}
-.p-chip.info {
-  background: rgba(55, 148, 255, 0.16);
-  color: var(--kira-info);
-}
-
-/* P17 D19 gave these a 16% tint to match `.p-chip`'s four status variants above, so a method
-   chip would read at the same weight a status chip does — colour only — no layout of its own —
-   so it composes onto either a `.p-chip` (the method chip in HttpRequestView.vue's head,
-   ResponseHistoryList.vue's row, CollectionRow.vue's tree row) or `.p-select.bordered`
-   (MethodSelect.vue's own trigger button, D18) without either consumer duplicating the
-   seven-plus-one colour rule.
+/* P17 D19 gave these a 16% tint to match the Badge component's warn/err/ok/info status variants
+   (P110 B22 folded the old chip primitive into that same component), so a method chip would read
+   at the same weight a status chip does — colour only — no layout of its own — so it composes
+   onto either a Badge (the
+   method chip in HttpRequestView.vue's head, ResponseHistoryList.vue's row, CollectionRow.vue's
+   tree row) or `.p-select.bordered` (MethodSelect.vue's own trigger button, D18) without either
+   consumer duplicating the seven-plus-one colour rule.
    P22 D7: the fill is dropped. The user reports it as the problem on the method *select*, where
    a tinted pill inside an already-bordered control reads as a second, competing control —
    coloured text on the control's own neutral ground is the treatment asked for. Applied to all
    five `.p-method` sites (F12: they are all Api — Studio's tree has no method/kind chip, only an
-   EngineIcon and a `.p-count`) so a method never has two looks in one window.
-   `.p-chip.warn/.err/.ok/.info` above are NOT changed — they are status, not method. */
+   EngineIcon and a count Badge) so a method never has two looks in one window.
+   The Badge component's warn/err/ok/info variants above are NOT changed — they are status, not
+   method. */
 .p-method.get {
   color: var(--kira-method-get);
 }

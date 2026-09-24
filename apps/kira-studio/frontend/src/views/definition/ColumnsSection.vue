@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
@@ -34,7 +35,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   <section class="def-section" data-testid="definition-columns">
     <header class="def-section-head">
       <span class="def-section-title">Columns</span>
-      <span class="p-badge">{{ columns.length }}</span>
+      <Badge>{{ columns.length }}</Badge>
     </header>
     <table class="def-table">
       <thead>

@@ -16,6 +16,7 @@ import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -1399,9 +1400,9 @@ const preconnectText = computed({
           </Button>
           <Tooltip v-if="testState.status !== 'idle'" :disabled="testState.status !== 'error'">
             <TooltipTrigger as-child>
-              <span
-                class="test-chip p-chip"
-                :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
+              <Badge
+                class="test-chip"
+                :variant="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
                 data-testid="connection-test-result"
               >
                 {{
@@ -1411,7 +1412,7 @@ const preconnectText = computed({
                       ? `OK — ${testState.message}`
                       : testState.message
                 }}
-              </span>
+              </Badge>
             </TooltipTrigger>
             <TooltipContent v-if="testState.status === 'error'">{{ testState.message ?? '' }}</TooltipContent>
           </Tooltip>

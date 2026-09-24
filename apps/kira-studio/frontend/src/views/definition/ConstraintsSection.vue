@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useTabsStore } from '../../state/tabs';
 import type { ConstraintRow } from './structure';
@@ -44,7 +45,7 @@ function onNavigate(c: ConstraintRow): void {
   <section class="def-section" data-testid="definition-constraints">
     <header class="def-section-head">
       <span class="def-section-title">Constraints</span>
-      <span class="p-badge">{{ constraints.length }}</span>
+      <Badge>{{ constraints.length }}</Badge>
     </header>
     <table class="def-table">
       <thead>
@@ -61,7 +62,7 @@ function onNavigate(c: ConstraintRow): void {
           <td class="def-con-type">
             <span v-if="KEY_LABEL[c.type] === 'PK'" class="header-key">PK</span>
             <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="header-key is-fk">FK</span>
-            <span v-else class="p-badge">{{ TYPE_LABEL[c.type] }}</span>
+            <Badge v-else>{{ TYPE_LABEL[c.type] }}</Badge>
           </td>
           <td class="def-con-detail font-data">{{ c.detail }}</td>
           <td class="def-con-table">

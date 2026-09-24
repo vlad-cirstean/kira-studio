@@ -3,6 +3,7 @@ import { definitionText } from '@shared/domain/definition';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
@@ -237,11 +238,11 @@ const breadcrumb = computed(() => {
       <span class="p-view-target" data-testid="definition-target">
         <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
       </span>
-      <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
-      <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
+      <Badge v-if="targetTail">{{ targetTail.kind }}</Badge>
+      <Badge>
         <CodiconIcon name="lock" :size="13" />
         read-only — {{ originPhrase }}
-      </span>
+      </Badge>
       <span class="ml-auto flex items-center gap-1" />
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />

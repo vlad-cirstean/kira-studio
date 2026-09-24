@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { IndexMeta } from '@shared/domain/tree';
+import { Badge } from '@theme/components/ui/badge';
 
 defineProps<{
   indexes: IndexMeta[];
@@ -10,7 +11,7 @@ defineProps<{
   <section class="def-section" data-testid="definition-indexes">
     <header class="def-section-head">
       <span class="def-section-title">Indexes</span>
-      <span class="p-badge">{{ indexes.length }}</span>
+      <Badge>{{ indexes.length }}</Badge>
     </header>
     <table class="def-table">
       <thead>
@@ -25,8 +26,8 @@ defineProps<{
         <tr v-for="idx in indexes" :key="idx.name" class="def-row">
           <td class="def-idx-name">{{ idx.name }}</td>
           <td class="def-idx-badges">
-            <span v-if="idx.primary" class="p-badge">primary</span>
-            <span v-else-if="idx.unique" class="p-badge">unique</span>
+            <Badge v-if="idx.primary">primary</Badge>
+            <Badge v-else-if="idx.unique">unique</Badge>
           </td>
           <td class="def-idx-method font-data">{{ idx.method ?? '' }}</td>
           <td class="def-idx-columns font-data">({{ idx.columns.join(', ') }})</td>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DocumentSchemaMeta } from '@shared/domain/definition';
+import { Badge } from '@theme/components/ui/badge';
 import { computed } from 'vue';
 import { jsonSchemaFields } from './structure';
 
@@ -22,12 +23,12 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
   <section class="def-section" data-testid="definition-validation">
     <header class="def-section-head">
       <span class="def-section-title">Validation</span>
-      <span v-if="documentSchema?.validationLevel" class="p-chip">
+      <Badge v-if="documentSchema?.validationLevel" variant="chip">
         {{ documentSchema.validationLevel }}
-      </span>
-      <span v-if="documentSchema?.validationAction" class="p-chip">
+      </Badge>
+      <Badge v-if="documentSchema?.validationAction" variant="chip">
         {{ documentSchema.validationAction }}
-      </span>
+      </Badge>
     </header>
 
     <p v-if="!documentSchema?.validator" class="def-empty">
@@ -40,7 +41,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
           <td class="def-val-name font-data">{{ f.name }}</td>
           <td class="def-val-type font-data">{{ f.bsonType ?? '' }}</td>
           <td class="def-val-required">
-            <span v-if="f.required" class="p-badge">required</span>
+            <Badge v-if="f.required">required</Badge>
           </td>
           <td class="def-val-desc">{{ f.description ?? '' }}</td>
         </tr>

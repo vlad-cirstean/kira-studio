@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import {
@@ -227,14 +228,14 @@ function selectMethod(service: string, method: string): void {
             @click="selectMethod(svc.name, m.name)"
           >
             <span class="method-name font-data">{{ m.name }}</span>
-            <span
+            <Badge
               v-if="m.serverStreaming || m.clientStreaming"
-              class="p-chip ok"
+              variant="ok"
               data-testid="grpc-method-streaming-badge"
             >
               STREAM
-            </span>
-            <span v-else class="p-chip info" data-testid="grpc-method-streaming-badge">UNARY</span>
+            </Badge>
+            <Badge v-else variant="info" data-testid="grpc-method-streaming-badge">UNARY</Badge>
           </button>
         </div>
       </template>

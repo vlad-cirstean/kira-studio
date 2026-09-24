@@ -4,6 +4,7 @@ import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
@@ -642,13 +643,12 @@ onUnmounted(() => {
         ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
       >
       <span class="ml-auto flex items-center gap-1">
-        <span
+        <Badge
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
-          class="p-badge"
           data-testid="stream-visibility-timeout"
         >
           visibility {{ page.visibilityTimeoutSeconds }}s
-        </span>
+        </Badge>
       </span>
     </div>
 

@@ -2,6 +2,7 @@
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
@@ -133,13 +134,13 @@ onUnmounted(() => {
     <div ref="panelEl" class="fk-preview p-float" data-testid="fk-preview" :style="style">
       <div class="fk-preview-header">
         <span class="fk-preview-title">{{ tableLabel }}</span>
-        <span
+        <Badge
           v-if="state.status === 'ready' && state.hasMore"
-          class="p-chip info"
+          variant="info"
           data-testid="fk-preview-more"
         >
           {{ state.rows.length }} of many matching rows
-        </span>
+        </Badge>
       </div>
 
       <div class="fk-preview-actions">
@@ -153,7 +154,7 @@ onUnmounted(() => {
         <div v-if="state.status === 'loading'" class="fk-preview-loading">
           <CodiconIcon name="loading" class="spin" :size="14" />
         </div>
-        <div v-else-if="state.status === 'error'" class="p-chip err">{{ state.message }}</div>
+        <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" class="strip-note" data-testid="fk-preview-empty">
           <AlertDescription class="strip-note-text">No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
@@ -166,14 +167,14 @@ onUnmounted(() => {
                 <span v-if="col.isTarget" class="header-key is-fk">FK</span>
               </th>
               <td>
-                <span
+                <Badge
                   v-if="state.rows[0]?.values[i]?.isNull"
-                  class="p-chip info"
+                  variant="info"
                   data-testid="fk-preview-null"
-                  >NULL</span
+                  >NULL</Badge
                 >
                 <span v-else>{{ state.rows[0]?.values[i]?.text }}</span>
-                <span v-if="state.rows[0]?.values[i]?.truncated" class="p-chip warn">truncated</span>
+                <Badge v-if="state.rows[0]?.values[i]?.truncated" variant="warn">truncated</Badge>
               </td>
             </tr>
           </tbody>

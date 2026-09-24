@@ -3,6 +3,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -207,20 +208,20 @@ async function onConfirm(): Promise<void> {
             <span v-if="row.username" class="ds-username text-subtle">{{ row.username }}</span>
             <Tooltip v-if="looksAlreadyImported(row)">
               <TooltipTrigger as-child>
-                <span class="p-chip warn" data-testid="datagrip-row-duplicate">
+                <Badge variant="warn" data-testid="datagrip-row-duplicate">
                   looks like it's already imported
-                </span>
+                </Badge>
               </TooltipTrigger>
               <TooltipContent>A connection with this name, host, port and database already exists.</TooltipContent>
             </Tooltip>
-            <span
+            <Badge
               v-if="row.passwordOutlook"
-              class="p-chip ml-auto"
-              :class="OUTLOOK_TONE[row.passwordOutlook]"
+              class="ml-auto"
+              :variant="OUTLOOK_TONE[row.passwordOutlook]"
               data-testid="datagrip-row-outlook"
             >
               {{ OUTLOOK_LABEL[row.passwordOutlook] }}
-            </span>
+            </Badge>
           </template>
           <template v-else>
             <span class="ds-skip ml-auto" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
@@ -265,13 +266,13 @@ async function onConfirm(): Promise<void> {
             <CodiconIcon :name="row.created ? 'check' : 'error'" :size="15" />
           </span>
           <span class="ds-name">{{ row.name }}</span>
-          <span
-            class="p-chip ml-auto"
-            :class="reportOutcome(row).tone"
+          <Badge
+            class="ml-auto"
+            :variant="reportOutcome(row).tone"
             data-testid="datagrip-report-row-outcome"
           >
             {{ reportOutcome(row).label }}
-          </span>
+          </Badge>
         </div>
       </div>
     </div>

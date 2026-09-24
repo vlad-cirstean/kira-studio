@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
@@ -162,7 +163,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
         @update:model-value="onNameInput(String($event))"
         @blur="emit('blur')"
       />
-      <span v-if="duplicate" class="p-chip warn" data-testid="variable-duplicate">duplicate</span>
+      <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">duplicate</Badge>
     </div>
     <div class="cell value-cell">
       <span v-if="notYetRevealed()" class="masked-value" data-testid="variable-value-masked">••••••••</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
   Tooltip,
@@ -51,16 +52,16 @@ const resetTitle = computed<string>(
 
 <template>
   <span class="edit-buffer-actions">
-    <span
+    <Badge
       v-if="buffer.isDirty.value"
-      class="p-chip warn"
+      variant="warn"
       :data-testid="`${testidPrefix}-modified`"
     >
       modified
-    </span>
-    <span v-if="showBytes" class="p-badge" :data-testid="`${testidPrefix}-byte-badge`">{{
+    </Badge>
+    <Badge v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{
       buffer.byteLabel.value
-    }}</span>
+    }}</Badge>
     <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger>

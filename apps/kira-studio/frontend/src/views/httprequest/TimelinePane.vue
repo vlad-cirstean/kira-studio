@@ -3,6 +3,7 @@ import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -239,13 +240,13 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <span>→</span>
             <Tooltip v-if="hop.status > 0">
               <TooltipTrigger as-child>
-                <span class="p-chip" :class="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</span>
+                <Badge :variant="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(hop.status) }}</TooltipContent>
             </Tooltip>
-            <span v-else class="p-chip err" data-testid="http-timeline-hop-failed-chip">
+            <Badge v-else variant="err" data-testid="http-timeline-hop-failed-chip">
               {{ hop.error || 'failed' }}
-            </span>
+            </Badge>
           </div>
 
           <div class="hop-track">

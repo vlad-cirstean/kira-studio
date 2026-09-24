@@ -2,6 +2,7 @@
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
@@ -287,9 +288,9 @@ onUnmounted(() => {
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="symbol-interface" :size="13" /></span>
       <span class="p-view-target" data-testid="grpc-request-target">{{ title }}</span>
-      <span v-if="tab.state.service && tab.state.method" class="p-chip info" data-testid="grpc-method-chip">
+      <Badge v-if="tab.state.service && tab.state.method" variant="info" data-testid="grpc-method-chip">
         {{ tab.state.service }}/{{ tab.state.method }}
-      </span>
+      </Badge>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
           <span class="dirty-mark" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
@@ -298,14 +299,14 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip v-if="unresolvedRefs.length > 0">
         <TooltipTrigger as-child>
-          <span class="p-chip warn" data-testid="grpc-unresolved-chip">{{ unresolvedRefs.length }} unresolved</span>
+          <Badge variant="warn" data-testid="grpc-unresolved-chip">{{ unresolvedRefs.length }} unresolved</Badge>
         </TooltipTrigger>
         <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
       </Tooltip>
       <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
       <Tooltip v-if="incognito">
         <TooltipTrigger as-child>
-          <span class="p-chip" data-testid="grpc-incognito-chip">Incognito</span>
+          <Badge variant="chip" data-testid="grpc-incognito-chip">Incognito</Badge>
         </TooltipTrigger>
         <TooltipContent>Nothing from this tab is saved</TooltipContent>
       </Tooltip>

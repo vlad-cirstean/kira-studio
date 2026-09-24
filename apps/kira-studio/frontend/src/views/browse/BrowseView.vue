@@ -2,6 +2,7 @@
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import {
@@ -529,14 +530,13 @@ onMounted(() => {
                       :size="13"
                   /></span>
                   <span class="row-name">{{ filteredNodes[vi.index]?.name }}</span>
-                  <span
+                  <Badge
                     v-if="
                       filteredNodes[vi.index]?.kind === 'key' &&
                       redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
                     "
-                    class="p-badge row-type-badge"
                     data-testid="browse-key-type"
-                    >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</span
+                    >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</Badge
                   >
                   <span v-if="filteredNodes[vi.index]?.detail" class="row-detail text-muted-foreground">{{
                     filteredNodes[vi.index]?.detail
@@ -670,7 +670,4 @@ onMounted(() => {
   @apply shrink-0 text-kira-xs;
 }
 
-.row-type-badge {
-  @apply shrink-0;
-}
 </style>

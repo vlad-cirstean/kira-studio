@@ -119,6 +119,11 @@ check_class 'p-xs' 'text-kira-xs'
 check_class 'p-push' 'ml-auto'
 # P110 B20: `icon-box` is not common prose.
 check_class 'icon-box' 'size-4 flex items-center justify-center shrink-0'
+# P110 B22: the badge/chip/count trio, folded into one Badge component
+# (packages/theme/src/components/ui/badge). None of the three read as prose.
+check_class 'p-badge' 'Badge (packages/theme/src/components/ui/badge)'
+check_class 'p-chip' 'Badge variant="chip"/"warn"/"err"/"ok"/"info"'
+check_class 'p-count' 'Badge variant="count"'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
