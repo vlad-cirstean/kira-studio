@@ -11,13 +11,26 @@ import (
 var leadingCommentRE = regexp.MustCompile(`(?s)^\s*(?:--[^\n]*\n|/\*.*?\*/\s*)*`)
 
 var explainableRE = regexp.MustCompile(`(?i)^(SELECT|WITH)\b`)
+var trailingSemicolonRE = regexp.MustCompile(`;\s*$`)
 
-// Explainable ports explain.ts's isExplainable verbatim (P18 D12, M3 §8.1): strips leading
-// comments, then requires a leading SELECT/WITH. Reused, not re-decided — see explain_query's own
-// refusal of anything else (M3 §4.3/§8).
+// Explainable ports explain.ts's isExplainable verbatim (P18 D12, M3 §8.1; P108 Part 11 F2):
+// strips leading comments, then requires a leading SELECT/WITH. Reused, not re-decided — see
+// explain_query's own refusal of anything else (M3 §4.3/§8).
+//
+// F2: a leading SELECT/WITH says nothing about a second statement smuggled behind it — the
+// splitter that decided this was "one statement" can itself be fooled, and Postgres's simple
+// protocol runs every command in one Query message, so a merged statement would execute past the
+// EXPLAIN wrapper. Checked against the RAW text, after stripping at most one trailing `;` — never
+// the caller's own span boundaries — mirroring adapters.ClassifySQL's own embedded-semicolon guard
+// (internal/adapters/classify.go). A `;` genuinely inside a string literal costs a disabled Explain
+// action, never a write.
 func Explainable(sql string) bool {
 	stripped := strings.TrimLeft(leadingCommentRE.ReplaceAllString(sql, ""), " \t\r\n")
-	return explainableRE.MatchString(stripped)
+	if !explainableRE.MatchString(stripped) {
+		return false
+	}
+	raw := trailingSemicolonRE.ReplaceAllString(sql, "")
+	return !strings.Contains(raw, ";")
 }
 
 // StatementsFor ports explain.ts's explainStatementsFor verbatim (P18 D13), keyed on kind exactly

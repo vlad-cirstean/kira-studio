@@ -8,10 +8,21 @@ import type { ConnectionKind } from '@shared/domain/connection';
 // query".
 const LEADING_COMMENT_RE = /^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/;
 const EXPLAINABLE_RE = /^(SELECT|WITH)\b/i;
+const TRAILING_SEMICOLON_RE = /;\s*$/;
 
 export function isExplainable(sql: string): boolean {
   const stripped = sql.replace(LEADING_COMMENT_RE, '').trimStart();
-  return EXPLAINABLE_RE.test(stripped);
+  if (!EXPLAINABLE_RE.test(stripped)) return false;
+  // P108 Part 11 F2: a leading SELECT/WITH says nothing about a second statement smuggled behind
+  // it — the splitter that decided this was "one statement" can itself be fooled (F4: Postgres
+  // E'...' strings, `$` inside an identifier), and Postgres's simple protocol runs every command in
+  // one Query message, so a merged `SELECT ...; DELETE ...` would execute the DELETE too once
+  // wrapped in EXPLAIN. Checked against the RAW text, after stripping at most one trailing `;` —
+  // never the lexer's own span boundaries — mirroring adapters.ClassifySQL's own embedded-semicolon
+  // guard (internal/adapters/classify.go), so no splitter bug can defeat it either way. A `;`
+  // genuinely inside a string literal costs a disabled Explain button, never a write.
+  const raw = sql.replace(TRAILING_SEMICOLON_RE, '');
+  return !raw.includes(';');
 }
 
 // M3 §9.1: the switch below is the authority on which kinds get an EXPLAIN statement composed —
