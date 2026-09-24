@@ -69,6 +69,11 @@ func (r *Router) handleRepoSettingsGet(_ context.Context, _ *gitsession.Conn, pa
 			return requireNonEmpty("repoSettings.get", "repoId", p.RepoID)
 		},
 		func(p RepoSettingsGetParams) (RepoSettingsSnapshot, error) {
+			// F8 (P108 Part 17 review): every other repo-keyed handler normalizes to NFC before use
+			// (G27 D6/G31 #4) — this one didn't, so a decomposed (non-NFC) repoId read back
+			// whatever the storage layer's own NFC-normalized RepoEntry.RepoSettings() lookup
+			// never actually matched.
+			p.RepoID = gitpath.CleanNFC(p.RepoID)
 			s, err := r.deps.Registry.RepoSettingsGet(p.RepoID)
 			if err != nil {
 				return RepoSettingsSnapshot{}, ipcerr.New("E_INTERNAL", "gitrpc: repoSettings.get: "+err.Error())
@@ -90,6 +95,11 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 			return requireNonEmpty("repoSettings.set", "repoId", p.RepoID)
 		},
 		func(p RepoSettingsSetParams) (RepoSettingsSnapshot, error) {
+			// F8 (P108 Part 17 review): normalize before both the storage write and the emitted
+			// event, matching repo.changed's own always-NFC convention elsewhere in this codebase
+			// — a client sending a decomposed repoId must not write settings rows that no entry
+			// ever reads back, nor have repoSettings.changed echo the raw, possibly non-NFC spelling.
+			p.RepoID = gitpath.CleanNFC(p.RepoID)
 			s, err := r.deps.Registry.RepoSettingsSet(p.RepoID, p.Patch.toModel())
 			if err != nil {
 				return RepoSettingsSnapshot{}, ipcerr.BadRequest("gitrpc: repoSettings.set: " + err.Error())

@@ -2,6 +2,7 @@ package gitrpc
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -102,6 +103,79 @@ func TestRepoSettings_GetSetRoundTrip(t *testing.T) {
 	}
 	if snap.PullStrategy != "rebase" {
 		t.Fatalf("Get after Set: PullStrategy = %q, want %q", snap.PullStrategy, "rebase")
+	}
+}
+
+// TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow is P108 Part 17 review F8's
+// own regression guard: every other repo-keyed handler normalizes repoId to NFC before use
+// (G27 D6/G31 #4), but repoSettings.get/set didn't — RepoEntry.RepoSettings() reads by
+// Summary.RepoID, which IS NFC-normalized internally, so a client writing under a decomposed
+// spelling and reading back under the composed one (or vice versa) used to see two entirely
+// different storage rows. The emitted repoSettings.changed event must also echo the normalized
+// spelling, matching repo.changed's own always-NFC convention elsewhere.
+func TestRepoSettings_DecomposedRepoIDReadsBackTheComposedlyWrittenRow(t *testing.T) {
+	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
+	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
+	decomposedRepoID := "/repos/caf" + decomposedE
+	composedRepoID := "/repos/caf" + composedE
+
+	router, _ := newTestRouter()
+	conn := gitsession.NewConn("conn-1", "client-1", "label", nil)
+	t.Cleanup(conn.Close)
+
+	var mu sync.Mutex
+	var changedRepoID string
+	conn.Emit = func(method string, payload any) {
+		if method == "repoSettings.changed" {
+			mu.Lock()
+			changedRepoID = payload.(RepoSettingsChangedPayload).RepoID
+			mu.Unlock()
+		}
+	}
+	handlers := router.ForConn(conn)
+
+	setParams, err := json.Marshal(map[string]any{
+		"repoId": decomposedRepoID,
+		"patch":  map[string]any{"kiraSpace.pull.strategy": "rebase"},
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if _, err := handlers.Request(context.Background(), "repoSettings.set", setParams); err != nil {
+		t.Fatalf("repoSettings.set (decomposed): %v", err)
+	}
+
+	// repoSettings.changed is delivered on ForConn's own forwarding goroutine, decoupled from the
+	// request's own caller (settings_test.go's own TestRepoSettings_ChangedEventReachesEveryConnection
+	// doc comment) — poll rather than assume it already landed.
+	deadline := time.Now().Add(time.Second)
+	for {
+		mu.Lock()
+		got := changedRepoID
+		mu.Unlock()
+		if got == composedRepoID {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("repoSettings.changed RepoID = %q, want the normalized composed spelling %q", got, composedRepoID)
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	getParams, err := json.Marshal(map[string]string{"repoId": composedRepoID})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got, err := router.handleRepoSettingsGet(context.Background(), conn, getParams)
+	if err != nil {
+		t.Fatalf("repoSettings.get (composed): %v", err)
+	}
+	snap, ok := got.(RepoSettingsSnapshot)
+	if !ok {
+		t.Fatalf("repoSettings.get result = %T, want RepoSettingsSnapshot", got)
+	}
+	if snap.PullStrategy != "rebase" {
+		t.Fatalf("Get(composed) after Set(decomposed): PullStrategy = %q, want %q (same repo, two un-normalized spellings)", snap.PullStrategy, "rebase")
 	}
 }
 
