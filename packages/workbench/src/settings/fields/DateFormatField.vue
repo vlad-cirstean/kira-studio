@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 
@@ -48,16 +49,17 @@ const fieldId = useId();
         <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
     </div>
-    <select
+    <NativeSelect
       :id="fieldId"
-      class="p-select bordered md"
+      variant="bordered"
+      size="kira-lg"
       data-testid="settings-date-format"
       :value="appearance.dateFormat"
       @change="onDateFormatChange"
     >
       <option value="relative">Relative (3 days ago)</option>
       <option value="absolute">Absolute (2024-12-30 22:48)</option>
-    </select>
+    </NativeSelect>
     <FieldDescription>The git graph's own commit timestamps.</FieldDescription>
   </Field>
 </template>

@@ -4,6 +4,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldGroup, fieldVariants } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
@@ -104,15 +105,16 @@ function onEditGlobalDefaults(): void {
           Inherit
         </Label>
       </div>
-      <select
-        class="p-select bordered md"
+      <NativeSelect
+        variant="bordered"
+        size="kira-lg"
         data-testid="http-settings-httpVersion"
         :disabled="settings.httpVersion === null"
         :value="settings.httpVersion ?? global.httpVersion"
         @change="onHttpVersionChange"
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
-      </select>
+      </NativeSelect>
       <FieldDescription>Global: HTTP/{{ global.httpVersion }}</FieldDescription>
     </Label>
 

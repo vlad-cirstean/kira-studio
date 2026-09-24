@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
 import type { VariableSupport } from '../../api/state/variableCompletion';
@@ -121,15 +122,15 @@ function onClearFile(index: number): void {
     </template>
 
     <template #trailing="{ row, index }">
-      <select
-        class="p-select bordered"
+      <NativeSelect
+        variant="bordered"
         data-testid="http-formdata-kind"
         :value="row.kind"
         @change="onKindChange(index, $event)"
       >
         <option value="text">Text</option>
         <option value="file">File</option>
-      </select>
+      </NativeSelect>
       <template v-if="row.kind === 'file'">
         <Button variant="toolbar" size="kira" data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
           Choose file…

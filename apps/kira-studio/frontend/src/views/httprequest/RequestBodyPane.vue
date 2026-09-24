@@ -11,6 +11,7 @@ import type { HttpCodeLanguage } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
@@ -167,9 +168,9 @@ const caption = computed(() =>
           <TooltipContent>{{ opt.title }}</TooltipContent>
         </Tooltip>
       </ToggleGroup>
-      <select
+      <NativeSelect
         v-if="tab.state.bodyMode === 'code' && tab.state.codeLanguage !== 'json'"
-        class="p-select bordered"
+        variant="bordered"
         data-testid="http-body-code-language"
         :value="tab.state.codeLanguage"
         @change="onCodeLanguageChange"
@@ -177,7 +178,7 @@ const caption = computed(() =>
         <option v-for="opt in CODE_LANGUAGE_OPTIONS" :key="opt.value" :value="opt.value">
           {{ opt.label }}
         </option>
-      </select>
+      </NativeSelect>
       <span class="ml-auto" />
       <Tooltip v-if="tab.state.bodyMode === 'code' && beautifyFormat">
         <TooltipTrigger as-child>

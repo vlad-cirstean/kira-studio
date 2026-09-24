@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import {
   Tooltip,
   TooltipContent,
@@ -48,14 +49,15 @@ function onDefaultPageSizeChange(e: Event): void {
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <select
-        class="p-select bordered md"
+      <NativeSelect
+        variant="bordered"
+        size="kira-lg"
         data-testid="settings-default-page-size"
         :value="draft.data.defaultPageSize"
         @change="onDefaultPageSizeChange"
       >
         <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
-      </select>
+      </NativeSelect>
     </Label>
   </div>
 </template>

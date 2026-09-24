@@ -4,6 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldError, FieldGroup, FieldLegend, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import {
   Tooltip,
   TooltipContent,
@@ -79,8 +80,9 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <select
-        class="p-select bordered md"
+      <NativeSelect
+        variant="bordered"
+        size="kira-lg"
         data-testid="settings-font-family"
         :value="draft.appearance.fontFamily"
         @change="onFontFamilyChange"
@@ -108,7 +110,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
             {{ f.label }}
           </option>
         </optgroup>
-      </select>
+      </NativeSelect>
       <span
         class="font-preview"
         data-testid="font-preview"

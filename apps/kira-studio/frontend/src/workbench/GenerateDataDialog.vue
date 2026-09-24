@@ -6,6 +6,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, onMounted, ref } from 'vue';
@@ -364,8 +365,8 @@ function onSequenceStartChange(index: number, start: number): void {
         >
           <span class="col-name">{{ plan.column.name }}</span>
           <span class="col-type text-muted-foreground">{{ plan.column.dataType }}</span>
-          <select
-            class="p-select bordered"
+          <NativeSelect
+            variant="bordered"
             :data-testid="`generate-data-recipe-${plan.column.name}`"
             :value="recipeSelectValue(plan.recipe)"
             :disabled="running"
@@ -378,7 +379,7 @@ function onSequenceStartChange(index: number, start: number): void {
             <option v-for="opt in optionsFor(plan)" :key="opt.id" :value="opt.id">
               {{ opt.label }}
             </option>
-          </select>
+          </NativeSelect>
           <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"

@@ -134,6 +134,11 @@ check_class 'strip-note' 'Alert variant="note"'
 check_class 'strip-note-text' 'the note variant'"'"'s own built-in AlertDescription/svg colour targeting'
 check_class 'strip-err' 'Alert variant="err"'
 check_class 'strip-err-text' 'the err variant'"'"'s own built-in AlertDescription/svg colour targeting'
+# P110 B24: the native <select> primitive, folded into the NativeSelect component
+# (packages/theme/src/components/ui/native-select) -- a real <select> consumer uses the component
+# directly, and the two app-drawn menu-trigger buttons (MethodSelect.vue, EnvironmentSelect.vue)
+# apply its exported nativeSelectVariants() as a class function instead. Not common prose.
+check_class 'p-select' 'NativeSelect (packages/theme/src/components/ui/native-select) or nativeSelectVariants() for an app-drawn trigger button'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

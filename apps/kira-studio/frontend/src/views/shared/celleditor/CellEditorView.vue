@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import {
   Tooltip,
@@ -545,7 +546,7 @@ const statusLine = computed(() => {
             <TooltipDisabledTrigger>
               <button
                 type="button"
-                class="p-select bordered format-select"
+                :class="[nativeSelectVariants({ variant: 'bordered' }), 'format-select']"
                 data-testid="cell-editor-format"
                 :disabled="isNullValue"
                 @click="openFormatMenu"
@@ -741,19 +742,18 @@ const statusLine = computed(() => {
 }
 
 /* P42 D27: an app-drawn menu trigger, not a native <select> — border/background/padding/cursor
-   still come from .p-select.bordered (plain CSS, unaffected by the element swap); its own
-   appearance:base-select/::picker(select)/option rules are select-only and simply don't match a
-   <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
+   still come from nativeSelectVariants({variant: 'bordered'}) (P110 B24, applied directly as a
+   class function since this is a <button>, not a NativeSelect component); its
+   appearance:base-select/::picker(select)/option selectors are select-only and simply don't
+   match a <button>, which is why the chevron below is drawn explicitly instead of relying on
+   one. Its own disabled:text-disabled/cursor-default already covers this button too, no local
+   duplicate needed. */
 .format-select {
   @apply max-w-40 font-[family-name:var(--kira-font-ui)];
 }
 
 .format-select-label {
   @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.format-select:disabled {
-  @apply cursor-default text-disabled;
 }
 
 .generate-anchor {

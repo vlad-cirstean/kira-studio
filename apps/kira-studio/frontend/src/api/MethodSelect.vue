@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { HTTP_METHODS, type HttpMethod, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { ref } from 'vue';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
 // (views/shared/celleditor/CellEditorView.vue's own format-select/openFormatMenu, F12) — a native
 // <select>'s per-option colour is `option`-level styling, which lands only under
-// `appearance: base-select` and only where the engine implements it (primitives.css:382's own
-// comment). The closed state is plain CSS either way (`.p-select.bordered`, untouched by the
-// element swap), so nothing about height/border/padding changes (P16 D6's own rule stays true) —
-// only the open list gains reliable per-row colour.
+// `appearance: base-select` and only where the engine implements it. The closed state is styled by
+// nativeSelectVariants({variant:'bordered'}) either way (untouched by the element swap), so nothing
+// about height/border/padding changes (P16 D6's own rule stays true) — only the open list gains
+// reliable per-row colour.
 //
 // A controlled component (`modelValue`/`update:modelValue`), not the tab-state patcher itself —
 // HttpRequestView.vue keeps calling patchHttpRequestTabState from its own onMethodChange, same
@@ -35,8 +36,7 @@ function select(method: HttpMethod): void {
       <PopoverTrigger as-child>
         <button
           type="button"
-          class="p-select bordered method-select p-method"
-          :class="httpMethodToken(props.modelValue)"
+          :class="[nativeSelectVariants({ variant: 'bordered' }), 'method-select', 'p-method', httpMethodToken(props.modelValue)]"
           :data-testid="testid"
           :data-value="props.modelValue"
         >
@@ -74,9 +74,9 @@ function select(method: HttpMethod): void {
   @apply relative flex;
 }
 
-/* F12's own comment, restated: border/background/padding/cursor come from .p-select.bordered
-   (unaffected by the element swap); the chevron is drawn explicitly since a <button> has no
-   ::picker-icon of its own to rely on. */
+/* F12's own comment, restated: border/background/padding/cursor come from
+   nativeSelectVariants({variant:'bordered'}) (unaffected by the element swap); the chevron is
+   drawn explicitly since a <button> has no ::picker-icon of its own to rely on. */
 .method-select {
   @apply font-semibold font-data;
 }

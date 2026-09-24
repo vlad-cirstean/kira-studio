@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 
@@ -48,9 +49,10 @@ const fieldId = useId();
         <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
     </div>
-    <select
+    <NativeSelect
       :id="fieldId"
-      class="p-select bordered md"
+      variant="bordered"
+      size="kira-lg"
       data-testid="settings-git-log-level"
       :value="advanced.gitLogLevel"
       @change="onGitLogLevelChange"
@@ -60,7 +62,7 @@ const fieldId = useId();
       <option value="warn">Warn</option>
       <option value="info">Info</option>
       <option value="debug">Debug</option>
-    </select>
+    </NativeSelect>
     <slot />
   </Field>
 </template>

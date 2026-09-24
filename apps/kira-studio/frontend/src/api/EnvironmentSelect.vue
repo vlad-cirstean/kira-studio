@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { connColorVar } from '@theme/connColor';
 import { computed, ref } from 'vue';
@@ -29,8 +30,9 @@ const variablesStore = useVariablesStore();
 // P18 D19: app-drawn now, on P17 D18's exact precedent (MethodSelect.vue) and for the identical
 // reason — a native <option>'s per-row colour is `option`-level styling that lands only under
 // `appearance: base-select` and only where the engine implements it, and this control now needs a
-// colour dot per row (D17). The closed state stays `.p-select.bordered` either way, so its height/
-// border/padding do not change at all (P16 D6's rule, api-ui-consistency.spec.ts's own guard).
+// colour dot per row (D17). The closed state stays styled by nativeSelectVariants({variant:
+// 'bordered'}) either way, so its height/border/padding do not change at all (P16 D6's rule,
+// api-ui-consistency.spec.ts's own guard).
 //
 // P112: no onMounted fetch left here — useVariablesStore's own app-lifetime query observer fetches
 // the environments list on store creation.
@@ -72,7 +74,7 @@ function manage(): void {
       <PopoverTrigger as-child>
         <button
           type="button"
-          class="p-select bordered environment-select"
+          :class="[nativeSelectVariants({ variant: 'bordered' }), 'environment-select']"
           data-testid="api-environment-select"
           :data-value="activeEnvironmentId"
         >

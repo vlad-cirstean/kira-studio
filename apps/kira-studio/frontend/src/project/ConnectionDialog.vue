@@ -23,6 +23,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -1247,8 +1248,8 @@ const preconnectText = computed({
                 <span class="mask-rule-target font-data" :title="`${rule.tableName}.${rule.columnName}`"
                   >{{ rule.tableName }}.{{ rule.columnName }}</span
                 >
-                <select
-                  class="p-select bordered"
+                <NativeSelect
+                  variant="bordered"
                   :value="rule.kind"
                   data-testid="mask-rule-kind"
                   @change="onChangeMaskRuleKind(rule.id, ($event.target as HTMLSelectElement).value as MaskKind)"
@@ -1259,7 +1260,7 @@ const preconnectText = computed({
                   <option value="number">Number</option>
                   <option value="date">Date</option>
                   <option value="redact">Redact</option>
-                </select>
+                </NativeSelect>
                 <Label v-if="KEEP_HINT_LABEL[rule.kind]" class="field checkbox mask-rule-flag">
                   <Checkbox
                     :model-value="rule.keepHint"
@@ -1304,14 +1305,14 @@ const preconnectText = computed({
             <div class="mask-rule-add field-row">
               <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-table" />
               <Input v-model="newMaskColumn" placeholder="column" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-column" />
-              <select v-model="newMaskKind" class="p-select bordered" data-testid="mask-rule-add-kind">
+              <NativeSelect v-model="newMaskKind" variant="bordered" data-testid="mask-rule-add-kind">
                 <option value="name">Name</option>
                 <option value="email">Email</option>
                 <option value="text">Text</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
                 <option value="redact">Redact</option>
-              </select>
+              </NativeSelect>
               <Button variant="dialog" size="kira-lg" data-testid="mask-rule-add" @click="onAddMaskRule">Add</Button>
             </div>
             <p class="helper-text">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>

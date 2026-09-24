@@ -290,91 +290,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------- P5 select ---------- */
-/* `appearance: none` + a manual background-image arrow only restyles the CLOSED control — the
-   opened option list is still a native, unstyled OS popup (a plain <select>'s listbox has no
-   CSS-reachable shadow boundary in the standard model), which is exactly the "still looks like
-   the system one" complaint: click it open and the app's dark theme vanishes. `appearance:
-   base-select` (Chromium's Customizable Select API — supported here since this app targets a
-   single pinned Electron/Chromium build, not arbitrary browsers) turns the popup into a normal,
-   CSS-reachable ::picker(select) part with plain <option> children and its own ::picker-icon part
-   for the arrow, so both halves can be themed like everything else. An unsupporting engine drops
-   every `base-select`/`::picker`-based declaration below as invalid and falls back to nothing
-   (a bare, unstyled native control) rather than this file's previous appearance:none + manual-SVG
-   approach — acceptable since, again, the Chromium version here is pinned, not guessed at. */
-.p-select {
-  /* P61: WebKit's `appearance: base-select` box carries its own intrinsic min-height floor
-     (font-metric-driven, ~24px at this font-size/line-height) that wins over an authored
-     `height` even under box-sizing: border-box — since Playwright 1.63's bundled WebKit, this
-     floor sits above --kira-control-h and breaks the .p-input height match below. min-height: 0
-     removes the floor so the authored height governs again, on every appearance: base-select
-     engine, not just the newer one. */
-  min-height: 0;
-  height: var(--kira-control-h);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-  cursor: pointer;
-  flex-shrink: 0;
-  appearance: base-select;
-}
-.p-select::picker-icon {
-  color: var(--kira-fg-muted);
-}
-.p-select::picker(select) {
-  appearance: base-select;
-  margin-top: var(--kira-s-1);
-  padding: var(--kira-s-1);
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-sm);
-  box-shadow: var(--kira-shadow);
-}
-.p-select option {
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg);
-  background: none;
-}
-.p-select option:hover {
-  background: var(--kira-hover);
-}
-.p-select option:checked {
-  background: var(--kira-select);
-  color: var(--kira-fg);
-}
-.p-select.bordered {
-  /* P16 D6: height inherited from .p-select (h-sm) — ten call sites, and only four actually sit
-     beside h-md controls; .md below is the opt-in for those, matching .p-input/.p-input.md and
-     .p-seg/.p-seg.md. */
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  background-color: var(--kira-bg-input);
-  color: var(--kira-fg);
-  padding: 0 var(--kira-s-2) 0 var(--kira-s-3);
-  padding-right: calc(var(--kira-s-2) + 14px);
-}
-.p-select.md {
-  height: var(--kira-control-h-lg);
-}
-.p-select:focus-visible {
-  border-color: var(--kira-focus);
-  outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: -1px;
-}
-.p-select:disabled {
-  color: var(--kira-fg-disabled);
-  cursor: default;
-}
-/* Only visible on .p-select.bordered — the borderless variant has no border to recolour, same as
-   every other state rule above it. */
-.p-select.is-invalid {
-  border-color: var(--kira-error);
-}
-
 /* ---------- P7 tab ---------- */
 .p-tab {
   height: var(--kira-control-h-lg);
@@ -420,7 +335,7 @@
    at the same weight a status chip does — colour only — no layout of its own — so it composes
    onto either a Badge (the
    method chip in HttpRequestView.vue's head, ResponseHistoryList.vue's row, CollectionRow.vue's
-   tree row) or `.p-select.bordered` (MethodSelect.vue's own trigger button, D18) without either
+   tree row) or the app-drawn select trigger button (MethodSelect.vue's own, D18) without either
    consumer duplicating the seven-plus-one colour rule.
    P22 D7: the fill is dropped. The user reports it as the problem on the method *select*, where
    a tinted pill inside an already-bordered control reads as a second, competing control —

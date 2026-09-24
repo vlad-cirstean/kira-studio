@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
@@ -376,13 +377,15 @@ onUnmounted(() => {
       <ToggleGroup type="single" :model-value="tab.state.tlsMode" data-testid="grpc-tls-toggle" @update:model-value="(v) => v && setTlsMode(v as 'plaintext' | 'tls')">
         <ToggleGroupItem v-for="opt in TLS_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>
-      <!-- P22b D10: the same wrapper + :deep(.p-select) idiom .grpc-target-field uses above, for
-           the identical reason — a bare <select> has no width rule of its own, so it shrinks to
-           its widest <option> label. Both fields are flex: 1 in this one toolbar row, so they
-           share the free space evenly and stay responsive at either extreme of window size. -->
+      <!-- P22b D10: the same wrapper idiom .grpc-target-field uses above, for the identical reason
+           — a bare <select> has no width rule of its own, so it shrinks to its widest <option>
+           label (P110 B24: now a class="w-full" passed straight to NativeSelect, not a scoped
+           descendant rule). Both fields are flex: 1 in this one toolbar row, so they share the
+           free space evenly and stay responsive at either extreme of window size. -->
       <div class="grpc-method-field">
-        <select
-          class="p-select bordered"
+        <NativeSelect
+          variant="bordered"
+          class="w-full"
           data-testid="grpc-method-select"
           :value="selectedMethodValue"
           :disabled="methodOptions.length === 0"
@@ -390,7 +393,7 @@ onUnmounted(() => {
         >
           <option value="" disabled>Choose a method…</option>
           <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
+        </NativeSelect>
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -583,15 +586,12 @@ onUnmounted(() => {
   @apply w-full;
 }
 
-/* P22b D10: the method select's own sibling of .grpc-target-field above — a bare <select> has no
-   width rule of its own and shrinks to its widest <option>. No :deep() needed here (unlike the
-   target field above): the <select> is a plain element in this component's own template, not
-   behind a child component's scoping boundary. */
+/* P22b D10: the method select's own sibling of .grpc-target-field above. P110 B24: NativeSelect is
+   a child component now, so its width comes from the `class="w-full"` passed at the call site
+   (merged onto its root <select> via cn()) rather than a scoped descendant rule reaching across
+   the component boundary. */
 .grpc-method-field {
   @apply min-w-0 flex-1;
-}
-.grpc-method-field .p-select {
-  @apply w-full;
 }
 
 .overview-anchor {

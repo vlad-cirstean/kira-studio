@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
 import { useSaveRequestDialogStore } from './state/saveRequestDialog';
@@ -98,12 +99,12 @@ function splitTarget(value: string): [string, string | null] {
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
       <Label class="text-kira-sm text-muted-foreground mt-1">Save to</Label>
-      <select v-model="target" class="p-select bordered" data-testid="save-request-target">
+      <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>
           <option v-for="f in c.folders" :key="f.id" :value="`${c.id}:${f.id}`">{{ f.label }}</option>
         </optgroup>
-      </select>
+      </NativeSelect>
 
       <Alert v-if="collectionTargets.length === 0" variant="warn" data-testid="save-request-no-target">
         <AlertDescription>

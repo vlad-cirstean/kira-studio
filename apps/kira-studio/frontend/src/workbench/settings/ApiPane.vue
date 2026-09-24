@@ -5,6 +5,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { FieldDescription, FieldError, FieldGroup, fieldVariants } from '@theme/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
 import {
   Tooltip,
   TooltipContent,
@@ -110,14 +111,15 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <select
-        class="p-select bordered md"
+      <NativeSelect
+        variant="bordered"
+        size="kira-lg"
         data-testid="settings-api-httpVersion"
         :value="draft.api.httpVersion"
         @change="onHttpVersionChange"
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
-      </select>
+      </NativeSelect>
     </Label>
 
     <Label :class="fieldVariants()">

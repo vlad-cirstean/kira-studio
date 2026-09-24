@@ -178,8 +178,8 @@ function onJump(e: Event): void {
 /* P22 D2: F3 shows the page-number box is already the same 22px height as the icon buttons
    beside it — the complaint's real cause is visual weight, a bordered/filled box in a row of
    transparent icon buttons. At rest this drops the fill/border so all five pager controls read
-   as one weight; :focus/:hover restore both, the same "engaged control" idiom .p-select
-   (borderless by default, .bordered opt-in) already uses. */
+   as one weight; :focus/:hover restore both, the same "engaged control" idiom NativeSelect
+   (borderless default variant, bordered opt-in) already uses. */
 .page-input :deep(input:not(:focus):not(:hover)) {
   @apply bg-none border-transparent;
 }
