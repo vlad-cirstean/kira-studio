@@ -136,8 +136,9 @@ const language = computed<EditorLanguageId>(() => {
 // document alone — D4's completion still takes it as a separate, first-priority argument, so it
 // must not be pre-merged with the cache the way `ddlSchema` below is for lint/hover.
 // P99 §5.5: a reactive useQuery (not the imperative ensureDdl) so a remote onSchemaChanged
-// broadcast's invalidateQueries (state/schemas.ts) refetches and this recomputes — the old
-// version read a reactive field a broadcast wrote directly, and must keep updating the same way.
+// broadcast's applyRemote (state/schemas.ts, F1) writes straight into this query's cache and this
+// recomputes — the old version read a reactive field a broadcast wrote directly, and must keep
+// updating the same way.
 const ddlQuery = useQuery(() => ({
   ...schemaQueryOptions(props.tab.connectionId ?? ''),
   enabled: !!props.tab.connectionId && dialect.value !== undefined,

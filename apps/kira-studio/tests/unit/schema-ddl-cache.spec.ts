@@ -13,7 +13,9 @@ import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { ensureDdl, saveDdl, schemaQueryKey } = await import('../../frontend/src/state/schemas');
+const { ensureDdl, saveDdl, schemaQueryKey, initSchemaSync } = await import(
+  '../../frontend/src/state/schemas'
+);
 const { queryClient } = await import('@workbench/state/queryClient');
 
 describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', () => {
@@ -85,5 +87,80 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
       'create table fresh (id int);',
     );
     expect(loaded).toBe('create table fresh (id int);');
+  });
+});
+
+// P108 Part 12 F1: applyRemote used to only invalidateQueries, which triggered a refetch that ran
+// straight into the "prefer whatever's cached" guard above and could never actually move the
+// cache — so a genuine remote push (another window's Schema dialog Save) never reached this one.
+describe('state/schemas.ts — remote schema push reaches the cache (P108 Part 12 F1)', () => {
+  test('a onSchemaChanged push writes the new DDL into the cache with no refetch', async () => {
+    const connectionId = 'conn-remote-push';
+    queryClient.removeQueries({ queryKey: schemaQueryKey(connectionId) });
+
+    let deliver: (ddl: { connectionId: string; ddl: string; updatedAt: string }) => void = () => {};
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).onSchemaChanged = (cb: typeof deliver) => {
+      deliver = cb;
+      return () => {};
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).onConnectionsChanged = () => () => {};
+
+    let fetchCount = 0;
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).schemaGet = () => {
+      fetchCount++;
+      return Promise.resolve({ connectionId, ddl: 'create table old (id int);', updatedAt: '' });
+    };
+
+    initSchemaSync();
+    expect(await ensureDdl(connectionId)).toBe('create table old (id int);');
+    expect(fetchCount).toBe(1);
+
+    // Another window saved a new document; the Go side pushes it here.
+    deliver({ connectionId, ddl: 'create table new (id int);', updatedAt: '' });
+
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table new (id int);',
+    );
+    // The push must not have triggered a refetch — it writes the cache directly.
+    expect(fetchCount).toBe(1);
+  });
+
+  test('a fetch already in flight when a remote push lands does not overwrite the push', async () => {
+    const connectionId = 'conn-remote-push-race';
+    queryClient.removeQueries({ queryKey: schemaQueryKey(connectionId) });
+
+    let deliver: (ddl: { connectionId: string; ddl: string; updatedAt: string }) => void = () => {};
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).onSchemaChanged = (cb: typeof deliver) => {
+      deliver = cb;
+      return () => {};
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).onConnectionsChanged = () => () => {};
+
+    const slowFetch = deferred<{ connectionId: string; ddl: string; updatedAt: string }>();
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control surface.
+    (control as any).schemaGet = () => slowFetch.promise;
+
+    initSchemaSync();
+    const loading = ensureDdl(connectionId);
+
+    // The remote push lands while the initial fetch is still in flight.
+    deliver({ connectionId, ddl: 'create table pushed (id int);', updatedAt: '' });
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table pushed (id int);',
+    );
+
+    // The slow initial fetch now resolves with pre-push (stale) text.
+    slowFetch.resolve({ connectionId, ddl: 'create table stale (id int);', updatedAt: '' });
+    const loaded = await loading;
+
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table pushed (id int);',
+    );
+    expect(loaded).toBe('create table pushed (id int);');
   });
 });

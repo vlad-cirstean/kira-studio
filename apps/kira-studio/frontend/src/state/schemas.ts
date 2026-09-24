@@ -22,6 +22,23 @@ export function schemaQueryKey(connectionId: string): readonly ['schema', string
   return ['schema', connectionId] as const;
 }
 
+// F1: per-connection counter bumped by every authoritative write straight into the schema query
+// cache (saveDdl and applyRemote below, both through commitDdl) — lets schemaQueryOptions's
+// queryFn tell a stale in-flight fetch apart from a fresh one, without falling back to "prefer
+// whatever's cached" (P12 round 2 finding #14's original fix), which made a genuine remote push
+// permanently invisible: applyRemote's invalidateQueries always triggered a refetch, and that
+// refetch's queryFn always re-returned the old cached value, so the cache could never actually
+// move on a remote write.
+const writeGeneration = new Map<string, number>();
+
+/** Writes `ddl` into the query cache for `connectionId` and bumps its write generation, so a
+ *  queryFn fetch already in flight for this connection (captured generation, see below) knows its
+ *  own result is now stale and must not overwrite this write. */
+function commitDdl(connectionId: string, ddl: string): void {
+  queryClient.setQueryData(schemaQueryKey(connectionId), ddl);
+  writeGeneration.set(connectionId, (writeGeneration.get(connectionId) ?? 0) + 1);
+}
+
 export function schemaQueryOptions(connectionId: string): {
   queryKey: readonly ['schema', string];
   queryFn: () => Promise<string>;
@@ -29,18 +46,16 @@ export function schemaQueryOptions(connectionId: string): {
 } {
   return {
     queryKey: schemaQueryKey(connectionId),
-    // P12 round 2 finding #14, carried over: whichever caller's fetch resolves (ensureDdl below,
-    // or useQuery's own auto-fetch in a component), TanStack Query commits this function's return
-    // value to the cache unconditionally — there is no hook to skip that commit short of
-    // cancelling the fetch, and cancelling rejects every caller currently awaiting it (verified
-    // empirically; see saveDdl's own comment), which is not what a caller of ensureDdl expects.
-    // Returning whatever is already cached, once fetched, instead of the fetched text itself, is
-    // what makes that unconditional commit safe: a saveDdl or a remote onSchemaChanged write that
-    // landed while this was in flight is picked up here and effectively re-committed (a no-op),
-    // rather than clobbered by the now-stale fetch result.
     queryFn: async () => {
+      const generation = writeGeneration.get(connectionId) ?? 0;
       const ddl = await control.schemaGet(connectionId).then((r) => r.ddl);
-      return queryClient.getQueryData<string>(schemaQueryKey(connectionId)) ?? ddl;
+      // F1: a local saveDdl or a remote applyRemote committed straight into the cache (bumping
+      // the generation) while this fetch was in flight — that write is newer than this response,
+      // so keep it instead of overwriting it with this fetch's now-stale result.
+      if ((writeGeneration.get(connectionId) ?? 0) !== generation) {
+        return queryClient.getQueryData<string>(schemaQueryKey(connectionId)) ?? ddl;
+      }
+      return ddl;
     },
     staleTime: Number.POSITIVE_INFINITY, // the Go side pushes onSchemaChanged — never stale silently
   };
@@ -54,13 +69,14 @@ export function ensureDdl(connectionId: string): Promise<string> {
 }
 
 /** SchemaDialog.vue's own Save — writes the saved text straight into the same query cache entry
- *  ensureDdl reads, which is what schemaQueryOptions's own queryFn comment above protects: a save
- *  landing while a fetch is still in flight is picked up by that fetch's own resolution instead of
- *  being clobbered by it. A plain function (not just a `useMutation` `mutationFn`) so it stays
- *  directly callable/testable outside a component, the same way `ensureDdl` already is. */
+ *  ensureDdl reads, via commitDdl, which is what schemaQueryOptions's own queryFn comment above
+ *  protects: a save landing while a fetch is still in flight is picked up by that fetch's own
+ *  resolution instead of being clobbered by it. A plain function (not just a `useMutation`
+ *  `mutationFn`) so it stays directly callable/testable outside a component, the same way
+ *  `ensureDdl` already is. */
 export async function saveDdl(connectionId: string, ddl: string): Promise<string> {
   const result = await control.schemaSet(connectionId, ddl);
-  queryClient.setQueryData(schemaQueryKey(connectionId), result.ddl);
+  commitDdl(connectionId, result.ddl);
   return result.ddl;
 }
 
@@ -151,10 +167,14 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
 }
 
 function applyRemote(ddl: ConnectionDdl): void {
-  // P99 §5.4: a broadcast invalidating TanStack Query data invalidates rather than writing a
-  // reactive field directly — an active observer (an open SchemaDialog on this connection)
-  // refetches; an inactive one just drops its stale cache entry.
-  queryClient.invalidateQueries({ queryKey: schemaQueryKey(ddl.connectionId) });
+  // F1: the push already carries the fresh DDL, so write it straight into the cache (via
+  // commitDdl) rather than invalidating and refetching — an invalidate-driven refetch always ran
+  // into schemaQueryOptions's own "prefer cache" guard (P12 round 2 finding #14) and could never
+  // actually move the cache forward. An active observer (an open SchemaDialog or console on this
+  // connection) picks this up the same way any other queryClient.setQueryData does: reactively,
+  // with no refetch. commitDdl's generation bump also protects this write from a fetch that was
+  // already in flight when this push landed.
+  commitDdl(ddl.connectionId, ddl.ddl);
 }
 
 let unsubscribeChanged: (() => void) | null = null;
