@@ -19,6 +19,7 @@ import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { EnvironmentsTabRecord } from '../state/tabDomain';
+import { mergeDrafts } from './state/draftMerge';
 import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
@@ -52,18 +53,58 @@ const runStateLabel = computed(() => {
     : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
 });
 
+interface EnvDraft {
+  name: string;
+  description: string;
+}
+
+function equalEnvDraft(a: EnvDraft, b: EnvDraft): boolean {
+  return a.name === b.name && a.description === b.description;
+}
+
+function envDraftFromRow(env: ApiEnvironment): EnvDraft {
+  return { name: env.name, description: env.description };
+}
+
 const nameDrafts = reactive<Record<string, string>>({});
 const descriptionDrafts = reactive<Record<string, string>>({});
+// P112: the snapshot each row's draft was last reseeded from — see draftMerge.ts. Templates bind
+// nameDrafts/descriptionDrafts directly (v-model), so those stay two plain string records; seeds
+// and the merge itself work over the combined { name, description } shape.
+const seeds = reactive<Record<string, EnvDraft>>({});
 const order = ref<string[]>([]);
 
+// D14: the same drag/keyboard reorder the variable rows use. Declared here, ahead of syncDrafts
+// below, so dragIndex already exists before that first immediate watch fires (canReorder/onReorder
+// close over isFiltered/variablesStore lazily, so declaring this early is safe even though both are
+// defined further down).
+const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
+  canReorder: () => !isFiltered.value,
+  onReorder: (next) => variablesStore.reorderEnvironmentsList(next),
+});
+
+// P112 §6.5: keep a row's draft that has changed since it was seeded and still differs from what
+// the row now is (an in-progress edit); reseed everything else. Order reseeds from the incoming
+// list too, unless a drag is in progress.
 function syncDrafts(): void {
+  const current: Record<string, EnvDraft> = {};
+  for (const id of Object.keys(nameDrafts)) {
+    current[id] = { name: nameDrafts[id] ?? '', description: descriptionDrafts[id] ?? '' };
+  }
+  const merged = mergeDrafts(seeds, current, variablesStore.environments, {
+    rowId: (env) => env.id,
+    toDraft: envDraftFromRow,
+    equalDraft: equalEnvDraft,
+  });
   for (const key of Object.keys(nameDrafts)) delete nameDrafts[key];
   for (const key of Object.keys(descriptionDrafts)) delete descriptionDrafts[key];
-  for (const env of variablesStore.environments) {
-    nameDrafts[env.id] = env.name;
-    descriptionDrafts[env.id] = env.description;
+  for (const [id, draft] of Object.entries(merged.drafts)) {
+    nameDrafts[id] = draft.name;
+    descriptionDrafts[id] = draft.description;
   }
-  order.value = variablesStore.environments.map((env) => env.id);
+  for (const key of Object.keys(seeds)) delete seeds[key];
+  Object.assign(seeds, merged.seeds);
+  if (dragIndex.value === null) order.value = merged.order;
 }
 watch(() => variablesStore.environments, syncDrafts, { immediate: true });
 
@@ -129,13 +170,9 @@ async function onDuplicate(id: string): Promise<void> {
   await variablesStore.duplicateEnvironment(id);
 }
 
-// D14: the same drag/keyboard reorder the variable rows use — and the same refusal while filtered
-// (both splice `order` by the rendered index, which a filter can move, but the deeper reason is
-// semantic: "move up" past a filter-hidden neighbour has no defined result).
-const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
-  canReorder: () => !isFiltered.value,
-  onReorder: (next) => variablesStore.reorderEnvironmentsList(next),
-});
+// D14: the same refusal while filtered as elsewhere (both splice `order` by the rendered index,
+// which a filter can move, but the deeper reason is semantic: "move up" past a filter-hidden
+// neighbour has no defined result).
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   if (isFiltered.value) return;
   const from = order.value.indexOf(id);

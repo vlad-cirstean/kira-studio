@@ -22,6 +22,7 @@ import type { VariableSetTabRecord } from '../state/tabDomain';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
+import { mergeDrafts } from './state/draftMerge';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
@@ -144,7 +145,39 @@ interface Draft {
   description: string;
 }
 
+function equalDraft(a: Draft, b: Draft): boolean {
+  return (
+    a.name === b.name &&
+    a.value === b.value &&
+    a.isSecret === b.isSecret &&
+    a.description === b.description
+  );
+}
+
+// P108 F3: every `rows` reload (any row's edit/add/reorder, a Git restore of another row's history
+// entry, or — P112 — a cross-window refetch) used to reset every draft to the row's own stored
+// `value` — '' for a secret (D4/D5's list projection). A revealed secret's plaintext survives in
+// `revealedValues[id]` untouched, but a fresh draft object starts blank; the reveal-mirror watch
+// below only fires when `revealedValues` itself changes, so pressing the eye again re-reveals the
+// same string, `revealedValues[id] = value` is a same-value set, and the watch never fires — the
+// row shows reveal state with an empty field until the grace expiry (up to 5 min). Seeding from
+// `revealedValues[id]` here, same mirror rule the watch uses, keeps the field showing what's
+// actually revealed across any unrelated reload.
+function draftFromRow(row: ApiVariable): Draft {
+  const revealed = variableSetStore.revealedValues[row.id];
+  return {
+    name: row.name,
+    value: revealed !== undefined ? revealed : row.value,
+    valueTouched: false,
+    isSecret: row.isSecret,
+    description: row.description,
+  };
+}
+
 const drafts = reactive<Record<string, Draft>>({});
+// P112: the snapshot each draft in `drafts` was last reseeded from — mergeDrafts' own "dirty
+// against its seed" test compares the live draft to this, never to whatever the incoming row is.
+const seeds = reactive<Record<string, Draft>>({});
 const trailingDraft = reactive<Draft>({
   name: '',
   value: '',
@@ -154,33 +187,36 @@ const trailingDraft = reactive<Draft>({
 });
 const order = ref<string[]>([]);
 
+// P107 T2-20: same drag/keyboard reorder EnvironmentsView.vue's own rows use. Declared here, ahead
+// of syncDrafts below, so dragIndex already exists before that first immediate watch fires
+// (canReorder/onReorder close over isFiltered/variableSetStore lazily, so declaring this early is
+// safe even though both are defined further down).
+const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
+  canReorder: () => !isFiltered.value,
+  onReorder: (next) =>
+    variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, next),
+});
+
+// P112 §6.5: keep a draft that has changed since it was seeded and still differs from what the
+// row now is (an in-progress edit); reseed everything else, including after this window's own
+// commit lands (the draft then equals the incoming row again). Order reseeds from the incoming
+// rows too, unless a drag is in progress.
 function syncDrafts(): void {
+  const merged = mergeDrafts(seeds, drafts, rows.value, {
+    rowId: (row) => row.id,
+    toDraft: draftFromRow,
+    equalDraft,
+  });
   for (const key of Object.keys(drafts)) delete drafts[key];
-  for (const row of rows.value) {
-    // P108 F3: every `rows` reload (any row's edit/add/reorder, a Git restore of another row's
-    // history entry) used to reset every draft to the row's own stored `value` — '' for a secret
-    // (D4/D5's list projection). A revealed secret's plaintext survives in `revealedValues[id]`
-    // untouched, but the fresh draft object built here starts blank; the reveal-mirror watch below
-    // only fires when `revealedValues` itself changes, so pressing the eye again re-reveals the
-    // same string, `revealedValues[id] = value` is a same-value set, and the watch never fires —
-    // the row shows reveal state with an empty field until the grace expiry (up to 5 min). Seeding
-    // from `revealedValues[id]` here, same mirror rule the watch uses, keeps the field showing
-    // what's actually revealed across any unrelated reload.
-    const revealed = variableSetStore.revealedValues[row.id];
-    drafts[row.id] = {
-      name: row.name,
-      value: revealed !== undefined ? revealed : row.value,
-      valueTouched: false,
-      isSecret: row.isSecret,
-      description: row.description,
-    };
-  }
+  Object.assign(drafts, merged.drafts);
+  for (const key of Object.keys(seeds)) delete seeds[key];
+  Object.assign(seeds, merged.seeds);
   trailingDraft.name = '';
   trailingDraft.value = '';
   trailingDraft.valueTouched = false;
   trailingDraft.isSecret = false;
   trailingDraft.description = '';
-  order.value = rows.value.map((row) => row.id);
+  if (dragIndex.value === null) order.value = merged.order;
 }
 watch(rows, syncDrafts, { immediate: true });
 
@@ -366,13 +402,6 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
 function onReveal(id: string): void {
   void variableSetStore.revealVariable(id, onRevealError);
 }
-
-// P107 T2-20: same drag/keyboard reorder EnvironmentsView.vue's own rows use.
-const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
-  canReorder: () => !isFiltered.value,
-  onReorder: (next) =>
-    variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, next),
-});
 
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   if (isFiltered.value) return;
