@@ -152,6 +152,18 @@ async function handleReconnect(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  // P108 F7: a retry re-enters here after an earlier run already subscribed and constructed
+  // states — unsubscribe and dispose that run's own before replacing them, so a failed run never
+  // leaves a `review.target`/`ui.action`/reconnect handler firing twice, or a state object leaking
+  // its own subscription forever.
+  unsubscribeTarget?.();
+  unsubscribeUiAction?.();
+  unsubscribeReconnect?.();
+  review.value?.dispose();
+  reviewFiles.value?.dispose();
+  reviewComments.value?.dispose();
+  settingsState.value?.dispose();
+
   const init = await bridge.init();
   capabilities.value = init.capabilities;
   settingsState.value = new SettingsState(bridge, init.settings);

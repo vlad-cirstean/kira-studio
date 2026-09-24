@@ -1235,23 +1235,27 @@ onMounted(() => {
   // applied and the rows it covers re-rendered with their lanes, not merely that the shell
   // mounted. `CommitGrid.vue`'s own `handleChunkLayout` — the one place that event fires — marks
   // it, once, the first time that happens; nothing here needs to know when that is.
-  void bootstrap()
-    .then(() => {
-      // G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a
-      // live RpcServer (panelView.ts's own #pendingUiAction). Runs once, after bootstrap() has
-      // resolved a repo/opsState to act against; a later hide/reveal of the same view starts with
-      // no pending action (panelView.ts clears it once consumed), so this never replays.
-      if (props.pendingUiAction) {
-        runUiAction(props.pendingUiAction.action, props.pendingUiAction.target);
-      }
-    })
-    .catch((err: unknown) => {
-      bootError.value = err instanceof Error ? err.message : String(err);
-    });
+  void bootstrap().then(onBootstrapSuccess).catch((err: unknown) => {
+    bootError.value = err instanceof Error ? err.message : String(err);
+  });
 });
 
+// G10 D19: the cold-bootstrap arm — a palette command that fired before this webview had a live
+// RpcServer (panelView.ts's own #pendingUiAction). P108 F7: shared between the initial mount and
+// every retry, so whichever attempt is the one that actually succeeds still runs it — a failed
+// first attempt followed by a successful Retry used to drop it silently. Still runs once: exactly
+// one bootstrap() call ever resolves (mount and retry are mutually exclusive — a retry only
+// happens after a failure, and success hides the Retry button), and a later hide/reveal of the
+// same view starts with no pending action (panelView.ts clears it once consumed), so this never
+// replays.
+function onBootstrapSuccess(): void {
+  if (props.pendingUiAction) {
+    runUiAction(props.pendingUiAction.action, props.pendingUiAction.target);
+  }
+}
+
 function retryBootstrap(): void {
-  sharedRetryBootstrap(bootError, bootstrap);
+  sharedRetryBootstrap(bootError, bootstrap, onBootstrapSuccess);
 }
 
 // `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
@@ -1283,6 +1287,11 @@ let lastPersisted: PersistedViewState = {
 };
 
 async function bootstrap(): Promise<void> {
+  // P108 F7: a retry re-enters here after an earlier run already got this far — dispose that
+  // run's own `SettingsState`/`RepoState` (each holds a live `bridge.on(...)` subscription) before
+  // replacing them, so a failed run never leaks a subscription forever.
+  repoState.value?.dispose();
+  settingsState.value?.dispose();
   const init = await bridge.init();
   settingsState.value = new SettingsState(bridge, init.settings);
   const repo = new RepoState(bridge, init.git);
