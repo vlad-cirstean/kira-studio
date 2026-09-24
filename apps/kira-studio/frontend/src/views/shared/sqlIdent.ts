@@ -78,6 +78,32 @@ export function dollarQuotingFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || dialect === 'postgres';
 }
 
+// P108 Part 11 F4: the four new sql-lex.ts options, one helper each, same shape as
+// backslashEscapesFor/dollarQuotingFor above. Unlike those two, none of these four has a pre-fix
+// universal behaviour to preserve — they are new lexical forms, previously unrecognised by every
+// dialect — so an unknown dialect (undefined) defaults to false/off for each, not true.
+const HASH_COMMENT_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
+
+/** MySQL, MariaDB and ClickHouse also start a line comment with `#`. */
+export function hashCommentsFor(dialect: SqlDialect | undefined): boolean {
+  return dialect !== undefined && HASH_COMMENT_DIALECTS.has(dialect);
+}
+
+/** Postgres nests its block comments; no other dialect here does. */
+export function nestedBlockCommentsFor(dialect: SqlDialect | undefined): boolean {
+  return dialect === 'postgres';
+}
+
+/** SQLite (and SQL Server) accept a `[bracket]`-quoted identifier. */
+export function bracketIdentifiersFor(dialect: SqlDialect | undefined): boolean {
+  return dialect === 'sqlite';
+}
+
+/** Postgres's `E'...'`/`e'...'` escape-string syntax. */
+export function postgresEscapeStringsFor(dialect: SqlDialect | undefined): boolean {
+  return dialect === 'postgres';
+}
+
 // F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as
 // INSERT) used to escape only `'`, never consulting backslashEscapesFor even though that helper
 // already exists and is already used for sql-split.ts/sql-lint.ts's own quote scanning. On

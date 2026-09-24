@@ -3878,6 +3878,17 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   `Set-Cookie` therefore stores that secret in plaintext in history. Closing this needs the same
   substituted-secret value set applied as a body/message/cookie scan, not just a header/URL one.
 
+- **The SQL splitter has no notion of a compound statement body** (F4, P108 Part 11). A SQLite
+  `CREATE TRIGGER … BEGIN …; …; END`, a MySQL stored procedure body, or a Postgres `BEGIN ATOMIC …
+  END` all use `;` to separate the *inner* statements of one outer statement — `sql-split.ts`'s
+  `scanSqlSpan`-driven scan tracks only quote/comment/dollar-quote lexical state, not `BEGIN`/`END`
+  nesting, so it splits at every inner `;` too. A verified SQLite trigger body splits into four
+  fragments instead of staying one statement. Closing this needs real `BEGIN`/`END` depth tracking
+  per dialect (a fifth `SqlLexOptions`-style flag isn't enough — it's a grammar-level construct, not
+  a lexical span), out of proportion to this finding's own five lexical-form fixes (`#`/`//`
+  comments, `E'…'` strings, nested block comments, `[ident]`, the `$`-in-identifier guard), which
+  this phase did close.
+
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
   `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets

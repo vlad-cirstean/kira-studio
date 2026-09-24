@@ -162,3 +162,84 @@ describe('statementAtCursor: caret in whitespace belongs to the preceding statem
     expect(statementAtCursor(source, source.length)?.text).toBe('DELETE FROM t');
   });
 });
+
+// P108 Part 11 F4: five dialect lexical forms the splitter used to miss entirely (each opt-in flag
+// off by default so an untouched caller's split never changes) — one boundary case per form, per
+// the finding's own "extend sql-split.spec.ts per form" fix text.
+describe('splitSqlStatements — dialect lexical forms (P108 Part 11 F4)', () => {
+  test('11. MySQL/ClickHouse: a `#` line comment hides a `;` until the newline', () => {
+    const stmts = splitSqlStatements('SELECT 1; -- a\nSELECT 2 # a; b\nWHERE x; SELECT 3', {
+      hashComments: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual([
+      'SELECT 1',
+      '-- a\nSELECT 2 # a; b\nWHERE x',
+      'SELECT 3',
+    ]);
+  });
+
+  test('11b. `#` is an ordinary character when hashComments is off', () => {
+    const stmts = splitSqlStatements('SELECT 1 # 2; SELECT 3');
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT 1 # 2', 'SELECT 3']);
+  });
+
+  test('12. Mongo: a `//` line comment hides a `;` until the newline', () => {
+    const stmts = splitSqlStatements('db.t.find({}); // a; b\ndb.t.find({})', {
+      slashSlashComments: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual(['db.t.find({})', '// a; b\ndb.t.find({})']);
+  });
+
+  test('13. Postgres: a nested block comment only closes on its own matching `*/`', () => {
+    const stmts = splitSqlStatements('SELECT /* a /* b; c */ d */ 1; SELECT 2', {
+      nestedBlockComments: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT /* a /* b; c */ d */ 1', 'SELECT 2']);
+  });
+
+  test('13b. a non-nesting block comment closes on the first `*/` even with an inner `/*`', () => {
+    const stmts = splitSqlStatements('SELECT /* a /* b */ c */ 1; SELECT 2');
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT /* a /* b */ c */ 1', 'SELECT 2']);
+  });
+
+  test('14. SQLite: a `[bracket identifier]` hides a `;` and doubles `]]` as an escape', () => {
+    const stmts = splitSqlStatements('SELECT [a;b], [c ]] d] FROM t; SELECT 2', {
+      bracketIdentifiers: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT [a;b], [c ]] d] FROM t', 'SELECT 2']);
+  });
+
+  test('14b. `[` is ordinary when bracketIdentifiers is off', () => {
+    const stmts = splitSqlStatements('SELECT [a;b]');
+    expect(stmts.map((s) => s.text)).toEqual(['SELECT [a', 'b]']);
+  });
+
+  test("15. Postgres: E'...' honours backslash escapes regardless of backslashEscapes", () => {
+    const stmts = splitSqlStatements(`SELECT E'a\\'; still one'; SELECT 2`, {
+      backslashEscapes: false,
+      postgresEscapeStrings: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual([`SELECT E'a\\'; still one'`, 'SELECT 2']);
+  });
+
+  test("15b. a plain '...' still ignores backslashes when backslashEscapes is false", () => {
+    const stmts = splitSqlStatements(`SELECT 'a\\'; still one'; SELECT 2`, {
+      backslashEscapes: false,
+      postgresEscapeStrings: true,
+    });
+    expect(stmts.map((s) => s.text)).toEqual([`SELECT 'a\\'`, `still one'; SELECT 2`]);
+  });
+
+  test("15c. a trailing 'E' that is part of a longer identifier is not an escape prefix", () => {
+    // `TABLEE'...'` — the `E` is the tail of `TABLEE`, not a standalone escape-string prefix, so
+    // postgresEscapeStrings must make no difference here: same (mis-)split as backslashEscapes:
+    // false alone, not the E'...'-honours-backslashes behaviour case 15 exercises.
+    const source = `SELECT TABLEE'x\\'y'; SELECT 2`;
+    const withEscape = splitSqlStatements(source, {
+      backslashEscapes: false,
+      postgresEscapeStrings: true,
+    });
+    const withoutEscape = splitSqlStatements(source, { backslashEscapes: false });
+    expect(withEscape.map((s) => s.text)).toEqual(withoutEscape.map((s) => s.text));
+  });
+});

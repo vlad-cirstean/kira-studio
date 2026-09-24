@@ -32,7 +32,11 @@ import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import {
   backslashEscapesFor,
+  bracketIdentifiersFor,
   dollarQuotingFor,
+  hashCommentsFor,
+  nestedBlockCommentsFor,
+  postgresEscapeStringsFor,
   type SqlDialect,
   sqlDialectFor,
 } from '../shared/sqlIdent';
@@ -89,8 +93,19 @@ const dialect = computed(() => sqlDialectFor(connectionKind.value));
 // splitSqlStatements/statementAtCursor call below — dollarQuoting is Postgres-only (a MySQL
 // identifier containing two `$` used to read as an unterminated dollar-quote open tag and swallow
 // the rest of the document into one statement).
+// P108 Part 11 F4: also the one place a Mongo console's own `//` line comments get recognised —
+// `dialect` stays undefined for Mongo (sqlDialectFor has no Mongo member), so that flag reads
+// connectionKind.value directly rather than through the per-SqlDialect helpers above it.
 function splitOptionsFor(d: SqlDialect | undefined) {
-  return { backslashEscapes: backslashEscapesFor(d), dollarQuoting: dollarQuotingFor(d) };
+  return {
+    backslashEscapes: backslashEscapesFor(d),
+    dollarQuoting: dollarQuotingFor(d),
+    hashComments: hashCommentsFor(d),
+    nestedBlockComments: nestedBlockCommentsFor(d),
+    bracketIdentifiers: bracketIdentifiersFor(d),
+    postgresEscapeStrings: postgresEscapeStringsFor(d),
+    slashSlashComments: connectionKind.value === 'mongodb',
+  };
 }
 
 // P18 addendum D23: realities #10's wart, fixed as a side effect of needing per-engine behaviour

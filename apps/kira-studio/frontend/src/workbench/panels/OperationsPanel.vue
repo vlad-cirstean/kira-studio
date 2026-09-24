@@ -19,7 +19,15 @@ import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
 import { useConsoleViewStore } from '../../views/console/state';
-import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../views/shared/sqlIdent';
+import {
+  backslashEscapesFor,
+  bracketIdentifiersFor,
+  dollarQuotingFor,
+  hashCommentsFor,
+  nestedBlockCommentsFor,
+  postgresEscapeStringsFor,
+  sqlDialectFor,
+} from '../../views/shared/sqlIdent';
 
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
@@ -126,9 +134,15 @@ function opSqlDialect(record: OpRecord) {
 // the whole thing — refused here too, not only via the disabled context-menu item below.
 function onRerun(record: OpRecord): void {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
+  const dialect = opSqlDialect(record);
   const statements = splitSqlStatements(record.command, {
-    backslashEscapes: backslashEscapesFor(opSqlDialect(record)),
-    dollarQuoting: dollarQuotingFor(opSqlDialect(record)),
+    backslashEscapes: backslashEscapesFor(dialect),
+    dollarQuoting: dollarQuotingFor(dialect),
+    hashComments: hashCommentsFor(dialect),
+    nestedBlockComments: nestedBlockCommentsFor(dialect),
+    bracketIdentifiers: bracketIdentifiersFor(dialect),
+    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+    slashSlashComments: connectionFor(record)?.kind === 'mongodb',
   }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = tabsStore.openConsoleTab(record.connectionId, '');

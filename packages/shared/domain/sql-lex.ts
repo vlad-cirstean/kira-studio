@@ -8,9 +8,34 @@ export interface SqlLexOptions {
   backslashEscapes: boolean;
   /** See `sql-split.ts`'s own `SplitSqlOptions.dollarQuoting` doc comment — mirrored exactly. */
   dollarQuoting: boolean;
+  /** P108 Part 11 F4: MySQL, MariaDB and ClickHouse also start a line comment with `#` — undefined/
+   *  false leaves `#` an ordinary character (every other dialect here, and the unknown-dialect
+   *  default). */
+  hashComments?: boolean;
+  /** F4: Mongo's JS-shell console syntax starts a line comment with `//` — no SQL dialect here
+   *  opts into this (`//` is not comment syntax in any of them, and floor-division-style code could
+   *  collide with it). */
+  slashSlashComments?: boolean;
+  /** F4: Postgres nests its block comments (an inner `/*` bumps the nesting depth) — every other
+   *  dialect here does not: the first close always ends the comment regardless of an inner open. */
+  nestedBlockComments?: boolean;
+  /** F4: SQLite (and SQL Server) accept a `[bracket]`-quoted identifier — a doubled `]]` inside
+   *  escapes a literal `]`, mirroring the doubled-quote escape every other quote kind here uses. */
+  bracketIdentifiers?: boolean;
+  /** F4: Postgres's `E'...'`/`e'...'` escape-string syntax honours backslash escapes inside it
+   *  regardless of `backslashEscapes` — Postgres's own default is `false` for an ordinary `'...'`
+   *  literal (standard_conforming_strings), but `E'...'` is the one syntax that always opts back
+   *  in. Only examined for a single-quoted run whose `E`/`e` is itself a standalone token (not the
+   *  tail of a longer identifier). */
+  postgresEscapeStrings?: boolean;
 }
 
-export type SqlLexSpanKind = 'lineComment' | 'blockComment' | 'quote' | 'dollarQuote';
+export type SqlLexSpanKind =
+  | 'lineComment'
+  | 'blockComment'
+  | 'quote'
+  | 'dollarQuote'
+  | 'bracketIdent';
 
 export interface SqlLexSpan {
   kind: SqlLexSpanKind;
@@ -28,19 +53,65 @@ export interface SqlLexSpan {
   quoteChar?: string;
 }
 
-/** P94 pass 3 §4.3: `scanSqlSpan`'s four span kinds, one scanner each — the parent only dispatches
- *  on the first character(s), each scanner keeps its own loop and its own EOF/`closed` handling. */
-function scanLineComment(source: string, i: number, n: number): SqlLexSpan {
-  let j = i + 2;
+/** P94 pass 3 §4.3: `scanSqlSpan`'s span kinds, one scanner each — the parent only dispatches on
+ *  the first character(s), each scanner keeps its own loop and its own EOF/`closed` handling.
+ *  `openerLen` is 1 for `#`, 2 for `--`/`//` — the only thing that differs between them. */
+function scanLineComment(source: string, i: number, n: number, openerLen: number): SqlLexSpan {
+  let j = i + openerLen;
   while (j < n && source[j] !== '\n') j++;
   return { kind: 'lineComment', start: i, end: j, closed: true };
 }
 
-function scanBlockComment(source: string, i: number, n: number): SqlLexSpan {
+// F4: Postgres nests `/* ... */` — an inner `/*` bumps a depth counter rather than being ignored,
+// so `/* a /* b */ c */` closes at the *second* `*/`, not the first. Every other dialect here
+// passes `nested: false` and keeps the original non-nesting scan.
+function scanBlockComment(source: string, i: number, n: number, nested: boolean): SqlLexSpan {
+  let depth = 1;
   let j = i + 2;
-  while (j < n && !(source[j] === '*' && source[j + 1] === '/')) j++;
-  if (j >= n) return { kind: 'blockComment', start: i, end: n, closed: false };
-  return { kind: 'blockComment', start: i, end: j + 2, closed: true };
+  while (j < n && depth > 0) {
+    if (nested && source[j] === '/' && source[j + 1] === '*') {
+      depth++;
+      j += 2;
+      continue;
+    }
+    if (source[j] === '*' && source[j + 1] === '/') {
+      depth--;
+      j += 2;
+      continue;
+    }
+    j++;
+  }
+  if (depth > 0) return { kind: 'blockComment', start: i, end: n, closed: false };
+  return { kind: 'blockComment', start: i, end: j, closed: true };
+}
+
+// F4: SQLite/SQL Server `[bracket]` quoted identifier — `]]` inside doubles as an escaped `]`,
+// the same doubled-delimiter escape scanQuotedRun's own '/"/` runs use.
+function scanBracketIdent(source: string, i: number, n: number): SqlLexSpan {
+  let j = i + 1;
+  let closed = false;
+  while (j < n) {
+    if (source[j] === ']') {
+      if (source[j + 1] === ']') {
+        j += 2;
+        continue;
+      }
+      j++;
+      closed = true;
+      break;
+    }
+    j++;
+  }
+  return { kind: 'bracketIdent', start: i, end: j, closed };
+}
+
+// F4: the dollar-quote-open guard and the E'...' guard both need "is this character part of a
+// longer identifier token" — Postgres allows `$` inside an unquoted identifier (`a$b$c`), and an
+// `E`/`e` immediately preceding a quote only means the escape-string prefix when it is itself a
+// standalone token, not the tail of a longer name (`TABLEE'x'` is one identifier, not `TABLE` then
+// an escape string).
+function isIdentChar(ch: string | undefined): boolean {
+  return ch !== undefined && /[A-Za-z0-9_]/.test(ch);
 }
 
 // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape (every SQL
@@ -97,11 +168,32 @@ export function scanSqlSpan(source: string, i: number, options: SqlLexOptions): 
   const n = source.length;
   const c = source[i];
 
-  if (c === '-' && source[i + 1] === '-') return scanLineComment(source, i, n);
-  if (c === '/' && source[i + 1] === '*') return scanBlockComment(source, i, n);
-  if (c === "'" || c === '"' || c === '`') {
-    return scanQuotedRun(source, i, n, c, options.backslashEscapes);
+  if (c === '-' && source[i + 1] === '-') return scanLineComment(source, i, n, 2);
+  if (options.hashComments && c === '#') return scanLineComment(source, i, n, 1);
+  if (c === '/' && source[i + 1] === '*') {
+    return scanBlockComment(source, i, n, options.nestedBlockComments === true);
   }
-  if (c === '$' && options.dollarQuoting) return scanDollarQuote(source, i, n);
+  if (options.slashSlashComments && c === '/' && source[i + 1] === '/') {
+    return scanLineComment(source, i, n, 2);
+  }
+  if (c === "'" || c === '"' || c === '`') {
+    // F4: Postgres's E'...'/e'...' escape string — backslash escapes are honoured inside it
+    // regardless of the dialect's own backslashEscapes setting. `source[i - 1]` is the 'E'/'e'
+    // itself; `source[i - 2]` must not be an identifier character, or this 'E' is the tail of a
+    // longer name, not the escape-string prefix.
+    const postgresEscape =
+      c === "'" &&
+      options.postgresEscapeStrings === true &&
+      (source[i - 1] === 'E' || source[i - 1] === 'e') &&
+      !isIdentChar(source[i - 2]);
+    return scanQuotedRun(source, i, n, c, postgresEscape || options.backslashEscapes);
+  }
+  if (options.bracketIdentifiers && c === '[') return scanBracketIdent(source, i, n);
+  // F4: a dollar-quote can only open where a new token starts — Postgres allows `$` inside an
+  // unquoted identifier (`a$b$c`), which otherwise reads as an unterminated dollar-quote open tag
+  // and swallows the rest of the document.
+  if (c === '$' && options.dollarQuoting && !isIdentChar(source[i - 1])) {
+    return scanDollarQuote(source, i, n);
+  }
   return null;
 }

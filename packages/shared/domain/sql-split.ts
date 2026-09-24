@@ -29,12 +29,25 @@ export interface SplitSqlOptions {
    *  swallows the rest of the document into one statement. Defaults to true, the pre-fix universal
    *  behaviour, for any caller that doesn't know its dialect. */
   dollarQuoting?: boolean;
+  /** P108 Part 11 F4: see sql-lex.ts's SqlLexOptions — mirrored exactly, all default off/undefined
+   *  (no pre-existing universal behaviour to preserve for any of these, unlike the two above). */
+  hashComments?: boolean;
+  slashSlashComments?: boolean;
+  nestedBlockComments?: boolean;
+  bracketIdentifiers?: boolean;
+  postgresEscapeStrings?: boolean;
 }
 
 export function splitSqlStatements(source: string, options?: SplitSqlOptions): SqlStatement[] {
-  const backslashEscapes = options?.backslashEscapes ?? true;
-  const dollarQuoting = options?.dollarQuoting ?? true;
-  const lexOptions = { backslashEscapes, dollarQuoting };
+  const lexOptions = {
+    backslashEscapes: options?.backslashEscapes ?? true,
+    dollarQuoting: options?.dollarQuoting ?? true,
+    hashComments: options?.hashComments,
+    slashSlashComments: options?.slashSlashComments,
+    nestedBlockComments: options?.nestedBlockComments,
+    bracketIdentifiers: options?.bracketIdentifiers,
+    postgresEscapeStrings: options?.postgresEscapeStrings,
+  };
   const statements: SqlStatement[] = [];
   const n = source.length;
   let i = 0;

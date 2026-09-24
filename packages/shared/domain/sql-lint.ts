@@ -28,18 +28,35 @@ export interface LintSqlOptions {
    *  same reason (a MySQL identifier containing two `$` is not a dollar-quote open tag). Defaults
    *  to true, the pre-fix universal behaviour. */
   dollarQuoting?: boolean;
+  /** P108 Part 11 F4: see sql-lex.ts's SqlLexOptions — mirrored exactly, all default off/undefined
+   *  (no pre-existing universal behaviour to preserve for any of these, unlike the two above). */
+  hashComments?: boolean;
+  slashSlashComments?: boolean;
+  nestedBlockComments?: boolean;
+  bracketIdentifiers?: boolean;
+  postgresEscapeStrings?: boolean;
 }
 
-function spanMessage(kind: 'blockComment' | 'quote' | 'dollarQuote', quoteChar?: string): string {
+function spanMessage(
+  kind: 'blockComment' | 'quote' | 'dollarQuote' | 'bracketIdent',
+  quoteChar?: string,
+): string {
   if (kind === 'blockComment') return 'unterminated block comment';
   if (kind === 'dollarQuote') return 'unterminated dollar-quoted string';
+  if (kind === 'bracketIdent') return 'unterminated quoted identifier';
   return quoteChar === '`' ? 'unterminated quoted identifier' : 'unterminated string literal';
 }
 
 export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
-  const backslashEscapes = options?.backslashEscapes ?? true;
-  const dollarQuoting = options?.dollarQuoting ?? true;
-  const lexOptions = { backslashEscapes, dollarQuoting };
+  const lexOptions = {
+    backslashEscapes: options?.backslashEscapes ?? true,
+    dollarQuoting: options?.dollarQuoting ?? true,
+    hashComments: options?.hashComments,
+    slashSlashComments: options?.slashSlashComments,
+    nestedBlockComments: options?.nestedBlockComments,
+    bracketIdentifiers: options?.bracketIdentifiers,
+    postgresEscapeStrings: options?.postgresEscapeStrings,
+  };
   const issues: LintIssue[] = [];
   const n = source.length;
   let i = 0;

@@ -22,6 +22,12 @@ export interface SqlTokenOptions {
   backslashEscapes: boolean;
   /** See sql-split.ts's own SplitSqlOptions.dollarQuoting — mirrors it exactly. */
   dollarQuoting: boolean;
+  /** P108 Part 11 F4: see sql-lex.ts's SqlLexOptions — mirrored exactly. */
+  hashComments?: boolean;
+  slashSlashComments?: boolean;
+  nestedBlockComments?: boolean;
+  bracketIdentifiers?: boolean;
+  postgresEscapeStrings?: boolean;
   /** Case-insensitive; a word in this set tokenises as `Keyword` rather than `Identifier` —
    *  `sql-keywords.ts`'s `keywordsFor(dialect)`. */
   keywords: ReadonlySet<string>;
@@ -270,6 +276,11 @@ function scanSpanNode(
   if (span.kind === 'lineComment' || span.kind === 'blockComment') {
     return { node: null, next: span.end };
   }
+  // P108 Part 11 F4: a bracket-quoted identifier has no `quoteChar` (it isn't one of the
+  // `'`/`"`/`` ` `` runs `quoteChar` distinguishes) — always a QuotedIdentifier, never String.
+  if (span.kind === 'bracketIdent') {
+    return { node: leaf('QuotedIdentifier', span.start, span.end), next: span.end };
+  }
   const name =
     span.quoteChar && identifierQuotes.includes(span.quoteChar) ? 'QuotedIdentifier' : 'String';
   return { node: leaf(name, span.start, span.end), next: span.end };
@@ -309,7 +320,15 @@ function scanLevel(
 ): { nodes: MNode[]; next: number } {
   const nodes: MNode[] = [];
   let i = start;
-  const lexOptions = { backslashEscapes: opts.backslashEscapes, dollarQuoting: opts.dollarQuoting };
+  const lexOptions = {
+    backslashEscapes: opts.backslashEscapes,
+    dollarQuoting: opts.dollarQuoting,
+    hashComments: opts.hashComments,
+    slashSlashComments: opts.slashSlashComments,
+    nestedBlockComments: opts.nestedBlockComments,
+    bracketIdentifiers: opts.bracketIdentifiers,
+    postgresEscapeStrings: opts.postgresEscapeStrings,
+  };
 
   while (i < n) {
     const c = source[i] as string;

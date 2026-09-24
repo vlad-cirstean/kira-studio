@@ -5,7 +5,11 @@ import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';
 import {
   backslashEscapesFor,
+  bracketIdentifiersFor,
   dollarQuotingFor,
+  hashCommentsFor,
+  nestedBlockCommentsFor,
+  postgresEscapeStringsFor,
   type SqlDialect,
   sqlDialectFor,
 } from '../shared/sqlIdent';
@@ -21,10 +25,19 @@ function lintSqlConsole(
   dialect: SqlDialect | undefined,
   schema: DdlSchema | undefined,
 ): (text: string) => ConsoleDiagnostic[] {
-  const backslashEscapes = backslashEscapesFor(dialect);
-  const dollarQuoting = dollarQuotingFor(dialect);
+  // P108 Part 11 F4: same per-dialect lexical options every other lintSql/splitSqlStatements/
+  // tokenizeSql call site now passes (format.ts, sql-split.ts callers, sqlNodes.ts) — a diagnostic
+  // must never disagree with what Run/Format/hover consider one statement's own lexical shape.
+  const lexOptions = {
+    backslashEscapes: backslashEscapesFor(dialect),
+    dollarQuoting: dollarQuotingFor(dialect),
+    hashComments: hashCommentsFor(dialect),
+    nestedBlockComments: nestedBlockCommentsFor(dialect),
+    bracketIdentifiers: bracketIdentifiersFor(dialect),
+    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+  };
   return (text) => {
-    const lexical = lintSql(text, { backslashEscapes, dollarQuoting });
+    const lexical = lintSql(text, lexOptions);
     if (!dialect || !schema || schema.tables.length === 0) return lexical;
     return [...lexical, ...ddlDiagnostics(dialect, text, schema)];
   };
