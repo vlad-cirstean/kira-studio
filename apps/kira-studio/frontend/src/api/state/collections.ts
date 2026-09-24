@@ -148,73 +148,12 @@ export const useCollectionsStore = defineStore('collections', () => {
     reconcileTree();
   }
 
-  // P112: fetchSavedRequest/savedRequestFor/isOrphanRequest/ensureSavedRequestLoaded (and their
-  // gRPC siblings) are now thin readers over the apiSavedRequest(Grpc)Key query cache rather than a
-  // second local Record — loadSavedRequest is cache-first (queryClient.query, staleTime: Infinity)
-  // and its queryFn already catches a failed GetRequest into `null` (apiQueries.ts's own orphan
-  // convention), so there is no separate fetch-then-catch or orphan flag left to maintain here.
-  // CollectionsTree.vue's own onOpen and both request views now call loadSavedRequest/
-  // useSavedRequest directly; these remain as the store's own compatibility surface (D14's original
-  // call sites) until nothing needs them.
-
-  /** Reads a saved request, cache-first — the dirty comparison's other half (D15) as well as an
-   *  open-cost saving: re-opening an already-open request costs no call. `null` is a confirmed
-   *  orphan (D14), never a thrown error. */
-  async function fetchSavedRequest(itemId: string): Promise<HttpSavedRequest | null> {
-    return loadSavedRequest(itemId);
-  }
-
-  /** The saved side of the dirty comparison, or null when this tab's row has never been read (or no
-   *  longer resolves — D14's orphan rule). An imperative reader (§3.5): callers wanting this to stay
-   *  live across a fetch should observe useSavedRequest's own `.data` instead. */
-  function savedRequestFor(itemId: string | null): HttpSavedRequest | null {
-    if (!itemId) return null;
-    return queryClient.getQueryData<HttpSavedRequest | null>(apiSavedRequestKey(itemId)) ?? null;
-  }
-
-  /** fetchSavedRequest's own gRPC sibling. */
-  async function fetchSavedGrpcRequest(itemId: string): Promise<GrpcSavedRequest | null> {
-    return loadSavedGrpcRequest(itemId);
-  }
-
-  /** savedRequestFor's own gRPC sibling. */
-  function savedGrpcRequestFor(itemId: string | null): GrpcSavedRequest | null {
-    if (!itemId) return null;
-    return (
-      queryClient.getQueryData<GrpcSavedRequest | null>(apiSavedGrpcRequestKey(itemId)) ?? null
-    );
-  }
-
-  // P108 F4: a restored request/gRPC tab (itemId set from persisted state, never opened through
-  // CollectionsTree.vue's own onOpen — the only call site that used to run fetchSavedRequest at
-  // all) read `savedRequestFor` as null forever: not because the row was deleted, but because
-  // nothing had ever fetched it. isDirty(state, null) reads that as "nothing to diff, not dirty",
-  // and onSave's own `saved() === null` check reads it as "no saved row — Save as…", silently
-  // creating a duplicate row and rebinding the tab to it on first Save. `isOrphanRequest`/
-  // `isOrphanGrpcRequest` below (now the query cache's own null-vs-undefined convention) let the
-  // view disable Save (not reroute it) while that's still unknown.
-
-  function isOrphanRequest(itemId: string): boolean {
-    return queryClient.getQueryData<HttpSavedRequest | null>(apiSavedRequestKey(itemId)) === null;
-  }
-
-  function isOrphanGrpcRequest(itemId: string): boolean {
-    return (
-      queryClient.getQueryData<GrpcSavedRequest | null>(apiSavedGrpcRequestKey(itemId)) === null
-    );
-  }
-
-  /** Fetches a restored tab's saved side exactly once — a no-op once something has already
-   *  resolved this itemId, whether a cache hit or a confirmed orphan (loadSavedRequest's own
-   *  cache-first contract). Safe to call on every mount and on every itemId change. */
-  async function ensureSavedRequestLoaded(itemId: string): Promise<void> {
-    await loadSavedRequest(itemId);
-  }
-
-  /** ensureSavedRequestLoaded's own gRPC sibling. */
-  async function ensureSavedGrpcRequestLoaded(itemId: string): Promise<void> {
-    await loadSavedGrpcRequest(itemId);
-  }
+  // P112: the store's own compatibility surface for saved-request reads
+  // (fetchSavedRequest/savedRequestFor/isOrphanRequest/ensureSavedRequestLoaded and their gRPC
+  // siblings) is gone — CollectionsTree.vue's own onOpen and both request views call
+  // loadSavedRequest/useSavedRequest (apiQueries.ts) directly now, and nothing else in the app
+  // still called the wrappers (commit 8's own grep confirmed it), so there was no reader left to
+  // keep them thin for.
 
   // ---- the row model ----
 
@@ -830,14 +769,6 @@ export const useCollectionsStore = defineStore('collections', () => {
     treeLoadError,
     activeSearchQuery,
     visibleRows,
-    fetchSavedRequest,
-    savedRequestFor,
-    fetchSavedGrpcRequest,
-    savedGrpcRequestFor,
-    isOrphanRequest,
-    isOrphanGrpcRequest,
-    ensureSavedRequestLoaded,
-    ensureSavedGrpcRequestLoaded,
     selectRow,
     toggleRow,
     expandRow,

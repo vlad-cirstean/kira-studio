@@ -3,12 +3,16 @@
 // descendant api_items row, not just the row clicked. deleteRow used to purge exactly one cache
 // entry (collectionsStore.requests[row.id] / grpcRequests[row.id]), leaving every *descendant*
 // request's cached HttpSavedRequest/GrpcSavedRequest behind. D14's orphan rule
-// (HttpRequestView.vue: canSave depends on collectionsStore.savedRequestFor(itemId) !== null) then silently
-// misbehaved for any tab open on one of those orphaned descendants: the stale cache entry made the
-// tab look saveable when its row no longer existed at all.
+// (HttpRequestView.vue: canSave depends on the apiSavedRequestKey query reading non-null) then
+// silently misbehaved for any tab open on one of those orphaned descendants: the stale cache entry
+// made the tab look saveable when its row no longer existed at all.
 //
 // This test fails against the pre-fix deleteRow (only the folder's own id is purged, both
 // descendant requests' cache entries survive) and passes once the whole subtree is purged.
+//
+// P112: rewritten off collectionsStore's own removed fetchSavedRequest/savedRequestFor wrappers —
+// asserts against the apiSavedRequestKey query cache directly (queryClient.getQueryData), which is
+// what deleteRow itself now writes `null` into for the whole orphaned subtree.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
@@ -16,7 +20,11 @@ import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/co
 import { queryClient } from '@workbench/state/queryClient';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
-import { apiCollectionsTreeKey } from '../../frontend/src/api/state/apiQueries';
+import {
+  apiCollectionsTreeKey,
+  apiSavedRequestKey,
+  loadSavedRequest,
+} from '../../frontend/src/api/state/apiQueries';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
@@ -42,6 +50,10 @@ await new Promise((resolve) => setTimeout(resolve, 0));
 // field — seed the tree the same way a real List response would land.
 function seedTree(collections: CollectionSummary[], items: CollectionItemSummary[]): void {
   queryClient.setQueryData(apiCollectionsTreeKey, { collections, items });
+}
+
+function savedRequestCache(itemId: string): unknown {
+  return queryClient.getQueryData(apiSavedRequestKey(itemId));
 }
 
 function collection(id: string, name: string): CollectionSummary {
@@ -91,7 +103,7 @@ function request(
 }
 
 // Only the fields httpSavedRequestSchema requires without a default matter here;
-// fetchSavedRequest's own .parse() fills in the rest from the schema's defaults.
+// loadSavedRequest's own .parse() fills in the rest from the schema's defaults.
 function savedRequest(name: string): Awaited<ReturnType<typeof control.collectionsGetRequest>> {
   return { method: 'GET', url: `https://api.example.com/${name}` } as Awaited<
     ReturnType<typeof control.collectionsGetRequest>
@@ -120,12 +132,12 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
     ).collectionsGetRequest = async (id: string) => savedRequest(id);
-    await collectionsStore.fetchSavedRequest('req-1');
-    await collectionsStore.fetchSavedRequest('req-2');
-    await collectionsStore.fetchSavedRequest('req-3');
-    expect(collectionsStore.savedRequestFor('req-1')).not.toBeNull();
-    expect(collectionsStore.savedRequestFor('req-2')).not.toBeNull();
-    expect(collectionsStore.savedRequestFor('req-3')).not.toBeNull();
+    await loadSavedRequest('req-1');
+    await loadSavedRequest('req-2');
+    await loadSavedRequest('req-3');
+    expect(savedRequestCache('req-1')).not.toBeNull();
+    expect(savedRequestCache('req-2')).not.toBeNull();
+    expect(savedRequestCache('req-3')).not.toBeNull();
 
     const captured: { deletedId: string | null } = { deletedId: null };
     (
@@ -161,10 +173,10 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     // this is the assertion that fails against the pre-fix code (only 'folder-1' was purged, which
     // has no cache entry of its own since it is a folder, so pre-fix this test would still find
     // req-1/req-2 cached).
-    expect(collectionsStore.savedRequestFor('req-1')).toBeNull();
-    expect(collectionsStore.savedRequestFor('req-2')).toBeNull();
+    expect(savedRequestCache('req-1')).toBeNull();
+    expect(savedRequestCache('req-2')).toBeNull();
     // The sibling outside the deleted subtree must survive.
-    expect(collectionsStore.savedRequestFor('req-3')).not.toBeNull();
+    expect(savedRequestCache('req-3')).not.toBeNull();
   });
 
   test('deleting a whole collection purges every item in it, regardless of nesting depth', async () => {
@@ -178,8 +190,8 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
     ).collectionsGetRequest = async (id: string) => savedRequest(id);
-    await collectionsStore.fetchSavedRequest('req-4');
-    expect(collectionsStore.savedRequestFor('req-4')).not.toBeNull();
+    await loadSavedRequest('req-4');
+    expect(savedRequestCache('req-4')).not.toBeNull();
 
     (
       control as unknown as { collectionsDelete: typeof control.collectionsDelete }
@@ -206,6 +218,6 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
       matched: false,
     });
 
-    expect(collectionsStore.savedRequestFor('req-4')).toBeNull();
+    expect(savedRequestCache('req-4')).toBeNull();
   });
 });
