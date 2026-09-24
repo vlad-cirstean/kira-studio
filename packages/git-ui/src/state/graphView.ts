@@ -100,6 +100,10 @@ export class GraphViewState {
    *  it, so its captured `repoId` is now stale and its resync must be skipped rather than
    *  reopening/resyncing the *old* repo's stream over the new one. */
   #loadGeneration = 0;
+  /** F11: the union of every `#applyChunk` range folded in since the last relayout actually
+   *  ran — `#queueLayoutRebuild`'s own doc comment. */
+  #pendingLayoutRange: LayoutRange | undefined;
+  #layoutDraining = false;
 
   readonly #unsubscribeChanged: () => void;
   readonly #unsubscribeLoading: () => void;
@@ -376,6 +380,12 @@ export class GraphViewState {
     this.#loadController = undefined;
     this.#loadGeneration++;
     this.loading.value = 'idle';
+    // F11: an old repo's own not-yet-applied merged range must never reach a listener after this
+    // point — `#resetLayout()`'s own `#layoutClient.reset()` below already turns any relayout
+    // still in flight into a no-op `LayoutClientStaleError` (`#rebuildLayout`'s own catch), so a
+    // `#drainLayoutRebuilds` loop already running simply sees no pending range left once that
+    // settles and exits; a fresh one starts the moment the new repo's own stream applies a chunk.
+    this.#pendingLayoutRange = undefined;
     this.#resetLayout();
     this.#packed.reset();
     this.#cancelAutoRefresh();
@@ -518,9 +528,54 @@ export class GraphViewState {
     });
     if (!range) return; // corrupted — already re-opening from row 0, nothing to lay out
 
-    const { from, to } = range;
-    await this.#rebuildLayout();
-    for (const listener of this.#layoutListeners) listener({ from, to });
+    // F11: folds `range` in and returns WITHOUT awaiting its own relayout — `rpc.ts`'s per-chunk
+    // credit gate (`INITIAL_STREAM_CREDIT`) waits on this method's own promise before letting the
+    // host send the next wire chunk, so a fast return here is what lets a large load (a 200k-row
+    // rehydration is 400 500-row chunks) pipeline many wire chunks per relayout instead of paying
+    // one full main-thread plan rebuild plus worker round trip per chunk.
+    this.#queueLayoutRebuild(range);
+  }
+
+  /** F11: merges `range` into whatever range is still waiting on its own relayout, and starts a
+   *  drain loop if none is already running. A relayout always lays out the WHOLE store
+   *  (`#rebuildLayout`'s own doc comment) — `range` only ever tells `#layoutListeners` which rows
+   *  are new since the listeners' own last look, so merging ranges is exactly the union of every
+   *  chunk folded into the store since the last relayout actually landed. */
+  #queueLayoutRebuild(range: LayoutRange): void {
+    this.#pendingLayoutRange = this.#pendingLayoutRange
+      ? {
+          from: Math.min(this.#pendingLayoutRange.from, range.from),
+          to: Math.max(this.#pendingLayoutRange.to, range.to),
+        }
+      : range;
+    if (this.#layoutDraining) return; // an already-running drain picks up the merge on its next loop
+    void this.#drainLayoutRebuilds();
+  }
+
+  /** F11: keeps relaying out until no further chunk landed while the last relayout was running —
+   *  a stream burst that outpaces the layout worker (chunk after 500-row chunk, `loadAll`'s own
+   *  loop; a cached rehydration replaying hundreds of chunks) coalesces into however many
+   *  relayouts the worker actually had time to run, never one per wire chunk. Listeners fire once
+   *  per relayout that actually landed, with the full merged range since the previous one. */
+  async #drainLayoutRebuilds(): Promise<void> {
+    this.#layoutDraining = true;
+    try {
+      while (this.#pendingLayoutRange) {
+        const range = this.#pendingLayoutRange;
+        this.#pendingLayoutRange = undefined;
+        await this.#rebuildLayout();
+        for (const listener of this.#layoutListeners) listener(range);
+      }
+    } catch (error) {
+      // F11: `#applyChunk` no longer awaits this loop (that is the whole point — see its own
+      // comment), so a `dispose()` racing a relayout still in flight (the worker itself torn
+      // down mid-`submit`, a non-`LayoutClientStaleError` rejection) has no caller left to hand
+      // this to. Logged, matching this file's own `graph.status failed after load` precedent —
+      // never rethrown, since nothing here would catch it.
+      console.error('graphView: #drainLayoutRebuilds failed', error);
+    } finally {
+      this.#layoutDraining = false;
+    }
   }
 
   dispose(): void {
