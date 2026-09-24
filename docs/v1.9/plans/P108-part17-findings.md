@@ -4,8 +4,8 @@ Reviewer pass over `P108-part17-space-git-rpc.md` §1 file set, current tree `bc
 already fixed and committed (F2 `f951ced`, F3 `cac7093`, F4-F6 `37767d3`, F7 `0719492`, F8
 `7bc7998`, F9 `bc365eb`). Numbering continues from F10. Fixer: one commit per finding.
 
-Status: IN PROGRESS — Go side done; TS framing/codec half (`socketChannel.ts`, `streamChannel.ts`,
-`blobFrame.ts`, `codec.ts`, `graphChunkCodec.ts`, `rpc.ts` server half) still under review.
+Status: review complete. Five findings, F10-F14: F10 Medium, F11 Low-Medium, F12-F14 Low. All
+four are handshake/pairing lifecycle bugs; the RPC method surface itself turned up nothing.
 
 ## F10 — transient trust-store error discards a valid token (Medium)
 
@@ -78,3 +78,71 @@ sends hello also leaks this way.
 
 Fix: `SetReadDeadline(now+10s)` before the hello `Receive`, and clear it (zero time) before
 `Serve`. Reject a `hello.Client.ID` over a fixed bound (for example 256 bytes) as row 1.
+
+## F14 — tokenRejected races the server's close and double-dials (Low)
+
+`apps/kira-space-vscode/src/connection.ts:400-406`, with `#onDisconnected` `:433-455` and
+`#scheduleReconnect` `:457-463`. One-hop caller (plan §2); it is the client half of the handshake.
+
+Bug: `runHandshake` returns right after sending `tokenRejected`, and `handleConn`'s deferred
+`nc.Close()` (`server.go:202`) closes the socket. The extension handler awaits
+`secrets.delete(...)` first. The socket `close` event lands during that await. `#onDisconnected`
+still sees the current `dialToken`, so it sets `connecting` and arms a 500 ms backoff timer. The
+`await` then resolves, `dialToken === this.#dialToken` still holds, and `void this.#dial()` runs
+immediately. The timer later fires a second `#dial()`, which destroys the first dial's socket. That
+socket is already waiting in the pairing queue, so the server keeps a dead entry (F12) beside the
+new one. The dialog shows "1 of 2". `#backoffMs` is also doubled for no real failure.
+
+Reachable: every revocation. `Revoke` closes the live conn, the extension reconnects with its stale
+token, the server answers `tokenRejected`, and the secret-store IPC round trip is far slower than
+the local socket close.
+
+Fix: in the `tokenRejected` branch, set `this.#disconnectHandledFor = dialToken` synchronously,
+before the `await`, so the close event is inert. Also clear `#reconnectTimer` at the top of
+`#dial()`, so any dial supersedes a pending timer.
+
+## Areas with nothing found
+
+- **§4.1 method-table and version parity.** Mechanical diff of Go `requestHandlers` against
+  `validate.ts` `REQUEST_KEY_MAP`/`EVENT_KEY_MAP`/`STREAM_KEY_MAP`. There are no Go-only methods.
+  The 15 TS-only request keys are all host-answered (`proxyHandlers.ts`, PF `hostHandlers.ts`)
+  and never forwarded. All 6 Go-emitted events are TS `EventKey`s. `graph.stream` matches.
+  `ContractVersion` 40 and `Protocol` 1 match on both sides.
+- **§4.2 params parity.** Go `requireNonEmpty` checks only `repoId`/`requestId`. Neither is
+  TS-optional. Enum fields (`mode` on checkout/reset/worktreeAdd/review.fileDiff, stash `scope`,
+  `repoSettings` enums through storage validation) are checked against the TS literal sets.
+  `limit`/`pageSize`/`pages` at ≤0 fall back to defaults. Comment ranges are bounded by
+  `1 <= start <= end`, ids by `> 0`, and bodies by 8 KiB. No mismatch found.
+- **§4.3 error-shape parity.** No TS consumer branches on a server `E_*` code. git-ui/vscode switch
+  only on `TransportError.code === 'cancelled'`. `mapGitError` yields `E_GIT_<KIND>`. Other errors
+  cross as `E_INTERNAL` with `err.Error()`. That string can carry local paths, but only to the
+  same-user, paired client that already names those paths. Not a leak.
+- **§4.4 argv injection.** Swept every handler, not just Part 16 F1's four. Ref/sha fields go
+  through `validRefArg`/`validObjectID`. Array elements (`preflight.revert` `shas`, review base
+  candidates, pathspec lists) are checked per element. Optional pointers are checked when present.
+  Pathspecs reach git after `--` in gitsession, and repo-relative paths go through the
+  escapes-root check. No bare-argv path found.
+- **§4.5 socket server lifecycle.** `Start` flock, unlink, listen and chmod 0600 ordering;
+  `acceptLoop`/`trackConn` against `Close`; double `Close`; `Revoke` before and after `addConn`
+  (F5 recheck present). All correct at `bc365eb`.
+- **§4.7 framing.** `frame.go`: 0-length, cap and cap+1 handled; single `Write` under the mutex.
+  `socketChannel.ts`: drain loop, the 64-frame pending cap, and destroy-on-delivery-throw are
+  correct. Close handlers fire twice (`error` then `close`), but `connection.ts`
+  `#disconnectHandledFor` makes that inert. `streamChannel.ts`: the P67b connect queue preserves
+  order, a `closed` phase drops posts, and decode and delivery share one try/catch. The blob frame
+  (`blobFrame.ts`) bounds-checks the header length and requires exactly one marker. `codec.ts` and
+  `graphChunkCodec.ts` decode from a trusted peer, with exact-size column copies and a checked
+  identifier and payload type. The Go `commitsBlob` literal matches the TS `$fb` tag.
+- **§4.8 streaming.** `createRpcServer` credit gate, cancel (abort, then drop gate and work),
+  shared `aborted` promise, and `end` on error/abort are correct. Client supersede via
+  `openStreamIdByMethod` settles the older stream (F2/F3, fixed).
+- **§4.9 mailboxes.** `repoSettings.changed` per-conn queue cap 8 drop-oldest, teardown on
+  disconnect, and emit into a closed session are correct.
+- **§4.10 gitvsix.** The VSIX path is absolute, derived from the executable, never client-supplied,
+  so it cannot be flag-like. 60 s timeout. `toolexec` bounds the stderr detail.
+
+## P111 overlap (named only)
+
+`remote.pullPreflight` `strategySetting` and `remote.run` `strategy` (`gitrpc/remote.go:35-39`,
+passed to `gitsession.RemoteOpParams.Strategy`) are not validated against the TS literal set at the
+gitrpc layer. P111 owns the pull-strategy wire change and this fix. It is not numbered here.
