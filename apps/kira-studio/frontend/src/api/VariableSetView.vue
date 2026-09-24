@@ -528,7 +528,7 @@ function onBulkClose(): void {
 
     <Alert v-if="ownersLoaded && !ownerExists" class="empty-state" data-testid="variable-set-orphan">
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">This variable set no longer exists</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">This variable set no longer exists</AlertTitle>
     </Alert>
     <BulkVariablesEditor
       v-else-if="bulkMode"

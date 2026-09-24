@@ -23,7 +23,7 @@
 @source "./";
 
 /* Maps the token set into Tailwind v4's CSS-first config, so utilities like
-   `bg-chrome` / `text-muted` exist alongside the raw custom properties. */
+   `bg-chrome` / `text-muted-foreground` exist alongside the raw custom properties. */
 @theme {
   --color-bg: var(--kira-bg);
   --color-elevated: var(--kira-bg-elevated);

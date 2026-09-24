@@ -273,12 +273,12 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
     <template v-else-if="emptyLabel">
       <Alert class="empty-state">
         <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">{{ emptyLabel }}</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyLabel }}</AlertTitle>
       </Alert>
     </template>
     <Alert v-else class="empty-state">
       <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
     </Alert>
   </div>
 </template>

@@ -199,7 +199,7 @@ async function onSave(): Promise<void> {
       }"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <span class="flex items-center justify-center shrink-0 size-4 text-muted">
+        <span class="flex items-center justify-center shrink-0 size-4 text-muted-foreground">
           <CodiconIcon name="gear" :size="13" />
         </span>
         <DialogTitle class="text-kira-lg font-normal">Settings</DialogTitle>
@@ -222,7 +222,7 @@ async function onSave(): Promise<void> {
             v-for="section in sections"
             :key="section"
             type="button"
-            class="text-left rounded-kira-sm bg-transparent border-none cursor-pointer h-5.5 px-1.5 text-muted text-kira-md hover:bg-hover"
+            class="text-left rounded-kira-sm bg-transparent border-none cursor-pointer h-5.5 px-1.5 text-muted-foreground text-kira-md hover:bg-hover"
             :class="{ 'bg-select! text-fg!': activeSection === section }"
             :data-testid="`settings-section-${section}`"
             @click="activeSection = section"

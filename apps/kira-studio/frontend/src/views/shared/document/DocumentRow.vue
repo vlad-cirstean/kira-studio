@@ -118,7 +118,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
 }
 
 .expand-toggle {
-  @apply flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted;
+  @apply flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground;
 }
 
 .doc-id {

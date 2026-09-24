@@ -293,7 +293,7 @@ function onEditGlobalDefaults(): void {
 }
 
 .field > span:first-child {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .field-head {
@@ -309,7 +309,7 @@ function onEditGlobalDefaults(): void {
 }
 
 .inherit {
-  @apply flex items-center gap-1 text-muted text-kira-xs;
+  @apply flex items-center gap-1 text-muted-foreground text-kira-xs;
 }
 
 .helper-text {

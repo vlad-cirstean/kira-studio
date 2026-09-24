@@ -49,6 +49,6 @@ defineProps<{
 }
 
 .def-idx-columns {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 </style>

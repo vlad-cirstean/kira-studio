@@ -1030,7 +1030,7 @@ onUnmounted(() => {
         class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon :name="rt ? 'json' : 'loading'" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">{{ rt ? 'No documents' : 'Loading…' }}</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ rt ? 'No documents' : 'Loading…' }}</AlertTitle>
       </Alert>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no documents loaded". -->
@@ -1040,7 +1040,7 @@ onUnmounted(() => {
         data-testid="document-no-matching-rows"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">No matching rows</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No matching rows</AlertTitle>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button
             variant="toolbar"
@@ -1251,7 +1251,7 @@ onUnmounted(() => {
    documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
    head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-sm font-data;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data;
   padding: 0 var(--kira-s-4) var(--kira-s-2);
 }
 

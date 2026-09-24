@@ -209,7 +209,7 @@ onUnmounted(() => {
 }
 
 .fk-preview-loading {
-  @apply flex items-center justify-center h-10 text-muted;
+  @apply flex items-center justify-center h-10 text-muted-foreground;
 }
 
 .spin {
@@ -228,7 +228,7 @@ onUnmounted(() => {
   @apply w-full border-collapse text-kira-sm;
 }
 .fk-preview-table th {
-  @apply text-left font-medium text-muted whitespace-nowrap align-top py-0.5 pl-0 pr-1;
+  @apply text-left font-medium text-muted-foreground whitespace-nowrap align-top py-0.5 pl-0 pr-1;
 }
 .fk-preview-table td {
   @apply break-words py-0.5;

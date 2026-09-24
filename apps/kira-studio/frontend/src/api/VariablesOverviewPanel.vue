@@ -104,7 +104,7 @@ function editEnvironmentVariables(): void {
           data-testid="variables-overview-empty"
         >
           <CodiconIcon name="search" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
         </Alert>
         <Alert
           v-else-if="rows.length === 0"
@@ -112,7 +112,7 @@ function editEnvironmentVariables(): void {
           data-testid="variables-overview-empty"
         >
           <CodiconIcon name="symbol-variable" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted font-normal">No variables in scope</AlertTitle>
+          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No variables in scope</AlertTitle>
         </Alert>
         <div
           v-for="row in filteredRows"
@@ -236,7 +236,7 @@ function editEnvironmentVariables(): void {
 }
 
 .scope-chip {
-  @apply justify-self-start bg-field text-muted;
+  @apply justify-self-start bg-field text-muted-foreground;
 }
 .scope-chip.environment {
   background: rgba(55, 148, 255, 0.16);

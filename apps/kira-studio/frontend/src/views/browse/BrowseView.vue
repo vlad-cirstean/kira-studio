@@ -552,7 +552,7 @@ onMounted(() => {
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
           <Alert v-else class="preview-empty" data-testid="browse-preview-empty">
             <CodiconIcon :name="emptyPreviewIcon" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted font-normal">{{ emptyPreviewLabel }}</AlertTitle>
+            <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyPreviewLabel }}</AlertTitle>
           </Alert>
         </SplitterPanel>
       </SplitterGroup>
@@ -571,7 +571,7 @@ onMounted(() => {
 }
 
 .crumb {
-  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted text-kira-sm px-0.5;
+  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted-foreground text-kira-sm px-0.5;
 }
 
 .crumb:hover {

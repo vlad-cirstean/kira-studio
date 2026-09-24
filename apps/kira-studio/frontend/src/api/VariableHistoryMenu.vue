@@ -41,7 +41,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
         data-testid="variable-history-empty"
       >
         <CodiconIcon name="history" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">No previous values</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No previous values</AlertTitle>
       </Alert>
       <div
         v-for="entry in variableSetStore.entries"

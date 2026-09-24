@@ -55,7 +55,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 @reference "@theme/base.css";
 
 .def-val-desc {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .def-raw {

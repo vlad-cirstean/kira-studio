@@ -103,7 +103,7 @@ function close(): void {
         data-testid="dynamic-values-filter-empty"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
       </Alert>
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>

@@ -122,7 +122,7 @@ onUnmounted(() => {
   <div v-if="!repoId" class="repo-multi-diff-root">
     <Alert class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">This tab has no repository.</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This tab has no repository.</AlertTitle>
     </Alert>
   </div>
   <div v-else class="repo-multi-diff-root" data-testid="repo-multi-diff-view">
@@ -167,28 +167,28 @@ onUnmounted(() => {
           class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
         >
           <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted">This file is binary and can't be compared.</AlertTitle>
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is binary and can't be compared.</AlertTitle>
         </Alert>
         <Alert
           v-else-if="sectionState[section.path] === 'tooLarge'"
           class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
         >
           <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted">This file is too large to compare (over 8 MB).</AlertTitle>
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is too large to compare (over 8 MB).</AlertTitle>
         </Alert>
         <Alert
           v-else-if="sectionState[section.path] === 'bothMissing'"
           class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
         >
           <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted">This file no longer exists.</AlertTitle>
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file no longer exists.</AlertTitle>
         </Alert>
         <Alert
           v-else
           class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
         >
           <CodiconIcon name="warning" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted">{{ sectionError[section.path] || 'Could not open this diff.' }}</AlertTitle>
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ sectionError[section.path] || 'Could not open this diff.' }}</AlertTitle>
         </Alert>
       </template>
     </div>
@@ -197,7 +197,7 @@ onUnmounted(() => {
       class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
     >
       <CodiconIcon name="git-compare" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">No changed files.</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">No changed files.</AlertTitle>
     </Alert>
   </div>
 </template>
@@ -222,7 +222,7 @@ onUnmounted(() => {
 }
 
 .path-dir {
-  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-sm;
+  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm;
 }
 
 .monaco-host {

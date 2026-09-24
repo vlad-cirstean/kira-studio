@@ -1088,7 +1088,7 @@ onUnmounted(() => {
         <div class="tbody" data-testid="keyvalue-list">
           <Alert v-if="!rt || rt.rowCount === 0" class="empty-state">
             <CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted font-normal">{{ rt ? 'No data' : 'Loading…' }}</AlertTitle>
+            <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ rt ? 'No data' : 'Loading…' }}</AlertTitle>
           </Alert>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
@@ -1098,7 +1098,7 @@ onUnmounted(() => {
             data-testid="keyvalue-no-matching-rows"
           >
             <CodiconIcon name="search" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted font-normal">No matching rows</AlertTitle>
+            <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matching rows</AlertTitle>
             <Button
               variant="toolbar"
               size="kira"

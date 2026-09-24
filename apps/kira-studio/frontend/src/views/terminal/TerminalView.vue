@@ -84,7 +84,7 @@ async function onDismissHooksPrompt(): Promise<void> {
 @reference "@theme/base.css";
 
 .claude-code-hooks-prompt {
-  @apply flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted text-kira-sm gap-1.5 mb-1 py-1 px-1.5;
+  @apply flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5;
 }
 .claude-code-hooks-prompt span {
   @apply flex-1;

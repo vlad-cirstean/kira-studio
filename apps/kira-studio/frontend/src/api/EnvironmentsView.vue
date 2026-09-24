@@ -379,7 +379,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
         </div>
         <Alert v-if="variablesStore.environments.length === 0" class="empty-state" data-testid="environments-empty">
           <CodiconIcon name="server-environment" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted font-normal">No environments yet</AlertTitle>
+          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No environments yet</AlertTitle>
         </Alert>
         <Alert
           v-else-if="isFiltered && displayEnvironments.length === 0"
@@ -387,7 +387,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
           data-testid="environments-filter-empty"
         >
           <CodiconIcon name="search" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
         </Alert>
     </div>
   </div>

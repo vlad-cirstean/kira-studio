@@ -19,7 +19,7 @@ const emit = defineEmits<{ retry: [] }>();
     <div class="w-105 max-w-full">
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="warning" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">Kira Studio failed to start</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">Kira Studio failed to start</AlertTitle>
         <p class="text-kira-xs text-subtle whitespace-pre-wrap">{{ message }}</p>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button

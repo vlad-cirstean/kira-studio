@@ -115,7 +115,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .twisty {
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 cursor-pointer w-3.5 h-3.5;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5;
 }
 
 .twisty.invisible {
@@ -126,7 +126,7 @@ function onKeydown(e: KeyboardEvent): void {
    .kv-file-tree-icon, ported verbatim) — was a bare 13px codicon glyph with no box at all. The
    mask-* rules are inert for the directory glyph (a codicon <i>, not a CSS mask) but harmless. */
 .node-icon {
-  @apply shrink-0 w-4 h-4 text-muted;
+  @apply shrink-0 w-4 h-4 text-muted-foreground;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
@@ -149,6 +149,6 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .repo-tree-row[data-status='?'] .label {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 </style>

@@ -100,7 +100,7 @@ function onNavigate(c: ConstraintRow): void {
 }
 
 .def-con-detail {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground;
 }
 
 .ref-link {

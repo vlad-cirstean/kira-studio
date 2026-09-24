@@ -484,7 +484,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 }
 
 .no-rows {
-  @apply h-full flex items-center justify-center text-muted text-kira-sm;
+  @apply h-full flex items-center justify-center text-muted-foreground text-kira-sm;
 }
 
 .doc-body {
@@ -513,7 +513,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 }
 
 .kv-field {
-  @apply w-52 flex items-center text-muted text-ellipsis px-2;
+  @apply w-52 flex items-center text-muted-foreground text-ellipsis px-2;
 }
 
 .kv-value {

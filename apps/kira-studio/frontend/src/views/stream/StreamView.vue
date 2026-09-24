@@ -1071,14 +1071,14 @@ onUnmounted(() => {
         class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="arrow-swap" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">Click Poll to fetch messages</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">Click Poll to fetch messages</AlertTitle>
       </Alert>
       <Alert
         v-else-if="!rt || rt.rowCount === 0"
         class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="inbox" :size="24" class="text-subtle" />
-        <AlertTitle v-if="rt" class="text-kira-md font-normal text-muted">No messages</AlertTitle>
+        <AlertTitle v-if="rt" class="text-kira-md font-normal text-muted-foreground">No messages</AlertTitle>
       </Alert>
       <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
            from "no messages loaded". -->
@@ -1088,7 +1088,7 @@ onUnmounted(() => {
         data-testid="stream-no-matching-rows"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">No matching rows</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No matching rows</AlertTitle>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button
             variant="toolbar"
@@ -1373,7 +1373,7 @@ onUnmounted(() => {
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
 .msg-body {
-  @apply text-muted text-kira-sm font-data;
+  @apply text-muted-foreground text-kira-sm font-data;
 }
 
 .list-body {

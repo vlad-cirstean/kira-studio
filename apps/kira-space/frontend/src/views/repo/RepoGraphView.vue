@@ -114,7 +114,7 @@ onActivated(() => handle?.setVisible?.(true));
   />
   <Alert v-else class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
     <CodiconIcon name="warning" :size="24" class="text-subtle" />
-    <AlertTitle class="text-kira-md font-normal text-muted">{{ errorMessage }}</AlertTitle>
+    <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage }}</AlertTitle>
   </Alert>
 </template>
 

@@ -571,7 +571,7 @@ const fieldAttrs = computed(
         v-for="(line, i) in hoverLines"
         :key="i"
         class="hover-line whitespace-pre-wrap [overflow-wrap:anywhere]"
-        :class="{ 'mt-0.5 text-muted': i > 0 }"
+        :class="{ 'mt-0.5 text-muted-foreground': i > 0 }"
         >{{ line }}</div
       >
     </div>

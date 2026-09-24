@@ -2687,7 +2687,7 @@ defineExpose({
       data-testid="grid-no-rows"
     >
       <CodiconIcon name="table" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">No rows</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No rows</AlertTitle>
     </Alert>
     <Alert
       v-else-if="showNoMatchingRows"
@@ -2695,7 +2695,7 @@ defineExpose({
       data-testid="grid-no-matching-rows"
     >
       <CodiconIcon name="search" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">No matching rows</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matching rows</AlertTitle>
       <Button
         variant="toolbar"
         size="kira"

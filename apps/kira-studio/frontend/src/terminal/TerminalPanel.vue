@@ -264,7 +264,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       >
         <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
           <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md font-normal text-muted">No quick commands</AlertTitle>
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">No quick commands</AlertTitle>
           <AlertAction class="static mt-1">
             <Button
               variant="dialog-primary"
@@ -305,7 +305,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 }
 
 .run-icon {
-  @apply shrink-0 text-muted;
+  @apply shrink-0 text-muted-foreground;
 }
 
 .swatch {
@@ -321,7 +321,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 }
 
 .quick-command-command {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-xs;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-xs;
 }
 
 .quick-command-add {

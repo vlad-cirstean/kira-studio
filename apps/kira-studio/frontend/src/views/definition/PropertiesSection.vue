@@ -35,7 +35,7 @@ defineProps<{
 @reference "@theme/base.css";
 
 .def-prop-name {
-  @apply whitespace-nowrap text-muted;
+  @apply whitespace-nowrap text-muted-foreground;
 }
 
 .def-prop-detail {

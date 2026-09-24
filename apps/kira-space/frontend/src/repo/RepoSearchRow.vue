@@ -144,7 +144,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .twisty {
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 w-3.5 h-3.5;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 w-3.5 h-3.5;
 }
 
 /* P67b §6.2: matches RepoTreeRow.vue's own rule — a real per-language icon here too, rather than

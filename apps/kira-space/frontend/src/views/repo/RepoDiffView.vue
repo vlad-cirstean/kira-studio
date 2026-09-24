@@ -134,28 +134,28 @@ onUnmounted(() => {
       class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
     >
       <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">This file is binary and can't be compared.</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is binary and can't be compared.</AlertTitle>
     </Alert>
     <Alert
       v-else-if="state === 'tooLarge'"
       class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
     >
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">This file is too large to compare (over 8 MB).</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file is too large to compare (over 8 MB).</AlertTitle>
     </Alert>
     <Alert
       v-else-if="state === 'bothMissing'"
       class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
     >
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">This file no longer exists.</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This file no longer exists.</AlertTitle>
     </Alert>
     <Alert
       v-else
       class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
     >
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted">{{ errorMessage || 'Could not open this diff.' }}</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage || 'Could not open this diff.' }}</AlertTitle>
     </Alert>
   </div>
 </template>

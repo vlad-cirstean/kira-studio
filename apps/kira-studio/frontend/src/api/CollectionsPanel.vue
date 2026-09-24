@@ -232,7 +232,7 @@ onUnmounted(() => {
       <ImportReportStrip />
       <Alert class="empty-state" data-testid="collections-empty">
         <CodiconIcon name="folder-library" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">No collections yet</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No collections yet</AlertTitle>
         <span class="p-xs dim side-empty-text"
           >Create one from the <b>+</b> above, or import a Postman collection.</span
         >
@@ -260,7 +260,7 @@ onUnmounted(() => {
    category shape (P18's own "promote when a second consumer appears" rule). */
 .panel-category-head {
   all: unset;
-  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted uppercase tracking-wider h-control text-kira-sm;
+  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted-foreground uppercase tracking-wider h-control text-kira-sm;
 }
 .panel-category-head:hover {
   @apply text-fg;

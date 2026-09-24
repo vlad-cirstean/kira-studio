@@ -197,11 +197,11 @@ const rawLanguage = computed(() =>
 }
 
 .native-cost {
-  @apply text-muted text-kira-xs cursor-default;
+  @apply text-muted-foreground text-kira-xs cursor-default;
 }
 
 .statement-excerpt {
-  @apply text-muted text-kira-xs whitespace-pre-wrap break-words;
+  @apply text-muted-foreground text-kira-xs whitespace-pre-wrap break-words;
 }
 
 .issue-list {
@@ -217,7 +217,7 @@ const rawLanguage = computed(() =>
 }
 
 .issue-list li.info {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .no-issues,
@@ -251,7 +251,7 @@ const rawLanguage = computed(() =>
 }
 
 .muted {
-  @apply text-muted text-kira-xs;
+  @apply text-muted-foreground text-kira-xs;
 }
 
 .plan-detail {

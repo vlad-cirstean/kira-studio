@@ -28,7 +28,7 @@ async function onImport(): Promise<void> {
     <div class="start-inner">
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="source-control" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">No repository open</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No repository open</AlertTitle>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button variant="dialog-primary" size="kira-lg" data-testid="git-start-import" @click="onImport">
             <CodiconIcon name="repo" :size="13" />

@@ -227,6 +227,6 @@ async function onClear(): Promise<void> {
   @apply text-subtle;
 }
 .empty-state-title {
-  @apply text-kira-md text-muted font-normal;
+  @apply text-kira-md text-muted-foreground font-normal;
 }
 </style>

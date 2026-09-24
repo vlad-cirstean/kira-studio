@@ -139,7 +139,7 @@ async function onClear(): Promise<void> {
 
     <Alert v-if="entries.length === 0" class="empty-state" data-testid="http-history-empty">
       <CodiconIcon name="history" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">No past responses yet</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No past responses yet</AlertTitle>
       <span class="p-xs dim scratch-note">
         <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
         <template v-else>
@@ -168,7 +168,7 @@ async function onClear(): Promise<void> {
         data-testid="http-history-filter-empty"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
       </Alert>
     </template>
 

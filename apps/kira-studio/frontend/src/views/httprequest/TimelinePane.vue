@@ -303,15 +303,15 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 
     <Alert v-else-if="response" class="empty-state" data-testid="http-timeline-empty">
       <CodiconIcon name="watch" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">No timeline for this response</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No timeline for this response</AlertTitle>
     </Alert>
     <Alert v-else-if="rt?.status === 'error'" class="empty-state" data-testid="http-timeline-empty">
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">This request failed before any timeline was captured</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">This request failed before any timeline was captured</AlertTitle>
     </Alert>
     <Alert v-else class="empty-state">
       <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
     </Alert>
   </div>
 </template>
@@ -344,7 +344,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-index {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .hop-url {

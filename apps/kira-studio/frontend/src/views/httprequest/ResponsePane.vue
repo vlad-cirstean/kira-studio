@@ -471,7 +471,7 @@ onUnmounted(() => {
       </template>
       <Alert v-else class="empty-state">
         <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
       </Alert>
     </div>
     <RawExchangePane
@@ -503,7 +503,7 @@ onUnmounted(() => {
       </template>
       <Alert v-else class="empty-state">
         <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
         <button
           v-if="hasHistory"
           type="button"

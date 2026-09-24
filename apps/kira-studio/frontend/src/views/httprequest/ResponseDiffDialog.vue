@@ -376,7 +376,7 @@ onUnmounted(() => {
 }
 
 .diff-arrow {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .diff-headers {
@@ -405,7 +405,7 @@ onUnmounted(() => {
 }
 
 .diff-header-name {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .diff-header-value {

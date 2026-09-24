@@ -91,7 +91,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
   <div v-if="mode === 'request'" class="cookies-pane" data-testid="http-request-cookies">
     <Alert v-if="disableCookieJar" class="empty-state" data-testid="http-cookies-jar-off">
       <CodiconIcon name="circle-slash" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">
         The cookie jar is off for this request
       </AlertTitle>
       <button type="button" class="hint-link" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
@@ -154,7 +154,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       </div>
       <Alert v-else class="empty-state" data-testid="http-cookies-empty">
         <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">No cookies for this request's URL</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No cookies for this request's URL</AlertTitle>
         <button type="button" class="hint-link" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
       </Alert>
     </template>
@@ -198,12 +198,12 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       </template>
       <Alert v-else class="empty-state" data-testid="http-response-cookies-empty">
         <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted font-normal">This response carries no cookies</AlertTitle>
+        <AlertTitle class="text-kira-md text-muted-foreground font-normal">This response carries no cookies</AlertTitle>
       </Alert>
     </template>
     <Alert v-else class="empty-state">
       <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
     </Alert>
   </div>
 </template>
@@ -242,7 +242,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 /* AutocompleteField.vue's own hover-panel shape (P71 §8.2): a value line, then a muted second
    line for everything that isn't the value itself. */
 .cookie-attributes {
-  @apply text-muted text-kira-xs font-[family-name:var(--kira-font-data)];
+  @apply text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)];
 }
 
 .cookies-group {
@@ -250,7 +250,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 }
 
 .cookies-group-head {
-  @apply m-0 px-1.5 py-0 text-muted text-kira-sm;
+  @apply m-0 px-1.5 py-0 text-muted-foreground text-kira-sm;
 }
 
 .hint-link {

@@ -265,7 +265,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
     <div v-if="opsStore.visibleOps.length === 0" class="min-h-0 flex-1">
       <Alert class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="checklist" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">No operations yet</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No operations yet</AlertTitle>
       </Alert>
     </div>
     <template v-else>

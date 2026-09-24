@@ -98,7 +98,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 }
 
 .tree-twisty {
-  @apply flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted;
+  @apply flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground;
 }
 
 .tree-twisty-spacer {
@@ -117,7 +117,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 }
 
 .tree-summary {
-  @apply text-muted;
+  @apply text-muted-foreground;
 }
 
 .tok-string {

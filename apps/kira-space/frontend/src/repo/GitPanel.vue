@@ -607,7 +607,7 @@ onUnmounted(() => {
             class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
           >
             <CodiconIcon name="source-control" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md font-normal text-muted">No repository open</AlertTitle>
+            <AlertTitle class="text-kira-md font-normal text-muted-foreground">No repository open</AlertTitle>
           </Alert>
         </template>
       </div>
@@ -619,7 +619,7 @@ onUnmounted(() => {
     >
       <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="source-control" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">Import a repository to get started.</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">Import a repository to get started.</AlertTitle>
       </Alert>
     </div>
   </div>
@@ -672,7 +672,7 @@ onUnmounted(() => {
 /* Imported, not open: muted icon. Open (active or not): full-brightness, the same distinction the
    title bar's own repo tabs used to carry (§4.4's row-state table). */
 .repo-icon {
-  @apply shrink-0 text-muted;
+  @apply shrink-0 text-muted-foreground;
 }
 .repo-row.open .repo-icon {
   @apply text-fg;
@@ -691,11 +691,11 @@ onUnmounted(() => {
 }
 
 .repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 cursor-pointer w-3.5 h-3.5;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5;
 }
 
 .worktree-row {
-  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted;
+  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground;
   /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap. */
   padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
 }

@@ -27,7 +27,7 @@ function onNewTerminal(): void {
     <div class="start-inner">
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md font-normal text-muted">No terminal open</AlertTitle>
+        <AlertTitle class="text-kira-md font-normal text-muted-foreground">No terminal open</AlertTitle>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Tooltip :disabled="terminalsStore.terminalDefaults.cwd !== ''">
             <TooltipTrigger as-child>

@@ -100,7 +100,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-icon {
-  @apply text-muted w-4;
+  @apply text-muted-foreground w-4;
 }
 
 .def-col-key {
@@ -115,7 +115,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-type {
-  @apply whitespace-nowrap text-muted;
+  @apply whitespace-nowrap text-muted-foreground;
 }
 
 .type-info {
@@ -123,14 +123,14 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-null {
-  @apply whitespace-nowrap text-muted w-20;
+  @apply whitespace-nowrap text-muted-foreground w-20;
 }
 
 .def-col-default {
-  @apply whitespace-nowrap text-muted;
+  @apply whitespace-nowrap text-muted-foreground;
 }
 
 .def-col-comment {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted max-w-60;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60;
 }
 </style>

@@ -72,7 +72,7 @@ const { session, footerText } = useTerminalMount({
   @apply flex-1 min-h-0;
 }
 .terminal-footer {
-  @apply shrink-0 text-muted text-kira-sm bg-chrome py-0.5 px-1;
+  @apply shrink-0 text-muted-foreground text-kira-sm bg-chrome py-0.5 px-1;
 }
 .terminal-footer-error {
   @apply text-error;

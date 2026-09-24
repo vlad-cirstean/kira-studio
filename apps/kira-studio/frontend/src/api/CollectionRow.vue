@@ -200,7 +200,7 @@ function onKeydown(e: KeyboardEvent): void {
 /* mutations.spec.ts/fake-data.spec.ts/tree.spec.ts select `.twisty` directly — kept as a marker
    class. */
 .twisty {
-  @apply flex h-3.5 w-3.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted;
+  @apply flex h-3.5 w-3.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground;
 }
 
 .twisty.invisible {
@@ -208,7 +208,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .node-icon {
-  @apply shrink-0 text-muted;
+  @apply shrink-0 text-muted-foreground;
 }
 
 /* A fixed width so every row's name starts at the same x — an unaligned ragged edge is exactly
