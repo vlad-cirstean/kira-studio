@@ -135,7 +135,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
           ref="historyTriggerEl"
           variant="toolbar"
           size="kira-icon"
-          :class="{ 'bg-input text-fg': historyOpen }"
+          :class="{ 'bg-field text-fg': historyOpen }"
           data-testid="filter-history-button"
           aria-label="Saved & recent filters"
           @click="historyOpen = !historyOpen"

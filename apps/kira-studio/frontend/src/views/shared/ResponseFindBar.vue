@@ -157,7 +157,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': matchCase }"
+            :class="{ 'bg-field text-fg': matchCase }"
             aria-label="Match case"
             data-testid="http-find-match-case"
             @click="matchCase = !matchCase"
@@ -172,7 +172,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': wholeWord }"
+            :class="{ 'bg-field text-fg': wholeWord }"
             aria-label="Whole word"
             data-testid="http-find-whole-word"
             @click="wholeWord = !wholeWord"
@@ -187,7 +187,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': regex }"
+            :class="{ 'bg-field text-fg': regex }"
             aria-label="Regular expression"
             data-testid="http-find-regex"
             @click="regex = !regex"

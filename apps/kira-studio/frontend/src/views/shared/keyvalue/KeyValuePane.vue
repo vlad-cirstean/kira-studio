@@ -1005,7 +1005,7 @@ onUnmounted(() => {
               <Button
                 variant="toolbar"
                 size="kira-icon"
-                :class="{ 'bg-input text-fg': !!rt?.searchOpen }"
+                :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
                 aria-label="Search this page"
                 data-testid="keyvalue-search"
                 @click="onToggleSearch"
@@ -1257,7 +1257,7 @@ onUnmounted(() => {
 }
 
 .truncated-chip {
-  @apply shrink-0 bg-input text-subtle ml-1.5;
+  @apply shrink-0 bg-field text-subtle ml-1.5;
 }
 
 .search-match {

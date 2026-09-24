@@ -141,7 +141,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         </Tooltip>
       </div>
       <span ref="requestTimeoutMsGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="REQUEST_TIMEOUT_MS_RANGE.min"
@@ -214,7 +214,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         </Tooltip>
       </div>
       <span ref="maxResponseMbGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="MAX_RESPONSE_MB_RANGE.min"
@@ -357,7 +357,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         </Tooltip>
       </div>
       <span ref="maxRedirectsGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="MAX_REDIRECTS_RANGE.min"

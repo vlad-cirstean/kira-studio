@@ -235,7 +235,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 <template>
   <div class="ops-panel">
     <div class="ops-header">
-      <div class="filter-input flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-input px-2">
+      <div class="filter-input flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2">
         <CodiconIcon name="filter" :size="13" class="shrink-0 text-fg-muted" />
         <Input
           v-model="opsStore.filterText"

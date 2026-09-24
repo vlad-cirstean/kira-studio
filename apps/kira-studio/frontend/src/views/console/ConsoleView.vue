@@ -779,7 +779,7 @@ const statusLine = computed(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg is-active': !tab.state.newResultSet }"
+              :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
               aria-label="New result set toggle"
               data-testid="console-new-result-toggle"
               @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
@@ -823,7 +823,7 @@ const statusLine = computed(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': !!rt?.searchOpen }"
+              :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
               aria-label="Find in the active result set"
               data-testid="console-search"
               @click="onToggleSearch"

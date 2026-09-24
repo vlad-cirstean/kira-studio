@@ -778,7 +778,7 @@ onUnmounted(() => {
                 variant="toolbar"
                 size="kira-icon"
                 class="relative"
-                :class="{ 'bg-input text-fg': projectionOpen }"
+                :class="{ 'bg-field text-fg': projectionOpen }"
                 aria-label="Fields"
                 data-testid="document-toolbar-projection"
                 @click="projectionOpen = !projectionOpen"
@@ -859,7 +859,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': rt?.searchOpen }"
+              :class="{ 'bg-field text-fg': rt?.searchOpen }"
               aria-label="Search this page"
               data-testid="document-toolbar-search"
               @click="onToggleSearch"
@@ -1104,7 +1104,7 @@ onUnmounted(() => {
                         <Button
                           variant="toolbar"
                           size="kira-icon"
-                          :class="{ 'bg-input text-fg': editingRow === rows[vi.index] }"
+                          :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
                           :disabled="!editGate.editable"
                           aria-label="Edit"
                           data-testid="document-edit"

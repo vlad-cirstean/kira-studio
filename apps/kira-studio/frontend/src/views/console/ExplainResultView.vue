@@ -157,7 +157,7 @@ const rawLanguage = computed(() =>
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': showRaw }"
+              :class="{ 'bg-field text-fg': showRaw }"
               aria-label="Show the raw EXPLAIN output"
               data-testid="explain-raw-toggle"
               @click="showRaw = !showRaw"

@@ -656,7 +656,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': incognito }"
+              :class="{ 'bg-field text-fg': incognito }"
               aria-label="Incognito"
               data-testid="http-incognito-toggle"
               @click="toggleIncognito"
@@ -685,7 +685,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': fieldFilterOpen }"
+            :class="{ 'bg-field text-fg': fieldFilterOpen }"
             aria-label="Filter"
             data-testid="http-field-filter-toggle"
             @click="toggleFieldFilter"
@@ -700,7 +700,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': tab.state.fieldDescriptions }"
+            :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
             aria-label="Descriptions"
             data-testid="http-field-descriptions-toggle"
             @click="toggleFieldDescriptions"
@@ -715,7 +715,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': requestFindOpen }"
+            :class="{ 'bg-field text-fg': requestFindOpen }"
             aria-label="Find in request"
             data-testid="http-request-find-toggle"
             @click="toggleRequestFind"
@@ -732,7 +732,7 @@ onUnmounted(() => {
               <Button
                 variant="toolbar"
                 size="kira-icon"
-                :class="{ 'bg-input text-fg': overviewOpen }"
+                :class="{ 'bg-field text-fg': overviewOpen }"
                 aria-label="Variables"
                 data-testid="http-variables-overview-toggle"
                 @click="overviewOpen = !overviewOpen"

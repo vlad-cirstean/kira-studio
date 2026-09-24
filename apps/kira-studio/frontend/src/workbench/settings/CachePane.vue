@@ -85,7 +85,7 @@ async function onClearCaches(): Promise<void> {
         </Tooltip>
       </div>
       <span ref="l2BudgetMbGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="CACHE_L2_BUDGET_MB_RANGE.min"
@@ -134,7 +134,7 @@ async function onClearCaches(): Promise<void> {
       <span>Current usage</span>
       <Input
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         :model-value="cacheSizeLabel"
         disabled
       />
@@ -143,7 +143,7 @@ async function onClearCaches(): Promise<void> {
       <span>Hit rate</span>
       <Input
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         :model-value="hitRateLabel"
         disabled
       />

@@ -27,7 +27,7 @@ export const buttonVariants = cva(
         toolbar: 'rounded-kira-sm text-muted hover:bg-hover hover:text-fg',
         'toolbar-primary':
           'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-45',
-        dialog: 'justify-center rounded-kira-sm border border-border-strong bg-input text-fg',
+        dialog: 'justify-center rounded-kira-sm border border-border-strong bg-field text-fg',
         'dialog-primary':
           'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground disabled:opacity-45',
         'dialog-danger':

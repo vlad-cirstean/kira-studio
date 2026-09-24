@@ -513,7 +513,7 @@ function onBulkClose(): void {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': bulkMode }"
+              :class="{ 'bg-field text-fg': bulkMode }"
               aria-label="Edit as .env text"
               data-testid="variables-bulk-toggle"
               @click="bulkMode = !bulkMode"

@@ -308,7 +308,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': findOpen }"
+            :class="{ 'bg-field text-fg': findOpen }"
             aria-label="Find in message"
             data-testid="grpc-find-toggle"
             @click="toggleFind"

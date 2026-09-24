@@ -106,7 +106,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         <Input
           :model-value="query"
           placeholder="Search"
-          class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2"
+          class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2"
           data-testid="repo-search-query"
           :aria-invalid="!!error"
           @update:model-value="(v) => (query = String(v))"
@@ -121,7 +121,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': options.caseSensitive }"
+              :class="{ 'bg-field text-fg': options.caseSensitive }"
               data-testid="repo-search-case"
               aria-label="Match case"
               @click="onToggleOption('caseSensitive')"
@@ -136,7 +136,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': options.wholeWord }"
+              :class="{ 'bg-field text-fg': options.wholeWord }"
               data-testid="repo-search-whole-word"
               aria-label="Whole word"
               @click="onToggleOption('wholeWord')"
@@ -151,7 +151,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': options.regex }"
+              :class="{ 'bg-field text-fg': options.regex }"
               data-testid="repo-search-regex"
               aria-label="Regular expression"
               @click="onToggleOption('regex')"

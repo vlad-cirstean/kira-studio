@@ -214,7 +214,7 @@ const connectionName = computed(
         <div class="name-filter-wrap">
           <Input
             v-model="nameFilter"
-            class="name-filter h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="name-filter h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             placeholder="Filter objects by name"
             data-testid="filter-name-input"
           />

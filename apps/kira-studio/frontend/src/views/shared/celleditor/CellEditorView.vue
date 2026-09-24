@@ -625,7 +625,7 @@ const statusLine = computed(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': findOpen }"
+              :class="{ 'bg-field text-fg': findOpen }"
               aria-label="Find in value"
               data-testid="cell-editor-search-toggle"
               @click="toggleFind"

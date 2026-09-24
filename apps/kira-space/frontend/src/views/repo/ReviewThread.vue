@@ -109,7 +109,7 @@ function submit(): void {
 }
 
 .review-thread-input {
-  @apply box-border w-full resize-y bg-input text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2;
+  @apply box-border w-full resize-y bg-field text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2;
 }
 
 .review-thread-input:focus {

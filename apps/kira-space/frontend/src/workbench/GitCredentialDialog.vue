@@ -86,7 +86,7 @@ function onCancel(): void {
           ref="inputField"
           v-model="value"
           :type="gitCredentialStore.active.masked ? 'password' : 'text'"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
           data-testid="git-credential-input"
           @keydown.enter="onSubmit"
         />

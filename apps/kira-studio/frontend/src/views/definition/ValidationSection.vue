@@ -59,6 +59,6 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 }
 
 .def-raw {
-  @apply m-0 whitespace-pre-wrap rounded-kira-sm bg-input text-fg p-2;
+  @apply m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2;
 }
 </style>

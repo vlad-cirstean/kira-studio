@@ -180,7 +180,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': visible }"
+            :class="{ 'bg-field text-fg': visible }"
             aria-label="Reveal"
             data-testid="variable-reveal"
             @click="onEyeClick"

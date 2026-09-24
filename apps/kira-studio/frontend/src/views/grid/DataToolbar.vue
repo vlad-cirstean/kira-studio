@@ -327,7 +327,7 @@ function onDeleteRow(): void {
               size="kira-icon"
               class="relative"
               data-testid="toolbar-columns"
-              :class="{ 'bg-input text-fg': columnsOpen }"
+              :class="{ 'bg-field text-fg': columnsOpen }"
               aria-label="Columns"
               @click="columnsOpen = !columnsOpen"
             >
@@ -413,7 +413,7 @@ function onDeleteRow(): void {
         <Button
           variant="toolbar"
           size="kira-icon"
-          :class="{ 'bg-input text-fg': rt?.searchOpen }"
+          :class="{ 'bg-field text-fg': rt?.searchOpen }"
           data-testid="toolbar-search"
           aria-label="Search this page"
           @click="onToggleSearch"
@@ -429,7 +429,7 @@ function onDeleteRow(): void {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg is-active': rt?.maskPreview }"
+            :class="{ 'bg-field text-fg is-active': rt?.maskPreview }"
             :disabled="hasPendingChanges"
             data-testid="toolbar-mask-preview"
             aria-label="Toggle masking preview"

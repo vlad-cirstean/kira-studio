@@ -260,7 +260,7 @@ function onSequenceStartChange(index: number, start: number): void {
              itself, which forwards no DOM ref) -- keeps run-fields' flex layout untouched since the
              wrapper contributes no box of its own. -->
         <span ref="rowCountGroupRef" class="contents">
-        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             :model-value="String(rowCount)"
             type="number"
@@ -303,7 +303,7 @@ function onSequenceStartChange(index: number, start: number): void {
         </span>
         <Label class="field-label p-sm muted">Seed</Label>
         <span ref="seedGroupRef" class="contents">
-        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             :model-value="String(seed)"
             type="number"
@@ -383,7 +383,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"
-            class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             :data-testid="`generate-data-constant-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onConstantChange(index, String(v))"
@@ -393,7 +393,7 @@ function onSequenceStartChange(index: number, start: number): void {
             class="contents"
             :ref="(el) => setSequenceStartGroup(plan.column.name, el as Element | null)"
           >
-            <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-input">
+            <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
               <InputGroupInput
                 :model-value="String(plan.recipe.start)"
                 type="number"

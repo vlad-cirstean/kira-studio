@@ -352,7 +352,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-track {
-  @apply relative h-3 overflow-hidden rounded-kira-sm bg-input;
+  @apply relative h-3 overflow-hidden rounded-kira-sm bg-field;
 }
 
 .hop-bar {

@@ -39,7 +39,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
       <Input
         ref="inputRef"
         :model-value="modelValue"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2"
         data-testid="text-prompt-input"
         @update:model-value="emit('update:modelValue', String($event))"
         @keydown="wrapSelectionOnType"

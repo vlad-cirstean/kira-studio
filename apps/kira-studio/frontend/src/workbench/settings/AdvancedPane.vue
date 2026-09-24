@@ -81,7 +81,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         </Tooltip>
       </div>
       <span ref="opLogRetentionGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="OP_LOG_RETENTION_DAYS_RANGE.min"
@@ -150,7 +150,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         </Tooltip>
       </div>
       <span ref="expensiveQueryRowsGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="EXPENSIVE_QUERY_ROWS_RANGE.min"

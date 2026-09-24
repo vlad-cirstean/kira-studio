@@ -725,7 +725,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira"
-              class="bg-input text-fg"
+              class="bg-field text-fg"
               data-testid="stream-poll"
               @click="onPoll"
             >
@@ -829,7 +829,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': rt?.searchOpen }"
+              :class="{ 'bg-field text-fg': rt?.searchOpen }"
               aria-label="Search this page"
               data-testid="stream-search-toggle"
               @click="onToggleSearch"
@@ -890,7 +890,7 @@ onUnmounted(() => {
         </div>
         <div class="filter-field">
           <div
-            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-input px-2"
+            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-field px-2"
           >
             <span
               class="shrink-0 text-kira-xs"
@@ -962,7 +962,7 @@ onUnmounted(() => {
             <Tooltip :disabled="!timestampError">
               <TooltipTrigger as-child>
                 <div
-                  class="flex items-center gap-1 w-40 h-control rounded-kira-sm border bg-input px-2"
+                  class="flex items-center gap-1 w-40 h-control rounded-kira-sm border bg-field px-2"
                   :class="timestampError ? 'border-error' : 'border-border-strong'"
                 >
                   <span

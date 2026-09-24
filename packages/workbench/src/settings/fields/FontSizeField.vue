@@ -66,7 +66,7 @@ const fieldId = useId();
       </Tooltip>
     </div>
     <div class="size-input" ref="fontSizeGroupRef">
-      <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+      <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
         <InputGroupInput
           :id="fieldId"
           type="number"

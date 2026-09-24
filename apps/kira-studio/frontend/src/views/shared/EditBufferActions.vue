@@ -67,7 +67,7 @@ const resetTitle = computed<string>(
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': buffer.formatted.value === 'indented' }"
+            :class="{ 'bg-field text-fg': buffer.formatted.value === 'indented' }"
             aria-label="Beautify"
             :data-testid="`${testidPrefix}-beautify-indented`"
             :disabled="!buffer.canBeautify.value"
@@ -85,7 +85,7 @@ const resetTitle = computed<string>(
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': buffer.formatted.value === 'compact' }"
+            :class="{ 'bg-field text-fg': buffer.formatted.value === 'compact' }"
             aria-label="Minify"
             :data-testid="`${testidPrefix}-beautify-compact`"
             :disabled="!buffer.canBeautify.value"

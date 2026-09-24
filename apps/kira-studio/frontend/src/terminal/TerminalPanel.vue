@@ -206,13 +206,13 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
               <Input
                 v-model="newName"
                 placeholder="Name"
-                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                 data-testid="quick-command-add-name"
               />
               <Input
                 v-model="newCommand"
                 placeholder="Command"
-                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                 data-testid="quick-command-add-command"
               />
               <div class="quick-command-add-actions">

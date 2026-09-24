@@ -158,7 +158,7 @@ async function onAddScript(): Promise<void> {
             <Input
               v-model="scriptDrafts[script.id].name"
               placeholder="Name"
-              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
               data-testid="custom-script-name"
               @blur="onScriptFieldBlur(script)"
             />
@@ -212,7 +212,7 @@ async function onAddScript(): Promise<void> {
           <Input
             v-model="scriptDrafts[script.id].command"
             placeholder="Command"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             data-testid="custom-script-command"
             @blur="onScriptFieldBlur(script)"
           />
@@ -221,7 +221,7 @@ async function onAddScript(): Promise<void> {
           <Input
             v-model="scriptDrafts[script.id].workingDir"
             placeholder="Active repository"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             data-testid="custom-script-workingdir"
             @blur="onScriptFieldBlur(script)"
           />
@@ -238,7 +238,7 @@ async function onAddScript(): Promise<void> {
           <Input
             v-model="newScriptName"
             placeholder="Name"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             data-testid="custom-script-add-name"
           />
         </div>
@@ -285,7 +285,7 @@ async function onAddScript(): Promise<void> {
         <Input
           v-model="newScriptCommand"
           placeholder="Command"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
           data-testid="custom-script-add-command"
         />
       </div>
@@ -293,7 +293,7 @@ async function onAddScript(): Promise<void> {
         <Input
           v-model="newScriptWorkingDir"
           placeholder="Active repository"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
           data-testid="custom-script-add-workingdir"
         />
       </div>

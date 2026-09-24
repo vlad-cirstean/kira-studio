@@ -283,7 +283,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': matchCase }"
+            :class="{ 'bg-field text-fg': matchCase }"
             aria-label="Match case"
             :data-testid="`${testidPrefix}search-match-case`"
             @click="matchCase = !matchCase"
@@ -298,7 +298,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': wholeWord }"
+            :class="{ 'bg-field text-fg': wholeWord }"
             aria-label="Whole word"
             :data-testid="`${testidPrefix}search-whole-word`"
             @click="wholeWord = !wholeWord"
@@ -313,7 +313,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': regex }"
+            :class="{ 'bg-field text-fg': regex }"
             aria-label="Regular expression"
             :data-testid="`${testidPrefix}search-regex`"
             @click="regex = !regex"
@@ -336,7 +336,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg is-active': filtering }"
+            :class="{ 'bg-field text-fg is-active': filtering }"
             aria-label="Show only matching rows"
             :data-testid="`${testidPrefix}search-filter-rows`"
             @click="toggleFilter"

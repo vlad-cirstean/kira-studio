@@ -410,10 +410,10 @@ onUnmounted(() => {
   @apply border-0 border-t border-border my-4 mx-0;
 }
 .md-reading :deep(code) {
-  @apply bg-input rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
+  @apply bg-field rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
 }
 .md-reading :deep(pre) {
-  @apply overflow-auto bg-input rounded-kira-sm max-w-none mt-0 mx-0 mb-2 p-2;
+  @apply overflow-auto bg-field rounded-kira-sm max-w-none mt-0 mx-0 mb-2 p-2;
 }
 /* P73 §7(a): more specific than :deep(code) above, so fenced code wins without touching that
    rule — a fenced block matches Monaco's own size exactly. Inline code deliberately stays at

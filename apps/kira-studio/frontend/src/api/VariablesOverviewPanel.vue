@@ -236,7 +236,7 @@ function editEnvironmentVariables(): void {
 }
 
 .scope-chip {
-  @apply justify-self-start bg-input text-muted;
+  @apply justify-self-start bg-field text-muted;
 }
 .scope-chip.environment {
   background: rgba(55, 148, 255, 0.16);

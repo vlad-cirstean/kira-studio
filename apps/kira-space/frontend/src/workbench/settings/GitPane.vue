@@ -148,7 +148,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <span ref="fetchAutoIntervalGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
@@ -225,7 +225,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
       </div>
       <Input
         type="text"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         data-testid="settings-git-path"
         v-model="draft.git.gitPath"
       />
@@ -257,7 +257,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <span ref="graphFontSizeGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
             type="number"
             :min="FONT_SIZE_RANGE.min"

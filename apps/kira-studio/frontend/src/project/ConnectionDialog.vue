@@ -662,7 +662,7 @@ const preconnectText = computed({
       <div class="flex-1 min-h-0 overflow-auto" data-testid="connection-dialog-body">
     <template v-if="step === 'engine'">
       <div class="p-dialog-body engine-body">
-        <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-input px-2">
+        <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-field px-2">
           <CodiconIcon name="search" :size="13" class="shrink-0 text-fg-muted" />
           <Input
             v-model="engineSearch"
@@ -768,7 +768,7 @@ const preconnectText = computed({
           <div class="field-row">
             <div class="field name-field">
               <Label>Name</Label>
-              <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-ui" data-testid="connection-name" />
+              <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-ui" data-testid="connection-name" />
             </div>
             <div class="field color-field">
               <Label>Color</Label>
@@ -840,7 +840,7 @@ const preconnectText = computed({
                 <div class="password-input">
                   <Input
                     :model-value="draft.database ?? ''"
-                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                     data-testid="connection-database"
                     @update:model-value="draft.database = String($event)"
                   />
@@ -858,14 +858,14 @@ const preconnectText = computed({
                 <Label>Host</Label>
                 <Input
                   :model-value="draft.host ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                   data-testid="connection-host"
                   @update:model-value="draft.host = String($event)"
                 />
               </div>
               <div class="field port-field" ref="portGroupRef">
                 <Label>Port</Label>
-                <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+                <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
                   <InputGroupInput
                     :model-value="draft.port != null ? String(draft.port) : ''"
                     type="number"
@@ -910,7 +910,7 @@ const preconnectText = computed({
                 <Label>Region</Label>
                 <Input
                   :model-value="draft.database ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
@@ -919,7 +919,7 @@ const preconnectText = computed({
                 <Label>AWS profile (optional)</Label>
                 <Input
                   :model-value="draft.username ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                   data-testid="connection-username"
                   @update:model-value="draft.username = String($event)"
                 />
@@ -930,7 +930,7 @@ const preconnectText = computed({
                 <Label>Database</Label>
                 <Input
                   :model-value="draft.database ?? ''"
-                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                   data-testid="connection-database"
                   @update:model-value="draft.database = String($event)"
                 />
@@ -940,7 +940,7 @@ const preconnectText = computed({
                   <Label>User</Label>
                   <Input
                     :model-value="draft.username ?? ''"
-                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                     data-testid="connection-username"
                     @update:model-value="draft.username = String($event)"
                   />
@@ -952,7 +952,7 @@ const preconnectText = computed({
                       <Input
                         :model-value="draft.password ?? ''"
                         :type="showPassword ? 'text' : 'password'"
-                        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                         :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
                         data-testid="connection-password"
                         @update:model-value="(v) => onPasswordInput(String(v))"
@@ -981,7 +981,7 @@ const preconnectText = computed({
               <Label>Connection URI</Label>
               <Input
                 :model-value="draft.uri ?? ''"
-                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                 data-testid="connection-uri"
                 @update:model-value="(v) => setUri(String(v))"
                 @blur="refreshUriNote"
@@ -1026,7 +1026,7 @@ const preconnectText = computed({
           <div class="field">
             <Label>Throttle commands <span class="dim">— per second</span></Label>
             <div class="size-input" ref="throttleGroupRef">
-              <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+              <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
                 <InputGroupInput
                   type="number"
                   :min="0"
@@ -1302,8 +1302,8 @@ const preconnectText = computed({
             <p v-else class="helper-text">No masking rules yet on this connection.</p>
 
             <div class="mask-rule-add field-row">
-              <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="mask-rule-add-table" />
-              <Input v-model="newMaskColumn" placeholder="column" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="mask-rule-add-column" />
+              <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-table" />
+              <Input v-model="newMaskColumn" placeholder="column" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-column" />
               <select v-model="newMaskKind" class="p-select bordered" data-testid="mask-rule-add-kind">
                 <option value="name">Name</option>
                 <option value="email">Email</option>

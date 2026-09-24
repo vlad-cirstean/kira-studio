@@ -107,7 +107,7 @@ onUnmounted(() => {
         ref="searchInput"
         :model-value="query"
         placeholder="Find"
-        class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         data-testid="stream-search-input"
         @update:model-value="(v) => (query = String(v))"
       />
@@ -143,7 +143,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': filtering }"
+            :class="{ 'bg-field text-fg': filtering }"
             aria-label="Show only matching rows"
             data-testid="stream-search-filter-rows"
             @click="toggleFilter"

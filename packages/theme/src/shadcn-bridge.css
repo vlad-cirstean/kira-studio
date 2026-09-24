@@ -34,8 +34,8 @@
   --destructive-foreground: var(--kira-accent-fg);
   --border: var(--kira-border);
   /* shadcn spends --input mostly as border-input on form controls; the bg-input/30 background use
-     is the minority case, and --kira-bg-input is reachable through Tailwind's own bg-input utility
-     (base.css's existing @theme) when a filled control needs it. */
+     is the minority case. App code reaches the same --kira-bg-input fill through bg-field
+     (base.css's @theme), a separate name so it never collides with shadcn's own --color-input. */
   --input: var(--kira-border-strong);
   --ring: var(--kira-focus);
   --chart-1: var(--kira-conn-blue);
