@@ -115,6 +115,10 @@
   /* Fonts */
   --font-data: var(--kv-font-data);
   --font-ui: var(--kv-font-ui);
+  /* P110 A9: rung 3 (§1.1) — every dialog form field's raw `font-family: inherit` (cancelling the
+     browser's own native form-control font so text/number/textarea inputs match the dialog's own
+     font) recurs across 11 files, a deliberate design seam, not a per-file one-off. */
+  --font-inherit: inherit;
 
   /* Radius */
   --radius-sm: var(--kv-radius-sm);

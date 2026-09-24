@@ -255,26 +255,31 @@ function onClose(): void {
 <template>
   <KuiDialog :open="active" :title="title" @close="onClose">
     <template v-if="mode === 'create'">
-      <label class="kv-dialog-field">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Message (optional)
-        <input type="text" v-model="message" placeholder="git's own WIP message" />
+        <input
+          type="text"
+          v-model="message"
+          placeholder="git's own WIP message"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
       </label>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="includeUntracked" />
         Include untracked files (<code>-u</code>)
       </label>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="keepIndex" />
         Keep staged changes staged (<code>--keep-index</code>)
       </label>
-      <p v-if="pathspec.length > 0" class="kv-dialog-note">
+      <p v-if="pathspec.length > 0" class="kv:text-diff-deleted">
         Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
         stashed, not the whole working tree.
       </p>
     </template>
 
     <template v-else-if="mode === 'branch'">
-      <p class="kv-dialog-note">
+      <p class="kv:text-diff-deleted">
         From <code>{{
           // A template literal here would put two closing braces back to back, which this Vue
           // parser reads as the mustache's own closing delimiter mid-expression.
@@ -283,15 +288,19 @@ function onClose(): void {
         }}</code>:
         {{ branchTarget?.message }}
       </p>
-      <label class="kv-dialog-field">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Branch name
-        <input type="text" v-model="branchName" />
+        <input
+          type="text"
+          v-model="branchName"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
       </label>
-      <p v-if="branchNameLocalError" class="kv-dialog-error">{{ branchNameLocalError }}</p>
-      <p v-else-if="branchPreflight?.name.error" class="kv-dialog-error">
+      <p v-if="branchNameLocalError" class="kv:text-diff-deleted kv:my-0.5">{{ branchNameLocalError }}</p>
+      <p v-else-if="branchPreflight?.name.error" class="kv:text-diff-deleted kv:my-0.5">
         {{ branchPreflight.name.error }}
       </p>
-      <div v-if="branchPreflight?.verdict === 'blocked'" class="kv-stash-prediction">
+      <div v-if="branchPreflight?.verdict === 'blocked'" class="kv:my-2">
         <p>
           The branch will be created, but switching to it will not be clean — your working tree
           has changes that would be overwritten. You will stay on your current branch until you
@@ -301,52 +310,56 @@ function onClose(): void {
     </template>
 
     <template v-else-if="mode === 'save'">
-      <label class="kv-dialog-field">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Label
-        <input type="text" v-model="saveLabel" />
+        <input
+          type="text"
+          v-model="saveLabel"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
       </label>
-      <fieldset class="kv-dialog-field">
+      <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         <legend>Source</legend>
-        <label class="kv-dialog-field--inline">
+        <label class="kv:flex-row kv:items-center">
           <input type="radio" value="workingTree" v-model="saveSource" />
           This working tree
         </label>
-        <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv-dialog-note">
+        <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv:text-diff-deleted">
           Untracked files will not be included — <code>git stash create</code> cannot save them.
           Promote an existing stash entry that already includes them instead if you need to keep
           those too.
         </p>
-        <label v-if="saveSourceEntry" class="kv-dialog-field--inline">
+        <label v-if="saveSourceEntry" class="kv:flex-row kv:items-center">
           <input type="radio" value="entry" v-model="saveSource" />
           This stash entry: {{ stashLabel(saveSourceEntry) }}
         </label>
       </fieldset>
-      <p class="kv-dialog-note">The source is copied — it is never removed or dropped.</p>
+      <p class="kv:text-diff-deleted">The source is copied — it is never removed or dropped.</p>
     </template>
 
     <template v-else-if="mode === 'popConfirm' && pending">
       <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
         <div
           v-if="blocker.kind === 'untrackedCollision'"
-          class="kv-stash-prediction kv-stash-prediction--conflict"
+          class="kv:my-2"
         >
           <p>These untracked files already exist in your working tree and would be overwritten:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
           <p>Remedy: move or remove them yourself, or discard them and try again.</p>
         </div>
         <div
           v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
-          class="kv-stash-prediction kv-stash-prediction--conflict"
+          class="kv:my-2"
         >
           <p>Your uncommitted changes to these files would be overwritten:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
           <p>Remedy: commit or discard those changes first.</p>
         </div>
-        <div v-else class="kv-stash-prediction kv-stash-prediction--conflict">
+        <div v-else class="kv:my-2">
           <p>An operation is already in progress — finish or abort it first.</p>
         </div>
       </template>
@@ -354,16 +367,16 @@ function onClose(): void {
       <template v-if="pending.preflight.blockers.length === 0">
         <div
           v-if="pending.preflight.prediction.kind === 'clean'"
-          class="kv-stash-prediction kv-stash-prediction--clean"
+          class="kv:my-2 kv:text-diff-added"
         >
           No conflicts predicted.
         </div>
         <div
           v-else-if="pending.preflight.prediction.kind === 'conflicts'"
-          class="kv-stash-prediction kv-stash-prediction--conflict"
+          class="kv:my-2"
         >
           <p>This will likely conflict in:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in pending.preflight.prediction.paths" :key="path">
               <code>{{ path }}</code>
             </li>
@@ -375,7 +388,7 @@ function onClose(): void {
             — nothing is lost.
           </p>
         </div>
-        <div v-else class="kv-stash-prediction">
+        <div v-else class="kv:my-2">
           Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
         </div>
       </template>
@@ -408,51 +421,3 @@ function onClose(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field--inline {
-  flex-direction: row;
-  align-items: center;
-}
-
-.kv-dialog-field input[type='text'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-s-1) 0;
-}
-
-.kv-dialog-file-list {
-  max-height: 160px;
-  overflow-y: auto;
-  margin: var(--kv-s-2) 0;
-  padding-left: var(--kv-s-5);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.9em;
-}
-
-.kv-stash-prediction {
-  margin: var(--kv-s-4) 0;
-}
-
-.kv-stash-prediction--clean {
-  color: var(--kv-diff-added-fg);
-}
-</style>

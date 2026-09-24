@@ -73,34 +73,34 @@ function confirm(): void {
   <KuiDialog :open="active" title="Cherry-pick" @close="cancel">
     <p>Applies this commit's changes here as a new commit — the original stays where it is.</p>
 
-    <p v-if="preflight?.detachedHead" class="kv-dialog-note">
+    <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
       HEAD is detached: the new commit will not belong to any branch until you create one.
     </p>
 
-    <p v-if="preflight?.alreadyApplied" class="kv-dialog-note">
+    <p v-if="preflight?.alreadyApplied" class="kv:text-diff-deleted">
       This change already appears in this branch's history; the pick will probably be empty.
     </p>
 
     <template v-if="hasBlocker">
-      <div v-for="(blocker, i) in blockers" :key="i" class="kv-cherry-pick-blocker">
+      <div v-for="(blocker, i) in blockers" :key="i" class="kv:my-1">
         <template v-if="blocker.kind === 'inProgressOperation'">
           <p>An operation is already in progress. Resolve or abort it first.</p>
         </template>
         <template v-else-if="blocker.kind === 'stagedChanges'">
           <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
         <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
           <p>These local changes would be overwritten by this pick:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
         <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
           <p>These untracked files would be overwritten by this pick:</p>
-          <ul class="kv-dialog-file-list">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
@@ -115,7 +115,7 @@ function confirm(): void {
       <div
         v-for="entry in preflight?.mainlineRequired"
         :key="entry.parentNumber"
-        class="kv-cherry-pick-parent"
+        class="kv:py-0.5"
       >
         <label>
           <input
@@ -133,24 +133,24 @@ function confirm(): void {
     <template v-if="!hasBlocker && (!needsMainline || selectedMainline !== undefined)">
       <div
         v-if="preflight?.prediction.kind === 'clean'"
-        class="kv-cherry-pick-prediction kv-cherry-pick-prediction--clean"
+        class="kv:my-2 kv:text-diff-added"
       >
         No conflicts predicted.
       </div>
       <div
         v-else-if="preflight?.prediction.kind === 'conflicts'"
-        class="kv-cherry-pick-prediction kv-cherry-pick-prediction--conflict"
+        class="kv:my-2"
       >
         <p>This will likely conflict in:</p>
-        <ul class="kv-dialog-file-list">
+        <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
           <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
         </ul>
-        <label class="kv-cherry-pick-no-commit">
+        <label class="kv:block kv:mt-1">
           <input type="checkbox" v-model="noCommit" />
           Stop before committing (<code>--no-commit</code>), so I can resolve first
         </label>
       </div>
-      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-cherry-pick-prediction">
+      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv:my-2">
         Couldn't predict the outcome: {{ preflight.prediction.reason }}
       </div>
     </template>
@@ -168,39 +168,3 @@ function confirm(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-file-list {
-  max-height: 160px;
-  overflow-y: auto;
-  margin: var(--kv-s-2) 0;
-  padding-left: var(--kv-s-5);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.9em;
-}
-
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-cherry-pick-blocker {
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-cherry-pick-parent {
-  padding: var(--kv-s-1) 0;
-}
-
-.kv-cherry-pick-prediction {
-  margin: var(--kv-s-4) 0;
-}
-
-.kv-cherry-pick-prediction--clean {
-  color: var(--kv-diff-added-fg);
-}
-
-.kv-cherry-pick-no-commit {
-  display: block;
-  margin-top: var(--kv-s-2);
-}
-</style>

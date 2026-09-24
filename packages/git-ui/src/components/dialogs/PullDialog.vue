@@ -36,7 +36,7 @@ function stashAndCarry(): void {
       Pulling with <code>{{ pending.strategy }}</code> would rewrite history here, and your
       working tree has uncommitted changes that would be overwritten.
     </p>
-    <p class="kv-dialog-note">
+    <p class="kv:text-diff-deleted">
       Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
       then — if it can be applied back with no conflict — they are popped back automatically. A
       predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
@@ -51,9 +51,3 @@ function stashAndCarry(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-</style>

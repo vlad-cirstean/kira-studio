@@ -128,9 +128,12 @@ function closeDialog(): void {
     @close="closeDialog"
   >
     <template v-if="target?.mode === 'setParent'">
-      <label class="kv-dialog-field">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Parent branch
-        <select v-model="selectedParent">
+        <select
+          v-model="selectedParent"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        >
           <option value="">None (remove from stack)</option>
           <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
         </select>
@@ -138,13 +141,13 @@ function closeDialog(): void {
     </template>
 
     <template v-else-if="target?.mode === 'restack' && preflight">
-      <p v-if="preflight.verdict === 'blocked'" class="kv-dialog-error">
+      <p v-if="preflight.verdict === 'blocked'" class="kv:text-diff-deleted">
         {{ blockerText(preflight) }}
       </p>
       <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
       <template v-else>
         <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
-        <ul class="kv-stack-plan">
+        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-sm">
           <li v-for="entry in preflight.plan" :key="entry.branch">
             <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
             ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
@@ -152,7 +155,7 @@ function closeDialog(): void {
             base: {{ entry.baseSource }})
           </li>
         </ul>
-        <p v-if="preflight.needsForcePush.length > 0" class="kv-dialog-note">
+        <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted">
           These branches will need a force-push afterwards:
           {{ preflight.needsForcePush.join(', ') }}.
         </p>
@@ -160,7 +163,7 @@ function closeDialog(): void {
 
       <template v-if="stack.restacking.value">
         <p>Restacking…</p>
-        <ul class="kv-stack-progress">
+        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-sm">
           <li v-for="(p, i) in stack.progress.value" :key="i">
             {{ p.branch }} ({{ p.index }}/{{ p.total }})
           </li>
@@ -191,38 +194,3 @@ function closeDialog(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field select {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-note {
-  color: var(--kv-description-fg);
-}
-
-.kv-stack-plan,
-.kv-stack-progress {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  border: 1px solid var(--kv-panel-border);
-  font-size: 0.9em;
-}
-</style>

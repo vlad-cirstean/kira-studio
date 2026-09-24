@@ -77,7 +77,7 @@ function confirm(): void {
       <template v-if="preflight.targetSubject">— {{ preflight.targetSubject }}</template>
     </template>
 
-    <p v-if="!preflight.branch" class="kv-dialog-note">
+    <p v-if="!preflight.branch" class="kv:text-diff-deleted">
       You are not on a branch, so no branch is changed — this moves HEAD only.
     </p>
 
@@ -90,12 +90,12 @@ function confirm(): void {
         <template v-if="preflight.branch"><code>{{ preflight.branch }}</code></template>
         <template v-else>HEAD</template>:
       </p>
-      <ul class="kv-dialog-file-list">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
         <li v-for="c in preflight.leavingCommits" :key="c.sha">
           <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
         </li>
       </ul>
-      <p v-if="preflight.leavingTruncated" class="kv-reset-more">and more…</p>
+      <p v-if="preflight.leavingTruncated" class="kv:text-muted kv:italic">and more…</p>
     </template>
     <p v-else>
       This moves to a different line of history: {{ preflight.leaving }} commit{{
@@ -104,14 +104,15 @@ function confirm(): void {
       leave, {{ preflight.gaining }} arrive.
     </p>
 
-    <fieldset class="kv-reset-mode-picker">
-      <legend>Mode</legend>
-      <label class="kv-reset-mode-option">
+    <fieldset class="kv:my-2 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm">
+      <legend class="kv:px-0.5 kv:text-muted">Mode</legend>
+      <label class="kv:flex kv:gap-1 kv:items-start kv:py-1">
         <input
           type="radio"
           name="kv-reset-mode"
           value="soft"
           :checked="mode === 'soft'"
+          class="kv:mt-0.5"
           @change="selectMode('soft')"
         />
         <span>
@@ -119,12 +120,13 @@ function confirm(): void {
           difference appears as staged changes. Nothing is lost.
         </span>
       </label>
-      <label class="kv-reset-mode-option">
+      <label class="kv:flex kv:gap-1 kv:items-start kv:py-1">
         <input
           type="radio"
           name="kv-reset-mode"
           value="mixed"
           :checked="mode === 'mixed'"
+          class="kv:mt-0.5"
           @change="selectMode('mixed')"
         />
         <span>
@@ -132,12 +134,13 @@ function confirm(): void {
           Working tree files untouched. Nothing is lost.
         </span>
       </label>
-      <label class="kv-reset-mode-option">
+      <label class="kv:flex kv:gap-1 kv:items-start kv:py-1">
         <input
           type="radio"
           name="kv-reset-mode"
           value="hard"
           :checked="mode === 'hard'"
+          class="kv:mt-0.5"
           @change="selectMode('hard')"
         />
         <span>
@@ -149,23 +152,28 @@ function confirm(): void {
     </fieldset>
 
     <template v-if="mode === 'hard' && destroys.length > 0">
-      <p class="kv-dialog-note">This will permanently discard these uncommitted changes:</p>
-      <ul class="kv-dialog-file-list">
+      <p class="kv:text-diff-deleted">This will permanently discard these uncommitted changes:</p>
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
         <li v-for="path in destroys" :key="path"><code>{{ path }}</code></li>
       </ul>
-      <p class="kv-reset-untracked-note">
+      <p class="kv:text-muted kv:italic">
         Untracked and ignored files are <strong>not</strong> affected.
       </p>
 
-      <label v-if="canStashFirst" class="kv-reset-stash-first">
+      <label v-if="canStashFirst" class="kv:block kv:my-1">
         <input type="checkbox" v-model="stashFirst" />
         Stash these changes first instead of discarding them
       </label>
 
       <template v-if="!stashFirst">
-        <label class="kv-reset-field">
+        <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
           Type <code>{{ shortTarget }}</code> to confirm
-          <input v-model="typedToken" type="text" data-testid="reset-confirm-token" />
+          <input
+            v-model="typedToken"
+            type="text"
+            data-testid="reset-confirm-token"
+            class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+          />
         </label>
       </template>
     </template>
@@ -193,71 +201,3 @@ function confirm(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-file-list {
-  max-height: 160px;
-  overflow-y: auto;
-  margin: var(--kv-s-2) 0;
-  padding-left: var(--kv-s-5);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.9em;
-}
-
-.kv-reset-more {
-  color: var(--kv-description-fg);
-  font-style: italic;
-}
-
-.kv-reset-mode-picker {
-  margin: var(--kv-s-4) 0;
-  padding: var(--kv-s-2);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-}
-
-.kv-reset-mode-picker legend {
-  padding: 0 var(--kv-s-1);
-  color: var(--kv-description-fg);
-}
-
-.kv-reset-mode-option {
-  display: flex;
-  gap: var(--kv-s-2);
-  align-items: flex-start;
-  padding: var(--kv-s-2) 0;
-}
-
-.kv-reset-mode-option input {
-  margin-top: 0.2em;
-}
-
-.kv-reset-untracked-note {
-  color: var(--kv-description-fg);
-  font-style: italic;
-}
-
-.kv-reset-stash-first {
-  display: block;
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-reset-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-reset-field input[type='text'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-</style>

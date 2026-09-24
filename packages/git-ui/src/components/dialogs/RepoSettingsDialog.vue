@@ -188,9 +188,9 @@ async function save(): Promise<void> {
     <!-- P72 §8.3/§9.1: dateFormat moved to Kira Space's own app-wide appearance.dateFormat
          (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
          remaining surface for it. -->
-    <section v-if="host !== 'kira'" class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Display</h3>
-      <label class="kv-dialog-field" for="repo-settings-date-format">
+    <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Display</h3>
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-date-format">
         Commit date
         <KuiSelect
           id="repo-settings-date-format"
@@ -199,21 +199,22 @@ async function save(): Promise<void> {
           @update:model-value="onDateFormatChange"
         />
       </label>
-      <p class="kv-dialog-note">This applies to every repository in this panel, not just this one.</p>
+      <p class="kv:text-diff-deleted">This applies to every repository in this panel, not just this one.</p>
     </section>
 
-    <section class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Graph</h3>
-      <label class="kv-dialog-field">
+    <section class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Graph</h3>
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Load more page size
         <input
           type="number"
           v-model.number="draft['kiraSpace.graph.pageSize']"
           :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
           :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit kv:w-[8em]"
         />
       </label>
-      <label class="kv-dialog-field" for="repo-settings-graph-scope">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-graph-scope">
         Scope
         <KuiSelect
           id="repo-settings-graph-scope"
@@ -224,50 +225,54 @@ async function save(): Promise<void> {
       </label>
     </section>
 
-    <section class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Checkout</h3>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+    <section class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Checkout</h3>
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.checkout.autoStash']" />
         Automatically stash local changes that block a branch switch
       </label>
-      <p class="kv-dialog-note">
+      <p class="kv:text-diff-deleted">
         The stash is tagged with the branch you switched FROM and is never popped back
         automatically — bring it back deliberately from the stash list, even onto a different
         branch. Off restores the old dialog (discard / stash and carry / cancel).
       </p>
     </section>
 
-    <section class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Stash</h3>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+    <section class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Stash</h3>
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.stash.showInGraph']" />
         Show stash entries as nodes in the commit graph
       </label>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.stash.includeUntracked']" />
         "Include untracked files" starts checked in the Stash dialog
       </label>
     </section>
 
-    <section class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Branch review</h3>
-      <label class="kv-dialog-field">
+    <section class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Branch review</h3>
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Candidate base branches (one per line, tried in order)
-        <textarea v-model="baseCandidatesText" rows="3"></textarea>
+        <textarea
+          v-model="baseCandidatesText"
+          rows="3"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        ></textarea>
       </label>
     </section>
 
-    <section class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">GitHub</h3>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+    <section class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">GitHub</h3>
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.github.enabled']" />
         Show pull request status for this repository
       </label>
     </section>
 
-    <section v-if="writeCapability" class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Pull</h3>
-      <label class="kv-dialog-field" for="repo-settings-pull-strategy">
+    <section v-if="writeCapability" class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Pull</h3>
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-pull-strategy">
         Strategy
         <KuiSelect
           id="repo-settings-pull-strategy"
@@ -282,9 +287,9 @@ async function save(): Promise<void> {
          advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
          remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
          genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
-    <section v-if="host !== 'kira'" class="kv-repo-settings-section">
-      <h3 class="kv-repo-settings-heading">Diagnostics</h3>
-      <label class="kv-dialog-field" for="repo-settings-log-level">
+    <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Diagnostics</h3>
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-log-level">
         Log level
         <KuiSelect
           id="repo-settings-log-level"
@@ -301,53 +306,3 @@ async function save(): Promise<void> {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-repo-settings-section {
-  margin: var(--kv-s-4) 0;
-}
-
-.kv-repo-settings-section:first-of-type {
-  margin-top: var(--kv-s-2);
-}
-
-.kv-repo-settings-heading {
-  margin: 0 0 var(--kv-s-1) 0;
-  font-size: 0.9em;
-  font-weight: 600;
-  color: var(--kv-row-fg);
-}
-
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field--inline {
-  flex-direction: row;
-  align-items: center;
-}
-
-.kv-dialog-field textarea {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-dialog-field input[type='number'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-  width: 8em;
-}
-
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-</style>

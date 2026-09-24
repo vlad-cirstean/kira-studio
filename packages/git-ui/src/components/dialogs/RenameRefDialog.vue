@@ -52,13 +52,17 @@ async function submit(): Promise<void> {
 
 <template>
   <KuiDialog :open="open" title="Rename branch" @close="cancel">
-    <p class="kv-dialog-note">Renaming <code>{{ currentName }}</code></p>
+    <p class="kv:text-diff-deleted">Renaming <code>{{ currentName }}</code></p>
 
-    <label class="kv-dialog-field">
+    <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
       New name
-      <input type="text" v-model="name" />
+      <input
+        type="text"
+        v-model="name"
+        class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+      />
     </label>
-    <p v-if="nameError" class="kv-dialog-error">{{ nameError }}</p>
+    <p v-if="nameError" class="kv:text-diff-deleted kv:my-0.5">{{ nameError }}</p>
 
     <template #actions>
       <KuiButton variant="primary" :disabled="!canSubmit" @click="submit">Rename branch</KuiButton>
@@ -66,29 +70,3 @@ async function submit(): Promise<void> {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field input[type='text'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-s-1) 0;
-}
-</style>

@@ -258,51 +258,77 @@ function onClose(): void {
 <template>
   <KuiDialog :open="active" :title="title" @close="onClose">
     <template v-if="phase === 'create'">
-      <label class="kv-dialog-field">
+      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Path
-        <input type="text" v-model="path" placeholder="../my-repo-feature-x" />
+        <input
+          type="text"
+          v-model="path"
+          placeholder="../my-repo-feature-x"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
       </label>
-      <fieldset class="kv-dialog-field">
+      <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         <legend>Start from</legend>
-        <label class="kv-dialog-field--inline">
+        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
           <input type="radio" value="existingBranch" v-model="mode" />
           An existing branch
         </label>
-        <label class="kv-dialog-field--inline">
+        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
           <input type="radio" value="newBranch" v-model="mode" />
           A new branch
         </label>
-        <label class="kv-dialog-field--inline">
+        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
           <input type="radio" value="detach" v-model="mode" />
           Detached (no branch)
         </label>
       </fieldset>
 
-      <label v-if="mode === 'existingBranch'" class="kv-dialog-field">
+      <label v-if="mode === 'existingBranch'" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Branch
-        <input type="text" v-model="branch" list="kv-worktree-branches" placeholder="branch name" />
+        <input
+          type="text"
+          v-model="branch"
+          list="kv-worktree-branches"
+          placeholder="branch name"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
         <datalist id="kv-worktree-branches">
           <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
         </datalist>
       </label>
       <template v-else-if="mode === 'newBranch'">
-        <label class="kv-dialog-field">
+        <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
           New branch name
-          <input type="text" v-model="branch" placeholder="feature/x" />
+          <input
+            type="text"
+            v-model="branch"
+            placeholder="feature/x"
+            class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+          />
         </label>
-        <p v-if="newBranchNameError" class="kv-dialog-error">{{ newBranchNameError }}</p>
-        <label class="kv-dialog-field">
+        <p v-if="newBranchNameError" class="kv:text-diff-deleted kv:my-0.5">{{ newBranchNameError }}</p>
+        <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
           Start point
-          <input type="text" v-model="startPoint" placeholder="main" />
+          <input
+            type="text"
+            v-model="startPoint"
+            placeholder="main"
+            class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+          />
         </label>
       </template>
-      <label v-else class="kv-dialog-field">
+      <label v-else class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Commit-ish
-        <input type="text" v-model="startPoint" placeholder="a branch, tag or sha" />
+        <input
+          type="text"
+          v-model="startPoint"
+          placeholder="a branch, tag or sha"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
+        />
       </label>
 
       <template v-if="preflight">
-        <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="kv-dialog-error">
+        <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="kv:text-diff-deleted kv:my-0.5">
           <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
           <template v-else-if="blocker.kind === 'pathExists'">
             <code>{{ blocker.path }}</code> already exists.
@@ -318,13 +344,13 @@ function onClose(): void {
             <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
           </template>
         </p>
-        <p v-if="canOfferDetachHere" class="kv-dialog-note">
+        <p v-if="canOfferDetachHere" class="kv:text-diff-deleted">
           The new worktree will start with a detached HEAD.
           <KuiButton @click="submitCreateDetached">
             Create it detached at that branch's commit
           </KuiButton>
         </p>
-        <p v-for="note in preflight.notes" :key="note.kind" class="kv-dialog-note">
+        <p v-for="note in preflight.notes" :key="note.kind" class="kv:text-diff-deleted">
           <template v-if="note.kind === 'pathInsideRepo'">
             This path is inside the current repository.
           </template>
@@ -339,23 +365,23 @@ function onClose(): void {
     </template>
 
     <template v-else-if="phase === 'prepare'">
-      <p class="kv-dialog-note">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
+      <p class="kv:text-diff-deleted">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
       <template v-if="!started">
         <p>This repository has a prepare script:</p>
-        <pre class="kv-worktree-script">{{ prepareScript }}</pre>
-        <p v-if="!runPrepareScriptCapability" class="kv-dialog-error">
+        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-xs kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
+        <p v-if="!runPrepareScriptCapability" class="kv:text-diff-deleted kv:my-0.5">
           Running scripts is disabled here.
         </p>
-        <label v-else class="kv-dialog-field--inline">
+        <label v-else class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
           <input type="checkbox" v-model="runChecked" />
           Run this script now, as your own shell, with your own permissions
         </label>
       </template>
       <template v-else>
-        <pre class="kv-worktree-output"><span
+        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-xs kv:whitespace-pre-wrap kv:break-all"><span
           v-for="(line, i) in ops.worktreePrepareOutput.value"
           :key="i"
-          :class="{ 'kv-worktree-output-stderr': line.stream === 'stderr' }"
+          :class="line.stream === 'stderr' ? 'kv:text-diff-deleted' : ''"
         >{{ line.text }}
 </span></pre>
         <p v-if="prepareResult && !preparing">
@@ -393,53 +419,3 @@ function onClose(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field--inline {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--kv-s-1);
-}
-
-.kv-dialog-field input[type='text'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-s-1) 0;
-}
-
-.kv-worktree-script,
-.kv-worktree-output {
-  max-height: 240px;
-  overflow-y: auto;
-  padding: var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.85em;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.kv-worktree-output-stderr {
-  color: var(--kv-diff-deleted-fg);
-}
-</style>

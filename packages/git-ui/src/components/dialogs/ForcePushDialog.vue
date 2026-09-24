@@ -88,32 +88,33 @@ function confirmPlain(): void {
       </template>
     </p>
 
-    <p v-if="protectedBy" class="kv-dialog-error">
+    <p v-if="protectedBy" class="kv:text-diff-deleted kv:my-0.5">
       <code>{{ resolvedBranch }}</code> matches your protected pattern
       <code>{{ protectedBy }}</code>. Type the branch name to confirm.
     </p>
-    <label v-if="protectedBy" class="kv-dialog-field">
+    <label v-if="protectedBy" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
       Branch name
       <input
         v-model="typedBranch"
         type="text"
         :placeholder="resolvedBranch"
         data-testid="force-push-confirm-branch"
+        class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
       />
     </label>
 
-    <details class="kv-force-push-plain">
-      <summary>Use plain <code>--force</code> instead</summary>
-      <p class="kv-dialog-error">
+    <details class="kv:mt-2 kv:pt-1 kv:border-t kv:border-panel-border">
+      <summary class="kv:cursor-pointer kv:text-muted">Use plain <code>--force</code> instead</summary>
+      <p class="kv:text-diff-deleted kv:my-0.5">
         This skips the lease check entirely — it will overwrite the remote branch even if someone
         else has pushed to it since the lease's own tip was read, with no protection against
         discarding their work.
       </p>
-      <label class="kv-dialog-field kv-dialog-field--inline">
+      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input v-model="understandPlain" type="checkbox" data-testid="force-push-plain-ack" />
         I understand — overwrite the remote branch without checking for other pushes
       </label>
-      <div class="kv-force-push-plain-actions">
+      <div class="kv:flex kv:justify-end kv:mt-1">
         <KuiButton
           variant="danger"
           :disabled="!canConfirmPlain"
@@ -138,47 +139,3 @@ function confirmPlain(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-  margin: var(--kv-s-1) 0;
-}
-
-.kv-dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: var(--kv-s-2) 0;
-}
-
-.kv-dialog-field--inline {
-  flex-direction: row;
-  align-items: center;
-}
-
-.kv-dialog-field input[type='text'] {
-  padding: var(--kv-s-1) var(--kv-s-2);
-  background: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  border: 1px solid var(--kv-panel-border);
-  font-family: inherit;
-}
-
-.kv-force-push-plain {
-  margin-top: var(--kv-s-4);
-  padding-top: var(--kv-s-2);
-  border-top: 1px solid var(--kv-panel-border);
-}
-
-.kv-force-push-plain summary {
-  cursor: pointer;
-  color: var(--kv-description-fg);
-}
-
-.kv-force-push-plain-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--kv-s-2);
-}
-</style>

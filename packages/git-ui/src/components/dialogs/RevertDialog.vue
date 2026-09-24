@@ -59,7 +59,7 @@ function confirm(): void {
       pushed.
     </p>
 
-    <p v-if="preflight?.detachedHead" class="kv-dialog-note">
+    <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
       HEAD is detached: the revert commit will not belong to any branch until you create one.
     </p>
 
@@ -71,10 +71,14 @@ function confirm(): void {
       <div
         v-for="entry in preflight?.mainlineRequired"
         :key="entry.sha"
-        class="kv-revert-mainline-group"
+        class="kv:my-1 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm"
       >
-        <p class="kv-revert-mainline-sha"><code>{{ entry.sha.slice(0, 7) }}</code></p>
-        <label v-for="parent in entry.parents" :key="parent.parentNumber" class="kv-revert-parent">
+        <p class="kv:m-0 kv:mb-0.5 kv:font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
+        <label
+          v-for="parent in entry.parents"
+          :key="parent.parentNumber"
+          class="kv:block kv:py-0.5"
+        >
           <input
             type="radio"
             name="kv-revert-mainline"
@@ -90,28 +94,28 @@ function confirm(): void {
     <template v-if="!needsMainline || selectedMainline !== undefined">
       <div
         v-if="preflight?.prediction.kind === 'clean'"
-        class="kv-revert-prediction kv-revert-prediction--clean"
+        class="kv:my-2 kv:text-diff-added"
       >
         No conflicts predicted.
       </div>
       <div
         v-else-if="preflight?.prediction.kind === 'conflicts'"
-        class="kv-revert-prediction kv-revert-prediction--conflict"
+        class="kv:my-2"
       >
         <p>This will likely conflict in:</p>
-        <ul class="kv-dialog-file-list">
+        <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
           <li v-for="path in preflight.prediction.paths" :key="path"><code>{{ path }}</code></li>
         </ul>
-        <label class="kv-revert-no-commit">
+        <label class="kv:block kv:mt-1">
           <input type="checkbox" v-model="noCommit" />
           Stop before committing (<code>--no-commit</code>), so I can resolve first
         </label>
       </div>
-      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv-revert-prediction">
+      <div v-else-if="preflight?.prediction.kind === 'unknown'" class="kv:my-2">
         Couldn't predict the outcome: {{ preflight.prediction.reason }}
       </div>
 
-      <p v-if="isMultiSha" class="kv-dialog-note">
+      <p v-if="isMultiSha" class="kv:text-diff-deleted">
         This prediction covers only the first of the {{ preflight?.shas.length }} selected
         commits — the rest may conflict differently.
       </p>
@@ -123,48 +127,3 @@ function confirm(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-dialog-file-list {
-  max-height: 160px;
-  overflow-y: auto;
-  margin: var(--kv-s-2) 0;
-  padding-left: var(--kv-s-5);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.9em;
-}
-
-.kv-revert-mainline-group {
-  margin: var(--kv-s-2) 0;
-  padding: var(--kv-s-2);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-}
-
-.kv-revert-mainline-sha {
-  margin: 0 0 var(--kv-s-1);
-  font-weight: 600;
-}
-
-.kv-revert-parent {
-  display: block;
-  padding: var(--kv-s-1) 0;
-}
-
-.kv-revert-prediction {
-  margin: var(--kv-s-4) 0;
-}
-
-.kv-revert-prediction--clean {
-  color: var(--kv-diff-added-fg);
-}
-
-.kv-revert-no-commit {
-  display: block;
-  margin-top: var(--kv-s-2);
-}
-</style>

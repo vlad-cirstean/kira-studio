@@ -82,7 +82,7 @@ function stashAndCarry(): void {
 
     <template v-else-if="headline?.kind === 'blockedByUntracked'">
       <p>These untracked files would be overwritten by the checkout:</p>
-      <ul class="kv-dialog-file-list">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
         <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
       </ul>
       <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
@@ -90,10 +90,10 @@ function stashAndCarry(): void {
 
     <template v-else-if="trackedBlocker">
       <p>These local changes would be overwritten by the checkout:</p>
-      <ul class="kv-dialog-file-list">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
         <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
       </ul>
-      <p v-if="canDiscard" class="kv-dialog-note">
+      <p v-if="canDiscard" class="kv:text-diff-deleted">
         Discard permanently deletes these changes — this cannot be undone.
         <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
       </p>
@@ -110,18 +110,3 @@ function stashAndCarry(): void {
     </template>
   </KuiDialog>
 </template>
-
-<style scoped>
-.kv-dialog-file-list {
-  max-height: 160px;
-  overflow-y: auto;
-  margin: var(--kv-s-2) 0;
-  padding-left: var(--kv-s-5);
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.9em;
-}
-
-.kv-dialog-note {
-  color: var(--kv-diff-deleted-fg);
-}
-</style>
