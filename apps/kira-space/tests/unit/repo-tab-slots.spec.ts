@@ -4,7 +4,7 @@
 // closeAll rather than through any UI.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -13,7 +13,13 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// persistent chain — restoreAfterEach restores control back to its real (never-settling in this
+// harness) tabsSave after every test, so a one-time override here only covered this file's first
+// test; beforeEach reapplies the benign stub before each one, same fix as consoleHarness.ts.
+beforeEach(() => {
+  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+});
 
 const { defaultRepoFileTabState } = await import('../../frontend/src/state/tabDomain');
 const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
@@ -149,7 +155,15 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
   // P79 review fix (Performance, MEDIUM): evicting a large cohort ("Open all changes" on a
   // many-file commit) used to call tabsStore.closeTab() per evicted tab, each doing its own synchronous
   // full-array control.tabsSave() round trip. Asserts the whole eviction now costs exactly one.
-  test('evicting a large cohort in one go saves exactly once', () => {
+  //
+  // P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+  // promise chain (enqueueSave) — the actual host.control.tabsSave call always happens on a later
+  // microtask, never synchronously inside saveNow() itself, unlike before this fix. The counting
+  // wrapper below must stay installed until that queued link has actually run (a `setTimeout(0)`
+  // drains every pending microtask first, with time to spare since nothing here has a real async
+  // delay of its own), not restored synchronously in a `finally` right after the call that queued
+  // it, or it would be swapped back out before the chain ever reads it.
+  test('evicting a large cohort in one go saves exactly once', async () => {
     const ws = freshWorkspace();
     openFile(ws, 'seed.ts', true, false);
     for (let i = 0; i < 20; i++) openFile(ws, `bulk${i}.ts`, true, true);
@@ -161,12 +175,10 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
       saveCalls += 1;
       return original(...args);
     };
-    let evictor: { id: string };
-    try {
-      evictor = openFile(ws, 'evict-all.ts', true, false); // a plain preview click, not a bulk open
-    } finally {
-      (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = original;
-    }
+    const evictor = openFile(ws, 'evict-all.ts', true, false); // a plain preview click, not a bulk open
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = original;
+
     expect(saveCalls).toBe(1);
     expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([evictor.id]);
   });

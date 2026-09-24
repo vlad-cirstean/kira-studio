@@ -5,7 +5,7 @@
 // distinguishing such tabs in the strip.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -14,7 +14,13 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// persistent chain — restoreAfterEach restores control back to its real (never-settling in this
+// harness) tabsSave after every test, so a one-time override here only covered this file's first
+// test; beforeEach reapplies the benign stub before each one, same fix as consoleHarness.ts.
+beforeEach(() => {
+  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+});
 
 const { asRepoFileTab } = await import('../../frontend/src/state/tabDomain');
 const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');

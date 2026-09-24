@@ -7,7 +7,7 @@
 // on close, and the post-await path is a no-op once the tab is gone.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import type { HttpResponseWire } from '@shared/domain/http';
 import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
@@ -18,6 +18,14 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
+// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// persistent chain — a real (never-settling in this harness) control.tabsSave triggered
+// incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
+// assertions for the rest of the process. This spec doesn't test persistence, so give it a
+// benign default.
+beforeEach(() => {
+  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+});
 const { openApiRequestTab } = await import('../../frontend/src/api/tabs');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const { useHttpRequestViewStore } = await import('../../frontend/src/views/httprequest/state');

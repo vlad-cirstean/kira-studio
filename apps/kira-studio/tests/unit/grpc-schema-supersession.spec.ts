@@ -25,9 +25,11 @@ const { control } = await import('../../frontend/src/bridge/control');
 // variablesListEnvironments are only ever set once, file-wide, so afterAll alone is enough for them.
 const originalCollectionsList = control.collectionsList;
 const originalVariablesListEnvironments = control.variablesListEnvironments;
+const originalTabsSave = control.tabsSave;
 afterAll(() => {
   control.collectionsList = originalCollectionsList;
   control.variablesListEnvironments = originalVariablesListEnvironments;
+  control.tabsSave = originalTabsSave;
 });
 // P112: loadSchema now awaits apiIdsForTab (variables.ts) before ever reaching grpcDescribe, which
 // awaits loadCollectionsTree/loadEnvironments (apiQueries.ts) — control.collectionsList/
@@ -40,6 +42,13 @@ afterAll(() => {
 ).variablesListEnvironments = async () => [];
 (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
   async () => ({ collections: [], items: [] });
+// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// persistent chain — a real (never-settling in this harness) control.tabsSave triggered
+// incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
+// assertions for the rest of the process. This spec doesn't test persistence, so give it a
+// benign default (not restored — same file-wide convention as collectionsList/
+// variablesListEnvironments above, since it's set only once, not per test).
+(control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
   '../../frontend/src/api/tabs'
 );

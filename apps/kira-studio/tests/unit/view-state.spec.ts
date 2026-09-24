@@ -11,7 +11,7 @@
 // resolved promises.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
 import { deferred } from '@workbench/testing/unit/async';
@@ -26,6 +26,14 @@ const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
+// P108 Part 12 F12: createTabsStore's saveIfChanged now serialises every save through one
+// persistent chain — a real (never-settling in this harness) control.tabsSave triggered
+// incidentally by opening a tab below would otherwise wedge every later spec's own tabsSave
+// assertions for the rest of the process. This spec doesn't test persistence, so give it a
+// benign default.
+beforeEach(() => {
+  (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
+});
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');

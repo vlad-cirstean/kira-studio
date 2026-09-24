@@ -189,28 +189,47 @@ export function createTabsStore<
     // D17: the last serialisation actually written — a save whose snapshot is identical to this
     // skips the IPC and the write entirely, not just the debounce.
     let lastSavedSnapshot: string | null = null;
-    let pendingSnapshot: string | null = null;
+    // P108 Part 12 F12: `nextSnapshot` coalesces every change that arrives while a save is already
+    // chained down to just the latest one; `saveChain` is what actually serialises — each
+    // enqueueSave call chains its own link after whatever is already queued, so at most one
+    // tabsSave call is ever in flight. Before this, two overlapping saves (an incognito toggle
+    // firing saveNow() while an earlier debounced save was still in flight) had no ordering
+    // guarantee — Wails v3 dispatches each bound call on its own goroutine and ReplaceKeyed is one
+    // transaction with nothing serialising two calls against each other, so whichever HTTP round
+    // trip landed last in the DB won, not whichever was issued last client-side. A close-time flush
+    // raced the exact same way against any save already in flight.
+    let nextSnapshot: string | null = null;
+    let saveChain: Promise<void> = Promise.resolve();
 
     function persistableTabs(): R[] {
       const isPersistable = host.persistable ?? ((t: R) => t.kind !== 'terminal');
       return tabsState.tabs.filter(isPersistable);
     }
 
-    function saveIfChanged(): void {
-      const snapshot = JSON.stringify(persistableTabs());
-      if (snapshot === lastSavedSnapshot || snapshot === pendingSnapshot) return;
-      pendingSnapshot = snapshot;
-      void host.control
-        .tabsSave(JSON.parse(snapshot) as R[])
-        .then(
+    // Chains onto whatever save is already in flight (or already queued) rather than firing its
+    // own — the returned promise resolves once every save queued up to and including this one has
+    // settled, which is what flushPendingTabState needs to await. No early-return on
+    // `snapshot === lastSavedSnapshot` here: a save targeting a since-superseded snapshot must
+    // still run its link so it can re-read `nextSnapshot` fresh at execution time and no-op
+    // correctly — an early return here could skip clearing a stale queued target.
+    function enqueueSave(snapshot: string): Promise<void> {
+      nextSnapshot = snapshot;
+      saveChain = saveChain.then(async () => {
+        if (nextSnapshot === null || nextSnapshot === lastSavedSnapshot) return;
+        const toSave = nextSnapshot;
+        nextSnapshot = null;
+        await host.control.tabsSave(JSON.parse(toSave) as R[]).then(
           () => {
-            lastSavedSnapshot = snapshot;
+            lastSavedSnapshot = toSave;
           },
           () => {},
-        )
-        .finally(() => {
-          if (pendingSnapshot === snapshot) pendingSnapshot = null;
-        });
+        );
+      });
+      return saveChain;
+    }
+
+    function saveIfChanged(): void {
+      void enqueueSave(JSON.stringify(persistableTabs()));
     }
 
     const saveDebounced = useDebounceFn(saveIfChanged, 1000);
@@ -222,7 +241,7 @@ export function createTabsStore<
 
     function flushPendingTabState(ack: () => void): void {
       saveDebounced.cancel();
-      void host.control.tabsSave(persistableTabs()).finally(ack);
+      void enqueueSave(JSON.stringify(persistableTabs())).finally(ack);
     }
 
     host.control.onFlushBeforeClose(() => flushPendingTabState(host.control.appFlushed));
