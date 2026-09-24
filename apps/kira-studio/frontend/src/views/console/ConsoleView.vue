@@ -432,6 +432,16 @@ function onFormat(): void {
   const originalText = props.tab.state.text;
   void (async () => {
     const result = await formatConsoleText(kind, originalText);
+    // P108 Part 11 F13: the first Format press awaits a dynamic import('sql-formatter') — a
+    // keystroke typed before it resolves used to be silently overwritten by the formatted version
+    // of the OLDER text underneath it. `result` was computed against `originalText`, which is no
+    // longer what's in the editor, so it's discarded outright rather than applied: not a partial
+    // success to react to (resetStalePreviewState/setText/the cursor remap/the warning-or-note
+    // strips below all assume `result` describes the document currently on screen).
+    if (props.tab.state.text !== originalText) {
+      formatNote.value = 'Text changed while formatting — press Format again.';
+      return;
+    }
     // Explicit, not left to the watch() above alone: an already-formatted document formats to
     // byte-identical text, which never triggers that watcher (props.tab.state.text doesn't
     // change) — Format succeeding is still a "next action" that should clear a stale explain/
