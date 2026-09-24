@@ -412,6 +412,12 @@ func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceR
 	}
 	content, err := codeworkspace.ReadDiff(ctx, sess, args.Path)
 	if err != nil {
+		// F4: the session s.session() just resolved was closed (CloseWorkspace/RemoveRepo, or a
+		// git.path edit through Registry.Open) by the time this reached readHeadSide — a clean
+		// "reopen the workspace" outcome for the caller, not an internal failure.
+		if errors.Is(err, codeworkspace.ErrSessionClosed) {
+			return codeworkspace.DiffContent{}, ipcerr.New("E_WORKSPACE_CLOSED", "codeworkspace: workspace was closed")
+		}
 		return codeworkspace.DiffContent{}, ipcerr.Internal(err.Error())
 	}
 	return content, nil

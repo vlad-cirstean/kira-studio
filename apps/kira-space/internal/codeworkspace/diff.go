@@ -60,12 +60,14 @@ func ReadDiff(ctx context.Context, s *Session, relPath string) (DiffContent, err
 // catfile.Session — the same 8 MiB gate as the worktree side (MaxReadBytes), not catfile's own
 // larger default, so the two sides can never disagree about what is too large.
 func readHeadSide(ctx context.Context, s *Session, relPath string) (DiffSide, error) {
-	cf := s.catfileSession()
+	cf, err := s.catfileSession()
+	if err != nil {
+		return DiffSide{}, err
+	}
 	rev := "HEAD:" + relPath
 
 	var info catfile.ObjectInfo
 	var data []byte
-	var err error
 	if strings.Contains(rev, "\n") {
 		// gitsession.Blob's own guard, carried here verbatim: a newline anywhere in the request
 		// desynchronises the one-line-in/one-line-out batch protocol for the life of the session,

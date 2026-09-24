@@ -8,11 +8,20 @@ package codeworkspace
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
 )
+
+// ErrSessionClosed is returned by any Session operation attempted after Close has already run
+// (F4): a caller can still be holding a *Session another goroutine just closed (CloseWorkspace,
+// RemoveRepo, or a git.path change through Registry.Open replacing it) — without this guard,
+// catfileSession would spawn a fresh, never-closed cat-file pair on a session already out of the
+// registry (CloseAll cannot reach it either), and BeginSearch would hand out a live, uncancellable
+// search (CancelSearch only ever reaches the registry's current session via Peek).
+var ErrSessionClosed = errors.New("codeworkspace: session is closed")
 
 // Session is one open repository's own read context — root, the app's own repo id (code_repos.id,
 // distinct from gitclient's RepoID), and the runner/gitPath pair every git invocation needs, plus
@@ -25,6 +34,7 @@ type Session struct {
 
 	mu      sync.Mutex
 	catfile *catfile.Session
+	closed  bool
 
 	// searchCancel is C7 D8's own one-in-flight-per-workspace state: beginSearch cancels whatever
 	// this workspace's previous search was running, under the same mutex as every other field here.
@@ -106,20 +116,28 @@ func (r *Registry) CloseAll() {
 
 // catfileSession lazily constructs this session's own catfile.Session on first use (diff.go's own
 // HEAD-side reader) — a workspace that never opens a diff tab never pays for the two extra
-// processes.
-func (s *Session) catfileSession() *catfile.Session {
+// processes. Returns ErrSessionClosed once Close has run (F4) rather than building a pair nothing
+// will ever stop.
+func (s *Session) catfileSession() (*catfile.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return nil, ErrSessionClosed
+	}
 	if s.catfile == nil {
 		s.catfile = catfile.NewSession(catfile.Deps{Runner: s.Runner, GitPath: s.GitPath, Dir: s.Root}, MaxReadBytes)
 	}
-	return s.catfile
+	return s.catfile, nil
 }
 
 // Close stops this session's catfile session and cancels any in-flight search (C7 D8). Idempotent.
+// Marks the session closed under the same lock (F4), so any later catfileSession/BeginSearch call
+// on this exact *Session — held by a caller that raced this Close — fails or self-cancels instead
+// of quietly reviving a session already out of the registry.
 func (s *Session) Close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
+		s.closed = true
 		searchCancel := s.searchCancel
 		cf := s.catfile
 		s.catfile = nil
@@ -143,6 +161,12 @@ func (s *Session) Close() {
 // Session.Close are the only two ways this context ever ends. Exported (the plan's own §4.3 names
 // it lowercase, but internal/bridge — a separate package — is its one caller alongside Close, so it
 // must be; disclosed as a plan correction, not a design change).
+//
+// F4: on a session Close already ran on, returns an already-cancelled context instead of
+// installing a live searchCancel — codeworkspace.Search then sees ctx.Err() == context.Canceled
+// immediately, the same clean "user stopped it" path StartSearch's own caller already treats a
+// real CancelSearch as, rather than running a full-worktree scan nothing can reach to cancel
+// (CancelSearch's Registry.Peek only ever sees the registry's *current* session for this id).
 func (s *Session) BeginSearch() context.Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -150,6 +174,10 @@ func (s *Session) BeginSearch() context.Context {
 		s.searchCancel()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	if s.closed {
+		cancel()
+		return ctx
+	}
 	s.searchCancel = cancel
 	return ctx
 }
