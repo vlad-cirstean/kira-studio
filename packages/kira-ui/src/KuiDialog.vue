@@ -15,6 +15,12 @@
  *
  * `labelledBy` overrides the auto-generated heading id for a caller that needs a stable/known id;
  * every other caller lets `useId()` mint one and never touches the attribute directly.
+ *
+ * P110 A6: controls.css's `.kui-modal-backdrop`/`.kui-modal`/`-title`/`-body`/`-actions` replaced
+ * by `kv:` utilities. `kv:z-[var(--kui-z-modal,50)]` stays an arbitrary value (§1.1 rung 4): it
+ * reads a raw `--kui-*` custom property with its own fallback, not a value on any Tailwind scale,
+ * and isn't reused by `KuiTooltip`/`KuiPopoverPanel`/`KuiContextMenu`'s own distinct classes.
+ * `kv:max-h-[85vh]`/`kv:text-[1.05em]` are one-off literals with no scale step close enough.
  */
 import { onClickOutside } from '@vueuse/core';
 import { computed, ref, useId } from 'vue';
@@ -55,10 +61,13 @@ onClickOutside(rootEl, close);
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="kui-modal-backdrop">
+    <div
+      v-if="open"
+      class="kv:fixed kv:inset-0 kv:z-[var(--kui-z-modal,50)] kv:flex kv:items-center kv:justify-center kv:bg-kui-overlay"
+    >
       <div
         ref="rootEl"
-        class="kui-modal"
+        class="kv:flex kv:flex-col kv:max-h-[85vh] kv:p-kui-5 kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
@@ -66,13 +75,19 @@ onClickOutside(rootEl, close);
         @keydown="onKeydown"
         @keydown.escape="close"
       >
-        <h2 :id="titleId" class="kui-modal-title">
+        <h2
+          :id="titleId"
+          class="kv:shrink-0 kv:m-0 kv:mb-kui-4 kv:text-[1.05em]"
+        >
           <slot name="title">{{ title }}</slot>
         </h2>
-        <div class="kui-modal-body">
+        <div class="kv:overflow-y-auto kv:min-h-0">
           <slot />
         </div>
-        <div v-if="$slots.actions" class="kui-modal-actions">
+        <div
+          v-if="$slots.actions"
+          class="kv:flex kv:shrink-0 kv:justify-end kv:gap-kui-2 kv:mt-kui-5"
+        >
           <slot name="actions" />
         </div>
       </div>

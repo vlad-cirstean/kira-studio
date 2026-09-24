@@ -6,6 +6,12 @@
 // component's own DOM parent) — so no consumer needs to pass an anchor element in explicitly.
 // The surface itself is only positioned and sized here (anchor + width); each consumer wraps its
 // own list/content in an inner element that owns its own max-height/overflow/flex-direction.
+//
+// P110 A6: controls.css's `.kui-popover-backdrop`/`.kui-popover` replaced by `kv:` utilities.
+// `kv:z-[var(--kui-z-popover,20)]`/`kv:max-h-[var(--kui-float-max-h,none)]`/
+// `kv:max-w-[var(--kui-float-max-w,none)]` stay arbitrary values (§1.1 rung 4): each reads a raw
+// `--kui-*` custom property with its own fallback, not a value on any Tailwind scale, and none is
+// reused by `KuiTooltip`/`KuiContextMenu`/`KuiDialog`'s own distinct classes.
 import { onClickOutside } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { autoUpdate, computeFloatPosition } from './floatingPosition.ts';
@@ -95,10 +101,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="backdropEl" class="kui-popover-backdrop" :data-testid="backdropTestId">
+  <div
+    ref="backdropEl"
+    class="kv:fixed kv:inset-0 kv:z-[var(--kui-z-popover,20)]"
+    :data-testid="backdropTestId"
+  >
     <div
       ref="popoverEl"
-      class="kui-popover"
+      class="kv:fixed kv:max-h-[var(--kui-float-max-h,none)] kv:max-w-[var(--kui-float-max-w,none)] kv:overflow-y-auto kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float"
       :data-testid="testId"
       :style="{ width: `${props.width}px`, ...popoverPosition }"
     >
