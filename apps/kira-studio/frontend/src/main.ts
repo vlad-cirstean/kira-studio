@@ -20,6 +20,8 @@ import { useKeepAwakeStore } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
+import { useSchemaColumnsStore } from './state/schemaColumns';
+import { initSchemaSync } from './state/schemas';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 // workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
@@ -308,6 +310,21 @@ async function bootstrap(): Promise<void> {
   const tabsStore = useTabsStore(pinia);
   const settingsStore = useSettingsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
+  const treeStore = useTreeStore(pinia);
+  const schemaColumnsStore = useSchemaColumnsStore(pinia);
+
+  // F3 (P108 Part 12): these three used to subscribe only from ProjectTree.vue's own onMounted —
+  // a window booted with the project panel hidden (API/Terminal mode, or per-mode panel gating)
+  // or with zero connections yet never got them for the whole session. onSchemaChanged and
+  // onConnectionMetadataInvalidated then never arrived, so a restored console tab's completion,
+  // lint and hover served stale schema/columns, and a deleted connection's DDL cache never got
+  // cleaned up. Same precedent as initApiDataSync above: live before the project panel ever
+  // mounts, whether or not it mounts this session. Each is its own idempotent
+  // unsubscribe-then-resubscribe, so calling this instead of (rather than in addition to)
+  // ProjectTree.vue's removed onMounted call changes nothing about their own behavior.
+  treeStore.initTreeSync();
+  initSchemaSync();
+  schemaColumnsStore.initSchemaColumnsSync();
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();

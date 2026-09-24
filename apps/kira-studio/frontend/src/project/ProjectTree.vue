@@ -3,10 +3,8 @@ import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
-import { useSchemaColumnsStore } from '../state/schemaColumns';
-import { initSchemaSync } from '../state/schemas';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
@@ -15,7 +13,6 @@ import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
 
 const contextMenuStore = useContextMenuStore();
-const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
@@ -54,11 +51,10 @@ const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRow
   scrollElement: scrollEl,
 });
 
-onMounted(() => {
-  treeStore.initTreeSync();
-  initSchemaSync();
-  schemaColumnsStore.initSchemaColumnsSync();
-});
+// F3 (P108 Part 12): initTreeSync/initSchemaSync/initSchemaColumnsSync used to be wired from here,
+// on mount — moved to main.ts's bootstrap() so they're live whether or not this panel ever
+// mounts (a window in API/Terminal mode, or one with no connections at boot, used to get none of
+// them for the whole session). See bootstrap()'s own comment for the full reasoning.
 
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
 // scrolling happens here, one tick later, once treeStore.visibleRows reflects the newly expanded
