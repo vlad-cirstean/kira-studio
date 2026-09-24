@@ -109,8 +109,8 @@ const gate = props.tab
     )
   : null;
 const needsReconnect = computed(() => gate?.needsReconnect.value ?? false);
-function onReconnectAndLoad(): Promise<void> {
-  return gate ? gate.onReconnectAndLoad() : Promise.resolve();
+function onReconnectAndLoad(): Promise<boolean> {
+  return gate ? gate.onReconnectAndLoad() : Promise.resolve(false);
 }
 
 const rt = computed(() => keyValueViewStore.runtime[props.viewKey]);

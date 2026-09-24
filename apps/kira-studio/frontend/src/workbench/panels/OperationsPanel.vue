@@ -28,7 +28,7 @@ import {
   postgresEscapeStringsFor,
   sqlDialectFor,
 } from '../../views/shared/sqlIdent';
-import { useConnectionGate } from '../../views/shared/useConnectionGate';
+import { ensureConnectedOnce } from '../../views/shared/useConnectionGate';
 
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
@@ -143,9 +143,22 @@ function opSqlDialect(record: OpRecord) {
 // longer resolves (a dropped database/schema) surfaces as that same real, descriptive connect
 // error instead of silently running somewhere else — refusing to run against the wrong target
 // covers the finding's own "refuse" requirement without a second, parallel existence check. (2)
-// Routes through the console's own reconnect gate (useConnectionGate, the exact composable
-// ConsoleView.vue's ensureConnectedForRun already wraps) before running — Run itself never fires
-// against a disconnected connection, and Re-run must not either.
+// Routes through the same reconnect step ConsoleView.vue's own ensureConnectedForRun wraps — Run
+// itself never fires against a disconnected connection, and Re-run must not either.
+//
+// P108 Part 12 F16: ensureConnectedOnce (not useConnectionGate — see its own doc comment) is used
+// here rather than the reactive gate every live tab's own view binds to a template: Re-run fires
+// from a context-menu click, well after this component's setup has already returned, so a fresh
+// useConnectionGate() call here built each of its two computed()s with no owning effect scope to
+// ever dispose them — a small, permanent leak on every Re-run. It also now checks whether the
+// connect actually succeeded: Go's Connect never rejects for a bad connection, it resolves with
+// that state, so a reconnect that lands on 'error' used to still run markHydrated and the SQL
+// below against a connection that was never actually connected. A genuine rejection (the IPC call
+// itself failing) is caught rather than left as an unhandled promise rejection — onRerun runs
+// fire-and-forget from the context menu (`run: () => void onRerun(record)`), so nothing else would
+// ever see it. Either way the tab this already opened is left showing its own reconnect gate
+// (ensureConnectedOnce never marks it hydrated on a failure) — no toast to build for it: that is
+// the same feedback every other reconnect-gated view already gives on a failed connect.
 async function onRerun(record: OpRecord): Promise<void> {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
   const dialect = opSqlDialect(record);
@@ -160,12 +173,13 @@ async function onRerun(record: OpRecord): Promise<void> {
   }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = tabsStore.openConsoleTab(record.connectionId, record.path ?? '');
-  const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => ({
-    id: tabId,
-    connectionId: record.connectionId,
-  }));
-  if (needsReconnect.value) await onReconnectAndLoad();
-  await consoleViewStore.run(tabId, statements);
+  try {
+    const connected = await ensureConnectedOnce(tabId, record.connectionId);
+    if (!connected) return;
+    await consoleViewStore.run(tabId, statements);
+  } catch (err) {
+    console.error('Re-run: failed to reconnect/run', err);
+  }
 }
 
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
