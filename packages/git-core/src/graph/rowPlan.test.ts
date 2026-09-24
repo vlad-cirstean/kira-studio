@@ -304,3 +304,35 @@ describe('projectLayoutInput', () => {
     for (let d = 0; d < plan.length; d++) expect(plan.forkParentOf(d)).toBe(-1);
   });
 });
+
+describe('displayRowOf — P108 F1 (range-tolerant, not an assert)', () => {
+  function records() {
+    return [commit(0, [1]), commit(1, [])];
+  }
+  function tips(): TipRef[] {
+    return [tip(0, 'main')];
+  }
+
+  test('a store row beyond storeLength returns -1 instead of throwing (identityRowPlan(0))', () => {
+    // The exact plan a fresh mount holds before its first chunk lands (`GraphViewState`'s own
+    // initial `shallowRef(identityRowPlan(0))`) — a persisted scroll position (even row 0) used
+    // to assert here.
+    const plan = identityRowPlan(0);
+    expect(plan.storeLength).toBe(0);
+    expect(() => plan.displayRowOf(0)).not.toThrow();
+    expect(plan.displayRowOf(0)).toBe(-1);
+  });
+
+  test('a store row beyond storeLength returns -1 instead of throwing (buildRowPlan)', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const plan = buildRowPlan(store, tips(), noOptions);
+    expect(plan.storeLength).toBe(2);
+    expect(() => plan.displayRowOf(5)).not.toThrow();
+    expect(plan.displayRowOf(5)).toBe(-1);
+    expect(plan.displayRowOf(-1)).toBe(-1);
+    // Every row this plan actually covers still resolves normally.
+    expect(plan.displayRowOf(0)).toBeGreaterThanOrEqual(0);
+    expect(plan.displayRowOf(1)).toBeGreaterThanOrEqual(0);
+  });
+});

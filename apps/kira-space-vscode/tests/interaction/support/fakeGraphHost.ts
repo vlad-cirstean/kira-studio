@@ -42,7 +42,7 @@ export const OTHER_REPO_ID = '/fake/other-repo';
 // viewport.clientWidth a vertical scrollbar leaves behind). SlickGrid only renders rows within (or
 // just past) its own viewport, so a big count costs this fixture nothing at boot — 300 rows
 // comfortably overflows this suite's default 720px viewport at any plausible row height.
-const MANY_ROWS_COUNT = 300;
+export const MANY_ROWS_COUNT = 300;
 function manyRowsSha(row: number): string {
   return `aa${row.toString(16).padStart(8, '0')}`.padEnd(40, '0');
 }
@@ -616,6 +616,39 @@ function buildResponses(): {
  * what `App.vue`'s own `setRepoId` sweep requests right after `repo.open` resolves — needed for
  * `branch-picker.spec.ts` to see anything but empty tabs.
  */
+/** P108 F1 regression fixture: a full, current-shape (`version: 8`) persisted view state —
+ *  `parsePersistedViewState`'s own `isPersistedViewStateShape` discards a `version` mismatch or a
+ *  missing field whole (`viewState.ts`'s own doc comment), so a fixture with only `scrollRow` set
+ *  would be silently rejected, not "restore with defaults". `scrollRow` is the one field
+ *  `buildFakeGraphHostInitScript`'s own `persistedScrollRow` option varies; every other field's
+ *  exact value is irrelevant to what this fixture exercises, so this is a plain object literal
+ *  (not `@kira/git-ui`'s own `PersistedViewState`/`DEFAULT_COLUMN_WIDTHS`) — same reason this
+ *  file's own `WIDESET_SAMPLE_TIMESTAMP` above is a literal rather than an import: `@kira/git-ui`'s
+ *  package entry (`index.ts`) re-exports `mount`, which pulls in `App.vue` and every other real
+ *  Vue SFC in the package — Playwright's own TS loader cannot parse `.vue` syntax, so importing
+ *  anything from `@kira/git-ui` here breaks every spec in this file, not just this fixture.
+ *  (This file's own `WIDEST_SAMPLE_TIMESTAMP` above is a literal for the identical reason.) */
+function buildPersistedViewState(repoId: string, scrollRow: number): unknown {
+  return {
+    version: 8,
+    repoId,
+    loadedRows: 0,
+    detailOpen: true,
+    scrollRow,
+    selectedSha: null,
+    columnWidths: { author: 140, date: 152, graph: 95 },
+    dateFormat: 'relative',
+    detailWidth: 380,
+    fileListMode: 'tree',
+    searchCaseSensitive: false,
+    searchWholeWord: false,
+    searchRegex: false,
+    searchScope: 'both',
+    searchOpen: false,
+    collapseBranches: true,
+  };
+}
+
 export function buildFakeGraphHostInitScript(options?: {
   readonly streamMode?:
     | 'oneChunk'
@@ -625,10 +658,19 @@ export function buildFakeGraphHostInitScript(options?: {
     | 'twoChunksSecondDecorated'
     | 'branchOrder';
   readonly withPickerData?: boolean;
+  /** P108 F1: seeds `getState()` with a persisted `FAKE_REPO_ID`/`scrollRow` view state, so
+   *  `App.vue`'s cold-bootstrap `persisted.repoId` branch reopens it (and mounts `CommitGrid.vue`
+   *  with `initialScrollRow` set) instead of every other fixture's own `getState()` returning
+   *  `undefined`. Omit for the ordinary "nothing persisted" boot every other spec here uses. */
+  readonly persistedScrollRow?: number;
 }): string {
   const responses = buildResponses();
   const streamMode = options?.streamMode ?? 'oneChunk';
   const withPickerData = options?.withPickerData ?? false;
+  const persistedViewState =
+    options?.persistedScrollRow === undefined
+      ? null
+      : buildPersistedViewState(FAKE_REPO_ID, options.persistedScrollRow);
   const data = {
     appInit: responses.appInit(0),
     repoList: responses.repoList(0),
@@ -681,6 +723,10 @@ export function buildFakeGraphHostInitScript(options?: {
       const FIXTURES = ${fixtureJson};
       const STREAM_MODE = ${JSON.stringify(streamMode)};
       const WITH_PICKER_DATA = ${JSON.stringify(withPickerData)};
+      // P108 F1: 'null' (no persisted state — every other spec) or a real, version-8 blob whose
+      // 'repoId' matches FAKE_REPO_ID, so App.vue's cold-bootstrap 'persisted.repoId' branch
+      // reopens it before CommitGrid.vue mounts with 'initialScrollRow' set.
+      let persistedViewState = ${JSON.stringify(persistedViewState)};
       window.__graphRefreshCalls = [];
 
       function withId(template, id) {
@@ -800,9 +846,11 @@ export function buildFakeGraphHostInitScript(options?: {
           // Every other method is deliberately left unanswered — see this file's own doc comment.
         },
         getState() {
-          return undefined;
+          return persistedViewState === null ? undefined : persistedViewState;
         },
-        setState() {},
+        setState(state) {
+          persistedViewState = state;
+        },
       });
     })();
   `;

@@ -119,6 +119,7 @@ export interface CollapsedRowContext {
 const PERMISSIVE_PLAN: RowPlan = {
   length: Number.MAX_SAFE_INTEGER,
   revision: 0,
+  storeLength: Number.MAX_SAFE_INTEGER,
   entryAt: (displayRow) => ({
     kind: 'commit',
     storeRow: displayRow,

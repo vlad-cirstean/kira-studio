@@ -206,6 +206,10 @@ let resizeObserver: ResizeObserver | undefined;
 let resizeRaf = 0;
 let scrollRaf = 0;
 let previousSelectedRow = -1;
+// P108 F1: `initialScrollRow` applies once — set the moment a plan actually covers it (or, once
+// loading settles with the row still uncovered, clamped to the nearest valid row) — never left to
+// keep retrying forever. See `applyInitialScrollRow` below.
+let initialScrollApplied = false;
 
 // P79 review fix (Performance, LOW): `false` while a KeepAlive host has backgrounded this mount
 // (RepoGraphView.vue's own onDeactivated, via main.ts's `setVisible`) — the four generation
@@ -789,6 +793,40 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
   }
 }
 
+/** P108 F1: `initialScrollRow` is a persisted *store* row (`viewState.scrollRow`), applied once,
+ *  right after mount — but the plan this component reads from can lag behind it two ways: a cold
+ *  boot mounts before the first chunk lands at all (`plan()` still `identityRowPlan(0)`), and a
+ *  restart-at-zero refresh can leave a stale plan covering the *old*, larger history for a moment.
+ *  Either way, converting the persisted row against a plan that does not yet cover it used to
+ *  assert; now `displayRowOf` returns `-1` for "not covered" instead (`rowPlan.ts`), and this
+ *  function is what turns that into "wait for a plan that does cover it, or, once loading has
+ *  genuinely settled with the row still uncovered (this repo just has fewer rows now), clamp to
+ *  the last one that exists" — never a permanent no-op and never a crash. Called once at mount,
+ *  then again from the `plan`/`loading` watchers below until it succeeds. */
+function applyInitialScrollRow(row: number): void {
+  if (initialScrollApplied || !grid) return;
+  const currentPlan = plan();
+  if (row >= 0 && row < currentPlan.storeLength) {
+    grid.scrollRowIntoView(currentPlan.displayRowOf(row));
+    initialScrollApplied = true;
+    return;
+  }
+  // Still streaming in: more rows may yet cover `row` exactly — keep waiting rather than clamping
+  // early against a plan that is only partially loaded. Two separate "not done yet" signals, both
+  // required: `loading` covers the network fetch, but `#applyChunk` (`graphView.ts`) folds a
+  // chunk into the store and returns WITHOUT awaiting its own relayout (F11's own coalescing
+  // drain loop) — so `loading` can already read `'idle'` while the plan is still one or more
+  // relayouts behind the store's real row count. Only `storeLength` catching up all the way to
+  // `store.rowCount` means there is no relayout left in flight to still change the answer.
+  if (props.graphView.loading.value !== 'idle') return;
+  if (currentPlan.storeLength < props.graphView.store.rowCount) return;
+  const storeLength = currentPlan.storeLength;
+  if (storeLength <= 0) return; // nothing loaded at all yet (or an empty repo) — nothing to clamp to.
+  const clamped = Math.min(Math.max(row, 0), storeLength - 1);
+  grid.scrollRowIntoView(currentPlan.containingDisplayRow(clamped));
+  initialScrollApplied = true;
+}
+
 onMounted(() => {
   if (!host.value) return;
   tokenReader.watch();
@@ -942,9 +980,11 @@ onMounted(() => {
 
   updateHandlePositions();
   // `initialScrollRow` (`viewState.scrollRow`) is a persisted store row — translate to the
-  // display row this mount's plan currently resolves it to.
+  // display row this mount's plan currently resolves it to. `applyInitialScrollRow` (P108 F1)
+  // handles a plan that does not cover it yet (cold boot, before the first chunk lands) by
+  // deferring to the `plan`/`loading` watchers below rather than converting it here unguarded.
   if (props.initialScrollRow !== undefined) {
-    instance.scrollRowIntoView(plan().displayRowOf(props.initialScrollRow));
+    applyInitialScrollRow(props.initialScrollRow);
   }
   previousSelectedRow = props.selection.row.value;
 });
@@ -998,7 +1038,22 @@ watch(
 // P92 item 4's own comment) must run whether or not the row *count* moved.
 watch(
   () => props.graphView.plan.value,
-  () => grid?.invalidate(),
+  () => {
+    grid?.invalidate();
+    // P108 F1: a plan rebuild landing is exactly "a plan that might now cover `initialScrollRow`"
+    // — retry here rather than only once at mount.
+    if (props.initialScrollRow !== undefined) applyInitialScrollRow(props.initialScrollRow);
+  },
+);
+// P108 F1: a plan rebuild does not necessarily accompany the LAST chunk of a load (`loading`
+// flips back to `'idle'` after it, with no further plan change) — this is what lets
+// `applyInitialScrollRow` clamp a genuinely-uncovered row once loading has actually settled,
+// instead of waiting on a plan change that may never come again.
+watch(
+  () => props.graphView.loading.value,
+  () => {
+    if (props.initialScrollRow !== undefined) applyInitialScrollRow(props.initialScrollRow);
+  },
 );
 watch(
   () => props.graphView.generation.value,
@@ -1123,23 +1178,42 @@ onBeforeUnmount(() => {
  *  (`containingDisplayRow` finds the placeholder row, `groupKeyAt` its key) and awaits the rebuild
  *  before scrolling against the NEW plan's own `displayRowOf` — `async` now, unlike before P93;
  *  both existing callers (`App.vue`) already discard the return value, so this is source-
- *  compatible for them either way. */
+ *  compatible for them either way.
+ *
+ *  P108 F1: `row` can also be one this plan does not cover at all yet (`row >= storeLength`, not
+ *  merely hidden) — e.g. a stale plan mid-rebuild after a restart-at-zero refresh. Guarded before
+ *  ever calling `containingDisplayRow` (whose own contract, unlike `displayRowOf`, still asserts
+ *  in range — it is never handed an uncovered row here), and re-checked after `rebuildOrder()`'s
+ *  own await: another rebuild (or repo switch) can land while it runs, and the row this call
+ *  started for may no longer be covered by the time it resolves. Either way, this bails rather
+ *  than scrolling to the wrong place. */
 async function scrollToRow(row: number): Promise<void> {
+  if (row < 0 || row >= plan().storeLength) return;
   if (plan().displayRowOf(row) < 0) {
     const key = plan().groupKeyAt(plan().containingDisplayRow(row));
     props.order.toggleGroup(key);
     await props.graphView.rebuildOrder();
+    if (row >= plan().storeLength) return;
   }
-  grid?.scrollRowIntoView(plan().displayRowOf(row));
+  const displayRow = plan().displayRowOf(row);
+  if (displayRow < 0) return;
+  grid?.scrollRowIntoView(displayRow);
 }
 
 /** G-UX item 2/D10: an auto-refresh's own viewport restore — `App.vue` captures
  *  `getViewport().top` before a background refresh and calls this with it afterward, so the
  *  user's scroll position wins over the selection's own `scrollRowIntoView` (the concern
  *  `RefreshButton.vue` originally raised for why auto-refresh did not exist). Distinct from
- *  `scrollToRow`, which centers a target row rather than pinning it to the viewport's top. */
+ *  `scrollToRow`, which centers a target row rather than pinning it to the viewport's top.
+ *
+ *  P108 F1: `row` is the viewport-top row captured *before* the refresh that just reset/rebuilt
+ *  the plan — a smaller post-refresh history can leave it uncovered. Falls back to the nearest
+ *  covered group's own display row (`containingDisplayRow`, safe once `row` is checked in range)
+ *  rather than pinning to nothing at all; entirely uncovered bails, same as `scrollToRow`. */
 function scrollToTopRow(row: number): void {
-  grid?.scrollRowToTop(plan().displayRowOf(row));
+  if (!grid || row < 0 || row >= plan().storeLength) return;
+  const displayRow = plan().displayRowOf(row);
+  grid.scrollRowToTop(displayRow >= 0 ? displayRow : plan().containingDisplayRow(row));
 }
 
 /** The row currently pinned at the viewport's top — `App.vue`'s own capture half of the
@@ -1160,11 +1234,16 @@ function getViewportTop(): number | undefined {
  *  cannot be relied on to trigger the selection watcher's own invalidate/render (a same-value
  *  `select()` call is a no-op): `invalidateRows`/`render()` are called directly instead, which is
  *  what actually runs `onRendered` → `applyAccessibility` and lets `pendingFocusRow` take effect.
- *  A no-op with nothing loaded yet (`plan().length === 0`) — there is no row to focus. */
+ *  A no-op with nothing loaded yet (`plan().length === 0`) — there is no row to focus.
+ *
+ *  P108 F1: `selection.row` can momentarily hold a row a just-reset plan no longer covers (a
+ *  restart-at-zero refresh's own pre-flush watcher order) — `displayRowOf` returning `-1` for
+ *  that now falls back to row 0, same as no selection at all, rather than focusing row `-1`. */
 function focusGrid(): void {
   if (!grid || plan().length === 0) return;
   const selectedStoreRow = props.selection.row.value;
-  const row = selectedStoreRow >= 0 ? plan().displayRowOf(selectedStoreRow) : 0;
+  const selectedDisplayRow = selectedStoreRow >= 0 ? plan().displayRowOf(selectedStoreRow) : -1;
+  const row = selectedDisplayRow >= 0 ? selectedDisplayRow : 0;
   grid.scrollRowIntoView(row);
   pendingFocusRow = row;
   grid.invalidateRows([row]);
