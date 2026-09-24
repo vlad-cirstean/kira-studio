@@ -127,6 +127,11 @@
   /* Shadow — geometry composed with the widget-shadow colour, same as this package's own
      precedent (kira-structure.css's doc comment; kui-bridge.css's --kui-shadow-float). */
   --shadow-float: var(--kv-shadow-dialog) var(--kv-widget-shadow);
+  /* P110 A12: rung 3 (§1.1) — `--kv-shadow` (kira-structure.css) is an existing, already-purposed
+     geometry token (a smaller ambient tier below --kv-shadow-dialog's own float/dialog tier),
+     simply not yet exposed as a Tailwind utility — same composition pattern as --shadow-float
+     directly above, not a fresh design decision. */
+  --shadow-widget: var(--kv-shadow) var(--kv-widget-shadow);
 
   /* Non-scale spacing: control/row/bar heights and icon box are calc()-derived from the host's
      live --vscode-font-size, not a fixed step on the default scale (§1.1 rung 2/3). */

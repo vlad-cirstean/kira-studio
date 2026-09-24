@@ -1775,7 +1775,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="kv-app"
+    class="kv:flex kv:flex-col kv:h-full kv:w-full kv:bg-bg kv:text-fg kv:overflow-hidden kv:text-base kv:[font-family:var(--kv-font-family)]"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
@@ -1787,12 +1787,12 @@ onBeforeUnmount(() => {
          live-data strip carried this testid unconditionally too (inside its own always-rendered
          toolbar), and it is a genuine e2e wait/assert target across all three hosts' specs, not
          merely cosmetic duplicate of the root's own data-connection-state attribute above. -->
-    <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
+    <span class="kv:sr-only" data-testid="connection-state">{{ connectionState }}</span>
     <!-- W14's one polite live region (see the `liveAnnouncement` watch above) — unconditional and
          present from first paint, same as connection-state above, since Load-more/Refresh can
          both complete while this file's own v-if chain is on any branch that renders the toolbar. -->
     <div
-      class="kv-visually-hidden"
+      class="kv:sr-only"
       role="status"
       aria-live="polite"
       data-testid="live-announcements"
@@ -1806,9 +1806,24 @@ onBeforeUnmount(() => {
     <ConnectionBanner :state="bridge.hostConnection.value" />
     <!-- G12 D6: outside the v-if="repoState" gate below, since bootError means bootstrap() never
          got that far — a blank panel is never an acceptable rendering of a failure. -->
-    <div v-if="bootError && !repoState" class="kv-boot-error" data-testid="boot-error">
-      <p>Kira Space isn't reachable — {{ bootError }}</p>
-      <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
+    <div
+      v-if="bootError && !repoState"
+      class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
+      data-testid="boot-error"
+    >
+      <p class="kv:m-0 kv:max-w-[480px] kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
+      <!-- Cancels KuiButton's own default-variant background/text/hover so the retry action here
+           keeps this panel's plain panel-bg/app-fg look (this button's own established
+           override, unaffected by hovering — same effect the old unlayered `.kv-boot-error
+           button` descendant rule had, since it always beat KuiButton's own layered hover
+           utility regardless of hover state). -->
+      <KuiButton
+        class="kv:py-1 kv:px-3 kv:border kv:border-panel-border kv:rounded-sm kv:bg-panel kv:text-fg kv:enabled:hover:bg-panel kv:enabled:hover:text-fg"
+        data-testid="boot-retry"
+        @click="retryBootstrap"
+      >
+        Retry
+      </KuiButton>
     </div>
     <template v-else-if="repoState">
       <!-- P108 F8: bootstrap() keeps going after repoState is set — through persisted repo.open,
@@ -1816,9 +1831,20 @@ onBeforeUnmount(() => {
            surface here regardless of which sub-branch below ends up rendering (GitBlockedPanel,
            NoRepositoryPanel, the unborn-head empty state, or the full graph), not only the last of
            them. One banner, above all of them, rather than duplicated into just one branch. -->
-      <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
+      <div
+        v-if="bootError"
+        class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:bg-hover kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui kv:text-error"
+        role="status"
+        data-testid="boot-error-banner"
+      >
         <span>Kira Space isn't reachable — {{ bootError }}</span>
-        <KuiButton data-testid="boot-error-banner-retry" @click="retryBootstrap">Retry</KuiButton>
+        <KuiButton
+          class="kv:ml-auto kv:py-0.5 kv:px-2 kv:border kv:border-panel-border kv:rounded-sm kv:bg-panel kv:text-fg kv:enabled:hover:bg-panel kv:enabled:hover:text-fg"
+          data-testid="boot-error-banner-retry"
+          @click="retryBootstrap"
+        >
+          Retry
+        </KuiButton>
       </div>
 
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
@@ -1831,7 +1857,7 @@ onBeforeUnmount(() => {
 
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
+        <div v-if="searchOpen" ref="searchRowEl" class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0">
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
@@ -1845,7 +1871,7 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
-        <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
+        <div v-if="searchOpen" ref="searchRowEl" class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0">
           <SearchBox
             ref="searchBoxRef"
             :search="searchState"
@@ -1860,8 +1886,8 @@ onBeforeUnmount(() => {
           :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
           :resolve-conflict="resolveConflictInEditor"
         />
-        <main class="kv-body">
-          <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
+        <main class="kv:flex kv:flex-1 kv:min-h-0 kv:min-w-0">
+          <section class="kv:relative kv:flex-1 kv:min-w-0 kv:flex kv:flex-col kv:bg-panel" data-testid="graph-region" aria-label="Commit graph">
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
@@ -1869,6 +1895,7 @@ onBeforeUnmount(() => {
             />
             <CommitGrid
               ref="commitGridRef"
+              class="kv:flex-1 kv:min-h-0"
               :graph-view="graphView"
               :order="graphOrder"
               :selection="selection"
@@ -1892,20 +1919,21 @@ onBeforeUnmount(() => {
               @open-pull-request="handleGridOpenPullRequest"
             />
             <LoadMoreButton :graph-view="graphView" :page-size="pageSize" />
-            <span class="kv-visually-hidden" data-testid="chunk-source">{{
+            <span class="kv:sr-only" data-testid="chunk-source">{{
               graphView.lastChunkSource.value ?? ""
             }}</span>
           </section>
 
           <aside
             v-if="detailOpen && breakpoint !== 'overlay'"
-            class="kv-detail-region"
+            class="kv:relative kv:shrink-0 kv:border-l kv:border-panel-border kv:bg-panel kv:overflow-auto"
             data-testid="detail-region"
             aria-label="Commit detail"
+            :style="{ width: detailWidthPx }"
           >
             <hr
               v-if="breakpoint === 'wide'"
-              class="kv-detail-resize-handle"
+              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-[5px] kv:m-0 kv:-ml-0.5 kv:border-0 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
               aria-orientation="vertical"
               aria-label="Resize detail pane"
               :aria-valuenow="detailWidth"
@@ -1916,7 +1944,7 @@ onBeforeUnmount(() => {
               @pointerdown="startDetailResize"
               @keydown="handleDetailHandleKeydown"
             />
-            <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
+            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1940,14 +1968,17 @@ onBeforeUnmount(() => {
           </aside>
         </main>
 
-        <div v-if="detailOpen && breakpoint === 'overlay'" class="kv-detail-drawer">
+        <div
+          v-if="detailOpen && breakpoint === 'overlay'"
+          class="kv:absolute kv:inset-0 kv:flex kv:justify-end kv:bg-overlay kv:z-20"
+        >
           <aside
             ref="overlayDetailRegionEl"
-            class="kv-detail-region"
+            class="kv:relative kv:shrink-0 kv:border-l kv:border-panel-border kv:bg-panel kv:overflow-auto kv:w-[min(320px,90vw)] kv:shadow-[-2px_0_8px_var(--kv-widget-shadow)]"
             data-testid="detail-region"
             aria-label="Commit detail"
           >
-            <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
+            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -2008,7 +2039,7 @@ onBeforeUnmount(() => {
           <div
             v-if="forceDeleteRefCandidate"
             ref="forceDeletePanelEl"
-            class="kv-branch-force-delete kv-branch-force-delete--floating"
+            class="kv-branch-force-delete kv:fixed kv:z-[var(--kui-z-popover,20)] kv:border kv:border-panel-border kv:rounded-sm kv:shadow-widget"
             :style="forceDeletePanelStyle"
           >
             <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
@@ -2086,178 +2117,3 @@ onBeforeUnmount(() => {
     </template>
   </div>
 </template>
-
-<style>
-.kv-app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background-color: var(--kv-app-bg);
-  color: var(--kv-app-fg);
-  font-family: var(--kv-font-family);
-  font-size: var(--kv-font-size);
-  overflow: hidden;
-}
-
-/* G-UX D9 (item 9): the graph search row — moved out of the always-rendered toolbar (item 9's own
-   correctness fix), toggled by `/`/`Ctrl+F`/`Ctrl+Alt+F`, a sibling between <AppToolbar> and
-   whatever follows it in both template branches. G34 D13: takes the toolbar's own inset, so the
-   two stacked bars read as one chrome block rather than two differently-padded strips. */
-.kv-search-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-4);
-  background-color: var(--kv-toolbar-bg);
-  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
-  flex-shrink: 0;
-}
-
-/* G12 D6: F7's blank-panel failure mode, rendered instead — same layout shape as
-   GitBlockedPanel's own centered state, since both are "nothing else in the UI renders while this
-   holds". */
-.kv-boot-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-4);
-  height: 100%;
-  padding: var(--kv-s-6);
-  text-align: center;
-  color: var(--kv-app-fg);
-}
-
-.kv-boot-error p {
-  margin: 0;
-  max-width: 480px;
-  color: var(--kv-description-fg);
-}
-
-.kv-boot-error button {
-  padding: var(--kv-s-2) var(--kv-s-5);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  cursor: pointer;
-}
-
-/* G14 D3: the same anatomy as ReviewView.vue's .kv-review-stale-banner — a one-line banner above
-   the body it does not otherwise block. */
-.kv-boot-error-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-3);
-  background: var(--kv-row-hover-bg);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
-  font-family: var(--kv-font-ui);
-  color: var(--kv-error-fg);
-}
-
-.kv-boot-error-banner button {
-  margin-left: auto;
-  padding: var(--kv-s-1) var(--kv-s-4);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-app-fg);
-  cursor: pointer;
-}
-
-.kv-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* `docs/plans/P7.md` W14: the ref-badge menu's own force-delete confirmation — anchored at the
-   badge's own click point (there is no picker dropdown here to grow an inline row inside of),
-   reusing `BranchPicker.vue`'s own `.kv-branch-force-delete` for its colours/spacing. */
-.kv-branch-force-delete--floating {
-  position: fixed;
-  z-index: var(--kui-z-popover, 20);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  box-shadow: 0 2px 8px var(--kv-widget-shadow);
-}
-
-.kv-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
-
-.kv-graph-region {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--kv-panel-bg);
-}
-
-.kv-graph-region .kv-commit-grid {
-  flex: 1;
-  min-height: 0;
-}
-
-.kv-detail-region {
-  position: relative;
-  width: v-bind(detailWidthPx);
-  flex-shrink: 0;
-  border-left: 1px solid var(--kv-panel-border);
-  background-color: var(--kv-panel-bg);
-  overflow: auto;
-}
-
-.kv-detail-resize-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 5px;
-  margin: 0 0 0 -2px;
-  border: 0;
-  cursor: col-resize;
-  z-index: 2;
-  background: transparent;
-}
-
-.kv-detail-resize-handle:hover,
-.kv-detail-resize-handle:focus-visible {
-  background-color: var(--kv-focus-border);
-  outline: none;
-}
-
-.kv-detail-empty {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-description-fg);
-}
-
-/* §6.3's <600px band: an overlay drawer over the graph rather than a docked pane. */
-.kv-detail-drawer {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: flex-end;
-  background-color: var(--kv-overlay-bg);
-  z-index: 20;
-}
-
-.kv-detail-drawer .kv-detail-region {
-  width: min(320px, 90vw);
-  box-shadow: -2px 0 8px var(--kv-widget-shadow);
-}
-</style>
