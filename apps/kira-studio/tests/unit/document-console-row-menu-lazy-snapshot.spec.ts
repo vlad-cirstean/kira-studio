@@ -46,7 +46,18 @@ describe('documents/menu.ts rowMenu — lazy allIds (P21 round 2 performance fin
       calls++;
       return ['a', 'b', 'c'];
     };
-    const items = rowMenu('tab-1', 'a', '{}', allIds, () => {}, { editable: true, label: 'Edit' });
+    const items = rowMenu(
+      'tab-1',
+      'a',
+      '{}',
+      allIds,
+      () => {},
+      { editable: true, label: 'Edit' },
+      {
+        deletable: true,
+        label: 'Delete',
+      },
+    );
     return { items, getCalls: () => calls };
   }
 
@@ -71,6 +82,43 @@ describe('documents/menu.ts rowMenu — lazy allIds (P21 round 2 performance fin
     const { items, getCalls } = menuWithCountedAllIds();
     findRun(items, 'copy-id')();
     expect(getCalls()).toBe(0);
+  });
+
+  // P108 Part 11 F17: the Delete item now carries the same editable/label gate editGate already
+  // gives Edit — a row whose Delete button DocumentView.vue disables (read-only connection, no
+  // canDelete cap) must offer no working Delete in the context menu either.
+  test('Delete is enabled and labelled "Delete" when deleteGate.deletable is true', () => {
+    const items = rowMenu(
+      'tab-1',
+      'a',
+      '{}',
+      () => [],
+      () => {},
+      { editable: true, label: 'Edit' },
+      { deletable: true, label: 'Delete' },
+    );
+    const item = items
+      .filter((i): i is MenuItemWithId => 'id' in i)
+      .find((i) => i.id === 'delete-document');
+    expect(item?.type === 'item' && item.disabled).toBeFalsy();
+    expect(item?.type === 'item' && item.label).toBe('Delete');
+  });
+
+  test('Delete is disabled and relabelled when deleteGate.deletable is false', () => {
+    const items = rowMenu(
+      'tab-1',
+      'a',
+      '{}',
+      () => [],
+      () => {},
+      { editable: true, label: 'Edit' },
+      { deletable: false, label: 'Connection is read-only' },
+    );
+    const item = items
+      .filter((i): i is MenuItemWithId => 'id' in i)
+      .find((i) => i.id === 'delete-document');
+    expect(item?.type === 'item' && item.disabled).toBe(true);
+    expect(item?.type === 'item' && item.label).toBe('Connection is read-only');
   });
 });
 

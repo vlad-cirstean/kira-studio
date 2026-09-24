@@ -43,6 +43,11 @@ export function rowMenu(
   // keyvalue/menu.ts's own `editable`/label pair: a row's own Edit icon and this menu entry must
   // agree, or right-clicking would offer an action the toolbar button already refused.
   editGate: { editable: boolean; label: string },
+  // P108 Part 11 F17: same reasoning as editGate — the row's own Delete icon (DocumentView.vue's
+  // canDelete/deleteTitle, itself caps.canDelete combined with the connection's readOnly flag)
+  // used to gate only the toolbar button, leaving this menu's own Delete item always enabled and
+  // able to fire a write the row button next to it already refuses.
+  deleteGate: { deletable: boolean; label: string },
 ): MenuItem[] {
   return [
     {
@@ -135,8 +140,9 @@ export function rowMenu(
     {
       type: 'item',
       id: 'delete-document',
-      label: 'Delete',
+      label: deleteGate.deletable ? 'Delete' : deleteGate.label,
       danger: true,
+      disabled: !deleteGate.deletable,
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {

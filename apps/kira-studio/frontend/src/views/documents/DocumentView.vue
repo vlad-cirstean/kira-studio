@@ -579,6 +579,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
       () => idsOf(rows.value),
       () => startEdit(row, entry.view.id, entry.body),
       editGate.value,
+      { deletable: canDelete.value, label: deleteTitle.value },
     ),
   );
 }
