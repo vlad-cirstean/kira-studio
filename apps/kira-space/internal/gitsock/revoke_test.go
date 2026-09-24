@@ -377,7 +377,7 @@ func TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken(t *testin
 			// is the one that must observe the row as revoked.
 			revokeAfter: 2,
 		},
-		Registry:   gitRegistry,
+		Registry: gitRegistry,
 		Router: gitrpc.New(gitrpc.Deps{
 			Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: "test-version",
 		}),
