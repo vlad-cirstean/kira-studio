@@ -41,6 +41,9 @@
   --text-kui-xs: var(--kui-font-size-xs, 0.85em);
   --text-kui-sm: var(--kui-font-size-sm, inherit);
   --text-kui-base: var(--kui-font-size, inherit);
+  /* P110 A3: the glyph size inside `KuiIconBox`/`KuiSearchInput`/`KuiSelect` — a distinct token
+     from the font-size triad above, not one more step on it. */
+  --text-kui-icon: var(--kui-icon-size, 13px);
 
   --radius-kui: var(--kui-radius, 4px);
   --radius-kui-float: var(--kui-radius-float, 6px);

@@ -41,91 +41,6 @@
   font-size: var(--kui-icon-size, 13px);
 }
 
-/* G34 D5: Kira's own `.p-btn` shape — borderless and muted at rest, brightening on hover, with a
-   transparent 1px border reserved rather than `border: none` so the box does not resize between
-   the default/primary/danger variants, which all draw one. */
-.kui-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kui-space-2, 4px);
-  height: var(--kui-control-h, 22px);
-  padding: 0 var(--kui-space-3, 6px);
-  background: transparent;
-  color: var(--kui-fg-muted, inherit);
-  border: var(--kui-border-width, 1px) solid transparent;
-  border-radius: var(--kui-radius, 4px);
-  font-family: inherit;
-  font-size: var(--kui-font-size-sm, inherit);
-  text-decoration: none;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.kui-button:hover:not(:disabled) {
-  background-color: var(--kui-hover-bg, rgba(128, 128, 128, 0.15));
-  color: var(--kui-fg, inherit);
-}
-
-.kui-button:focus-visible {
-  outline: var(--kui-border-width, 1px) solid var(--kui-focus-border, currentColor);
-  outline-offset: -1px;
-}
-
-.kui-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.kui-button--active {
-  background-color: var(--kui-active-bg, var(--kui-hover-bg));
-  color: var(--kui-fg, inherit);
-}
-
-/* G34 D5: Kira's own icon-only button — a square at the control height, no text, no border. This
-   is the variant that replaced five separate hand-rolled icon-button implementations across
-   `packages/git-ui` (G34 D14) and is why `variant="ghost"` (below, previously) is gone: once
-   `.kui-button` is itself borderless and muted, "ghost" no longer named anything distinct. */
-.kui-button--icon {
-  width: var(--kui-control-h, 22px);
-  padding: 0;
-  justify-content: center;
-}
-
-/* G21 D2: `--kui-button-bg`/`--kui-button-fg`/`--kui-button-hover-bg` are a real, dedicated
-   filled-button token triple (the eleven dialogs' own "Confirm"/"Create branch"/… submit
-   buttons used `--kv-button-bg` for exactly this reason — a host's actual button colour, not its
-   row-selection colour) — falling back to `--kui-selected-*` for a host that has not bridged
-   them, so this variant still renders reasonably with zero required bridge changes. */
-.kui-button--primary {
-  background-color: var(--kui-button-bg, var(--kui-selected-bg));
-  color: var(--kui-button-fg, var(--kui-selected-fg));
-  border-color: var(--kui-button-bg, var(--kui-focus-border, var(--kui-border)));
-}
-
-.kui-button--primary:hover:not(:disabled) {
-  background-color: var(--kui-button-hover-bg, var(--kui-button-bg, var(--kui-selected-bg)));
-  border-color: var(--kui-button-hover-bg, var(--kui-button-bg, var(--kui-focus-border)));
-}
-
-.kui-button--danger {
-  color: var(--kui-danger-fg, var(--kui-fg));
-  border-color: var(--kui-danger-fg, var(--kui-border));
-}
-
-.kui-button-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 999px;
-  background-color: var(--kui-selected-bg, var(--kui-hover-bg));
-  color: var(--kui-selected-fg, var(--kui-fg));
-  font-size: 0.75em;
-  line-height: 14px;
-}
-
 /* G34 D7: Kira's own row primitive (`.p-row`) — one "row inside a floating panel" shape, where
    seven local implementations across `packages/git-ui` used to each draw their own (F8 in the
    G34 plan). `min-height`, not a fixed `height`: a genuinely two-line row (a menu item's `detail`
@@ -167,16 +82,6 @@
 .kui-row--danger,
 .kui-row--danger .kui-icon-box {
   color: var(--kui-danger-fg, var(--kui-fg));
-}
-
-/* Several `packages/git-ui` rows compose `.kui-row` directly onto a `<KuiButton>` (the row was
-   already clickable via `KuiButton` before this phase; F8 in the G34 plan unified their geometry,
-   it didn't swap the element out). `.kui-button`'s own fixed `height` would otherwise win over
-   `.kui-row`'s `min-height` at equal specificity (later rule wins; `.kui-button` is defined
-   first) and clip a row whose content wraps to a second line — this cancels it generically rather
-   than requiring every composing file to repeat the same override. */
-.kui-button.kui-row {
-  height: auto;
 }
 
 .kui-text-input {

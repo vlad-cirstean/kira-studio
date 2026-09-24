@@ -13,14 +13,17 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * `extend.theme` registers every custom (non-default-scale) key either theme file's `@theme`
  * mappings introduce, so tailwind-merge recognises e.g. `kv:h-control`/`kv:h-kui-control` as
  * spacing-scale values that conflict with `kv:h-8`, rather than treating the unrecognised suffix
- * as an arbitrary one-off it can't merge against anything. Font-size (`text-xs/sm/base/lg`),
- * radius t-shirt names (`sm`/`lg`), and every `bg-*`/`text-*`/`border-*` colour name need no entry
- * here: tailwind-merge's own default config already accepts a real Tailwind t-shirt size for the
- * first two and any suffix for colour (`color: [isAny]`), so the collision the audit found in
- * `packages/theme`'s `cn()` (a custom size *name* like `kira-sm` read as a colour) can't recur
- * here — this package's own `--text-*` overrides reuse the real t-shirt names instead.
+ * as an arbitrary one-off it can't merge against anything. Radius t-shirt names (`sm`/`lg`), and
+ * every `bg-*`/`text-*`/`border-*` COLOUR name need no entry here: tailwind-merge's own default
+ * config already accepts a real Tailwind t-shirt size for the former and any suffix for colour
+ * (`color: [isAny]`), so the collision the audit found in `packages/theme`'s `cn()` (a custom size
+ * *name* like `kira-sm` read as a colour) can't recur for `text-xs/sm/base/lg`, which reuse the
+ * real t-shirt names. `kui-icon` (A3, `--text-kui-icon`) is a font-size but not a t-shirt name, so
+ * it needs its own `text` entry below — without it, tailwind-merge would file it under the
+ * (default, catch-all) colour group instead and could wrongly cancel a real text colour utility
+ * placed next to it.
  */
-const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow'>({
+const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text'>({
   prefix: 'kv',
   extend: {
     theme: {
@@ -50,6 +53,7 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow'>({
       ],
       radius: ['kui', 'kui-float'],
       shadow: ['float', 'kui-float'],
+      text: ['kui-icon'],
     },
   },
 });
