@@ -6,7 +6,20 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
+
+// validPullStrategy is remote.run's own strategy vocabulary: @kira/git-ipc's PullStrategy union,
+// plus "" (every non-pull kind sends none).
+func validPullStrategy(s string) bool {
+	switch gitpreflight.PullStrategy(s) {
+	case "", gitpreflight.PullFFOnly, gitpreflight.PullMerge, gitpreflight.PullRebase:
+		return true
+	default:
+		return false
+	}
+}
 
 // remote.pullPreflight/remote.pushPreflight are reads and stay on the request ctx. remote.run
 // detaches (D19/G5 D8, applied again): a write already in flight must never be killed by a client
@@ -22,6 +35,9 @@ func (r *Router) handleRemotePullPreflight(ctx context.Context, c *gitsession.Co
 			}
 			if err := validRefArg("branch", p.Branch); err != nil {
 				return "", err
+			}
+			if p.StrategySetting != "" && !model.ValidPullStrategy(p.StrategySetting) {
+				return "", ipcerr.BadRequest("gitrpc: remote.pullPreflight: invalid strategySetting " + p.StrategySetting)
 			}
 			return p.RepoID, nil
 		},
@@ -87,6 +103,9 @@ func (r *Router) handleRemoteRun(ctx context.Context, c *gitsession.Conn, params
 				if err := validRefArg("branch", p.Branch); err != nil {
 					return "", err
 				}
+			}
+			if !validPullStrategy(p.Strategy) {
+				return "", ipcerr.BadRequest("gitrpc: remote.run: invalid strategy " + p.Strategy)
 			}
 			return p.RepoID, nil
 		},
