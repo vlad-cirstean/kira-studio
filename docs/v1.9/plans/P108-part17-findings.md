@@ -5,7 +5,7 @@ already fixed and committed (F2 `f951ced`, F3 `cac7093`, F4-F6 `37767d3`, F7 `07
 `7bc7998`, F9 `bc365eb`). Numbering continues from F10. Fixer: one commit per finding.
 
 Status: review complete. Five findings, F10-F14: F10 Medium, F11 Low-Medium, F12-F14 Low. All
-four are handshake/pairing lifecycle bugs; the RPC method surface itself turned up nothing.
+five are handshake/pairing lifecycle bugs; the RPC method surface itself turned up nothing.
 
 ## F10 — transient trust-store error discards a valid token (Medium)
 
