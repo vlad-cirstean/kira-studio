@@ -143,8 +143,13 @@ function fakerCall(
       if (bounds.intRange) return () => randomIntText(faker, bounds);
       if (bounds.precision !== undefined) {
         const dec = bounds.scale ?? 0;
-        const wholeDigits = Math.max(1, Math.min(bounds.precision - dec, 15));
-        return () => faker.finance.amount({ dec, max: 10 ** wholeDigits - 1 });
+        // F19 (P108 Part 10): numeric(p,p) (precision === scale, e.g. numeric(2,2), max 0.99) has
+        // no whole-number digits at all — the old Math.max(1, ...) floor forced at least one,
+        // generating up to 9.99 and overflowing every batch. wholeDigits = 0 means the max is just
+        // under 1 (1 - 10 ** -dec), not 10 ** 0 - 1 = 0.
+        const wholeDigits = Math.max(0, Math.min(bounds.precision - dec, 15));
+        const max = wholeDigits === 0 ? 1 - 10 ** -dec : 10 ** wholeDigits - 1;
+        return () => faker.finance.amount({ dec, max });
       }
       return () => clamp(faker.finance.amount({ dec: bounds.scale ?? 2 }), bounds.maxLength);
     case 'date.recent':

@@ -108,6 +108,14 @@ describe('finance.amount respects the column’s real numeric bounds (finding 2)
     }
   });
 
+  test('numeric(2,2) (no whole-number digits) never overflows, was 9.99 before F19 (P108 Part 10)', async () => {
+    const values = await valuesFor(planFor('rate', 'numeric(2,2)', 'finance.amount'));
+    for (const v of values) {
+      expect(v).toMatch(/^0\.\d{2}$/);
+      expect(Number(v)).toBeLessThan(1);
+    }
+  });
+
   test('a plain text column (no numeric bounds) keeps the previous 2-decimal default behaviour', async () => {
     const values = await valuesFor(planFor('cost', 'varchar(255)', 'finance.amount'));
     for (const v of values) {
