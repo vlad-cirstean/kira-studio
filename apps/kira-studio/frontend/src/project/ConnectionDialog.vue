@@ -263,14 +263,29 @@ const filteredKinds = computed(() => {
   return kinds.filter((kind) => KIND_LABEL[kind].toLowerCase().includes(q));
 });
 
+// P108 Part 12 F17: draft is edited in place (every field's v-model mutates the same reactive
+// object; only a whole-dialog reopen/swap reassigns connectionDialogStore.draft itself, the case
+// requestReveal's own stillCurrent below already guards), so a plain field edit made while a Test
+// is in flight left `d` pointing at the very same, now-different object — the response then
+// landed as the result for whatever the user had typed by the time it arrived, not what was
+// actually tested. `snapshot` catches that edit; the identity/editingId check catches the rarer
+// swap-to-a-different-connection race, same pattern requestReveal already established.
 async function onTest(): Promise<void> {
   const d = draft.value;
   if (!d) return;
+  const targetEditingId = connectionDialogStore.editingId;
+  const snapshot = JSON.stringify(d);
+  const stillCurrent = (): boolean =>
+    connectionDialogStore.draft === d &&
+    connectionDialogStore.editingId === targetEditingId &&
+    JSON.stringify(connectionDialogStore.draft) === snapshot;
+
   testState.value = { status: 'testing' };
   // P14 D3: editingId (empty for a brand-new connection) lets the backend fill in the stored
   // secret when the draft carries none, so testing an existing connection whose password was
   // never revealed still probes with the real credential rather than none at all.
-  const result = await control.connectionsTest(d, connectionDialogStore.editingId ?? '');
+  const result = await control.connectionsTest(d, targetEditingId ?? '');
+  if (!stillCurrent()) return;
   testState.value = result.ok
     ? { status: 'ok', message: result.serverVersion }
     : { status: 'error', message: result.error };
