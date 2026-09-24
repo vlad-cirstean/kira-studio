@@ -3772,6 +3772,116 @@ side (Part 16's result section names `884fae5` as the surviving hash for its F13
   with no pre-fix equivalent — F2's CAS helper, F4's generation guard, F9's harness cleanup, F10's
   lock-staleness check).
 
+## P108 Part 17 result
+
+Reviewed per `plans/P108-part17-space-git-rpc.md` (Opus reviewer, no fixing; tree surveyed at
+`e5fbcdd`), 14 findings total across two review passes. F1-F9 landed first (F2 `f951ced`, F3
+`cac7093`, F4-F6 `37767d3`, F7 `0719492`, F8 `7bc7998`, F9 `bc365eb`); this pass fixed the
+remaining five, F10-F14, all handshake/pairing lifecycle bugs — the RPC method surface itself
+(handler table, params, error shapes, argv injection) turned up nothing across both passes. One
+Sonnet fixer landed one commit per finding, none dismissed or deferred.
+
+- **F10 (Medium) `76fe4e1`** — `verifyClientToken` folded a trust-store lookup error (SQLite
+  busy/locked under a concurrent write, or the DB closing during shutdown) into the same path as a
+  missing row, so `runHandshake` answered a transient failure with `tokenRejected`. The extension
+  treats that frame as authoritative and deletes its stored token, turning one flaky read into a
+  permanent, unnecessary re-pair for an editor that was still trusted. Made `verifyClientToken`
+  tri-state (`tokenVerified`/`tokenInvalid`/`tokenLookupFailed`); on a lookup failure `runHandshake`
+  closes with no frame (row 1's own posture) instead, so the extension's ordinary backoff-reconnect
+  path runs and its token survives. Kept the dummy `verifyToken` call on the lookup-failed path too,
+  so timing stays uniform (D6).
+- **F11 (Low-Medium) `371623d`** — `Broker`'s closed guard, its queue-cap check, and `Shutdown` all
+  resolved a non-decision (server shutting down, queue full, `Request` called post-`Shutdown`) with
+  the same `PairingDenied` outcome a real user Deny uses. `runHandshake` mapped that to a
+  `pairingDenied` frame, and the extension's handler for it sets a terminal state only a manual
+  `retry()` ever clears — so quitting Kira Space with a request pending, or hitting the 200-request
+  queue cap, left the editor stuck showing "denied" until the user found and pressed retry. Added
+  `PairingAborted`, used only by those three non-decision paths (the cooldown short-circuit inside
+  `Request` stays `PairingDenied` — that one *is* a real Deny's own cooldown); `runHandshake` answers
+  it with the row-1 posture, so the client backs off and redials instead.
+- **F12 (Low) `bc7cbf6`** — `runHandshake`'s row-7 wait blocked on `<-entry.result` for up to 120s
+  without watching the socket, so a requester that disconnected mid-wait (window closed, extension
+  reload) left its entry queued and presentable; an Approve landing after that minted a trusted
+  `git_clients` row for a connection nobody held. Added `Broker.Cancel(requestID)` (removes the
+  entry if still queued, resolves it `PairingAborted`, a no-op if already resolved) and a watcher
+  goroutine that blocks on a 1-byte `Peek` of the connection's own reader for as long as the request
+  is queued; a read error cancels it. Re-read the stop sequence adversarially for the race the
+  finding named: `stopWatch` sets a deadline already in the past (unblocks an in-flight or
+  about-to-start `Peek` immediately), waits for the watcher goroutine to actually exit, and only then
+  clears the deadline — before the connection is handed to `Serve`, so nothing is left reading it
+  concurrently. Verified with `go test -race` (including a dedicated regression test,
+  `TestHandshake_Row7_DisconnectDuringWaitCancelsEntry`) run repeatedly, clean.
+- **F13 (Low) `5ebf92c`** — the handshake's first `Receive()` had no read deadline, and `readFrame`
+  allocates the declared body (up to the 8 MiB cap) before reading it — a same-user local process
+  that connected and sent nothing, or trickled an 8 MiB body, held a goroutine, an fd and up to 8 MiB
+  until `Server.Close`. `hello.Client.ID` was also unclamped (only the label was). Added a 10s read
+  deadline around the first `Receive()` only, and a 256-byte cap on `hello.Client.ID`, rejected as
+  row 1.
+- **F14 (Low) `70f4f51`** — TS side (`kira-space-vscode/src/connection.ts`). `runHandshake` returns
+  right after sending `tokenRejected`, and the server's deferred `nc.Close()` closes the socket while
+  `#handleHandshakeFrame` is still awaiting `secrets.delete(...)` — the secret-store IPC round trip
+  is far slower than a local socket close. `#onDisconnected` still saw the current `dialToken` and
+  raced the `tokenRejected` branch: it armed its own reconnect timer AND the branch's own immediate
+  `#dial()` ran too, so every revocation double-dialed, leaving a dead entry in the server's pairing
+  queue (F12) beside the new one. Set `#disconnectHandledFor = dialToken` synchronously, before the
+  await, so the close event is inert; also clear `#reconnectTimer` at the top of `#dial()`, so any
+  dial supersedes a pending timer. Read `#onDisconnected`/`#scheduleReconnect`/`#dial()` in full
+  before editing to confirm no other reconnect path depends on the old ordering.
+
+Also landed, not a numbered finding: a pre-existing `gofmt` struct-literal alignment nit in
+`internal/gitsock/revoke_test.go`, caught by `gofmt -l` while verifying this phase's own file set
+(`223b90f`).
+
+**Nothing dismissed or deferred.** All five findings matched real, reachable code; every fix landed
+as specified. The findings file's own "Areas with nothing found" section (method-table/version
+parity, params parity, error-shape parity, argv injection across every handler, socket lifecycle,
+framing, streaming, per-connection mailboxes, `gitvsix`) together with F1-F9's own prior fixes and
+F10-F14 above account for the whole chunk's plan (`P108-part17-space-git-rpc.md` §4's ten edge-case
+categories). The one open item, `remote.pullPreflight`/`remote.run`'s strategy fields not validated
+against the TS literal set, is explicitly named as P111's own hand-off in the findings file, not
+numbered here — out of this chunk's scope by the plan's own §6.
+
+**A pre-existing, diffuse test flakiness was investigated, not fixed.** `gitsock`'s own
+`TestServer_Close_ReturnsPromptlyWithASilentConnection` was named in Part 2's result section as "to
+investigate when [Part 17] runs." Investigated: run 20x in isolation with `-race`, 100% pass — not
+itself flaky. Full-package `go test -race -count=1 ./internal/gitsock/...` reruns instead showed a
+handful of *different*, unrelated integration tests failing once apiece across many runs
+(`TestIntegration_RefcountAndDisconnectTeardown`, `TestIntegration_CommentsAreOrderedByFileThenLine`,
+`TestIntegration_FileReadBranches`), none touching handshake/pairing code, each passing again in
+isolation. Confirmed pre-existing and unrelated to this phase: reproduced the same pattern on
+`bc365eb` (the commit immediately before F10, before this phase touched anything) via a disposable
+`git worktree`. Reads as resource contention (real `git` subprocesses, fsnotify watchers, and
+`-race`'s own instrumentation overhead) across many `t.Parallel()` integration tests sharing one
+container, not a logic bug — fixing test-suite parallelism/resource budgeting is a different
+subsystem (test infrastructure, not the git-RPC/socket contract this chunk owns) and, per
+`CLAUDE.md`'s own root-cause rule, is named here rather than attempted.
+
+**Verification, run for real:**
+
+- `cd apps/kira-space && go build ./...`: exit 0.
+- `go vet ./...`: 0 issues.
+- `gofmt -l` on every file this phase touched (`handshake.go`, `pairing.go`, `handshake_test.go`,
+  `pairing_test.go`, `revoke_test.go`, `connection.ts` is not Go): clean.
+- `go test -race ./internal/gitsock/...`: clean on every run that touched only this phase's own
+  changes; the diffuse pre-existing flakiness above is the only exception, reproduced on the
+  pre-phase tree too.
+- `bun run typecheck:git` (`git-ipc`/`git-core`/`kira-space-vscode`/`git-ui`/`kira-ui`, the chain
+  covering `connection.ts`): exit 0.
+- `bun run lint` (biome + `check-tokens.sh`): 0 issues.
+- `bun test apps/kira-space-vscode/src`: 60 pass, 0 fail (11 files) — no dedicated test added for
+  F14 itself: `ConnectionManager` has no existing harness mocking `vscode.ExtensionContext`/
+  `net.Socket`, and building one from scratch is a nontrivial new-scaffolding project outside this
+  single ordering fix's own scope; verified instead by reading `#onDisconnected`/
+  `#scheduleReconnect`/`#dial()` in full and tracing the exact race by hand.
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
+  used.
+- Regression tests added and confirmed meaningful: `TestHandshake_Row7_DisconnectDuringWaitCancelsEntry`
+  (F12) and `TestHandshake_Row1_OversizedClientID_ClosesSilently` (F13) are new, with no pre-fix
+  equivalent — definitional. F10/F11's fixes are covered by existing `handshake_test.go`/
+  `pairing_test.go` rows exercised through the changed code paths (`TestBroker_
+  RequestAfterShutdownIsAbortedImmediately`, `TestBroker_QueueBoundedAgainstUnlimitedEnqueue`,
+  updated in place to assert the new `PairingAborted` outcome rather than duplicated).
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
