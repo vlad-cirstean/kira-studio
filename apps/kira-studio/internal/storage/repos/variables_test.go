@@ -516,6 +516,44 @@ func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testin
 	}
 }
 
+// TestSecretsForUndecryptableEnvSecretLeavesReferenceUnresolvedNotCollectionValue is P108 F5:
+// mergeSecrets used to set seen[name] only after a successful decrypt, so a NULL or
+// undecryptable row `continue`d without ever marking the name seen. Since out already held the
+// collection-scope value from SecretsFor's earlier, lower-precedence mergeSecrets call, a broken
+// higher-precedence (environment) row silently left that stale collection value in place — Send
+// would use the collection's secret while findSecretVariableId (curl.ts) already treats the
+// broken env row as unresolved, so Copy-as-curl and Send disagreed. A corrupted env-scope secret
+// shadowing a same-named collection secret must now come back absent from SecretsFor (unresolved)
+// rather than falling through to the collection's value.
+func TestSecretsForUndecryptableEnvSecretLeavesReferenceUnresolvedNotCollectionValue(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+	env, err := r.CreateEnvironment("Staging", "", "none")
+	if err != nil {
+		t.Fatalf("CreateEnvironment: %v", err)
+	}
+
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", strPtr("collection-value"), true, ""); err != nil {
+		t.Fatalf("Upsert(collection): %v", err)
+	}
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", strPtr("env-value"), true, ""); err != nil {
+		t.Fatalf("Upsert(environment): %v", err)
+	}
+
+	// Simulate a corrupted ciphertext (e.g. key rotation gone wrong) on the environment-scope row.
+	if _, err := db.Exec(`UPDATE api_variables SET secret_value = 'not-valid-ciphertext' WHERE environment_id = ? AND name = 'token'`, env.ID); err != nil {
+		t.Fatalf("corrupt env secret: %v", err)
+	}
+
+	secrets, err := r.SecretsFor(collectionID, env.ID)
+	if err != nil {
+		t.Fatalf("SecretsFor: %v", err)
+	}
+	if got, ok := secrets["token"]; ok {
+		t.Fatalf("SecretsFor()[\"token\"] = %q, want absent (unresolved) — must not fall through to the collection's value", got)
+	}
+}
+
 // ---- 5. DuplicateEnvironment (P17 D17): a raw-ciphertext copy, no history, never active ----
 
 func TestDuplicateEnvironmentCopiesCiphertextVerbatimNoHistoryNeverActive(t *testing.T) {

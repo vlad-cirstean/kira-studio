@@ -1102,15 +1102,28 @@ func (r *VariablesRepo) mergeSecrets(out map[string]string, column, ownerID stri
 		if err := rows.Scan(&name, &secretValue); err != nil {
 			return fmt.Errorf("repos/variables: scan secret: %w", err)
 		}
-		if !secretValue.Valid || seen[name] {
+		if seen[name] {
+			continue
+		}
+		// F5: mark seen before the validity/decrypt checks below, so a NULL or undecryptable row
+		// still shadows — both a later same-named row further down this scope's sort_order (D12's
+		// first-wins), and a same-named value SecretsFor's own earlier, lower-precedence call
+		// (collection, before environment) already wrote into out. Without this, the next row
+		// with the same name won, silently substituting a different scope's value: Send would use
+		// the collection's secret while findSecretVariableId (curl.ts) already treats the broken
+		// env row as unresolved, so Copy-as-curl and Send disagreed. delete(out, name) makes this
+		// row's failure win too, leaving the {{reference}} unresolved (literal) rather than wrong.
+		seen[name] = true
+		if !secretValue.Valid {
+			delete(out, name)
 			continue
 		}
 		plain, err := r.cipher.Decrypt(secrets.ScopeVariable, secretValue.String)
 		if err != nil {
 			slog.Warn("a secret variable could not be decrypted while resolving a request", "scope", "storage/variables", "name", name, "err", err)
+			delete(out, name)
 			continue
 		}
-		seen[name] = true
 		out[name] = plain
 	}
 	return rows.Err()
