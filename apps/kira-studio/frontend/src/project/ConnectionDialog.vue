@@ -814,24 +814,20 @@ const preconnectText = computed({
 
           <div class="field">
             <Label>Mode</Label>
-            <div class="segmented">
-              <button
-                type="button"
-                :class="{ active: draft.mode === 'fields' }"
-                data-testid="mode-fields"
-                @click="setMode('fields')"
-              >
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              :model-value="draft.mode"
+              @update:model-value="(v) => v && setMode(v as 'fields' | 'uri')"
+            >
+              <ToggleGroupItem value="fields" data-testid="mode-fields" :class="{ active: draft.mode === 'fields' }">
                 Fields
-              </button>
-              <button
-                type="button"
-                :class="{ active: draft.mode === 'uri' }"
-                data-testid="mode-uri"
-                @click="setMode('uri')"
-              >
+              </ToggleGroupItem>
+              <ToggleGroupItem value="uri" data-testid="mode-uri" :class="{ active: draft.mode === 'uri' }">
                 Connection URI
-              </button>
-            </div>
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
@@ -1513,35 +1509,13 @@ const preconnectText = computed({
   min-width: 0;
 }
 
-.segmented {
-  display: inline-flex;
-  height: var(--kira-h-md);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
-  align-self: flex-start;
-}
-
-.segmented button {
-  padding: 0 var(--kira-s-3);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
-.segmented button + button {
-  border-left: var(--kira-border-width) solid var(--kira-border-strong);
-}
-
-.segmented button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-}
+/* P110 B33: the Fields/URI mode switch above is now a ToggleGroup (pre-approved, plan 1.4) --
+   `.active` on each ToggleGroupItem is a bare marker class kept only because connections.spec.ts/
+   connection-dialog-tabs.spec.ts/preconnect.spec.ts assert it via toHaveClass, still the same
+   conditional binding the old buttons used, no rule attaches to the name any more. */
 
 /* P28 §4.2: step 2's General/Advanced/Pre-connect tabs, using the app's existing tab-chip
-   utilities (P110 B29) rather than .segmented (already spent on the Fields/URI mode switch above). */
+   utilities (P110 B29). */
 .p-tab-strip {
   display: flex;
   gap: var(--kira-s-2);

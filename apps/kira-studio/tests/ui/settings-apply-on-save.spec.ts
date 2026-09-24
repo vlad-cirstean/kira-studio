@@ -14,12 +14,8 @@ function dialog(page: Page) {
   return page.locator('[data-testid="settings-dialog"]');
 }
 
-// The row-density segmented control has no data-testid of its own (a design-system button pair,
-// not a form control tests elsewhere key off) — first is Compact, second Comfortable.
 function densityButton(page: Page, density: 'compact' | 'comfortable') {
-  return dialog(page)
-    .locator('.segmented button')
-    .nth(density === 'compact' ? 0 : 1);
+  return dialog(page).locator(`[data-testid="settings-appearance-rowDensity-${density}"]`);
 }
 
 function rowHeightVar(page: Page): Promise<string> {

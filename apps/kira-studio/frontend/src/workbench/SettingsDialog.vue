@@ -158,28 +158,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   @apply flex-1 min-w-0 flex items-center;
 }
 
-.segmented {
-  @apply inline-flex overflow-hidden self-start rounded-kira-sm;
-  height: var(--kira-h-md);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-}
-
-.segmented button {
-  @apply cursor-pointer border-none bg-none;
-  padding: 0 var(--kira-s-3);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-}
-
-.segmented button + button {
-  border-left: var(--kira-border-width) solid var(--kira-border-strong);
-}
-
-.segmented button.active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-}
-
 .font-preview {
   @apply overflow-hidden text-ellipsis whitespace-nowrap;
   font-size: var(--kira-t-sm);

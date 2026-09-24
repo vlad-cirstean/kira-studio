@@ -3,6 +3,7 @@ import type { AppearanceSettings, RowDensity } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Field } from '@theme/components/ui/field';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 
 // I2-18: the row-density button pair (compact/comfortable) was byte-identical between kira-studio's
@@ -41,22 +42,22 @@ function setRowDensity(density: RowDensity): void {
         <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
     </div>
-    <div class="segmented">
-      <button
-        type="button"
-        :class="{ active: appearance.rowDensity === 'compact' }"
-        @click="setRowDensity('compact')"
-      >
+    <!-- P110 B33: .segmented -> ToggleGroup (pre-approved, plan 1.4). data-testid replaces the old
+         `.segmented button` positional CSS locator settings-apply-on-save.spec.ts used. -->
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      :model-value="appearance.rowDensity"
+      @update:model-value="(v) => v && setRowDensity(v as RowDensity)"
+    >
+      <ToggleGroupItem value="compact" data-testid="settings-appearance-rowDensity-compact">
         Compact · 22 px
-      </button>
-      <button
-        type="button"
-        :class="{ active: appearance.rowDensity === 'comfortable' }"
-        @click="setRowDensity('comfortable')"
-      >
+      </ToggleGroupItem>
+      <ToggleGroupItem value="comfortable" data-testid="settings-appearance-rowDensity-comfortable">
         Comfortable · 28 px
-      </button>
-    </div>
+      </ToggleGroupItem>
+    </ToggleGroup>
     <slot />
   </Field>
 </template>
