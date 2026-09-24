@@ -65,7 +65,7 @@ func TestVariablesSortOrderIsDenseAndScopeIndependent(t *testing.T) {
 	// Delete the middle collection variable — its siblings must re-index dense, and the
 	// environment's own list must be completely unaffected (a collection's reorder must not
 	// renumber an environment's, D4's own comment).
-	if err := r.Delete(collectionIDs[1]); err != nil {
+	if _, _, err := r.Delete(collectionIDs[1]); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	remaining, err := r.List(model.VariableScopeCollection, collectionID)

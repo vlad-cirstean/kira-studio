@@ -81,6 +81,10 @@ const (
 	// outlives the reason a user made it is a surprise, and the persistent half of this feature is
 	// the Settings toggle.
 	ChannelKeepAwake = "kira:keepAwake:changed"
+	// ChannelApiDataChanged is P112's own broadcast — every API-client mutation (collections,
+	// saved requests, variables, environments) Emits it with the scopes that mutation touched, so
+	// every window's TanStack Query cache invalidates exactly those keys (apidata.go).
+	ChannelApiDataChanged = "kira:api:dataChanged"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

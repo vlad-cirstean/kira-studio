@@ -98,6 +98,7 @@ func (s *CollectionsService) SaveRequest(args CollectionsSaveRequestArgs) (ItemS
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
 	return item, nil
 }
 
@@ -119,6 +120,7 @@ func (s *CollectionsService) SaveGrpcRequest(args CollectionsSaveGrpcRequestArgs
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
 	return item, nil
 }
 
@@ -134,6 +136,7 @@ func (s *CollectionsService) CreateCollection(args CollectionsCreateCollectionAr
 	if err != nil {
 		return CollectionSummary{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange())
 	return c, nil
 }
 
@@ -159,6 +162,7 @@ func (s *CollectionsService) CreateItem(args CollectionsCreateItemArgs) (ItemSum
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange())
 	return item, nil
 }
 
@@ -182,6 +186,7 @@ func (s *CollectionsService) CreateGrpcItem(args CollectionsCreateGrpcItemArgs) 
 	if err != nil {
 		return ItemSummary{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange())
 	return item, nil
 }
 
@@ -203,6 +208,7 @@ func (s *CollectionsService) Rename(args CollectionsTargetArgs) error {
 	if err := s.Deps.Repos.Collections.Rename(args.ID, args.Target, args.Name); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, treeChange())
 	return nil
 }
 
@@ -212,6 +218,11 @@ func (s *CollectionsService) Delete(args CollectionsTargetArgs) error {
 	}
 	if err := s.Deps.Repos.Collections.Delete(args.ID, args.Target); err != nil {
 		return ipcerr.Internal(err.Error())
+	}
+	if args.Target == "collection" {
+		emitApiData(s.Deps.Events, treeChange(), variablesChange(model.VariableScopeCollection, args.ID))
+	} else {
+		emitApiData(s.Deps.Events, treeChange())
 	}
 	return nil
 }
@@ -289,6 +300,10 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	if err != nil {
 		return ImportReport{}, ipcerr.Internal(err.Error())
 	}
+	// P112: ImportTree committed here, on every path below — success, rollback success (net-zero
+	// change, one harmless refetch) and rollback failure (the partially imported collection stays
+	// visible, and other windows must see it too).
+	defer emitApiData(s.Deps.Events, treeChange())
 	// D15/F13: a second call, deliberately — encrypting a secret variable needs VariablesRepo's
 	// own Cipher, which CollectionsRepo does not have (D4/F4's module boundary). See
 	// VariablesRepo.ImportVariables' own comment for why this cannot join ImportTree's transaction.

@@ -62,7 +62,8 @@ func TestImport_RollsBackTheCollectionWhenImportVariablesFails(t *testing.T) {
 	variablesRepo := repos.NewVariables(db.DB, failingCipher{})
 
 	svc := &CollectionsService{Deps: appcore.Deps{
-		Repos: &repos.Repos{Collections: collectionsRepo, Variables: variablesRepo},
+		Repos:  &repos.Repos{Collections: collectionsRepo, Variables: variablesRepo},
+		Events: &fakeEmitter{},
 	}}
 
 	path := writeTempCollection(t, importCollectionWithSecretVariable)

@@ -41,6 +41,7 @@ func (s *VariablesService) CreateEnvironment(args VariablesCreateEnvironmentArgs
 	if err != nil {
 		return model.Environment{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange())
 	return env, nil
 }
 
@@ -64,6 +65,7 @@ func (s *VariablesService) UpdateEnvironment(args VariablesUpdateEnvironmentArgs
 	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description, args.Color); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
 }
 
@@ -78,6 +80,7 @@ func (s *VariablesService) DeleteEnvironment(args VariablesEnvironmentIDArgs) er
 	if err := s.Deps.Repos.Variables.DeleteEnvironment(args.ID); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange(), variablesChange(model.VariableScopeEnvironment, args.ID))
 	return nil
 }
 
@@ -90,6 +93,7 @@ func (s *VariablesService) DuplicateEnvironment(args VariablesEnvironmentIDArgs)
 	if err != nil {
 		return model.Environment{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange())
 	return env, nil
 }
 
@@ -99,6 +103,7 @@ func (s *VariablesService) SetActiveEnvironment(args VariablesEnvironmentIDArgs)
 	if err := s.Deps.Repos.Variables.SetActiveEnvironment(args.ID); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
 }
 
@@ -110,6 +115,7 @@ func (s *VariablesService) ReorderEnvironments(args VariablesReorderEnvironments
 	if err := s.Deps.Repos.Variables.ReorderEnvironments(args.IDs); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
 }
 
@@ -173,6 +179,7 @@ func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, err
 	if err != nil {
 		return model.Variable{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, variablesChange(v.Scope, v.OwnerID))
 	return v, nil
 }
 
@@ -184,9 +191,11 @@ func (s *VariablesService) Delete(args VariablesIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Deps.Repos.Variables.Delete(args.ID); err != nil {
+	scope, ownerID, err := s.Deps.Repos.Variables.Delete(args.ID)
+	if err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, variablesChange(scope, ownerID))
 	return nil
 }
 
@@ -203,6 +212,7 @@ func (s *VariablesService) Reorder(args VariablesReorderArgs) error {
 	if err := s.Deps.Repos.Variables.Reorder(args.Scope, args.OwnerID, args.IDs); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, variablesChange(args.Scope, args.OwnerID))
 	return nil
 }
 
@@ -225,6 +235,7 @@ func (s *VariablesService) ApplyBulk(args VariablesApplyBulkArgs) (model.Variabl
 	if err != nil {
 		return model.VariableBulkResult{}, ipcerr.Internal(err.Error())
 	}
+	emitApiData(s.Deps.Events, variablesChange(args.Scope, args.OwnerID))
 	return result, nil
 }
 

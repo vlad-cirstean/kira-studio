@@ -640,32 +640,34 @@ func (r *VariablesRepo) recordHistory(tx *sql.Tx, variableID, oldPlain string, o
 }
 
 // Delete removes one variable (and its history, cascaded) and re-indexes its surviving siblings
-// dense — CollectionsRepo.Delete's own discipline (P4).
-func (r *VariablesRepo) Delete(id string) error {
+// dense — CollectionsRepo.Delete's own discipline (P4). It returns the deleted variable's scope
+// and owner id (P112) so the bridge can emit an api-data-changed event without a second query —
+// which would also race the delete.
+func (r *VariablesRepo) Delete(id string) (model.VariableScope, string, error) {
 	if id == "" {
-		return fmt.Errorf("repos/variables: id is required")
+		return "", "", fmt.Errorf("repos/variables: id is required")
 	}
 	tx, err := r.db.Begin()
 	if err != nil {
-		return fmt.Errorf("repos/variables: begin: %w", err)
+		return "", "", fmt.Errorf("repos/variables: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	var collectionID, environmentID sql.NullString
 	err = tx.QueryRow(`SELECT collection_id, environment_id FROM api_variables WHERE id = ?`, id).Scan(&collectionID, &environmentID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("repos/variables: no variable %s", id)
+		return "", "", fmt.Errorf("repos/variables: no variable %s", id)
 	}
 	if err != nil {
-		return fmt.Errorf("repos/variables: read variable %s: %w", id, err)
+		return "", "", fmt.Errorf("repos/variables: read variable %s: %w", id, err)
 	}
 
 	res, err := tx.Exec(`DELETE FROM api_variables WHERE id = ?`, id)
 	if err != nil {
-		return fmt.Errorf("repos/variables: delete variable %s: %w", id, err)
+		return "", "", fmt.Errorf("repos/variables: delete variable %s: %w", id, err)
 	}
 	if err := sqlitex.RequireOneRow(res, "variable "+id); err != nil {
-		return err
+		return "", "", err
 	}
 
 	scope, ownerID := model.VariableScopeCollection, collectionID.String
@@ -673,12 +675,12 @@ func (r *VariablesRepo) Delete(id string) error {
 		scope, ownerID = model.VariableScopeEnvironment, environmentID.String
 	}
 	if err := reindexVariables(tx, scope, ownerID); err != nil {
-		return err
+		return "", "", err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos/variables: commit: %w", err)
+		return "", "", fmt.Errorf("repos/variables: commit: %w", err)
 	}
-	return nil
+	return scope, ownerID, nil
 }
 
 func reindexVariables(tx *sql.Tx, scope model.VariableScope, ownerID string) error {
