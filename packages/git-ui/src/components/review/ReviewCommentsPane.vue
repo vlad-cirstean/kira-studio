@@ -177,8 +177,8 @@ function anchorTitle(c: ReviewComment): string | undefined {
   font-size: var(--kv-t-sm);
 }
 
-/* G34 D14: `.kui-button--icon`'s own box (kira-ui/theme/controls.css) is now this exact shape —
-   only the header's own "push everything after the count to the right" layout survives. */
+/* G34 D14: P110 A3's `KuiButton.vue` `icon` variant box is now this exact shape — only the
+   header's own "push everything after the count to the right" layout survives. */
 .kv-review-comments-icon-button {
   margin-left: auto;
 }

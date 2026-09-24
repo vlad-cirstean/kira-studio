@@ -349,10 +349,10 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
   gap: var(--kv-s-2);
 }
 
-/* Grows to the row's own width instead of a hard 160px — `.kui-search-input`
-   (packages/kira-ui/theme/controls.css) is `inline-flex` with no explicit width of its own, so
-   `flex: 1` here is what makes it fill the remaining row space; `min-width: 0` is the usual flex-
-   item guard against its content's own intrinsic width winning instead. */
+/* Grows to the row's own width instead of a hard 160px — P110 A4's `KuiSearchInput.vue` wrapper
+   is `kv:inline-flex` with no explicit width of its own, so `flex: 1` here is what makes it fill
+   the remaining row space; `min-width: 0` is the usual flex-item guard against its content's own
+   intrinsic width winning instead. */
 .kv-search-field {
   flex: 1;
   min-width: 0;

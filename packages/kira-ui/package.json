@@ -7,7 +7,6 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./theme/controls.css": "./src/theme/controls.css",
     "./theme/tailwind-theme.css": "./src/theme/tailwind-theme.css"
   },
   "dependencies": {

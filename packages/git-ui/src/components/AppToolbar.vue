@@ -531,11 +531,11 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
   text-overflow: ellipsis;
 }
 
-/* G19 D3a: the toolbar-button look now comes from @kira/kira-ui's own KuiButton (theme/
-   controls.css's `.kui-button`, via this host's kui-bridge.css) — the duplicated
-   `.kv-toolbar-button` rule that used to live here *and* in `PullStrategyPicker.vue` is closed at
-   its source, not restyled around. `.kv-push-main`/`.kv-push-chevron` below only add the split-
-   button corner radii KuiButton has no opinion about. */
+/* G19 D3a: the toolbar-button look now comes from @kira/kira-ui's own KuiButton (P110 A3's
+   `kuiButtonVariants` cva, via this host's kui-bridge.css) — the duplicated `.kv-toolbar-button`
+   rule that used to live here *and* in `PullStrategyPicker.vue` is closed at its source, not
+   restyled around. `.kv-push-main`/`.kv-push-chevron` below only add the split-button corner
+   radii KuiButton has no opinion about. */
 .kv-push-group {
   position: relative;
   display: inline-flex;

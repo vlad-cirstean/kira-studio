@@ -867,8 +867,8 @@ watch(visibleBranchNames, (names) => {
   min-height: 0;
 }
 
-/* G34 D14: takes `.kui-menu-heading`'s own treatment (kira-ui/theme/controls.css) — the same
-   section-label look every menu in the app now uses. */
+/* G34 D14: takes P110 A5's `KuiMenuList.vue` own heading treatment — the same section-label look
+   every menu in the app now uses. */
 .kv-branch-section-title {
   display: flex;
   align-items: center;

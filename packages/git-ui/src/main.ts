@@ -15,10 +15,10 @@ import './theme/app-shell.css';
 import './icons/codicon.css';
 import './theme/vscode-tokens.css';
 import './theme/density.css';
-// G19 D3: bridges --kv-* onto @kira/kira-ui's own --kui-* vocabulary, plus that package's own
-// component CSS (theme/controls.css) — loaded once, here, for every consumer in this bundle.
+// G19 D3: bridges --kv-* onto @kira/kira-ui's own --kui-* vocabulary. P110 A8: `@kira/kira-ui`'s
+// own component CSS (theme/controls.css) is retired — every `Kui*` component now carries its own
+// `kv:` utility classes directly, scanned via this file's `@source` lines in theme/tailwind.css.
 import './theme/kui-bridge.css';
-import '@kira/kira-ui/theme/controls.css';
 // G34 D1: colourless structural tokens — hoisted to :root, the app's one scale for both roots.
 import './theme/kira-structure.css';
 
