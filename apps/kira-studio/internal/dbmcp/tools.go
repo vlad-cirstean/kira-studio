@@ -458,6 +458,17 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		})
 		switch outcome {
 		case ApprovalApproved:
+			// F6: mirror runQuery's own awaitApproval re-check — summary/m above were resolved
+			// before this (up to 2-minute) wait, so an Approve landing after the user revoked MCP
+			// exposure or tightened read mode to deny must not still run the composed EXPLAIN.
+			resummary, rerr := s.resolveEnabled(args.ConnectionID)
+			if rerr != nil {
+				return errResult(rerr.Error())
+			}
+			if rm := modesOf(resummary); rm.read == "deny" {
+				return errResult(fmt.Sprintf("connection %q's MCP permissions now deny read statements; change them in the connection's MCP tab", resummary.Name))
+			}
+			summary = resummary
 			// fall through to Execute below.
 		case ApprovalDenied:
 			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))

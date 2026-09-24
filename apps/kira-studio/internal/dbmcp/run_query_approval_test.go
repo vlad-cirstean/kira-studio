@@ -42,6 +42,12 @@ func (f *fakeConnsMutable) setWriteMode(mode string) {
 	f.summary.McpWriteMode = mode
 }
 
+func (f *fakeConnsMutable) setReadMode(mode string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.summary.McpReadMode = mode
+}
+
 // fakeQueryRunner always classifies as a fixed class and counts executions — the assertion this
 // test cares about is whether Execute ever runs, not what it returns.
 type fakeQueryRunner struct {
