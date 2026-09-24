@@ -23,7 +23,7 @@ import {
   KuiTooltip,
   pointReference,
 } from '@kira/kira-ui';
-import { onClickOutside } from '@vueuse/core';
+import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -1651,20 +1651,39 @@ function setDetailWidth(next: number): void {
   detailWidth.value = Math.max(MIN_DETAIL_WIDTH, Math.min(MAX_DETAIL_WIDTH, Math.round(next)));
 }
 
-function startDetailResize(event: MouseEvent): void {
+// P108 F11: pre-existing, not a P105 regression (P105 touched only the column handles) — mirrors
+// `KuiColumnResizeHandle` (kira-ui)'s own fix for the identical shape. The old plain
+// `window`/`mousemove`/`mouseup` pair never learned about a drag interrupted outside this window
+// (releasing the mouse outside the VS Code webview iframe or the browser window) or this
+// component unmounting mid-drag — either left the pane resizing on every later pointer move.
+// Pointer events + `setPointerCapture` fix the first; `stopDetailResizeDrag`, hoisted so
+// `onBeforeUnmount` can also call it, fixes the second.
+let stopDetailResizeDrag: (() => void) | undefined;
+
+function startDetailResize(event: PointerEvent): void {
   event.preventDefault();
+  const target = event.currentTarget as HTMLElement;
   const startX = event.clientX;
   const startWidth = detailWidth.value;
-  const onMove = (moveEvent: MouseEvent): void => {
+  target.setPointerCapture(event.pointerId);
+  const stopMove = useEventListener(window, 'pointermove', (moveEvent: PointerEvent) => {
     // Dragging the left edge left (negative movementX) widens a right-docked pane.
     setDetailWidth(startWidth - (moveEvent.clientX - startX));
-  };
-  const onUp = (): void => {
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-  };
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
+  });
+  const stopUp = useEventListener(window, 'pointerup', (upEvent: PointerEvent) => {
+    target.releasePointerCapture?.(upEvent.pointerId);
+    endDetailResize();
+  });
+  const stopCancel = useEventListener(window, ['pointercancel', 'lostpointercapture'], () => {
+    endDetailResize();
+  });
+  function endDetailResize(): void {
+    stopMove();
+    stopUp();
+    stopCancel();
+    stopDetailResizeDrag = undefined;
+  }
+  stopDetailResizeDrag = endDetailResize;
 }
 
 const DETAIL_HANDLE_KEY_STEP = 16;
@@ -1718,6 +1737,8 @@ onBeforeUnmount(() => {
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   stopTooltips?.();
+  // P108 F11: releases a detail-pane resize drag still in flight when this view tears down.
+  stopDetailResizeDrag?.();
   unsubscribeUiAction();
   unsubscribeReconnect();
   graphView.dispose();
@@ -1877,7 +1898,7 @@ onBeforeUnmount(() => {
               :aria-valuemax="MAX_DETAIL_WIDTH"
               :aria-valuetext="`${detailWidth} pixels`"
               tabindex="0"
-              @mousedown="startDetailResize"
+              @pointerdown="startDetailResize"
               @keydown="handleDetailHandleKeydown"
             />
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
