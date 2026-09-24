@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -197,29 +198,50 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_connections",
 		Description: "List every database connection this app has exposed to MCP, with its kind, read-only flag, live status and (once connected) capabilities.",
-	}, s.listConnections)
+	}, withPanicRecovery(s, "list_connections", s.listConnections))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "list_children",
 		Description: "List one container's own children — databases, schemas, tables, keys, topics, buckets, whatever this connection's own engine has at that level. Omit path for the connection's top level.",
-	}, s.listChildren)
+	}, withPanicRecovery(s, "list_children", s.listChildren))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_table",
 		Description: "Describe one table, view or collection's own columns, primary key, foreign keys, indexes and row estimate.",
-	}, s.describeTable)
+	}, withPanicRecovery(s, "describe_table", s.describeTable))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "describe_schema",
 		Description: "Describe every table and view's columns in one database or schema in a single call — cheaper than one describe_table call per table.",
-	}, s.describeSchema)
+	}, withPanicRecovery(s, "describe_schema", s.describeSchema))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
 		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes. On a connection whose owner turned auto-explain on, an explainable SELECT/WITH is planned first — a plan estimated over the connection owner's expensive-query threshold pauses the query for approval the same way a prompt-mode permission does.",
-	}, s.runQuery)
+	}, withPanicRecovery(s, "run_query", s.runQuery))
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "explain_query",
 		Description: "Plan one SELECT or WITH statement without running it, and return the normalized plan: the node tree, each node's estimated rows and native cost, and the structural issues this app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
-	}, s.explainQuery)
+	}, withPanicRecovery(s, "explain_query", s.explainQuery))
 
 	return srv
+}
+
+// withPanicRecovery wraps every MCP tool handler mcp.AddTool registers (F7): go-sdk v1.8.0 runs
+// each request in its own goroutine with no recover() anywhere in the module, so an unguarded nil
+// deref or index panic in any handler — render.go scanning client SQL, queryplan parsing server
+// EXPLAIN output, a mask transform, a tree.Service call — kills the whole desktop app, including
+// every open editor and terminal, from an authenticated local client. Generic over the handler's
+// own args type so every tool shares one wrapper rather than six hand-duplicated ones; every
+// handler here returns `any` as its result type (tools.go), so that half is fixed. The recovered
+// message never repeats the panic value: on a masked connection it could carry a row's own data
+// (mirrors maskedToolError's posture) — only the stack goes to the log.
+func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, any, error)) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, any, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest, in In) (res *mcp.CallToolResult, out any, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Error("dbmcp: tool handler panicked", "tool", name, "panic", fmt.Sprintf("%v", r), "stack", string(debug.Stack()))
+				res, out, err = errResult("internal error handling this tool call")
+			}
+		}()
+		return h(ctx, req, in)
+	}
 }
 
 // Token returns the plaintext token (empty unless this construction — or a subsequent SetToken —
