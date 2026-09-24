@@ -9,7 +9,7 @@ const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
-// line of copy, one p-dlgbtn primary button), the same `api/ -> state/` edge
+// line of copy, one Button variant="dialog-primary" button), the same `api/ -> state/` edge
 // CollectionsPanel.vue's own New request action uses (D7).
 //
 // P4 C9 adds a secondary action beside it: on a first run there is nothing to open, and importing

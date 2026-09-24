@@ -139,6 +139,10 @@ check_class 'strip-err-text' 'the err variant'"'"'s own built-in AlertDescriptio
 # directly, and the two app-drawn menu-trigger buttons (MethodSelect.vue, EnvironmentSelect.vue)
 # apply its exported nativeSelectVariants() as a class function instead. Not common prose.
 check_class 'p-select' 'NativeSelect (packages/theme/src/components/ui/native-select) or nativeSelectVariants() for an app-drawn trigger button'
+# P110 B26: the two hand-rolled button primitives, folded into Button's own existing
+# toolbar/toolbar-primary/dialog/dialog-primary variants (packages/theme/src/components/ui/button).
+check_class 'p-btn' 'Button variant="toolbar"/"toolbar-primary"'
+check_class 'p-dlgbtn' 'Button variant="dialog"/"dialog-primary"'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

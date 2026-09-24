@@ -167,7 +167,7 @@ test('font-roles — chrome renders in the interface font, and it differs from t
 
   const readFont = (el: Element) => getComputedStyle(el).fontFamily;
 
-  // A toolbar .p-btn (console's "Run" button, AppButton's default kind="toolbar").
+  // A toolbar Button (console's "Run" button, variant="toolbar").
   await openRowMenu(page, DB_PATH);
   await page.click('[data-testid="menu-item-open-console"]');
   const runBtn = page.locator('[data-testid="console-run-statement"]');

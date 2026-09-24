@@ -25,8 +25,12 @@ test('collections empty state has no duplicate action buttons (D6)', async ({ re
   await expect(page.locator('[data-testid="new-request"]')).toBeVisible();
   await expect(page.locator('[data-testid="new-collection"]')).toBeVisible();
   await expect(page.locator('[data-testid="import-collection"]')).toHaveCount(0);
-  // D6/F3: no bordered dialog button anywhere in the panel's own empty-state slot.
-  await expect(page.locator('.side-empty .p-dlgbtn')).toHaveCount(0);
+  // D6/F3: no bordered dialog button anywhere in the panel's own empty-state slot. P110 B26:
+  // the old .p-dlgbtn class is gone (folded into Button variant="dialog"/"dialog-primary") --
+  // `data-variant` is the component's own stable attribute, set regardless of variant name.
+  await expect(
+    page.locator('.side-empty [data-slot="button"][data-variant^="dialog"]'),
+  ).toHaveCount(0);
 });
 
 // Minimal schema for the D12 test below — needs only enough for findMethod to resolve
@@ -142,9 +146,9 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
 
 // P22 D3/F5: a freshly opened gRPC tab has neither a service nor a method, so Call is disabled
 // from the moment the tab opens — the one place the app-wide disabled-primary-button defect
-// (every `.p-btn.primary`/`.p-iconbtn.is-primary`, not a gRPC-specific bug) was actually visible
-// to a user. Asserted as "the disabled primary path uses opacity", not as a contrast number
-// computed in the test.
+// (every primary Button variant, not a gRPC-specific bug) was actually visible to a user.
+// Asserted as "the disabled primary path uses opacity", not as a contrast number computed in the
+// test.
 test('a disabled Call button dims via opacity, not an unreadable label on a full-strength fill (D3)', async ({
   relaunch,
 }) => {

@@ -11,6 +11,7 @@
 // app's stores, and the one real difference — the Claude Code hooks banner below, passed as
 // TerminalHostView's default slot, since Kira Space's own TerminalService has no AgentHooks
 // integration.
+import { Button } from '@theme/components/ui/button';
 import TerminalHostView, { type TerminalHostDeps } from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
@@ -73,8 +74,23 @@ async function onDismissHooksPrompt(): Promise<void> {
           Kira Studio can show what this session is doing — a running-session count and a tab dot
           when it needs your attention.
         </span>
-        <button type="button" class="p-btn primary" @click="onEnableHooksPrompt">Enable</button>
-        <button type="button" class="p-btn" @click="onDismissHooksPrompt">Not now</button>
+        <!-- P110 B26: retired-primitive geometry (gap-1/px-1.5, --kira-s-2/--kira-s-3) is a real,
+             quantified mismatch against toolbar/kira's own gap-1.5/px-3 -- kept as a class override
+             rather than a new Button size, since only these two call sites need it. toolbar-primary
+             adds a hover:bg-primary/80 dim the old CSS never had (a `:hover`/`.primary` specificity
+             tie that always favoured `.primary`'s own static colour) -- an expected, low-risk
+             affordance gain, not a regression, per this stream's own swap-consequence precedent. -->
+        <Button
+          type="button"
+          variant="toolbar-primary"
+          size="kira"
+          class="gap-1 px-1.5"
+          @click="onEnableHooksPrompt"
+          >Enable</Button
+        >
+        <Button type="button" variant="toolbar" size="kira" class="gap-1 px-1.5" @click="onDismissHooksPrompt"
+          >Not now</Button
+        >
       </template>
     </div>
   </TerminalHostView>

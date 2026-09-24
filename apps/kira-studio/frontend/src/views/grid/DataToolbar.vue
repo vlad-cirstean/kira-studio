@@ -441,9 +441,9 @@ function onDeleteRow(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
-   p-seg, p-input, plus the Badge component) — the pager's own layout/page-jump-input styling
-   lives in PagerControls.vue now; only the columns anchor's positioning is left here. */
+/* Sizing/spacing/colour all come from .p-toolbar and what it hosts (p-iconbtn, Button variant="toolbar",
+   p-seg, InputGroup variant="kira", plus the Badge component) — the pager's own layout/page-jump-input
+   styling lives in PagerControls.vue now; only the columns anchor's positioning is left here. */
 
 .columns-anchor {
   @apply relative;

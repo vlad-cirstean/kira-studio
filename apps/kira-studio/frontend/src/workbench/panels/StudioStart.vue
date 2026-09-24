@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { connColorVar } from '@theme/connColor';
 import { formatRelative } from '@workbench/util/format';
 import { computed } from 'vue';
@@ -59,20 +60,32 @@ function openRecent(entry: RecentTableEntry): void {
       <div class="start-sub text-muted-foreground">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
+      <!-- P110 B26: --kira-s-2 (4px) -> gap-1 is a real, quantified mismatch against
+           dialog/kira-lg's own gap-1.5 (6px) -- kept as a class override rather than a new Button
+           size, since only these two call sites need it. Padding/height/border/background/colour
+           all already match dialog/dialog-primary + kira-lg exactly (both pre-existing tokens). -->
       <span class="first-run-actions">
-        <button type="button" class="p-dlgbtn primary" @click="connectionDialogStore.openCreateDialog">
+        <Button
+          type="button"
+          variant="dialog-primary"
+          size="kira-lg"
+          class="gap-1"
+          @click="connectionDialogStore.openCreateDialog"
+        >
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
           New connection
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          class="p-dlgbtn"
+          variant="dialog"
+          size="kira-lg"
+          class="gap-1"
           data-testid="first-run-import-datagrip"
           @click="datagripImportStore.pickAndScanDataGripProject"
         >
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="cloud-download" :size="13" /></span>
           Import from DataGrip
-        </button>
+        </Button>
       </span>
     </div>
   </div>
