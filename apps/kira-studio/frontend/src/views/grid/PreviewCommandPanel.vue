@@ -29,6 +29,11 @@ const { data, isLoading, error } = useQuery(() => ({
     return pendingChangesStore.previewPending(tab.connectionId, tab.path, props.tabId);
   },
   enabled: !!tabsStore.findDataTab(props.tabId)?.connectionId,
+  // F18 (P108 Part 10): the key carries no pending-set version, so a stale cache entry from a
+  // previous open would otherwise show for a moment (isLoading false while data exists) — this
+  // component fully unmounts on close (DataView.vue's v-if="previewOpen"), so gcTime: 0 discards
+  // the cache entry immediately and the next open starts empty until its own fetch lands.
+  gcTime: 0,
 }));
 
 const statements = computed(() => data.value ?? []);
