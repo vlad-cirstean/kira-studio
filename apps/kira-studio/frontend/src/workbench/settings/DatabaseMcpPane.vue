@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, FieldLegend, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed } from 'vue';
@@ -75,14 +76,14 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
+  <div class="contents" v-show="active">
     <!-- M1 §6.2: the same instant-action posture the 'Connected editors' section's own
          revoke/install actions used before it moved to apps/kira-space (P100 Part 2) — this leaf
          (dbMcp.serverEnabled) both persists and starts/stops the embedded DB MCP server in
          one call, so it belongs on the action side of the draft/Save line, never mixed with
          it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
          "enabling is never a silent action"). -->
-    <Label class="field checkbox">
+    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.dbMcp.serverEnabled"
@@ -93,10 +94,10 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <span>Enable the database MCP server</span>
-      <span class="helper-text"
+      <FieldDescription
         >Lets an AI client list, browse and query the connections exposed below, through
         the same path this app's own SQL console uses. Starts and stops with this
-        toggle.</span
+        toggle.</FieldDescription
       >
     </Label>
 
@@ -122,9 +123,9 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
             @click="onInstallDbMcpClaudeCode"
           >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
           </Button>
-          <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
+          <FieldDescription v-if="dbMcpInstallMessage" data-testid="db-mcp-install-outcome">
             {{ dbMcpInstallMessage }}
-          </p>
+          </FieldDescription>
         </template>
         <p v-else class="muted-note" data-testid="db-mcp-no-token">
           This server restarted since it was last enabled; its registration command needs a
@@ -141,9 +142,8 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
           Regenerate token
         </Button>
       </template>
-      <p
+      <FieldDescription
         v-if="dbMcpStore.status.running && dbMcpStore.status.expiresAt"
-        class="helper-text"
         data-testid="db-mcp-token-expiry"
       >
         {{
@@ -151,14 +151,14 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
             ? 'Token expired — regenerate it above.'
             : `Token valid until ${new Date(dbMcpStore.status.expiresAt).toLocaleString()}.`
         }}
-      </p>
+      </FieldDescription>
     </template>
 
-    <div class="sec-label">Exposed connections</div>
-    <p class="helper-text">
+    <FieldLegend>Exposed connections</FieldLegend>
+    <FieldDescription>
       Deny by default — only connections checked here are visible to an AI client through
       this server.
-    </p>
+    </FieldDescription>
     <p class="muted-note">
       A newly exposed connection defaults to read allow, write prompt, DDL deny — this
       migration tightened what an already-exposed connection allowed too. Edit a
@@ -179,25 +179,24 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
       >
         <div class="db-mcp-connection-info">
           <span class="db-mcp-connection-name">{{ conn.name }}</span>
-          <span class="helper-text"
+          <FieldDescription
             >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
             {{ conn.mcpDdlMode }}<template v-if="conn.mcpAutoExplain">
               · plans queries</template
-            ></span
+            ></FieldDescription
           >
-          <span v-if="mcpDescriptionFirstLine(conn)" class="helper-text">{{
+          <FieldDescription v-if="mcpDescriptionFirstLine(conn)">{{
             mcpDescriptionFirstLine(conn)
-          }}</span>
+          }}</FieldDescription>
           <!-- M5 §7.5: extends this existing read-only glance — no second full editor
                here (M2's own established split); editing lives in the connection's own
                Privacy tab. -->
-          <span
+          <FieldDescription
             v-if="maskRuleCountsQuery.data.value?.[conn.id]"
-            class="helper-text"
             :data-testid="`db-mcp-connection-masked-${conn.id}`"
             >{{ maskRuleCountsQuery.data.value?.[conn.id] }} masked column{{
               maskRuleCountsQuery.data.value?.[conn.id] === 1 ? '' : 's'
-            }}</span
+            }}</FieldDescription
           >
         </div>
         <Checkbox

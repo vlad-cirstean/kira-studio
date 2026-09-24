@@ -2,6 +2,7 @@
 import type { GitLogLevel } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
@@ -26,8 +27,8 @@ const fieldId = useId();
 </script>
 
 <template>
-  <div class="field">
-    <div class="field-head">
+  <Field>
+    <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Git log level</Label>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -61,5 +62,5 @@ const fieldId = useId();
       <option value="debug">Debug</option>
     </select>
     <slot />
-  </div>
+  </Field>
 </template>

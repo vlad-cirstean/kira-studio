@@ -83,10 +83,14 @@ async function save(patch: SettingsPatch): Promise<void> {
 
     <template #footer="f">
       <span class="footer-status">
-        <span v-if="f.saveError" class="field-error" data-testid="settings-save-error">{{
+        <!-- P110 B12: .footer-status has no `flex` of its own (unlike Kira Studio's own copy) --
+             its children are plain inline spans today, so kept as spans with .field-error's/
+             .helper-text's own utility-class equivalent, not FieldError/FieldDescription (a
+             <div>/<p>), which would introduce blockification that isn't there now. -->
+        <span v-if="f.saveError" class="leading-normal text-error text-kira-xs" data-testid="settings-save-error">{{
           f.saveError
         }}</span>
-        <span v-else class="helper-text" data-testid="settings-footer-status">{{
+        <span v-else class="leading-normal text-subtle text-kira-xs" data-testid="settings-footer-status">{{
           f.isDirty ? 'Unsaved changes' : ''
         }}</span>
       </span>

@@ -58,6 +58,17 @@ check_class 'bg-input' 'bg-field'
 check_class 'p-run-state' 'data-testid="run-state"/"run-state-label" plus plain utilities'
 # P110 B8
 check_class 'p-panel-head' 'flex items-center shrink-0 h-control-lg (or h-bar) gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider'
+# P110 B12: SettingsShell.vue's own panes' shared field-level vocabulary, deleted from
+# packages/workbench/src/workbench.css. Guards only the four names with zero legitimate survivors
+# repo-wide -- `field`/`field.checkbox`/`field-error`/`helper-text` are deliberately NOT guarded
+# here: ConnectionDialog.vue, StreamComposeMessage.vue, SchemaDialog.vue and TerminalPanel.vue each
+# keep their own scoped `<style>` redeclaration of those same names (the plan's own named leak
+# sites, backfilled to stay self-sufficient after the shared rule's deletion), so those are a
+# real, ongoing, local pattern, not a retired one.
+check_class 'field-head' 'flex items-center justify-between gap-1'
+check_class 'checkbox-row' 'FieldGroup (packages/theme/src/components/ui/field)'
+check_class 'sec-label' 'FieldLegend (packages/theme/src/components/ui/field)'
+check_class 'settings-pane' 'class="contents" (a SettingsShell.vue pane) or plain utility classes (a standalone panel, e.g. RequestSettingsPane.vue)'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

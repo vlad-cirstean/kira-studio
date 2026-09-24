@@ -149,7 +149,10 @@ async function submit(): Promise<void> {
 }
 
 .field {
-  @apply flex flex-col gap-0.5;
+  /* P110 B12: text-kira-sm inlined -- was the shared workbench.css `.field` rule's own
+     contribution (this scoped block already redeclares `gap` at its own, tighter value), now
+     deleted along with the rest of the shared field vocabulary. */
+  @apply flex flex-col gap-0.5 text-kira-sm;
 }
 
 .field-inline {

@@ -10,7 +10,7 @@ const props = defineProps<{
 <template>
   <legend
     data-slot="field-legend"
-    :class="cn('uppercase text-kira-sm text-subtle tracking-wider pt-1', props.class)"
+    :class="cn('uppercase text-kira-sm text-subtle tracking-wider pt-1 px-0', props.class)"
   >
     <slot />
   </legend>

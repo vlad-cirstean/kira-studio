@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, FieldError, FieldGroup, fieldVariants } from '@theme/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import {
@@ -87,9 +88,9 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <Label class="field">
-      <div class="field-head">
+  <div class="contents" v-show="active">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>HTTP version</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -119,8 +120,8 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       </select>
     </Label>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Request timeout (ms)</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -182,18 +183,17 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span
+      <FieldError
         v-if="requestTimeoutMsError"
-        class="field-error"
         data-testid="settings-api-requestTimeoutMs-error"
       >
         {{ requestTimeoutMsError }}
-      </span>
-      <span v-else class="helper-text">0 = no timeout.</span>
+      </FieldError>
+      <FieldDescription v-else>0 = no timeout.</FieldDescription>
     </Label>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Max response size (MB)</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -255,18 +255,17 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span
+      <FieldError
         v-if="maxResponseMbError"
-        class="field-error"
         data-testid="settings-api-maxResponseMb-error"
       >
         {{ maxResponseMbError }}
-      </span>
-      <span v-else class="helper-text">0 = unlimited. A larger body is truncated, not refused.</span>
+      </FieldError>
+      <FieldDescription v-else>0 = unlimited. A larger body is truncated, not refused.</FieldDescription>
     </Label>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.sslVerify"
@@ -295,16 +294,16 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
-    <p v-if="!draft.api.sslVerify" class="field-error" data-testid="settings-api-sslVerify-warning">
+    </FieldGroup>
+    <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">
       Turning certificate verification off lets any server present any certificate.
       Anything on the network between you and the server can then read and modify every
       request and response, including credentials. Leave this on unless you are testing
       against a server with a self-signed certificate you control.
-    </p>
+    </FieldError>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.followRedirects"
@@ -333,10 +332,10 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
+    </FieldGroup>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Max redirects</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -401,20 +400,19 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span
+      <FieldError
         v-if="maxRedirectsError"
-        class="field-error"
         data-testid="settings-api-maxRedirects-error"
       >
         {{ maxRedirectsError }}
-      </span>
-      <span v-else-if="!draft.api.followRedirects" class="helper-text">
+      </FieldError>
+      <FieldDescription v-else-if="!draft.api.followRedirects">
         Follow redirects is off — this has no effect.
-      </span>
+      </FieldDescription>
     </Label>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.disableCookieJar"
@@ -424,9 +422,9 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Disable cookie jar</span>
-        <span class="helper-text"
+        <FieldDescription
           >Off keeps a session cookie a server sets and replays it on later requests to
-          the same host.</span
+          the same host.</FieldDescription
         >
       </Label>
       <Tooltip>
@@ -447,6 +445,6 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
+    </FieldGroup>
   </div>
 </template>

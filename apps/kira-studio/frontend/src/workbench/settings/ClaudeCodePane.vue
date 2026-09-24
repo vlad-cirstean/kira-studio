@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { useAgentHooksStore } from '../../state/agentHooks';
@@ -30,12 +31,12 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
+  <div class="contents" v-show="active">
     <!-- P86 §9.3: instant-action only, same posture as Connected editors/Database MCP —
          this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
          hook listener in one call, so it belongs on the action side of the draft/Save
          line, never mixed with it. -->
-    <Label class="field checkbox">
+    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.claudeCode.hooksEnabled"
@@ -46,10 +47,10 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <span>Report session activity to Kira Studio</span>
-      <span class="helper-text"
+      <FieldDescription
         >A Claude Code tab launches with a `--settings` flag pointing at a file this app
         owns — no project file is written. Turning this off affects only the next launch;
-        a session already running simply stops reporting.</span
+        a session already running simply stops reporting.</FieldDescription
       >
     </Label>
 
@@ -73,7 +74,7 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
     <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
          enough to hold the assertion, and this leaf's own instant-action posture mirrors
          the hooks toggle just above. -->
-    <Label class="field checkbox">
+    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
@@ -84,10 +85,10 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <span>Keep this Mac awake while a Claude Code session is running</span>
-      <span class="helper-text"
+      <FieldDescription
         >Prevents idle sleep, and system sleep on AC power, for as long as at least one
         Claude Code tab is live. Independent of the title bar's own keep-awake button —
-        either one is enough to keep the machine awake.</span
+        either one is enough to keep the machine awake.</FieldDescription
       >
     </Label>
   </div>

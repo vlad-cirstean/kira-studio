@@ -1459,6 +1459,10 @@ const preconnectText = computed({
   flex-direction: column;
   gap: var(--kira-s-2);
   flex: 1;
+  /* P110 B12: inlined -- was the shared workbench.css `.field` rule's own contribution (this
+     scoped block otherwise redeclares that rule already), now deleted along with the rest of the
+     shared field vocabulary. */
+  font-size: var(--kira-t-sm);
 }
 
 .field > label {
@@ -1574,6 +1578,8 @@ const preconnectText = computed({
 .field-error {
   color: var(--kira-error);
   font-size: var(--kira-t-xs);
+  /* P110 B12: inlined -- see .field's own comment above. */
+  line-height: 1.5;
 }
 
 .credential-note {

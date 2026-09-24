@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription, FieldError, fieldVariants } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
@@ -87,14 +88,14 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
+  <div class="contents" v-show="active">
     <h3 class="section-subhead">Git remote operations</h3>
     <p class="muted-note">
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Protected branch patterns (one per line)</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -121,13 +122,13 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         placeholder="main"
         data-testid="settings-git-protected-branches"
       />
-      <span class="helper-text"
+      <FieldDescription
         >Force-pushing or deleting a matching remote branch requires typing its name to
-        confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</span
+        confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</FieldDescription
       >
     </Label>
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Auto-fetch interval (minutes)</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -189,21 +190,20 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span
+      <FieldError
         v-if="fetchAutoIntervalError"
-        class="field-error"
         data-testid="settings-git-fetch-auto-interval-error"
       >
         {{ fetchAutoIntervalError }}
-      </span>
-      <span v-else class="helper-text"
+      </FieldError>
+      <FieldDescription v-else
         >0 disables background fetching. Never prompts for a credential — a remote that
         needs one simply fails silently and disables the timer until the next explicit
-        fetch.</span
+        fetch.</FieldDescription
       >
     </Label>
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Git executable path</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -229,14 +229,14 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         data-testid="settings-git-path"
         v-model="draft.git.gitPath"
       />
-      <span class="helper-text"
+      <FieldDescription
         >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
-        time, never cached, so a change here takes effect on the next one.</span
+        time, never cached, so a change here takes effect on the next one.</FieldDescription
       >
     </Label>
     <h3 class="section-subhead">Graph</h3>
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Font size</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -298,10 +298,10 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span v-if="graphFontSizeError" class="field-error" data-testid="settings-git-graphFontSize-error">
+      <FieldError v-if="graphFontSizeError" data-testid="settings-git-graphFontSize-error">
         {{ graphFontSizeError }}
-      </span>
-      <span v-else class="helper-text">0 = match the app font size.</span>
+      </FieldError>
+      <FieldDescription v-else>0 = match the app font size.</FieldDescription>
     </Label>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, FieldError, FieldGroup, FieldLegend, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -55,10 +56,10 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <div class="sec-label first">Typography</div>
-    <Label class="field">
-      <div class="field-head">
+  <div class="contents" v-show="active">
+    <FieldLegend class="pt-0">Typography</FieldLegend>
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Data font</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -114,12 +115,12 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         :style="{ fontFamily: draft.appearance.fontFamily }"
         >The quick brown fox jumps over the lazy dog — 0123456789</span
       >
-      <span v-if="fontFamilyUnavailable" class="field-error" data-testid="font-unavailable">
+      <FieldError v-if="fontFamilyUnavailable" data-testid="font-unavailable">
         Not installed<template v-if="fontFamilyFallback">
           — text falls back to the browser's {{ fontFamilyFallback }} default.</template
         ><template v-else> — text falls back to the browser's default.</template>
-      </span>
-      <span v-else class="helper-text">Grid cells, editors, anything that came out of a database.</span>
+      </FieldError>
+      <FieldDescription v-else>Grid cells, editors, anything that came out of a database.</FieldDescription>
     </Label>
 
     <FontSizeField
@@ -130,7 +131,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
     />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text">Applies to the tree, the grid and every list.</span>
+      <FieldDescription>Applies to the tree, the grid and every list.</FieldDescription>
       <div class="row-preview">
         <div class="row-preview-row row-preview-head">
           <span class="row-preview-cell row-preview-gutter" :style="{ height: `${rowPreviewHeight}px` }" />
@@ -151,14 +152,14 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
     </RowDensityField>
 
     <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text"
+      <FieldDescription
         >Long lines wrap instead of scrolling — the query console, the Mongo console and
-        the cell editor.</span
+        the cell editor.</FieldDescription
       >
     </WordWrapField>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.appearance.rowColoring"
@@ -168,9 +169,9 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Row colouring</span>
-        <span class="helper-text"
+        <FieldDescription
           >Colour grid values by their column's data type. Off renders every row in the
-          plain text colour.</span
+          plain text colour.</FieldDescription
         >
       </Label>
       <Tooltip>
@@ -191,10 +192,10 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
+    </FieldGroup>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
@@ -204,9 +205,9 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Inline blame</span>
-        <span class="helper-text"
+        <FieldDescription
           >Show who last changed the current line, at the end of that line, in the
-          repository file viewer.</span
+          repository file viewer.</FieldDescription
         >
       </Label>
       <Tooltip>
@@ -227,7 +228,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
+    </FieldGroup>
 
     <DateFormatField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
   </div>

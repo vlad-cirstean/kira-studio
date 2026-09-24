@@ -333,6 +333,8 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 }
 
 .field-error {
-  @apply text-error text-kira-xs;
+  /* P110 B12: leading-normal inlined -- was the shared workbench.css `.field-error` rule's own
+     contribution, now deleted along with the rest of the shared field vocabulary. */
+  @apply text-error text-kira-xs leading-normal;
 }
 </style>

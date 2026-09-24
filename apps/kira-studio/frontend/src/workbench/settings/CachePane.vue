@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldError, fieldVariants } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
@@ -62,9 +63,9 @@ async function onClearCaches(): Promise<void> {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <Label class="field">
-      <div class="field-head">
+  <div class="contents" v-show="active">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Result page cache budget (MB)</span>
         <Tooltip>
         <TooltipTrigger as-child>
@@ -126,12 +127,12 @@ async function onClearCaches(): Promise<void> {
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span v-if="cacheBudgetError" class="field-error" data-testid="settings-cache-budget-error">
+      <FieldError v-if="cacheBudgetError" data-testid="settings-cache-budget-error">
         {{ cacheBudgetError }}
-      </span>
+      </FieldError>
     </Label>
-    <Label class="field">
-      <span>Current usage</span>
+    <Label :class="fieldVariants()">
+      <span class="text-muted-foreground">Current usage</span>
       <Input
         type="text"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -139,8 +140,8 @@ async function onClearCaches(): Promise<void> {
         disabled
       />
     </Label>
-    <Label class="field">
-      <span>Hit rate</span>
+    <Label :class="fieldVariants()">
+      <span class="text-muted-foreground">Hit rate</span>
       <Input
         type="text"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"

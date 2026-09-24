@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, FieldGroup, fieldVariants } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { computed } from 'vue';
@@ -88,9 +89,9 @@ function onEditGlobalDefaults(): void {
 </script>
 
 <template>
-  <div class="settings-pane" data-testid="http-settings-pane">
-    <Label class="field">
-      <div class="field-head">
+  <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>HTTP version</span>
         <Label class="inherit">
           <Checkbox
@@ -112,11 +113,11 @@ function onEditGlobalDefaults(): void {
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </select>
-      <span class="helper-text">Global: HTTP/{{ global.httpVersion }}</span>
+      <FieldDescription>Global: HTTP/{{ global.httpVersion }}</FieldDescription>
     </Label>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Request timeout (ms)</span>
         <Label class="inherit">
           <Checkbox
@@ -138,13 +139,13 @@ function onEditGlobalDefaults(): void {
         :model-value="String(settings.requestTimeoutMs ?? global.requestTimeoutMs)"
         @input="onRequestTimeoutMsInput"
       />
-      <span class="helper-text">
+      <FieldDescription>
         Global: {{ global.requestTimeoutMs === 0 ? 'no timeout' : `${global.requestTimeoutMs} ms` }}
-      </span>
+      </FieldDescription>
     </Label>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Max response size (MB)</span>
         <Label class="inherit">
           <Checkbox
@@ -166,13 +167,13 @@ function onEditGlobalDefaults(): void {
         :model-value="String(settings.maxResponseMb ?? global.maxResponseMb)"
         @input="onMaxResponseMbInput"
       />
-      <span class="helper-text">
+      <FieldDescription>
         Global: {{ global.maxResponseMb === 0 ? 'unlimited' : `${global.maxResponseMb} MB` }}
-      </span>
+      </FieldDescription>
     </Label>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup class="items-center">
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           :model-value="settings.sslVerify ?? global.sslVerify"
           :disabled="settings.sslVerify === null"
@@ -193,11 +194,11 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         Inherit
       </Label>
-    </div>
-    <span class="helper-text">Global: {{ global.sslVerify ? 'on' : 'off' }}</span>
+    </FieldGroup>
+    <FieldDescription>Global: {{ global.sslVerify ? 'on' : 'off' }}</FieldDescription>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup class="items-center">
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           :model-value="settings.followRedirects ?? global.followRedirects"
           :disabled="settings.followRedirects === null"
@@ -218,11 +219,11 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         Inherit
       </Label>
-    </div>
-    <span class="helper-text">Global: {{ global.followRedirects ? 'on' : 'off' }}</span>
+    </FieldGroup>
+    <FieldDescription>Global: {{ global.followRedirects ? 'on' : 'off' }}</FieldDescription>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Max redirects</span>
         <Label class="inherit">
           <Checkbox
@@ -244,14 +245,14 @@ function onEditGlobalDefaults(): void {
         :model-value="String(settings.maxRedirects ?? global.maxRedirects)"
         @input="onMaxRedirectsInput"
       />
-      <span v-if="!effectiveFollowRedirects" class="helper-text">
+      <FieldDescription v-if="!effectiveFollowRedirects">
         Follow redirects is off — this has no effect.
-      </span>
-      <span v-else class="helper-text">Global: {{ global.maxRedirects }}</span>
+      </FieldDescription>
+      <FieldDescription v-else>Global: {{ global.maxRedirects }}</FieldDescription>
     </Label>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup class="items-center">
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           :model-value="settings.disableCookieJar ?? global.disableCookieJar"
           :disabled="settings.disableCookieJar === null"
@@ -272,8 +273,8 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         Inherit
       </Label>
-    </div>
-    <span class="helper-text">Global: {{ global.disableCookieJar ? 'off' : 'on' }}</span>
+    </FieldGroup>
+    <FieldDescription>Global: {{ global.disableCookieJar ? 'off' : 'on' }}</FieldDescription>
 
     <button type="button" class="hint-link" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
       Edit global defaults…
@@ -284,36 +285,8 @@ function onEditGlobalDefaults(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.settings-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5;
-}
-
-.field {
-  @apply flex flex-col gap-1 text-kira-sm;
-}
-
-.field > span:first-child {
-  @apply text-muted-foreground;
-}
-
-.field-head {
-  @apply flex items-center justify-between gap-1;
-}
-
-.field.checkbox {
-  @apply flex-row items-center gap-1.5;
-}
-
-.checkbox-row {
-  @apply flex-row items-center justify-between;
-}
-
 .inherit {
   @apply flex items-center gap-1 text-muted-foreground text-kira-xs;
-}
-
-.helper-text {
-  @apply text-subtle text-kira-xs leading-normal;
 }
 
 .hint-link {

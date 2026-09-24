@@ -3,6 +3,7 @@ import type { AppearanceSettings } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldGroup, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 
@@ -21,8 +22,8 @@ function onWordWrapChange(checked: boolean): void {
 </script>
 
 <template>
-  <div class="field checkbox-row">
-    <Label class="field checkbox">
+  <FieldGroup>
+    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
       <Checkbox
         class="size-3.5"
         :model-value="appearance.wordWrap"
@@ -52,5 +53,5 @@ function onWordWrapChange(checked: boolean): void {
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
     </Tooltip>
-  </div>
+  </FieldGroup>
 </template>

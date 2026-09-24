@@ -3,6 +3,7 @@ import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -135,12 +136,12 @@ async function onAddScript(): Promise<void> {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <p class="helper-text">
+  <div class="contents" v-show="active">
+    <FieldDescription>
       Each script becomes an entry in the tab strip's "+" button and the Terminal module's
       own quick-command panel, opening a new terminal tab running its command. An empty
       working directory falls back to the Terminal module's own default directory.
-    </p>
+    </FieldDescription>
 
     <div
       v-if="customScriptsStore.records.length"
@@ -228,9 +229,9 @@ async function onAddScript(): Promise<void> {
         </div>
       </div>
     </div>
-    <p v-else class="helper-text">
+    <FieldDescription v-else>
       No scripts yet. Add one to launch it from the tab strip's + button.
-    </p>
+    </FieldDescription>
 
     <div class="custom-script-add">
       <div class="script-row-top">
@@ -298,9 +299,9 @@ async function onAddScript(): Promise<void> {
         />
       </div>
     </div>
-    <span v-if="scriptError" class="field-error" data-testid="custom-script-error">{{
+    <FieldError v-if="scriptError" data-testid="custom-script-error">{{
       scriptError
-    }}</span>
+    }}</FieldError>
   </div>
 </template>
 

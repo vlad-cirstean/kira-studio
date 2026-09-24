@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
@@ -57,7 +58,7 @@ const vsixOutcomeMessage = computed(() => {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
+  <div class="contents" v-show="active">
     <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
          VsixStatus, but the click itself always re-resolves through Install. -->
     <div class="git-vsix-install">
@@ -83,9 +84,9 @@ const vsixOutcomeMessage = computed(() => {
           }}
         </Button>
       </template>
-      <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
+      <FieldDescription v-if="vsixOutcomeMessage" data-testid="git-vsix-outcome">
         {{ vsixOutcomeMessage }}
-      </p>
+      </FieldDescription>
       <p
         v-if="gitClientsStore.vsix.bundled && !gitClientsStore.vsix.codeAvailable && gitClientsStore.vsix.probed.length > 0"
         class="muted-note"
@@ -109,7 +110,10 @@ const vsixOutcomeMessage = computed(() => {
       >
         <div class="git-client-info">
           <span class="git-client-label">{{ client.label || client.id }}</span>
-          <span class="helper-text">
+          <!-- P110 B12: .git-client-info is unstyled (no flex) -- kept as an inline span with
+               .helper-text's own utility-class equivalent, not FieldDescription (a <p>), so this
+               stays inline exactly as it renders today. -->
+          <span class="leading-normal text-subtle text-kira-xs">
             <template v-if="client.revokedAt">Revoked</template>
             <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
           </span>

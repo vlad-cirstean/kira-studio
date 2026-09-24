@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { FieldDescription, FieldGroup, FieldLegend, fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -27,8 +28,8 @@ function onInlineBlameChange(checked: boolean): void {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <div class="sec-label first">Typography</div>
+  <div class="contents" v-show="active">
+    <FieldLegend class="pt-0">Typography</FieldLegend>
     <FontSizeField
       :appearance="draft.appearance"
       :is-at-default="isAtDefault"
@@ -37,15 +38,15 @@ function onInlineBlameChange(checked: boolean): void {
     />
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text">Applies to the file tree and every list.</span>
+      <FieldDescription>Applies to the file tree and every list.</FieldDescription>
     </RowDensityField>
 
     <WordWrapField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text">Long lines wrap instead of scrolling, in the file viewer.</span>
+      <FieldDescription>Long lines wrap instead of scrolling, in the file viewer.</FieldDescription>
     </WordWrapField>
 
-    <div class="field checkbox-row">
-      <Label class="field checkbox">
+    <FieldGroup>
+      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
         <Checkbox
           class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
@@ -55,9 +56,9 @@ function onInlineBlameChange(checked: boolean): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Inline blame</span>
-        <span class="helper-text"
+        <FieldDescription
           >Show who last changed the current line, at the end of that line, in the
-          repository file viewer.</span
+          repository file viewer.</FieldDescription
         >
       </Label>
       <Tooltip>
@@ -78,7 +79,7 @@ function onInlineBlameChange(checked: boolean): void {
       </TooltipTrigger>
       <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
-    </div>
+    </FieldGroup>
 
     <DateFormatField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
   </div>

@@ -3,6 +3,7 @@ import type { AppearanceSettings } from '@shared/domain/settings';
 import { FONT_SIZE_RANGE } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -44,8 +45,8 @@ const fieldId = useId();
 </script>
 
 <template>
-  <div class="field">
-    <div class="field-head">
+  <Field>
+    <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Data font size</Label>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -108,9 +109,9 @@ const fieldId = useId();
         </InputGroupAddon>
       </InputGroup>
     </div>
-    <span v-if="fontSizeError" class="field-error" data-testid="settings-font-size-error">
+    <FieldError v-if="fontSizeError" data-testid="settings-font-size-error">
       {{ fontSizeError }}
-    </span>
-    <span v-else class="helper-text">{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</span>
-  </div>
+    </FieldError>
+    <FieldDescription v-else>{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</FieldDescription>
+  </Field>
 </template>

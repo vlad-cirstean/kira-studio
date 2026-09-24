@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { sections, useSettingsStore } from '../state/settings';
@@ -119,10 +120,10 @@ async function save(patch: SettingsPatch): Promise<void> {
 
     <template #footer="f">
       <span class="footer-status">
-        <span v-if="f.saveError" class="field-error" data-testid="settings-save-error">{{ f.saveError }}</span>
-        <span v-else class="helper-text" data-testid="settings-footer-status"
+        <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
+        <FieldDescription v-else data-testid="settings-footer-status"
           >Stored in <span class="mono">~/.kira-studio/kira.sqlite</span><template v-if="f.isDirty">
-          · Unsaved changes</template></span
+          · Unsaved changes</template></FieldDescription
         >
       </span>
       <span class="flex items-center gap-1">

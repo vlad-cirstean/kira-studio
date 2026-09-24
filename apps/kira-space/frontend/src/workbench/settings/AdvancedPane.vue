@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FieldDescription } from '@theme/components/ui/field';
 import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
 import type { SettingsPaneProps } from './types';
 
@@ -9,9 +10,9 @@ defineProps<SettingsPaneProps>();
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
+  <div class="contents" v-show="active">
     <GitLogLevelField :advanced="draft.advanced" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text">Kira-version's own diagnostic log verbosity.</span>
+      <FieldDescription>Kira-version's own diagnostic log verbosity.</FieldDescription>
     </GitLogLevelField>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { FieldDescription, FieldError, fieldVariants } from '@theme/components/ui/field';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import {
@@ -58,9 +59,9 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <Label class="field">
-      <div class="field-head">
+  <div class="contents" v-show="active">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Operation log retention (days)</span>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -122,14 +123,14 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span v-if="opLogRetentionError" class="field-error" data-testid="settings-oplog-retention-error">
+      <FieldError v-if="opLogRetentionError" data-testid="settings-oplog-retention-error">
         {{ opLogRetentionError }}
-      </span>
+      </FieldError>
     </Label>
     <p class="muted-note">Takes effect after restart.</p>
 
-    <Label class="field">
-      <div class="field-head">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Expensive query threshold (rows)</span>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -191,22 +192,21 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
           </InputGroupAddon>
         </InputGroup>
       </span>
-      <span
+      <FieldError
         v-if="expensiveQueryRowsError"
-        class="field-error"
         data-testid="settings-expensive-query-rows-error"
       >
         {{ expensiveQueryRowsError }}
-      </span>
-      <span v-else class="helper-text"
+      </FieldError>
+      <FieldDescription v-else
         >A query whose plan is estimated to read at least this many rows is flagged as
         expensive by the console's Explain button and by auto-explain. Not comparable
-        across engines' own cost figures — see the plan panel's own note.</span
+        across engines' own cost figures — see the plan panel's own note.</FieldDescription
       >
     </Label>
 
     <GitLogLevelField :advanced="draft.advanced" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <span class="helper-text">Verbosity of kira-space's own diagnostic log, for every repository.</span>
+      <FieldDescription>Verbosity of kira-space's own diagnostic log, for every repository.</FieldDescription>
     </GitLogLevelField>
   </div>
 </template>

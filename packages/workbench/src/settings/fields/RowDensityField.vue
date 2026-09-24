@@ -2,6 +2,7 @@
 import type { AppearanceSettings, RowDensity } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Field } from '@theme/components/ui/field';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 
 // I2-18: the row-density button pair (compact/comfortable) was byte-identical between kira-studio's
@@ -19,8 +20,8 @@ function setRowDensity(density: RowDensity): void {
 </script>
 
 <template>
-  <div class="field">
-    <div class="field-head">
+  <Field>
+    <div class="flex items-center justify-between gap-1">
       <span>Row height</span>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -57,5 +58,5 @@ function setRowDensity(density: RowDensity): void {
       </button>
     </div>
     <slot />
-  </div>
+  </Field>
 </template>

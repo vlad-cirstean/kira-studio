@@ -2,6 +2,7 @@
 import type { AppearanceSettings } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
@@ -26,8 +27,8 @@ const fieldId = useId();
 </script>
 
 <template>
-  <div class="field">
-    <div class="field-head">
+  <Field>
+    <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Commit date</Label>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -57,6 +58,6 @@ const fieldId = useId();
       <option value="relative">Relative (3 days ago)</option>
       <option value="absolute">Absolute (2024-12-30 22:48)</option>
     </select>
-    <span class="helper-text">The git graph's own commit timestamps.</span>
-  </div>
+    <FieldDescription>The git graph's own commit timestamps.</FieldDescription>
+  </Field>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { fieldVariants } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -25,9 +26,9 @@ function onDefaultPageSizeChange(e: Event): void {
 </script>
 
 <template>
-  <div class="settings-pane" v-show="active">
-    <Label class="field">
-      <div class="field-head">
+  <div class="contents" v-show="active">
+    <Label :class="fieldVariants()">
+      <div class="flex items-center justify-between gap-1">
         <span>Default page size</span>
         <Tooltip>
         <TooltipTrigger as-child>

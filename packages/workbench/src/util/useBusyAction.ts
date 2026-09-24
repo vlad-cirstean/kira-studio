@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 
 // P107 T1-20: the same `busy = true; try { await action() } finally { busy = false }` in-flight
-// flag six settings-pane call sites (ClaudeCodePane.vue x2, DatabaseMcpPane.vue x3,
+// flag six settings pane call sites (ClaudeCodePane.vue x2, DatabaseMcpPane.vue x3,
 // ConnectedEditorsPane.vue x1) each defined locally, to disable a checkbox/button while its own
 // instant action (bypasses draft/Save, P86 §9.3) is running.
 //
