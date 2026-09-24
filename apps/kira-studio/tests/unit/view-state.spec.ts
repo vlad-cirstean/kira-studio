@@ -279,31 +279,42 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(3);
   });
 
-  test("9. a superseded (stale) load's failure does not revert a pageIndex a newer load already advanced", async () => {
+  // F7 (P108 Part 10): this test used to lock in the exact bug F7 fixed — a second goNext firing
+  // before the first's load resolved stacked a second optimistic pageIndex advance on top of the
+  // first, so a failure could only ever revert to one or the other guess, never to the page that
+  // had actually last loaded. goNext/goPrev now no-op while a load is already in flight, so that
+  // stacking can no longer happen at all — rewritten to assert the guard, not the old two-in-
+  // flight scenario it made impossible.
+  test('9. a second goNext call while a load is in flight is a no-op, not a second optimistic advance', async () => {
     const { id } = tabsStore.openDataTab('conn9', 'public.orders', { newTab: true });
     const first = deferred<{ page: unknown; source: string }>();
-    const second = deferred<{ page: unknown; source: string }>();
-    const reads: Array<typeof first> = [first, second];
-    let call = 0;
+    let readCalls = 0;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
-    (data as any).read = () => reads[call++]?.promise;
+    (data as any).read = () => {
+      readCalls++;
+      return first.promise;
+    };
 
-    const older = gridViewStore.goNext(id); // page 0 -> 1, opId A
+    const older = gridViewStore.goNext(id); // page 0 -> 1, opId A, still in flight
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
-    const newer = gridViewStore.goNext(id); // page 1 -> 2, opId B (supersedes A)
-    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(2);
 
-    // A's request fails after B has already taken over — its failure must not stomp on B's
-    // optimistic pageIndex, and reverting to "1" (the index *before A's own* advance) would be
-    // exactly that stomp.
-    first.reject(Object.assign(new Error('stale failure'), { code: 'E_QUERY' }));
+    await gridViewStore.goNext(id); // stray second click while A is in flight
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1); // never stacked to 2
+    expect(readCalls).toBe(1); // data.read was never issued a second time
+
+    // A itself now fails — reverts to its own previous index (0), same as any single failed load.
+    first.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
     await older;
-    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(2);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
 
-    // B itself now fails — being the current op, it must revert to its own previous index (1).
-    second.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
-    await newer;
+    // The guard clears once the in-flight load resolves — goNext works normally again.
+    const second = deferred<{ page: unknown; source: string }>();
+    (data as any).read = () => second.promise;
+    const again = gridViewStore.goNext(id);
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
+    second.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
+    await again;
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
   });
 });
 
