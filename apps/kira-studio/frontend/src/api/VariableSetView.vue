@@ -154,9 +154,19 @@ const order = ref<string[]>([]);
 function syncDrafts(): void {
   for (const key of Object.keys(drafts)) delete drafts[key];
   for (const row of rows.value) {
+    // P108 F3: every `rows` reload (any row's edit/add/reorder, a Git restore of another row's
+    // history entry) used to reset every draft to the row's own stored `value` — '' for a secret
+    // (D4/D5's list projection). A revealed secret's plaintext survives in `revealedValues[id]`
+    // untouched, but the fresh draft object built here starts blank; the reveal-mirror watch below
+    // only fires when `revealedValues` itself changes, so pressing the eye again re-reveals the
+    // same string, `revealedValues[id] = value` is a same-value set, and the watch never fires —
+    // the row shows reveal state with an empty field until the grace expiry (up to 5 min). Seeding
+    // from `revealedValues[id]` here, same mirror rule the watch uses, keeps the field showing
+    // what's actually revealed across any unrelated reload.
+    const revealed = variableSetStore.revealedValues[row.id];
     drafts[row.id] = {
       name: row.name,
-      value: row.value,
+      value: revealed !== undefined ? revealed : row.value,
       valueTouched: false,
       isSecret: row.isSecret,
       description: row.description,
