@@ -4896,6 +4896,157 @@ on; the two incidents above were both caught this way, not by luck.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
   starts, written by an Opus subagent per `CLAUDE.md`'s own process, never edited afterward.
 
+## P112 result
+
+Landed as 10 plan commits (`plans/P112-tanstack-query-api-client-caches.md`, tree surveyed at
+`264069c`) plus 5 phase-end fix commits, against `docs/v1.9/SPEC.md`'s own P112 row (F12's own
+follow-up phase). One sequential Sonnet implementer across the whole phase, per `CLAUDE.md`.
+
+- **1 `4965bf4` — Go-side `api-data-changed` broadcast (§2).** `emitApiData` helper + `ApiDataChange`
+  scoped payload (`bridge/apidata.go`), wired into the 19 mutation call sites across
+  `bridge/variables.go`/`bridge/collections.go` (§2.3).
+- **2 `5a82979` — TS-side channel, listener, query module (§3.1-3.4).** `api-data-changed` IPC
+  channel + Zod mirror, `apiQueries.ts`'s query-key/options module, the boot-time listener turning a
+  broadcast into `queryClient.invalidateQueries`.
+- **3 `f3f7946` — environments list onto TanStack Query.** `variables.ts`'s `state.environments`/
+  `loaded`/`initInFlight` replaced by `apiEnvironmentsQueryOptions`'s `useQuery`; active-environment
+  mutations move onto `useMutation`.
+- **4 `a2f8807` — variable rows onto TanStack Query.** `listCache`/`ensureVariablesLoaded`/
+  `cachedVariables`/`evictListCache` dropped for `apiVariablesQueryOptions`; new pure functions
+  (`mergeVariableRows`, `overviewRowsOf`) and async helpers (`variablesForSend`, `apiIdsForTab`)
+  replace the removed store methods' call sites (`HttpRequestView.vue`, `GrpcRequestView.vue`,
+  `httprequest/state.ts`, `grpcrequest/state.ts`, `variableCompletion.ts`, `curl.ts`,
+  `VariableSetView.vue`, `VariablesOverviewPanel.vue`). Rewrites the four F2/F9 unit specs the
+  removal broke, ahead of commit 8, since `bun run typecheck` covers `tests/unit/**` too. **Contains
+  foreign content from a shared-index race**, disclosed below.
+- **5 `5ea9684` — collections tree onto TanStack Query.** `collections.ts`'s tree/`orphanRequests`/
+  `orphanGrpcRequests` replaced by `apiCollectionsTreeQueryOptions`; create/rename/delete move onto
+  `useMutation`. **Contains foreign content from the same race**, disclosed below.
+- **6 `1252e12` — saved requests onto TanStack Query.** `apiSavedRequestQueryOptions`/
+  `apiSavedGrpcRequestQueryOptions`, `useSavedRequest`/`useSavedGrpcRequest` reactive readers wired
+  into both request views.
+- **7 `259320f` — keep in-progress drafts across a cross-window refetch (§6.5).** Risk (a) from the
+  plan's own §8: an unsaved edit in the active window must not be clobbered by a refetch triggered by
+  a save in another window.
+- **8 `7cc5a95` — move the remaining API-client unit specs onto the query cache.** The
+  collections-scoped specs commit 4 deferred (still depended on commit 5's own migration).
+- **9 `743ec54` — cross-window `api-data-changed` UI spec (§7.2).** `api-cross-window-sync.spec.ts`,
+  3 cases — see "GUI verification" below for what this covers in place of the plan's §9.6 manual
+  check.
+- **10 `11c621d` — docs: record `api-data-changed` and the API-client query caches.**
+  `docs/ARCHITECTURE.md` updated.
+- **`6eacc38` — fix(studio): drop needless export on three internal-only query options (P112).**
+  Phase-end knip fix: `apiCollectionsTreeQueryOptions`/`apiSavedRequestQueryOptions`/
+  `apiSavedGrpcRequestQueryOptions` were exported with no caller outside `apiQueries.ts` itself.
+- **`5677487` — fix(studio): unhang `grpc-schema-supersession.spec.ts` after `loadSchema`'s
+  `apiIdsForTab` await (P112).** Fixes the exact regression `## P108 Part 11 result` names below its
+  own "Deferred" section as caused by this phase's still-in-progress `a2f8807` — confirmed landed
+  here, resolving that deferral from P112's side.
+- **`a8d1998` — fix(studio): restore `control.collectionsList`/`variablesListEnvironments` after each
+  spec file (P112).** A cross-file control-mock leak commit 8's own migration exposed (§8(b)).
+- **`7fc3e4e` / `cd96e09` — phase-end `test:ui:studio` fixes**, both pre-existing test-fixture bugs,
+  detailed under "Phase-end verification" below.
+
+**Foreign content from a shared-index race, disclosed in full (both incidents caught and reconciled
+by the concurrent `## P108 Part 11 result` review, cross-checked here from P112's own side, not
+newly found):**
+
+1. **`a2f8807`** (commit 4, variable rows) carries `## P108 Part 11 result`'s own **F3** — a
+   `statementAtOffset` caret/statement-boundary fix in `packages/shared/domain/sql-split.ts` and
+   `views/console/ConsoleView.vue`, entirely orthogonal to variable rows/TanStack Query. Per that
+   review's own account: its session had `sql-split.ts`/`ConsoleView.vue`/`sql-split.spec.ts` staged
+   when this session's broad `git commit` landed against the same shared index between the review
+   session's `git add` and `git commit` calls. Confirmed from this side via `git show a2f8807 --
+   packages/shared/domain/sql-split.ts` — the diff's own doc comments read "P108 Part 11 F3"
+   throughout, and `git log -S"export function statementAtOffset"` shows it was introduced in that
+   one commit, nowhere else. No P112 file lost content; the mixed-in diff is real, complete, and
+   already credited to F3 in `## P108 Part 11 result`'s own entry.
+2. **`5ea9684`** (commit 5, collections tree) carries that same review's **F5** — a `Go`-side
+   fix (`adapterhost/host.go`, all 5 adapters' `console.go`, `adapters/sqltext.go`+`_test.go`,
+   `oplog/wire.go`, `0027_p108part11_op_log_path.sql`, `storage/model/ops.go`, `storage/repos/ops.go`,
+   `shared/domain/ops.ts`) restoring operation-history re-run's original path. Same race, same
+   reconciliation already recorded in Part 11's own F5 entry; nothing P112-scoped was lost from
+   `5ea9684`'s own tree-migration diff.
+3. **`259320f`** (commit 7) sits chronologically next to `dbeb9da`
+   (`fix: gate console Run/Run all/Explain during a slow reconnect`) on the shared branch — a
+   genuinely separate, unrelated commit from a concurrent subagent interleaved between P112's own
+   commits, not content-mixed into `259320f` itself. Confirmed via `git show --stat 259320f` (touches
+   only the drafts-across-refetch files §6.5 names) and `git show --stat dbeb9da` (touches only
+   console reconnect-gating files, none shared with P112).
+
+Both incidents were caught by the same discipline `## P111 result` already documents for this
+checkout ("every commit's own file list checked against its intended set before moving on") — here,
+cross-checked against the sibling review's own disclosure rather than independently discovered, since
+that review's own result section had already named and reconciled both by the time this phase closed.
+
+**Phase-end verification (`CLAUDE.md`'s "implement the whole plan first, then test once" rule), plan
+§9 items, run for real:**
+
+1. Removed-identifier grep (§9.1) — every hit under `SF`/`ST` is either a doc comment naming the old
+   mechanism for contrast, or a deliberately reused name (`loadCollectionsTree`/`loadEnvironments`
+   now live in `apiQueries.ts` as `queryClient.query`-backed imperative loaders, same name, entirely
+   new TanStack Query mechanism underneath) — not the old hand-rolled cache surviving. No bare
+   `state.requests`/`state.grpcRequests`/`listCacheGen`/`ensureInFlight`/`initInFlight` reference
+   remains outside a comment.
+2. `useQuery(`/`useMutation(` grep (§9.2) — real callers confirmed in `collections.ts` (1 query, 5
+   mutations), `variables.ts` (1 query, 8 mutations), `apiQueries.ts` (3 more `useQuery`s for saved
+   request/grpc request/variable rows); `useSavedRequest`/`useVariableRows` real callers confirmed in
+   both `HttpRequestView.vue` and `GrpcRequestView.vue`.
+3. `emitApiData(` grep (§9.3) — 20 hits total under `apps/kira-studio/internal/bridge/`: 1 is the
+   function's own definition (`apidata.go:30`), 19 are call sites (`variables.go`, `collections.go`),
+   matching §2.3's own count exactly.
+4. `go test ./apps/kira-studio/...`, `bun run lint:go`, `bun run typecheck` (all 8 projects),
+   `bun run lint` (biome + token check), `bun run lint:dead`, `bun run test:unit`,
+   `bun run build:studio` — all clean. `test:unit`: 1659 pass, 0 fail, across 173 files. `lint:dead`:
+   6 duplicate-export pairs, 8 configuration hints — matches this chapter's current baseline exactly
+   (`docs/v1.9/SPEC.md`'s own most recent knip mentions). `build:studio`: exit 0 (one pre-existing
+   `INEFFECTIVE_DYNAMIC_IMPORT` warning on `monacoTheme.ts`, unrelated to this phase, not a failure).
+5. `bun run test:ui:studio`, once at phase end (§9.5) — **273 passed, 5 failed, 4 did not run**
+   (`ui` + `ui-timing` projects combined, 8.4m). Two categories of failure, fully triaged:
+   - **Two genuine, pre-existing, P112-scoped test-fixture bugs, found and fixed here.**
+     `grpc-request.spec.ts` (4 tests) and `api-ui-consistency.spec.ts` (1 test, its D12 case) restore
+     a gRPC tab via `grpcTab({ service, method })` with no `target` override and no `grpcDescribe`
+     control mock. `GrpcRequestView.vue`'s schema-load watch has always (confirmed via
+     `git log -S` predating P112 entirely) returned early for `descriptorMode: 'reflection'` with an
+     empty `target`, so `loadSchema`/`grpcDescribe` never fires, `methodResolved` never resolves, and
+     the Call button stays disabled forever — not a P112 regression (the watch block is byte-identical
+     across every P112 diff), not the sandbox's documented worker-contention flake class (confirmed
+     deterministic under `--workers=1` isolation). Fixed by adding `target: 'demo.example.com:443'`
+     plus a `grpcDescribe` snapshot to all 5 tests, matching the pattern every sibling test in both
+     files already used. `7fc3e4e` (grpc-request.spec.ts, 4 tests, 22/22 passing after) and `cd96e09`
+     (api-ui-consistency.spec.ts, its 32/32 passing after).
+   - **5 failures + 4 did-not-run, confirmed out of this phase's own scope, left for whoever owns
+     that work.** `cell-editor.spec.ts:332`, `console-format.spec.ts:387`, `interaction.spec.ts:1101`,
+     `mask-preview.spec.ts:130`, `mutations.spec.ts:220` — all against the console/SQL-grid
+     subsystem (`views/console/*`, `views/browse/BrowseView.vue`). `git diff --stat 264069c..HEAD --
+     apps/kira-studio/frontend/src/views/console apps/kira-studio/frontend/src/views/browse` shows 10
+     files touched, all by the concurrent `## P108 Part 12` fixer's own in-flight commits
+     (`bdc0147`, `48be876`, `582031f` landed mid-session, after this phase's own last commit); no P112
+     commit's own diff touches any of these files. The `ui-timing` project's 4 "did not run" tests sit
+     behind Playwright's own project-dependency skip when `ui` has failures — not a separate finding.
+     `api-secret-reveal-isolation.spec.ts` and one `api-ui-consistency.spec.ts` case ("hover z-index")
+     failed on an earlier full-suite attempt and are confirmed pure resource-contention flakes, not
+     genuine bugs — both passed cleanly in isolated single-worker re-runs; absent from this final run.
+6. **GUI verification (§9.6) — unverified, named explicitly per the plan's own instruction.** This
+   session cannot open a GUI, so the manual two-window check (`bun run dev`, a second window) was not
+   run. Covered instead by the §7.2 UI spec, `api-cross-window-sync.spec.ts` (commit 9, `743ec54`),
+   whose 3 cases exercise: a variable edit in one window reaching another window's next send; an
+   active-environment switch in one window reaching another window's selector; a save in the
+   originating window not re-dirtying after its own event-triggered refetch (risk (a) from §8). The
+   plan's other two manual-check bullets — a rename/delete in window B reaching window A's tree with
+   the open tab reading orphan — are **not** covered by any automated spec and are named here as
+   genuinely unverified, not claimed.
+7. F2/F9 guarantee specs (§9.7) — `api-variables-duplicate-names.spec.ts`,
+   `api-variables-delete-eviction.spec.ts`, `api-variables-ensure-load-race.spec.ts`,
+   `api-secret-reveal-expiry-round2.spec.ts` all exist (rewritten in commits 4/8 per each one's own
+   scope) and pass: 9/9, 0 fail.
+
+**File list.** Every file touched across the 15 commits sits under `apps/kira-studio/frontend/src/`,
+`apps/kira-studio/internal/bridge/`, `apps/kira-studio/tests/`, `packages/shared/`, or
+`docs/ARCHITECTURE.md`/`docs/v1.9/`, matching the plan's own `SF`/`SI`/`ST`/`SP` scope — with the two
+foreign-content exceptions disclosed above, both already reconciled by the sibling review's own
+result section.
+
 ## P108 Part 11 result
 
 Reviewed per `plans/P108-part11-findings.md` (Opus reviewer, no fixing) — chunk "Studio console and
