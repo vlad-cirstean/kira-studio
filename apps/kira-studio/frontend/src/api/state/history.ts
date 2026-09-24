@@ -157,6 +157,12 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
    *  after a fresh send is the same complaint as a stale list. */
   function noteRecorded(tabId: string): void {
     const tab = opts.findTab(tabId);
+    // P108 F8: HttpRequestView.vue's own send() used to call this for a tab already closed
+    // (findHttpRequestTab guard added there fixes the call site, but this is the one place every
+    // protocol's send/call funnels through) — without this guard, `ensure()` recreates a runtime
+    // and seq entry (history.ts's own module state) for a tab id registerTabRuntimeCleanup already
+    // deleted both of, and nothing closes that gap again.
+    if (!tab) return;
     const rt = ensure(tabId);
     rt.viewing = null;
     if (tab?.state.responsePane === 'history') {

@@ -142,7 +142,12 @@ function noteSendCompleted(tabId: string): void {
 export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
   const { runtime, ensureRuntime } = createRuntimeStore<HttpRequestViewRuntime>(defaultRuntime);
 
+  // P108 F8: gRPC's own cleanup already cancels an in-flight call here (state.ts); HTTP's did not
+  // — a send kept running in Go and recording history for a tab already gone. stopOp before the
+  // delete matches that shape (registerTabRuntimeCleanup is the one place a closing tab's cleanup
+  // and an in-flight op's cancellation can share one call).
   registerTabRuntimeCleanup((tabId) => {
+    stopOp(runtime[tabId]);
     delete runtime[tabId];
   });
 
@@ -194,6 +199,12 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
         incognito: useTabIncognitoStore().isIncognito(tabId),
         options: buildSettingsWire(tab.state.settings),
       });
+      // P108 F8: `rt` is a captured reference to the (possibly already cleaned-up) runtime object
+      // — closing the tab mid-send never touched `rt.opId` itself (cleanup only stops the op and
+      // deletes `runtime[tabId]`), so the opId check alone still passed for a tab that no longer
+      // exists, and noteSendRecorded/noteSendCompleted below ran for it, recreating a history
+      // runtime and seq entry (api/state/history.ts) nothing ever cleans up again.
+      if (!findHttpRequestTab(tabId)) return;
       if (rt.opId !== opId) return; // superseded by a newer send
       rt.status = 'idle';
       rt.opId = null;
@@ -205,6 +216,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       // without the user re-navigating.
       noteSendCompleted(tabId);
     } catch (err) {
+      if (!findHttpRequestTab(tabId)) return; // P108 F8: same guard, the failure path's own half
       if (rt.opId !== opId) return;
       rt.opId = null;
       const failure = classifyLoadError(err);
