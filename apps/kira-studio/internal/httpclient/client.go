@@ -106,6 +106,15 @@ func sameRedirectHost(from, dest *url.URL) bool {
 	return dh == fh || strings.HasSuffix(dh, "."+fh)
 }
 
+// isSchemeDowngrade reports whether dest drops from https to http on an otherwise same-host hop
+// (F3). net/http's own sensitive-header stripping (shouldCopyHeaderOnRedirect) compares hostnames
+// only, never scheme, so an https-to-http redirect keeps Authorization/Cookie on the wire in
+// clear even when checkRedirectFor's own host check says "same host" — callers must strip those
+// two explicitly on a downgrade rather than relying on net/http to have done it.
+func isSchemeDowngrade(from, dest *url.URL) bool {
+	return strings.EqualFold(from.Scheme, "https") && strings.EqualFold(dest.Scheme, "http")
+}
+
 // HasScheme reports whether s already begins with "<scheme>://" — deliberately stricter than
 // url.Parse's own Scheme field, which never populates for a bare "api.example.com/path" (no
 // "//") in the first place, so resolveURL has to know to prepend one before parsing at all. An

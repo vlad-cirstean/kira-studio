@@ -107,6 +107,92 @@ func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
 	}
 }
 
+// TestSend_RedirectHeaderStrippingComparesAgainstOrigin is P108 F2: net/http's redirect
+// machinery always re-copies headers from the *original* request onto every new hop (it never
+// copies from the previous hop's already-modified request), so checkRedirectFor must compare
+// each hop against via[0] (the origin), not the immediately-previous hop — otherwise an
+// A -> B -> B chain strips on the first (cross-host) hop but restores the header on the second
+// (same-host-as-previous-hop) one.
+func TestSend_RedirectHeaderStrippingComparesAgainstOrigin(t *testing.T) {
+	var finalHeader string
+
+	finalSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/mid":
+			// Relative redirect: resolves against the host the client actually used
+			// ("localhost", set below), so this hop is same-host relative to /mid but still
+			// cross-host relative to the origin.
+			http.Redirect(w, r, "/final", http.StatusFound)
+		case "/final":
+			finalHeader = r.Header.Get("X-Api-Key")
+			_, _ = w.Write([]byte("final"))
+		}
+	}))
+	defer finalSrv.Close()
+	finalPort := finalSrv.Listener.Addr().(*net.TCPAddr).Port
+
+	startSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// "localhost" resolves to the same loopback address as httptest's own 127.0.0.1, but is a
+		// different *hostname* — the cross-host hop sameRedirectHost must catch, same as
+		// TestSend_CrossHostRedirectStripsUserHeaders.
+		http.Redirect(w, r, fmt.Sprintf("http://localhost:%d/mid", finalPort), http.StatusFound)
+	}))
+	defer startSrv.Close()
+
+	if _, err := Send(context.Background(), Request{
+		Method:  "GET",
+		URL:     startSrv.URL,
+		Headers: []Header{{Name: "X-Api-Key", Value: "sk-secret"}},
+	}, Options{}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if finalHeader != "" {
+		t.Errorf("X-Api-Key reached the B->B hop after an A->B redirect: %q, want stripped", finalHeader)
+	}
+}
+
+// TestSend_SchemeDowngradeRedirectStripsAuthAndCookie is P108 F3: net/http's own sensitive-header
+// stripping (shouldCopyHeaderOnRedirect) compares hostnames only, never scheme, so an https to
+// http redirect on the same host keeps Authorization and Cookie on the wire in clear unless
+// checkRedirectFor strips them explicitly.
+func TestSend_SchemeDowngradeRedirectStripsAuthAndCookie(t *testing.T) {
+	var finalAuth, finalCookie, finalCustom string
+	plainSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		finalAuth = r.Header.Get("Authorization")
+		finalCookie = r.Header.Get("Cookie")
+		finalCustom = r.Header.Get("X-Api-Key")
+		_, _ = w.Write([]byte("plain"))
+	}))
+	defer plainSrv.Close()
+	plainPort := plainSrv.Listener.Addr().(*net.TCPAddr).Port
+
+	tlsSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, fmt.Sprintf("http://127.0.0.1:%d/final", plainPort), http.StatusFound)
+	}))
+	defer tlsSrv.Close()
+
+	if _, err := Send(context.Background(), Request{
+		Method: "GET",
+		URL:    tlsSrv.URL,
+		Headers: []Header{
+			{Name: "Authorization", Value: "Bearer tok"},
+			{Name: "Cookie", Value: "session=s3cret"},
+			{Name: "X-Api-Key", Value: "sk-secret"},
+		},
+	}, Options{SSLVerify: ptr(false)}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if finalAuth != "" {
+		t.Errorf("Authorization reached the http hop after an https->http downgrade: %q, want stripped", finalAuth)
+	}
+	if finalCookie != "" {
+		t.Errorf("Cookie reached the http hop after an https->http downgrade: %q, want stripped", finalCookie)
+	}
+	if finalCustom != "" {
+		t.Errorf("X-Api-Key reached the http hop after an https->http downgrade: %q, want stripped", finalCustom)
+	}
+}
+
 // §6.3 case 2 / §6.1: a response larger than Options.MaxResponseMb — BodyTruncated is true,
 // BodyBytes reports what was read, and the reader is not left open. A second case with
 // MaxResponseMb: ptr(0) asserts the size cap is off entirely (P90 §2.3).

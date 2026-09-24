@@ -156,19 +156,38 @@ func checkRedirectFor(r resolved) func(*http.Request, []*http.Request) error {
 			tl.closeHop(req.Response, req.Method, req.URL.String())
 		}
 
-		// P21 round 3 finding 5: net/http's redirect machinery copies every header from the
-		// previous hop onto this one by default, stripping only Authorization/WWW-Authenticate/
-		// Cookie/Cookie2 when the host changes. A saved request's own custom headers — X-Api-Key,
-		// PRIVATE-TOKEN, X-Amz-Security-Token and the like are at least as common in this app's
-		// requests as Authorization — would otherwise silently follow a redirect to a different
-		// host, replaying a secret to whatever answered the redirect. Drop every header the user
-		// actually typed the moment a hop crosses hosts; the transport itself never depends on the
-		// caller's own headers being present.
-		if len(via) > 0 && !sameRedirectHost(via[len(via)-1].URL, req.URL) {
-			if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
-				for _, name := range names {
-					req.Header.Del(name)
+		// P21 round 3 finding 5: net/http's redirect machinery re-copies every header from the
+		// *original* request onto each new hop (makeHeadersCopier closes over ireq, not the
+		// previous hop's request), stripping only Authorization/WWW-Authenticate/Cookie/Cookie2
+		// when the host changed from the original. A saved request's own custom headers —
+		// X-Api-Key, PRIVATE-TOKEN, X-Amz-Security-Token and the like are at least as common in
+		// this app's requests as Authorization — would otherwise silently follow a redirect to a
+		// different host, replaying a secret to whatever answered the redirect. Drop every header
+		// the user actually typed the moment a hop crosses hosts.
+		//
+		// F2: comparing only against the immediately-previous hop misses A -> B -> B — the second
+		// hop is same-host relative to B, but the headers being carried were re-copied from the
+		// *original* A request, so what matters is whether the current hop differs from the
+		// original, not from the previous one. Since net/http always re-copies from the original,
+		// comparing every hop against via[0] here is both correct and sufficient — no separate
+		// "stay stripped once crossed" state needed.
+		if len(via) > 0 {
+			origin := via[0].URL
+			crossHost := !sameRedirectHost(origin, req.URL)
+			downgrade := isSchemeDowngrade(origin, req.URL)
+			if crossHost || downgrade {
+				if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
+					for _, name := range names {
+						req.Header.Del(name)
+					}
 				}
+			}
+			if downgrade {
+				// F3: an https -> http downgrade on the same host passes net/http's own
+				// isDomainOrSubdomain check (it never looks at scheme), so Authorization and
+				// Cookie survive onto the plaintext hop unless stripped here explicitly.
+				req.Header.Del("Authorization")
+				req.Header.Del("Cookie")
 			}
 		}
 		return nil
