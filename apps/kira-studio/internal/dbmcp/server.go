@@ -30,9 +30,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// DefaultPort is the port this instance tries first (§3.2); a second instance on one machine
-// (there is at most one per KIRA_HOME in practice) falls back to an OS-assigned ephemeral one
-// automatically (http.go).
+// DefaultPort is the one port this instance ever binds (§3.2) — there is at most one instance per
+// KIRA_HOME in practice, and bindHTTP refuses to start rather than silently fall back to an
+// ephemeral port when it is taken (F11): every existing registration names this port, and a
+// fallback would leave it pointing at whatever else is now listening there.
 const DefaultPort = 8766
 
 // TokenProvider resolves this instance's own 7-day-rotating token — no repo-id slug to key on: one
@@ -142,7 +143,7 @@ const serverVersion = "0.0.0"
 const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Plan an expensive-looking query with `explain_query` before running it, and expect `run_query` to plan it anyway on connections whose owner turned auto-explain on. A connection with masked columns lists them in `list_connections`' own `maskedColumns` field, as \"table.column: kind\" — a masked cell's value is redacted (never the real value), and a trailing `#TAG` is an opaque correlation token, never a literal part of the value: equal values always share a tag, but the tag is short enough that two distinct values can rarely share one too, so treat a tag match as a strong hint toward equality, not proof of it."
 
 // New resolves cfg, mints or loads this instance's own token, builds the five-tool mcp.Server, and
-// binds the HTTP listener (§3.2's default-then-fallback port selection) — but does not yet accept
+// binds the HTTP listener (§3.2, DefaultPort only — see bindHTTP/F11) — but does not yet accept
 // connections; call Serve for that.
 func New(cfg Config) (*Server, error) {
 	if cfg.Home == "" {

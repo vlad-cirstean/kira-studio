@@ -3370,9 +3370,12 @@ one.
 
 `internal/dbmcp` is an MCP protocol server (`go-sdk/mcp`, loopback-only Streamable HTTP, `mcpauth`
 bearer token) fronting the app's own database connections, this app's only embedded MCP server since
-v1.9 P97 removed the repo-map one it originally sat beside. `DefaultPort` **8766**, with an
-OS-assigned-ephemeral fallback on conflict (`http.go:37-43`). One token file, `mcp-db-token.json`, no
-slug, because one instance exists per app process per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`).
+v1.9 P97 removed the repo-map one it originally sat beside. `DefaultPort` **8766** only — a conflict
+refuses to start rather than silently falling back to an OS-assigned ephemeral port (`http.go`,
+P108 Part 7 F11): every existing registration names 8766, and a fallback would leave it pointing at
+whatever else is now listening there, with the live bearer token going to it on the next connection
+attempt. One token file, `mcp-db-token.json`, no slug, because one instance exists per app process
+per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`).
 Lifecycle is `bridge.DbMcpService` — the
 server is constructed and started when the Settings toggle turns on (or already is, at boot) and
 stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `main.go`

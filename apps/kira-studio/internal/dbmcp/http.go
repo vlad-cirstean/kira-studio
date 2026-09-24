@@ -32,16 +32,23 @@ type httpState struct {
 	http     *http.Server
 }
 
-// bindHTTP tries DefaultPort first, falls back to an OS-assigned ephemeral port on conflict — never
-// 0.0.0.0, always loopback only (§3.2) — mounts the auth-wrapped Streamable HTTP handler, and
-// records the bound listener. Does not start serving; call Serve for that.
+// bindHTTP binds DefaultPort — never 0.0.0.0, always loopback only (§3.2) — mounts the auth-wrapped
+// Streamable HTTP handler, and records the bound listener. Does not start serving; call Serve for
+// that.
+//
+// F11: DefaultPort conflict is refused outright, never silently falls back to an OS-assigned
+// ephemeral port. Every existing registration (Command's own text, or whatever the user already
+// ran) names DefaultPort — with no re-registration signal of its own, a fallback would leave that
+// registration pointing at a port another local uid could hold instead, silently receiving
+// Claude Code's own live bearer token on its next connection attempt (the loopback listener is
+// reachable by every local uid). Refusing surfaces through the exact same path an ordinary bind
+// failure already does — statusFn's own Error field, startIfEnabled's boot-time warn log,
+// SetEnabled's st.Error — so this needs no new status surface, only a real error where a silent
+// fallback used to be.
 func (s *Server) bindHTTP() error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", DefaultPort))
 	if err != nil {
-		ln, err = net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			return fmt.Errorf("dbmcp: bind: %w", err)
-		}
+		return fmt.Errorf("dbmcp: bind 127.0.0.1:%d: %w (another process is using this port — free it and try again)", DefaultPort, err)
 	}
 
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcp }, &mcp.StreamableHTTPOptions{
@@ -89,7 +96,8 @@ func (s *Server) tokenVerifier() auth.TokenVerifier {
 	})
 }
 
-// Port returns the actually-bound port — DefaultPort, or the ephemeral fallback.
+// Port returns the actually-bound port — always DefaultPort (F11: bindHTTP refuses to start on any
+// other port).
 func (s *Server) Port() int {
 	return s.listener.Addr().(*net.TCPAddr).Port
 }
