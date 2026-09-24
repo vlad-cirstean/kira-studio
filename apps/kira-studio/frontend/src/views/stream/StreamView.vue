@@ -583,6 +583,15 @@ function onResizeCommit(column: string, width: number): void {
   });
   liveResizeWidth.value = null;
 }
+// P108 Part 11 F10: a drag ended by pointercancel/lostpointercapture (the OS hands the gesture off
+// elsewhere) used to never reach onResizeCommit, so liveResizeWidth stuck at the aborted drag's
+// last live value -- shown but never saved, until a later drag on some other column overwrote it
+// and this column snapped back. KuiColumnResizeHandle's own `cancel` emit is the fix's other half.
+// Guarded by column, same as widthFor's own read: an unrelated drag already started on another
+// column by the time this fires must not clear ITS live preview.
+function onResizeCancel(column: string): void {
+  if (liveResizeWidth.value?.column === column) liveResizeWidth.value = null;
+}
 
 let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
@@ -1095,6 +1104,7 @@ onUnmounted(() => {
                 :min="40"
                 @update:value="(w) => onResizeLive('key', w)"
                 @change="(w) => onResizeCommit('key', w)"
+                @cancel="() => onResizeCancel('key')"
                 @click.stop
               />
             </div>
@@ -1109,6 +1119,7 @@ onUnmounted(() => {
                 :min="40"
                 @update:value="(w) => onResizeLive('timestamp', w)"
                 @change="(w) => onResizeCommit('timestamp', w)"
+                @cancel="() => onResizeCancel('timestamp')"
                 @click.stop
               />
             </div>
@@ -1123,6 +1134,7 @@ onUnmounted(() => {
                 :min="40"
                 @update:value="(w) => onResizeLive('headers', w)"
                 @change="(w) => onResizeCommit('headers', w)"
+                @cancel="() => onResizeCancel('headers')"
                 @click.stop
               />
             </div>
@@ -1137,6 +1149,7 @@ onUnmounted(() => {
                 :min="40"
                 @update:value="(w) => onResizeLive('attrs', w)"
                 @change="(w) => onResizeCommit('attrs', w)"
+                @cancel="() => onResizeCancel('attrs')"
                 @click.stop
               />
             </div>
