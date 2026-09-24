@@ -196,6 +196,15 @@ describe('toRelaxedText — canonical -> Relaxed Extended JSON v2', () => {
     expect(toRelaxedText('{"pi":{"$numberDouble":"3.5"}}')).toBe('{\n  "pi": 3.5\n}');
   });
 
+  // F9 (P108 Part 10): $numberLong used to unwrap on Number.isFinite, which an Int64 above 2^53
+  // still satisfies while no longer being exactly representable as a JS number — the relaxed copy
+  // silently produced a different integer than the one that was copied.
+  test('a $numberLong beyond Number.MAX_SAFE_INTEGER stays wrapped, not silently rounded', () => {
+    expect(toRelaxedText('{"n":{"$numberLong":"9007199254740993"}}')).toBe(
+      '{\n  "n": {\n    "$numberLong": "9007199254740993"\n  }\n}',
+    );
+  });
+
   test('a non-finite $numberDouble (NaN/Infinity) stays wrapped — no bare-JSON spelling exists', () => {
     expect(toRelaxedText('{"n":{"$numberDouble":"NaN"}}')).toBe(
       '{\n  "n": {\n    "$numberDouble": "NaN"\n  }\n}',

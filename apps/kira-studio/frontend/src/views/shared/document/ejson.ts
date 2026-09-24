@@ -386,7 +386,10 @@ function canonicalToRelaxed(value: unknown): unknown {
   }
   if (keys.length === 1 && keys[0] === '$numberLong' && typeof value.$numberLong === 'string') {
     const n = Number(value.$numberLong);
-    if (Number.isFinite(n)) return n;
+    // F9 (P108 Part 10): an Int64 above 2^53 is finite but not exactly representable as a JS
+    // number — Number.isFinite(n) let e.g. 9007199254740993 silently unwrap to 9007199254740992.
+    // isSafeInteger keeps anything beyond exact double precision wrapped, same as canonical.
+    if (Number.isSafeInteger(n)) return n;
   }
   if (keys.length === 1 && keys[0] === '$numberDouble' && typeof value.$numberDouble === 'string') {
     const n = Number(value.$numberDouble);
