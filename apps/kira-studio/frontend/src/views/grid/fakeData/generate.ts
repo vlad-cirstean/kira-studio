@@ -162,7 +162,14 @@ function fakerCall(
     case 'string.uuid':
       return () => clamp(faker.string.uuid(), bounds.maxLength);
     case 'datatype.boolean':
-      return () => String(faker.datatype.boolean());
+      // F8 (P108 Part 10): 'true'/'false' as a text parameter fails MySQL's strict-mode TINYINT
+      // bind ("Incorrect integer value") and lands as text in SQLite's NUMERIC-affinity BOOLEAN
+      // column instead of 1/0. Postgres/ClickHouse accept true/false natively.
+      return () => {
+        const value = faker.datatype.boolean();
+        if (dialect === 'mysql' || dialect === 'sqlite') return value ? '1' : '0';
+        return String(value);
+      };
     case 'number.int':
       return () => randomIntText(faker, bounds);
     case 'json.object':
