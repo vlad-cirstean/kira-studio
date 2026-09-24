@@ -471,6 +471,21 @@ function applyRepoIdToStates(repoId: string | undefined): void {
     // `graphView.generation` (the other closing point, above) on its own.
     contextMenuState.value = undefined;
     stashContextMenuState.value = undefined;
+    // P108 F3: every dialog/menu ref below names a branch/tag/worktree/stash target (or an open
+    // flag) from the *old* repo — same stale-ref hazard as the context menus above, same fix,
+    // same lifecycle point.
+    refContextMenuState.value = undefined;
+    forceDeleteRefCandidate.value = undefined;
+    tagDialogState.value = { open: false, target: '' };
+    branchDialogState.value = { open: false, startPoint: '' };
+    stashBranchTarget.value = undefined;
+    stashCreateOpen.value = false;
+    globalStashSaveOpen.value = false;
+    globalStashSaveSourceEntry.value = undefined;
+    repoSettingsDialogOpen.value = false;
+    worktreeCreateRequest.value = undefined;
+    stackDialogTarget.value = undefined;
+    renameRefDialogState.value = { open: false, currentName: '' };
   }
   repoIdStatesAppliedOnce = true;
 }
