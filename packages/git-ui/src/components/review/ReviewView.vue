@@ -790,7 +790,7 @@ watch(
 <template>
   <div
     ref="rootEl"
-    class="kv:flex kv:flex-col kv:h-full kv:w-full kv:relative kv:bg-bg kv:text-fg kv:font-ui kv:text-base kv:overflow-hidden"
+    class="kv-review-view kv:flex kv:flex-col kv:h-full kv:w-full kv:relative kv:bg-bg kv:text-fg kv:font-ui kv:text-base kv:overflow-hidden"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
@@ -939,7 +939,7 @@ watch(
       <div
         v-if="review.phase.value === 'listing'"
         ref="toolbarEl"
-        class="kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0"
+        class="kv-review-toolbar kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0"
       >
         <KuiSegmented
           :options="panelOptions"

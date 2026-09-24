@@ -1263,7 +1263,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          were this element's own children. `host` is SlickGrid's *exclusive* DOM: the handles are
          its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
-    <div ref="host" class="kv:h-full kv:w-full"></div>
+    <div ref="host" class="kv-grid-host kv:h-full kv:w-full"></div>
     <!-- G21 D6b: an off-screen probe carrying .kv-cell-date's own font-affecting rules, purely so
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
@@ -1314,8 +1314,11 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 /* P110 A13: `.kv-commit-grid`'s own base box (position/height/width/min-height/overflow/font/
    color) moved onto the template's own `kv:` utilities — the classname itself stays, here and on
    the root `<div>`, since every `.kv-commit-grid .xxx` descendant rule below still needs it as a
-   scoping ancestor for SlickGrid's JS-built DOM. `.kv-grid-host`/`.kv-date-width-probe` had no
-   descendant rule of their own, so those two convert and drop their classnames entirely. */
+   scoping ancestor for SlickGrid's JS-built DOM. `.kv-date-width-probe` had no descendant rule of
+   its own and no other consumer, so it converts and drops its classname entirely.
+   P110 A-fix: `.kv-grid-host` looked like the same case (no CSS rule of its own either) but
+   graph-columns.spec.ts queries it directly (`document.querySelector('[data-testid="commit-grid"]
+   .kv-grid-host')`) — kept as a bare literal on the `host` div for that reason alone. */
 
 /* SlickGrid's own dynamic stylesheet (`createCssRules`, `applyColumnWidths`) only ever writes
    `height`/`left`/`right` onto these elements — never `position`. Its own upstream CSS (not

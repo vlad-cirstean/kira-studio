@@ -116,7 +116,7 @@ function onToggleReviewed(path: string): void {
       </p>
 
       <FileTree
-        class="kv:flex-auto kv:min-h-0 kv:border-b kv:border-panel-border"
+        class="kv-review-files-tree kv:flex-auto kv:min-h-0 kv:border-b kv:border-panel-border"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"

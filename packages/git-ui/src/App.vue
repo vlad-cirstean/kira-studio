@@ -1775,7 +1775,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="rootEl"
-    class="kv:flex kv:flex-col kv:h-full kv:w-full kv:bg-bg kv:text-fg kv:overflow-hidden kv:text-base kv:[font-family:var(--kv-font-family)]"
+    class="kv-app kv:flex kv:flex-col kv:h-full kv:w-full kv:bg-bg kv:text-fg kv:overflow-hidden kv:text-base kv:[font-family:var(--kv-font-family)]"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >

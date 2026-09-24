@@ -19,6 +19,17 @@ import { createApp, h, reactive } from 'vue';
 // own small Vite step (commitMetaHarnessServer.ts), not the shared packages/git-ui/vite.config.ts
 // bundle, so it reaches the component the same way any other file in this monorepo would.
 import DetailPaneVue from '../../../../../packages/git-ui/src/components/DetailPane.vue';
+// P110 A-fix: DetailPane.vue/CommitMeta.vue/FileTree.vue render entirely through `kv:` Tailwind
+// utilities now (P110 A14/A15) — this harness needs the real compiled theme chain applied for its
+// own geometry assertions (overflow/max-height) to mean anything, the same chain `main.ts`
+// imports for every other tier. `app-shell.css` is left out on purpose: this harness sizes `#app`
+// directly (a fixed 480px, in this file's own inline `<style>` below), it has no document-owning
+// `mount()` bootstrap to give `html`/`body` a height chain for.
+import '../../../../../packages/git-ui/src/theme/tailwind.css';
+import '../../../../../packages/git-ui/src/theme/vscode-tokens.css';
+import '../../../../../packages/git-ui/src/theme/density.css';
+import '../../../../../packages/git-ui/src/theme/kui-bridge.css';
+import '../../../../../packages/git-ui/src/theme/kira-structure.css';
 
 const PARAGRAPH =
   'This paragraph exists only to overflow a two-line clamp reliably regardless of viewport ' +

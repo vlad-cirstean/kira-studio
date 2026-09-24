@@ -320,13 +320,13 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-[70%] kv:overflow-auto'
-        : 'kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
+        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-[70%] kv:overflow-auto'
+        : 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
     "
     data-testid="commit-meta"
   >
     <div class="kv:flex kv:items-start kv:justify-between kv:gap-1">
-      <h2 class="kv:m-0 kv:text-base kv:font-semibold">{{ detail.subject }}</h2>
+      <h2 class="kv-meta-subject kv:m-0 kv:text-base kv:font-semibold">{{ detail.subject }}</h2>
       <KuiButton
         variant="icon"
         icon="codicon-diff-multiple"
@@ -370,27 +370,27 @@ const prIcon = computed(() => {
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
       v-show="expanded"
-      class="kv:m-0 kv:mt-1 kv:whitespace-normal"
+      class="kv-meta-body kv:m-0 kv:mt-1 kv:whitespace-normal"
     ></p>
 
     <KuiButton
-      class="kv:mt-0.5 kv:border-0 kv:p-0 kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:text-base kv:cursor-pointer kv:hover:underline"
+      class="kv-meta-body-toggle kv:mt-0.5 kv:border-0 kv:p-0 kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:text-base kv:cursor-pointer kv:hover:underline"
       @click="expanded = !expanded"
     >
       {{ expanded ? 'Show less' : 'Show more' }}
     </KuiButton>
 
-    <div v-if="expanded" class="kv:flex kv:flex-col kv:gap-1 kv:mt-1">
-      <p class="kv:m-0 kv:text-sm kv:text-muted">
+    <div v-if="expanded" class="kv-meta-expanded kv:flex kv:flex-col kv:gap-1 kv:mt-1">
+      <p class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted">
         {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
       </p>
-      <p v-if="committerDiffersFromAuthor" class="kv:m-0 kv:text-sm kv:text-muted">
+      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
         <span class="kv:text-xs">committer</span>
       </p>
       <dl
         v-if="trailerRows.length > 0"
-        class="kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
+        class="kv-meta-trailers kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
       >
         <template v-for="(row, index) in trailerRows" :key="index">
           <dt class="kv:text-muted">{{ row.token }}</dt>
@@ -406,7 +406,7 @@ const prIcon = computed(() => {
       >
         <template v-if="detail.decoration.length > 0">
           <dt class="kv:text-muted">Refs</dt>
-          <dd ref="decorationEl" class="kv:m-0 kv:flex kv:flex-wrap kv:gap-0.5"></dd>
+          <dd ref="decorationEl" class="kv-meta-refs kv:m-0 kv:flex kv:flex-wrap kv:gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
           <dt class="kv:text-muted">Signature</dt>

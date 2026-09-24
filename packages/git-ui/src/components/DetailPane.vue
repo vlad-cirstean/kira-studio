@@ -62,7 +62,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
+  <div class="kv-detail-pane kv:flex kv:flex-col kv:min-h-0 kv:h-full">
     <p v-if="detailState.error.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load this commit — {{ detailState.error.value }}
     </p>
@@ -75,7 +75,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
       />
       <FileTree
-        class="kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
+        class="kv-detail-pane-tree kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
         :files="detail.files"
         :selected-file="detailState.selectedFile.value"
         :list-mode="detailState.listMode.value"

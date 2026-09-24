@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import { dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { type Rolldown, build as viteBuild } from 'vite';
 
@@ -36,7 +37,14 @@ export async function startCommitMetaHarnessServer(): Promise<HarnessServer> {
   const result = await viteBuild({
     configFile: false,
     root: __dirname,
-    plugins: [vue()],
+    // P110 A-fix: `DetailPane.vue`/`CommitMeta.vue`/`FileTree.vue` no longer carry any scoped
+    // `<style>` of their own (P110 A14/A15 converted every rule to `kv:` utilities) — the plain
+    // `vue()` plugin alone now emits no CSS asset at all, since there is no SFC `<style>` block
+    // left to extract. The real compiled Tailwind build (same plugin `packages/git-ui/
+    // vite.config.ts` uses) is what actually turns those utilities into CSS; this geometry test
+    // needs it applied for real, not a no-op stylesheet, since it asserts real computed
+    // overflow/max-height.
+    plugins: [vue(), tailwindcss()],
     logLevel: 'warn',
     build: {
       write: false,

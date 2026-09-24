@@ -241,10 +241,16 @@ function rowKey(row: FileTreeRow): string {
  *  (`.kv-file-tree-row`'s own padding shorthand always fully overrode it, unlayered). The focus
  *  ring is `group-focus-within` (the container below carries `kv:group`) applied only to the one
  *  row `index === focusedRow` names — reproducing the old
- *  `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused` compound selector. */
+ *  `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused` compound selector.
+ *
+ *  P110 A-fix: `.kv-file-tree-row` itself is kept, as a bare literal (no CSS of its own —
+ *  tailwind-merge passes an unrecognized class straight through) — several Playwright specs
+ *  outside this package's own tests (file-tree-open/review-interaction/kui-floating-geometry)
+ *  select rows by this class name; dropping it broke them. */
 function rowClass(row: FileTreeRow, index: number): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
+    'kv-file-tree-row',
     kuiRowVariants({ selected }),
     'kv:py-0.5 kv:px-2',
     index === focusedRow.value
@@ -573,7 +579,7 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
+            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
@@ -604,7 +610,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -697,7 +703,7 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
+            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
@@ -731,7 +737,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span

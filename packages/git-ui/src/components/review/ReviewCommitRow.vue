@@ -228,7 +228,7 @@ function onOpenFile(index: number, pinned: boolean): void {
          already sits on, and that combination passes. -->
     <div
       ref="headerEl"
-      class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:min-w-0 kv:font-ui kv:group-hover:bg-hover"
+      class="kv-review-row-header kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:min-w-0 kv:font-ui kv:group-hover:bg-hover"
     >
       <span
         class="codicon kv:text-[12px] kv:w-3 kv:shrink-0"
