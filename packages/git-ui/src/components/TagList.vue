@@ -102,27 +102,31 @@ async function onRefMenuSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <section class="kv-branch-section" aria-label="Tags">
-    <div class="kv-branch-section-title">Tags</div>
+  <section aria-label="Tags">
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">Tags</div>
     <div
       v-for="row in section.visible"
       :key="row.refname"
-      class="kv-branch-row"
+      class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
-      <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main']" @click="checkout(row)">
+      <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']" @click="checkout(row)">
         <span
           class="codicon codicon-tag"
-          :class="{ 'kv-tag-lightweight': !row.annotation }"
+          :class="{ 'kv:opacity-60': !row.annotation }"
           aria-hidden="true"
         ></span>
-        <span class="kv-branch-row-name">{{ row.shortName }}</span>
-        <span class="kv-tag-kind">{{ row.annotation ? "annotated" : "lightweight" }}</span>
-        <span v-if="row.annotation" class="kv-tag-subject" v-kui-tooltip="row.annotation.subject">
+        <span class="kv:truncate">{{ row.shortName }}</span>
+        <span class="kv:text-[0.75em] kv:text-muted">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span
+          v-if="row.annotation"
+          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted"
+          v-kui-tooltip="row.annotation.subject"
+        >
           {{ row.annotation.subject }}
         </span>
-        <span class="kv-tag-target">{{ targetCommit(row) }}</span>
+        <span class="kv:font-data kv:text-xs kv:text-muted">{{ targetCommit(row) }}</span>
       </KuiButton>
       <KuiButton
         variant="icon"
@@ -134,10 +138,14 @@ async function onRefMenuSelect(id: string): Promise<void> {
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+    <KuiButton
+      v-if="section.hiddenCount > 0"
+      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
+      @click="showMore"
+    >
       Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
     </KuiButton>
-    <div v-if="section.visible.length === 0" class="kv-branch-empty">No tags</div>
+    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">No tags</div>
 
     <RowContextMenu
       v-if="refMenu"
@@ -151,29 +159,3 @@ async function onRefMenuSelect(id: string): Promise<void> {
   </section>
 </template>
 
-<style>
-.kv-tag-kind {
-  font-size: 0.75em;
-  color: var(--kv-description-fg);
-}
-
-.kv-tag-lightweight {
-  opacity: 0.6;
-}
-
-.kv-tag-subject {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-tag-target {
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-</style>

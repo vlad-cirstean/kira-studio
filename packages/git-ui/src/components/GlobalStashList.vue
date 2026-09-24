@@ -90,8 +90,8 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 </script>
 
 <template>
-  <section class="kv-branch-section" aria-label="Global stash">
-    <div class="kv-branch-section-title kv-global-stash-title">
+  <section aria-label="Global stash">
+    <div class="kv:flex kv:items-center kv:justify-between kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">
       <span>Global stash</span>
       <KuiButton
         v-if="writeCapability"
@@ -118,12 +118,3 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
   </section>
 </template>
 
-<style>
-.kv-global-stash-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* G34: `.kv-global-stash-save` is gone — `variant="icon"` is this icon-only button's box now. */
-</style>

@@ -85,15 +85,17 @@ async function removeFromStack(branch: string): Promise<void> {
 </script>
 
 <template>
-  <section class="kv-branch-section" aria-label="Stacks">
-    <div class="kv-branch-section-title">Stacks</div>
+  <section aria-label="Stacks">
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">
+      Stacks
+    </div>
 
-    <div v-for="group in stacks.visible" :key="group.summary.base" class="kv-stack-group">
-      <div class="kv-stack-header">
-        <span class="kv-stack-base" v-kui-tooltip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
+    <div v-for="group in stacks.visible" :key="group.summary.base" class="kv:mb-1">
+      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted">
+        <span class="kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <KuiButton
           v-if="writeCapability"
-          class="kv-stack-restack"
+          class="kv:ml-auto"
           :disabled="!group.summary.needsRestack"
           @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
         >
@@ -104,17 +106,17 @@ async function removeFromStack(branch: string): Promise<void> {
       <div
         v-for="row in rowsFor(group.branches)"
         :key="row.name"
-        class="kv-branch-row kv-stack-row"
+        class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
         :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
         :data-row-id="`stack:${row.name}`"
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main kv-stack-row-main">
-          <span v-if="row.isHead" class="kv-stack-badge" v-kui-tooltip="'Current branch'">●</span>
-          <span class="kv-stack-label">{{ row.name }}</span>
+        <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
+          <span v-if="row.isHead" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Current branch'">●</span>
+          <span class="kv:truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
-            class="kv-badge kv-badge-pill kv-stack-stale"
+            class="kv-badge kv-badge-pill kv:bg-stack-stale kv:text-stack-stale-fg"
             v-kui-tooltip="row.staleText"
           >
             stale
@@ -137,8 +139,8 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </span>
-          <span v-if="row.trackText" class="kv-stack-track">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="kv-stack-badge" v-kui-tooltip="row.checkedOutIn">
+          <span v-if="row.trackText" class="kv:text-xs kv:text-muted">{{ row.trackText }}</span>
+          <span v-if="row.checkedOutIn" class="kv:text-xs kv:opacity-80" v-kui-tooltip="row.checkedOutIn">
             <span class="codicon codicon-repo" aria-hidden="true"></span>
           </span>
         </div>
@@ -163,20 +165,20 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <div v-if="orphans.visible.length > 0" class="kv-stack-group">
-      <div class="kv-stack-header">
-        <span class="kv-stack-base">Needs attention</span>
+    <div v-if="orphans.visible.length > 0" class="kv:mb-1">
+      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted">
+        <span class="kv:flex-1 kv:min-w-0 kv:truncate">Needs attention</span>
       </div>
       <div
         v-for="row in orphanRows()"
         :key="row.name"
-        class="kv-branch-row kv-stack-row"
+        class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
         :data-row-id="`orphan:${row.name}`"
         :tabindex="focusedRowId === `orphan:${row.name}` ? 0 : -1"
       >
-        <div class="kv-branch-row-main kv-stack-row-main">
-          <span class="kv-stack-label">{{ row.name }}</span>
-          <span class="kv-stack-orphan-reason">{{ row.orphanReason }}</span>
+        <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
+          <span class="kv:truncate">{{ row.name }}</span>
+          <span class="kv:truncate kv:text-xs kv:text-diff-deleted">{{ row.orphanReason }}</span>
         </div>
         <KuiButton
           v-if="writeCapability"
@@ -192,7 +194,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <KuiButton
       v-if="stacks.hiddenCount > 0 || orphans.hiddenCount > 0"
-      class="kv-branch-more-button"
+      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
       @click="showMore"
     >
       Show {{ Math.min(REF_LIST_SECTION_CAP, stacks.hiddenCount + orphans.hiddenCount) }} more
@@ -201,73 +203,9 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="kv-branch-empty"
+      class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs"
     >
       No stacked branches
     </div>
   </section>
 </template>
-
-<style scoped>
-.kv-stack-group {
-  margin-bottom: var(--kv-s-2);
-}
-
-.kv-stack-header {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  padding: var(--kv-s-1) var(--kv-s-2);
-  font-weight: 600;
-  color: var(--kv-description-fg);
-}
-
-.kv-stack-base {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-stack-restack {
-  margin-left: auto;
-}
-
-.kv-stack-row-main {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-stack-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kv-stack-badge {
-  font-size: 0.85em;
-  opacity: 0.8;
-}
-
-.kv-stack-track {
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-stack-stale {
-  background: var(--kv-stack-stale-bg, var(--kv-diff-deleted-fg));
-  color: var(--kv-stack-stale-fg, var(--kv-panel-bg));
-}
-
-.kv-stack-orphan-reason {
-  font-size: 0.85em;
-  color: var(--kv-diff-deleted-fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

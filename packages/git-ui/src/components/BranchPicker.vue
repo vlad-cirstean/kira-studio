@@ -255,7 +255,13 @@ function onFilterKeydown(event: KeyboardEvent): void {
  *  returns to the filter); `Home`/`End` jump to the ends; `Enter` runs the focused row's own main
  *  action where it has one (`.kv-branch-row-main` is a `<button>` for branch/tag/stash rows and a
  *  plain, unclickable `<div>` for worktree/stack rows — one selector does both without a per-kind
- *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons. */
+ *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons.
+ *
+ *  P110 A18: `.kv-branch-row`/`.kv-branch-row-main` carry no CSS any more (every row's own styling
+ *  moved to `kv:` utilities, here and in TagList/StashRows/WorktreeList/StackList) — both class
+ *  names stay as bare query-selector hooks for `closest()`/`querySelector()` below, the same
+ *  "functional, not stylistic" reason `.kv-branch-rename-input` (line ~636) stays a literal class
+ *  for its own `querySelector(...).focus()` call. */
 const rowsScrollEl = ref<HTMLElement | null>(null);
 function onRowsKeydown(event: KeyboardEvent): void {
   const rowEl = (event.target as HTMLElement).closest<HTMLElement>('.kv-branch-row[data-row-id]');
@@ -621,18 +627,18 @@ watch(visibleBranchNames, (names) => {
       >
         <template v-if="activeTab === 'branches'">
         <section aria-label="Branches">
-          <div class="kv-branch-section-title">Branches</div>
+          <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">Branches</div>
           <div
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
-            class="kv-branch-row"
+            class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
             :class="{ 'kv:font-semibold': row.isHead }"
             :data-row-id="`branch:${row.refname}`"
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
             <template v-if="renaming?.name === row.shortName">
               <KuiTextInput
-                class="kv:flex-1"
+                class="kv-branch-rename-input kv:flex-1"
                 v-model="renaming.value"
                 ariaLabel="Rename branch"
                 @keydown.enter="submitRename"
@@ -643,7 +649,7 @@ watch(visibleBranchNames, (names) => {
               </KuiButton>
             </template>
             <template v-else>
-              <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main']" @click="checkoutBranch(row)">
+              <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']" @click="checkoutBranch(row)">
                 <span
                   class="kv:w-2.5 kv:text-focus"
                   :role="row.isHead ? 'img' : undefined"
@@ -651,7 +657,7 @@ watch(visibleBranchNames, (names) => {
                   :aria-hidden="!row.isHead"
                   >{{ row.isHead ? "●" : "" }}</span
                 >
-                <span class="kv-branch-row-name">{{ row.shortName }}</span>
+                <span class="kv:truncate">{{ row.shortName }}</span>
                 <button
                   v-if="prFor(row.shortName) && openExternalCapability"
                   type="button"
@@ -697,30 +703,30 @@ watch(visibleBranchNames, (names) => {
           </div>
           <KuiButton
             v-if="model.branchesLocal.hiddenCount > 0"
-            class="kv-branch-more-button"
+            class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
             @click="showMore('branchesLocal')"
           >
             Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesLocal.hiddenCount) }} more
             ({{ model.branchesLocal.hiddenCount }} remaining)
           </KuiButton>
-          <div v-if="model.branchesLocal.visible.length === 0" class="kv-branch-empty">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
-          <div class="kv-branch-section-title">Remote branches</div>
+          <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">Remote branches</div>
           <div
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
-            class="kv-branch-row"
+            class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
             :data-row-id="`remote:${row.refname}`"
             :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
           >
             <KuiButton
-              :class="[kuiRowVariants(), 'kv-branch-row-main']"
+              :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']"
               icon="codicon-cloud"
               @click="checkoutRemote(row)"
             >
-              <span class="kv-branch-row-name">{{ row.shortName }}</span>
+              <span class="kv:truncate">{{ row.shortName }}</span>
               <span class="kv:text-xs kv:text-muted">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
             <KuiButton
@@ -735,13 +741,13 @@ watch(visibleBranchNames, (names) => {
           </div>
           <KuiButton
             v-if="model.branchesRemote.hiddenCount > 0"
-            class="kv-branch-more-button"
+            class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
             @click="showMore('branchesRemote')"
           >
             Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesRemote.hiddenCount) }} more
             ({{ model.branchesRemote.hiddenCount }} remaining)
           </KuiButton>
-          <div v-if="model.branchesRemote.visible.length === 0" class="kv-branch-empty">
+          <div v-if="model.branchesRemote.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">
             No remote branches
           </div>
         </section>
@@ -833,73 +839,3 @@ watch(visibleBranchNames, (names) => {
   </div>
 </template>
 
-<style>
-/* P110 A17: every rule this file used to own alone is converted (kv: utilities in the template
-   above). What's left below is shared with TagList/StashList/StashRows/WorktreeList/StackList/
-   GlobalStashList (A18) — converting BranchPicker's own usage now would just add utilities that
-   still lose to these unlayered rules (§1.3), so both the rules and every consumer's own class
-   attribute stay untouched until A18 converts the last consumer and deletes this block. */
-
-/* G34 D14: takes P110 A5's `KuiMenuList.vue` own heading treatment — the same section-label look
-   every menu in the app now uses. */
-.kv-branch-section-title {
-  display: flex;
-  align-items: center;
-  height: var(--kv-control-h-sm);
-  padding: 0 var(--kv-s-4);
-  font-size: var(--kv-t-xs);
-  font-weight: 600;
-  color: var(--kv-description-fg);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.kv-branch-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  padding: 0 var(--kv-s-2);
-}
-
-/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template onto
-   `KuiButton`'s own `min-h-kui-control` base — a min-height needs no override to let this row grow
-   past it) — this class keeps only what's specific to this row inside `.kv-branch-row`'s own flex
-   layout. */
-.kv-branch-row-main {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.kv-branch-row-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-branch-empty {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-/* P77 §6.3: the cap's own step button — a plain-text-shaped `KuiButton` so it reads as the same
-   "N more" line the static div used to be, but is actually clickable. */
-.kv-branch-more-button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-  background: none;
-  border: none;
-}
-
-.kv-branch-more-button:hover {
-  color: var(--kv-app-fg);
-  text-decoration: underline;
-}
-</style>

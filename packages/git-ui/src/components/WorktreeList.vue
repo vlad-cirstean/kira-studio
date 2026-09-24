@@ -117,12 +117,12 @@ async function confirmRemove(): Promise<void> {
 </script>
 
 <template>
-  <section class="kv-branch-section" aria-label="Worktrees">
-    <div class="kv-branch-section-title">
+  <section aria-label="Worktrees">
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">
       Worktrees
       <KuiButton
         v-if="writeCapability"
-        class="kv-worktree-create"
+        class="kv:ml-auto"
         @click="emit('create-worktree')"
       >
         Create Worktree…
@@ -131,21 +131,21 @@ async function confirmRemove(): Promise<void> {
     <div
       v-for="entry in section.visible"
       :key="entry.path"
-      class="kv-branch-row"
+      class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
       :data-row-id="`worktree:${entry.path}`"
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
-      <div class="kv-branch-row-main kv-worktree-row-main">
-        <span v-if="entry.isCurrent" class="kv-worktree-badge" v-kui-tooltip="'This window'">●</span>
-        <span v-if="entry.isMain" class="kv-worktree-badge" v-kui-tooltip="'Main worktree'">M</span>
-        <span v-if="entry.locked" class="kv-worktree-badge" v-kui-tooltip="entry.locked.reason">
+      <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
+        <span v-if="entry.isCurrent" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'This window'">●</span>
+        <span v-if="entry.isMain" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Main worktree'">M</span>
+        <span v-if="entry.locked" class="kv:text-xs kv:opacity-80" v-kui-tooltip="entry.locked.reason">
           <span class="codicon codicon-lock" aria-hidden="true"></span>
         </span>
-        <span v-if="entry.openElsewhere" class="kv-worktree-badge" v-kui-tooltip="'Open in another window'">
+        <span v-if="entry.openElsewhere" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Open in another window'">
           <span class="codicon codicon-window" aria-hidden="true"></span>
         </span>
-        <span class="kv-worktree-label" v-kui-tooltip="entry.path">{{ worktreeLabel(entry) }}</span>
-        <span class="kv-worktree-path">{{ entry.path }}</span>
+        <span class="kv:truncate" v-kui-tooltip="entry.path">{{ worktreeLabel(entry) }}</span>
+        <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted">{{ entry.path }}</span>
       </div>
       <KuiButton
         v-if="writeCapability && !entry.isCurrent"
@@ -175,10 +175,14 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-trash" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+    <KuiButton
+      v-if="section.hiddenCount > 0"
+      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
+      @click="showMore"
+    >
       Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
     </KuiButton>
-    <div v-if="section.visible.length === 0" class="kv-branch-empty">No worktrees</div>
+    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">No worktrees</div>
 
     <KuiDialog
       :open="pendingRemove !== undefined"
@@ -186,7 +190,7 @@ async function confirmRemove(): Promise<void> {
       @close="cancelRemove"
     >
       <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
-        <p class="kv-dialog-error">{{ blockerText(pendingRemove.preflight) }}</p>
+        <p class="kv:text-diff-deleted">{{ blockerText(pendingRemove.preflight) }}</p>
       </template>
       <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
         <p>
@@ -210,46 +214,3 @@ async function confirmRemove(): Promise<void> {
   </section>
 </template>
 
-<style scoped>
-.kv-branch-section-title {
-  display: flex;
-  align-items: center;
-}
-
-.kv-worktree-create {
-  margin-left: auto;
-}
-
-.kv-worktree-row-main {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-worktree-badge {
-  font-size: 0.85em;
-  opacity: 0.8;
-}
-
-.kv-worktree-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kv-worktree-path {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-dialog-error {
-  color: var(--kv-diff-deleted-fg);
-}
-</style>

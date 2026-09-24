@@ -111,7 +111,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section class="kv-branch-section" aria-label="Stashes">
-    <div class="kv-branch-section-title">Stashes</div>
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">Stashes</div>
     <StashRows
       :section="section"
       :stash="stash"
@@ -128,52 +128,3 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
   </section>
 </template>
 
-<style>
-.kv-stash-row--selected {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-stash-index {
-  white-space: nowrap;
-  font-family: var(--kv-mono-font-family);
-}
-
-.kv-stash-message {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-stash-untracked {
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.85em;
-  opacity: 0.8;
-}
-
-.kv-stash-origin {
-  white-space: nowrap;
-  font-size: 0.8em;
-  padding: 0 0.4em;
-  border-radius: 3px;
-  background-color: var(--kv-stash-origin-bg);
-  color: var(--kv-stash-origin-fg);
-}
-
-.kv-stash-auto {
-  white-space: nowrap;
-  font-size: 0.8em;
-  padding: 0 0.4em;
-  border-radius: 3px;
-  background-color: var(--kv-stash-auto-bg);
-  color: var(--kv-stash-auto-fg);
-}
-
-.kv-stash-filecount,
-.kv-stash-date {
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-  white-space: nowrap;
-}
-</style>

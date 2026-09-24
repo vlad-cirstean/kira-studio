@@ -90,29 +90,34 @@ function onMenuSelect(id: string): void {
   <div
     v-for="entry in section.visible"
     :key="entry.sha"
-    class="kv-branch-row"
-    :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
+    class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
+    :class="{ 'kv:bg-hover': stash.selectedSha.value === entry.sha }"
     v-kui-tooltip="rowModel(entry).rowTooltip"
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
     <KuiButton
-      :class="[kuiRowVariants(), 'kv-branch-row-main']"
+      :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']"
       icon="codicon-archive"
       @click="select(entry)"
     >
-      <span v-if="rowModel(entry).badge" class="kv-stash-index">{{ rowModel(entry).badge }}</span>
+      <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
-        class="kv-stash-origin"
+        class="kv:whitespace-nowrap kv:text-[0.8em] kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
         v-kui-tooltip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
-      <span v-if="rowModel(entry).auto" class="kv-stash-auto" v-kui-tooltip="'Created automatically by an auto-stashed checkout'">auto</span>
-      <span class="kv-stash-message" v-kui-tooltip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="kv-stash-untracked" v-kui-tooltip="'Includes untracked files'">-u</span>
-      <span class="kv-stash-filecount">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
-      <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
+      <span
+        v-if="rowModel(entry).auto"
+        class="kv:whitespace-nowrap kv:text-[0.8em] kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
+        v-kui-tooltip="'Created automatically by an auto-stashed checkout'"
+        >auto</span
+      >
+      <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
+      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-xs kv:opacity-80" v-kui-tooltip="'Includes untracked files'">-u</span>
+      <span class="kv:text-xs kv:text-muted kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
+      <span class="kv:text-xs kv:text-muted kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </KuiButton>
     <KuiButton
       variant="icon"
@@ -124,10 +129,14 @@ function onMenuSelect(id: string): void {
       <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
     </KuiButton>
   </div>
-  <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+  <KuiButton
+    v-if="section.hiddenCount > 0"
+    class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
+    @click="showMore"
+  >
     Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
   </KuiButton>
-  <div v-if="section.visible.length === 0" class="kv-branch-empty">{{ emptyMessage }}</div>
+  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">{{ emptyMessage }}</div>
 
   <RowContextMenu
     v-if="stashMenu"
