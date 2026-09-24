@@ -510,10 +510,18 @@ async function handleReconnect(): Promise<void> {
   const repo = repoState.value;
   const active = repo?.activeRepo.value;
   if (!repo || !active) return;
-  const outcome = await repo.open(active.root);
+  // P108 F5: `handleRepoOpened` below unconditionally clears both `pendingSelectionSha` and
+  // `selection` — correct for a genuine repo switch (§6.2's own doc comment), wrong for a
+  // reconnect, which re-opens the *same* repo and should re-resolve the same commit exactly like
+  // a plain refresh does (`watch(graphView.generation)` above). Captured before the reopen, then
+  // re-armed after, so the same `watch(graphView.loadedRows)` re-select+scroll this file's own
+  // refresh path already relies on picks it back up once the re-walk's rows land.
+  const sha = selection.sha.value;
+  const outcome = await repo.open(active.root); // F4: 'superseded' here also bails, same as 'ok' check below.
   if (outcome.kind !== 'ok') return;
   await handleRepoOpened(outcome.repo.repoId);
   applyRepoIdToStates(outcome.repo.repoId);
+  if (sha !== null) pendingSelectionSha.value = sha;
 }
 
 const unsubscribeReconnect = bridge.onReconnect(() => {
