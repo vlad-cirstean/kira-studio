@@ -16,6 +16,18 @@ export const useOpsStore = defineStore('ops', () => {
 
   let unsubscribe: (() => void) | null = null;
 
+  // Shared by the live post-hydration path below and hydrateOps' own buffer replay (F7) — a
+  // 'running' row replaced by its finished self, or a brand-new op unshifted newest-first.
+  function applyUpdate(records: OpRecord[], raw: OpRecord): void {
+    const idx = records.findIndex((r) => r.id === raw.id);
+    if (idx >= 0) {
+      records[idx] = raw;
+    } else {
+      records.unshift(raw);
+      if (records.length > MAX_RECORDS) records.length = MAX_RECORDS;
+    }
+  }
+
   async function hydrateOps(): Promise<void> {
     // P21 round 3 performance finding 13: every op emits op:start then op:end, and each used to run
     // an O(500) findIndex scan of this deep-reactive array — pure bookkeeping, but each comparison
@@ -24,18 +36,30 @@ export const useOpsStore = defineStore('ops', () => {
     // for the gRPC message buffer) marks these immutable wire records so Vue never wraps them: every
     // `.id`/`.status` read anywhere they're accessed (this findIndex, visibleOps/runningCount's own
     // filters) becomes a plain property read instead of a trap.
-    state.records = (await control.opsRecent(HYDRATE_LIMIT)).map((r) => markRaw(r));
+    //
+    // P108 Part 12 F7: subscribe BEFORE the opsRecent await, not after — an op that both started and
+    // finished in that gap used to leave a permanently 'running' row in the snapshot, since the old
+    // subscribe (below the await) never saw its update at all. Every update arriving before the
+    // snapshot lands is buffered here (by id, so a start-then-finish pair for the same op collapses
+    // to just its final state) instead of touching state.records; replayed over the snapshot once it
+    // resolves, in arrival order, matching applyUpdate's own newest-first unshift for an id the
+    // snapshot never had. `hydrated` flips the handler over to applying live from then on.
+    let hydrated = false;
+    const buffered = new Map<string, OpRecord>();
     unsubscribe?.();
     unsubscribe = control.onOpUpdate((record) => {
       const raw = markRaw(record);
-      const idx = state.records.findIndex((r) => r.id === raw.id);
-      if (idx >= 0) {
-        state.records[idx] = raw; // a 'running' row replaced by its finished self
-      } else {
-        state.records.unshift(raw);
-        if (state.records.length > MAX_RECORDS) state.records.length = MAX_RECORDS;
+      if (!hydrated) {
+        buffered.set(raw.id, raw);
+        return;
       }
+      applyUpdate(state.records, raw);
     });
+
+    const records = (await control.opsRecent(HYDRATE_LIMIT)).map((r) => markRaw(r));
+    for (const raw of buffered.values()) applyUpdate(records, raw);
+    state.records = records;
+    hydrated = true;
   }
 
   // Clears the in-memory ring only — op_log retention on disk is automatic (Step 10b's button
