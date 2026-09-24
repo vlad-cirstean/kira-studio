@@ -1708,6 +1708,10 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
     return;
   }
   const dc = displayCell(row, displayCol);
+  // F6 (P108 Part 10): raw (non-masked) values for the filter/FK literals this menu builds —
+  // `dc` above (the masking-aware wrapper) stays the source for `text`/`isNull` (Copy).
+  const rawDc = rvDisplayCell(props.tabId, getPage(props.tabId), order, row, displayCol);
+  const rawSnap = rvRowSnapshot(props.tabId, getPage(props.tabId), order, row);
   const name = order[displayCol] ?? '';
   const t = tab();
   const p = getPage(props.tabId);
@@ -1725,11 +1729,13 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       canDelete: canDeleteRows(),
       isDeleted: isDeleted(row),
       isGenerated: pageCol >= 0 ? (p?.columns[pageCol]?.generated ?? false) : false,
+      truncated: rawDc.truncated,
+      staged: rawDc.staged,
       startEdit: () => startEditCell(row, displayCol),
       onPaste: () => void onPaste(),
       meta: rt()?.meta ?? null,
       connectionId: t?.connectionId ?? '',
-      rowValues: rowSnapshot(row).values,
+      rowValues: rawSnap.values,
     }),
   );
 }

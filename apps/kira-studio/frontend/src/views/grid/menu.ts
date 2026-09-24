@@ -229,6 +229,9 @@ export interface CellMenuContext {
   tabId: string;
   row: number;
   columnName: string;
+  /** Display text — the masking-aware wrapper's own value (M5 §6.6: copy follows display). Used
+   *  only by Copy/Copy with header/Copy as JSON below; never for the filter or FK literals (F6,
+   *  P108 Part 10) — see `rowValues`. */
   isNull: boolean;
   text: string;
   dialect: SqlDialect | undefined;
@@ -239,11 +242,20 @@ export interface CellMenuContext {
   /** F3 (P108 Part 10): the server computes a generated column's value — Edit/Set NULL must
    *  refuse it the same way onBeforeEditCell does, not just the insert paths. */
   isGenerated: boolean;
+  /** F6 (P108 Part 10): this exact cell's own raw value is truncated (the engine's 64 KiB cap) or
+   *  has a staged, uncommitted edit — either makes "Filter by this value" build a predicate that
+   *  either matches nothing (a truncated prefix) or describes a value that isn't stored yet (a
+   *  staged edit, which setFilter's own reload then clears anyway). */
+  truncated: boolean;
+  staged: boolean;
   startEdit: () => void;
   /** P21 D12: DataGrid.vue's own onPaste — an existing, guarded handler this menu had no row for. */
   onPaste: () => void;
   meta: ObjectMeta | null;
   connectionId: string;
+  /** F6 (P108 Part 10): raw page values (`cell()`), never the masking-aware display wrapper — a
+   *  masked or truncated *display* value must not end up as a filter or FK-join literal, where it
+   *  would either match nothing (masked/truncated) or describe the wrong row entirely. */
   rowValues: Record<string, string | null>;
 }
 
@@ -251,9 +263,18 @@ export interface CellMenuContext {
 // to referenced row / Referenced by (P7).
 export function cellMenu(ctx: CellMenuContext): MenuItem[] {
   const editDisabled = !ctx.canEdit || ctx.isDeleted || ctx.isGenerated;
-  const filterExpr = ctx.isNull
-    ? `${quoteIdent(ctx.dialect, ctx.columnName)} IS NULL`
-    : `${quoteIdent(ctx.dialect, ctx.columnName)} = ${quoteLiteral(ctx.dialect, ctx.text)}`;
+  // F6: built from the raw rowValues, never ctx.text/ctx.isNull (the masked/display pair) — a
+  // masked or truncated cell under preview used to compare against text nothing in the table
+  // matches; the FK nav button already used raw values (unaffected, still correct) while this
+  // menu's own filter/FK items did not.
+  const rawValue = ctx.rowValues[ctx.columnName] ?? null;
+  const filterExpr =
+    rawValue === null
+      ? `${quoteIdent(ctx.dialect, ctx.columnName)} IS NULL`
+      : `${quoteIdent(ctx.dialect, ctx.columnName)} = ${quoteLiteral(ctx.dialect, rawValue)}`;
+  // F6: a truncated or staged cell has no reliable raw value to filter on — refuse rather than
+  // build a predicate that either matches nothing or describes a value not yet committed.
+  const filterDisabled = ctx.truncated || ctx.staged;
   const fkCtx: FkNavContext = {
     connectionId: ctx.connectionId,
     dialect: ctx.dialect,
@@ -341,6 +362,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       id: 'filter-by-value',
       label: 'Filter by this value',
       icon: 'filter',
+      disabled: filterDisabled,
       // Replaces (not appends to) the current filter — a deliberate narrowing action, not an
       // accumulating AND-chain (D5).
       run: () => void useGridViewStore().setFilter(ctx.tabId, filterExpr),
