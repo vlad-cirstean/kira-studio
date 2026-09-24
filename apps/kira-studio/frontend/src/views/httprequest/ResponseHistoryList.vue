@@ -115,7 +115,7 @@ async function onClear(): Promise<void> {
   <div class="history-pane" data-testid="http-history-list">
     <div class="history-toolbar p-toolbar">
       <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Button
         variant="toolbar"
         size="kira"
@@ -217,7 +217,7 @@ async function onClear(): Promise<void> {
             <span class="text-kira-xs text-subtle">{{ entry.elapsedMs }} ms</span>
             <span class="text-kira-xs text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
             <span v-if="entry.environment" class="text-kira-xs text-subtle">{{ entry.environment }}</span>
-            <span class="p-push" />
+            <span class="ml-auto" />
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button

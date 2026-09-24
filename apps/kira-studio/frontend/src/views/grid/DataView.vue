@@ -217,7 +217,7 @@ function onCloseSearch(): void {
       <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
         >Σ {{ rt.count.value.toLocaleString() }} rows</span
       >
-      <span class="p-push flex items-center gap-1">
+      <span class="ml-auto flex items-center gap-1">
         <span v-if="primaryKeyLabel" class="p-chip info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</span>
       </span>
     </div>
@@ -262,7 +262,7 @@ function onCloseSearch(): void {
         </Tooltip>
       </div>
       <DataToolbar :tab="tab" />
-      <span class="p-push" />
+      <span class="ml-auto" />
       <span
         data-testid="run-state"
         class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

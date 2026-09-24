@@ -641,7 +641,7 @@ onUnmounted(() => {
         ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
         ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
       >
-      <span class="p-push flex items-center gap-1">
+      <span class="ml-auto flex items-center gap-1">
         <span
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
           class="p-badge"
@@ -840,7 +840,7 @@ onUnmounted(() => {
           <TooltipContent>Search this page</TooltipContent>
         </Tooltip>
       </div>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
           <span

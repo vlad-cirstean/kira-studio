@@ -242,7 +242,7 @@ const breadcrumb = computed(() => {
         <CodiconIcon name="lock" :size="13" />
         read-only — {{ originPhrase }}
       </span>
-      <span class="p-push flex items-center gap-1" />
+      <span class="ml-auto flex items-center gap-1" />
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <div class="p-toolbar">
@@ -283,7 +283,7 @@ const breadcrumb = computed(() => {
         </TooltipTrigger>
         <TooltipContent>{{ pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints' }}</TooltipContent>
       </Tooltip>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <span
         data-testid="run-state"
         class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

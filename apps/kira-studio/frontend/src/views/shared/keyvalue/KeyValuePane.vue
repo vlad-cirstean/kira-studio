@@ -737,7 +737,7 @@ onUnmounted(() => {
           ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
           >{{ targetTail?.name ?? tab.path }}</span
         >
-        <span class="p-push flex items-center gap-1" />
+        <span class="ml-auto flex items-center gap-1" />
       </div>
       <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connColor) }" />
       <div class="p-toolbar last">
@@ -769,7 +769,7 @@ onUnmounted(() => {
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
         </div>
-        <span class="p-push" />
+        <span class="ml-auto" />
         <span
           data-testid="run-state"
           class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

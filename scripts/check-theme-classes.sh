@@ -115,6 +115,8 @@ check_class_in_attrs 'dim' 'text-subtle'
 check_class 'p-sm' 'text-kira-sm'
 # P110 B18: same reasoning as B17 -- `p-xs` is not common prose.
 check_class 'p-xs' 'text-kira-xs'
+# P110 B19: `p-push` is not common prose.
+check_class 'p-push' 'ml-auto'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

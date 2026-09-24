@@ -131,7 +131,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            class="p-push"
+            class="ml-auto"
             :class="{ 'bg-field text-fg': showSearch }"
             aria-label="Search"
             data-testid="toggle-search"

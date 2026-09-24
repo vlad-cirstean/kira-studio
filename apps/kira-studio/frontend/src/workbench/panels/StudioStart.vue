@@ -101,7 +101,7 @@ function openRecent(entry: RecentTableEntry): void {
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="entry-path">{{ entry.path }}</span>
-            <span class="p-push text-kira-xs text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
+            <span class="ml-auto text-kira-xs text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
           </button>
         </div>
       </template>

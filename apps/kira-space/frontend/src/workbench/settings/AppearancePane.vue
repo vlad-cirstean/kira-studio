@@ -67,7 +67,7 @@ function onInlineBlameChange(checked: boolean): void {
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-appearance-inlineBlame"
             :disabled="isAtDefault('appearance', 'inlineBlame')"
             aria-label="Reset to default"

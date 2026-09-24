@@ -219,7 +219,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" class="p-push" aria-label="Close" data-testid="http-find-close" @click="close">
+        <Button variant="toolbar" size="kira-icon" class="ml-auto" aria-label="Close" data-testid="http-find-close" @click="close">
           <CodiconIcon name="close" :size="13" />
         </Button>
       </TooltipTrigger>

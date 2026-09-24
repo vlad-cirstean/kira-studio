@@ -168,7 +168,7 @@ onUnmounted(() => {
         <Button
           variant="toolbar"
           size="kira-icon"
-          class="p-push"
+          class="ml-auto"
           aria-label="Close"
           data-testid="stream-search-close"
           @click="close"

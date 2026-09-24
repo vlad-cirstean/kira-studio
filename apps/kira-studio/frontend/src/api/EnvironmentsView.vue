@@ -236,7 +236,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
       />
       <span class="icon-box"><CodiconIcon name="server-environment" :size="13" /></span>
       <span class="p-view-target" data-testid="environments-target">Environments</span>
-      <span class="p-push flex items-center gap-1" />
+      <span class="ml-auto flex items-center gap-1" />
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <div class="p-toolbar last">
@@ -249,7 +249,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <span
         data-testid="run-state"
         class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

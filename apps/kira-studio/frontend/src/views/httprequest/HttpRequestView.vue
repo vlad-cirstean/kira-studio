@@ -524,7 +524,7 @@ onUnmounted(() => {
       <!-- P22b D3: Save stays ahead of the push, so it shifts position whenever the dirty mark or
            unresolved chip changes width — P15 D7 (OQ-2)'s own "first control ever placed in a view
            head" comment still holds, only the slot moved. -->
-      <span class="p-push flex items-center gap-1">
+      <span class="ml-auto flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -611,7 +611,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Send</TooltipContent>
       </Tooltip>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <!-- P22 D4: RunState stays ahead of the toolbar-end group so a consumer's own last control
            really is the toolbar's right-most element. LAW 12: the label reserves its own
            min-width, so it reflows neither the push to its left nor the group to its right. -->

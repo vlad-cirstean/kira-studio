@@ -315,7 +315,7 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>{{ hint }}</TooltipContent>
         </Tooltip>
-        <span class="p-push" />
+        <span class="ml-auto" />
         <Tooltip>
           <TooltipTrigger as-child>
             <button
@@ -342,7 +342,7 @@ onUnmounted(() => {
           </ToggleGroupItem>
         </ToggleGroup>
       </template>
-      <span v-else class="p-push" />
+      <span v-else class="ml-auto" />
       <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
            find affordance — Headers has its own separate filter (D12), and History/Timeline are
            lists, not one searchable document. -->

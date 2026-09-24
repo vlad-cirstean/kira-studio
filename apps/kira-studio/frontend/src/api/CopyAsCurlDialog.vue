@@ -128,7 +128,7 @@ function close(): void {
       </div>
 
       <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions p-push">
+        <span class="p-dialog-actions ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
           <Button
             variant="dialog-primary"

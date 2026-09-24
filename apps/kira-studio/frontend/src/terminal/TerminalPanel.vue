@@ -146,7 +146,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
             <Button
               variant="toolbar"
               size="kira-icon"
-              class="p-push"
+              class="ml-auto"
               :data-active="showSearch"
               :aria-label="showSearch ? 'Hide search' : 'Search'"
               data-testid="toggle-search"

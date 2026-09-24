@@ -666,7 +666,7 @@ onUnmounted(() => {
         >{{ targetTail?.name ?? tab.path }}</span
       >
       <span class="p-badge">collection</span>
-      <span class="p-push flex items-center gap-1"></span>
+      <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
@@ -870,7 +870,7 @@ onUnmounted(() => {
           <TooltipContent>Search this page</TooltipContent>
         </Tooltip>
       </div>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
           <span

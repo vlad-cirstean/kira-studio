@@ -476,7 +476,7 @@ function onBulkClose(): void {
         <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
       </span>
       <span class="p-view-target" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
-      <span class="p-push flex items-center gap-1" />
+      <span class="ml-auto flex items-center gap-1" />
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
@@ -493,7 +493,7 @@ function onBulkClose(): void {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <span
         data-testid="run-state"
         class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

@@ -8,14 +8,14 @@ import { useVariablesStore } from './state/variables';
 const variablesStore = useVariablesStore();
 
 // P5 D11: the switcher — mounted in both request views' existing `#toolbar-2` slot, right-aligned
-// via `.p-push` beside the request-pane SegmentedControl. The left panel's header and the title
+// via `.ml-auto` beside the request-pane SegmentedControl. The left panel's header and the title
 // bar were both weighed and declined (§ D11): environments exist independently of collections, so
 // the switcher must stay visible with none, and the title bar is shared chrome Api must not grow
 // into.
 //
 // Real-interaction fix (reported bug — the dropdown rendered right-aligned): its own popover used
 // to request `anchor="left"` ('bottom-start', its left edge flush with the trigger's own left
-// edge) despite this trigger sitting flush against its toolbar's own right edge (`.p-push` above)
+// edge) despite this trigger sitting flush against its toolbar's own right edge (`.ml-auto` above)
 // — a 200px popover extending rightward from there almost always has nowhere to go, so
 // PopoverPanel's own shift() middleware silently clamped it back against the *viewport's* right
 // edge instead, not this trigger's. Confirmed empirically (Playwright, a 1440px window): the
@@ -68,7 +68,7 @@ function manage(): void {
 
 <template>
   <Popover v-model:open="open">
-    <div class="environment-anchor p-push">
+    <div class="environment-anchor ml-auto">
       <PopoverTrigger as-child>
         <button
           type="button"

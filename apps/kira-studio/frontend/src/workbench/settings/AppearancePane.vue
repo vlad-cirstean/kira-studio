@@ -180,7 +180,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-appearance-rowColoring"
             :disabled="isAtDefault('appearance', 'rowColoring')"
             aria-label="Reset to default"
@@ -216,7 +216,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-appearance-inlineBlame"
             :disabled="isAtDefault('appearance', 'inlineBlame')"
             aria-label="Reset to default"

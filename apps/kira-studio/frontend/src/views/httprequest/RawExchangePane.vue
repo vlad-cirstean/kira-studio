@@ -240,7 +240,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
             <span class="text-kira-xs text-subtle font-data raw-caption" :data-testid="section.captionTestid">
               {{ section.caption }}
             </span>
-            <span class="p-push" />
+            <span class="ml-auto" />
             <Tooltip>
               <TooltipTrigger as-child>
                 <Button variant="toolbar" size="kira-icon" :aria-label="section.copyLabel" :data-testid="section.copyTestid" @click="section.onCopy">

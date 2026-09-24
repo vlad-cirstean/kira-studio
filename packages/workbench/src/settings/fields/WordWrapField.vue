@@ -41,7 +41,7 @@ function onWordWrapChange(checked: boolean): void {
           <Button
             variant="toolbar"
             size="kira-icon"
-            class="p-push"
+            class="ml-auto"
             data-testid="settings-reset-appearance-wordWrap"
             :disabled="isAtDefault('appearance', 'wordWrap')"
             aria-label="Reset to default"

@@ -100,7 +100,7 @@ onMounted(() => {
       </div>
 
       <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions p-push">
+        <span class="p-dialog-actions ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
           <Button
             variant="dialog-primary"

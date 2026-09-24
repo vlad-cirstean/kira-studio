@@ -282,7 +282,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-api-sslVerify"
             :disabled="isAtDefault('api', 'sslVerify')"
             aria-label="Reset to default"
@@ -320,7 +320,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-api-followRedirects"
             :disabled="isAtDefault('api', 'followRedirects')"
             aria-label="Reset to default"
@@ -433,7 +433,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <Button
             variant="toolbar"
             size="kira-icon"
-          class="p-push"
+          class="ml-auto"
             data-testid="settings-reset-api-disableCookieJar"
             :disabled="isAtDefault('api', 'disableCookieJar')"
             aria-label="Reset to default"

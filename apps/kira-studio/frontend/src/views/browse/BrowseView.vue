@@ -304,7 +304,7 @@ onMounted(() => {
         ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
         >{{ targetName }}</span
       >
-      <span class="p-push flex items-center gap-1"></span>
+      <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
@@ -351,7 +351,7 @@ onMounted(() => {
           </TooltipTrigger>
           <TooltipContent>Upload file…</TooltipContent>
         </Tooltip>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
           <span
@@ -475,7 +475,7 @@ onMounted(() => {
                 </button>
               </template>
             </span>
-            <span class="p-push text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
+            <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </div>
           <div class="p-panel body-panel">
             <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty text-muted-foreground">Loading…</div>

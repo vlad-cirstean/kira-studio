@@ -94,7 +94,7 @@ onUnmounted(() => {
       >
         <div class="error-popover-body">{{ props.message }}</div>
         <div class="p-toolbar last error-popover-actions">
-          <Button variant="toolbar" size="kira" class="p-push" @click="copyText(props.message)">Copy</Button>
+          <Button variant="toolbar" size="kira" class="ml-auto" @click="copyText(props.message)">Copy</Button>
           <Button variant="toolbar" size="kira" @click="close">Close</Button>
         </div>
       </div>

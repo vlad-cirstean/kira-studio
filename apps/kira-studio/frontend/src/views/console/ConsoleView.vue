@@ -648,7 +648,7 @@ const statusLine = computed(() => {
       <span class="p-view-target" data-testid="console-target">{{
         targetTail?.name ?? tab.path ?? 'Console'
       }}</span>
-      <span class="p-push flex items-center gap-1"></span>
+      <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
@@ -836,7 +836,7 @@ const statusLine = computed(() => {
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
           <span
@@ -965,7 +965,7 @@ const statusLine = computed(() => {
               </button>
             </div>
           </div>
-          <span class="text-kira-sm text-muted-foreground p-push" data-testid="console-status">{{ statusLine }}</span>
+          <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="console-status">{{ statusLine }}</span>
           <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
                result — DocumentView.vue's own expand-all/collapse-all pair, needed here now that
                a document row's only other way to reveal its full body (the cell editor dock) is
@@ -1116,12 +1116,12 @@ const statusLine = computed(() => {
    chips. No .p-tab-rail: every result set in one console belongs to the same connection, so a
    colour rail here would carry no information the main tab strip's own rail doesn't already.
    Item 6: the status text used to sit *inside* the same scrolling flex row as the chips
-   themselves, `.p-push`ed to the far end of that row's *content* — once enough chips
+   themselves, pushed via `ml-auto` to the far end of that row's *content* — once enough chips
    accumulated to overflow the strip, that end sat off past the visible edge, so the status text
    (the running/result-count readout) scrolled out of view along with the chips that pushed past
    it. Splitting the chips into their own scrollable child, sized to the *remaining* width by
    `flex: 1; min-width: 0`, keeps `.result-strip-row` itself unscrolled and exactly toolbar-width —
-   `.p-push`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
+   `ml-auto`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
    scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
 .result-strip-row {
   @apply gap-1;

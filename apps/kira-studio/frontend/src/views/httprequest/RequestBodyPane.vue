@@ -178,7 +178,7 @@ const caption = computed(() =>
           {{ opt.label }}
         </option>
       </select>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Tooltip v-if="tab.state.bodyMode === 'code' && beautifyFormat">
         <TooltipTrigger as-child>
           <Button variant="toolbar" size="kira-icon" aria-label="Beautify" data-testid="http-body-beautify" @click="onBeautifyBody">

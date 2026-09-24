@@ -294,13 +294,13 @@ onUnmounted(() => {
         <span v-else class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
           {{ codeName }} ({{ code }})
         </span>
-        <span class="p-push" />
+        <span class="ml-auto" />
         <span class="text-kira-xs text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
         <span class="text-kira-xs text-subtle" data-testid="grpc-message-summary">
           {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
         </span>
       </template>
-      <span v-else class="p-push" />
+      <span v-else class="ml-auto" />
       <!-- P22b D14: HTTP's own ResponsePane.vue idiom — only the Messages pane has a document to
            search (Metadata is a plain key-value list, History is a row list). -->
       <Tooltip v-if="tab.state.responsePane === 'messages'">
@@ -440,7 +440,7 @@ onUnmounted(() => {
                 </TooltipTrigger>
                 <TooltipContent>Stored copy cut at 64 KB — not the full message</TooltipContent>
               </Tooltip>
-              <span class="p-push" />
+              <span class="ml-auto" />
               <span class="text-kira-xs text-subtle">#{{ entry.m.seq }}</span>
             </button>
             <div v-if="expanded.has(entry.m.seq)" class="message-detail">

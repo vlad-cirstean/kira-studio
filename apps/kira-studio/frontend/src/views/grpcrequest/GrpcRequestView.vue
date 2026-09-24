@@ -309,7 +309,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Nothing from this tab is saved</TooltipContent>
       </Tooltip>
-      <span class="p-push flex items-center gap-1">
+      <span class="ml-auto flex items-center gap-1">
         <!-- P22b D3 (HttpRequestView.vue's own sibling): Save stays ahead of the push, same as the
              #badges group above, so it shifts position with the dirty mark/unresolved chip. -->
         <Tooltip>
@@ -408,7 +408,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? 'Waiting on the schema…' : 'Call' }}</TooltipContent>
       </Tooltip>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <span
         data-testid="run-state"
         class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"

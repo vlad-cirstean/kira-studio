@@ -606,7 +606,7 @@ const statusLine = computed(() => {
         </template>
       </span>
 
-      <span class="p-push flex items-center gap-1">
+      <span class="ml-auto flex items-center gap-1">
         <Tooltip v-if="readOnlyReason && readOnlyChipTitle">
           <TooltipTrigger as-child>
             <span class="p-chip warn">

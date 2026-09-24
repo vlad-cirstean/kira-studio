@@ -91,7 +91,7 @@ async function onClear(): Promise<void> {
   <div class="history-pane" data-testid="grpc-history-list">
     <div class="history-toolbar p-toolbar">
       <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
-      <span class="p-push" />
+      <span class="ml-auto" />
       <Button
         variant="toolbar"
         size="kira"
@@ -167,7 +167,7 @@ async function onClear(): Promise<void> {
           </TooltipTrigger>
           <TooltipContent>{{ entry.calledAt }}</TooltipContent>
         </Tooltip>
-        <span class="p-push" />
+        <span class="ml-auto" />
         <Tooltip>
           <TooltipTrigger as-child>
             <Button

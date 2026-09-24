@@ -215,7 +215,7 @@ async function onConfirm(): Promise<void> {
             </Tooltip>
             <span
               v-if="row.passwordOutlook"
-              class="p-chip p-push"
+              class="p-chip ml-auto"
               :class="OUTLOOK_TONE[row.passwordOutlook]"
               data-testid="datagrip-row-outlook"
             >
@@ -223,7 +223,7 @@ async function onConfirm(): Promise<void> {
             </span>
           </template>
           <template v-else>
-            <span class="ds-skip p-push" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
+            <span class="ds-skip ml-auto" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
           </template>
 
           <span v-if="row.warnings.length > 0" class="ds-warnings">
@@ -266,7 +266,7 @@ async function onConfirm(): Promise<void> {
           </span>
           <span class="ds-name">{{ row.name }}</span>
           <span
-            class="p-chip p-push"
+            class="p-chip ml-auto"
             :class="reportOutcome(row).tone"
             data-testid="datagrip-report-row-outcome"
           >

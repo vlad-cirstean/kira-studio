@@ -117,7 +117,7 @@ function splitTarget(value: string): [string, string | null] {
       </div>
 
       <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions p-push">
+        <span class="p-dialog-actions ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
           <Button
             variant="dialog-primary"

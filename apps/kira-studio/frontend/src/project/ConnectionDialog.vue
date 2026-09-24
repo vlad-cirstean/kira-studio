@@ -606,7 +606,7 @@ const preconnectText = computed({
       <DialogHeader v-if="step === 'engine'" class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <span class="icon-box text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
         <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
-        <span class="title-mid p-push">
+        <span class="title-mid ml-auto">
           <span v-if="!isEdit" class="steps">
             <span class="step on"><span class="n">1</span>Engine</span>
             <span class="text-subtle">›</span>
@@ -638,7 +638,7 @@ const preconnectText = computed({
         <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira" class="p-push" @click="step = 'engine'">
+            <Button variant="toolbar" size="kira" class="ml-auto" @click="step = 'engine'">
               <CodiconIcon name="chevron-left" :size="13" />
               Change engine
             </Button>

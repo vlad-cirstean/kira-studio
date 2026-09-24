@@ -66,7 +66,7 @@ async function submit(): Promise<void> {
           <Button
             variant="toolbar"
             size="kira-icon"
-            class="p-push"
+            class="ml-auto"
             aria-label="Close"
             @click="emit('close')"
           >
