@@ -129,7 +129,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop" aria-hidden="true">
+  <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop">
     <div ref="panelEl" class="fk-preview p-float" data-testid="fk-preview" :style="style">
       <div class="fk-preview-header">
         <span class="fk-preview-title">{{ tableLabel }}</span>
