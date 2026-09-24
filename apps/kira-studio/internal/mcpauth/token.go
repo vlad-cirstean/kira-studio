@@ -100,7 +100,10 @@ func TokenVerifier(label string, load func() Record) auth.TokenVerifier {
 		case OutcomeValid:
 			return &auth.TokenInfo{}, nil
 		case OutcomeExpired:
-			return nil, fmt.Errorf("%w: the %s MCP token expired at %s. Kira Studio mints a fresh one when the server restarts or when you press Regenerate in Settings; re-register this server with the command it shows.",
+			// F8: post-F2, the registered command never carries the token — the live plaintext
+			// lives only in the helper token mirror file, which Regenerate rewrites in place. No
+			// re-registration is needed on expiry, unlike before F2.
+			return nil, fmt.Errorf("%w: the %s MCP token expired at %s. Press Regenerate in Kira Studio's Database MCP settings to mint a fresh one — no need to re-register this server.",
 				auth.ErrInvalidToken, label, rec.ExpiresAt.Format(time.RFC3339))
 		default:
 			return nil, auth.ErrInvalidToken
@@ -121,8 +124,10 @@ func PathNamed(home, name string) string {
 // bearer token on that process's own argv, but the helper script it writes has to read the LIVE
 // plaintext from somewhere at connection time, including well after a restart mid-token-life, when
 // the hash-only Record above no longer carries a recoverable plaintext at all. This file exists
-// only for that helper script to read — 0600 (SaveHelperToken), never read back by this app itself
-// — narrowing the exposure from D8's original threat (nothing on disk, anywhere) to "readable by
+// for that helper script to read — 0600 (SaveHelperToken) — and, since F8, is also read back by
+// this app itself (LoadHelperToken) to confirm the mirror still verifies against the live Record
+// before showing Command/Install, never for any other purpose — narrowing the exposure from D8's
+// original threat (nothing on disk, anywhere) to "readable by
 // this OS user account, same as every other local process already running as it", which is the
 // same posture agenthooks' own 0700 socket directory already takes, and strictly better than the
 // argv exposure it replaces (readable by every local uid via /proc, and by exec-event EDR logging).
@@ -172,6 +177,21 @@ func Save(path string, rec Record) error {
 // already holds the correct value from the last mint and needs no update.
 func SaveHelperToken(path, plain string) error {
 	return atomicWrite0600(path, []byte(plain))
+}
+
+// LoadHelperToken reads path's plaintext back (F8): the embedded server's own "can I show
+// Command/Install" gate needs to confirm the on-disk helper mirror still verifies against the
+// currently-held Record, not just that this process minted a token at some point this run. A
+// missing file returns ok=false with no error, same posture as Load.
+func LoadHelperToken(path string) (plain string, ok bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("mcpauth: read %s: %w", path, err)
+	}
+	return string(data), true, nil
 }
 
 // atomicWrite0600 is Save/SaveHelperToken's own shared temp-file-plus-rename write, mode 0600.

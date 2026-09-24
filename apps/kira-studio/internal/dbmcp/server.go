@@ -117,13 +117,15 @@ type Server struct {
 	cfg Config
 	log *slog.Logger
 
-	// tokenMu guards token/tokenPlain/tokenMinted: Regenerate (bridge.DbMcpService's own
-	// restart-recovery action) mutates these on a live, already-serving instance, concurrently with
-	// tokenVerifier reading them on every in-flight request (http.go).
-	tokenMu     sync.RWMutex
-	token       mcpauth.Record
-	tokenPlain  string
-	tokenMinted bool
+	// tokenMu guards token: Regenerate (bridge.DbMcpService's own restart-recovery action) mutates
+	// it on a live, already-serving instance, concurrently with tokenVerifier reading it on every
+	// in-flight request (http.go). F8: the plaintext is never held here beyond New's own call —
+	// bridge.dbMcpTokenProviderFor persists it to the helper token mirror file itself before
+	// returning it, and the "can Command/Install show" gate reads that file back and verifies it
+	// against TokenRecord() below, rather than an in-memory "this run minted a fresh token" flag
+	// that stayed false, wrongly, across every restart within the token's own TTL.
+	tokenMu sync.RWMutex
+	token   mcpauth.Record
 
 	mcp *mcp.Server
 
@@ -166,17 +168,18 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("dbmcp: Config.ExplainThreshold is required")
 	}
 
-	tokenRec, tokenPlain, tokenMinted, err := cfg.Token()
+	// plain/minted served the old in-memory-plaintext gate (F8) — cfg.Token() (bridge's
+	// dbMcpTokenProviderFor) already persists a fresh plaintext to the helper token mirror file
+	// itself before returning here, so neither is needed beyond this call.
+	tokenRec, _, _, err := cfg.Token()
 	if err != nil {
 		return nil, fmt.Errorf("dbmcp: resolve token: %w", err)
 	}
 
 	s := &Server{
-		cfg:         cfg,
-		log:         log,
-		token:       tokenRec,
-		tokenPlain:  tokenPlain,
-		tokenMinted: tokenMinted,
+		cfg:   cfg,
+		log:   log,
+		token: tokenRec,
 	}
 	s.mcp = s.buildMCPServer()
 
@@ -244,12 +247,14 @@ func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *
 	}
 }
 
-// Token returns the plaintext token (empty unless this construction — or a subsequent SetToken —
-// actually minted a fresh one; a hash cannot be reversed) and whether one is currently held.
-func (s *Server) Token() (plain string, minted bool) {
+// TokenRecord returns the currently-held auth record (hash+salt+expiry, never the plaintext) —
+// F8's own gate seam: bridge.DbMcpService checks Command/Install availability by reading the
+// helper token mirror file back and verifying it against this record, not an in-memory
+// "this run minted" flag.
+func (s *Server) TokenRecord() mcpauth.Record {
 	s.tokenMu.RLock()
 	defer s.tokenMu.RUnlock()
-	return s.tokenPlain, s.tokenMinted
+	return s.token
 }
 
 // TokenExpiry returns the currently-held record's own expiry instant (zero for a record that has
@@ -262,13 +267,13 @@ func (s *Server) TokenExpiry() time.Time {
 
 // SetToken replaces this instance's own live auth record — bridge.DbMcpService's Regenerate
 // action, safe to call while requests are in flight: the very next request is checked against the
-// new record, never a stale in-memory copy.
-func (s *Server) SetToken(rec mcpauth.Record, plain string) {
+// new record, never a stale in-memory copy. The plaintext itself is not stored here (F8) — the
+// caller persists it to the helper token mirror file itself, the same file the gate above reads
+// back.
+func (s *Server) SetToken(rec mcpauth.Record) {
 	s.tokenMu.Lock()
 	defer s.tokenMu.Unlock()
 	s.token = rec
-	s.tokenPlain = plain
-	s.tokenMinted = true
 }
 
 // Close shuts the HTTP listener down. Idempotent.

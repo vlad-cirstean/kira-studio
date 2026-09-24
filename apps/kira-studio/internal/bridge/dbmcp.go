@@ -99,9 +99,12 @@ func NewDbMcpService(deps appcore.Deps, installer McpInstaller, approvals *dbmcp
 				return st
 			}
 			st.Running = true
-			// Command is "" whenever no plaintext is currently held (an app restart with the
-			// setting already on) — the Database MCP section shows a Regenerate action instead.
-			if _, minted := srv.Token(); minted {
+			// F8: Command is "" whenever the on-disk helper token mirror is missing or does not
+			// verify against the currently-held record — never gated on whether *this run* minted
+			// the token, which stayed false across every ordinary restart within the token's own
+			// TTL even though the helper file (and the record it matches) both survive restarts
+			// and stay valid.
+			if helperTokenValid(srv) {
 				helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
 				st.Command = mcpinstall.Command(dbMcpServerName, srv.URL(), helperPath)
 			}
@@ -141,32 +144,72 @@ func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 	return func() (mcpauth.Record, string, bool, error) {
 		path := mcpauth.PathNamed(home, dbMcpTokenName)
 		helperPath := mcpauth.HelperTokenPathNamed(home, dbMcpTokenName)
-		if !mint {
-			plain, rec, minted, err := mcpauth.LoadOrMintTTL(path, mcpauth.TTL)
-			// A fresh plaintext (minted, or the one-shot zero-ExpiresAt stamp — neither of which
-			// LoadOrMintTTL distinguishes in its own return shape) only exists here when minted is
-			// true (LoadOrMintTTL's own doc: plain is "" whenever it did not mint). The helper
-			// script's own mirror file needs updating only then — a plain load leaves it untouched,
-			// already holding the correct current value from the last mint (F2).
-			if err == nil && minted {
-				if serr := mcpauth.SaveHelperToken(helperPath, plain); serr != nil {
-					return rec, plain, minted, serr
-				}
-			}
+		if mint {
+			return remintDbMcpToken(path, helperPath)
+		}
+		plain, rec, minted, err := mcpauth.LoadOrMintTTL(path, mcpauth.TTL)
+		if err != nil {
 			return rec, plain, minted, err
 		}
-		plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
-		if err != nil {
-			return mcpauth.Record{}, "", false, err
+		if minted {
+			// A fresh plaintext (minted, or the one-shot zero-ExpiresAt stamp — neither of which
+			// LoadOrMintTTL distinguishes in its own return shape) only exists here when minted is
+			// true (LoadOrMintTTL's own doc: plain is "" whenever it did not mint).
+			if serr := mcpauth.SaveHelperToken(helperPath, plain); serr != nil {
+				return rec, plain, minted, serr
+			}
+			return rec, plain, minted, nil
 		}
-		if err := mcpauth.Save(path, rec); err != nil {
-			return mcpauth.Record{}, "", false, err
+		// F8: a loaded (not minted) record must still have a helper mirror whose plaintext
+		// verifies against it. A missing file (never written on some older run), or a mismatch
+		// (Save succeeded then SaveHelperToken failed on a previous run, or a stale copy left
+		// over some other way), would otherwise leave every client silently 401ing forever — this
+		// app never re-derives a plaintext from a hash. Remint fresh, both files together, rather
+		// than serve a record no client can match.
+		if helperTokenMatchesRecord(helperPath, rec) {
+			return rec, plain, minted, nil
 		}
-		if err := mcpauth.SaveHelperToken(helperPath, plain); err != nil {
-			return mcpauth.Record{}, "", false, err
-		}
-		return rec, plain, true, nil
+		return remintDbMcpToken(path, helperPath)
 	}
+}
+
+// remintDbMcpToken mints a fresh token and persists it to both files together — the record
+// (hash+salt) and the helper mirror (plaintext) must never go out of sync, since nothing here can
+// recover one from the other.
+func remintDbMcpToken(path, helperPath string) (mcpauth.Record, string, bool, error) {
+	plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
+	if err != nil {
+		return mcpauth.Record{}, "", false, err
+	}
+	if err := mcpauth.Save(path, rec); err != nil {
+		return mcpauth.Record{}, "", false, err
+	}
+	if err := mcpauth.SaveHelperToken(helperPath, plain); err != nil {
+		return mcpauth.Record{}, "", false, err
+	}
+	return rec, plain, true, nil
+}
+
+// helperTokenMatchesRecord reports whether helperPath's own plaintext still verifies against rec —
+// the shared check dbMcpTokenProviderFor's load branch and helperTokenValid below both need, over
+// a Record read from two different places (a freshly loaded one here, a live server's
+// TokenRecord() there).
+func helperTokenMatchesRecord(helperPath string, rec mcpauth.Record) bool {
+	plain, ok, err := mcpauth.LoadHelperToken(helperPath)
+	if err != nil || !ok {
+		return false
+	}
+	return mcpauth.Verify(plain, rec)
+}
+
+// helperTokenValid is the running server's own F8 gate: Command/Install must show only when the
+// on-disk helper token mirror still verifies against the record the server is actually checking
+// bearer tokens against right now — not whether this particular run minted a fresh token, which
+// stayed false, wrongly, across every ordinary restart within the token's own 7-day TTL even
+// though the helper file (and the record it matches) both survive a restart and stay valid.
+func helperTokenValid(srv *dbmcp.Server) bool {
+	helperPath := mcpauth.HelperTokenPathNamed(config.KiraHome(), dbMcpTokenName)
+	return helperTokenMatchesRecord(helperPath, srv.TokenRecord())
 }
 
 // explainThreshold is dbmcp.Config.ExplainThreshold's real backend: settingsState.advanced.
@@ -260,7 +303,7 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 		slog.Warn("db mcp: persist regenerated helper token", "scope", "dbmcp", "err", err)
 		return s.embedded.statusLocked()
 	}
-	s.embedded.server.SetToken(rec, plain)
+	s.embedded.server.SetToken(rec)
 	return s.embedded.statusLocked()
 }
 
@@ -286,8 +329,9 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	if s.embedded.server == nil {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
-	_, minted := s.embedded.server.Token()
-	if !minted {
+	// F8: same gate statusFn uses — the on-disk helper mirror must exist and verify against the
+	// live record, not just "this run minted a fresh token".
+	if !helperTokenValid(s.embedded.server) {
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
 	helperPath := mcpinstall.HeaderHelperScriptPath(config.KiraHome())
