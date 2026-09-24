@@ -4771,7 +4771,126 @@ finding:
   checked against its intended file set — no cross-contamination with any sibling subagent's work in
   either direction.
 
-## Layout
+## P111 result
+
+Landed as 5 commits against `2f6b61b` (the plan's own survey commit) / plan `7649c72`
+(`plans/P111-git-ipc-pull-strategy-contract.md`): `daa27d2`, `067149b`, `3495ae6`, `e33cb06`, plus
+this section's own commit. The plan's own §6 specified exactly 4 (C1-C4); one small corrective 5th
+(`e33cb06`) landed mid-sequence for a reason disclosed below, under "Shared-checkout git races" —
+still test-only content inside C3's own scope, not a scope change.
+
+- **C1 `daa27d2` `fix(kira-space): validate pull strategy params at the gitrpc layer`.** §4.4's
+  gitrpc-layer validation (the Part 17 overlap): `remote.pullPreflight`'s `strategySetting` checked
+  against `model.ValidPullStrategy`, `remote.run`'s `strategy` checked against a new
+  `validPullStrategy` closed vocabulary, both refusing with `ipcerr.BadRequest` before any spawn. No
+  wire-shape change, no version bump, independent of C2.
+- **C2 `067149b` `feat(git-ipc)!: carry rebaseMerges from remote.pullPreflight through remote.run`.**
+  The full wire change, atomic: `gitpreflight.ResolveRebaseMerges` (§4.1, the pure function moved out
+  of `gitsession.wantsRebaseMerges`'s deleted switch), `PullPreflight.RebaseMerges`/
+  `RemoteOpParams.RebaseMerges` (Go) and their TS mirrors (`contract.ts`, `git-core`'s structural
+  copies), `runPullOp` reading `params.RebaseMerges` instead of re-deriving it, the `rebaseMerges`
+  guard on `remote.run` (§4.4), `runPull`'s own `rebaseMerges` local (§5.3) sent as
+  `preflight.rebaseMerges` for the resolved strategy and `false` for an explicit override, and
+  `ContractVersion`/`CONTRACT_VERSION` 40 → 41 in lockstep with their history comments and the two
+  `docs/ARCHITECTURE.md` mentions. `wantsRebaseMerges` deleted entirely, `TestWantsRebaseMerges`
+  (`gitsession/remote_test.go`) deleted with it (its cases move into C3's table test). Two fixes the
+  plan's own survey did not catch, both required by the version bump's own hard-lockstep rule and
+  fixed in the same commit rather than left red: `TestContractVersion_Is40`
+  (`gitrpc/stash_test.go`, a literal-40 assertion added after the survey commit) renamed/updated to
+  `TestContractVersion_Is41`; `packages/git-ipc/testdata/graphChunkFrame.bin`'s embedded JSON
+  header carries a `"version":40` literal from a real captured Go-encoded frame, patched to `41` by
+  exact byte replacement (2-digit ASCII, no length change) rather than via its own regenerator
+  (`gitsock`'s `TestFixtures_CaptureGraphChunkFrame`, gated behind `KIRA_GIT_FIXTURES=write`) — that
+  regenerator was tried first and reverted: it re-derives from a fresh, non-deterministic test repo
+  (new SHAs/timestamps/`repoId`) and reformats the JSON fixture's arrays, introducing large,
+  unrelated noise this phase does not own. `BREAKING CHANGE: git-ipc contract 40 -> 41`.
+- **C3 `3495ae6` `test(kira-space): prove rebaseMerges follows the ladder, not an override`.** §7's
+  three additions: `TestResolveRebaseMerges` (`gitpreflight/pull_test.go`, 8-case table:
+  strategy x source x two config keys), `TestIntegration_PullPreflightHonorsRepoStoredStrategy`
+  extended with `pull.rebase=merges` set in real git config alongside the stored `"rebase"` setting
+  (proves `RebaseMerges == false` end to end over the real socket), and `ops.test.ts`'s new describe
+  block (`runPull('origin', 'main')` → `rebaseMerges: true` from a scripted preflight;
+  `runPull('origin', 'main', 'rebase')` → `rebaseMerges: false` for the explicit pick).
+- **`e33cb06` `test(kira-space): drop TestResolveRebaseMerges's dangling reference to a deleted
+  function name`.** The corrective 5th commit — see "Shared-checkout git races" below for why it
+  exists as its own commit rather than folded into C3.
+
+**Verification, run for real (plan §9), after every commit landed:**
+
+1. `go build ./... && go vet ./apps/kira-space/...` — clean, exit 0.
+2. `go test ./apps/kira-space/internal/gitpreflight/ ./apps/kira-space/internal/gitsession/
+   ./apps/kira-space/internal/gitrpc/ ./apps/kira-space/internal/gitsock/
+   ./apps/kira-space/internal/bridge/` — all `ok`.
+3. `bun run typecheck` (the full parallel `typecheck:*` split) and `bun run lint` (`biome check .` +
+   `scripts/check-tokens.sh`) — both clean, exit 0.
+4. `bun test packages/git-ipc/src packages/git-core/src packages/git-ui/src
+   apps/kira-space-vscode/src` — 596 pass, 0 fail, across 57 files (up from 594 pre-C3; C3 added 2).
+5. §9.5's greps, each checked against its stated count: `wantsRebaseMerges` under `apps/kira-space`
+   — 0 hits (a stray doc-comment mention of the deleted function's name in C3's own new test is what
+   `e33cb06` exists to fix — see below); `ResolveRebaseMerges` under `apps/kira-space/internal` — a
+   real caller in `gitsession/remote.go:737`, not only the definition and test; `params.RebaseMerges`
+   in `gitsession/remote.go` — 1 hit, in `runPullOp`; `ContractVersion = 41`/`CONTRACT_VERSION = 41`
+   — exactly 2 hits in code (`contract.go`, `validate.ts`); `"40 today"`/`"(40 as of"` in
+   `docs/ARCHITECTURE.md` — 0 hits. One count differs from the plan's own description without being
+   wrong: `rebaseMerges` in `packages/git-ui/src/state/ops.ts` is 7 hits, not the "5 param literals +
+   the runPull local" (6) the plan named — the 7th is `runPull`'s own doc-comment sentence the plan's
+   own §5.3 explicitly asked for ("update `runPull`'s doc comment … one sentence that `rebaseMerges`
+   travels with the preflight-resolved strategy"); the plan's own count just didn't anticipate that
+   sentence would itself contain the word.
+6. `git diff --stat 2f6b61b..HEAD -- apps/kira-space-vscode/src/proxyHandlers.ts
+   apps/kira-space/internal/bridge/gitstream.go` — empty, confirming §5.4's no-change claim held.
+7. §9.7 (webview/UI suites, `bun run test:webview`/`bun run test:ui:space`) skipped here per
+   `CLAUDE.md`'s "expensive suite once, at phase end" rule — not run by this implementer.
+
+**File list, confirmed against the plan's own scope.** Every file touched is one the plan names,
+with three exceptions, each a direct, necessary consequence of the version-bump's own hard-lockstep
+rule (§3.2) rather than a scope change: `gitrpc/stash_test.go` (a literal-`40` test added to the
+tree after the plan's own `2f6b61b` survey), `git-ipc/testdata/graphChunkFrame.bin` (a binary
+fixture carrying the same literal), and `gitpreflight/pull_test.go`'s own `e33cb06` follow-up (a
+wording fix inside a file C3 already owns). Nothing under `apps/kira-studio/` (Studio's own frontend
+or backend) was touched.
+
+**Shared-checkout git races, disclosed in full.** This checkout was worked concurrently by several
+other subagents throughout (confirmed via interleaved unrelated commits — `3e96d1b`, `5662dc0`,
+`7dd9f45`, `a175384`, `604e080`, `e345c1b`, and others). Three incidents, beyond the ordinary
+`.git/index.lock` contention every commit polled through:
+
+1. **C1's first commit attempt (`git add` + plain `git commit`) picked up another subagent's own
+   staged, unrelated files** (`apps/kira-studio/frontend/src/views/shared/celleditor/timestamp.ts`
+   plus a new spec file) — staged by that subagent between this session's `git add` and `git commit`
+   calls, since a shared checkout has one index. Caught immediately from the commit's own "3 files
+   changed" summary not matching the 1 file intended. Fixed with `git reset --soft HEAD~1` (undoes
+   only the commit, keeps the index) then `git restore --staged` on the two foreign paths, restoring
+   them to their pre-commit state untouched. From C1 onward, every commit in this phase used a
+   pathspec-scoped `git commit -m "…" -- <files>` instead of a plain `git commit` on whatever the
+   index held — the correct fix, since a pathspec-scoped commit builds its tree only from the named
+   paths regardless of what else is staged, immune to this race by construction.
+2. **The pathspec fix above still raced once, more seriously.** Fixing C3's own dangling
+   `wantsRebaseMerges` doc-comment reference (found during this phase's own §9.5 grep, before
+   reporting complete) was attempted as `git commit --amend --no-edit -- <path>` against what this
+   session believed was still its own `3495ae6` (C3). Between the check and the amend, another
+   subagent's unrelated commit (`docs(shared): correct load.ts header's false stream/state.ts
+   claim`) had landed as the new HEAD — `--amend` amends HEAD, not "the commit I made," so it folded
+   this session's one-file fix into that foreign commit instead, corrupting it. Caught immediately
+   from the amended commit's own message/stat not matching either side's intent. Fixed via
+   `git reflog` (found the foreign commit's pre-amend hash, `604e080`) and `git reset --soft
+   604e080` — restores the branch pointer to the foreign commit exactly as its own author left it
+   (verified byte-for-byte via `git show --stat`/`git diff` after), with this session's own fix
+   landing back in the working tree, unstaged. Committed separately and cleanly as `e33cb06`
+   (pathspec-scoped, one file) — the reason this phase has 5 commits instead of the plan's 4.
+   **Lesson applied for the rest of the phase and worth stating plainly: `--amend` is unsafe in a
+   shared checkout regardless of pathspec scoping, since it always targets whatever HEAD currently
+   is, not a specific commit this session made — not used again.**
+3. `packages/git-ipc/testdata/graphChunkFrame.bin`'s own regenerator
+   (`TestFixtures_CaptureGraphChunkFrame`, gated behind `KIRA_GIT_FIXTURES=write`) was run once,
+   produced a real but unrelated diff (fresh commit SHAs/timestamps/`repoId` from its own fresh test
+   repo, plus JSON array reformatting), and was reverted (`git checkout --`) before the surgical
+   2-byte patch described under C2 above — not a git race, but disclosed alongside the others since
+   it is the same class of "don't let an automated regenerator's side effects bleed into this
+   phase's diff" discipline.
+
+Every commit's own file list was checked against its intended set (`git show --stat`) before moving
+on; the two incidents above were both caught this way, not by luck.
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
