@@ -1749,6 +1749,16 @@ onBeforeUnmount(() => {
       <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
     </div>
     <template v-else-if="repoState">
+      <!-- P108 F8: bootstrap() keeps going after repoState is set — through persisted repo.open,
+           the auto-open candidate loop and openStream — so a rejection from any of those must
+           surface here regardless of which sub-branch below ends up rendering (GitBlockedPanel,
+           NoRepositoryPanel, the unborn-head empty state, or the full graph), not only the last of
+           them. One banner, above all of them, rather than duplicated into just one branch. -->
+      <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
+        <span>Kira Space isn't reachable — {{ bootError }}</span>
+        <KuiButton data-testid="boot-error-banner-retry" @click="retryBootstrap">Retry</KuiButton>
+      </div>
+
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
 
       <NoRepositoryPanel
@@ -1788,16 +1798,6 @@ onBeforeUnmount(() => {
           :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
           :resolve-conflict="resolveConflictInEditor"
         />
-        <!-- G14 D3: bootstrap() keeps going after repoState is set — through repo.open, the
-             auto-open candidate loop and openStream — so a rejection from any of those used to set
-             bootError into the full-panel error state above, which this v-else branch never shows.
-             That rendered a chrome-complete panel with no history and no explanation: exactly item
-             1's reported shape, whatever the underlying cause. Same anatomy as ReviewView.vue's
-             stale-comparison banner: one line, a Retry action that also dismisses it. -->
-        <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
-          <span>Kira Space isn't reachable — {{ bootError }}</span>
-          <KuiButton data-testid="boot-error-banner-retry" @click="retryBootstrap">Retry</KuiButton>
-        </div>
         <main class="kv-body">
           <section class="kv-graph-region" data-testid="graph-region" aria-label="Commit graph">
             <UncommittedChangesStrip

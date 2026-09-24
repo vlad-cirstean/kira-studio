@@ -10,16 +10,26 @@
  */
 import type { RepoCandidate } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
 
 const props = defineProps<{ repoState: RepoState }>();
 const emit = defineEmits<(event: 'repo-opened', repoId: string) => void>();
 
-onMounted(() => {
-  void props.repoState.refreshList();
-});
+// P108 F8: this panel's own refreshList() call (independent of bootstrap()'s own) can fail too —
+// distinct copy so a transport drop here never reads as "none of your folders is a Git
+// repository", which is a different, host-confirmed answer this failure never actually gave.
+const refreshError = ref<string | undefined>(undefined);
+
+function refreshCandidates(): void {
+  refreshError.value = undefined;
+  void props.repoState.refreshList().catch((err: unknown) => {
+    refreshError.value = err instanceof Error ? err.message : String(err);
+  });
+}
+
+onMounted(refreshCandidates);
 
 async function openCandidate(candidate: RepoCandidate): Promise<void> {
   const result = await props.repoState.open(candidate.path);
@@ -46,10 +56,18 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         </KuiButton>
       </li>
     </ul>
-    <p v-else class="kv-no-repo-note">
-      Kira Space follows the folders open in this VS Code window. None of them is a Git
-      repository — open one with File → Open Folder.
-    </p>
+    <template v-else>
+      <p v-if="refreshError" class="kv-no-repo-note" data-testid="no-repository-refresh-error">
+        Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
+      </p>
+      <p v-else class="kv-no-repo-note">
+        Kira Space follows the folders open in this VS Code window. None of them is a Git
+        repository — open one with File → Open Folder.
+      </p>
+      <KuiButton v-if="refreshError" data-testid="no-repository-retry" @click="refreshCandidates">
+        Retry
+      </KuiButton>
+    </template>
   </div>
 </template>
 
