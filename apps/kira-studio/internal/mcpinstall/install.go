@@ -181,8 +181,14 @@ type serverJSON struct {
 // shell. No token anywhere in this string (F2): helperPath names a local script, never a secret
 // itself, so unlike the old `--header "Authorization: Bearer <token>"` form this is safe to display
 // and safe to have landed in a shell history.
+//
+// F10: headersHelper is shell-quoted here, the same way Install below quotes it, so the displayed
+// command matches what Install actually sends — a helperPath containing a space (KIRA_HOME or
+// $HOME with one, common on macOS for a custom KIRA_HOME) would otherwise break into two shell
+// words once Claude Code later runs the stored headersHelper string through a shell of its own,
+// silently sending no Authorization header and failing every call with an unexplained 401.
 func Command(name, url, helperPath string) string {
-	payload, _ := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: helperPath})
+	payload, _ := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: shellSingleQuote(helperPath)})
 	return "claude mcp remove --scope user " + name + " 2>/dev/null; claude mcp add-json --scope user " +
 		name + " '" + string(payload) + "'"
 }
@@ -219,6 +225,13 @@ func isNotRegisteredError(err error) bool {
 // older app version's `--header` form, or simply re-running it), so this stays idempotent
 // regardless. A "nothing to remove" outcome is not a failure and is never surfaced as one.
 func (i *Installer) Install(ctx context.Context, name, url, helperPath string) Result {
+	// F10: a relative helperPath resolves against Claude Code's own cwd, not Kira's — reachable
+	// when os.UserHomeDir fails and kirapaths.Home falls back to a relative path. Refuse outright
+	// rather than register a headersHelper that silently reads the wrong file (or nothing).
+	if !filepath.IsAbs(helperPath) {
+		return Result{Outcome: OutcomeInstallFailed, Detail: "internal error: header helper path is not absolute"}
+	}
+
 	claudePath, probed, found := i.locateClaude()
 	if !found {
 		return Result{Outcome: OutcomeNotFound, Probed: probed}
@@ -232,7 +245,12 @@ func (i *Installer) Install(ctx context.Context, name, url, helperPath string) R
 		return Result{Outcome: OutcomeInstallFailed, Detail: detailFor(spawnCtx, err), Probed: probed}
 	}
 
-	payload, err := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: helperPath})
+	// F10: Claude Code runs the stored headersHelper string through a shell of its own at
+	// connection time — an unquoted path containing a space (or any other shell metacharacter)
+	// splits into more than one word there, so no Authorization header is ever sent and every call
+	// gets a 401 with no hint why. Single-quoting here is the fix; EnsureHeaderHelperScript already
+	// quotes the token path the same way for the same reason, one level down.
+	payload, err := json.Marshal(serverJSON{Type: "http", URL: url, HeadersHelper: shellSingleQuote(helperPath)})
 	if err != nil {
 		return Result{Outcome: OutcomeInstallFailed, Detail: err.Error(), Probed: probed}
 	}
