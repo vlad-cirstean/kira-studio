@@ -439,7 +439,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // which comfortably fit the viewport, so there is nothing left to scroll past and the band
   // clears entirely (same as the initial "nothing pinned at scrollTop 0" case above).
   await expect(stickyRows.last()).toHaveAttribute('data-path', APP_PATH);
-  await expect(stickyRows.last().locator('.p-tree-rail')).toBeVisible();
+  await expect(stickyRows.last().locator('[data-testid="tree-rail"]')).toBeVisible();
   await stickyRows.last().locator('.twisty').click();
   await expect(stickyRows).toHaveCount(0);
   await expandRow(page, APP_PATH); // restore for the assertions that follow

@@ -32,7 +32,6 @@ import { useRunState } from '../../state/runState';
 import { useSettingsStore } from '../../state/settings';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
-import { cellClass } from '../../theme/cellClass';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
@@ -146,7 +145,7 @@ function rowAt(i: number) {
 }
 
 // P49 F7/D5: `.stream-row` never had an explicit height before this view was virtualized — its
-// rows sized themselves off whichever cell had text (`.p-td`'s own line-height), which is why
+// rows sized themselves off whichever cell had text (the tabular cell's own line-height), which is why
 // `.stream-row`'s CSS rule below carries none — VirtualList needs one fixed pixel value for its
 // offset math, so this adopts the same density-driven height ConsoleResultGrid.vue/KeyValueView.vue
 // (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
@@ -628,8 +627,8 @@ onUnmounted(() => {
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
-        class="p-conn-dot"
-        :class="{ none: !railColor || railColor === 'none' }"
+        class="size-1.25 rounded-full shrink-0"
+        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
@@ -1107,10 +1106,10 @@ onUnmounted(() => {
         </AlertAction>
       </Alert>
       <template v-else>
-          <div class="p-thead">
-            <div class="p-th gutter w-10" />
-            <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
-              <span class="name">key</span>
+          <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative w-10" />
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
+              <span class="text-fg overflow-hidden text-ellipsis">key</span>
               <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
@@ -1124,8 +1123,8 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="p-th" :style="{ width: `${widthFor('timestamp')}px` }">
-              <span class="name">timestamp</span>
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
+              <span class="text-fg overflow-hidden text-ellipsis">timestamp</span>
               <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
@@ -1139,8 +1138,8 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="p-th" :style="{ width: `${widthFor('headers')}px` }">
-              <span class="name">headers</span>
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
+              <span class="text-fg overflow-hidden text-ellipsis">headers</span>
               <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
@@ -1154,8 +1153,8 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="p-th" :style="{ width: `${widthFor('attrs')}px` }">
-              <span class="name">attrs</span>
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
+              <span class="text-fg overflow-hidden text-ellipsis">attrs</span>
               <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
@@ -1169,7 +1168,7 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="p-th flex-1"><span class="name">body</span></div>
+            <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative flex-1"><span class="text-fg overflow-hidden text-ellipsis">body</span></div>
           </div>
           <div
             ref="scrollEl"
@@ -1194,7 +1193,7 @@ onUnmounted(() => {
                 }"
               >
                 <div
-                  class="p-td gutter w-10"
+                  class="flex items-center justify-end px-2 border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
                   role="option"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
@@ -1204,8 +1203,8 @@ onUnmounted(() => {
                   {{ rowIndices[vi.index] + 1 }}
                 </div>
                 <div
-                  class="p-td"
-                  :class="cellClass({ isNull: rowAt(rowIndices[vi.index])?.key === null })"
+                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate"
+                  :class="rowAt(rowIndices[vi.index])?.key === null ? 'italic text-subtle' : 'text-fg'"
                   :style="{ width: `${widthFor('key')}px` }"
                   data-testid="stream-key"
                   role="option"
@@ -1217,7 +1216,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
                 <div
-                  class="p-td"
+                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
                   :style="{ width: `${widthFor('timestamp')}px` }"
                   data-testid="stream-timestamp"
                   role="option"
@@ -1229,7 +1228,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
                 </div>
                 <div
-                  class="p-td"
+                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
                   :style="{ width: `${widthFor('headers')}px` }"
                   data-testid="stream-headers"
                   role="option"
@@ -1241,7 +1240,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.headers }}
                 </div>
                 <div
-                  class="p-td"
+                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate"
                   :style="{ width: `${widthFor('attrs')}px` }"
                   data-testid="stream-attrs"
                   role="option"
@@ -1253,7 +1252,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
                 <div
-                  class="p-td msg-body flex-1"
+                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate msg-body flex-1"
                   data-testid="stream-body"
                   role="option"
                   tabindex="0"
@@ -1321,9 +1320,9 @@ onUnmounted(() => {
   @apply relative;
 }
 
-/* tabular body shared shape (P16's .thead/.th/.td law) — .p-thead/.p-th/.p-td come from
-   primitives.css; the flex row container and the scrolling wrapper around it are local glue,
-   same as the source design's own (unshared) .tbody/.tr rules. */
+/* tabular body shared shape (P16's thead/th/td law, P110 B29's utility strings) — the flex row
+   container and the scrolling wrapper around it are local glue, same as the source design's own
+   (unshared) .tbody/.tr rules. */
 .tbody-scroll {
   @apply flex-1 min-h-0 overflow-auto;
 }
@@ -1423,17 +1422,12 @@ onUnmounted(() => {
 
 /* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors the
    deleted DataGrid.vue's own `.header-cell`/`.resize-handle` pair — SlickGrid resizes its own
-   columns natively now, so this hand-rolled pattern survives only here) — `.p-th` needs
-   `position: relative` as its positioning context, scoped here rather than in primitives.css
-   since it's a stream-only affordance (grid/keyvalue/console reuse `.p-th` too but never resize it
-   this way). Unlike the deleted DataGrid.vue's `.header-cell` (no overflow rule of its own),
-   primitives.css's shared `.p-th` sets `overflow: hidden` — `right: 0` (rather than DataGrid's
-   `right: -2px`) keeps the whole 4px handle inside `.p-th`'s own box instead of half-clipped by
-   that overflow. */
-.p-th {
-  @apply relative;
-}
-
+   columns natively now, so this hand-rolled pattern survives only here) — each header cell's own
+   template class list (P110 B29) carries `relative` directly as its positioning context now,
+   rather than a shared scoped rule. Unlike the deleted DataGrid.vue's `.header-cell` (no overflow
+   rule of its own), the header cell's own `overflow-hidden` utility means `right: 0` (rather than
+   DataGrid's `right: -2px`) keeps the whole 4px handle inside its own box instead of half-clipped
+   by that overflow. */
 .resize-handle {
   @apply absolute top-0 right-0 w-1 h-full cursor-col-resize z-1;
 }

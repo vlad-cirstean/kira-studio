@@ -184,7 +184,7 @@ test('the view-head band and the toolbar beneath it report the same height (F2(c
 
   const viewHeadHeight = await page
     .locator('[data-testid="grid-target"]')
-    .evaluate((el) => el.closest('.p-view-head')?.getBoundingClientRect().height);
+    .evaluate((el) => el.closest('[data-testid="view-head"]')?.getBoundingClientRect().height);
   expect(viewHeadHeight).toBeCloseTo(barH, 0);
 
   const toolbarHeight = await page

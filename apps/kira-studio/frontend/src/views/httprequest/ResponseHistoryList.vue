@@ -16,6 +16,7 @@ import {
   InputGroupInput,
 } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { methodTextClass } from '@theme/methodColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
@@ -208,7 +209,7 @@ async function onClear(): Promise<void> {
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
-            <Badge variant="chip" class="p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</Badge>
+            <Badge variant="chip" :class="methodTextClass(httpMethodToken(entry.method))">{{ entry.method }}</Badge>
             <Tooltip>
               <TooltipTrigger as-child>
                 <Badge :variant="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</Badge>

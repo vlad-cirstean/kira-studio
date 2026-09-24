@@ -109,7 +109,7 @@ function close(): void {
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="p-row dynamic-values-row w-full border-0 text-left"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dynamic-values-row w-full border-0 text-left"
             data-testid="dynamic-values-fake-row"
             :data-name="entry.name"
             @click="onCopy(entry.name)"

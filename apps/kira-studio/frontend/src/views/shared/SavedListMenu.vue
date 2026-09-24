@@ -68,7 +68,7 @@ defineSlots<{
         <div
           v-for="entry in saved"
           :key="entry.id"
-          class="entry-row p-row"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover entry-row"
           :data-testid="savedEntryTestId"
           role="option"
           tabindex="0"
@@ -111,7 +111,7 @@ defineSlots<{
           <div
             v-for="entry in recent"
             :key="entry.id"
-            class="entry-row p-row"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover entry-row"
             :data-testid="recentEntryTestId"
             role="option"
             tabindex="0"

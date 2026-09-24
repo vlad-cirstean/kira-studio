@@ -710,9 +710,9 @@ const preconnectText = computed({
           <div class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
             <button
               type="button"
-              class="p-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
               role="tab"
-              :class="{ 'is-active': activeTab === 'General' }"
+              :class="(activeTab === 'General') ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
               :aria-selected="activeTab === 'General'"
               data-testid="connection-tab-general"
               @click="activeTab = 'General'"
@@ -721,9 +721,9 @@ const preconnectText = computed({
             </button>
             <button
               type="button"
-              class="p-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
               role="tab"
-              :class="{ 'is-active': activeTab === 'Advanced' }"
+              :class="(activeTab === 'Advanced') ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
               :aria-selected="activeTab === 'Advanced'"
               data-testid="connection-tab-advanced"
               @click="activeTab = 'Advanced'"
@@ -732,9 +732,9 @@ const preconnectText = computed({
             </button>
             <button
               type="button"
-              class="p-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
               role="tab"
-              :class="{ 'is-active': activeTab === 'Pre-connect' }"
+              :class="(activeTab === 'Pre-connect') ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
               :aria-selected="activeTab === 'Pre-connect'"
               data-testid="connection-tab-preconnect"
               @click="activeTab = 'Pre-connect'"
@@ -743,9 +743,9 @@ const preconnectText = computed({
             </button>
             <button
               type="button"
-              class="p-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
               role="tab"
-              :class="{ 'is-active': activeTab === 'MCP' }"
+              :class="(activeTab === 'MCP') ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
               :aria-selected="activeTab === 'MCP'"
               data-testid="connection-tab-mcp"
               @click="activeTab = 'MCP'"
@@ -754,9 +754,9 @@ const preconnectText = computed({
             </button>
             <button
               type="button"
-              class="p-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
               role="tab"
-              :class="{ 'is-active': activeTab === 'Privacy' }"
+              :class="(activeTab === 'Privacy') ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
               :aria-selected="activeTab === 'Privacy'"
               data-testid="connection-tab-privacy"
               @click="activeTab = 'Privacy'"
@@ -1540,8 +1540,8 @@ const preconnectText = computed({
   color: var(--kira-fg);
 }
 
-/* P28 §4.2: step 2's General/Advanced/Pre-connect tabs, using the app's existing .p-tab
-   primitive rather than .segmented (already spent on the Fields/URI mode switch above). */
+/* P28 §4.2: step 2's General/Advanced/Pre-connect tabs, using the app's existing tab-chip
+   utilities (P110 B29) rather than .segmented (already spent on the Fields/URI mode switch above). */
 .p-tab-strip {
   display: flex;
   gap: var(--kira-s-2);

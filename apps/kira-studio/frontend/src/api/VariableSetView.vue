@@ -469,8 +469,8 @@ function onBulkClose(): void {
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
-        class="p-conn-dot"
-        :class="{ none: !railColor || railColor === 'none' }"
+        class="size-1.25 rounded-full shrink-0"
+        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0">

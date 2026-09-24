@@ -284,7 +284,10 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // picker by D35) still lists and still paints its own rail. ---------------------------------
   const retiredRow = await connectionRow(page, 'Retired Colour Conn');
   await expect(retiredRow).toBeVisible();
-  await expect(retiredRow.locator('.p-tree-rail')).toHaveAttribute('style', /--kira-conn-orange/);
+  await expect(retiredRow.locator('[data-testid="tree-rail"]')).toHaveAttribute(
+    'style',
+    /--kira-conn-orange/,
+  );
 
   // --- create through the dialog (fields mode) -------------------------------------------
   await page.click('[data-testid="add-connection"]');
@@ -324,7 +327,10 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
 
   const row = await connectionRow(page, 'Test PG');
   await expect(row).toBeVisible();
-  await expect(row.locator('.p-tree-rail')).toHaveAttribute('style', /--kira-conn-green/);
+  await expect(row.locator('[data-testid="tree-rail"]')).toHaveAttribute(
+    'style',
+    /--kira-conn-green/,
+  );
   await expect(row.locator('.status-dot')).toHaveAttribute('data-status', 'disconnected');
 
   // D9 ("connectionsList never carries a password") is no longer checkable from here: there is
@@ -395,18 +401,16 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   await page.click('[data-testid="menu-item-edit"]');
   await page.click('[data-testid="color-red"]');
   await page.click('[data-testid="connection-save"]');
-  await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
-    'style',
-    /--kira-conn-red/,
-  );
+  await expect(
+    (await connectionRow(page, 'Test PG')).locator('[data-testid="tree-rail"]'),
+  ).toHaveAttribute('style', /--kira-conn-red/);
 
   await (await connectionRow(page, 'Test PG')).click({ button: 'right' });
   await page.hover('[data-testid="menu-item-color"]');
   await page.click('[data-testid="menu-item-color-cyan"]');
-  await expect((await connectionRow(page, 'Test PG')).locator('.p-tree-rail')).toHaveAttribute(
-    'style',
-    /--kira-conn-cyan/,
-  );
+  await expect(
+    (await connectionRow(page, 'Test PG')).locator('[data-testid="tree-rail"]'),
+  ).toHaveAttribute('style', /--kira-conn-cyan/);
 
   // --- P42 D35: the picker offers exactly eight swatches (six hues + grey + none) -----------
   await (await connectionRow(page, 'Test PG')).click({ button: 'right' });

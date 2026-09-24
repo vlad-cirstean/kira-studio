@@ -63,8 +63,11 @@ const keepAwakeTooltip = computed(() => {
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="p-tab mode-tab"
-        :class="{ 'is-active': modeStore.active === mode }"
+        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm mode-tab"
+        :class="[
+          modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+          { 'is-active': modeStore.active === mode },
+        ]"
         data-testid="mode-tab"
         :data-mode="mode"
         @click="onClick(mode)"
@@ -182,8 +185,8 @@ const keepAwakeTooltip = computed(() => {
    child here must explicitly override it, or clicking a mode tab would also start a window drag. */
 .mode-tab {
   --wails-draggable: none;
-  /* P15 D9: .p-tab's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) inside a 38px bar leaves 6px
-     of clearance, the same --kira-s-3 the bar already uses as its own right padding. */
+  /* P15 D9: the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) inside a 38px bar
+     leaves 6px of clearance, the same --kira-s-3 the bar already uses as its own right padding. */
   padding: 0 var(--kira-s-5);
   gap: var(--kira-s-2);
 }

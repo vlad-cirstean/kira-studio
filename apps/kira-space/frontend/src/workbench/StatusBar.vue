@@ -38,7 +38,7 @@ function onRevealBlameCommit(): void {
           <TooltipDisabledTrigger>
             <button
               type="button"
-              class="p-status blame"
+              class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover blame"
               data-testid="blame-status"
               :disabled="!blameStatusStore.reveal"
               @click="onRevealBlameCommit"
@@ -57,10 +57,10 @@ function onRevealBlameCommit(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* .blame is a <button> so keyboard focus/Enter/Space come free; its UA chrome reset mirrors
-   .p-status. No accent color — a blame readout is informational, not something needing attention. */
+/* .blame is a <button> so keyboard focus/Enter/Space come free; its own template class list
+   (P110 B29) already supplies the UA chrome reset. No accent color — a blame readout is
+   informational, not something needing attention. */
 .blame {
-  @apply bg-none;
   font: inherit;
   color: var(--kira-fg);
 }

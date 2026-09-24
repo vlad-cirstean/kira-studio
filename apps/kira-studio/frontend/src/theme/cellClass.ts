@@ -9,7 +9,7 @@
 export interface CellClassFlags {
   /** Right-aligned (numeric) column. */
   alignRight?: boolean;
-  /** The cell's value is SQL/Redis NULL — mirrors primitives.css's `.p-td.null`. */
+  /** The cell's value is SQL/Redis NULL — mirrors the tabular cell's own null styling. */
   isNull?: boolean;
   /** Part of the current selection (single cell, range, row, or column). */
   selected?: boolean;

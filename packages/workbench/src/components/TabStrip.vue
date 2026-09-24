@@ -218,8 +218,11 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="p-tab is-pinned"
-            :class="{ 'is-active': tab.active }"
+            class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip is-pinned"
+            :class="[
+              tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+              { 'is-active': tab.active },
+            ]"
             data-testid="tab"
             :data-tab-id="tab.id"
             :data-tab-kind="tab.kind"
@@ -246,13 +249,16 @@ useEventListener(stripRef, 'dragend', onDragEnd);
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        class="p-tab"
-        :class="{
-          'is-active': tab.active,
-          'is-dragging': dragId === tab.id,
-          'is-preview': host.tabs.isPreview(tab.id),
-          'is-attention': isAttention(tab),
-        }"
+        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip"
+        :class="[
+          tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+          {
+            'is-active': tab.active,
+            'is-dragging': dragId === tab.id,
+            'is-preview': host.tabs.isPreview(tab.id),
+            'is-attention': isAttention(tab),
+          },
+        ]"
         data-testid="tab"
         :data-tab-id="tab.id"
         :data-tab-kind="tab.kind"
@@ -263,7 +269,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         :style="{ '--kira-rail': connColorVar(host.railColorFor(tab)) }"
         draggable="true"
       >
-        <span class="p-tab-rail" />
+        <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
         <button
           type="button"
           class="tab-main"
@@ -329,7 +335,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   padding: 2px 0 0 4px;
 }
 
-.p-tab.is-pinned {
+.tab-chip.is-pinned {
   padding: 0 var(--kira-s-2);
 }
 
@@ -352,16 +358,16 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   @apply hidden;
 }
 
-.p-tab:hover:not(.is-active) {
+.tab-chip:hover:not(.is-active) {
   background: var(--kira-hover);
 }
 
-.p-tab.is-dragging {
+.tab-chip.is-dragging {
   @apply opacity-50;
 }
 
 /* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
-   whole chip — unstyled beyond filling the space .p-tab's own padding/gap leaves it. */
+   whole chip — unstyled beyond filling the space .tab-chip's own padding/gap leaves it. */
 .tab-main {
   @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
 }
@@ -387,15 +393,15 @@ useEventListener(stripRef, 'dragend', onDragEnd);
 }
 
 /* C5 §5.1: the preview-tab affordance — VS Code's own convention for "opened, not yet promoted". */
-.p-tab.is-preview .tab-title {
+.tab-chip.is-preview .tab-title {
   @apply italic;
 }
 
 /* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one. */
-.p-tab.is-attention {
+.tab-chip.is-attention {
   @apply relative;
 }
-.p-tab.is-attention::after {
+.tab-chip.is-attention::after {
   @apply absolute top-1 right-1 w-1.5 h-1.5 rounded-full;
   content: '';
   background: var(--kira-state-on);
@@ -416,8 +422,8 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   @apply shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 opacity-0 rounded-kira-sm;
 }
 
-.p-tab:hover .tab-close,
-.p-tab.is-active .tab-close {
+.tab-chip:hover .tab-close,
+.tab-chip.is-active .tab-close {
   @apply opacity-100;
 }
 

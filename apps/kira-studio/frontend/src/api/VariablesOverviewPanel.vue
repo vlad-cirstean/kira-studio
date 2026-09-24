@@ -183,8 +183,8 @@ function editEnvironmentVariables(): void {
         >
           <span
             v-if="environmentId"
-            class="p-conn-dot"
-            :class="{ none: environmentColor === 'none' }"
+            class="size-1.25 rounded-full shrink-0"
+            :class="environmentColor === 'none' ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
             :style="{ '--kira-rail': connColorVar(environmentColor) }"
             data-testid="variables-overview-environment-dot"
           />

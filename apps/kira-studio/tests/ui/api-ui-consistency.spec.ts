@@ -1394,7 +1394,7 @@ test('the environment select opens an app-drawn menu carrying each environmentâ€
 
   const select = page.locator('[data-testid="api-environment-select"]');
   await expect(select).toBeVisible();
-  await expect(select.locator('.p-conn-dot')).toBeVisible();
+  await expect(select.locator('[data-testid="conn-dot"]')).toBeVisible();
 
   // P16 D6's own rule, extended: the closed control's height matches its neighbours in the same
   // toolbar row, unaffected by the native-<select> -> app-drawn-<button> swap.
@@ -1421,14 +1421,14 @@ test('the environment select opens an app-drawn menu carrying each environmentâ€
   expect(Math.round(menuBox.x + menuBox.width)).toBe(Math.round(selectBox.x + selectBox.width));
 
   const noneRow = page.locator('[data-testid="api-environment-option-none"]');
-  await expect(noneRow.locator('.p-conn-dot.none')).toBeVisible();
+  await expect(noneRow.locator('[data-testid="conn-dot"]')).toHaveClass(/bg-none/);
 
   const rows = page.locator('[data-testid="api-environment-option"]');
   await expect(rows).toHaveCount(2);
   const prodRow = rows.filter({ hasText: 'Prod' });
   const stagingRow = rows.filter({ hasText: 'Staging' });
-  await expect(prodRow.locator('.p-conn-dot')).not.toHaveClass(/none/);
-  await expect(stagingRow.locator('.p-conn-dot')).toHaveClass(/none/);
+  await expect(prodRow.locator('[data-testid="conn-dot"]')).not.toHaveClass(/none/);
+  await expect(stagingRow.locator('[data-testid="conn-dot"]')).toHaveClass(/none/);
 
   await prodRow.click();
   await expect(menu).toHaveCount(0);
@@ -1459,10 +1459,10 @@ test('an environmentâ€™s colour reaches the request viewâ€™s toolbar cap and hea
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  const rail = page.locator('[data-testid="http-request-view"] .p-toolbar-rail');
+  const rail = page.locator('[data-testid="http-request-view"] [data-testid="toolbar-rail"]');
   await expect(rail).toHaveAttribute('style', /--kira-conn-blue/);
 
-  const headDot = page.locator('.p-view-head .p-conn-dot');
+  const headDot = page.locator('[data-testid="view-head"] [data-testid="conn-dot"]');
   await expect(headDot).not.toHaveClass(/none/);
   await expect(headDot).toHaveAttribute('style', /--kira-conn-blue/);
 

@@ -3,6 +3,8 @@ import { HTTP_METHODS, type HttpMethod, httpMethodToken } from '@shared/domain/h
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { cn } from '@theme/lib/utils';
+import { methodTextClass } from '@theme/methodColor';
 import { ref } from 'vue';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
@@ -36,7 +38,7 @@ function select(method: HttpMethod): void {
       <PopoverTrigger as-child>
         <button
           type="button"
-          :class="[nativeSelectVariants({ variant: 'bordered' }), 'method-select', 'p-method', httpMethodToken(props.modelValue)]"
+          :class="cn(nativeSelectVariants({ variant: 'bordered' }), 'method-select', methodTextClass(httpMethodToken(props.modelValue)))"
           :data-testid="testid"
           :data-value="props.modelValue"
         >
@@ -51,8 +53,13 @@ function select(method: HttpMethod): void {
           v-for="m in HTTP_METHODS"
           :key="m"
           type="button"
-          class="p-row row method-menu-item p-method"
-          :class="httpMethodToken(m)"
+          class="row method-menu-item"
+          :class="
+            cn(
+              'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover',
+              methodTextClass(httpMethodToken(m)),
+            )
+          "
           :data-testid="`method-menu-item-${m}`"
           :data-value="m"
           @click="select(m)"
@@ -93,7 +100,7 @@ function select(method: HttpMethod): void {
   @apply flex-1;
 }
 
-/* P22 D7: .p-method no longer paints its own fill (colour only), so this row no longer needs a
-   brightness workaround to fight it — the plain `.p-row:hover { background: var(--kira-hover) }`
-   every other menu row already has now applies here too. */
+/* P22 D7: the method colour class paints text only (no fill), so this row no longer needs a
+   brightness workaround to fight it — the plain hover background every other menu row already
+   has now applies here too. */
 </style>

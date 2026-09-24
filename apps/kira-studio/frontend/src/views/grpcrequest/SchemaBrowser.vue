@@ -156,7 +156,7 @@ function selectMethod(service: string, method: string): void {
     <div v-if="tab.state.descriptorMode === 'proto'" class="import-paths" data-testid="grpc-import-paths">
       <span class="def-section-title">Import paths</span>
       <div class="import-path-list">
-        <div v-for="(p, i) in tab.state.importPaths" :key="i" class="p-row">
+        <div v-for="(p, i) in tab.state.importPaths" :key="i" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
           <Tooltip>
             <TooltipTrigger as-child>
               <span class="text-kira-xs font-data import-path-text">{{ p }}</span>
@@ -222,8 +222,8 @@ function selectMethod(service: string, method: string): void {
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            class="p-row method-row"
-            :class="{ 'is-selected': tab.state.service === svc.name && tab.state.method === m.name }"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer method-row"
+            :class="(tab.state.service === svc.name && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
@@ -298,8 +298,9 @@ function selectMethod(service: string, method: string): void {
   @apply py-0.5;
 }
 
-/* p-row supplies height/display/align-items/gap/padding/border-radius/color/font-size/cursor
-   and its own hover + is-selected states; this button only needs what .p-row does not supply. */
+/* The row's own template class list (P110 B29) supplies height/display/align-items/gap/padding/
+   border-radius/color/font-size/cursor and its own hover/selected background; this button only
+   needs what that list does not supply. */
 .method-row {
   @apply w-full justify-between border-0 bg-none text-left font-[inherit];
 }

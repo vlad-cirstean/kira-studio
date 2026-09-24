@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { methodTextClass } from '@theme/methodColor';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
@@ -92,9 +93,10 @@ const { railColor, runState, runStateLabel, incognito, toggleIncognito, envId } 
 );
 
 // D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
-// replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4
-// D16's own reasoning still holds: the map lives in the shared domain beside statusClass, since
-// the collections tree's own row needs it too and `http/**` may not import `views/**`.
+// replaces httpMethodClass outright, F13/D19), over the method chip's own tinted-text colour class
+// (P110 B29). P4 D16's own reasoning still holds: the map lives in the shared domain beside
+// statusClass, since the collections tree's own row needs it too and `http/**` may not import
+// `views/**`.
 const methodToken = computed(() => httpMethodToken(props.tab.state.method));
 
 function onMethodChange(method: HttpMethod): void {
@@ -490,16 +492,17 @@ onUnmounted(() => {
 <template>
   <div class="http-request-view" data-testid="http-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="view-head">
       <span
         v-if="railColor !== undefined"
-        class="p-conn-dot"
-        :class="{ none: !railColor || railColor === 'none' }"
+        class="size-1.25 rounded-full shrink-0"
+        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+        data-testid="conn-dot"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{ title }}</span>
-      <Badge variant="chip" class="p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
+      <Badge variant="chip" :class="methodTextClass(methodToken)" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
            which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
@@ -545,7 +548,11 @@ onUnmounted(() => {
         </Tooltip>
       </span>
     </div>
-    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div
+      class="h-0.5 shrink-0 bg-(--kira-rail)"
+      data-testid="toolbar-rail"
+      :style="{ '--kira-rail': connColorVar(railColor) }"
+    />
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>

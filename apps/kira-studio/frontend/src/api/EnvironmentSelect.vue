@@ -79,8 +79,9 @@ function manage(): void {
           :data-value="activeEnvironmentId"
         >
           <span
-            class="p-conn-dot"
-            :class="{ none: !activeEnvironment?.color || activeEnvironment.color === 'none' }"
+            class="size-1.25 rounded-full shrink-0"
+            :class="(!activeEnvironment?.color || activeEnvironment.color === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+            data-testid="conn-dot"
             :style="{ '--kira-rail': connColorVar(activeEnvironment?.color) }"
           />
           <span class="environment-select-label">{{ activeEnvironment?.name ?? 'No environment' }}</span>
@@ -96,12 +97,12 @@ function manage(): void {
       <div class="environment-menu">
         <button
           type="button"
-          class="p-row row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
           data-testid="api-environment-option-none"
           data-value=""
           @click="selectNone"
         >
-          <span class="p-conn-dot none" />
+          <span class="size-1.25 rounded-full shrink-0 bg-none border border-disabled" data-testid="conn-dot" />
           <span class="label">No environment</span>
           <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="activeEnvironmentId === ''" name="check" :size="13" />
@@ -111,14 +112,15 @@ function manage(): void {
           v-for="env in variablesStore.environments"
           :key="env.id"
           type="button"
-          class="p-row row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
           data-testid="api-environment-option"
           :data-value="env.id"
           @click="selectEnvironment(env.id)"
         >
           <span
-            class="p-conn-dot"
-            :class="{ none: env.color === 'none' }"
+            class="size-1.25 rounded-full shrink-0"
+            :class="env.color === 'none' ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
+            data-testid="conn-dot"
             :style="{ '--kira-rail': connColorVar(env.color) }"
           />
           <span class="label">{{ env.name }}</span>
@@ -129,7 +131,7 @@ function manage(): void {
         <div class="environment-menu-separator" />
         <button
           type="button"
-          class="p-row row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
           data-testid="api-environment-manage"
           @click="manage"
         >

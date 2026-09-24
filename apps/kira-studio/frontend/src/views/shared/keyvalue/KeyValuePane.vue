@@ -724,8 +724,8 @@ onUnmounted(() => {
       <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
         <span
           v-if="connColor !== undefined"
-          class="p-conn-dot"
-          :class="{ none: !connColor || connColor === 'none' }"
+          class="size-1.25 rounded-full shrink-0"
+          :class="(!connColor || connColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
           :style="{ '--kira-rail': connColorVar(connColor) }"
         />
         <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0">
@@ -1076,15 +1076,15 @@ onUnmounted(() => {
       />
 
       <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 table-panel">
-        <div class="p-thead">
-          <div class="p-th gutter kv-col-gutter"></div>
-          <div class="p-th kv-col-field">
-            <span class="name">{{
+        <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-gutter"></div>
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-field">
+            <span class="text-fg overflow-hidden text-ellipsis">{{
               page?.redisType === 'string' ? '' : page?.redisType === 'list' ? 'index' : 'field'
             }}</span>
           </div>
-          <div class="p-th kv-col-value">
-            <span class="name">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-value">
+            <span class="text-fg overflow-hidden text-ellipsis">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
           </div>
         </div>
         <div class="tbody" data-testid="keyvalue-list">
@@ -1131,11 +1131,11 @@ onUnmounted(() => {
                   @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
-                  <div class="p-td gutter kv-col-gutter">{{ entry.i + 1 }}</div>
+                  <div class="flex items-center justify-end px-2 border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative kv-col-gutter">{{ entry.i + 1 }}</div>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="p-td kv-col-field"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-field"
                         :class="{
                           'search-match': isSearchMatch(entry.i, 'field'),
                           'search-match-current': isCurrentSearchMatch(entry.i, 'field'),
@@ -1150,7 +1150,7 @@ onUnmounted(() => {
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="p-td kv-col-value"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-value"
                         :class="{
                           'search-match': isSearchMatch(entry.i, 'value'),
                           'search-match-current': isCurrentSearchMatch(entry.i, 'value'),

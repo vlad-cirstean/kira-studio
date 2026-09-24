@@ -127,7 +127,11 @@ function onKeydown(e: KeyboardEvent): void {
     @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <div class="p-tree-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div
+      class="absolute inset-y-0 left-0 w-0.5 bg-(--kira-rail)"
+      data-testid="tree-rail"
+      :style="{ '--kira-rail': connColorVar(railColor) }"
+    />
 
     <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the

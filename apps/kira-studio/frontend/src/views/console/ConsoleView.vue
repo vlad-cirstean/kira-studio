@@ -635,8 +635,8 @@ const statusLine = computed(() => {
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
-        class="p-conn-dot"
-        :class="{ none: !railColor || railColor === 'none' }"
+        class="size-1.25 rounded-full shrink-0"
+        :class="(!railColor || railColor === 'none') ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
@@ -936,8 +936,13 @@ const statusLine = computed(() => {
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="p-tab result-tab"
-              :class="{ 'is-active': result.key === rt.activeKey }"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm result-tab"
+              :class="[
+                result.key === rt.activeKey
+                  ? 'bg-elevated border-border-strong text-fg'
+                  : 'border-transparent text-muted-foreground',
+                { 'is-active': result.key === rt.activeKey },
+              ]"
               data-testid="console-result-tab"
               :data-active="result.key === rt.activeKey"
             >
@@ -1089,7 +1094,7 @@ const statusLine = computed(() => {
   @apply flex-1 basis-3/5 min-h-0 flex flex-col;
 }
 
-/* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
+/* One tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
    TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
    here. The trailing status text keeps data-testid="console-status": the "N results" /
    "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4, wording
@@ -1098,8 +1103,8 @@ const statusLine = computed(() => {
    P42 D6: a step smaller than the app's primary tabs (--kira-h-sm/--kira-t-xs vs. --kira-h-md/
    --kira-t-sm) — the only way a secondary, in-panel strip actually reads as secondary — and
    scrollable under the wheel once new-result-by-default (D5) means a working session accumulates
-   chips. No .p-tab-rail: every result set in one console belongs to the same connection, so a
-   colour rail here would carry no information the main tab strip's own rail doesn't already.
+   chips. No colour rail here: every result set in one console belongs to the same connection, so
+   it would carry no information the main tab strip's own rail doesn't already.
    Item 6: the status text used to sit *inside* the same scrolling flex row as the chips
    themselves, pushed via `ml-auto` to the far end of that row's *content* — once enough chips
    accumulated to overflow the strip, that end sat off past the visible edge, so the status text
@@ -1130,7 +1135,7 @@ const statusLine = computed(() => {
 }
 
 /* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
-   whole chip — unstyled beyond filling the space .p-tab's own padding leaves it. */
+   whole chip — unstyled beyond filling the space .result-tab's own padding leaves it. */
 .result-tab-main {
   @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
 }

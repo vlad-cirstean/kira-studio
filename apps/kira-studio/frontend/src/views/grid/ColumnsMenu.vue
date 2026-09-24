@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
         <Label
           v-for="(name, index) in order"
           :key="name"
-          class="columns-menu-item p-row"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item"
           :class="{ 'is-pk': pkNames.has(name), 'is-dragging': dragIndex === index }"
           draggable="true"
           @dragstart="onDragStart(index)"

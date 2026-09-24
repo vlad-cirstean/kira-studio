@@ -593,7 +593,7 @@ const statusLine = computed(() => {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="p-row generate-item"
+                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover generate-item"
                       :data-testid="`cell-editor-generate-${gen.id}`"
                       @click="applyGenerator(gen)"
                     >

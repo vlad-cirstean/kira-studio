@@ -200,7 +200,10 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   const tab = page.locator('[data-testid="tab"]');
   await expect(tab).toHaveAttribute('data-color', 'blue');
   await expect(tab).toHaveAttribute('style', /--kira-conn-blue/);
-  await expect(page.locator('.p-toolbar-rail')).toHaveAttribute('style', /--kira-conn-blue/);
+  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveAttribute(
+    'style',
+    /--kira-conn-blue/,
+  );
 
   await openRowMenu(page, '');
   await page.hover('[data-testid="menu-item-color"]');
@@ -208,7 +211,10 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await page.click('[data-testid="menu-item-color-magenta"]');
   await expect(tab).toHaveAttribute('data-color', 'magenta');
   await expect(tab).toHaveAttribute('style', /--kira-conn-magenta/);
-  await expect(page.locator('.p-toolbar-rail')).toHaveAttribute('style', /--kira-conn-magenta/);
+  await expect(page.locator('[data-testid="toolbar-rail"]')).toHaveAttribute(
+    'style',
+    /--kira-conn-magenta/,
+  );
 });
 
 // P23: the Color submenu's own trigger was ContextMenu.vue's `.submenu` CSS — `left: 100%; top:

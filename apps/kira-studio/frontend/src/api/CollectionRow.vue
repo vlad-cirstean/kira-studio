@@ -4,6 +4,7 @@ import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { methodTextClass } from '@theme/methodColor';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
@@ -149,7 +150,7 @@ function onKeydown(e: KeyboardEvent): void {
     >
       gRPC
     </Badge>
-    <Badge v-else-if="row.kind === 'request'" variant="chip" class="method p-method" :class="httpMethodToken(row.method)">{{
+    <Badge v-else-if="row.kind === 'request'" variant="chip" class="method" :class="methodTextClass(httpMethodToken(row.method))">{{
       row.method
     }}</Badge>
     <CodiconIcon v-else :name="icon" :size="13" class="node-icon" />

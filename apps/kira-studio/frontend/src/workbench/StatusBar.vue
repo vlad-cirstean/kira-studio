@@ -111,7 +111,7 @@ const agentTooltip = computed(() =>
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="p-status update"
+            class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover update"
             data-testid="update-available"
             @click="onOpenReleasePage"
           >
@@ -123,7 +123,7 @@ const agentTooltip = computed(() =>
       </Tooltip>
       <Tooltip v-if="agentCount > 0">
         <TooltipTrigger as-child>
-          <span class="p-status" data-testid="agent-sessions">
+          <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="agent-sessions">
             <CodiconIcon name="sparkle" :size="13" />
             {{ agentCount }}
           </span>
@@ -132,7 +132,7 @@ const agentTooltip = computed(() =>
       </Tooltip>
       <Tooltip v-if="appMetricsStore.sample">
         <TooltipTrigger as-child>
-          <span class="p-status" data-testid="app-metrics">
+          <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="app-metrics">
             <CodiconIcon name="pulse" :size="13" />
             <span class="metric-value font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
             <span class="metric-sep">·</span>
@@ -145,7 +145,7 @@ const agentTooltip = computed(() =>
       </Tooltip>
       <Tooltip v-if="cacheSizeLabel">
         <TooltipTrigger as-child>
-          <span class="p-status" data-testid="cache-size">
+          <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="cache-size">
             <CodiconIcon name="database" :size="13" />
             {{ cacheSizeLabel }}
           </span>
@@ -154,7 +154,7 @@ const agentTooltip = computed(() =>
       </Tooltip>
       <Tooltip :disabled="engineStore.lastPingMs === null">
         <TooltipTrigger as-child>
-          <span class="p-status" data-testid="engine-status" :data-status="engineStore.status">
+          <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="engine-status" :data-status="engineStore.status">
             <CodiconIcon
               name="circle-large-filled"
               :size="13"
@@ -189,10 +189,9 @@ const agentTooltip = computed(() =>
 }
 
 /* .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
-   and Enter/Space come free. Reset the button's own UA chrome; .p-status already supplies
-   height/padding/border-radius/cursor. */
+   and Enter/Space come free. Its own template class list (P110 B29) already supplies
+   height/padding/border-radius/cursor/border-reset. */
 .update {
-  @apply bg-none;
   font: inherit;
   color: var(--kira-info);
 }

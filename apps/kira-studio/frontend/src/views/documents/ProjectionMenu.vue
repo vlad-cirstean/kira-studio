@@ -89,7 +89,7 @@ onUnmounted(() => {
       No fields seen yet — load a page first.
     </div>
     <div v-else class="columns-menu-list">
-      <Label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
+      <Label v-for="name in fieldNames" :key="name" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item">
         <Checkbox
           :model-value="selected.has(name)"
           class="size-3.5"

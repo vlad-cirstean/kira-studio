@@ -171,7 +171,7 @@ async function saveCurrent(): Promise<void> {
     </template>
     <template #footer>
       <Separator class="my-1" />
-      <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
+      <button type="button" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover save-current" data-testid="save-current-filter" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
         Save current filter…
       </button>

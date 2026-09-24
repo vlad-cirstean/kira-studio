@@ -157,6 +157,19 @@ check_class 'p-view-head' 'h-bar shrink-0 flex items-center gap-1.5 px-2 border-
 check_class 'p-view-target' 'text-kira-md text-fg truncate (plus text-subtle for .path)'
 check_class 'p-float' 'bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden'
 check_class 'p-panel' 'border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0'
+# P110 B29: the list/table family, folded into plain utilities (and, for method colour, a small
+# literal-class-map helper -- a template literal can never resolve at scan time). Not common prose.
+check_class 'p-tab' 'h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm (plus a local tab-chip hook class where a scoped selector needs one)'
+check_class 'p-row' 'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer (plus hover:bg-hover or a selection ternary)'
+check_class 'p-method' 'methodTextClass() (packages/theme/src/methodColor.ts)'
+check_class 'p-conn-dot' 'size-1.25 rounded-full shrink-0 (plus bg-(--kira-rail) or bg-none border border-disabled)'
+check_class 'p-tab-rail' 'w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)'
+check_class 'p-tree-rail' 'absolute inset-y-0 left-0 w-0.5 bg-(--kira-rail)'
+check_class 'p-thead' 'h-control-lg shrink-0 flex bg-elevated border-b border-border-strong'
+check_class 'p-th' 'flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap'
+check_class 'p-td' 'flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate (plus the gutter variant)'
+check_class 'p-statusbar' 'h-statusbar shrink-0 flex items-center justify-between px-1.5'
+check_class 'p-status' 'h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
