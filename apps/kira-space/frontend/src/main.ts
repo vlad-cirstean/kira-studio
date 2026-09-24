@@ -2,6 +2,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import BootFailure from './BootFailure.vue';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
 import { useLayoutStore } from './state/layout';
@@ -21,7 +22,7 @@ import '@workbench/workbench.css';
 // appMetrics/appUpdate/cacheStats/agentHooks/agentSessions/keepAwake/ops/dbMcp/customScripts stores
 // (none of those subsystems exist in this app — apps/kira-space/main.go's own Services list has no
 // counterpart for any of them).
-async function bootstrap(): Promise<void> {
+async function mountShell(): Promise<void> {
   // Every store used here runs before app.use(pinia) below, so each needs the module-level `pinia`
   // instance passed explicitly (Pinia has no active instance yet at this point).
   const layoutStore = useLayoutStore(pinia);
@@ -41,10 +42,21 @@ async function bootstrap(): Promise<void> {
     layoutStore.hydrateLayout(),
     settingsStore.hydrateSettings(),
     codeReposStore.hydrateCodeRepos(),
-    gitClientsStore.hydrateGitClients(),
-    terminalsStore.hydrateTerminalDefaults(),
     tabsStore.hydrateTabs(),
   ]);
+
+  // F2: gitClients (Connected editors/pairing) and terminals (new-terminal defaults) are not on
+  // the critical path to a rendered shell — Promise.allSettled so one of these hitting a DB error
+  // never takes down the whole window the way it did bundled into the Promise.all above.
+  const optional = await Promise.allSettled([
+    gitClientsStore.hydrateGitClients(),
+    terminalsStore.hydrateTerminalDefaults(),
+  ]);
+  for (const result of optional) {
+    if (result.status === 'rejected') {
+      console.error('bootstrap: optional store hydrate failed', result.reason);
+    }
+  }
 
   // C5 §6.1: hydrateTabs (state/tabs.ts) already derived workspaceStore.openRepos from the
   // restored tabs themselves — ensureWorkspaceShell's own doc comment calls for running it once per
@@ -62,6 +74,27 @@ async function bootstrap(): Promise<void> {
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');
+}
+
+// F2: mountShell's own essential hydrates (layout/settings/codeRepos/tabs) can still reject — a DB
+// error, or a busy DB past the 5s _busy_timeout (F7's second-instance case makes this plausible).
+// Left uncaught, that rejection skipped app.mount entirely: a permanently blank window, logged only
+// as an unhandled rejection in the webview console. bootstrap() catches it and mounts BootFailure
+// instead, with a Retry that re-runs the whole sequence.
+async function bootstrap(): Promise<void> {
+  try {
+    await mountShell();
+  } catch (err) {
+    console.error('bootstrap: failed to hydrate/mount the shell', err);
+    const failureApp = createApp(BootFailure, {
+      message: err instanceof Error ? err.message : String(err),
+      onRetry: () => {
+        failureApp.unmount();
+        void bootstrap();
+      },
+    });
+    failureApp.mount('#app');
+  }
 }
 
 void bootstrap();
