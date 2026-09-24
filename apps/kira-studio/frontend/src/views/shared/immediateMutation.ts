@@ -28,8 +28,30 @@ export function createImmediateMutator<
       path: tab.path,
       ops,
     });
-    await opts.reload(tabId);
-    reloadTabsForTarget(tab.connectionId, tab.path, tabId);
-    await after?.(tab as T & { connectionId: string });
+    // F14 (P108 Part 10): the write above already succeeded — a failure in any step below (this
+    // tab's own reload, telling sibling tabs, the caller's `after`) must not read as "the mutation
+    // failed" to a caller whose own catch reports it that way; a user retrying on that false
+    // signal duplicates a non-idempotent write (Redis list push, stream XADD). Each step gets its
+    // own try/catch so one failing never skips the next, and any failures are reported together
+    // afterward rather than silently swallowed.
+    const failures: string[] = [];
+    try {
+      await opts.reload(tabId);
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : String(err));
+    }
+    try {
+      reloadTabsForTarget(tab.connectionId, tab.path, tabId);
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : String(err));
+    }
+    try {
+      await after?.(tab as T & { connectionId: string });
+    } catch (err) {
+      failures.push(err instanceof Error ? err.message : String(err));
+    }
+    if (failures.length > 0) {
+      throw new Error(`saved, but refresh failed: ${failures.join('; ')}`);
+    }
   };
 }
