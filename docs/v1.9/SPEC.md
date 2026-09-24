@@ -54,6 +54,7 @@ reason v1.6/v1.8 give: independent, unrelated phases, not one cohesive subsystem
 | **P110 Fix the `--color-muted` custom-property collision between `packages/theme/src/base.css` and `packages/theme/src/shadcn-bridge.css`** | `base.css:33` defines `--color-muted: var(--kira-fg-muted)` — the original app's foreground-gray text token. `shadcn-bridge.css:67` separately defines `--color-muted: var(--muted)` — shadcn's own semantic background token, backing every `bg-muted`/`data-[state=on]:bg-muted` consumer (`ToggleGroup`, `DropdownMenu`, and others P104's primitive swap wired in). Same custom-property name, two unrelated meanings; since `base.css`'s `@theme` block loads after its own import of `shadcn-bridge.css`, the foreground-gray value silently wins app-wide, so every shadcn `bg-muted` consumer renders gray text instead of the intended dark background. Confirmed pre-existing (predates P104: `base.css` at `8602d41`, `shadcn-bridge.css` at `5864d79`, both via `git log`) and confirmed live (direct grep of both files; the one non-font-drift `test:visual` failure P104 left open traces to exactly this). The real fix needs the legacy `.muted`/`text-muted`-style consumers — roughly 100 files — renamed off `--color-muted` so the name is free for shadcn's own semantic value; that rename is a real design decision (naming scheme, scope of what counts as "legacy" vs. shadcn-owned), not a mechanical single-file fix, so it doesn't land inside P104 itself. Acceptance: `--color-muted` resolves to shadcn's `--muted` value app-wide with zero second definition (a grep for `--color-muted:` across `packages/theme/src` returns exactly one hit), the renamed legacy consumers keep their original foreground-gray behavior under their own distinct token, and the `test:visual` baseline this bug caused re-records clean | Found and root-caused during P104 Stream A's own closing verification — real, pre-existing, not a P104 regression, but needs an out-of-scope legacy-token rename `CLAUDE.md`'s own exception reserves for a named follow-up phase rather than a same-pass fix. Appended last, after P109, since it surfaced only during P104's own verification, after every other row in this chapter was already written |
 | **P111 Thread the pull-strategy ladder's resolution source through the `git-ipc` wire contract, so a config-derived `--rebase-merges` never applies to an explicit strategy override** | `gitsession/remote.go`'s `wantsRebaseMerges` (fixed in P108 Part 16's own F6) can now only apply `--rebase-merges` when `ResolvePullStrategy`'s ladder result is genuinely config-derived — but the ladder itself has no wire-level way to say *why* it picked "rebase": an explicit `kiraSpace.pull.strategy` override and a git-config-derived one currently look identical once they reach `remote.pullPreflight`'s result. The real fix needs `@kira/git-ipc`'s contract extended — either carrying the resolution's source (`"override" | "config" | "default"`) or a plain `rebaseMerges` boolean — from `remote.pullPreflight`'s response through `remote.run`'s own request params, so the executor can tell the two cases apart without guessing. That is a wire-contract change (new/changed fields on both the Go and TS sides of `packages/git-ipc`, plus `gitrpc`'s handler and `git-core`'s client), a real design decision (exact field shape, whether to version the contract), not a mechanical fix — so it doesn't land inside Part 16 itself, per `CLAUDE.md`'s own exception for exactly this shape of finding. Acceptance: an explicit Kira Space `pull.strategy` override of "rebase" never adds `--rebase-merges` even when the repo's git config says `pull.rebase=merges`; a git-config-derived "merges" resolution still does | Found and confirmed still-live during P108 Part 16's own review (re-verifying Part 15's own F6 deferral note) — real, needs an out-of-scope `git-ipc` contract change `CLAUDE.md`'s own exception reserves for a named follow-up phase rather than a same-pass fix. Appended last, after P110, since it surfaced during P108's own review, after every other row in this chapter was already written |
 | **P112 Move Studio API-client server state (collections tree, saved requests, variable rows, environments, active environment) onto TanStack Query, with a Go-broadcast `api-data-changed` event per scope as its invalidation signal** | `api/state/variables.ts`'s `listCache`, environment list and active environment, and `api/state/collections.ts`'s tree and saved-request caches are hand-rolled server-state caches fetched over the bridge with their own ad hoc loading/error/cache logic — exactly what `CLAUDE.md` routes through TanStack Query, with no named decline on record for any of them. None of the four invalidate across windows: an edit in window B never reaches window A, `listCache` never refetches once filled (so a stale entry substitutes plain values into every send until something else happens to refresh that scope), the active environment (`is_active`, app-wide) stays stale in the other window, and the tree stays stale until a manual reload. The fix needs Go to broadcast a scoped event (naming what changed — a collection id, an environment id, or "environments list changed") whenever a mutation lands, and every one of these caches replaced by a TanStack Query `useQuery`/`useMutation` pair keyed by scope, invalidated by that event rather than by a hand-rolled generation counter. P108 Part 9's own F2/F9 point fixes (per-key in-flight dedupe and generation guard on `ensureVariablesLoaded`, evicting a deleted owner's `listCache` entry) stay as landed — this phase replaces the caching mechanism underneath them, not those two fixes' own correctness | Found during P108 Part 9's own review (`P108-part9-findings.md` F12) — real, but the review's own instruction was explicit: too large a migration for that review-fix chunk itself, name a follow-up phase instead of a same-pass fix, the same `CLAUDE.md` exception P110/P111 already use. Appended last, after P111, since it surfaced during P108's own review, after every other row in this chapter was already written |
+| **P113 Second duplication sweep: CodeGraph re-run + jscpd/dupl tooling** | Re-run P107's own method (S1 body hash, S2 name-collision, S3 callee-fingerprint LCS, S4 file-pair diff — `docs/v1.9/plans/P107-duplication-findings.md` §0) against the tree once P108-P112 all close, not before — those five phases still have hundreds of pending fix commits ahead of them, and re-sweeping now would just re-find duplication those phases are already mid-removing or mid-introducing, the same reasoning P107's own row gave for running after P103/P104. This phase's own planning pass widens S3's threshold (currently LCS ratio ≥0.7 and ≥6 callees) to catch shorter/looser duplicates the current cutoff misses by design — P107 iteration 2's own S5/S6 additions are the precedent that a tighter first pass leaves real duplication unfound, and this phase reruns S3 wider rather than adding a third round of brand-new sweep types. Add **jscpd** (TS/Vue) and **dupl** (Go) as new, independently-installed devDependencies — the user's own explicit instruction that these live in the repo permanently, not as one-off scripts — with `dedup:ts`/`dedup:go` `package.json` scripts. Both measured fast in prior testing (jscpd: 171ms/526 files; dupl: 282ms/whole kira-space Go tree). Both real OSS tools needing the license check `CLAUDE.md`'s OSS-only rule requires before adoption: **jscpd is MIT** (`https://github.com/kucherenko/jscpd/blob/master/LICENSE`, and the npm registry's own `license` field) and **dupl is MIT** (`https://github.com/mibk/dupl/blob/master/LICENSE` — not BSD-3-Clause as commonly assumed elsewhere; confirmed by reading the actual file, not asserted from memory), so both clear the check outright — neither is dual-licensed, non-commercial-tier, or Enterprise-gated. Same findings-doc-then-Sonnet-fixer loop P107 used: an Opus review pass writes findings only to a committed `plans/` doc, then one sequential Sonnet fixer implements, commit per finding, fast checks per commit, full suites once near the end. P107 iteration 1's own 12 explicit declines (`P107-duplication-findings.md` §3 — `typeClassFor` ×4, `resolveFields`, bound Wails bridge services, bridge thin-wrapper pass-throughs, simple CRUD repos, `buildDSN`, `embed.go` `All` ×3, `codeLanguageForContentType`, git-ui `onOpenFile`/`blockerText`/`runRestack`, vscode `asExplicitTarget`, generated FlatBuffers, cross-language mirrors) are worth revisiting under the new/widened thresholds and the two new tools — a decline made against a 0.7/≥6-callee cutoff or a CodeGraph-only sweep may not hold against a wider LCS threshold or jscpd/dupl's own token-based method, so this phase's planning pass re-checks each of the 12 rather than carrying them forward unexamined | Scheduling dependency: only makes sense once P108, P109, P110, P111 and P112 are all closed, so it is positioned last in the chapter's remaining sequence, after P112. A second, independent sweep pass earns its own phase rather than folding into P107, since P107 is already closed (its own iteration 2 closing-sweep addendum says exactly this: "no iteration 3 required unless later opened") and CLAUDE.md's numbering rule gives a new phase like this the next sequential `P` number rather than reopening a closed one |
 
 ## P96 result
 
@@ -2297,6 +2298,78 @@ the `text-accent-fg` risk (row 3) — audit check 7 clean; the visual-baseline-d
 known ~0.01 ratio caveat, not a new issue. The `--color-muted` collision this pass found is out of P104's
 own scope by design and already has its own follow-up row, P110.
 
+## P105 result
+
+Landed as 11 commits against `129bb25d` (the plan doc's own base, `docs/v1.9/plans/P105-a11y-findings.md`),
+merged as `6febddb`: 109 files changed, 2,223 insertions(+), 657 deletions(-). One Sonnet subagent,
+sequential, per the plan's own §18 commit order — no parallel split, since the 254 findings share
+files across rules (`StreamView.vue` alone spans three sections, `TabStrip.vue` four).
+
+**Re-measured before touching anything, per the plan's own §19 risk 1 (P107 held every one of these
+files open in its own worktrees).** Implementation started only after P107 iteration 1 merged into
+`v1.9-integration`, as the plan required; the 254-finding/13-rule count carried over unchanged
+(P107 iteration 1 touched none of the same lines).
+
+**Commits, in the plan's own order:**
+
+1. **`f9eef48`** — §4: extracted `packages/theme/src/components/ui/tooltip/TooltipDisabledTrigger.vue`,
+   repointed all 79 duplicate `<span tabindex="0">` disabled-tooltip wrappers at it. Single largest
+   drop: 81 `noNoninteractiveTabindex` findings to 0, one suppression.
+2. **`520ab4f`** — §5.1: 19 files' container-level listeners (`@keydown`/`@contextmenu`/drag-surface
+   handlers on layout-only `<div>`s) moved off the template onto VueUse's `useEventListener`,
+   clearing `noStaticElementInteractions` for all 22 elements with no click at all.
+3. **`ea43945`** — §5.2(a): extracted `packages/kira-ui/src/KuiColumnResizeHandle.vue` from
+   `CommitGrid.vue`'s existing `role="separator"`/arrow-key pattern, repointed `StreamView.vue`'s
+   ten column-resize handles and `CommitGrid.vue`'s own three at it. StreamView gained real
+   keyboard column resizing as a side effect, not just a lint fix. Second suppression (`<hr>` can't
+   carry `aria-valuenow`/focus, named in the component).
+4. **`74ed493`** — §5.2(b): the six dismiss scrims/backdrops (`GitPanel.vue`, `ConsoleSavedMenu.vue`,
+   `FilterHistoryMenu.vue`, `FkPreviewPopover.vue`, `CommandPalette.vue` ×2, `KuiDialog.vue`) moved
+   onto VueUse's `onClickOutside`, dropping their own click handlers and going `aria-hidden="true"`.
+5. **`b7f3d20`** — §5.2(c)/§6: the ~24 list/tree/menu rows converted to `<button type="button">`
+   where nothing nests inside them, or given the container's implied role
+   (`option`/`treeitem`/`menuitem`) plus `tabindex` and `@keydown.enter`/`.space` alongside the
+   existing `@click`, with the container role added in the same edit where missing. Every flagged
+   element's `data-testid` preserved verbatim.
+6. **`fa4f481`** — §11: the three nested tab-close-inside-tab-button structural bugs
+   (`ConsoleView.vue`, `ExplainResultView.vue`, `TabStrip.vue`) restructured so the close control is
+   a sibling `<button type="button">` instead of an invalid focusable child, clearing nine findings
+   across three rules for one shape. Own commit, run against the UI suite per the plan.
+7. **`ba0e9d5`** — §8: all 14 `autofocus` removals across 12 files (11 in `git-ui`'s dialogs), each
+   verified against `KuiDialog`'s own `useModalFocus` first-focusable-element behavior; sites where
+   the control wasn't already first got an explicit VueUse `useFocus`/`watch` instead of relying on
+   the attribute.
+8. **`10e08b2`** — the remaining small rules (§7 roles, §9 `aria-labelledby`/`role="img"`, §10
+   `type="button"`, §12 `ui/label` association, §13 prop rename, §14 `<nav>`→`<div>`, §15
+   singletons, §16 vendored `input-group` fixes) plus the acceptance test itself: deleted
+   `"a11y": "off"` from `biome.json`'s `**/*.vue` override.
+9. **`0b6e1ae`** — a follow-up fix restoring Playwright/click-handler compatibility the radio-swatch
+   a11y conversion (§7's `ToggleGroup` swap) had disturbed.
+10. **`5dc8bbc`** — a test-selector follow-up: stale `InputGroup` `div` selectors updated to
+    `fieldset`, matching §16's `role="group"` → `<fieldset>` conversion.
+
+**§16's `InputGroupAddon.vue` click handler went further than the plan's own fallback.** The plan
+allowed a `biome-ignore lint/a11y/useKeyWithClickEvents` suppression there (a pointer-only shortcut
+to a sibling input already in the tab order); the landed fix instead moved the click listener off
+the template entirely via `useTemplateRef` + VueUse's `useEventListener`, so Biome sees no
+on-template `@click` to flag — a real fix, not a suppression, and it also brought the file into line
+with `CLAUDE.md`'s own VueUse rule.
+
+**Verification, re-confirmed now against the current tree:**
+
+- `grep -n '"a11y"' biome.json`: no hits — the override's `a11y` entry is gone; the `**/*.vue`
+  override keeps only its unrelated `useVueHyphenatedAttributes`/`noNonNullAssertion` entries, per
+  plan §19.1.
+- `grep -rn "biome-ignore lint/a11y" apps packages`: exactly 2 hits —
+  `TooltipDisabledTrigger.vue`'s `noNoninteractiveTabindex` and `KuiColumnResizeHandle.vue`'s
+  `useSemanticElements`, each with its requirement named directly above it. Under the plan's §17
+  budget of 3 (the `InputGroupAddon` third was avoided outright, per above).
+- `grep -rn ':tabindex="0"' --include=*.vue apps packages`: no hits — the plan's forbidden
+  bound-attribute evasion never landed.
+
+All of P105 is complete: the 254 findings across 13 rules and 95 files are at 0, and the
+`biome.json` override deletion — the plan's own acceptance test — is in place on the current tree.
+
 ## P106 result
 
 Landed as 2 commits against `c2ce9969`: `a93eca58` (the rename) and `348deb0a` (the doc/comment
@@ -2391,6 +2464,84 @@ and prose referencing them, so the fast-check set above (lint, typecheck, both b
 go build) is the right bar per `CLAUDE.md`'s own "fast checks are cheap and fine per-commit; an
 expensive suite runs once near phase end" — and this phase has no application-behavior change for
 an expensive suite to catch.
+
+## P107 result
+
+Landed in two audit-plus-fix iterations, each findings document doubling as the phase's own plan
+per the row's user-directed shape (audit and consolidation as one phase, no separate methodology
+plan), plus a closing-sweep addendum that fully closed iteration 2. All four whole-repo, both apps'
+Go and TypeScript/Vue, every `packages/*`.
+
+**Method — CodeGraph-index sweeps over `.codegraph/codegraph.db`, then per-candidate verification
+with `codegraph_explore` and comment-blind diff, exactly as `CLAUDE.md`'s own mandatory-for-discovery
+rule requires:**
+
+- **S1** body hash — every `function`/`method` node's source, comments and whitespace stripped,
+  hashed; a second, identifier-blind pass.
+- **S2** name collisions — same symbol name, ≥2 files, same language (most groups benign — `New`,
+  `Close` — kept only where bodies actually matched).
+- **S3** callee fingerprint — per-function ordered callee list from the index's `calls` edges,
+  paired where LCS ratio ≥0.7 and ≥6 callees.
+- **S4** file-pair diff — comment-blind `diff` over the file pairs S1-S3 flagged, counts recorded
+  where decisive.
+- **S5** (iteration 2 only, new) line shingles — K=6 normalized-line shingles over every tracked
+  `.go`/`.ts`/`.vue` file, Vue templates included, maximal repeated blocks ≥8 lines.
+- **S6** (iteration 2 only, new) MinHash/LSH — 64 hashes, 16 bands, identifier-blind 4-gram token
+  shingles per function ≥8 lines, Jaccard ≥0.5, production pairs ≥0.70 all read. Iteration 2's own
+  §0 explains why S5/S6 were added: S1 sees only exact bodies and S3 only call order, so a
+  near-identical block inside a larger function, or a repeated Vue template region, never surfaced
+  under iteration 1's four sweeps alone.
+
+Excluded before counting, both iterations: generated code (`page/wire`, `gitwire`,
+`shared/protocol/wire`, `git-ipc/src/generated`) and cross-language mirrors (`mask.go`/`mask.ts`,
+`page/encode.go`/`encodeFrame.ts`, `queryplan` Go vs `planParsers` TS).
+
+**Iteration 1** — `docs/v1.9/plans/P107-duplication-findings.md`, tree audited at `c2ce9969`: **25
+tier-2 findings** (flows/chains — T2-1 through T2-25, e.g. the relational read/mutate trio shared
+across mysqlfamily/postgres/sqlite, the `ConnSet` LRU pool shared across postgres/mysqlfamily/redis,
+the disabled-tooltip-wrapper and column-resize-handle patterns P105 also touched), **28 tier-1
+findings** (narrow helpers — T1-1 through T1-28, e.g. `abbreviateUnits` ×6, `itoaPositive` ×5,
+`requireOneRow` ×2), and **12 declines**, each with the requirement that keeps the copies apart
+named in place (`typeClassFor` ×4 engine-specific type tables, bound Wails bridge service struct
+types whose binding generation P103 §2.3 already covers, generated FlatBuffers, cross-language
+mirrors, and 8 more). Implemented per the doc's own §4 order — Go base helpers, then adapters, then
+repo-root hoists, then frontend, then git packages/vscode, then test support — as ~62 `refactor:`/
+`fix:` commits (`T1-*`/`T2-*` tagged), one per finding, fast checks per commit. Merged into
+`v1.9-integration` as `c3a1da7`/`4f7fc33`.
+
+**Iteration 2** — `docs/v1.9/plans/P107-duplication-findings-iter2.md`, fresh sweep from scratch
+(not a review of iteration 1's fixes) at `ad5c4959`, iteration 1's consolidation already landed:
+**28 tier-2 findings**, **14 tier-1 findings**, **13 declines**. Of the 42 findings, the doc's own
+§0 breaks down the composition: 10 are residue of an iteration-1 finding that landed narrower than
+its own shape, 2 are iteration-1's own extractions left as identical thin wrappers around the new
+helper, 30 are genuinely new — surfaced almost entirely by S5/S6, confirming why they were added.
+Two areas were excluded as in-flight rather than declined — the disabled-tooltip wrapper and the
+column/pane resize handle, both mid-extraction by P105's own concurrent pass at the time — and
+picked up later once P105 merged (I2-18, I2-21, deferred). Implemented per §4's own order as two
+parallel streams (Stream A Go, Stream B frontend/vscode, ~142 `I2-*`-tagged commits combined),
+merged as `f3a5d1a` (Stream A) and `371913d` (Stream B), then the two P105-blocked deferred findings
+plus a closing S1/S6 re-sweep against the merged tree as `69eeed3` — that re-sweep mapped every
+remaining exact or near-duplicate group to a named finding or decline, except five genuinely new
+candidates left for a follow-up rather than fixed inline.
+
+**Closing-sweep addendum** — those five candidates documented in
+`P107-duplication-findings-iter2.md` §5 (`32bd27f`): `state/tabs.ts`'s four `open*Tab` functions
+(I2-43), `dbmcp/tools.go`'s three list/describe methods (I2-44), `page/builder.go`'s three `Finish`
+variants (I2-45), `gitops/conflict.go`'s three arg builders (I2-46), and `gitsession/conn.go`'s
+`WalkFor`/`ReviewWalkFor`/`alreadyHeld` trio (I2-47). Implemented and merged as `d45eb28`: four
+fixed outright (`openTrackedTab`, `resolveReadGated`, `sumChunkBytes`, `sequencerArgs`); I2-47 split
+on inspection — `WalkFor`/`ReviewWalkFor`'s shared body extracted into `walkForSlot`, but
+`alreadyHeld` declined as S6 noise once read for real (a different map holding a different value
+type, not a duplicate). This closed P107 iteration 2 in full, with no iteration 3 required unless
+later opened — which `P113` below now does, against the tree these five phases (P108-P112) leave
+behind.
+
+**Totals across both iterations plus the addendum:** 53 iteration-1 findings fixed (25 tier-2 + 28
+tier-1) against 12 declines; 42 iteration-2 findings addressed (28 tier-2 + 14 tier-1, some as
+residue/wrapper cleanup) against 13 declines; 5 closing-sweep findings (4 fixed, 1 split
+fix-plus-decline). Every decline across all three passes names the concrete requirement that keeps
+the near-duplicate apart — a differing type set, a differing error contract, a generated-code or
+cross-language boundary — never "these look similar, left alone."
 
 ## P108 Part 1 result
 
