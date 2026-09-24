@@ -275,7 +275,12 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   ): Promise<void> {
     const rows = await control.variablesList(scope, ownerId);
     ensureVariableSetRuntime(tabId).rows = rows;
-    listCache[cacheKey(scope, ownerId)] = rows;
+    const key = cacheKey(scope, ownerId);
+    listCache[key] = rows;
+    // P108 F2: this is an authoritative write (a fresh list right after a mutation) — bump so any
+    // ensureVariablesLoaded that started before it, and is still in flight, discards its own reply
+    // instead of clobbering these rows with a pre-edit snapshot.
+    bumpListCacheGen(key);
   }
 
   function variableSetRows(tabId: string): ApiVariable[] {
@@ -304,11 +309,48 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   // reasoning as variableSetRuntime above.
   const listCache = reactive<Record<string, ApiVariable[]>>({});
 
+  // P108 F2: per-key generation counter, bumped by every authoritative write to a `listCache` key
+  // (loadVariableSetRows below; the cache-eviction sites F9 adds). ensureVariablesLoaded compares
+  // against this to tell "nothing else has touched this key since I started" from "I'm answering a
+  // question a fresher write already superseded" — the same opId-supersession shape the request
+  // views' own runtimes use, applied to this cache instead of a per-tab runtime.
+  const listCacheGen = new Map<string, number>();
+  function bumpListCacheGen(key: string): void {
+    listCacheGen.set(key, (listCacheGen.get(key) ?? 0) + 1);
+  }
+
+  // P108 F2: concurrent ensureVariablesLoaded calls for the same key each used to fire their own
+  // control.variablesList request. A slow first reply landing after a later loadVariableSetRows
+  // (a post-edit refresh) overwrote the just-written fresh rows with the pre-edit list — silently:
+  // every subsequent send for that scope substituted stale plain values until the next edit. One
+  // in-flight promise per key so concurrent callers share a single request, and a generation check
+  // on the reply so a superseded one never overwrites a fresher write.
+  const ensureInFlight = new Map<string, Promise<void>>();
+
   /** Populates the cache for one scope if it is not already loaded — safe to call on every render;
    *  a no-op for '' (a scratch tab's collection, or no active environment). */
   async function ensureVariablesLoaded(scope: VariableScope, ownerId: string): Promise<void> {
-    if (!ownerId || listCache[cacheKey(scope, ownerId)]) return;
-    listCache[cacheKey(scope, ownerId)] = await control.variablesList(scope, ownerId);
+    if (!ownerId) return;
+    const key = cacheKey(scope, ownerId);
+    if (listCache[key]) return;
+    const existing = ensureInFlight.get(key);
+    if (existing) return existing;
+    const startGen = listCacheGen.get(key) ?? 0;
+    const promise = control
+      .variablesList(scope, ownerId)
+      .then((rows) => {
+        // Only commit if nothing (a loadVariableSetRows post-edit refresh, or a cache eviction)
+        // has touched this key since this fetch started — otherwise this reply is an answer to a
+        // question already superseded by a fresher one.
+        if (!listCache[key] && (listCacheGen.get(key) ?? 0) === startGen) {
+          listCache[key] = rows;
+        }
+      })
+      .finally(() => {
+        ensureInFlight.delete(key);
+      });
+    ensureInFlight.set(key, promise);
+    return promise;
   }
 
   function cachedVariables(scope: VariableScope, ownerId: string): ApiVariable[] {
