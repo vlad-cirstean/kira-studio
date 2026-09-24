@@ -302,6 +302,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         <AutocompleteField
           v-if="nameCandidates || valueVariableSupport"
           grow
+          class="w-full"
           :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
@@ -332,6 +333,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
           <AutocompleteField
             v-if="valueVariableSupport"
             grow
+            class="w-full"
             :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
@@ -413,9 +415,6 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
 
 .field-cell {
   @apply min-w-0;
-}
-.field-cell :deep(.p-input) {
-  @apply w-full;
 }
 
 .field-cell-trailing {

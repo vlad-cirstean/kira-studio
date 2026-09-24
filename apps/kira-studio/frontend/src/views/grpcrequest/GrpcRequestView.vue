@@ -356,13 +356,16 @@ onUnmounted(() => {
         </Tooltip>
       </div>
       <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
-           no-op (F14) -- TextField/AutocompleteField set inheritAttrs: false, so a call-site
-           style lands on the inner <input> (already flex: 1) and never on the wrapping .p-input
-           box that actually sizes it. The app's existing wrapper + :deep(.p-input) idiom (used
-           at ten other call sites, HttpRequestView.vue's own .url-field among them) fixes it
-           here too — the target field now actually grows with the window. -->
+           no-op (F14) -- AutocompleteField sets inheritAttrs: false, so a call-site style lands on
+           the inner <input> (already flex: 1) and never on the wrapping box that actually sizes it.
+           The app's existing wrapper (used at ten other call sites, HttpRequestView.vue's own
+           .url-field among them) fixes it here too — the target field now actually grows with the
+           window. P110 B25: the wrapper's own width now lands as a `class="w-full"` prop straight
+           onto AutocompleteField (routed to its own InputGroup box), not a scoped `:deep(.p-input)`
+           rule reaching across the component boundary. -->
       <div class="grpc-target-field">
         <AutocompleteField
+          class="w-full"
           :model-value="tab.state.target"
           placeholder="api.example.com:443"
           data-testid="grpc-target"
@@ -578,12 +581,11 @@ onUnmounted(() => {
 
 /* P18 D14/F14: HttpRequestView.vue's own .url-field idiom, verbatim — the wrapper (not the inner
    input) is what actually sizes in the toolbar row. api-ui-consistency.spec.ts selects
-   `.grpc-target-field` directly — kept as a marker class. */
+   `.grpc-target-field` directly — kept as a marker class. P110 B25: AutocompleteField's own
+   `class="w-full"` prop (template above) does the actual sizing now; this wrapper only supplies
+   the flex-1/min-w-0 that lets it grow inside the toolbar row. */
 .grpc-target-field {
   @apply min-w-0 flex-1;
-}
-.grpc-target-field :deep(.p-input) {
-  @apply w-full;
 }
 
 /* P22b D10: the method select's own sibling of .grpc-target-field above. P110 B24: NativeSelect is

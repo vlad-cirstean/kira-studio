@@ -112,7 +112,7 @@ function onJump(e: Event): void {
           v-model="pageInputValue"
           type="number"
           min="1"
-          class="h-control w-full text-center"
+          class="h-control w-full px-1 text-center not-focus:not-hover:border-transparent not-focus:not-hover:bg-none"
           :data-testid="`${testidPrefix}pager-page-input`"
           @change="onJump"
         />
@@ -171,16 +171,11 @@ function onJump(e: Event): void {
   @apply w-12;
 }
 
-.page-input :deep(input) {
-  @apply px-1;
-}
-
 /* P22 D2: F3 shows the page-number box is already the same 22px height as the icon buttons
    beside it — the complaint's real cause is visual weight, a bordered/filled box in a row of
    transparent icon buttons. At rest this drops the fill/border so all five pager controls read
    as one weight; :focus/:hover restore both, the same "engaged control" idiom NativeSelect
-   (borderless default variant, bordered opt-in) already uses. */
-.page-input :deep(input:not(:focus):not(:hover)) {
-  @apply bg-none border-transparent;
-}
+   (borderless default variant, bordered opt-in) already uses. P110 B25: the `:deep(input)` class
+   props above move directly onto <Input> — `not-focus:`/`not-hover:` (Tailwind's own built-in
+   variants) replace the old `:not(:focus):not(:hover)` compound selector. */
 </style>

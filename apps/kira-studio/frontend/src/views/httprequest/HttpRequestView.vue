@@ -574,6 +574,7 @@ onUnmounted(() => {
       />
       <div class="url-field">
         <AutocompleteField
+          class="w-full"
           :model-value="tab.state.url"
           placeholder="https://api.example.com/users"
           data-testid="http-url"
@@ -839,17 +840,15 @@ onUnmounted(() => {
   @apply flex h-full min-h-0 flex-col;
 }
 
-/* P15 D4: TextField's inheritAttrs: false lands a call site's own class/style on the inner
-   <input>, never the wrapping .p-input box that actually sizes it (F3) — the app's existing
-   wrapper + :deep(.p-input) idiom, used at ten other call sites, fixes it here too. Was
-   `style="flex: 1"` directly on <TextField>, which landed on the input (already flex: 1) and did
-   nothing — the URL field never grew with the window. api-ui-consistency.spec.ts selects
-   `.url-field` directly — kept as a marker class. */
+/* P15 D4: AutocompleteField's inheritAttrs: false lands a call site's own class/style on the inner
+   <input>, never the wrapping box that actually sizes it (F3) — the app's existing wrapper, used
+   at ten other call sites, fixes it here too. Was `style="flex: 1"` directly on <AutocompleteField>,
+   which landed on the input (already flex: 1) and did nothing — the URL field never grew with the
+   window. api-ui-consistency.spec.ts selects `.url-field` directly — kept as a marker class. P110
+   B25: AutocompleteField's own `class="w-full"` prop (template above) does the actual sizing now;
+   this wrapper only supplies the flex-1/min-w-0 that lets it grow in the toolbar row. */
 .url-field {
   @apply min-w-0 flex-1;
-}
-.url-field :deep(.p-input) {
-  @apply w-full;
 }
 
 .request-response-split {

@@ -935,6 +935,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <AutocompleteField
               v-model="searchText"
+              class="w-full"
               prefix="FILTER"
               :prefix-active="tab.state.search.trim() !== ''"
               placeholder="{ name: 'a' }"
@@ -954,6 +955,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <AutocompleteField
               v-model="sortText"
+              class="w-full"
               prefix="SORT"
               :prefix-active="!!tab.state.sort"
               placeholder="{ createdAt: -1, name: 1 }"
@@ -1201,9 +1203,10 @@ onUnmounted(() => {
   @apply h-full flex flex-col min-h-0;
 }
 
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so the permanent filter row's "grow to fill" sizing
-   moves onto this wrapper instead of a style attribute on the component tag itself. */
+/* AutocompleteField's own inheritAttrs:false lands a call-site class/style on its inner <input>,
+   never the wrapping box — P110 B25: the permanent filter row's "grow to fill" sizing is now a
+   `class="w-full"` prop straight on <AutocompleteField> (template above), routed to its own
+   InputGroup box, not a scoped `:deep(.p-input)` rule reaching across the component boundary. */
 .history-anchor {
   @apply relative;
 }
@@ -1212,20 +1215,12 @@ onUnmounted(() => {
   @apply flex-1 min-w-0;
 }
 
-.filter-field :deep(.p-input) {
-  @apply w-full;
-}
-
 /* FilterToolbar.vue's orderby-input precedent: a fixed width beside the filter field that grows
-   to fill, same TextField inheritAttrs:false reasoning as `.filter-field` above. Widened from the
-   SQL-style box's 230px — a Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer
-   than the old `field ASC, field2 DESC` text it replaced. */
+   to fill, same reasoning as `.filter-field` above. Widened from the SQL-style box's 230px — a
+   Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer than the old
+   `field ASC, field2 DESC` text it replaced. */
 .sort-field {
   @apply w-72 shrink-0;
-}
-
-.sort-field :deep(.p-input) {
-  @apply w-full;
 }
 
 .projection-anchor {

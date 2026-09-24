@@ -100,6 +100,7 @@ function onClearFile(index: number): void {
         <AutocompleteField
           v-if="variables"
           grow
+          class="w-full"
           :model-value="row.value"
           placeholder="value"
           data-testid="http-formdata-value"
@@ -177,9 +178,6 @@ function onClearFile(index: number): void {
    FieldRowsTable's — so its own .field-cell rule doesn't reach these slots; repeated here. */
 .field-cell {
   @apply flex-1 min-w-0;
-}
-.field-cell :deep(.p-input) {
-  @apply w-full;
 }
 
 .formdata-file-caption {

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { InputGroup } from '@theme/components/ui/input-group';
 import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { loadMonaco, type MonacoModule } from '@workbench/editor/monaco';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { AutocompleteRoot, ComboboxAnchor, ComboboxContent, ComboboxItem, ComboboxPortal, ComboboxViewport } from 'reka-ui';
-import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, type HTMLAttributes, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
 import type { RangeHighlight } from '../../editor/ranges';
@@ -98,6 +99,11 @@ const props = withDefaults(
     /** TextField.vue's own opt-in 4-row auto-grow — the control becomes a `<textarea>`. Off by
      *  default: every existing call site renders byte-identically. */
     grow?: boolean;
+    /** P110 B25: routed onto the InputGroup box (this field's own root), never onto the inner
+     *  `<input>`/`<textarea>` — matches every other named `:deep(.p-input)` call site's own intent
+     *  (a wrapper's width, e.g. `class="w-full"`), which now becomes a plain prop instead of a
+     *  scoped descendant rule reaching across the component boundary. */
+    class?: HTMLAttributes['class'];
   }>(),
   { candidates: () => [] },
 );
@@ -498,11 +504,15 @@ const fieldAttrs = computed(
     ignore-filter
     :highlight-on-hover="false"
   >
-    <span
+    <InputGroup
+      variant="kira"
       class="p-input autocomplete-field relative"
-      :class="{ 'is-invalid': invalid, 'is-grow': grow }"
+      :class="[{ 'is-grow': grow }, props.class]"
+      :aria-invalid="invalid"
     >
-      <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
+      <span v-if="prefix" :class="prefixActive ? 'text-state-on' : 'text-muted-foreground'">{{
+        prefix
+      }}</span>
       <span class="input-wrap relative flex min-w-0 flex-1 items-center" :data-value="modelValue">
         <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
              behind the real input rather than the input itself. `overlayHtml` is built entirely by
@@ -517,17 +527,34 @@ const fieldAttrs = computed(
           aria-hidden="true"
           v-html="overlayHtml"
         ></div>
+        <!-- P110 B25: primitives.css's old `.p-input input,textarea{...}` reset, direct utilities
+             now (`text-fg`/`font-data`/`text-kira-sm` replace `color:inherit`/`font:inherit` --
+             form elements don't inherit either by UA default, so the original rule set them
+             explicitly too, just via the box's own computed values rather than repeating the
+             tokens). `.p-input.is-grow` (primitives.css, B31 residue) still targets this same
+             literal class name unconditionally applied above. -->
         <textarea
           v-if="grow"
           ref="inputRef"
           rows="1"
           wrap="soft"
+          class="min-w-0 flex-1 border-0 bg-transparent text-fg font-data text-kira-sm outline-none placeholder:text-muted-foreground"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
-        <input v-else ref="inputRef" v-bind="{ ...$attrs, ...fieldAttrs }" />
+        <!-- §1.2 allowlist: the two `::-webkit-*-spin-button` arbitrary utilities are pre-approved
+             for "the p-input successor component only" -- carrying forward primitives.css's own
+             `input[type=number]` spin-button hide. `-moz-appearance:textfield` (the original's
+             Firefox counterpart) is dropped: this app ships on WebKitGTK/WKWebView/Chromium only,
+             never Firefox's own engine, so it was dead weight. -->
+        <input
+          v-else
+          ref="inputRef"
+          class="min-w-0 flex-1 border-0 bg-transparent text-fg font-data text-kira-sm outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+          v-bind="{ ...$attrs, ...fieldAttrs }"
+        />
         <ComboboxAnchor :reference="inputRef ?? undefined" />
       </span>
-    </span>
+    </InputGroup>
     <ComboboxPortal>
       <ComboboxContent
         v-if="filtered.length > 0"

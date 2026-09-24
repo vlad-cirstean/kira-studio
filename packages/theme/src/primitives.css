@@ -71,60 +71,19 @@
 }
 
 /* ---------- P4 input ---------- */
-.p-input {
-  height: var(--kira-control-h);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  /* P16 D7: 8px, the inset every other text surface in the app uses (.p-toolbar, .p-view-head,
-     .p-th/.p-td, .slick-cell/.slick-header-column) — this was the one outlier at 6px. Goes on the
-     box, never on `.p-input input` below: AutocompleteField.vue paints a read-only CodeMirror
-     overlay behind the real <input>, both inside `.input-wrap`, with the two engines' first glyph
-     aligned on the same pixel — padding on the inner <input> would break that alignment. */
-  padding: 0 var(--kira-s-4);
-  border-radius: var(--kira-radius-sm);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-}
-.p-input.md {
-  height: var(--kira-control-h-lg);
-}
-.p-input.ui {
-  /* P26: was the app's one hard-coded font stack (the design system's --font-ui, verbatim). Now
-     the same token every other chrome surface resolves through, so the interface font has exactly
-     one definition in the repo. */
-  font-family: var(--kira-font-ui);
-}
-.p-input:focus-within {
-  border-color: var(--kira-focus);
-  outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: -1px;
-}
-/* P24 D36: was an inline :style — the one place in the app a colour could never be themed,
-   overridden, or seen in the stylesheet. */
-.p-input.is-invalid {
-  border-color: var(--kira-error);
-}
-.p-input input,
-.p-input textarea {
-  background: none;
-  border: none;
-  outline: none;
-  color: inherit;
-  font: inherit;
-  min-width: 0;
-  flex: 1;
-}
-/* P71 §8: opt-in 4-row auto-grow (TextField.vue/AutocompleteField.vue's own `grow` prop) — a CSS
+/* P110 B25: the box rule, focus/invalid states, spin-button hide and stepper block that used to
+   live here are folded into InputGroup's own `kira` variant (packages/theme/src/components/ui/
+   input-group) and AutocompleteField.vue's own template utilities — see that variant's doc comment
+   for the full token mapping. `.p-input`/`.is-grow` below are B31's own residue: the class name
+   stays applied (unconditionally, on AutocompleteField's own InputGroup box) purely as this
+   compound selector's own hook — the auto-grow math has no Tailwind utility equivalent (a CSS grid
+   sizing replica, clamped padding-block calc), and this unlayered rule must keep beating the `kira`
+   variant's own `h-control`/`items-center` layered utilities by construction. */
+/* P71 §8: opt-in 4-row auto-grow (AutocompleteField.vue's own `grow` prop) — a CSS
    grid replica sized by the same text, clamped to 4 lines, with no JS height write per keystroke.
    `field-sizing: content` is Chromium-only (this app ships on WebKitGTK/WKWebView too) and a JS
    autosize library writes an inline height per input event across a table that can hold dozens of
-   rows — this is ~15 lines of CSS with no JS, no observer, no per-keystroke layout write. Placed
-   after the plain `.p-input input/textarea` rule above so its higher-specificity selectors sort in
-   ascending order, not because it depends on that rule's own properties. */
+   rows — this is ~15 lines of CSS with no JS, no observer, no per-keystroke layout write. */
 .p-input.is-grow {
   --grow-lh: 1.45;
   --grow-rows: 4;
@@ -166,8 +125,9 @@
      replica had already grown to fit, so it scrolled from row 2 on, regardless of the padding fix
      below. This is what makes it fill the track like the replica next to it. */
   align-self: stretch;
-  /* P90: the UA gives a textarea `padding: 2px`, which the plain `.p-input textarea` reset above
-     does not clear. The ::after replica that sizes this grid track has none, so the textarea
+  /* P90: the UA gives a textarea `padding: 2px`, which AutocompleteField.vue's own `border-0`/
+     utility reset on the real <textarea> does not clear either. The ::after replica that sizes
+     this grid track has none, so the textarea
      wrapped ~4px earlier than the replica measured and was ~4px shorter than the track it was
      stretched to — it scrolled before the box finished growing, at a boundary that moved with the
      font size. These three declarations are what make the replica's box and this one the same
@@ -175,72 +135,6 @@
   padding: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.p-input .ph,
-.p-input input::placeholder,
-.p-input textarea::placeholder {
-  /* P16 D8: was --kira-fg-disabled (2.55:1 on --kira-bg-input — the worst-contrast text in the
-     app, and this is neither a disabled control nor the reserved-word set D9 renames — a
-     placeholder/prefix is the most-read low-contrast text in both modes). --kira-fg-muted clears
-     4.80:1 here and is still a visible step below --kira-fg, so "this is a hint" still reads. */
-  color: var(--kira-fg-muted);
-}
-/* P27: a filter/sort field's own prefix label ("WHERE", "ORDER BY", "SORT", "FILTER", "offset",
-   "since") used to render in this exact same disabled grey regardless of whether the field held
-   an applied value — no visual difference between "nothing is filtered/sorted" and "this view is
-   filtered/sorted right now." Each caller (FilterToolbar.vue, DocumentView.vue, StreamView.vue)
-   decides "active" off its own persisted tab state, not the live edit buffer.
-   P19 D18: moved off `--kira-accent` onto `--kira-state-on` (tokens.css) — three of these five
-   call sites sit beside a CodeMirror syntax overlay painting the field's own value in
-   --kira-syntax-keyword/--kira-syntax-name, both within 8 degrees of --kira-accent's own hue, so
-   "this filter is on" read as indistinguishable from "this is part of the query". */
-.p-input .ph.ph-active {
-  color: var(--kira-state-on);
-}
-
-/* Hide the OS-native up/down spinner — .p-input .stepper below draws the app's own. */
-.p-input input[type="number"] {
-  -moz-appearance: textfield;
-}
-.p-input input[type="number"]::-webkit-inner-spin-button,
-.p-input input[type="number"]::-webkit-outer-spin-button {
-  appearance: none;
-  margin: 0;
-}
-.p-input .stepper {
-  display: flex;
-  flex-direction: column;
-  align-self: stretch;
-  flex-shrink: 0;
-  border-left: var(--kira-border-width) solid var(--kira-border);
-  border-top-right-radius: var(--kira-radius-sm);
-  border-bottom-right-radius: var(--kira-radius-sm);
-  overflow: hidden;
-}
-/* P42 F16: each button's content box is ~8px tall; TextField.vue's chevron icon is sized to fit
-   it (9px). overflow:hidden is a guard against the glyph spilling out again if a height token
-   moves — the icon's own :size prop is the actual fix, since its inline style would win over any
-   font-size set here. */
-.p-input .step-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  width: 16px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  line-height: 0;
-  overflow: hidden;
-}
-.p-input .step-btn:hover {
-  color: var(--kira-fg);
-  background: var(--kira-hover);
-}
-.p-input .step-btn:active {
-  background: var(--kira-select);
 }
 
 /* ---------- P13 dialog body ---------- */

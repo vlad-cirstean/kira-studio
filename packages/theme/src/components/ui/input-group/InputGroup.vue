@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { cn } from '@theme/lib/utils'
 import type { HTMLAttributes } from 'vue'
+import type { InputGroupBoxVariants } from '.'
+import { inputGroupVariants } from '.'
 
-const props = defineProps<{
-  class?: HTMLAttributes['class']
-}>()
+// P110 B25: `variant` added (default: 'default', shadcn-vue's own registry root, untouched) --
+// `kira` is the retired `.p-input` box's own successor, see index.ts's own inputGroupVariants doc
+// comment for the token mapping.
+const props = withDefaults(
+  defineProps<{
+    class?: HTMLAttributes['class']
+    variant?: InputGroupBoxVariants['variant']
+  }>(),
+  { variant: 'default' },
+)
 </script>
 
 <template>
   <fieldset
     data-slot="input-group"
-    :class="cn(
-      'm-0 min-w-0 border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-disabled:bg-input/50 dark:has-disabled:bg-input/80 h-8 rounded-lg border transition-colors in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 group/input-group relative flex w-full items-center p-0 outline-none has-[>textarea]:h-auto',
-      props.class,
-    )"
+    :class="cn(inputGroupVariants({ variant: props.variant }), props.class)"
   >
     <slot />
   </fieldset>

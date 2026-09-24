@@ -161,6 +161,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   <div class="where-input">
     <AutocompleteField
       v-model="whereText"
+      class="w-full"
       prefix="WHERE"
       :prefix-active="!!tab.state.filter"
       placeholder="status = 'paid'"
@@ -177,6 +178,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   <div class="orderby-input">
     <AutocompleteField
       v-model="orderByText"
+      class="w-full"
       prefix="ORDER BY"
       :prefix-active="!!tab.state.sort"
       placeholder="placed_at DESC"
@@ -200,11 +202,10 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 <style scoped>
 @reference "@theme/base.css";
 
-/* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths
-   live here. TextField's root <span class="p-input"> only receives fallthrough attrs on its
-   inner <input> (see TextField.vue's inheritAttrs:false), so each field's width lives on this
-   wrapper instead of a class/style on the <TextField> tag itself (DocumentView.vue's same
-   `.filter-field` precedent). */
+/* Height, padding and colour come from .p-toolbar/InputGroup's own kira variant — only the two
+   fields' own widths live here. P110 B25: each field's width is now a `class="w-full"` prop
+   straight on <AutocompleteField> (template above), not a scoped `:deep(.p-input)` rule reaching
+   across the component boundary (DocumentView.vue's same `.filter-field` precedent). */
 .history-anchor {
   @apply relative;
 }
@@ -213,15 +214,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   @apply flex-1 min-w-0;
 }
 
-.where-input :deep(.p-input) {
-  @apply w-full;
-}
-
 .orderby-input {
   @apply w-56 shrink-0;
-}
-
-.orderby-input :deep(.p-input) {
-  @apply w-full;
 }
 </style>

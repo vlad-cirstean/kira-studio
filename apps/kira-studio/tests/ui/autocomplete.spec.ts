@@ -292,16 +292,21 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
   });
 
   const filterInput = page.locator('[data-testid="document-search"]');
-  // AutocompleteField's `.ph` prefix label is a sibling of the real <input> (both under one
-  // .p-input span), not a descendant of it -- data-testid lands on the input via $attrs.
-  const filterLabel = page.locator('span.p-input:has([data-testid="document-search"]) .ph');
+  // AutocompleteField's prefix label is a sibling of the real <input> (both under one .p-input
+  // box), not a descendant of it -- data-testid lands on the input via $attrs. P110 B25: the old
+  // `.ph`/`.ph-active` classes are gone (folded into direct text-muted-foreground/text-state-on
+  // utilities), and the box itself is a <fieldset> (InputGroup), not a <span> -- selected
+  // structurally (the one span holding this literal text) rather than by either retired name.
+  const filterLabel = page
+    .locator('.p-input:has([data-testid="document-search"]) span')
+    .filter({ hasText: 'FILTER' });
   await expect(filterLabel).toHaveText('FILTER');
-  await expect(filterLabel).not.toHaveClass(/ph-active/);
+  await expect(filterLabel).not.toHaveClass(/text-state-on/);
 
   await filterInput.fill(APPLIED_FILTER);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="document-row"]')).toHaveCount(1, { timeout: 10_000 });
-  await expect(filterLabel).toHaveClass(/ph-active/);
+  await expect(filterLabel).toHaveClass(/text-state-on/);
 
   await filterInput.click();
   await page.click('[data-testid="document-count"]');
@@ -320,7 +325,7 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
   );
   expect(readOpsCount(await stream.ops(), DATA_OP.count)).toBe(1);
   await expect(page.locator('[data-testid="document-pager"]')).toContainText('of 1');
-  await expect(filterLabel).toHaveClass(/ph-active/);
+  await expect(filterLabel).toHaveClass(/text-state-on/);
 
   // Escape reverts an unsent edit rather than applying it.
   await filterInput.click();

@@ -130,14 +130,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   @apply flex-1 min-w-0;
 }
 
-.size-input {
-  @apply w-24;
-}
-
-.size-input .p-input {
-  @apply w-full;
-}
-
 .segmented {
   @apply inline-flex overflow-hidden self-start rounded-kira-sm;
   height: var(--kira-h-md);

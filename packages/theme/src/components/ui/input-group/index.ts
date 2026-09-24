@@ -31,6 +31,32 @@ export const inputGroupAddonVariants = cva(
 
 export type InputGroupVariants = VariantProps<typeof inputGroupAddonVariants>;
 
+// P110 B25: the box (root <fieldset>) itself. `default` is shadcn-vue's own registry string,
+// verbatim -- untouched, so every existing InputGroup consumer (the P104-era number-stepper
+// migration) renders byte-identical. `kira` is primitives.css's retired `.p-input` box translated
+// to Tailwind: height/gap/padding/radius/border/background/text tokens per the P110 plan's own
+// mapping table, `focus-within:` for the old `:focus-within` ring, `aria-invalid:` (a generic
+// Tailwind functional variant, not a fixed list -- compiles to `&[aria-invalid="true"]` for any
+// name) replacing the old `.is-invalid` class toggle. `min-w-0`: fieldset's own UA min-content
+// sizing quirk, same reason the `default` variant already carries it. `.is-grow`'s own height/
+// line-height/padding-block math stays live, unlayered CSS in primitives.css (B31 residue) --
+// unlayered beats this layered utility, so `h-control` here is a no-op once `.is-grow` also
+// applies, by design.
+export const inputGroupVariants = cva('', {
+  variants: {
+    variant: {
+      default:
+        'm-0 min-w-0 border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-disabled:bg-input/50 dark:has-disabled:bg-input/80 h-8 rounded-lg border transition-colors in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:ring-3 has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 group/input-group relative flex w-full items-center p-0 outline-none has-[>textarea]:h-auto',
+      kira: 'm-0 min-w-0 inline-flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2 py-0 text-fg font-data text-kira-sm focus-within:border-focus focus-within:outline focus-within:outline-1 focus-within:-outline-offset-1 focus-within:outline-focus aria-invalid:border-error',
+    },
+  },
+  defaultVariants: {
+    variant: 'default',
+  },
+});
+
+export type InputGroupBoxVariants = VariantProps<typeof inputGroupVariants>;
+
 export const inputGroupButtonVariants = cva('gap-2 text-sm flex items-center shadow-none', {
   variants: {
     size: {
