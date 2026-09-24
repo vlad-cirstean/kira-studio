@@ -106,9 +106,22 @@ let unsubscribeTarget: (() => void) | undefined;
 let unsubscribeUiAction: (() => void) | undefined;
 let unsubscribeReconnect: (() => void) | undefined;
 
-async function applyTarget(nextRepoId: string, branch: string): Promise<void> {
+// P108 F6: one target-sequence token, bumped by every `applyTarget` call — the one place every
+// "which repoId/branch is this view now reviewing" transition funnels through (a `review.target`
+// push, a user's own branch/base pick, `handleReconnect`, `resumeSession`, cold bootstrap). Each
+// caller that applies further state after its own additional awaits (`setBase`, `setPane`,
+// `listMode`/`filter`/`diffMode` restores) captures the token `applyTarget` returns and re-checks
+// it before every one of those later writes, skipping any whose token has gone stale — a newer
+// target already superseded it, so an older override base/pane/filter must not land on top of
+// the newer target's own state. Mirrors `GraphViewState`'s own `#loadGeneration` (Part 18 F1) /
+// `RepoState`'s own open-sequence token (P108 F4) for the identical shape.
+let targetSequence = 0;
+
+async function applyTarget(nextRepoId: string, branch: string): Promise<number> {
+  const token = ++targetSequence;
   repoId.value = nextRepoId;
   await review.value?.setTarget(nextRepoId, branch);
+  return token;
 }
 
 /** F2: the host's socket just reconnected (`BridgeClient.onReconnect`'s own doc comment) — the
@@ -128,8 +141,13 @@ async function handleReconnect(): Promise<void> {
     review.value?.resolution.value?.reason === 'override'
       ? review.value.resolution.value.base
       : undefined;
-  await applyTarget(id, branch);
+  const token = await applyTarget(id, branch);
+  // P108 F6: a `review.target` push (or another reconnect) landed during `applyTarget`'s own
+  // await — that newer target already owns `review`/`repoId` now; applying this stale override
+  // base or re-seeding `refsState` with this call's own (now old) `id` would stomp on it.
+  if (token !== targetSequence) return;
   if (overrideBase) await review.value?.setBase(overrideBase);
+  if (token !== targetSequence) return;
   refsState.setRepoId(id);
 }
 
@@ -158,6 +176,11 @@ async function bootstrap(): Promise<void> {
     return;
   }
   const list = await bridge.request('repo.list', {});
+  // P108 F6: a `review.target` push can land during this await (the `bridge.on('review.target',
+  // ...)` listener just above is already live) and already call `applyTarget`, setting `repoId`
+  // itself — must not then clobber it with the workspace's own default active repo while
+  // `review` still holds the pushed repo/branch.
+  if (repoId.value !== undefined) return;
   if (list.activeRepoId) {
     repoId.value = list.activeRepoId;
     await resumeSession(list.activeRepoId);
@@ -185,8 +208,13 @@ async function resumeSession(id: string): Promise<void> {
   }
   const session = loaded.session;
   if (!session || review.value?.branch.value) return;
-  await applyTarget(id, session.branch);
+  const token = await applyTarget(id, session.branch);
+  // P108 F6: `session.branch` was checked above the *previous* await (`review.session.load`), not
+  // this one — a `review.target` push or a user's own pick during `applyTarget` itself must still
+  // win over this resume's own base/pane/filter restore.
+  if (token !== targetSequence) return;
   if (session.baseOverride !== null) await review.value?.setBase(session.baseOverride);
+  if (token !== targetSequence) return;
   review.value?.setPane(session.pane);
   listMode.value = session.listMode;
   filter.value = session.filter;

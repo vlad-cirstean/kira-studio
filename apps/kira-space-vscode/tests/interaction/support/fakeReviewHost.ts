@@ -42,6 +42,11 @@ export const FAKE_REVIEW_FILE_NONE = 'src/pending.ts';
 export const FAKE_REVIEW_FILE_PARTIAL = 'src/halfway.ts';
 export const FAKE_REVIEW_FILE_FULL = 'src/done.ts';
 
+// P108 F6: a second, distinct repoId — the workspace's own "active repo" `repo.list` resolves to,
+// standing in for whatever `bootstrap()` would otherwise fall back to once a `review.target` push
+// (naming `FAKE_REPO_ID` above) has already landed first.
+export const OTHER_REPO_ID = '/fake/other-repo';
+
 function wrap(body: unknown): unknown {
   return encode({ version: CONTRACT_VERSION, body }, 'base64').payload;
 }
@@ -61,6 +66,14 @@ function buildResponses(): {
   reviewFiles: (id: number) => unknown;
   openAllChangesOk: (id: number) => unknown;
   revealCommitOk: (id: number) => unknown;
+  /** P108 F6: `activeRepoId` is a placeholder here (`repoListDeferred`'s own runtime value isn't
+   *  known until the test calls `window.__resolveRepoList`) — the in-page script substitutes the
+   *  real one into a clone, the same way `withId` substitutes a real request id. */
+  repoList: (id: number, activeRepoIdPlaceholder: string) => unknown;
+  refsListEmpty: (id: number) => unknown;
+  reviewSessionLoadNone: (id: number) => unknown;
+  /** P108 F6: placeholders for both fields, substituted the same way. */
+  reviewTargetEvent: (repoIdPlaceholder: string, branchPlaceholder: string) => unknown;
 } {
   return {
     appInit: (id) =>
@@ -221,6 +234,32 @@ function buildResponses(): {
     openAllChangesOk: (id) =>
       wrap({ t: 'res', id, ok: true, result: { opened: 2, failed: 0, mode: 'tabs' } }),
     revealCommitOk: (id) => wrap({ t: 'res', id, ok: true, result: { revealed: true } }),
+    repoList: (id, activeRepoIdPlaceholder) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: { candidates: [], activeRepoId: activeRepoIdPlaceholder },
+      }),
+    refsListEmpty: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          branches: [],
+          remoteBranches: [],
+          tags: [],
+          head: { kind: 'unborn', name: 'main' },
+        },
+      }),
+    reviewSessionLoadNone: (id) => wrap({ t: 'res', id, ok: true, result: { session: null } }),
+    reviewTargetEvent: (repoIdPlaceholder, branchPlaceholder) =>
+      wrap({
+        t: 'evt',
+        method: 'review.target',
+        payload: { repoId: repoIdPlaceholder, branch: branchPlaceholder },
+      }),
   };
 }
 
@@ -229,18 +268,32 @@ function buildResponses(): {
  * `acquireVsCodeApi().postMessage(...)` call and, for the methods this fixture scripts,
  * dispatches the matching wire response(s) as a `window` `message` event — exactly the shape
  * `createVsCodeChannel`'s own `onMessage` (`webview/main.ts`) already listens for. Every other
- * method (`refs.list`, `review.comment.list`, `review.session.save`, …) is left unanswered — a
- * pending promise nothing in these specs' own assertions waits on, matching §4.2's own scope
- * (D10/D11a's DOM assertions never depend on any of them resolving).
+ * method (`review.comment.list`, `review.session.save`, …) is left unanswered — a pending promise
+ * nothing in these specs' own assertions waits on, matching §4.2's own scope (D10/D11a's DOM
+ * assertions never depend on any of them resolving).
  *
  * G21 D14: `editor.openDiff` is the exception — every call is both answered (`{}`, so
  * `openInEditor`'s own `await` resolves) and recorded onto `window.__openDiffCalls`, in arrival
  * order, so `file-tree-open.spec.ts` can read back exactly which `pinned` value each click/
  * dblclick/`Enter` gesture actually sent. P75 §8: `editor.openAllChanges`/`graph.revealCommit`
  * are answered and recorded the same way, onto `window.__openAllChangesCalls`/
- * `window.__revealCommitCalls`.
+ * `window.__revealCommitCalls`. P108 F6: `repo.list` (optionally deferred, `options
+ * .repoListDeferred`), `refs.list` (recorded onto `window.__refsListCalls`) and
+ * `review.session.load` (always `{session: null}`) are answered too, plus `window
+ * .__emitReviewTarget(repoId, branch)` for pushing a real `review.target` event — this trio exists
+ * purely so `graph-review-target-race.spec.ts` can drive `ReviewView.vue`'s own `bootstrap()`
+ * fallback path end to end; every other existing spec here never requests any of them at all
+ * (`reviewTarget` is always set, so `props.target` short-circuits `bootstrap()` first).
  */
-export function buildFakeHostInitScript(): string {
+export function buildFakeHostInitScript(options?: {
+  /** P108 F6: `repo.list`'s own response is held back until the test calls
+   *  `window.__resolveRepoList(activeRepoId)` — a real pause point to push a `review.target`
+   *  event into, between `bootstrap()`'s own `repo.list` request and its reply, the exact window
+   *  the finding's own "review.target push during repo.list" race needs. Omitted (the default)
+   *  for every existing spec here: `repo.list` is simply never requested, since `reviewTarget` is
+   *  always set (`props.target` short-circuits `bootstrap()` before it gets there). */
+  readonly repoListDeferred?: boolean;
+}): string {
   const responses = buildResponses();
   const data = {
     appInit: responses.appInit(0),
@@ -251,16 +304,25 @@ export function buildFakeHostInitScript(): string {
     reviewFiles: responses.reviewFiles(0),
     openAllChangesOk: responses.openAllChangesOk(0),
     revealCommitOk: responses.revealCommitOk(0),
+    // P108 F6: built against placeholder ids/values (0, '') — the in-page script substitutes the
+    // real ones into a fresh clone before dispatch, the same way every other fixture here
+    // substitutes a real request id via `withId`.
+    repoList: responses.repoList(0, ''),
+    refsListEmpty: responses.refsListEmpty(0),
+    reviewSessionLoadNone: responses.reviewSessionLoadNone(0),
+    reviewTargetEvent: responses.reviewTargetEvent('', ''),
   };
   // Each fixture above was built against a placeholder id (0); the in-page script below
   // substitutes the *real* request id (assigned by the client's own `nextId` counter) into a
   // fresh deep clone before dispatch, so a real client's own request/response id matching still
   // works despite these being precomputed once, here, statically.
   const fixtureJson = JSON.stringify(data);
+  const repoListDeferred = options?.repoListDeferred ?? false;
 
   return `
     (() => {
       const FIXTURES = ${fixtureJson};
+      const REPO_LIST_DEFERRED = ${JSON.stringify(repoListDeferred)};
 
       function withId(template, id) {
         const clone = JSON.parse(JSON.stringify(template));
@@ -277,6 +339,11 @@ export function buildFakeHostInitScript(): string {
       // request, so a spec can await the gesture and read back exactly what host method fired.
       window.__openAllChangesCalls = [];
       window.__revealCommitCalls = [];
+      // P108 F6: every refs.list call's own repoId param, in arrival order — the one signal that
+      // distinguishes "refsState re-seeded against the pushed target's repo" from "…against the
+      // workspace's own default repo" (review.branch.value alone can't: this fixture's own
+      // resolveBase response ignores which branch was actually asked for).
+      window.__refsListCalls = [];
 
       window.acquireVsCodeApi = () => ({
         postMessage(message) {
@@ -319,14 +386,48 @@ export function buildFakeHostInitScript(): string {
             dispatch(withId(endEnvelope, body.id));
             return;
           }
-          // Every other method (refs.list, review.comment.list, review.session.save/.load, …) is
-          // deliberately left unanswered — see this file's own doc comment.
+          if (body.t === 'req' && body.method === 'repo.list') {
+            const send = (activeRepoId) => {
+              const envelope = withId(FIXTURES.repoList, body.id);
+              envelope.body.result.activeRepoId = activeRepoId;
+              dispatch(envelope);
+            };
+            if (REPO_LIST_DEFERRED) {
+              // P108 F6: held back until the test itself calls this — the real pause point a
+              // review.target push lands inside.
+              window.__resolveRepoList = (activeRepoId) => send(activeRepoId);
+            } else {
+              send(null);
+            }
+            return;
+          }
+          if (body.t === 'req' && body.method === 'refs.list') {
+            window.__refsListCalls.push(body.params);
+            dispatch(withId(FIXTURES.refsListEmpty, body.id));
+            return;
+          }
+          if (body.t === 'req' && body.method === 'review.session.load') {
+            dispatch(withId(FIXTURES.reviewSessionLoadNone, body.id));
+            return;
+          }
+          // Every other method (review.comment.list, review.session.save, …) is deliberately left
+          // unanswered — see this file's own doc comment.
         },
         getState() {
           return undefined;
         },
         setState() {},
       });
+
+      // P108 F6: a real review.target push (bridge.on('review.target', ...)'s own wire
+      // frame) — the test's own hook to land one during whatever await it chooses, same shape
+      // fakeGraphHost.ts's __emitRepoChanged already establishes for repo.changed.
+      window.__emitReviewTarget = (repoId, branch) => {
+        const envelope = JSON.parse(JSON.stringify(FIXTURES.reviewTargetEvent));
+        envelope.body.payload.repoId = repoId;
+        envelope.body.payload.branch = branch;
+        dispatch(envelope);
+      };
     })();
   `;
 }
