@@ -17,8 +17,7 @@
   cursor: pointer;
   flex-shrink: 0;
 }
-.p-btn:hover,
-.p-btn.is-hover {
+.p-btn:hover {
   background: var(--kira-hover);
   color: var(--kira-fg);
 }
@@ -99,8 +98,7 @@
      one definition in the repo. */
   font-family: var(--kira-font-ui);
 }
-.p-input:focus-within,
-.p-input.is-focus {
+.p-input:focus-within {
   border-color: var(--kira-focus);
   outline: var(--kira-border-width) solid var(--kira-focus);
   outline-offset: -1px;
@@ -208,14 +206,6 @@
 .p-input input[type="number"]::-webkit-outer-spin-button {
   appearance: none;
   margin: 0;
-}
-/* P42: the stepper takes the field's own right edge (no dead gutter of input background beyond
-   it) — the input's own right padding moves onto .stepper's right corner radius instead. */
-.p-input.has-stepper {
-  padding-right: 0;
-}
-.p-input.has-stepper input {
-  padding-right: var(--kira-s-2);
 }
 .p-input .stepper {
   display: flex;
@@ -418,8 +408,7 @@
   font-size: var(--kira-t-md);
   cursor: pointer;
 }
-.p-row:hover,
-.p-row.is-hover {
+.p-row:hover {
   background: var(--kira-hover);
 }
 .p-row.is-selected {
@@ -536,8 +525,7 @@
 .p-status.is-on {
   background: var(--kira-bg-input);
 }
-.p-status:hover,
-.p-status.is-hover {
+.p-status:hover {
   background: var(--kira-hover);
 }
 
@@ -791,9 +779,6 @@
 .p-td.null {
   color: var(--kira-fg-subtle);
   font-style: italic;
-}
-.p-td.num {
-  justify-content: flex-end;
 }
 .p-td.sel {
   background: var(--kira-select);
