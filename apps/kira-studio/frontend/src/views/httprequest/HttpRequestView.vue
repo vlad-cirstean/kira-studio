@@ -443,6 +443,11 @@ function onResizeRequestPane(size: number): void {
 // Send here, same as ConsoleView.vue registers Run/Run all onto the same two channels' shape.
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
+  // P108 F5: collectionIdFor(props.tab.state) reads the tree loaded by CollectionsPanel.vue's own
+  // mount — empty (no collection match, so no collection variables) whenever the project panel is
+  // hidden or the app opens outside Api mode. initCollections is idempotent (state.loaded guard),
+  // same shape as EnvironmentSelect's own onMounted(initVariables) call below it.
+  collectionsStore.initCollections();
   unregisterCommands = [
     registerCommand('view.run', onSend),
     registerCommand('view.refresh', onSend),

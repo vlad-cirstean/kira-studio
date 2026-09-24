@@ -256,6 +256,10 @@ function onBeautify(): void {
 
 let unregisterCommands: Array<() => void> = [];
 onMounted(() => {
+  // P108 F5: HttpRequestView.vue's own fix, mirrored — collectionIdFor(props.tab.state) reads the
+  // tree loaded by CollectionsPanel.vue's own mount, empty whenever the project panel is hidden or
+  // the app opens outside Api mode. initCollections is idempotent (state.loaded guard).
+  collectionsStore.initCollections();
   unregisterCommands = [
     registerCommand('view.run', onCall),
     registerCommand('view.refresh', onCall),
