@@ -651,32 +651,36 @@ const statusLine = computed(() => {
              permanently-grey button sitting in the rail for no reason a user can see. -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="console-refresh"
-              :disabled="!needsReconnect"
-              aria-label="Refresh"
-              @click="onReconnectAndLoad"
-            >
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
+            <TooltipDisabledTrigger>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="console-refresh"
+                :disabled="!needsReconnect"
+                aria-label="Refresh"
+                @click="onReconnectAndLoad"
+              >
+                <CodiconIcon name="refresh" :size="13" />
+              </Button>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'text-error': running }"
-              data-testid="console-stop"
-              :disabled="!running"
-              aria-label="Stop"
-              @click="onStop"
-            >
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <TooltipDisabledTrigger>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'text-error': running }"
+                data-testid="console-stop"
+                :disabled="!running"
+                aria-label="Stop"
+                @click="onStop"
+              >
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>

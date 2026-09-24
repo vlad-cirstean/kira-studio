@@ -245,9 +245,6 @@ const breadcrumb = computed(() => {
       <span class="p-push flex items-center gap-1" />
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <!-- Stop is permanently disabled: this load has no cancellation to offer (state.ts tracks
-         no op-id for it) — the slot stays reserved rather than wired to a stop that doesn't
-         exist. -->
     <div class="p-toolbar">
       <div class="group">
         <Tooltip>
@@ -259,16 +256,6 @@ const breadcrumb = computed(() => {
             </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button variant="toolbar" size="kira-icon" disabled aria-label="Stop">
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
         </Tooltip>
       </div>
       <div class="sep" />

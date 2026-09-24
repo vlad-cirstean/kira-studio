@@ -318,14 +318,6 @@ onMounted(() => {
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" data-testid="browse-stop" disabled aria-label="Stop">
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
       </div>
         <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps

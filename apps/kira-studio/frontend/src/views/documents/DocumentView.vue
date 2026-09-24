@@ -687,17 +687,19 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'text-error': running }"
-              data-testid="document-stop"
-              :disabled="!running"
-              aria-label="Stop"
-              @click="onStop"
-            >
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <TooltipDisabledTrigger>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'text-error': running }"
+                data-testid="document-stop"
+                :disabled="!running"
+                aria-label="Stop"
+                @click="onStop"
+              >
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
