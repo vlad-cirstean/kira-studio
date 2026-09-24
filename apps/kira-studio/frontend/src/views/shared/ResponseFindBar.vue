@@ -198,7 +198,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
         <TooltipContent>Regular expression</TooltipContent>
       </Tooltip>
     </div>
-    <span class="p-sm text-muted-foreground find-count" data-testid="http-find-count">
+    <span class="text-kira-sm text-muted-foreground find-count" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
     </span>
     <Tooltip>

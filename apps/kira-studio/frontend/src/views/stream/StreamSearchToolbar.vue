@@ -112,7 +112,7 @@ onUnmounted(() => {
         @update:model-value="(v) => (query = String(v))"
       />
     </div>
-    <span class="p-sm text-muted-foreground search-count" data-testid="stream-search-count">
+    <span class="text-kira-sm text-muted-foreground search-count" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
         <b class="font-data">{{ entry.index + 1 }}</b> of <b class="font-data">{{ entry.matches.length }}</b>
       </template>

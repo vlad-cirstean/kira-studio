@@ -475,7 +475,7 @@ onMounted(() => {
                 </button>
               </template>
             </span>
-            <span class="p-push p-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
+            <span class="p-push text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </div>
           <div class="p-panel body-panel">
             <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty text-muted-foreground">Loading…</div>

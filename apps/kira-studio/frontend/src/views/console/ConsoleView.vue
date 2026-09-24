@@ -965,7 +965,7 @@ const statusLine = computed(() => {
               </button>
             </div>
           </div>
-          <span class="p-sm text-muted-foreground p-push" data-testid="console-status">{{ statusLine }}</span>
+          <span class="text-kira-sm text-muted-foreground p-push" data-testid="console-status">{{ statusLine }}</span>
           <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
                result — DocumentView.vue's own expand-all/collapse-all pair, needed here now that
                a document row's only other way to reveal its full body (the cell editor dock) is

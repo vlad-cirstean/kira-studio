@@ -42,7 +42,7 @@ function onClearFile(): void {
     <template v-if="tab.state.binaryFile">
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="p-sm text-muted-foreground p-0" data-testid="http-binary-file-caption">{{ caption }}</span>
+          <span class="text-kira-sm text-muted-foreground p-0" data-testid="http-binary-file-caption">{{ caption }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ tab.state.binaryFile.path }}</TooltipContent>
       </Tooltip>

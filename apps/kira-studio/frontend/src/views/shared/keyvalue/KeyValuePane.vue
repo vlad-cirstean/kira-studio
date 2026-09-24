@@ -840,7 +840,7 @@ onUnmounted(() => {
             </TooltipTrigger>
             <TooltipContent>Previous page</TooltipContent>
           </Tooltip>
-          <span class="font-data p-sm text-muted-foreground" data-testid="keyvalue-status">{{ statusLine }}</span>
+          <span class="font-data text-kira-sm text-muted-foreground" data-testid="keyvalue-status">{{ statusLine }}</span>
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
               <TooltipDisabledTrigger>
@@ -913,7 +913,7 @@ onUnmounted(() => {
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
               <div class="popover-form">
-                <div class="popover-title p-sm text-muted-foreground">Add key (string value)</div>
+                <div class="popover-title text-kira-sm text-muted-foreground">Add key (string value)</div>
                 <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
                 <Input
                   v-model="addValue"
@@ -956,7 +956,7 @@ onUnmounted(() => {
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
               <div class="popover-form">
-                <div class="popover-title p-sm text-muted-foreground">Edit value</div>
+                <div class="popover-title text-kira-sm text-muted-foreground">Edit value</div>
                 <Input
                   v-model="editDraft"
                   class="w-full"

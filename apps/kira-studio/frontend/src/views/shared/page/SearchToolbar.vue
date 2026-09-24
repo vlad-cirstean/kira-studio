@@ -353,7 +353,7 @@ onUnmounted(() => {
 
     <span
       v-if="errorMessage"
-      class="p-sm search-error"
+      class="text-kira-sm search-error"
       :data-testid="`${testidPrefix}search-error`"
       >{{ errorMessage }}</span
     >
@@ -366,7 +366,7 @@ onUnmounted(() => {
            used to set `scanning` false while a newer scan was still genuinely running, falling
            through to this same branch with a partial `index: -1` entry underneath it; that path is
            closed by `startSearch`'s own handle-identity check, not by this template. -->
-      <span class="p-sm text-muted-foreground search-count" :data-testid="`${testidPrefix}search-count`">
+      <span class="text-kira-sm text-muted-foreground search-count" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">
           <b class="font-data">{{ entry.index + 1 }}</b> of

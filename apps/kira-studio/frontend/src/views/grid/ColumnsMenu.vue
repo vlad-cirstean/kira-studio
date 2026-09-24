@@ -106,7 +106,7 @@ onBeforeUnmount(() => {
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
         <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">None</Button>
       </div>
-      <div v-if="!meta" class="columns-menu-loading p-sm text-muted-foreground">Loading columns…</div>
+      <div v-if="!meta" class="columns-menu-loading text-kira-sm text-muted-foreground">Loading columns…</div>
       <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked. -->
       <div v-else class="columns-menu-list">
