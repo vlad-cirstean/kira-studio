@@ -81,6 +81,10 @@ const elapsedMs = computed(() =>
 const messageBytes = computed(() =>
   viewing.value ? viewing.value.snapshot.entry.messageBytes : (rt.value?.messageBytes ?? 0),
 );
+// P108 F18: a stored message cut at the 64 KiB per-message cap carries its own `truncated` flag
+// (grpc-history.ts's own GrpcCallHistoryMessage) — this used to drop it, rendering the cut prefix
+// in Monaco as if it were the complete, valid JSON body. A live message is never truncated (the
+// cap only applies to what History stores), so it maps in as `false`.
 const messages = computed(() =>
   viewing.value
     ? viewing.value.snapshot.messages.map((m) => ({
@@ -88,8 +92,16 @@ const messages = computed(() =>
         json: m.json,
         wireBytes: m.wireBytes,
         offsetMs: m.offsetMs,
+        truncated: m.truncated,
       }))
-    : liveMessages.value,
+    : liveMessages.value.map((m) => ({ ...m, truncated: false })),
+);
+// P108 F18: the stored request message's own truncation flag (requestMessageTruncated) had zero
+// frontend readers — surfaced here as a note next to the "viewing a history call" band, since this
+// pane does not render the stored request message body itself (D14's message list is the
+// response's own messages; showing the request body too is out of scope for this fix).
+const requestMessageTruncated = computed(
+  () => viewing.value?.snapshot.requestMessageTruncated ?? false,
 );
 // Round-2 review finding 10: the summary line used to read messages.length — capped at
 // MAX_LIVE_MESSAGES for a live call (state.ts) and at maxGrpcStoredMessages for a stored entry
@@ -355,6 +367,19 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
+    <!-- P108 F18: the stored request message was cut at the 256 KiB per-entry cap; this pane does
+         not render the request body itself (see the computed above), so the note is the only
+         surface for requestMessageTruncated. -->
+    <Alert
+      v-if="requestMessageTruncated"
+      variant="note"
+      data-testid="grpc-request-message-truncated"
+    >
+      <AlertDescription>
+        The stored request message was cut at 256 KB and is not shown.
+      </AlertDescription>
+    </Alert>
+
     <Alert v-if="rt?.status === 'cancelled'" variant="warn" data-testid="grpc-stopped-strip">
       <AlertDescription>
         Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
@@ -405,6 +430,16 @@ onUnmounted(() => {
             <button type="button" class="message-header" @click="toggleExpanded(entry.m.seq)">
               <span class="p-xs dim" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
               <span class="p-xs dim">{{ formatBytes(entry.m.wireBytes) }}</span>
+              <Tooltip v-if="entry.m.truncated">
+                <TooltipTrigger as-child>
+                  <CodiconIcon
+                    name="warning"
+                    :size="12"
+                    data-testid="grpc-message-truncated"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Stored copy cut at 64 KB — not the full message</TooltipContent>
+              </Tooltip>
               <span class="p-push" />
               <span class="p-xs dim">#{{ entry.m.seq }}</span>
             </button>
