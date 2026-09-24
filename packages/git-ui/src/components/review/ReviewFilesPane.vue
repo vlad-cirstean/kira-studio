@@ -88,7 +88,7 @@ function onToggleReviewed(path: string): void {
 </script>
 
 <template>
-  <div class="kv-review-files-pane">
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
     <p v-if="reviewFiles.loadError.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load the file list — {{ reviewFiles.loadError.value }}
     </p>
@@ -96,14 +96,14 @@ function onToggleReviewed(path: string): void {
     <template v-else>
       <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
-      <div class="kv-review-files-diff-mode">
+      <div class="kv:flex kv:items-center kv:gap-1.5 kv:py-0.5 kv:px-2 kv:border-b kv:border-panel-border kv:font-ui">
         <KuiSegmented
           :options="diffModeOptions"
           :model-value="reviewFiles.diffMode.value"
           ariaLabel="What to compare"
           @update:model-value="(value) => reviewFiles.setDiffMode(value as ReviewDiffMode)"
         />
-        <span v-if="deltaStatusText" class="kv-review-files-delta-status">{{ deltaStatusText }}</span>
+        <span v-if="deltaStatusText" class="kv:ml-auto kv:text-muted kv:text-sm">{{ deltaStatusText }}</span>
       </div>
       <p v-if="reviewFiles.diffError.value" class="kv:m-0 kv:p-3 kv:text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
@@ -137,34 +137,3 @@ function onToggleReviewed(path: string): void {
   </div>
 </template>
 
-<style>
-.kv-review-files-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-/* G12 D14/D16: the same .p-seg-shaped segmented group as ReviewView.vue's own toggles. */
-.kv-review-files-diff-mode {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-3);
-  padding: var(--kv-s-1) var(--kv-s-4);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  font-family: var(--kv-font-ui);
-}
-
-.kv-review-files-delta-status {
-  margin-left: auto;
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-}
-
-/* P110 A14: the error/loading text and the tree's flex/border were `DetailPane.vue`'s own shared
- * `.kv-detail-pane-error`/`-tree`/`-loading` classes (`StashDetailPane.vue`'s own precedent) — now
- * inlined as `kv:` utilities directly on this file's own elements above, since A14 deleted those
- * rules along with DetailPane.vue's `<style>` block. This file's own remaining rules
- * (`.kv-review-files-pane`, `.kv-review-files-diff-mode`, `.kv-review-files-delta-status`) convert
- * in A16. */
-</style>

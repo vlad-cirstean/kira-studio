@@ -68,15 +68,15 @@ function anchorTitle(c: ReviewComment): string | undefined {
 </script>
 
 <template>
-  <div class="kv-review-comments-pane">
-    <div class="kv-review-comments-header">
-      <span class="kv-review-comments-count" data-testid="review-comments-count">{{
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
+    <div class="kv:flex kv:items-center kv:gap-1 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui">
+      <span class="kv:text-muted kv:text-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
       <KuiButton
         v-if="capabilities.clipboard"
         variant="icon"
-        class="kv-review-comments-icon-button"
+        class="kv:ml-auto"
         :icon="ACTION_ICONS.copy"
         v-kui-tooltip="'Copy for AI'"
         aria-label="Copy for AI"
@@ -86,14 +86,14 @@ function anchorTitle(c: ReviewComment): string | undefined {
       <KuiButton
         v-if="!reviewComments.confirmingClear.value"
         variant="icon"
-        class="kv-review-comments-icon-button"
+        :class="capabilities.clipboard ? '' : 'kv:ml-auto'"
         :icon="ACTION_ICONS.clearAll"
         v-kui-tooltip="'Clear all comments'"
         aria-label="Clear all comments"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
-      <div v-else class="kv-review-comments-clear-confirm">
+      <div v-else class="kv:flex kv:items-center kv:gap-1 kv:ml-auto kv:text-sm">
         <KuiButton @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
         </KuiButton>
@@ -106,30 +106,41 @@ function anchorTitle(c: ReviewComment): string | undefined {
     </p>
 
     <template v-else>
-      <div v-if="groups.length > 0" class="kv-review-comments-list" role="listbox" aria-label="Comments">
-        <div v-for="group in groups" :key="group.path" class="kv-review-comments-group">
-          <div class="kv-review-comments-path">{{ group.path }}</div>
+      <div
+        v-if="groups.length > 0"
+        class="kv:flex-1 kv:min-h-0 kv:overflow-auto"
+        role="listbox"
+        aria-label="Comments"
+      >
+        <div
+          v-for="group in groups"
+          :key="group.path"
+          class="kv:border-t kv:border-panel-border kv:first:border-t-0"
+        >
+          <div class="kv:pt-1 kv:px-2 kv:pb-0.5 kv:font-data kv:font-semibold kv:text-row-fg">
+            {{ group.path }}
+          </div>
           <div
             v-for="c in group.comments"
             :key="c.id"
-            class="kv-review-comments-row"
+            class="kv:flex kv:flex-col kv:gap-0.5 kv:pt-0.5 kv:px-2 kv:pb-1 kv:cursor-pointer kv:hover:bg-hover"
             role="option"
             :aria-selected="false"
             tabindex="0"
             @click="emit('select-comment', group.path)"
             @keydown.enter="emit('select-comment', group.path)"
           >
-            <div class="kv-review-comments-row-head">
-              <span class="kv-review-comments-lines">{{ lineLabel(c.range) }}</span>
+            <div class="kv:flex kv:items-center kv:gap-1">
+              <span class="kv:font-data kv:text-muted kv:text-sm">{{ lineLabel(c.range) }}</span>
               <span
                 v-if="anchorTitle(c)"
-                class="codicon codicon-warning kv-review-comments-warning"
+                class="codicon codicon-warning kv:text-diff-modified"
                 v-kui-tooltip="anchorTitle(c)"
                 :aria-label="anchorTitle(c)"
               ></span>
               <KuiButton
                 variant="icon"
-                class="kv-review-comments-row-delete"
+                class="kv:ml-auto"
                 :icon="ACTION_ICONS.remove"
                 v-kui-tooltip="'Delete comment'"
                 aria-label="Delete comment"
@@ -137,12 +148,12 @@ function anchorTitle(c: ReviewComment): string | undefined {
                 @click.stop="reviewComments.remove(c.id)"
               />
             </div>
-            <p class="kv-review-comments-body">{{ c.body }}</p>
+            <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-sm">{{ c.body }}</p>
           </div>
         </div>
       </div>
 
-      <p v-else-if="!reviewComments.loading.value" class="kv-review-comments-empty">
+      <p v-else-if="!reviewComments.loading.value" class="kv:m-0 kv:p-3 kv:text-muted">
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
       </p>
 
@@ -156,118 +167,3 @@ function anchorTitle(c: ReviewComment): string | undefined {
   </div>
 </template>
 
-<style>
-.kv-review-comments-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-.kv-review-comments-header {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  height: var(--kv-bar-h);
-  padding: 0 var(--kv-s-4);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
-  font-family: var(--kv-font-ui);
-}
-
-.kv-review-comments-count {
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-}
-
-/* G34 D14: P110 A3's `KuiButton.vue` `icon` variant box is now this exact shape — only the
-   header's own "push everything after the count to the right" layout survives. */
-.kv-review-comments-icon-button {
-  margin-left: auto;
-}
-
-.kv-review-comments-icon-button + .kv-review-comments-icon-button {
-  margin-left: 0;
-}
-
-.kv-review-comments-clear-confirm {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  margin-left: auto;
-  font-size: var(--kv-t-sm);
-}
-
-/* G34 D14: `.kv-review-comments-clear-confirm button` is gone — both children are already
-   `KuiButton`, whose own default box is this exact shape. */
-
-.kv-review-comments-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.kv-review-comments-group + .kv-review-comments-group {
-  border-top: var(--kv-border-width) solid var(--kv-panel-border);
-}
-
-.kv-review-comments-path {
-  padding: var(--kv-s-2) var(--kv-s-4) var(--kv-s-1);
-  font-family: var(--kv-font-data); /* LAW 08: a file path is data. */
-  font-weight: 600;
-  color: var(--kv-row-fg);
-}
-
-.kv-review-comments-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  padding: var(--kv-s-1) var(--kv-s-4) var(--kv-s-2);
-  cursor: pointer;
-}
-
-.kv-review-comments-row:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-review-comments-row-head {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-}
-
-.kv-review-comments-lines {
-  font-family: var(--kv-font-data); /* LAW 08: a line reference is data. */
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-}
-
-/* ConflictBanner.vue's own precedent for a warning-tinted codicon — no dedicated --kv-warning-fg
-   token exists, so this reuses the same amber "modified" tint. */
-.kv-review-comments-warning {
-  color: var(--kv-diff-modified-fg);
-}
-
-.kv-review-comments-row-delete {
-  margin-left: auto;
-}
-
-.kv-review-comments-body {
-  margin: 0;
-  padding-left: calc(var(--kv-s-4) + var(--kv-s-1));
-  white-space: pre-wrap;
-  color: var(--kv-row-fg);
-  font-size: var(--kv-t-sm);
-}
-
-.kv-review-comments-empty {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-description-fg);
-}
-
-/* P110 A14: the error/loading text above were `DetailPane.vue`'s own shared
- * `.kv-detail-pane-error`/`-loading` classes — now inlined as `kv:` utilities directly on this
- * file's own elements, since A14 deleted those rules along with DetailPane.vue's `<style>` block.
- * This file's own remaining rules convert in A16. */
-</style>

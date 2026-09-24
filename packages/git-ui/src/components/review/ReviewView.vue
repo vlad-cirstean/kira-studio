@@ -790,15 +790,15 @@ watch(
 <template>
   <div
     ref="rootEl"
-    class="kv-review-view"
+    class="kv:flex kv:flex-col kv:h-full kv:w-full kv:relative kv:bg-bg kv:text-fg kv:font-ui kv:text-base kv:overflow-hidden"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
     <!-- G20 D2: this root's own tooltip surface — independent of App.vue's (two separate webview
          documents). -->
     <KuiTooltip />
-    <span class="kv-visually-hidden" data-testid="connection-state">{{ connectionState }}</span>
-    <div class="kv-visually-hidden" role="status" aria-live="polite" data-testid="live-announcements">
+    <span class="kv:sr-only" data-testid="connection-state">{{ connectionState }}</span>
+    <div class="kv:sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
     </div>
 
@@ -808,27 +808,36 @@ watch(
     <ConnectionBanner :state="bridge.hostConnection.value" />
 
     <template v-if="bootError">
-      <div class="kv-review-boot-error" data-testid="boot-error">
-        <p>Kira Space isn't reachable — {{ bootError }}</p>
-        <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
+      <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
+        <p class="kv:m-0 kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
+        <KuiButton
+          class="kv:self-start kv:py-1 kv:px-3 kv:border-panel-border kv:rounded-sm kv:bg-panel kv:enabled:hover:bg-panel kv:text-row-fg kv:enabled:hover:text-row-fg"
+          data-testid="boot-retry"
+          @click="retryBootstrap"
+        >
+          Retry
+        </KuiButton>
       </div>
     </template>
 
     <template v-else-if="!review">
-      <p class="kv-review-loading">Loading…</p>
+      <p class="kv:p-3 kv:text-muted">Loading…</p>
     </template>
 
     <template v-else-if="noActiveRepo">
-      <div class="kv-review-empty-state">
-        <h2>Review branch changes</h2>
+      <div class="kv:flex kv:flex-col kv:gap-1 kv:p-3 kv:min-h-0">
+        <h2 class="kv:m-0 kv:text-lg">Review branch changes</h2>
         <p>Open a repository first, then pick a branch to review.</p>
       </div>
     </template>
 
     <template v-else-if="!review.branch.value">
-      <div class="kv-review-picker" data-testid="review-no-branch">
-        <h2>Review branch changes</h2>
-        <p class="kv-review-picker-copy">
+      <div
+        class="kv:flex kv:flex-col kv:gap-1 kv:p-3 kv:min-h-0 kv:h-full"
+        data-testid="review-no-branch"
+      >
+        <h2 class="kv:m-0 kv:text-lg">Review branch changes</h2>
+        <p class="kv:m-0 kv:text-muted">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
         <KuiSearchInput
@@ -837,27 +846,30 @@ watch(
           placeholder="Filter branches"
           ariaLabel="Filter branches"
         />
-        <div class="kv-review-picker-scroll">
-          <div class="kv-review-picker-section">
-            <div class="kv-review-picker-section-title">Branches</div>
+        <div class="kv:flex-1 kv:min-h-0 kv:overflow-auto">
+          <div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted kv:text-xs kv:uppercase">Branches</div>
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              :class="[kuiRowVariants(), 'kv-review-picker-row']"
+              :class="[kuiRowVariants(), 'kv:w-full kv:text-left']"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
             </KuiButton>
-            <div v-if="branchSections.branches.visible.length === 0" class="kv-review-picker-empty">
+            <div
+              v-if="branchSections.branches.visible.length === 0"
+              class="kv:text-muted kv:py-0.5 kv:px-1"
+            >
               No matching branches
             </div>
           </div>
-          <div class="kv-review-picker-section">
-            <div class="kv-review-picker-section-title">Remote branches</div>
+          <div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted kv:text-xs kv:uppercase">Remote branches</div>
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              :class="[kuiRowVariants(), 'kv-review-picker-row']"
+              :class="[kuiRowVariants(), 'kv:w-full kv:text-left']"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -873,8 +885,13 @@ watch(
            invert control). G19 D11a (item 11): the back-to-selection button renders here too,
            whenever a branch is picked — including the error phase, which is exactly the state a
            resumed session pointing at a deleted branch/base lands in (D11b). -->
-      <header class="kv-review-header">
-        <div class="kv-review-header-row">
+      <!-- P110 A16: this header used to restyle .p-panel-head's own geometry (height/gap/padding)
+           but deliberately never its uppercase/letter-spacing — that primitive styles a short
+           section label, and the branch name here is live data, which must never be re-cased. -->
+      <header
+        class="kv:flex kv:flex-col kv:gap-0.5 kv:py-1 kv:px-1.5 kv:border-b kv:border-panel-border kv:shrink-0 kv:min-w-0"
+      >
+        <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
           <KuiButton
             :icon="ACTION_ICONS.back"
             v-kui-tooltip="'Back to branch selection'"
@@ -882,15 +899,17 @@ watch(
             data-testid="review-back-button"
             @click="goBackToSelection"
           />
-          <div class="kv-review-compare">
-            <div class="kv-review-compare-side">
+          <div class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
+            <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
               <span class="codicon codicon-git-branch" aria-hidden="true"></span>
-              <span class="kv-review-branch-name" data-testid="review-branch-name">{{
-                review.branch.value
-              }}</span>
+              <span
+                class="kv:font-data kv:font-semibold kv:truncate"
+                data-testid="review-branch-name"
+                >{{ review.branch.value }}</span
+              >
             </div>
-            <div class="kv-review-compare-side">
-              <span class="kv-review-summary-arrow" aria-hidden="true">↔</span>
+            <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
+              <span class="kv:text-muted kv:shrink-0" aria-hidden="true">↔</span>
               <BaseSelector
                 :resolution="review.resolution.value"
                 :refs-state="refsState"
@@ -906,7 +925,10 @@ watch(
             @click="onSwapBaseAndBranch"
           />
         </div>
-        <div v-if="review.phase.value === 'listing'" class="kv-review-summary-meta">
+        <div
+          v-if="review.phase.value === 'listing'"
+          class="kv:font-ui kv:text-muted kv:text-xs kv:truncate"
+        >
           {{ comparisonSummaryLabel }}
         </div>
       </header>
@@ -914,7 +936,11 @@ watch(
       <!-- G12 D13/D14: one panel-level toolbar, holding the Commits/Files pane toggle, the
            filter, and the Tree/Flat toggle — replacing what used to be one FileTree toolbar per
            expanded row plus a third, separately-stateful copy in the Files pane. -->
-      <div v-if="review.phase.value === 'listing'" ref="toolbarEl" class="kv-review-toolbar">
+      <div
+        v-if="review.phase.value === 'listing'"
+        ref="toolbarEl"
+        class="kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0"
+      >
         <KuiSegmented
           :options="panelOptions"
           :model-value="review.pane.value"
@@ -936,7 +962,7 @@ watch(
         />
         <KuiTextInput
           v-if="filterVisible"
-          class="kv-review-toolbar-filter"
+          class="kv:flex-1 kv:min-w-0 kv-review-toolbar-filter"
           placeholder="Filter files"
           aria-label="Filter files"
           :model-value="filter"
@@ -950,22 +976,26 @@ watch(
         />
       </div>
 
-      <div class="kv-review-body">
-        <p v-if="review.phase.value === 'resolving'" class="kv-review-status">
+      <div class="kv:flex-1 kv:min-h-0 kv:flex kv:flex-col">
+        <p v-if="review.phase.value === 'resolving'" class="kv:m-0 kv:p-3 kv:text-muted">
           Resolving comparison…
         </p>
 
-        <p v-else-if="review.phase.value === 'error'" class="kv-review-status kv-review-error">
+        <p v-else-if="review.phase.value === 'error'" class="kv:m-0 kv:p-3 kv:text-error">
           Couldn't compare — {{ review.resolveError.value }}
         </p>
 
-        <div v-else-if="review.phase.value === 'ask'" class="kv-review-status" data-testid="review-ask">
+        <div
+          v-else-if="review.phase.value === 'ask'"
+          class="kv:m-0 kv:p-3 kv:text-muted"
+          data-testid="review-ask"
+        >
           <p>Nothing was detected for <strong>{{ review.branch.value }}</strong> — pick a base above. We won't guess.</p>
         </div>
 
         <p
           v-else-if="review.phase.value === 'unrelated'"
-          class="kv-review-status"
+          class="kv:m-0 kv:p-3 kv:text-muted"
           data-testid="review-unrelated"
         >
           “{{ review.branch.value }}” and “{{ review.resolution.value?.base }}” share no common
@@ -974,7 +1004,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'empty'"
-          class="kv-review-status"
+          class="kv:m-0 kv:p-3 kv:text-muted"
           data-testid="review-empty"
         >
           “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.
@@ -985,12 +1015,13 @@ watch(
         >
           <div
             v-if="review.staleReview.value"
-            class="kv-review-stale-banner"
+            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:bg-hover kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui"
             role="status"
             data-testid="review-stale-banner"
           >
             <span>This comparison has changed.</span>
             <KuiButton
+              class="kv:justify-center kv:h-control kv:w-control kv:ml-auto kv:border-0 kv:rounded-sm kv:enabled:hover:bg-transparent kv:text-fg kv:enabled:hover:text-fg"
               :icon="ACTION_ICONS.refresh"
               v-kui-tooltip="'Refresh'"
               aria-label="Refresh"
@@ -1000,7 +1031,7 @@ watch(
 
           <div
             ref="rowsEl"
-            class="kv-review-rows"
+            class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none"
             role="tree"
             aria-label="Commits"
             @keydown="onRowsKeydown"
@@ -1027,17 +1058,22 @@ watch(
                server-fetching "Load more" below it. Mutually exclusive with that button (v-else-if)
                so only one affordance shows at a time: reveal the local buffer first, only then ask
                the server for more. -->
-          <div v-if="shas.length > renderCap" class="kv-review-load-more">
+          <div v-if="shas.length > renderCap" class="kv:flex kv:justify-center kv:py-1 kv:px-1.5 kv:shrink-0">
+            <!-- `kv-review-load-more-button` carries no styling of its own (verified: no rule ever
+                 existed for it) — kept as a plain test-selector hook,
+                 `review-commit-list-cap.spec.ts`'s own precedent. -->
             <KuiButton class="kv-review-load-more-button" @click="revealMore">
               {{ revealMoreLabel() }}
             </KuiButton>
           </div>
           <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
                comparison never emits a chunk, so there is no server-side signal to correct here.
-               Kept visible while loading so the affordance does not vanish mid-load. -->
+               Kept visible while loading so the affordance does not vanish mid-load.
+               P110 A16: "Load more" stays plain text (its label carries a count), so this button
+               takes no cancellation classes — KuiButton's own default shape already matches. -->
           <div
             v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
-            class="kv-review-load-more"
+            class="kv:flex kv:justify-center kv:py-1 kv:px-1.5 kv:shrink-0"
           >
             <KuiButton
               class="kv-review-load-more-button"
@@ -1056,7 +1092,7 @@ watch(
             reviewFiles &&
             filesActions
           "
-          class="kv-review-files-mount"
+          class="kv:flex-1 kv:min-h-0"
           :review-files="reviewFiles"
           :store="review.store"
           :actions="filesActions"
@@ -1068,7 +1104,7 @@ watch(
           v-else-if="
             review.phase.value === 'listing' && review.pane.value === 'comments' && reviewComments && capabilities
           "
-          class="kv-review-comments-mount"
+          class="kv:flex-1 kv:min-h-0"
           :review-comments="reviewComments"
           :capabilities="capabilities"
           @select-comment="onSelectComment"
@@ -1078,269 +1114,3 @@ watch(
   </div>
 </template>
 
-<style>
-.kv-review-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  position: relative;
-  background-color: var(--kv-app-bg);
-  color: var(--kv-app-fg);
-  /* LAW 08 (G12 D14): UI chrome is --kv-font-ui; a sha/branch/path overrides back to
-     --kv-font-data at its own rule, below. */
-  font-family: var(--kv-font-ui);
-  font-size: var(--kv-font-size);
-  overflow: hidden;
-}
-
-.kv-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.kv-review-loading {
-  padding: var(--kv-s-5);
-  color: var(--kv-description-fg);
-}
-
-.kv-review-boot-error {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-4);
-  padding: var(--kv-s-5);
-}
-
-.kv-review-boot-error p {
-  margin: 0;
-  color: var(--kv-description-fg);
-}
-
-.kv-review-boot-error button {
-  align-self: flex-start;
-  padding: var(--kv-s-2) var(--kv-s-5);
-  border: 1px solid var(--kv-panel-border);
-  border-radius: var(--kv-radius-sm);
-  background-color: var(--kv-panel-bg);
-  color: var(--kv-row-fg);
-  cursor: pointer;
-}
-
-.kv-review-empty-state,
-.kv-review-picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-5);
-  min-height: 0;
-}
-
-.kv-review-picker {
-  height: 100%;
-}
-
-.kv-review-empty-state h2,
-.kv-review-picker h2 {
-  margin: 0;
-  font-size: 1.1em;
-}
-
-.kv-review-picker-copy {
-  margin: 0;
-  color: var(--kv-description-fg);
-}
-
-/* G34 D14: gone — this class landed on `KuiSearchInput`'s own wrapper `<div>`, not its real
-   `<input>` (attrs fallthrough targets the single root element), so its box-chrome properties
-   never actually painted anything; `.kui-search-input-field`'s own chrome is what always rendered. */
-
-.kv-review-picker-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.kv-review-picker-section-title {
-  padding: var(--kv-s-2) 0 var(--kv-s-1);
-  color: var(--kv-description-fg);
-  font-size: 0.8em;
-  text-transform: uppercase;
-}
-
-/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template) — this
-   class keeps only the full-width stretch a vertical list of these needs. */
-.kv-review-picker-row {
-  width: 100%;
-  text-align: left;
-}
-
-.kv-review-picker-empty {
-  color: var(--kv-description-fg);
-  padding: var(--kv-s-1) var(--kv-s-2);
-}
-
-/* G12 D14: .p-panel-head's geometry — height/gap/padding — for the view head carrying the branch
-   name and base selector. Not its uppercase/letter-spacing treatment: that primitive styles a
-   short section label, and this row's own content is live data (a real branch name), which must
-   never be visually re-cased. */
-/* G14 D8 row 3: the comparison summary node — two lines, replacing the old single-row header's
- * fixed `--kv-control-h-lg`. */
-.kv-review-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  padding: var(--kv-s-2) var(--kv-s-3);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-/* G19 D5: the back button, the two stacked compare rows, and the swap button share one flex
-   row — .kv-review-compare grows to fill the middle. */
-.kv-review-header-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  min-width: 0;
-}
-
-.kv-review-compare {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-review-compare-side {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  min-width: 0;
-}
-
-.kv-review-branch-name {
-  font-family: var(--kv-font-data); /* LAW 08: a branch name is data. */
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-review-summary-arrow {
-  color: var(--kv-description-fg);
-  flex-shrink: 0;
-}
-
-.kv-review-summary-meta {
-  font-family: var(--kv-font-ui);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* G12 D13/D14: the new panel toolbar — .p-toolbar's own geometry, holding the Commits/Files
-   toggle, the filter, and the Tree/Flat toggle, all at --kv-control-h. */
-.kv-review-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-3);
-  height: var(--kv-bar-h);
-  padding: 0 var(--kv-s-4);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
-}
-
-/* G34 D14: everything but the growable width is gone — `.kui-text-input`'s own chrome (this is a
-   real `KuiTextInput`, whose class lands on its actual `<input>` root) already matches it. */
-.kv-review-toolbar-filter {
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-review-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.kv-review-files-mount,
-.kv-review-comments-mount {
-  flex: 1;
-  min-height: 0;
-}
-
-.kv-review-status {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-description-fg);
-}
-
-.kv-review-error {
-  color: var(--kv-error-fg);
-}
-
-.kv-review-stale-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-3);
-  background: var(--kv-row-hover-bg);
-  border-bottom: var(--kv-border-width) solid var(--kv-panel-border);
-  flex-shrink: 0;
-  font-family: var(--kv-font-ui);
-}
-
-/* G12 D16: the refresh affordance in the stale banner became an icon button — .p-iconbtn's shape. */
-.kv-review-stale-banner button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--kv-control-h);
-  width: var(--kv-control-h);
-  margin-left: auto;
-  border: none;
-  border-radius: var(--kv-radius-sm);
-  background: transparent;
-  color: var(--kv-app-fg);
-  cursor: pointer;
-}
-
-.kv-review-rows {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  outline: none;
-}
-
-.kv-review-load-more {
-  display: flex;
-  justify-content: center;
-  padding: var(--kv-s-2) var(--kv-s-3);
-  flex-shrink: 0;
-}
-
-/* G12 D16: Load more stays text (its label carries a count) — .p-btn's own geometry, per D14.
-   G34: the box this comment already claimed is now actually true — the local re-declaration
-   (height/padding/border/border-radius, with a border `.kui-button` never draws at rest) is
-   gone, found by the phase's own exit-criteria sweep for this class of leftover. */
-
-/* G21 D11: FileTree.vue's row geometry, font roles and status-letter mono font used to be
- * restyled from here, under the .kv-skin-kira ancestor, because the graph panel's tree had to
- * stay byte-identical while it still embedded a diff (G12 D14's own guarantee). That guarantee no
- * longer has anything to protect (items 9/10/12/13 already changed the graph tree's own
- * appearance and behaviour), so this whole block moved into FileTree.vue's own <style> as its one
- * unconditional appearance instead — see that file's own doc comment. G34 D1: `.kv-skin-kira` no
- * longer exists at all — `kira-structure.css` is `:root`-scoped now, so there is nothing left to
- * apply here. */
-</style>

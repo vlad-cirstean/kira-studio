@@ -210,7 +210,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div
     v-if="commit"
-    class="kv-review-row"
+    class="kv:flex kv:flex-col kv:border-b kv:border-panel-border kv:cursor-pointer kv:group kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-2"
     role="treeitem"
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"
@@ -222,35 +222,45 @@ function onOpenFile(index: number, pinned: boolean): void {
          a click on any file row inside .kv-review-row-body used to bubble straight up and
          collapse the very commit it was clicked inside, since nothing along the way ever called
          stopPropagation()). Only the header itself toggles the row now. -->
+    <!-- W17: hover tint scoped to the header, not the whole row — the expanded body's own
+         diff-deleted-fg text drops below 4.5:1 contrast in vscode-dark against the hover tint
+         (axe caught it); the header's own background (--kv-app-bg, unhovered) is what the body
+         already sits on, and that combination passes. -->
     <div
       ref="headerEl"
-      class="kv-review-row-header"
-      :class="{ 'kv-review-row-header-focused': focused }"
+      class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-1.5 kv:min-w-0 kv:font-ui kv:group-hover:bg-hover"
     >
       <span
-        class="codicon kv-review-row-chevron"
+        class="codicon kv:text-[12px] kv:w-3 kv:shrink-0"
         :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
         aria-hidden="true"
       ></span>
       <!-- G14 D8 row 1: two lines — subject on its own, full-width line; author/date/sha, muted,
            below it. GitLens's own commit-node anatomy. -->
-      <span class="kv-review-row-lines">
-        <span class="kv-review-row-subject">{{ commit.subject }}</span>
-        <span class="kv-review-row-meta">
-          <span class="kv-review-row-author">{{ commit.author.name }}</span>
-          <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
-          <span class="kv-review-row-date">{{ dateText }}</span>
-          <span class="kv-review-row-meta-sep" aria-hidden="true">·</span>
+      <span class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
+        <span class="kv:truncate">{{ commit.subject }}</span>
+        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted kv:text-xs kv:whitespace-nowrap kv:overflow-hidden">
+          <span class="kv:overflow-hidden kv:text-ellipsis">{{ commit.author.name }}</span>
+          <span class="kv:shrink-0" aria-hidden="true">·</span>
+          <span class="kv:overflow-hidden kv:text-ellipsis">{{ dateText }}</span>
+          <span class="kv:shrink-0" aria-hidden="true">·</span>
           <!-- G19 D7: the clickable-sha button and its own "Copy SHA" affordance are gone — the
                sha renders as plain text; the existing copySha context-menu item (buildReviewRowMenu)
                already covers this, and F7 found these two affordances genuinely redundant with it. -->
-          <span class="kv-review-row-sha">{{ shortSha }}</span>
+          <span class="kv:font-data kv:text-inherit kv:shrink-0 kv:bg-transparent kv:border-0 kv:cursor-pointer kv:p-0">{{ shortSha }}</span>
         </span>
       </span>
       <!-- G14 D8 row 2: inline icon actions, right-aligned — revealed on hover/focus-within
            (below) and always present for the roving-tabindex-focused row. GitLens's own
-           row-action pattern. -->
-      <span class="kv-review-row-actions">
+           row-action pattern. `kv-review-row-actions` is kept as a literal class — `onRowClick`'s
+           own `.closest('.kv-review-row-actions')` guard below reads it as a script hook, not
+           styling. -->
+      <span
+        :class="[
+          'kv-review-row-actions kv:flex kv:items-center kv:gap-0.5 kv:shrink-0',
+          focused ? 'kv:opacity-100' : 'kv:opacity-0 kv:group-hover:opacity-100 kv:group-focus-within:opacity-100',
+        ]"
+      >
         <KuiButton
           variant="icon"
           icon="codicon-diff-multiple"
@@ -272,8 +282,8 @@ function onOpenFile(index: number, pinned: boolean): void {
       </span>
     </div>
 
-    <div v-if="expanded" class="kv-review-row-body">
-      <p v-if="expansion?.detail.error.value" class="kv-review-row-error">
+    <div v-if="expanded" class="kv:border-t kv:border-panel-border kv:min-h-30 kv:max-h-80 kv:flex kv:flex-col">
+      <p v-if="expansion?.detail.error.value" class="kv:m-0 kv:p-2 kv:text-error">
         Couldn't load this commit — {{ expansion.detail.error.value }}
       </p>
       <FileTree
@@ -290,7 +300,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
-      <p v-else class="kv-review-row-loading">Loading…</p>
+      <p v-else class="kv:m-0 kv:p-2 kv:text-muted">Loading…</p>
     </div>
 
     <RowContextMenu
@@ -305,128 +315,3 @@ function onOpenFile(index: number, pinned: boolean): void {
   </div>
 </template>
 
-<style>
-.kv-review-row {
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--kv-panel-border);
-  cursor: pointer;
-}
-
-.kv-review-row:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -2px;
-}
-
-.kv-review-row-header {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-3);
-  min-width: 0;
-  font-family: var(--kv-font-ui);
-}
-
-/* W17: scoped to the header, not the whole row — `--kv-row-hover-bg` behind
- * `.kv-review-row-body`'s own `--kv-diff-deleted-fg` text (the FileTree's per-file/per-directory
- * deletion count) drops below 4.5:1 in `vscode-dark` (axe caught it: hovering an *expanded* row
- * left the lighter hover tint sitting behind that red text, something the panel's own detail pane
- * never risked, since a grid row's hover state lives in a wholly different region from the detail
- * pane it reveals). The row's own background — `--kv-app-bg`, via `.kv-review-view` — is what the
- * body already sits on while unhovered, and that combination already passes. */
-.kv-review-row:hover .kv-review-row-header {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-review-row-chevron {
-  font-size: 12px;
-  width: 12px;
-  flex-shrink: 0;
-}
-
-/* G14 D8 row 1: the two-line stack — subject above, muted author/date/sha below. */
-.kv-review-row-lines {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-review-row-subject {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-review-row-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.kv-review-row-meta-sep {
-  flex-shrink: 0;
-}
-
-.kv-review-row-author,
-.kv-review-row-date {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kv-review-row-sha {
-  font-family: var(--kv-mono-font-family);
-  color: inherit;
-  flex-shrink: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* G14 D8 row 2: hidden until the row is hovered/focus-within, or is the roving-tabindex cursor
- * (`.kv-review-row-header-focused`, set from the `focused` prop) — GitLens's own row-action
- * pattern, always visible for the keyboard-focused row so the actions are reachable without a
- * mouse. */
-.kv-review-row-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  flex-shrink: 0;
-  opacity: 0;
-}
-
-.kv-review-row-header-focused .kv-review-row-actions,
-.kv-review-row:hover .kv-review-row-actions,
-.kv-review-row:focus-within .kv-review-row-actions {
-  opacity: 1;
-}
-
-/* G34 D14: `.kv-review-row-action` is gone — its `:hover` painted the *selection* blue, not a
-   hover tint (F9 in the G34 plan); `.kui-button`/`.kui-button--icon`'s own hover is correct and
-   is what both row-action KuiButtons above get. */
-
-.kv-review-row-body {
-  border-top: 1px solid var(--kv-panel-border);
-  min-height: 120px;
-  max-height: 320px;
-  display: flex;
-  flex-direction: column;
-}
-
-.kv-review-row-error,
-.kv-review-row-loading {
-  margin: 0;
-  padding: var(--kv-s-4);
-  color: var(--kv-description-fg);
-}
-
-.kv-review-row-error {
-  color: var(--kv-error-fg);
-}
-</style>

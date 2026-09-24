@@ -114,63 +114,67 @@ function pick(ref: string): void {
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-base-selector">
+  <div ref="rootEl" class="kv:relative">
     <KuiButton
-      class="kv-base-trigger"
+      class="kv:max-w-full"
       aria-haspopup="true"
       :aria-expanded="isOpen"
       data-testid="base-selector-trigger"
       @click="toggle"
     >
-      <span class="kv-base-trigger-label">{{ triggerLabel }}</span>
-      <span v-if="triggerReason" class="kv-base-trigger-reason">{{ triggerReason }}</span>
+      <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
+      <span v-if="triggerReason" class="kv:text-muted kv:text-xs">{{ triggerReason }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </KuiButton>
 
     <KuiPopoverPanel v-if="isOpen" anchor="left" :width="280" @close="close">
-    <div class="kv-base-panel" role="dialog" aria-label="Choose a comparison base">
+    <div
+      class="kv:max-h-80 kv:flex kv:flex-col kv:min-h-0"
+      role="dialog"
+      aria-label="Choose a comparison base"
+    >
       <KuiSearchInput
-        class="kv-base-filter"
+        class="kv:m-1"
         v-model="filter"
         placeholder="Filter branches"
         ariaLabel="Filter branches"
       />
-      <div class="kv-base-panel-scroll">
-        <section v-if="suggested.length > 0" class="kv-base-section" aria-label="Suggested">
-          <div class="kv-base-section-title">Suggested</div>
+      <div class="kv:overflow-auto kv:min-h-0">
+        <section v-if="suggested.length > 0" aria-label="Suggested">
+          <div class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs kv:uppercase">Suggested</div>
           <KuiButton
             v-for="candidate in suggested"
             :key="candidate.ref"
-            :class="[kuiRowVariants(), 'kv-base-row']"
+            :class="[kuiRowVariants(), 'kv:w-full']"
             @click="pick(candidate.ref)"
           >
-            <span class="kv-base-row-name">{{ candidate.ref }}</span>
-            <span class="kv-base-row-reason">{{ candidateReason(candidate) }}</span>
+            <span class="kv:truncate">{{ candidate.ref }}</span>
+            <span class="kv:ml-auto kv:text-muted kv:text-xs">{{ candidateReason(candidate) }}</span>
           </KuiButton>
         </section>
 
-        <section class="kv-base-section" aria-label="All branches">
-          <div class="kv-base-section-title">All branches</div>
+        <section aria-label="All branches">
+          <div class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs kv:uppercase">All branches</div>
           <KuiButton
             v-for="row in sections.branches.visible"
             :key="row.refname"
-            :class="[kuiRowVariants(), 'kv-base-row']"
+            :class="[kuiRowVariants(), 'kv:w-full']"
             @click="pick(row.shortName)"
           >
-            <span class="kv-base-row-name">{{ row.shortName }}</span>
+            <span class="kv:truncate">{{ row.shortName }}</span>
           </KuiButton>
           <KuiButton
             v-for="row in sections.remoteBranches.visible"
             :key="row.refname"
-            :class="[kuiRowVariants(), 'kv-base-row']"
+            :class="[kuiRowVariants(), 'kv:w-full']"
             icon="codicon-cloud"
             @click="pick(row.shortName)"
           >
-            <span class="kv-base-row-name">{{ row.shortName }}</span>
+            <span class="kv:truncate">{{ row.shortName }}</span>
           </KuiButton>
           <div
             v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-            class="kv-base-empty"
+            class="kv:py-1 kv:px-2 kv:text-muted"
           >
             No matching branches
           </div>
@@ -180,74 +184,3 @@ function pick(ref: string): void {
     </KuiPopoverPanel>
   </div>
 </template>
-
-<style>
-.kv-base-selector {
-  position: relative;
-}
-
-/* G34 D14: everything but `max-width` is gone — the default `KuiButton` box is now this shape
-   (the old 24px height matched nothing in either scale; the default control height does). */
-.kv-base-trigger {
-  max-width: 100%;
-}
-
-.kv-base-trigger-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.kv-base-trigger-reason {
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-/* G20 D5: positioning/chrome move onto KuiPopoverPanel's own `.kui-popover`. */
-.kv-base-panel {
-  max-height: 320px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.kv-base-filter {
-  margin: var(--kv-s-2);
-}
-
-.kv-base-panel-scroll {
-  overflow: auto;
-  min-height: 0;
-}
-
-.kv-base-section-title {
-  padding: var(--kv-s-1) var(--kv-s-4);
-  color: var(--kv-description-fg);
-  font-size: 0.8em;
-  text-transform: uppercase;
-}
-
-/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template) — this
-   class keeps only the full-width stretch a vertical list of these needs. */
-.kv-base-row {
-  width: 100%;
-}
-
-.kv-base-row-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-base-row-reason {
-  margin-left: auto;
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-.kv-base-empty {
-  padding: var(--kv-s-2) var(--kv-s-4);
-  color: var(--kv-description-fg);
-}
-</style>
