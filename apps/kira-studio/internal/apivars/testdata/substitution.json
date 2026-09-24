@@ -422,5 +422,40 @@
         "pipeline": ["upper"]
       }
     ]
+  },
+  {
+    "name": "P108 F6: a plain value carrying a secret reference reports it deferred too",
+    "template": "{{auth}}",
+    "values": {
+      "auth": "Bearer {{apiKey}}"
+    },
+    "secrets": ["apiKey"],
+    "want": "Bearer {{apiKey}}",
+    "refs": [
+      {
+        "name": "auth",
+        "kind": "resolved"
+      },
+      {
+        "name": "apiKey",
+        "kind": "deferred"
+      }
+    ]
+  },
+  {
+    "name": "P108 F6: a piped plain value does not report a nested secret (the transform already consumed the raw text)",
+    "template": "{{auth | upper}}",
+    "values": {
+      "auth": "bearer {{apiKey}}"
+    },
+    "secrets": ["apiKey"],
+    "want": "BEARER {{APIKEY}}",
+    "refs": [
+      {
+        "name": "auth",
+        "kind": "resolved",
+        "pipeline": ["upper"]
+      }
+    ]
   }
 ]

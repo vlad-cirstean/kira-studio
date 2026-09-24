@@ -302,6 +302,12 @@ export class OpsState {
     this.#unsubscribe = bridge.on('repo.changed', (event) => {
       if (this.#repoId !== event.repoId) return;
       void this.refreshStatus();
+      // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
+      // repo (another webview, the native app, a review view). An op run from one of those
+      // replaces the slot; without this, this surface kept showing its own stale slot and got
+      // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
+      // switch), which never observes another surface's write.
+      void this.refreshUndo();
     });
     this.#unsubscribeProgress = bridge.on('remote.progress', (event) => {
       if (this.#repoId !== event.repoId) return;

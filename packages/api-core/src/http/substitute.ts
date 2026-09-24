@@ -87,8 +87,18 @@ export interface SubstitutionResult {
  * The grammar (D17), in full: scan for `{{`; from there scan for the next `}}`; no `}}` ⇒ the
  * rest of the string is literal and the scan ends. The name is the text between, trimmed; an
  * empty name is not a reference. Nesting is not a thing — `{{a{{b}}}}` takes `a{{b` as the name,
- * finds nothing, and passes through literally. One pass only: a resolved value that itself
- * contains `{{other}}` is never re-expanded.
+ * finds nothing, and passes through literally. One pass only, within this one call: a resolved
+ * *plain* value that itself contains `{{other}}` is never re-expanded by this call (the shared
+ * corpus's own "a resolved value carrying {{x}} is not re-expanded" case).
+ *
+ * F6: that "one pass" guarantee is per call, not end to end. Go's apivars.ResolveRequest (stage
+ * 2) runs a second Resolve-shaped pass over this function's own combined output, so a plain value
+ * that itself contains a verbatim `{{secretName}}` span — typed or pasted — is resolved there, on
+ * purpose: this is what lets a header like `auth = Bearer {{apiKey}}` work at all. This call
+ * still reports that nested name as a `deferred` Reference (only when the outer reference had no
+ * pipeline, since a pipeline would consume the raw text before stage 2 ever sees it), so a caller
+ * deciding what to reveal from `refs` alone (curl.ts's Copy-as-curl dialog) does not disagree
+ * with what stage 2 actually resolves.
  *
  * P6 D2: `dynamic`, when supplied, is consulted for every `$`-prefixed name — once per occurrence
  * (D3: two `{{$guid}}` references call it twice, matching Postman's own per-occurrence behaviour,
@@ -220,6 +230,26 @@ export function resolve(
     }
     const outcome = resolveOne(kind, name, pipeline, values, dynamic);
     pushRef(outcome.kind);
+    // F6: a plain value can itself contain a `{{secretName}}` span verbatim (typed or pasted,
+    // e.g. an "auth" variable whose value is "Bearer {{apiKey}}"). Go's stage 2
+    // (apivars.ResolveRequest) rescans this function's own combined output and resolves such a
+    // span there, on purpose — this is what lets that header work at all. A caller that decides
+    // what to reveal from `refs` alone (curl.ts's Copy-as-curl dialog, via `applySecretValues`)
+    // must be told about that nested name too, or its preview disagrees with what Send actually
+    // sends. Only meaningful with no pipeline: a transform on the outer reference consumes the
+    // raw text, so any nested `{{...}}` syntax would already be mangled before stage 2 ever sees
+    // it. Classification-only — `resolve` is called with an empty values map so nothing here is
+    // itself substituted; a genuinely nested *plain* reference still stays unknown, same as the
+    // "one pass only" case above.
+    if (kind === 'resolved' && pipeline.length === 0 && secretNames.length > 0) {
+      const value = values[name];
+      if (value.includes('{{')) {
+        const nested = resolve(value, {}, secretNames);
+        for (const nref of nested.refs) {
+          if (nref.kind === 'deferred') refs.push(nref);
+        }
+      }
+    }
     out += outcome.kind === 'resolved' ? outcome.text : (sanitizeUnresolved?.(span) ?? span);
   }
 

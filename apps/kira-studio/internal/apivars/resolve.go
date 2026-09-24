@@ -100,8 +100,18 @@ type SubstitutionResult struct {
 // The grammar, in full: scan for `{{`; from there scan for the next `}}`; no `}}` ⇒ the rest of
 // the string is literal and the scan ends. The name is the text between, trimmed; an empty name
 // is not a reference. Nesting is not a thing — `{{a{{b}}}}` takes `a{{b` as the name, finds
-// nothing, and passes through literally. One pass only: a resolved value that itself contains
-// `{{other}}` is never re-expanded.
+// nothing, and passes through literally. One pass only, within this one call: a resolved *plain*
+// value that itself contains `{{other}}` is never re-expanded by this call (the shared corpus's
+// own "a resolved value carrying {{x}} is not re-expanded" case).
+//
+// F6: that "one pass" guarantee is per call, not end to end. ResolveRequest (stage 2, below) runs
+// a second Resolve-shaped pass over this function's own combined output, so a plain value that
+// itself contains a verbatim `{{secretName}}` span — typed or pasted — is resolved there, on
+// purpose: this is what lets a header like `auth = Bearer {{apiKey}}` work at all. This call
+// still reports that nested name as a KindDeferred Reference (only when the outer reference had
+// no pipeline, since a pipeline would consume the raw text before stage 2 ever sees it), so a
+// caller deciding what to reveal from refs alone does not disagree with what stage 2 actually
+// resolves.
 func Resolve(text string, values map[string]string, secretNames []string) SubstitutionResult {
 	return resolveWithSanitizer(text, values, secretNames, nil, nil)
 }
@@ -208,6 +218,27 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 					onResolved(ref, rendered, parsed.Normalized)
 				}
 				out.WriteString(rendered)
+				// F6: a plain value can itself contain a `{{secretName}}` span verbatim (typed or
+				// pasted, e.g. an "auth" variable whose value is "Bearer {{apiKey}}"). Stage 2
+				// (ResolveRequest below) rescans this function's own combined output and resolves
+				// such a span there — a real second pass across the pipeline as a whole, even
+				// though this one call never re-expands its own output (the "one pass only" line
+				// above is about this call). A caller that decides what to reveal from refs alone
+				// (curl.ts's Copy-as-curl dialog) must be told about that name too, or its preview
+				// disagrees with what Send actually sends. Only meaningful with no pipeline: a
+				// transform on the outer reference consumes the raw text, so any nested `{{...}}`
+				// syntax would already be mangled before stage 2 ever sees it. Classification-only
+				// — resolveWithSanitizer is called with a nil values map so nothing here is itself
+				// substituted; a genuinely nested *plain* reference still stays unknown, matching
+				// the one-pass contract.
+				if len(pipeline) == 0 && len(secrets) > 0 && strings.Contains(value, "{{") {
+					nested := resolveWithSanitizer(value, nil, secretNames, nil, nil)
+					for _, nref := range nested.Refs {
+						if nref.Kind == KindDeferred {
+							refs = append(refs, nref)
+						}
+					}
+				}
 			} else {
 				pushRef(KindUnknown)
 				out.WriteString(sanitizeOrVerbatim(span))
