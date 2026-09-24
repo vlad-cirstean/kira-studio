@@ -3,6 +3,7 @@ package codeworkspace
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,9 +119,23 @@ type FileContent struct {
 }
 
 // ReadFile reads relPath (already validated by ValidateRelPath) and classifies it per §8.1: a NUL
-// byte in the first 8 KiB is binary (C1 §5.4's own rule), a file above MaxReadBytes is tooLarge
-// (checked via a stat before reading its bytes, not after loading it whole), a missing file
-// (deleted since ListFiles ran) reports `missing` rather than erroring the whole call.
+// byte in the first 8 KiB is binary (C1 §5.4's own rule), a file above MaxReadBytes is tooLarge, a
+// missing file (deleted since ListFiles ran) reports `missing` rather than erroring the whole
+// call.
+//
+// F12: the type check (Mode().IsRegular()) runs on a plain os.Stat(absPath), before this ever calls
+// os.Open — not after. os.Stat never blocks regardless of what absPath names; os.Open does: opening
+// a FIFO for reading blocks until some other process opens its write end, verified directly against
+// Go's own runtime (a FIFO with no writer makes os.Open hang indefinitely, confirmed with `go run`
+// against a real mkfifo — not merely inferred from POSIX semantics). A symlink git tracked resolving
+// to a FIFO (never an escape: pathsafe.ValidateRelPath's requireUnder already rejects anything
+// outside root) would otherwise pass the old code's stat (size 0, not a dir) straight into a
+// blocking os.ReadFile, pinning the bound call or a search worker forever — checking type on the
+// stat, before any Open is even attempted, is what actually keeps this call from ever making that
+// blocking syscall, which stat-ing an already-opened descriptor cannot do (the hang happens inside
+// Open itself). The subsequent read still goes through io.LimitReader(f, MaxReadBytes+1) — a
+// regular file's size can still grow between this stat and the read finishing, and that bound is
+// what classifies tooLarge on overflow instead of loading an unbounded amount.
 func ReadFile(absPath, relPath string) (FileContent, error) {
 	limit := FileContent{LimitBytes: MaxReadBytes, Language: languageFor(relPath)}
 
@@ -132,7 +147,9 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 	if err != nil {
 		return FileContent{}, fmt.Errorf("codeworkspace: stat %s: %w", relPath, err)
 	}
-	if info.IsDir() {
+	if info.IsDir() || !info.Mode().IsRegular() {
+		// A FIFO, device, socket, or anything else ListFiles' own git enumeration would never have
+		// reported as a worktree file — treated the same as "gone", never opened.
 		limit.Kind = "missing"
 		return limit, nil
 	}
@@ -142,13 +159,27 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 		return limit, nil
 	}
 
-	data, err := os.ReadFile(absPath) //nolint:gosec // absPath already validated (ValidateRelPath).
+	f, err := os.Open(absPath) //nolint:gosec // absPath already validated (ValidateRelPath); type checked above.
 	if err != nil {
 		if os.IsNotExist(err) {
 			limit.Kind = "missing"
 			return limit, nil
 		}
+		return FileContent{}, fmt.Errorf("codeworkspace: open %s: %w", relPath, err)
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(io.LimitReader(f, MaxReadBytes+1))
+	if err != nil {
 		return FileContent{}, fmt.Errorf("codeworkspace: read %s: %w", relPath, err)
+	}
+	if len(data) > MaxReadBytes {
+		// Grew past the gate above between that stat and this read finishing — info.Size() is the
+		// best honest answer left for Bytes (the exact final size is no longer meaningful: this
+		// read never consumed the rest of it).
+		limit.Kind = "tooLarge"
+		limit.Bytes = int(info.Size())
+		return limit, nil
 	}
 
 	sniffLen := len(data)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"runtime"
@@ -314,13 +315,21 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 		return nil, false, true
 	}
 
-	// Gate 2: a directory, a vanished file, or a file over MaxSearchFileBytes.
+	// Gate 2: a directory, a vanished file, a non-regular file, or one over MaxSearchFileBytes.
+	//
+	// F12: the Mode().IsRegular() check runs on this plain os.Stat, before os.Open is ever called —
+	// os.Stat cannot block regardless of what abs names, but os.Open can: opening a FIFO for reading
+	// blocks until some other process opens its write end (verified directly against Go's own
+	// runtime, not merely inferred). A symlink git tracked resolving to a FIFO (never an escape:
+	// gate 1's ValidateRelPath already rejects anything outside root) would otherwise pass the old
+	// code's stat (size 0, not a dir) straight into a blocking os.Open, pinning a search worker
+	// forever — files.go's ReadFile carries the identical fix and reasoning.
 	info, err := os.Stat(abs)
-	if err != nil || info.IsDir() || info.Size() > MaxSearchFileBytes {
+	if err != nil || info.IsDir() || !info.Mode().IsRegular() || info.Size() > MaxSearchFileBytes {
 		return nil, false, true
 	}
 
-	f, err := os.Open(abs) //nolint:gosec // abs already validated (ValidateRelPath, gate 1).
+	f, err := os.Open(abs) //nolint:gosec // abs already validated (ValidateRelPath, gate 1); type checked above.
 	if err != nil {
 		return nil, false, true
 	}
@@ -329,7 +338,7 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 	// Gate 3: a NUL byte in the first 8 KiB marks the file binary — the identical rule ReadFile
 	// already uses (Peek does not advance the reader, so the scanner below still sees the file from
 	// byte 0).
-	br := bufio.NewReaderSize(f, binarySniffBytes)
+	br := bufio.NewReaderSize(io.LimitReader(f, MaxSearchFileBytes+1), binarySniffBytes)
 	peek, _ := br.Peek(binarySniffBytes)
 	if bytes.IndexByte(peek, 0) >= 0 {
 		return nil, false, true

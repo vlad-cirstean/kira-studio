@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -266,5 +268,45 @@ func TestScanFile_WordBoundaryWithinLine(t *testing.T) {
 	}
 	if matches[1].Column != 8 || matches[1].EndColumn != 11 {
 		t.Fatalf("match[1] = [%d,%d], want [8,11] (\"foo\" at the end, not the mid-word one)", matches[1].Column, matches[1].EndColumn)
+	}
+}
+
+// TestScanFile_FIFO_SkippedWithoutHanging is F12's search-side twin of
+// TestReadFile_FIFO_ReturnsMissingWithoutHanging (files_test.go) — gate 2's os.Stat now rejects a
+// non-regular file before scanFile ever calls os.Open, which is the only ordering that actually
+// avoids the hang (os.Open, not os.Stat, is what blocks opening a FIFO with no writer).
+func TestScanFile_FIFO_SkippedWithoutHanging(t *testing.T) {
+	dir := t.TempDir()
+	fifoPath := filepath.Join(dir, "pipe")
+	if err := syscall.Mkfifo(fifoPath, 0o600); err != nil {
+		t.Fatalf("Mkfifo: %v", err)
+	}
+
+	m, err := newMatcher(SearchRequest{Query: "foo", CaseSensitive: true})
+	if err != nil {
+		t.Fatalf("newMatcher: %v", err)
+	}
+
+	type result struct {
+		matches   []SearchMatch
+		truncated bool
+		skipped   bool
+	}
+	done := make(chan result, 1)
+	go func() {
+		matches, truncated, skipped := scanFile(dir, "pipe", m, make([]byte, 0, 64*1024))
+		done <- result{matches, truncated, skipped}
+	}()
+
+	select {
+	case r := <-done:
+		if !r.skipped {
+			t.Fatalf("scanFile(FIFO): skipped = false, want true")
+		}
+		if len(r.matches) != 0 || r.truncated {
+			t.Fatalf("scanFile(FIFO) = %+v, want zero matches, not truncated", r)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("scanFile(FIFO) did not return within 2s — it hung opening the FIFO")
 	}
 }
