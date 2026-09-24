@@ -282,7 +282,7 @@ onUnmounted(() => {
     <!-- P18 D14 (P15 D1's gRPC sibling): the status row, the pane switcher and every strip render
          from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
          opened tab used to show no Messages/Metadata/History switcher at all. -->
-    <div class="response-status-row p-toolbar">
+    <div class="response-status-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>

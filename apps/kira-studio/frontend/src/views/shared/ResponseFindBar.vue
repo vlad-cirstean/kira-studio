@@ -134,7 +134,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
-  <div ref="rootEl" class="response-find-bar p-toolbar" data-testid="http-find-bar">
+  <div ref="rootEl" class="response-find-bar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="http-find-bar">
     <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground">
       <CodiconIcon name="search" :size="13" />
     </span>
@@ -151,7 +151,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
     <!-- Three independent toggles (all three can be on at once), not a single-value picker — the
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
          options in the data views. -->
-    <div class="group">
+    <div class="flex items-center gap-1.5 min-w-0">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button

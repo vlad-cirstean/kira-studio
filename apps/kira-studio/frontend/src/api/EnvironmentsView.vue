@@ -227,7 +227,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
 <template>
   <div class="environments-view" data-testid="environments-dialog">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -235,11 +235,11 @@ useEventListener(listEl, 'dragend', onDragEnd);
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="server-environment" :size="13" /></span>
-      <span class="p-view-target" data-testid="environments-target">Environments</span>
+      <span class="text-kira-md text-fg truncate" data-testid="environments-target">Environments</span>
       <span class="ml-auto flex items-center gap-1" />
     </div>
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar last">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
       <InputGroup v-if="variablesStore.environments.length > 0">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" />
@@ -264,7 +264,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
           }"
         />
       </span>
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Button variant="toolbar-primary" size="kira" data-testid="new-environment" @click="onNewEnvironment">
           New environment
         </Button>

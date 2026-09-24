@@ -490,7 +490,7 @@ onUnmounted(() => {
 <template>
   <div class="http-request-view" data-testid="http-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -498,7 +498,7 @@ onUnmounted(() => {
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="globe" :size="13" /></span>
-      <span class="p-view-target" data-testid="http-request-target">{{ title }}</span>
+      <span class="text-kira-md text-fg truncate" data-testid="http-request-target">{{ title }}</span>
       <Badge variant="chip" class="p-method" :class="methodToken" data-testid="http-method-chip">{{ tab.state.method }}</Badge>
       <!-- D15: the dirty mark sits beside the name here and deliberately *not* on the tab strip,
            which renders purely from TAB_KINDS — a dirty(tab) registry member that seven of the
@@ -545,9 +545,9 @@ onUnmounted(() => {
         </Tooltip>
       </span>
     </div>
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="http-request-refresh" @click="onSend">
@@ -635,7 +635,7 @@ onUnmounted(() => {
            text, unaffected by incognito — this toggle sits after them. Tooltip states the
            prospective rule (§3.1): switching this on stops future writes, it never deletes rows
            already saved before it was flipped. -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira-icon" aria-label="Copy as curl" data-testid="http-copy-as-curl" @click="onCopyAsCurl">
@@ -672,7 +672,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="p-toolbar last">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
       <ToggleGroup
         type="single"
         :model-value="tab.state.requestPane"

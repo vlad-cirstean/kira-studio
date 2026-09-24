@@ -632,7 +632,7 @@ const statusLine = computed(() => {
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -645,15 +645,15 @@ const statusLine = computed(() => {
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="terminal" :size="13" />
       </span>
-      <span class="p-view-target" data-testid="console-target">{{
+      <span class="text-kira-md text-fg truncate" data-testid="console-target">{{
         targetTail?.name ?? tab.path ?? 'Console'
       }}</span>
       <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar last">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+      <div class="flex items-center gap-1.5 min-w-0">
         <!-- The console's search_path/schema control and the "writes go to production" chip from
              Console.html both need tracked data this app does not have yet (no per-console
              schema, no per-connection write-warning flag) — skipped rather than faked. Refresh
@@ -769,7 +769,7 @@ const statusLine = computed(() => {
           </TooltipTrigger>
           <TooltipContent>{{ explainTooltip }}</TooltipContent>
         </Tooltip>
-        <div class="sep"></div>
+        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
         <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
              this is what makes a run replace the last result set instead of stacking a new one,
@@ -793,7 +793,7 @@ const statusLine = computed(() => {
               : 'Running replaces the current result sets — click to add a new one instead'
           }}</TooltipContent>
         </Tooltip>
-        <div class="sep"></div>
+        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
         <div class="saved-anchor">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -815,7 +815,7 @@ const statusLine = computed(() => {
             <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
           </Popover>
         </div>
-        <div class="sep"></div>
+        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
         <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
              is gated off the same way expand/collapse-all above is gated on document-ness. -->
         <Tooltip v-if="!activeResultIsPlan">
@@ -856,7 +856,7 @@ const statusLine = computed(() => {
           </span>
         </TooltipTrigger>
       </Tooltip>
-      <div class="group"></div>
+      <div class="flex items-center gap-1.5 min-w-0"></div>
     </div>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="console-error">
@@ -926,7 +926,7 @@ const statusLine = computed(() => {
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <div class="result-strip-row p-toolbar">
+        <div class="result-strip-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
           <div
             ref="resultStripRef"
             class="result-strip"

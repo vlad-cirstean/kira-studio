@@ -564,7 +564,7 @@ const fieldAttrs = computed(
         side="bottom"
         align="start"
         :side-offset="4"
-        class="autocomplete-suggestions p-completion p-float z-[var(--kira-z-autocomplete)] m-0 list-none"
+        class="autocomplete-suggestions p-completion bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden z-[var(--kira-z-autocomplete)] m-0 list-none"
         @mousedown.prevent
       >
         <ComboboxViewport>
@@ -589,7 +589,7 @@ const fieldAttrs = computed(
     <div
       v-if="hoverLines"
       ref="hoverPanelRef"
-      class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
+      class="var-hover-panel bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed z-[var(--kira-z-autocomplete)] max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
       role="tooltip"
       data-testid="autocomplete-hover"
       :style="hoverStyle ?? undefined"

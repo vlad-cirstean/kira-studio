@@ -650,7 +650,7 @@ onUnmounted(() => {
          === false"` made an absent can-refresh mean "always disabled" -- Refresh below has no
          disabled binding at all now, since this view always passes the literal `true` ViewChrome
          used to receive. -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -663,17 +663,17 @@ onUnmounted(() => {
       <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
         <CodiconIcon name="json" :size="13" />
       </span>
-      <span class="p-view-target" data-testid="document-target"
-        ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+      <span class="text-kira-md text-fg truncate" data-testid="document-target"
+        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
         >{{ targetTail?.name ?? tab.path }}</span
       >
       <Badge>collection</Badge>
       <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -707,7 +707,7 @@ onUnmounted(() => {
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
       </div>
-      <div class="sep"></div>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- Real-interaction fix (reported bug — the pager sits on the right instead of where it
            made sense before): mirrors DataToolbar.vue's own P28 D7 revert of d2892f49 ("the
            pager sits at the toolbar's right edge"), which moved the SQL grid's pager back beside
@@ -747,10 +747,10 @@ onUnmounted(() => {
           {{ opt.label }}
         </ToggleGroupItem>
       </ToggleGroup>
-      <div class="sep"></div>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
            the exact count, the fields/projection menu, and expand/collapse-all. -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -835,10 +835,10 @@ onUnmounted(() => {
           <TooltipContent>Collapse all</TooltipContent>
         </Tooltip>
       </div>
-      <div class="sep"></div>
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
            affordance in the toolbar (deletion lives on the row's own context menu). -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -892,7 +892,7 @@ onUnmounted(() => {
           </span>
         </TooltipTrigger>
       </Tooltip>
-      <div class="group"></div>
+      <div class="flex items-center gap-1.5 min-w-0"></div>
     </div>
     <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
          SORT box beside it (read.ts's structured-sort-only rule, see ./sortDocument.ts's
@@ -900,7 +900,7 @@ onUnmounted(() => {
          Mongo can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's.
          History button and Clear button match FilterToolbar.vue's own layout exactly — this row
          used to have neither. -->
-    <div class="p-toolbar last">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
       <div class="history-anchor">
         <Tooltip>
           <TooltipTrigger as-child>

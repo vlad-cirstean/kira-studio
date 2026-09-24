@@ -466,7 +466,7 @@ function onBulkClose(): void {
 <template>
   <div class="variable-set-view" data-testid="variables-dialog" :data-scope="scope">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -476,15 +476,15 @@ function onBulkClose(): void {
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
       </span>
-      <span class="p-view-target" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
+      <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
       <span class="ml-auto flex items-center gap-1" />
     </div>
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
          #toolbar-2 row this view used to build both controls into on its own — the search box
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
-    <div class="p-toolbar last">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
       <InputGroup v-if="!bulkMode">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" />
@@ -509,7 +509,7 @@ function onBulkClose(): void {
           }"
         />
       </span>
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip v-if="ownerExists">
           <TooltipTrigger as-child>
             <Button

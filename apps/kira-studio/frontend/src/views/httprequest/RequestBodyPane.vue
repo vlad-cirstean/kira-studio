@@ -154,7 +154,7 @@ const caption = computed(() =>
 
 <template>
   <div class="body-pane">
-    <div class="body-mode-row p-toolbar">
+    <div class="body-mode-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <ToggleGroup
         type="single"
         :model-value="selection"

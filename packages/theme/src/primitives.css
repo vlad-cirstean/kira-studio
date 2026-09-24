@@ -189,13 +189,6 @@
 }
 
 /* ---------- P11 floating surface (menu / dialog / popover) ---------- */
-.p-float {
-  background: var(--kira-bg-elevated);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius);
-  box-shadow: var(--kira-shadow-dialog);
-  overflow: hidden;
-}
 .p-menu-label {
   height: var(--kira-control-h-sm);
   display: flex;
@@ -256,56 +249,17 @@
   flex-shrink: 0;
 }
 /* ---------- P12 panel ---------- */
-.p-panel {
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  background: var(--kira-bg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 /* P110 B8: the old panel-head primitive converted to utilities on its 6 consumers -- see
    flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm
-   text-muted-foreground uppercase tracking-wider. */
-
-/* ---------- LAW: a toolbar is --kira-toolbar-h, holds only h-sm controls ---------- */
-.p-toolbar {
-  height: var(--kira-toolbar-h);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-.p-toolbar.last {
-  border-bottom: none;
-}
-.p-toolbar .group {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  min-width: 0;
-}
-.p-toolbar .sep {
-  width: var(--kira-border-width);
-  height: var(--kira-control-inline-h);
-  background: var(--kira-border-strong);
-  margin: 0 var(--kira-s-1);
-  flex-shrink: 0;
-}
+   text-muted-foreground uppercase tracking-wider. P110 B28 folded the panel/toolbar/view-header
+   primitives themselves into plain utilities the same way; see the P110 plan's own commit list
+   (§7.1 B28) and scripts/check-theme-classes.sh for the exact per-family utility strings. */
 
 /* ---------- LAW: connection colour is a 2px rail — tree, tab, toolbar cap.
    Nothing else: no tint, no background, no full border. No colour assigned
    is the default; the slot stays reserved either way so nothing shifts when
    a colour is set. Consumers set --kira-rail to a `var(--kira-conn-*)` (or
    leave it unset for "no colour"). ---------- */
-.p-toolbar-rail {
-  height: 2px;
-  flex-shrink: 0;
-  background: var(--kira-rail, transparent);
-}
 .p-conn-dot {
   width: 5px;
   height: 5px;
@@ -331,30 +285,6 @@
   bottom: 0;
   width: 2px;
   background: var(--kira-rail, transparent);
-}
-
-/* ---------- view header — every non-grid view opens with this ---------- */
-.p-view-head {
-  /* P22 D1: was a literal 28px, one bar shorter than .p-toolbar's 34px directly beneath it in
-     every view — fb7476e's own bar-role family (tokens.css) missed this one bar (F2(c)). The one
-     deliberate rendered height change in this commit. */
-  height: var(--kira-viewhead-h);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-.p-view-target {
-  font-size: var(--kira-t-md);
-  color: var(--kira-fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.p-view-target .path {
-  color: var(--kira-fg-subtle);
 }
 
 /* ---------- tabular body shared by grid / kv / stream / console ---------- */

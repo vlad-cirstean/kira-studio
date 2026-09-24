@@ -34,7 +34,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 
 <template>
   <div ref="scrimEl" class="text-prompt-scrim" data-testid="text-prompt">
-    <div class="text-prompt-box p-float">
+    <div class="text-prompt-box bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden">
       <div class="text-prompt-title text-kira-sm text-muted-foreground">{{ title }}</div>
       <Input
         ref="inputRef"

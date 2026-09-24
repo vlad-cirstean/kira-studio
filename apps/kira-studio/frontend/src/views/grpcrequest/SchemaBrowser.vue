@@ -104,7 +104,7 @@ function selectMethod(service: string, method: string): void {
 
 <template>
   <div class="schema-browser" data-testid="grpc-schema-browser">
-    <div class="source-row p-toolbar">
+    <div class="source-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <ToggleGroup
         type="single"
         :model-value="tab.state.descriptorMode"

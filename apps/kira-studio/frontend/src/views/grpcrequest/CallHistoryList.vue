@@ -90,7 +90,7 @@ async function onClear(): Promise<void> {
 
 <template>
   <div class="history-pane" data-testid="grpc-history-list">
-    <div class="history-toolbar p-toolbar">
+    <div class="history-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
       <span class="ml-auto" />
       <Button

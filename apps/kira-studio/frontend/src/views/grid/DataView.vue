@@ -201,12 +201,12 @@ function onCloseSearch(): void {
 
 <template>
   <div class="data-view">
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span v-if="railColor !== undefined" class="p-conn-dot" :class="{ none: !railColor }" :style="{ '--kira-rail': connColorVar(railColor) }" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
       <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
-      <span class="p-view-target" data-testid="grid-target">
-        <span v-if="pathPrefix" class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
+      <span class="text-kira-md text-fg truncate" data-testid="grid-target">
+        <span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
       </span>
       <Badge v-if="targetTail?.kind" data-testid="grid-kind-badge">{{ targetTail.kind }}</Badge>
       <Badge v-if="columnCount !== null" data-testid="grid-column-count-badge"
@@ -223,9 +223,9 @@ function onCloseSearch(): void {
       </span>
     </div>
 
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar" data-testid="data-toolbar">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="data-toolbar">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -281,7 +281,7 @@ function onCloseSearch(): void {
       <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
            accent-filled control on the whole screen. The preview-command eye sits in this same
            group. -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <template v-if="tabHasPending">
           <Badge variant="warn"
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
@@ -346,7 +346,7 @@ function onCloseSearch(): void {
         </template>
       </div>
     </div>
-    <div class="p-toolbar last" data-testid="filter-toolbar">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" data-testid="filter-toolbar">
       <FilterToolbar :tab="tab" />
     </div>
 

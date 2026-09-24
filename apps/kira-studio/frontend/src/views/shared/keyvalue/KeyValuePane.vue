@@ -28,7 +28,7 @@
 // duplication §2.2 rules out. Rendering ViewChrome as a thin header (icon/name/refresh/stop only)
 // and this component's own badges/toolbar bands as its next sibling keeps every line of that
 // markup in one place, at the cost of badges no longer sitting inline with the header name —
-// still one coherent `.p-toolbar`-styled band, immediately below it.
+// still one coherent toolbar-styled band, immediately below it.
 import type { PageSize } from '@shared/domain/tabs';
 import { decodePath, pathParent, pathTail } from '@shared/domain/tree';
 import {
@@ -721,7 +721,7 @@ onUnmounted(() => {
   <div class="keyvalue-pane" data-testid="keyvalue-pane" :class="{ embedded: !tab }">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <template v-if="tab">
-      <div class="p-view-head">
+      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
         <span
           v-if="connColor !== undefined"
           class="p-conn-dot"
@@ -734,15 +734,15 @@ onUnmounted(() => {
         <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
           <CodiconIcon :name="page?.redisType === 'object' ? 'file' : 'key'" :size="13" />
         </span>
-        <span class="p-view-target" data-testid="keyvalue-target"
-          ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+        <span class="text-kira-md text-fg truncate" data-testid="keyvalue-target"
+          ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
           >{{ targetTail?.name ?? tab.path }}</span
         >
         <span class="ml-auto flex items-center gap-1" />
       </div>
-      <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connColor) }" />
-      <div class="p-toolbar last">
-        <div class="group">
+      <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(connColor) }" />
+      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+        <div class="flex items-center gap-1.5 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="keyvalue-refresh" @click="onRefresh">
@@ -785,7 +785,7 @@ onUnmounted(() => {
             }"
           />
         </span>
-        <div class="group" />
+        <div class="flex items-center gap-1.5 min-w-0" />
       </div>
     </template>
 
@@ -800,7 +800,7 @@ onUnmounted(() => {
       </Button>
     </Alert>
     <template v-else>
-      <div v-if="page" class="p-toolbar kv-badges" data-testid="keyvalue-badges">
+      <div v-if="page" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border kv-badges" data-testid="keyvalue-badges">
         <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
         <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
@@ -818,8 +818,8 @@ onUnmounted(() => {
         <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
       </div>
 
-      <div class="p-toolbar last kv-toolbar" data-testid="keyvalue-toolbar">
-        <div class="group">
+      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 kv-toolbar" data-testid="keyvalue-toolbar">
+        <div class="flex items-center gap-1.5 min-w-0">
           <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
                same call StreamView.vue's isBatch makes for SQS. The status text stays: it's the
@@ -862,7 +862,7 @@ onUnmounted(() => {
         </div>
 
         <template v-if="!isSingleObjectPage">
-          <div class="sep" />
+          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
           <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
                DataToolbar.vue's own page-size segmented control occupies. -->
@@ -878,11 +878,11 @@ onUnmounted(() => {
           </ToggleGroup>
         </template>
 
-        <div class="sep" />
+        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
         <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
              (a key has no schema), so this group is count alone, same slot as SQL/Document. -->
-        <div class="group">
+        <div class="flex items-center gap-1.5 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira-icon" aria-label="Exact count" data-testid="keyvalue-count" @click="keyValueViewStore.runCount(viewKey)">
@@ -893,11 +893,11 @@ onUnmounted(() => {
           </Tooltip>
         </div>
 
-        <div class="sep" />
+        <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
         <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
              add-before-delete order), search trails, same as every other view. -->
-        <div class="group">
+        <div class="flex items-center gap-1.5 min-w-0">
           <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
             <div ref="addAnchorRef" class="add-anchor">
               <Tooltip>
@@ -1075,7 +1075,7 @@ onUnmounted(() => {
         @close="onCloseSearch"
       />
 
-      <div class="p-panel table-panel">
+      <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 table-panel">
         <div class="p-thead">
           <div class="p-th gutter kv-col-gutter"></div>
           <div class="p-th kv-col-field">

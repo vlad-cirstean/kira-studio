@@ -88,12 +88,12 @@ onUnmounted(() => {
       <div
         v-if="open"
         ref="popoverRef"
-        class="error-popover p-float"
+        class="error-popover bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden"
         data-testid="error-popover"
         :style="style"
       >
         <div class="error-popover-body">{{ props.message }}</div>
-        <div class="p-toolbar last error-popover-actions">
+        <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 error-popover-actions">
           <Button variant="toolbar" size="kira" class="ml-auto" @click="copyText(props.message)">Copy</Button>
           <Button variant="toolbar" size="kira" @click="close">Close</Button>
         </div>

@@ -288,7 +288,7 @@ onMounted(() => {
 <template>
   <div class="browse-view" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -301,16 +301,16 @@ onMounted(() => {
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon :name="headerIcon" :size="13" />
       </span>
-      <span class="p-view-target" data-testid="browse-target"
-        ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+      <span class="text-kira-md text-fg truncate" data-testid="browse-target"
+        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
         >{{ targetName }}</span
       >
       <span class="ml-auto flex items-center gap-1"></span>
     </div>
 
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar last">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira-icon" data-testid="browse-refresh" aria-label="Refresh" @click="onReload">
@@ -372,7 +372,7 @@ onMounted(() => {
           </span>
         </TooltipTrigger>
       </Tooltip>
-      <div class="group"></div>
+      <div class="flex items-center gap-1.5 min-w-0"></div>
     </div>
 
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
@@ -441,10 +441,10 @@ onMounted(() => {
           @resize="onResizeList"
         >
           <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
-               ViewChrome's own toolbar into the pane whose list they act on. Reuses `.p-toolbar`
-               styling (the same 26px in-view band every other toolbar already is) rather than
-               inventing a header. -->
-          <div class="p-toolbar list-head" data-testid="browse-list-head">
+               ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
+               toolbar utility band (the same 26px in-view band every other toolbar already is)
+               rather than inventing a header. -->
+          <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border list-head" data-testid="browse-list-head">
             <Tooltip>
               <TooltipTrigger as-child>
                 <TooltipDisabledTrigger>
@@ -478,7 +478,7 @@ onMounted(() => {
             </span>
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </div>
-          <div class="p-panel body-panel">
+          <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 body-panel">
             <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty text-muted-foreground">Loading…</div>
             <div v-else-if="rt.nodes.length === 0" class="empty text-muted-foreground" data-testid="browse-empty">
               No items

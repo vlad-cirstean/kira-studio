@@ -510,11 +510,11 @@ const statusLine = computed(() => {
          ViewHeader inlined (P104 §3: layout container, no library counterpart) — the row number
          rides along in the target text itself (cell-editor-target's toContainText assertions
          don't care about styling). -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="symbol-string" :size="13" />
       </span>
-      <span class="p-view-target" data-testid="cell-editor-target"
+      <span class="text-kira-md text-fg truncate" data-testid="cell-editor-target"
         >{{ `${targetLabel} · row ${selectedCell.row + 1}` }}</span
       >
       <Tooltip v-if="dataTypeHint">

@@ -242,7 +242,7 @@ function onDeleteRow(): void {
   <!-- LAW 01/10: ViewChrome's own Refresh/Stop group renders ahead of this slot's content, so
        the leading sep below matches every other view's #toolbar (KeyValueView.vue,
        DocumentView.vue) rather than assuming its own hand-rolled equivalent (F1/F3). -->
-  <div class="sep" />
+  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
   <!-- P28 D7 reverts P16 D1 (commit d2892f49, which moved this to DataView.vue's #toolbar-end)
        by user report: navigation belongs beside the page-size picker it pages through, at the
@@ -281,9 +281,9 @@ function onDeleteRow(): void {
     </ToggleGroupItem>
   </ToggleGroup>
 
-  <div class="sep" />
+  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-  <div class="group">
+  <div class="flex items-center gap-1.5 min-w-0">
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
@@ -340,9 +340,9 @@ function onDeleteRow(): void {
     </Popover>
   </div>
 
-  <div class="sep" />
+  <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-  <div class="group">
+  <div class="flex items-center gap-1.5 min-w-0">
     <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger>
@@ -441,9 +441,10 @@ function onDeleteRow(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* Sizing/spacing/colour all come from .p-toolbar and what it hosts (p-iconbtn, Button variant="toolbar",
-   p-seg, InputGroup variant="kira", plus the Badge component) — the pager's own layout/page-jump-input
-   styling lives in PagerControls.vue now; only the columns anchor's positioning is left here. */
+/* Sizing/spacing/colour all come from the parent toolbar div's utility classes (P110 B28) and what
+   this hosts (p-iconbtn, Button variant="toolbar", p-seg, InputGroup variant="kira", plus the Badge
+   component) — the pager's own layout/page-jump-input styling lives in PagerControls.vue now; only
+   the columns anchor's positioning is left here. */
 
 .columns-anchor {
   @apply relative;

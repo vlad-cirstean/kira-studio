@@ -280,7 +280,7 @@ onUnmounted(() => {
 <template>
   <div class="grpc-request-view" data-testid="grpc-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -288,7 +288,7 @@ onUnmounted(() => {
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="symbol-interface" :size="13" /></span>
-      <span class="p-view-target" data-testid="grpc-request-target">{{ title }}</span>
+      <span class="text-kira-md text-fg truncate" data-testid="grpc-request-target">{{ title }}</span>
       <Badge v-if="tab.state.service && tab.state.method" variant="info" data-testid="grpc-method-chip">
         {{ tab.state.service }}/{{ tab.state.method }}
       </Badge>
@@ -333,9 +333,9 @@ onUnmounted(() => {
         </Tooltip>
       </span>
     </div>
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="grpc-request-refresh" @click="onCall">
@@ -432,7 +432,7 @@ onUnmounted(() => {
       </span>
       <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
            icon-only action group, so this is its own toolbar-end group. -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -451,7 +451,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="p-toolbar last">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
       <ToggleGroup type="single" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
         <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>

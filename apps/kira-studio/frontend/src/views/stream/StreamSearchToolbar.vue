@@ -100,7 +100,7 @@ onUnmounted(() => {
 
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
-  <div ref="rootEl" class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar">
+  <div ref="rootEl" class="stream-search-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="stream-search-toolbar">
     <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
       <Input
@@ -134,10 +134,10 @@ onUnmounted(() => {
       </TooltipTrigger>
       <TooltipContent>Next match</TooltipContent>
     </Tooltip>
-    <div class="sep" />
+    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <!-- P31 D17: same filter *mode* as views/shared/page/SearchToolbar.vue (P24 D1/D9) — hides every
          non-matching row. -->
-    <div class="group">
+    <div class="flex items-center gap-1.5 min-w-0">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -156,7 +156,7 @@ onUnmounted(() => {
         }}</TooltipContent>
       </Tooltip>
     </div>
-    <div class="sep" />
+    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <span class="text-kira-xs text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
         showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows

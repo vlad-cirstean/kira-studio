@@ -150,6 +150,13 @@ check_class 'p-dlgbtn' 'Button variant="dialog"/"dialog-primary"'
 # own named target: "not bg-muted/50: today's actions have no fill").
 check_class 'p-dialog-body' 'flex flex-col gap-2 p-3 (or gap-0.5 p-1 for the .list variant)'
 check_class 'p-dialog-actions' 'flex items-center gap-1.5 (plus justify-end w-full for .end)'
+# P110 B28: the toolbar/view-header/floating-surface/panel family, folded into plain utilities.
+check_class 'p-toolbar' 'h-bar shrink-0 flex items-center gap-1.5 px-2 (+ border-b border-border unless .last)'
+check_class 'p-toolbar-rail' 'h-0.5 shrink-0 bg-(--kira-rail)'
+check_class 'p-view-head' 'h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border'
+check_class 'p-view-target' 'text-kira-md text-fg truncate (plus text-subtle for .path)'
+check_class 'p-float' 'bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden'
+check_class 'p-panel' 'border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

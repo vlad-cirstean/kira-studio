@@ -273,7 +273,7 @@ onUnmounted(() => {
 <template>
   <template v-if="state === 'loading' || state === 'found'">
     <div v-if="isMarkdown" class="repo-file">
-      <div class="p-toolbar last">
+      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
         <ToggleGroup
           type="single"
           :model-value="view"

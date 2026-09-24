@@ -253,7 +253,7 @@ onUnmounted(() => {
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
   <div
     ref="rootEl"
-    class="search-toolbar p-toolbar"
+    class="search-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <span
@@ -276,7 +276,7 @@ onUnmounted(() => {
          single-value picker, so each is its own icon button rather than a <SegmentedControl> (which
          only models "exactly one option selected") — the same three codicons VS Code's own
          find widget uses for this. -->
-    <div class="group">
+    <div class="flex items-center gap-1.5 min-w-0">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -324,12 +324,12 @@ onUnmounted(() => {
       </Tooltip>
     </div>
 
-    <div class="sep" />
+    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
     <!-- P24 D1/D9: a filter *mode* on this same widget — hides every row with no match. Its own
          group, flanked by .sep on both sides, since case/word/regex say *how to match* and this
          (with prev/next) says *what to do with the matches*. -->
-    <div class="group">
+    <div class="flex items-center gap-1.5 min-w-0">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -349,7 +349,7 @@ onUnmounted(() => {
       </Tooltip>
     </div>
 
-    <div class="sep" />
+    <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
     <span
       v-if="errorMessage"
@@ -399,7 +399,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Next match</TooltipContent>
       </Tooltip>
-      <div class="sep" />
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <span class="text-kira-xs text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
           showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }}

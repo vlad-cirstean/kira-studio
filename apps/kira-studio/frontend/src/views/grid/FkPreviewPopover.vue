@@ -131,7 +131,7 @@ onUnmounted(() => {
 
 <template>
   <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop">
-    <div ref="panelEl" class="fk-preview p-float" data-testid="fk-preview" :style="style">
+    <div ref="panelEl" class="fk-preview bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
       <div class="fk-preview-header">
         <span class="fk-preview-title">{{ tableLabel }}</span>
         <Badge

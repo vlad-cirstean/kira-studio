@@ -625,7 +625,7 @@ onUnmounted(() => {
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
          made an absent can-refresh mean "always disabled" -- Refresh below carries the same
          `:disabled="isBatch"` this view's `can-refresh="!isBatch"` used to compute. -->
-    <div class="p-view-head">
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -638,8 +638,8 @@ onUnmounted(() => {
       <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }">
         <CodiconIcon name="broadcast" :size="13" />
       </span>
-      <span class="p-view-target"
-        ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+      <span class="text-kira-md text-fg truncate"
+        ><span v-if="pathPrefix" class="text-subtle">{{ pathPrefix }}</span
         ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
       >
       <span class="ml-auto flex items-center gap-1">
@@ -652,9 +652,9 @@ onUnmounted(() => {
       </span>
     </div>
 
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar" :class="{ last: !isKafka }">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" :class="{ 'border-b border-border': isKafka }">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -694,11 +694,11 @@ onUnmounted(() => {
       <!-- Toolbar-consistency pass: a leading separator after the built-in refresh/stop group,
            matching every other view's #toolbar slot (KeyValueView.vue, DocumentView.vue) and
            DataToolbar.vue's own canonical ordering. -->
-      <div class="sep" />
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
       <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
            in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -757,7 +757,7 @@ onUnmounted(() => {
       <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
            (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
            leading sep. -->
-      <div class="sep" />
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
       <ToggleGroup
         type="single"
@@ -775,9 +775,9 @@ onUnmounted(() => {
         </ToggleGroupItem>
       </ToggleGroup>
 
-      <div class="sep" />
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <div class="add-message-anchor">
           <Tooltip v-if="canInsert">
             <TooltipTrigger as-child>
@@ -860,10 +860,10 @@ onUnmounted(() => {
           </span>
         </TooltipTrigger>
       </Tooltip>
-      <div class="group"></div>
+      <div class="flex items-center gap-1.5 min-w-0"></div>
     </div>
 
-    <div v-if="isKafka" class="p-toolbar last">
+    <div v-if="isKafka" class="h-bar shrink-0 flex items-center gap-1.5 px-2">
         <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->

@@ -224,9 +224,9 @@ const breadcrumb = computed(() => {
     data-read-only-reason="definition-not-editable"
   >
     <!-- P104 §3: ViewChrome/ViewHeader inlined (no library counterpart) — Tailwind utilities over
-         components/ui parts, byte-identical `.p-view-head`/`.p-toolbar*` chrome classes kept since
-         primitives.css still styles them until A-final's cleanup. -->
-    <div class="p-view-head">
+         components/ui parts, the same view-head/toolbar chrome utility set every other view uses
+         (P110 B28). -->
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
         v-if="railColor !== undefined"
         class="p-conn-dot"
@@ -235,8 +235,8 @@ const breadcrumb = computed(() => {
       />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
-      <span class="p-view-target" data-testid="definition-target">
-        <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
+      <span class="text-kira-md text-fg truncate" data-testid="definition-target">
+        <span v-if="breadcrumb" class="text-subtle">{{ breadcrumb }}</span>{{ targetLabel }}
       </span>
       <Badge v-if="targetTail">{{ targetTail.kind }}</Badge>
       <Badge>
@@ -245,9 +245,9 @@ const breadcrumb = computed(() => {
       </Badge>
       <span class="ml-auto flex items-center gap-1" />
     </div>
-    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="p-toolbar">
-      <div class="group">
+    <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+      <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
@@ -259,8 +259,8 @@ const breadcrumb = computed(() => {
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
       </div>
-      <div class="sep" />
-      <div class="group">
+      <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
+      <div class="flex items-center gap-1.5 min-w-0">
         <ToggleGroup type="single" :model-value="pane" data-testid="definition-pane" @update:model-value="(v) => v && setPane(v as 'structure' | 'source')">
           <ToggleGroupItem v-for="opt in PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
             {{ opt.label }}
@@ -299,11 +299,11 @@ const breadcrumb = computed(() => {
           }"
         />
       </span>
-      <div class="group">
+      <div class="flex items-center gap-1.5 min-w-0">
         <!-- D7: Copy/notes describe the Source pane's raw text specifically — Structure has its
              own per-section content and count badges, nothing to copy as one document. -->
         <template v-if="pane === 'source'">
-          <div class="sep" />
+          <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
           <Tooltip>
             <TooltipTrigger as-child>
               <Button variant="toolbar" size="kira" data-testid="definition-copy" @click="onCopy">

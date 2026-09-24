@@ -306,7 +306,7 @@ onUnmounted(() => {
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
-    <div class="response-status-row p-toolbar">
+    <div class="response-status-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <template v-if="response">
         <Tooltip>
           <TooltipTrigger as-child>
