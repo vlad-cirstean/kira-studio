@@ -95,6 +95,9 @@ const treeIndent = computed(
   () => `${settingsState.value?.settings.value['workbench.tree.indent'] ?? FALLBACK_TREE_INDENT}px`,
 );
 
+// P108 F12: this instance's own root, so a document-level handler below can tell a key/click that
+// landed inside it from one that landed in a sibling mount (a graph tab, another review sidebar).
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
 const repoId = ref<string | undefined>(undefined);
 const noActiveRepo = ref(false);
 // G12 D6: same treatment as App.vue's own bootError — "Loading…" forever is not an acceptable
@@ -720,8 +723,16 @@ function toggleRow(sha: string): void {
 // G12 D12: the diff overlay (and W17's modal-focus wiring for it) is gone — every diff opens in
 // VS Code now, so there is nothing left in the webview for Escape's first stage to close. Only
 // the second stage (collapse the focused row) remains.
+//
+// P108 F12: Kira Space mounts this alongside one or more graph tabs in the same document (kept
+// alive with `v-show` rather than unmounted) — this `document`-level listener otherwise fired for
+// an Escape typed while focus was inside a graph tab's own DOM too, collapsing a review row the
+// user was never even looking at. Scoped to this instance's own root.
 function onDocumentKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return;
+  if (!rootEl.value || !(event.target instanceof Node) || !rootEl.value.contains(event.target)) {
+    return;
+  }
   const sha = shas.value[focusedRow.value];
   if (sha && review.value?.expandedShas.value.has(sha)) review.value.collapse(sha);
 }
@@ -777,6 +788,7 @@ watch(
 
 <template>
   <div
+    ref="rootEl"
     class="kv-review-view"
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"

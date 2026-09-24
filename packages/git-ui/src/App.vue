@@ -74,6 +74,7 @@ import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
+import { useGraphVisible } from './graphVisibility.ts';
 import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
@@ -1482,6 +1483,12 @@ function breakpointFor(width: number): Breakpoint {
 }
 
 const rootEl = ref<HTMLDivElement | null>(null);
+// P108 F12: `main.ts`'s own `mount()` provides this per instance only for a Kira Space graph tab
+// (a `KeepAlive`d sibling among possibly several) — always `true` everywhere else (VS Code's own
+// webview host, this package's own tests), so `onDocumentKeydown` below behaves exactly as before
+// wherever only one instance ever exists.
+const graphVisible = useGraphVisible();
+const overlayDetailRegionEl = ref<HTMLElement | null>(null);
 const breakpoint = ref<Breakpoint>('wide');
 let breakpointObserver: ResizeObserver | undefined;
 let breakpointRaf = 0;
@@ -1614,6 +1621,15 @@ function onSearchShortcut(event: KeyboardEvent): boolean {
 }
 
 function onDocumentKeydown(event: KeyboardEvent): void {
+  // P108 F12: Kira Space mounts several git-ui apps into one document — one per graph tab
+  // (`KeepAlive`d while hidden) plus the review sidebar (`v-show`). Every instance's own
+  // `document`-level listener otherwise fires for every keydown regardless of which one is
+  // actually visible or focused. Handle it here only when the key actually landed inside this
+  // instance's own DOM, or — for a shortcut typed with focus elsewhere entirely (the host chrome,
+  // no graph focused at all) — only the one instance Kira Space currently shows.
+  const target = event.target;
+  const insideThisRoot = !!rootEl.value && target instanceof Node && rootEl.value.contains(target);
+  if (!insideThisRoot && !graphVisible.value) return;
   if (onSearchShortcut(event)) return;
   if (event.key === 'Escape' && detailOpen.value) closeDetail();
 }
@@ -1621,13 +1637,12 @@ function onDocumentKeydown(event: KeyboardEvent): void {
 // The overlay drawer's own "dismissible... on a click outside" (§6.3) — only acted on while the
 // drawer is actually showing, and only at the overlay breakpoint (the docked pane at wide/narrow
 // has no such behaviour; clicking the grid to select a different row is normal use there, not a
-// dismissal).
-onClickOutside(
-  () => document.querySelector<HTMLElement>('[data-testid="detail-region"]'),
-  () => {
-    if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
-  },
-);
+// dismissal). P108 F12: a template ref scoped to this instance's own overlay `<aside>` — the old
+// `document.querySelector('[data-testid="detail-region"]')` resolved the first match in the whole
+// document, which could belong to a different graph tab's own mount.
+onClickOutside(overlayDetailRegionEl, () => {
+  if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
+});
 
 function scheduleBreakpointUpdate(): void {
   if (breakpointRaf !== 0) return;
@@ -1926,7 +1941,12 @@ onBeforeUnmount(() => {
         </main>
 
         <div v-if="detailOpen && breakpoint === 'overlay'" class="kv-detail-drawer">
-          <aside class="kv-detail-region" data-testid="detail-region" aria-label="Commit detail">
+          <aside
+            ref="overlayDetailRegionEl"
+            class="kv-detail-region"
+            data-testid="detail-region"
+            aria-label="Commit detail"
+          >
             <p v-if="!hasSelection" class="kv-detail-empty">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
