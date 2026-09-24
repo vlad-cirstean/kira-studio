@@ -100,6 +100,13 @@ export class PrState {
    *  rather than one debounced no-op per row. */
   #disabledForRepo = false;
   readonly #unsubscribe: () => void;
+  /** F9: bumped by every `#clear()` — `setRepoId` (a repo switch) AND the `refsChanged` handler
+   *  (same repo, server caches dropped) alike. `ensureSnapshot`'s worker pool and `resolveBranch`
+   *  each capture this alongside `repoId` at their own start: a repo switch alone (`repoId`
+   *  changing) already stopped a *different* repo's warm-up, but nothing stopped THIS repo's own
+   *  warm-up/resolve from continuing to run — and apply its answers — straight through a
+   *  same-repo `refsChanged` clear. */
+  #clearGeneration = 0;
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -123,6 +130,7 @@ export class PrState {
   }
 
   #clear(): void {
+    this.#clearGeneration++;
     this.#selectController?.abort();
     if (this.#selectTimer !== undefined) {
       clearTimeout(this.#selectTimer);
@@ -216,6 +224,12 @@ export class PrState {
    *  GitHub"; a small worker pool here bounds "how many requests are ever in flight at once",
    *  independent of how many branches the repo has. */
   async ensureSnapshot(branchNames: readonly string[]): Promise<void> {
+    const repoId = this.#repoId;
+    // F9: captured once, before the pool ever starts — a repo switch OR a same-repo `refsChanged`
+    // clear landing mid-warm-up must stop every worker from issuing its NEXT request, not just
+    // stop this repo's answers from being applied (wasted `gh`/GitHub REST calls against a repo
+    // nobody is looking at any more otherwise keep firing for as long as `toFetch` has entries).
+    const generation = this.#clearGeneration;
     const toFetch = branchNames.filter(
       (name) =>
         !this.byBranch.value.has(name) &&
@@ -225,6 +239,7 @@ export class PrState {
     let next = 0;
     const worker = async (): Promise<void> => {
       while (next < toFetch.length) {
+        if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
         const name = toFetch[next];
         next += 1;
         if (name !== undefined) await this.resolveBranch(name);
@@ -248,10 +263,13 @@ export class PrState {
       this.#branchRequests.has(branch)
     )
       return;
+    // F9: captured alongside `repoId` — a same-repo `refsChanged` clear leaves `repoId` itself
+    // unchanged, so that check alone cannot detect it; `generation` can.
+    const generation = this.#clearGeneration;
     this.#branchRequests.add(branch);
     try {
       const result = await this.#bridge.request('branch.resolvePr', { repoId, branch });
-      if (this.#repoId !== repoId) return;
+      if (this.#repoId !== repoId || this.#clearGeneration !== generation) return;
       if (result.kind === 'ok') {
         const first = result.prs[0];
         if (first !== undefined) {
@@ -270,7 +288,11 @@ export class PrState {
     } catch {
       // Fail-open (D9/§0.4) — same posture as #requestCommit above.
     } finally {
-      this.#branchRequests.delete(branch);
+      // F9: a clear that landed while this request was in flight already let a NEWER call for
+      // the same branch name re-`add()` it under the current generation — this stale call's own
+      // delete must not remove that entry (the classic "two owners, one shared boolean" bug: it
+      // would let a second, duplicate concurrent fetch start for a branch already back in flight).
+      if (this.#clearGeneration === generation) this.#branchRequests.delete(branch);
     }
   }
 

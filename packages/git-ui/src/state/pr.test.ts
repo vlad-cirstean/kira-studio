@@ -572,3 +572,82 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     pr.dispose();
   });
 });
+
+// F9: resolveBranch used to read `this.#repoId` fresh but never guard against a SAME-repo
+// refsChanged clear, and its own `finally` deleted `#branchRequests`' marker unconditionally —
+// even when a newer request for the same branch name (started after the clear) already owned it.
+describe('PrState — F9: a stale resolveBranch across a same-repo refsChanged clear', () => {
+  test('the stale request neither overwrites the fresh answer nor lets a duplicate concurrent fetch start', async () => {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+
+    const resolvers: Array<(v: unknown) => void> = [];
+    transport.onRequest = () =>
+      new Promise((resolve) => {
+        resolvers.push(resolve);
+      });
+
+    // A: the first (soon-to-be-stale) resolveBranch — left hanging.
+    const requestA = pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(1);
+
+    // A same-repo refsChanged clear lands while A is still in flight — repoId itself never
+    // changes, only #clearGeneration, so a guard keyed on repoId alone would miss this entirely.
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+
+    // B: a fresh resolveBranch for the SAME branch, issued after the clear (e.g. BranchPicker
+    // reopening) — #branchRequests was cleared, so this is a real new request, not a no-op.
+    const requestB = pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(2);
+
+    // A settles FIRST, with a now-stale answer.
+    resolvers[0]?.({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 'stale',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: sha(1),
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await requestA;
+
+    // A's own reply must never have applied (dropped as stale) NOR removed B's still-in-flight
+    // #branchRequests marker — a THIRD concurrent fetch for the same branch must not start.
+    expect(pr.byBranch.value.has('feature')).toBe(false);
+    void pr.resolveBranch('feature');
+    await sleep();
+    expect(resolvers).toHaveLength(2); // still just A and B — no duplicate fetch.
+
+    // B settles — its own answer is the one that actually applies.
+    resolvers[1]?.({
+      kind: 'ok',
+      prs: [
+        {
+          number: 2,
+          title: 'fresh',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: sha(2),
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await requestB;
+
+    expect(pr.byBranch.value.get('feature')?.number).toBe(2);
+    pr.dispose();
+  });
+});
