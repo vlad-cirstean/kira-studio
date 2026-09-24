@@ -101,7 +101,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
       </div>
     </div>
 
-    <p v-if="reviewComments.loadError.value" class="kv-detail-pane-error">
+    <p v-if="reviewComments.loadError.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load the comment list — {{ reviewComments.loadError.value }}
     </p>
 
@@ -146,7 +146,10 @@ function anchorTitle(c: ReviewComment): string | undefined {
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
       </p>
 
-      <p v-if="reviewComments.loading.value && groups.length === 0" class="kv-detail-pane-loading">
+      <p
+        v-if="reviewComments.loading.value && groups.length === 0"
+        class="kv:m-0 kv:p-3 kv:text-muted"
+      >
         Loading…
       </p>
     </template>
@@ -263,6 +266,8 @@ function anchorTitle(c: ReviewComment): string | undefined {
   color: var(--kv-description-fg);
 }
 
-/* `.kv-detail-pane-error`/`.kv-detail-pane-loading` are `DetailPane.vue`'s own — reused, not
- * redeclared (`ReviewFilesPane.vue`'s own precedent). */
+/* P110 A14: the error/loading text above were `DetailPane.vue`'s own shared
+ * `.kv-detail-pane-error`/`-loading` classes — now inlined as `kv:` utilities directly on this
+ * file's own elements, since A14 deleted those rules along with DetailPane.vue's `<style>` block.
+ * This file's own remaining rules convert in A16. */
 </style>

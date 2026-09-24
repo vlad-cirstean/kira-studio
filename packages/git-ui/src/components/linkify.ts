@@ -68,10 +68,18 @@ function linkifySegments(text: string): LinkifiedSegment[] {
   return segments;
 }
 
+/** P110 A14: the button's class was `.kv-linkify-url` (CommitMeta.vue's own deleted `<style>`) —
+ *  now a literal `kv:` utility string built here since Tailwind scans `.ts` source too (git-ui's
+ *  own `@source` covers this package). `[font:inherit]` (rung 4, one-off): the exact CSS shorthand
+ *  the old rule used, not decomposable into scale utilities without re-deriving the ambient
+ *  size/weight/line-height it inherits. */
+const LINKIFY_URL_CLASS =
+  'kv:bg-transparent kv:border-0 kv:p-0 kv:m-0 kv:[font:inherit] kv:text-focus kv:cursor-pointer kv:hover:underline';
+
 /** Appends one line's worth of linkified DOM to `parent` — a text node per plain-text segment,
- *  and per URL segment: a `<button class="kv-linkify-url">` calling `onOpenExternal` when given,
- *  or a plain text node (matching `CommitMeta.vue`'s PR row's own inert-text sibling) when
- *  `onOpenExternal` is `undefined` — never a raw `<a href>` (P79 finding 4). */
+ *  and per URL segment: a `<button>` (styled via `LINKIFY_URL_CLASS`) calling `onOpenExternal`
+ *  when given, or a plain text node (matching `CommitMeta.vue`'s PR row's own inert-text sibling)
+ *  when `onOpenExternal` is `undefined` — never a raw `<a href>` (P79 finding 4). */
 export function appendLinkifiedText(
   parent: HTMLElement,
   text: string,
@@ -88,7 +96,7 @@ export function appendLinkifiedText(
     }
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'kv-linkify-url';
+    button.className = LINKIFY_URL_CLASS;
     button.textContent = segment.url;
     button.addEventListener('click', () => onOpenExternal(segment.url));
     parent.appendChild(button);

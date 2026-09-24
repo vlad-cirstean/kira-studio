@@ -154,6 +154,16 @@ const PR_STATE_LABEL: Readonly<Record<string, string>> = {
   closed: 'Closed',
 };
 
+// P110 A14 (§1.3): a lookup map, not string interpolation, so every kv:text-badge-pr-* class
+// Tailwind must scan appears as a complete literal below. Replaces the old dynamic
+// `kv-meta-pr-icon--${state}` class, whose own colour rule lived in this file's deleted <style>.
+const PR_ICON_CLASS: Readonly<Record<string, string>> = {
+  open: 'kv:text-badge-pr-open',
+  draft: 'kv:text-badge-pr-draft',
+  merged: 'kv:text-badge-pr-merged',
+  closed: 'kv:text-badge-pr-closed',
+};
+
 interface PrDetailView {
   readonly kind: 'prs' | 'none' | 'unavailable';
   readonly prs: readonly {
@@ -308,12 +318,15 @@ const prIcon = computed(() => {
 <template>
   <div
     v-if="detail"
-    class="kv-commit-meta"
-    :class="{ 'kv-detail-pane-meta--expanded': expanded }"
+    :class="
+      expanded
+        ? 'kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-[70%] kv:overflow-auto'
+        : 'kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
+    "
     data-testid="commit-meta"
   >
-    <div class="kv-meta-header">
-      <h2 class="kv-meta-subject">{{ detail.subject }}</h2>
+    <div class="kv:flex kv:items-start kv:justify-between kv:gap-1">
+      <h2 class="kv:m-0 kv:text-base kv:font-semibold">{{ detail.subject }}</h2>
       <KuiButton
         variant="icon"
         icon="codicon-diff-multiple"
@@ -324,15 +337,15 @@ const prIcon = computed(() => {
       />
     </div>
 
-    <p class="kv-meta-facts">
+    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted kv:text-xs">
       <span v-kui-tooltip="formatAbsoluteDate(detail.committer.timestamp)">{{
         formatRelativeDate(detail.committer.timestamp)
       }}</span>
-      <span class="kv-meta-facts-sep" aria-hidden="true">·</span>
+      <span class="kv:shrink-0" aria-hidden="true">·</span>
       <button
         v-if="actions.capabilities.clipboard"
         type="button"
-        class="kv-meta-sha"
+        class="kv:font-data kv:text-inherit kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:hover:underline"
         v-kui-tooltip="'Copy full SHA'"
         aria-label="Copy full SHA"
         data-testid="commit-meta-sha"
@@ -340,12 +353,12 @@ const prIcon = computed(() => {
       >
         {{ shortSha }}
       </button>
-      <code v-else class="kv-meta-sha-static" data-testid="commit-meta-sha">{{ shortSha }}</code>
+      <code v-else class="kv:font-data" data-testid="commit-meta-sha">{{ shortSha }}</code>
       <button
         v-if="prIcon && actions.capabilities.openExternal"
         type="button"
-        class="kv-meta-pr-icon codicon codicon-github"
-        :class="`kv-meta-pr-icon--${prIcon.state}`"
+        class="codicon codicon-github kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:text-lg kv:leading-none"
+        :class="PR_ICON_CLASS[prIcon.state]"
         v-kui-tooltip="`#${prIcon.number} ${prIcon.title} — ${prIcon.stateLabel}`"
         :aria-label="`Open pull request #${prIcon.number} on GitHub`"
         data-testid="commit-meta-pr-icon"
@@ -357,57 +370,76 @@ const prIcon = computed(() => {
       v-if="bodyParagraphs.length > 0"
       ref="bodyEl"
       v-show="expanded"
-      class="kv-meta-body"
+      class="kv:m-0 kv:mt-1 kv:whitespace-normal"
     ></p>
 
-    <KuiButton class="kv-meta-body-toggle" @click="expanded = !expanded">
+    <KuiButton
+      class="kv:mt-0.5 kv:border-0 kv:p-0 kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:text-base kv:cursor-pointer kv:hover:underline"
+      @click="expanded = !expanded"
+    >
       {{ expanded ? 'Show less' : 'Show more' }}
     </KuiButton>
 
-    <div v-if="expanded" class="kv-meta-expanded">
-      <p class="kv-meta-identity">{{ detail.author.name }} &lt;{{ detail.author.email }}&gt;</p>
-      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity">
-        {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-        <span class="kv-meta-identity-role">committer</span>
+    <div v-if="expanded" class="kv:flex kv:flex-col kv:gap-1 kv:mt-1">
+      <p class="kv:m-0 kv:text-sm kv:text-muted">
+        {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
       </p>
-      <dl v-if="trailerRows.length > 0" class="kv-meta-trailers">
+      <p v-if="committerDiffersFromAuthor" class="kv:m-0 kv:text-sm kv:text-muted">
+        {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
+        <span class="kv:text-xs">committer</span>
+      </p>
+      <dl
+        v-if="trailerRows.length > 0"
+        class="kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
+      >
         <template v-for="(row, index) in trailerRows" :key="index">
-          <dt>{{ row.token }}</dt>
-          <dd v-if="row.name !== undefined">
-            {{ row.name }} <span class="kv-meta-trailer-email">&lt;{{ row.email }}&gt;</span>
+          <dt class="kv:text-muted">{{ row.token }}</dt>
+          <dd v-if="row.name !== undefined" class="kv:m-0">
+            {{ row.name }} <span class="kv:text-muted">&lt;{{ row.email }}&gt;</span>
           </dd>
-          <dd v-else>{{ row.raw }}</dd>
+          <dd v-else class="kv:m-0">{{ row.raw }}</dd>
         </template>
       </dl>
-      <dl v-if="hasDetails" class="kv-meta-details-list">
+      <dl
+        v-if="hasDetails"
+        class="kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
+      >
         <template v-if="detail.decoration.length > 0">
-          <dt>Refs</dt>
-          <dd ref="decorationEl" class="kv-meta-refs"></dd>
+          <dt class="kv:text-muted">Refs</dt>
+          <dd ref="decorationEl" class="kv:m-0 kv:flex kv:flex-wrap kv:gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
-          <dt>Signature</dt>
-          <dd>{{ signatureText }}</dd>
+          <dt class="kv:text-muted">Signature</dt>
+          <dd class="kv:m-0">{{ signatureText }}</dd>
         </template>
         <template v-if="prDetail">
-          <dt>Pull request</dt>
-          <dd v-if="prDetail.kind === 'prs'" class="kv-meta-pr">
-            <div v-for="pr in prDetail.prs" :key="pr.number" class="kv-meta-pr-row">
+          <dt class="kv:text-muted">Pull request</dt>
+          <dd v-if="prDetail.kind === 'prs'" class="kv:m-0 kv:flex kv:flex-col kv:gap-0.5">
+            <div
+              v-for="pr in prDetail.prs"
+              :key="pr.number"
+              class="kv:flex kv:items-center kv:gap-0.5"
+            >
               <span class="kv-badge kv-badge-pill kv-badge-pr" :class="`kv-badge-pr--${pr.state}`">
                 {{ pr.stateLabel }}
               </span>
               <button
                 v-if="actions.capabilities.openExternal"
                 type="button"
-                class="kv-meta-pr-link"
+                class="kv:bg-transparent kv:border-0 kv:p-0 kv:text-inherit kv:[font:inherit] kv:text-left kv:cursor-pointer kv:hover:underline"
                 @click="openPullRequest(pr.number)"
               >
                 #{{ pr.number }} {{ pr.title }}
               </button>
-              <span v-else class="kv-meta-pr-link">#{{ pr.number }} {{ pr.title }}</span>
+              <span
+                v-else
+                class="kv:bg-transparent kv:border-0 kv:p-0 kv:text-inherit kv:[font:inherit] kv:text-left"
+                >#{{ pr.number }} {{ pr.title }}</span
+              >
             </div>
           </dd>
-          <dd v-else-if="prDetail.kind === 'none'">No pull request</dd>
-          <dd v-else class="kv-meta-pr-unavailable" data-testid="pr-unavailable">
+          <dd v-else-if="prDetail.kind === 'none'" class="kv:m-0">No pull request</dd>
+          <dd v-else class="kv:m-0 kv:text-muted" data-testid="pr-unavailable">
             {{ prDetail.reason }}
           </dd>
         </template>
@@ -415,223 +447,3 @@ const prIcon = computed(() => {
     </div>
   </div>
 </template>
-
-<style>
-.kv-commit-meta {
-  padding: var(--kv-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-2);
-}
-
-.kv-meta-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--kv-s-2);
-}
-
-.kv-meta-subject {
-  margin: 0;
-  font-size: 1em;
-  font-weight: 600;
-}
-
-/* G-UX (item 6): the date + short-SHA row — visible even while collapsed, alongside the title and
-   the "Open all changes" action. */
-.kv-meta-facts {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-  color: var(--kv-description-fg);
-  font-size: 0.85em;
-}
-
-.kv-meta-facts-sep {
-  flex-shrink: 0;
-}
-
-.kv-meta-sha {
-  font-family: var(--kv-mono-font-family);
-  color: inherit;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.kv-meta-sha:hover {
-  text-decoration: underline;
-}
-
-.kv-meta-sha-static {
-  font-family: var(--kv-mono-font-family);
-}
-
-.kv-meta-body {
-  margin: var(--kv-s-2) 0 0;
-  white-space: normal;
-}
-
-/* P79 finding 4: a <button>, not an <a> (linkify.ts's own doc comment) — reset to read as
-   ordinary link-styled text, since it sits inline inside message-body prose rather than beside a
-   badge the way .kv-meta-pr-link does. */
-.kv-linkify-url {
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: var(--kv-focus-border);
-  cursor: pointer;
-}
-
-.kv-linkify-url:hover {
-  text-decoration: underline;
-}
-
-/* Deliberately not a standard control's box: "Show more"/"Show less" reads as an inline link
-   (the same --kv-focus-border blue .kv-meta-body a uses just above), zero-padding and borderless
-   by design rather than left over from before the button system existed — no button variant
-   models a link, and inventing one for this single caller would be speculative generality. */
-.kv-meta-body-toggle {
-  margin-top: var(--kv-s-1);
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--kv-focus-border);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.kv-meta-body-toggle:hover {
-  text-decoration: underline;
-}
-
-/* G-UX (items 6/7): the collapsible region behind "Show more" — body, author/committer identity,
-   trailers, then Refs/Signature/Pull request, all folded into the one region. Zero space cost
-   while collapsed (the default view): nothing here renders until `expanded` is true. */
-.kv-meta-expanded {
-  margin-top: var(--kv-s-2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-2);
-}
-
-.kv-meta-identity {
-  margin: 0;
-  font-size: 0.92em;
-  color: var(--kv-description-fg);
-}
-
-.kv-meta-identity-role {
-  font-size: 0.85em;
-}
-
-.kv-meta-trailers {
-  margin: 0;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--kv-s-1) var(--kv-s-4);
-  font-size: 0.92em;
-}
-
-.kv-meta-trailers dt {
-  color: var(--kv-description-fg);
-}
-
-.kv-meta-trailers dd {
-  margin: 0;
-}
-
-.kv-meta-trailer-email {
-  color: var(--kv-description-fg);
-}
-
-.kv-meta-details-list {
-  margin: 0;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--kv-s-1) var(--kv-s-4);
-  font-size: 0.92em;
-}
-
-.kv-meta-details-list dt {
-  color: var(--kv-description-fg);
-}
-
-.kv-meta-details-list dd {
-  margin: 0;
-}
-
-.kv-meta-refs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kv-s-1);
-}
-
-.kv-meta-pr {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-}
-
-.kv-meta-pr-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-}
-
-/* A <button> when actions.capabilities.openExternal, a plain <span> otherwise (the template's own
-   v-if/v-else) — reset either way so the row reads identically, interactive or not. */
-.kv-meta-pr-link {
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-button.kv-meta-pr-link {
-  cursor: pointer;
-}
-
-button.kv-meta-pr-link:hover {
-  text-decoration: underline;
-}
-
-.kv-meta-pr-unavailable {
-  color: var(--kv-description-fg);
-}
-
-/* P74 §4.3: the facts row's own PR icon — sized/coloured off the row's own 0.85em text, never a
-   bare px literal, and coloured by the same --kv-badge-pr-*-fg token the grid/StackList/detail
-   pane's own PR badges already use, so no surface can disagree about what a state looks like. */
-.kv-meta-pr-icon {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-size: 1.1em;
-  line-height: 1;
-}
-
-.kv-meta-pr-icon--open {
-  color: var(--kv-badge-pr-open-fg);
-}
-
-.kv-meta-pr-icon--draft {
-  color: var(--kv-badge-pr-draft-fg);
-}
-
-.kv-meta-pr-icon--merged {
-  color: var(--kv-badge-pr-merged-fg);
-}
-
-.kv-meta-pr-icon--closed {
-  color: var(--kv-badge-pr-closed-fg);
-}
-</style>

@@ -89,7 +89,7 @@ function onToggleReviewed(path: string): void {
 
 <template>
   <div class="kv-review-files-pane">
-    <p v-if="reviewFiles.loadError.value" class="kv-detail-pane-error">
+    <p v-if="reviewFiles.loadError.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load the file list — {{ reviewFiles.loadError.value }}
     </p>
 
@@ -105,18 +105,18 @@ function onToggleReviewed(path: string): void {
         />
         <span v-if="deltaStatusText" class="kv-review-files-delta-status">{{ deltaStatusText }}</span>
       </div>
-      <p v-if="reviewFiles.diffError.value" class="kv-detail-pane-error">
+      <p v-if="reviewFiles.diffError.value" class="kv:m-0 kv:p-3 kv:text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
       </p>
       <!-- G30 round-1 functional-correctness review, finding #7: a failed review.mark used to be
            an unhandled promise rejection with nothing shown here — the checkbox just silently
            reverted on the next render. Mirrors loadError/diffError's own pattern exactly. -->
-      <p v-if="reviewFiles.markError.value" class="kv-detail-pane-error">
+      <p v-if="reviewFiles.markError.value" class="kv:m-0 kv:p-3 kv:text-error">
         Couldn't update that file's review status — {{ reviewFiles.markError.value }}
       </p>
 
       <FileTree
-        class="kv-detail-pane-tree kv-review-files-tree"
+        class="kv:flex-auto kv:min-h-0 kv:border-b kv:border-panel-border"
         :files="files"
         :selected-file="selectedIndex"
         :list-mode="listMode"
@@ -130,7 +130,7 @@ function onToggleReviewed(path: string): void {
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />
-      <p v-if="reviewFiles.loading.value && files.length === 0" class="kv-detail-pane-loading">
+      <p v-if="reviewFiles.loading.value && files.length === 0" class="kv:m-0 kv:p-3 kv:text-muted">
         Loading…
       </p>
     </template>
@@ -143,10 +143,6 @@ function onToggleReviewed(path: string): void {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-}
-
-.kv-review-files-tree {
-  border-top: none;
 }
 
 /* G12 D14/D16: the same .p-seg-shaped segmented group as ReviewView.vue's own toggles. */
@@ -165,6 +161,10 @@ function onToggleReviewed(path: string): void {
   font-size: var(--kv-t-sm);
 }
 
-/* `.kv-detail-pane-diff`/`.kv-detail-pane-tree`/`.kv-detail-pane-error`/`.kv-detail-pane-loading`
- * are `DetailPane.vue`'s own — reused, not redeclared (`StashDetailPane.vue`'s own precedent). */
+/* P110 A14: the error/loading text and the tree's flex/border were `DetailPane.vue`'s own shared
+ * `.kv-detail-pane-error`/`-tree`/`-loading` classes (`StashDetailPane.vue`'s own precedent) — now
+ * inlined as `kv:` utilities directly on this file's own elements above, since A14 deleted those
+ * rules along with DetailPane.vue's `<style>` block. This file's own remaining rules
+ * (`.kv-review-files-pane`, `.kv-review-files-diff-mode`, `.kv-review-files-delta-status`) convert
+ * in A16. */
 </style>

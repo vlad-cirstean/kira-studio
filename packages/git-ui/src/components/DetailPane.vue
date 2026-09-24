@@ -16,9 +16,10 @@
  * above the tree, a second "details" instance for Refs/Signature/PR below it, each with its own
  * scroll cap) — it is a single instance now, folding all of that behind one "Show more" region, so
  * nothing renders stranded below the file tree any more. The collapsed-state proportion is
- * enforced the same way as before: `.kv-detail-pane-meta` is `flex: 0 0 auto` with a `max-height`
- * cap (a bounded `%` of the pane's own height, not of the viewport), `.kv-detail-pane-tree` is
- * `flex: 1 1 auto` and takes the remainder.
+ * enforced the same way as before: `CommitMeta.vue`'s own root is `kv:flex-none` with a `max-height`
+ * cap (a bounded `%` of the pane's own height, not of the viewport — P110 A14 moved the cap and its
+ * `expanded` variant fully into `CommitMeta.vue` itself, since only it knows that state), and
+ * `<FileTree>` here is `kv:flex-auto` and takes the remainder.
  */
 import type { CommitStore } from '@kira/git-core';
 import { computed } from 'vue';
@@ -61,21 +62,20 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv-detail-pane">
-    <p v-if="detailState.error.value" class="kv-detail-pane-error">
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
+    <p v-if="detailState.error.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load this commit — {{ detailState.error.value }}
     </p>
 
     <template v-if="detail">
       <CommitMeta
-        class="kv-detail-pane-meta"
         :detail="detail"
         :actions="actions"
         :pr-result="pr?.selected.value"
         :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
       />
       <FileTree
-        class="kv-detail-pane-tree"
+        class="kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
         :files="detail.files"
         :selected-file="detailState.selectedFile.value"
         :list-mode="detailState.listMode.value"
@@ -93,54 +93,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!detailState.error.value" class="kv-detail-pane-loading">Loading…</p>
+    <p v-else-if="!detailState.error.value" class="kv:m-0 kv:p-3 kv:text-muted">Loading…</p>
   </div>
 </template>
-
-<style>
-.kv-detail-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-/* G-UX D7 (7c): the subject/description block — naturally ~3 lines collapsed; hard-bounded so a
-   pathological subject or an expanded description can never push the tree below its own share of
-   the pane. The percentage is of THIS pane's own height (the flex container), not the viewport —
-   `.kv-detail-pane-meta--expanded` (CommitMeta.vue's own `:class` binding, keyed off its internal
-   `bodyExpanded`) widens the cap while "Show more" is open. */
-.kv-detail-pane-meta {
-  flex: 0 0 auto;
-  max-height: 20%;
-  overflow: hidden;
-}
-
-/* Expanded: a real region of the pane, never a percentage the tree can squeeze to nothing.
-   min-height is what makes the expansion visible even in a short panel; the tree keeps the rest. */
-.kv-detail-pane-meta.kv-detail-pane-meta--expanded {
-  flex: 0 1 auto;
-  min-height: min(220px, 60%);
-  max-height: 70%;
-  overflow: auto;
-}
-
-.kv-detail-pane-tree {
-  flex: 1 1 auto;
-  min-height: 0;
-  border-top: 1px solid var(--kv-panel-border);
-  border-bottom: 1px solid var(--kv-panel-border);
-}
-
-.kv-detail-pane-error {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-error-fg);
-}
-
-.kv-detail-pane-loading {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-description-fg);
-}
-</style>

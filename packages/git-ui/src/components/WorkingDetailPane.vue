@@ -47,14 +47,16 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv-working-detail-pane">
-    <div class="kv-working-detail-pane-header">Uncommitted Changes</div>
-    <p v-if="workingState.error.value" class="kv-working-detail-pane-error">
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
+    <div class="kv:flex-none kv:p-3 kv:font-semibold kv:border-b kv:border-panel-border">
+      Uncommitted Changes
+    </div>
+    <p v-if="workingState.error.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load uncommitted changes — {{ workingState.error.value }}
     </p>
     <FileTree
       v-else
-      class="kv-working-detail-pane-tree"
+      class="kv:flex-auto kv:min-h-0"
       :files="files"
       :selected-file="workingState.selectedFile.value"
       :list-mode="workingState.listMode.value"
@@ -70,30 +72,3 @@ function onOpenFile(index: number, pinned: boolean): void {
     />
   </div>
 </template>
-
-<style>
-.kv-working-detail-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-.kv-working-detail-pane-header {
-  flex: 0 0 auto;
-  padding: var(--kv-s-5);
-  font-weight: 600;
-  border-bottom: 1px solid var(--kv-panel-border);
-}
-
-.kv-working-detail-pane-tree {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.kv-working-detail-pane-error {
-  margin: 0;
-  padding: var(--kv-s-5);
-  color: var(--kv-error-fg);
-}
-</style>

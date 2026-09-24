@@ -53,25 +53,25 @@ function onOpenFile(index: number, pinned: boolean): void {
 </script>
 
 <template>
-  <div class="kv-stash-detail-pane">
-    <p v-if="stash.error.value" class="kv-detail-pane-error">
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
+    <p v-if="stash.error.value" class="kv:m-0 kv:p-3 kv:text-error">
       Couldn't load this stash — {{ stash.error.value }}
     </p>
 
     <template v-if="entry">
-      <div class="kv-stash-detail-header">
-        <p class="kv-stash-detail-message">{{ entry.message }}</p>
-        <p class="kv-stash-detail-facts">
+      <div class="kv:py-2 kv:px-3 kv:border-b kv:border-panel-border">
+        <p class="kv:m-0 kv:mb-0.5 kv:font-semibold kv:break-words">{{ entry.message }}</p>
+        <p class="kv:m-0 kv:text-xs kv:text-muted">
           <span v-kui-tooltip="formatAbsoluteDate(entry.timestamp)">{{
             formatRelativeDate(entry.timestamp)
           }}</span>
           <span> · based on <code>{{ entry.baseSha.slice(0, 7) }}</code></span>
           <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
-          <span v-if="entry.includedUntracked" class="kv-stash-detail-untracked">-u</span>
+          <span v-if="entry.includedUntracked" class="kv:ml-1 kv:font-data kv:opacity-80">-u</span>
         </p>
       </div>
       <FileTree
-        class="kv-detail-pane-tree"
+        class="kv:flex-auto kv:min-h-0 kv:border-y kv:border-panel-border"
         :files="files"
         :selected-file="stash.selectedFile.value"
         :list-mode="stash.listMode.value"
@@ -87,42 +87,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!stash.error.value" class="kv-detail-pane-loading">Loading…</p>
+    <p v-else-if="!stash.error.value" class="kv:m-0 kv:p-3 kv:text-muted">Loading…</p>
   </div>
 </template>
-
-<style>
-.kv-stash-detail-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-}
-
-.kv-stash-detail-header {
-  padding: var(--kv-s-4) var(--kv-s-5);
-  border-bottom: 1px solid var(--kv-panel-border);
-}
-
-.kv-stash-detail-message {
-  margin: 0 0 var(--kv-s-1);
-  font-weight: 600;
-  overflow-wrap: break-word;
-}
-
-.kv-stash-detail-facts {
-  margin: 0;
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-stash-detail-untracked {
-  margin-left: var(--kv-s-2);
-  font-family: var(--kv-mono-font-family);
-  opacity: 0.8;
-}
-
-/* `.kv-detail-pane-tree`/`.kv-detail-pane-error`/`.kv-detail-pane-loading` used above are
- * `DetailPane.vue`'s own — this file is unscoped CSS, same as that one, and `App.vue` always
- * imports both, so reusing rather than redeclaring them is safe and DRY. */
-</style>
