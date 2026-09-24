@@ -142,12 +142,15 @@ const rawLanguage = computed(() =>
           </button>
           <span v-else class="plan-toggle-spacer"></span>
           <span class="plan-label">{{ row.node.label }}</span>
-          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta muted"
+          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-xs"
             >~{{ row.node.estimatedRows.toLocaleString() }} rows</span
           >
-          <span v-if="row.node.cost" class="plan-meta muted">cost {{ row.node.cost.total.toLocaleString() }}</span>
-          <span v-if="row.node.detail" class="plan-detail font-data muted">{{ row.node.detail }}</span>
-          <span v-if="row.node.metrics.length" class="plan-metrics muted">{{ metricsLine(row.node) }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-xs">cost {{ row.node.cost.total.toLocaleString() }}</span>
+          <!-- P110 B15: no `muted` here -- `.plan-detail`'s own unlayered rule already sets
+               text-subtle/text-kira-xs and always wins over a co-present Tailwind utility class,
+               so `muted` never affected this element's rendering; nothing to replace it with. -->
+          <span v-if="row.node.detail" class="plan-detail font-data">{{ row.node.detail }}</span>
+          <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-xs">{{ metricsLine(row.node) }}</span>
         </div>
       </div>
 
@@ -167,13 +170,13 @@ const rawLanguage = computed(() =>
           </TooltipTrigger>
           <TooltipContent>Show the raw EXPLAIN output the server returned</TooltipContent>
         </Tooltip>
-        <span class="p-sm muted">Raw</span>
+        <span class="p-sm text-muted-foreground text-kira-xs">Raw</span>
       </div>
       <div v-if="showRaw" class="raw-body" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
       </div>
     </template>
-    <p v-else class="no-plan muted">No plan.</p>
+    <p v-else class="no-plan">No plan.</p>
   </div>
 </template>
 
@@ -220,9 +223,17 @@ const rawLanguage = computed(() =>
   @apply text-muted-foreground;
 }
 
-.no-issues,
-.no-plan {
+.no-issues {
   @apply text-subtle m-0;
+}
+
+/* P110 B15: `.no-plan` used to share `.no-issues`'s own rule, but always paired with `muted` in
+   markup (line below) -- `.muted`'s own later declaration in this file won the `color`/font-size
+   tie against this shared rule (same specificity, later wins), so `.no-plan` actually rendered
+   text-muted-foreground/text-kira-xs, never text-subtle. Split out and baked in directly, so
+   deleting `.muted` doesn't silently flip this element over to text-subtle. */
+.no-plan {
+  @apply text-muted-foreground text-kira-xs m-0;
 }
 
 .plan-tree {
@@ -248,10 +259,6 @@ const rawLanguage = computed(() =>
 
 .plan-label {
   @apply font-data;
-}
-
-.muted {
-  @apply text-muted-foreground text-kira-xs;
 }
 
 .plan-detail {

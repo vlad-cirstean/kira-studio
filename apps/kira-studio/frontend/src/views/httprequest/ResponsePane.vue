@@ -487,7 +487,7 @@ onUnmounted(() => {
       <template v-if="response">
         <span
           v-if="response.bodyEncoding === 'base64'"
-          class="p-sm muted binary-note"
+          class="p-sm text-muted-foreground binary-note"
           data-testid="http-response-binary"
         >
           {{ response.bodyBytes }} bytes of binary data

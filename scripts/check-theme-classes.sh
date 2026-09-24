@@ -45,6 +45,26 @@ check_class() {
   fi
 }
 
+# check_class_in_attrs <retired-name> <replacement> [scan-dirs]
+# Same as check_class, but the retired name is a common English word with real, legitimate prose
+# uses in comments/docs (plan §5.11's own warning: "muted is a common word") -- a whole-file grep
+# would false-positive on those. Scoped instead to `class="..."`/`:class="..."` attribute VALUES
+# only, so a comment using the word never matches.
+check_class_in_attrs() {
+  name="$1"
+  replacement="$2"
+  dirs="${3:-$SCAN_DIRS}"
+  hits=$(grep -rnoP --include='*.vue' --include='*.ts' \
+    -- '(?::?class)="[^"]*"' $dirs 2>/dev/null |
+    grep -P "(?<![-\\w])${name}(?![-\\w])" |
+    grep -v "^${THEME_SRC}/components/ui/" || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: retired class '$name' still used in a class attribute -- replace with '$replacement':" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+
 # P110 B3/B4: base.css's @theme used to shadow shadcn-bridge.css's own --color-muted; app code's
 # text-muted/text-fg-muted are both renamed to shadcn's own text-muted-foreground.
 check_class 'text-muted' 'text-muted-foreground'
@@ -85,6 +105,9 @@ check_class 'tab-new' 'inline utility classes on the new-tab button (see Workben
 # both were reworded to drop the bare word rather than excluding a path, so this plain check_class
 # call has zero legitimate survivors left to false-positive against.
 check_class 'mono' 'font-data'
+# P110 B15: `muted` is common prose too (design-idiom comments, docs) -- uses the attribute-scoped
+# variant above instead of reworking every legitimate comment.
+check_class_in_attrs 'muted' 'text-muted-foreground'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

@@ -77,7 +77,7 @@ function close(): void {
           <TooltipContent>Close</TooltipContent>
         </Tooltip>
       </div>
-      <div v-if="isLoading" class="preview-panel-loading p-sm muted">Loading…</div>
+      <div v-if="isLoading" class="preview-panel-loading p-sm text-muted-foreground">Loading…</div>
       <div
         v-else-if="errorMessage"
         class="preview-panel-error p-sm"
@@ -85,7 +85,7 @@ function close(): void {
       >
         {{ errorMessage }}
       </div>
-      <div v-else-if="statements.length === 0" class="preview-panel-empty p-sm muted">
+      <div v-else-if="statements.length === 0" class="preview-panel-empty p-sm text-muted-foreground">
         No pending changes.
       </div>
       <div v-else class="preview-panel-body">

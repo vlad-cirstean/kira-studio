@@ -124,15 +124,15 @@ watch(
         <Button variant="dialog" size="kira-lg" class="self-start" data-testid="upload-choose-file" @click="chooseFile">
           Choose file…
         </Button>
-        <div v-if="chosenFile" class="p-sm muted p-0" data-testid="upload-chosen-file">
+        <div v-if="chosenFile" class="p-sm text-muted-foreground p-0" data-testid="upload-chosen-file">
           {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
         </div>
 
         <template v-if="chosenFile">
-          <Label class="p-sm muted p-0">Key</Label>
+          <Label class="p-sm text-muted-foreground p-0">Key</Label>
           <Input v-model="key" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-key" />
 
-          <Label class="p-sm muted p-0">Content type</Label>
+          <Label class="p-sm text-muted-foreground p-0">Content type</Label>
           <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-content-type" />
         </template>
 

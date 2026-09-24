@@ -136,7 +136,7 @@ function onClearFile(index: number): void {
         </Button>
         <Tooltip v-if="row.fileName">
           <TooltipTrigger as-child>
-            <span class="p-xs muted formdata-file-caption" data-testid="http-formdata-file-caption">
+            <span class="p-xs text-muted-foreground formdata-file-caption" data-testid="http-formdata-file-caption">
               {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
             </span>
           </TooltipTrigger>

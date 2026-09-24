@@ -117,7 +117,7 @@ function close(): void {
         </AlertDescription>
       </Alert>
 
-      <div v-if="hasDynamicValue" class="p-sm muted" data-testid="copy-as-curl-dynamic-note">
+      <div v-if="hasDynamicValue" class="p-sm text-muted-foreground" data-testid="copy-as-curl-dynamic-note">
         {{ dynamicNote }}
       </div>
 

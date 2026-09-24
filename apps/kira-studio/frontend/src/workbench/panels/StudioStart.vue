@@ -56,7 +56,7 @@ function openRecent(entry: RecentTableEntry): void {
     <div class="start-inner first-run">
       <span class="start-mark dim"><CodiconIcon name="database" :size="32" /></span>
       <div class="start-title">No connections yet</div>
-      <div class="start-sub muted">
+      <div class="start-sub text-muted-foreground">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <span class="first-run-actions">
@@ -81,7 +81,7 @@ function openRecent(entry: RecentTableEntry): void {
   <div v-else class="start" data-testid="no-tab-open">
     <div class="start-inner">
       <div class="start-title">Kira Studio</div>
-      <div class="start-sub muted">Pick something from the tree on the left, or reopen one of these.</div>
+      <div class="start-sub text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
 
       <template v-if="recentTablesStore.entries.length > 0">
         <div class="col-label dim">Recent tables</div>

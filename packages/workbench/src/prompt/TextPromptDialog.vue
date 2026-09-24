@@ -35,7 +35,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 <template>
   <div ref="scrimEl" class="text-prompt-scrim" data-testid="text-prompt">
     <div class="text-prompt-box p-float">
-      <div class="text-prompt-title p-sm muted">{{ title }}</div>
+      <div class="text-prompt-title p-sm text-muted-foreground">{{ title }}</div>
       <Input
         ref="inputRef"
         :model-value="modelValue"

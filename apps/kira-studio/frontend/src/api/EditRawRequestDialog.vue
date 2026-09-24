@@ -90,7 +90,7 @@ function close(): void {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="p-dialog-body">
-      <div class="p-sm muted" data-testid="edit-raw-hint">{{ hint }}</div>
+      <div class="p-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
 
       <div class="raw-editor">
         <MonacoHost

@@ -143,7 +143,7 @@ async function onConfirm(): Promise<void> {
       class="flex flex-col p-0 gap-0 w-180 h-140"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
+        <span class="icon-box text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
         <DialogTitle class="text-kira-lg font-normal">{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
         <DialogClose as-child>
           <Button

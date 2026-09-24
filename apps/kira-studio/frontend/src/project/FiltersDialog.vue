@@ -147,7 +147,7 @@ const connectionName = computed(
       class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>
+        <span class="icon-box text-muted-foreground"><CodiconIcon name="filter" :size="13" /></span>
         <DialogTitle class="text-kira-lg font-normal"
           >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >

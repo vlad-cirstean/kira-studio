@@ -396,7 +396,7 @@ onUnmounted(() => {
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
     <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
       <div class="metadata-group">
-        <div class="metadata-group-title p-xs muted">Header</div>
+        <div class="metadata-group-title p-xs text-muted-foreground">Header</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
           <span class="p-kv-name font-data">{{ h.name }}</span>
           <span class="p-kv-value font-data">{{ h.value }}</span>
@@ -404,7 +404,7 @@ onUnmounted(() => {
         <div v-if="header.length === 0" class="p-xs dim">No header metadata</div>
       </div>
       <div class="metadata-group">
-        <div class="metadata-group-title p-xs muted">Trailer</div>
+        <div class="metadata-group-title p-xs text-muted-foreground">Trailer</div>
         <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
           <span class="p-kv-name font-data">{{ t.name }}</span>
           <span class="p-kv-value font-data">{{ t.value }}</span>

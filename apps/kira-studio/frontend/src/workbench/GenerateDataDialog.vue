@@ -254,7 +254,7 @@ function onSequenceStartChange(index: number, start: number): void {
       <div class="overflow-auto">
     <div class="generate-form">
       <div class="run-fields">
-        <Label class="field-label p-sm muted">Rows</Label>
+        <Label class="field-label p-sm text-muted-foreground">Rows</Label>
         <!-- P104 §2: `ref` on a wrapping display:contents span (not the InputGroup component
              itself, which forwards no DOM ref) -- keeps run-fields' flex layout untouched since the
              wrapper contributes no box of its own. -->
@@ -300,7 +300,7 @@ function onSequenceStartChange(index: number, start: number): void {
           </InputGroupAddon>
         </InputGroup>
         </span>
-        <Label class="field-label p-sm muted">Seed</Label>
+        <Label class="field-label p-sm text-muted-foreground">Seed</Label>
         <span ref="seedGroupRef" class="contents">
         <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
@@ -343,13 +343,13 @@ function onSequenceStartChange(index: number, start: number): void {
           </InputGroupAddon>
         </InputGroup>
         </span>
-        <span v-if="rowCount > BATCH_SIZE" class="p-sm muted" data-testid="generate-data-batch-note">
+        <span v-if="rowCount > BATCH_SIZE" class="p-sm text-muted-foreground" data-testid="generate-data-batch-note">
           {{ Math.ceil(rowCount / BATCH_SIZE) }} batches of {{ BATCH_SIZE }}
         </span>
       </div>
 
       <div class="recipe-table">
-        <div class="recipe-row recipe-head p-sm muted">
+        <div class="recipe-row recipe-head p-sm text-muted-foreground">
           <span>Column</span>
           <span>Type</span>
           <span>Recipe</span>
@@ -363,7 +363,7 @@ function onSequenceStartChange(index: number, start: number): void {
           :data-column="plan.column.name"
         >
           <span class="col-name">{{ plan.column.name }}</span>
-          <span class="col-type muted">{{ plan.column.dataType }}</span>
+          <span class="col-type text-muted-foreground">{{ plan.column.dataType }}</span>
           <select
             class="p-select bordered"
             :data-testid="`generate-data-recipe-${plan.column.name}`"
@@ -433,7 +433,7 @@ function onSequenceStartChange(index: number, start: number): void {
               </InputGroupAddon>
             </InputGroup>
           </span>
-          <span v-else class="muted"></span>
+          <span v-else class="text-muted-foreground"></span>
         </div>
       </div>
 
@@ -470,7 +470,7 @@ function onSequenceStartChange(index: number, start: number): void {
           {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
         </button>
         <div v-if="previewOpen" class="preview-body" data-testid="generate-data-preview">
-          <div v-if="previewLoading" class="muted p-sm">Loading…</div>
+          <div v-if="previewLoading" class="text-muted-foreground p-sm">Loading…</div>
           <div v-else-if="previewError" class="p-sm" data-testid="generate-data-preview-error">
             {{ previewError }}
           </div>

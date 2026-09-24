@@ -79,7 +79,7 @@ async function submit(): Promise<void> {
 
     <div class="compose-body">
       <Label v-if="isKafka" class="field">
-        <span class="p-sm muted">Key (optional)</span>
+        <span class="p-sm text-muted-foreground">Key (optional)</span>
         <Input
           :model-value="key"
           placeholder="(none)"
@@ -90,7 +90,7 @@ async function submit(): Promise<void> {
       </Label>
 
       <Label class="field">
-        <span class="p-sm muted">Body</span>
+        <span class="p-sm text-muted-foreground">Body</span>
         <Textarea
           v-model="body"
           class="font-data"
@@ -102,7 +102,7 @@ async function submit(): Promise<void> {
       </Label>
 
       <Label class="field">
-        <span class="p-sm muted">Headers (optional JSON object)</span>
+        <span class="p-sm text-muted-foreground">Headers (optional JSON object)</span>
         <Textarea
           v-model="headers"
           class="font-data"

@@ -94,10 +94,10 @@ function splitTarget(value: string): [string, string | null] {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="p-dialog-body">
-      <Label class="p-sm muted mt-1">Name</Label>
+      <Label class="p-sm text-muted-foreground mt-1">Name</Label>
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
-      <Label class="p-sm muted mt-1">Save to</Label>
+      <Label class="p-sm text-muted-foreground mt-1">Save to</Label>
       <select v-model="target" class="p-select bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>

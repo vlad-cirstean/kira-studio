@@ -105,7 +105,7 @@ function onJump(e: Event): void {
       </TooltipTrigger>
       <TooltipContent>Previous page</TooltipContent>
     </Tooltip>
-    <span class="page-label p-sm muted">
+    <span class="page-label p-sm text-muted-foreground">
       page
       <div class="page-input">
         <Input

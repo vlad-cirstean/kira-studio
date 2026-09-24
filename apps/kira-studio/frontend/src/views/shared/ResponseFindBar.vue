@@ -135,7 +135,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
   <div ref="rootEl" class="response-find-bar p-toolbar" data-testid="http-find-bar">
-    <span class="icon-box muted">
+    <span class="icon-box text-muted-foreground">
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="find-input">
@@ -198,7 +198,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
         <TooltipContent>Regular expression</TooltipContent>
       </Tooltip>
     </div>
-    <span class="p-sm muted find-count" data-testid="http-find-count">
+    <span class="p-sm text-muted-foreground find-count" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
     </span>
     <Tooltip>

@@ -475,16 +475,16 @@ onMounted(() => {
                 </button>
               </template>
             </span>
-            <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
+            <span class="p-push p-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </div>
           <div class="p-panel body-panel">
-            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
-            <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
+            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty text-muted-foreground">Loading…</div>
+            <div v-else-if="rt.nodes.length === 0" class="empty text-muted-foreground" data-testid="browse-empty">
               No items
             </div>
             <div
               v-else-if="filteredNodes.length === 0"
-              class="empty muted"
+              class="empty text-muted-foreground"
               data-testid="browse-empty"
             >
               No matching items
@@ -519,7 +519,7 @@ onMounted(() => {
                   <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
                        has arrived (redisTypeIcon falls back to the generic key glyph otherwise —
                        never a wrong type). S3 objects and every container kind are unaffected. -->
-                  <span class="icon-box muted"
+                  <span class="icon-box text-muted-foreground"
                     ><CodiconIcon
                       :name="
                         filteredNodes[vi.index]?.kind === 'key'
@@ -538,7 +538,7 @@ onMounted(() => {
                     data-testid="browse-key-type"
                     >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</span
                   >
-                  <span v-if="filteredNodes[vi.index]?.detail" class="row-detail muted">{{
+                  <span v-if="filteredNodes[vi.index]?.detail" class="row-detail text-muted-foreground">{{
                     filteredNodes[vi.index]?.detail
                   }}</span>
                 </div>

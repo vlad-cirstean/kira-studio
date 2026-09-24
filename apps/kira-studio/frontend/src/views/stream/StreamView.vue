@@ -719,7 +719,7 @@ onUnmounted(() => {
             rt?.countError ? `Count failed: ${rt.countError}` : 'Count'
           }}</TooltipContent>
         </Tooltip>
-        <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
+        <span class="p-sm text-muted-foreground" data-testid="stream-status">{{ statusLine }}</span>
         <Tooltip v-if="isBatch">
           <TooltipTrigger as-child>
             <Button
@@ -930,12 +930,12 @@ onUnmounted(() => {
             <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
             <PopoverContent align="start" class="w-52 p-0" data-testid="stream-partition-menu">
               <div class="partition-menu">
-                <div v-if="partitionOptionsLoading" class="p-sm muted partition-menu-empty">
+                <div v-if="partitionOptionsLoading" class="p-sm text-muted-foreground partition-menu-empty">
                   Loading…
                 </div>
                 <div
                   v-else-if="partitionOptions.length === 0"
-                  class="p-sm muted partition-menu-empty"
+                  class="p-sm text-muted-foreground partition-menu-empty"
                 >
                   No partitions
                 </div>
@@ -1259,7 +1259,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.body }}
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
-                      <span class="p-xs muted">(truncated)</span>
+                      <span class="p-xs text-muted-foreground">(truncated)</span>
                     </TooltipTrigger>
                     <TooltipContent>body truncated</TooltipContent>
                   </Tooltip>

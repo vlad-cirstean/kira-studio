@@ -85,7 +85,7 @@ onUnmounted(() => {
         >None</Button
       >
     </div>
-    <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm muted">
+    <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm text-muted-foreground">
       No fields seen yet — load a page first.
     </div>
     <div v-else class="columns-menu-list">
