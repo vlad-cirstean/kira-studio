@@ -70,6 +70,17 @@ const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab
 const rt = computed(() => consoleViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
+// P108 Part 11 F11: `running` only reflects rt.status, which run()/explain() sets synchronously
+// the instant either is actually called (state.ts's own run() sets rt.status = 'running' before
+// its own first internal await) — but ensureConnectedForRun's own reconnect await stands between
+// the guard below and that call. A second click/Ctrl+Enter/palette command during a slow reconnect
+// passed the (still false) `running` guard, and the toolbar button was still enabled -- both runs
+// executed server-side (an INSERT pressed twice while reconnecting inserted twice), and the
+// first run's own result was discarded as superseded by the second. `starting` covers exactly that
+// window: set before the reconnect await, cleared right after it resolves and before run()/
+// explain() is called -- by the time either actually runs, `running` has already taken over.
+const starting = ref(false);
+
 const targetTail = computed(() => pathTail(props.tab.path));
 
 // P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
@@ -365,7 +376,8 @@ async function ensureConnectedForRun(): Promise<void> {
 function runStatement(): void {
   // P12 round 2 finding #4: the toolbar's Run button is disabled while running (below), but the
   // command (⌘↵/palette) had no such gate — two overlapping runs raced explainOpId/opId bookkeeping.
-  if (running.value) return;
+  // F11: `starting` covers the reconnect-await window `running` can't (see its own doc comment).
+  if (running.value || starting.value) return;
   const stmt = statementAtCursor(
     props.tab.state.text,
     cursorPos.value,
@@ -373,19 +385,29 @@ function runStatement(): void {
   );
   if (!stmt) return;
   void (async () => {
-    await ensureConnectedForRun();
+    starting.value = true;
+    try {
+      await ensureConnectedForRun();
+    } finally {
+      starting.value = false;
+    }
     await consoleViewStore.run(props.tab.id, [stmt.text]);
   })();
 }
 
 function runAll(): void {
-  if (running.value) return;
+  if (running.value || starting.value) return;
   const statements = splitSqlStatements(props.tab.state.text, splitOptionsFor(dialect.value)).map(
     (s) => s.text,
   );
   if (statements.length === 0) return;
   void (async () => {
-    await ensureConnectedForRun();
+    starting.value = true;
+    try {
+      await ensureConnectedForRun();
+    } finally {
+      starting.value = false;
+    }
     await consoleViewStore.run(props.tab.id, statements);
   })();
 }
@@ -456,9 +478,14 @@ function onFormat(): void {
 function onExplain(): void {
   const kind = connectionKind.value;
   const stmt = statementAtCursorText.value;
-  if (!kind || !stmt || !canExplain.value) return;
+  if (!kind || !stmt || !canExplain.value || starting.value) return;
   void (async () => {
-    await ensureConnectedForRun();
+    starting.value = true;
+    try {
+      await ensureConnectedForRun();
+    } finally {
+      starting.value = false;
+    }
     const result = await consoleViewStore.explain(props.tab.id, kind, stmt);
     explainError.value = result.ok ? null : result.reason;
   })();
@@ -651,7 +678,7 @@ const statusLine = computed(() => {
                 variant="toolbar-primary"
                 size="kira"
                 data-testid="console-run-statement"
-                :disabled="running"
+                :disabled="running || starting"
                 @click="runStatement"
               >
                 <CodiconIcon name="play" :size="13" />
@@ -668,7 +695,7 @@ const statusLine = computed(() => {
                 variant="toolbar"
                 size="kira"
                 data-testid="console-run-all"
-                :disabled="running"
+                :disabled="running || starting"
                 @click="runAll"
               >
                 <CodiconIcon name="run-all" :size="13" />
@@ -706,7 +733,7 @@ const statusLine = computed(() => {
                 variant="toolbar"
                 size="kira"
                 data-testid="console-explain"
-                :disabled="!canExplain"
+                :disabled="!canExplain || starting"
                 @click="onExplain"
               >
                 <CodiconIcon name="list-tree" :size="13" />
