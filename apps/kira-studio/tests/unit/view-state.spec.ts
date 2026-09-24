@@ -309,6 +309,7 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
 
     // The guard clears once the in-flight load resolves — goNext works normally again.
     const second = deferred<{ page: unknown; source: string }>();
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () => second.promise;
     const again = gridViewStore.goNext(id);
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
