@@ -81,18 +81,27 @@ func (d *caffeinateDriver) Acquire() error {
 // reap is Acquire's own goroutine, one per spawn: it blocks on Wait() (deliberately never called
 // under Controller's own lock, §1.3) and, if this exit was not requested by Release, reports it
 // through onLost — Controller's self-heal path (§1.4).
+//
+// F12: whether to report is decided under the same `d.cmd == cmd` check that clears d.cmd, not
+// read as a bare driver-wide d.expected — Rearm (Release then Acquire back to back) can have the
+// new Acquire already reset d.expected to false for the NEW child before this reaper, still
+// unwinding the OLD child's intentional kill, ever gets the lock. Reading d.expected outside this
+// identity check would then see the wrong child's flag and report a real assertion loss for a
+// death this driver itself caused. Once cmd has been superseded (d.cmd != cmd), this reaper has
+// nothing to report and nothing to clear — whichever reaper does own the current d.cmd handles it.
 func (d *caffeinateDriver) reap(cmd *exec.Cmd) {
 	err := cmd.Wait()
 
 	d.mu.Lock()
-	expected := d.expected
+	var report bool
 	if d.cmd == cmd {
+		report = !d.expected
 		d.cmd = nil
 	}
 	onLost := d.onLost
 	d.mu.Unlock()
 
-	if !expected && onLost != nil {
+	if report && onLost != nil {
 		onLost(err)
 	}
 }
