@@ -32,11 +32,13 @@ export interface TimestampShape {
   offset: 'none' | 'Z' | '+HH' | '+HH:MM' | '+HHMM';
   /** iso8601 only: the offset's own minutes from UTC, so re-encoding keeps the original zone. */
   offsetMinutes: number;
-  /** iso8601 only: digits of sub-second precision in the original (0-9). */
+  /** iso8601 and epochSeconds (F15, P108 Part 10): digits of sub-second precision in the
+   *  original (0-9). Always 0 for epochMillis — `Date` already stores whole-millisecond
+   *  precision, so an epoch-millis value has no sub-millisecond fraction to preserve. */
   fractionDigits: number;
-  /** iso8601 only: the original fraction's exact digits (may exceed `Date`'s ms precision — see
-   *  encodeTimestamp's own note on why this is carried separately from `fractionDigits`). '' when
-   *  `fractionDigits` is 0. */
+  /** iso8601 and epochSeconds: the original fraction's exact digits (may exceed `Date`'s ms
+   *  precision — see encodeTimestamp's own note on why this is carried separately from
+   *  `fractionDigits`). '' when `fractionDigits` is 0. */
   fractionRaw: string;
   /** iso8601 only: true when the original had no time part at all (a `date` column). */
   dateOnly: boolean;
@@ -134,11 +136,24 @@ export function parseTimestamp(
 ): { date: Date; shape: TimestampShape } | null {
   const t = text.trim();
   if (format === 'epochSeconds' || format === 'epochMillis') {
+    // F15 (P108 Part 10): bare `Number(t)` accepted `0x10` (16), `1e9` and `''` (0) as valid epoch
+    // text — an empty/blank cell silently read as 1970-01-01 for any caller other than
+    // validateFormat (which pre-checks empty itself), and a hex/exponent spelling silently
+    // re-encoded as plain digits on the very next edit. Only a plain, optionally signed,
+    // optionally fractional decimal numeral is a real epoch value.
+    const m = /^-?\d+(?:\.(\d+))?$/.exec(t);
+    if (!m) return null;
     const n = Number(t);
     if (!Number.isFinite(n)) return null;
     const date = new Date(format === 'epochSeconds' ? n * 1000 : n);
     if (Number.isNaN(date.getTime())) return null;
-    return { date, shape: defaultShapeFor(format) };
+    // The fraction only round-trips meaningfully for epochSeconds (see encodeTimestamp's own
+    // note) — epochMillis already keeps its shape's fractionDigits at 0 via defaultShapeFor.
+    const fractionRaw = format === 'epochSeconds' ? (m[1] ?? '') : '';
+    return {
+      date,
+      shape: { ...defaultShapeFor(format), fractionDigits: fractionRaw.length, fractionRaw },
+    };
   }
   if (format === 'iso8601') return parseIso8601Shaped(t);
   return null;
@@ -150,7 +165,30 @@ export function parseTimestamp(
  * precision, changing only the digits a genuine edit actually changed.
  */
 export function encodeTimestamp(shape: TimestampShape, date: Date): string {
-  if (shape.kind === 'epochSeconds') return String(Math.round(date.getTime() / 1000));
+  if (shape.kind === 'epochSeconds') {
+    // F15 (P108 Part 10): a fractional epoch-seconds value (`1700000000.5`) used to round-trip
+    // through Math.round(ms / 1000), silently losing its own sub-second digits on the very next
+    // re-encode even though nothing about the instant's millisecond value had changed — breaking
+    // the "exact inverse" contract iso8601 below already keeps. Mirrors iso8601's own "reuse the
+    // original digits unless the instant's own ms value moved" trick when a fraction was parsed.
+    if (shape.fractionDigits === 0) return String(Math.round(date.getTime() / 1000));
+    // Split on sign and absolute value, not floor/modulo, so a pre-1970 instant reassembles to
+    // the right decimal text: -500ms is "-0.500" (whole 0, fraction 500), never "-1.500" (which
+    // floor(-500 / 1000) === -1 would otherwise produce).
+    const totalMs = date.getTime();
+    const sign = totalMs < 0 ? '-' : '';
+    const absMs = Math.abs(totalMs);
+    const wholeSeconds = Math.floor(absMs / 1000);
+    const msNow = String(absMs % 1000).padStart(3, '0');
+    const msOriginal = shape.fractionRaw
+      ? String(Math.round(Number(`0.${shape.fractionRaw}`) * 1000)).padStart(3, '0')
+      : '000';
+    const fraction =
+      msNow === msOriginal
+        ? shape.fractionRaw
+        : msNow.padEnd(shape.fractionDigits, '0').slice(0, shape.fractionDigits);
+    return `${sign}${wholeSeconds}.${fraction}`;
+  }
   if (shape.kind === 'epochMillis') return String(date.getTime());
 
   // iso8601: shift by the shape's own offset first, then read wall-clock components off the
