@@ -270,6 +270,11 @@ async function handleRepoOpened(repoId: string): Promise<void> {
   // worth re-resolving, unlike a refresh's re-walk of the *same* history.
   pendingSelectionSha.value = null;
   selection.clear();
+  // P108 F4: a reveal-in-graph paging through the *old* repo's history must not keep running (or
+  // land a stale `selection.select`/`scrollToRow`) once this repo switch has already reset the
+  // store out from under it — `revealAndSelectSha`'s own cancel-and-restart shape, applied here
+  // for the same reason.
+  revealController?.abort();
   graphView.reset();
   graphOrder.reset();
   await graphView.openStream(repoId);
@@ -1344,13 +1349,20 @@ async function bootstrap(): Promise<void> {
   // rather than inventing a second policy.
   if (!openedFromPersisted) {
     await repo.refreshList();
+    // P108 F4: `NoRepositoryPanel.vue`'s own onMounted already calls `refreshList()` and can
+    // render candidates a user clicks while this loop is still awaiting an earlier one —
+    // `repo.activeRepo.value` is the one shared signal that a pick already won, checked before
+    // every candidate `open()` this loop is about to make, not just relied on via the sequence
+    // token inside `open()` itself.
     for (const candidate of repo.candidates.value) {
+      if (repo.activeRepo.value) break;
       const outcome = await repo.open(candidate.path);
       if (outcome.kind === 'ok') {
         await handleRepoOpened(outcome.repo.repoId);
         break;
       }
       if (outcome.kind === 'gitUnavailable') break; // git itself is blocked; GitBlockedPanel owns it.
+      if (outcome.kind === 'superseded') break; // a newer open (a user's pick) already won.
       // 'notARepository' — a workspace folder that simply is not a repo; try the next one.
     }
   }

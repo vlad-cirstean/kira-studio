@@ -33,7 +33,15 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <h2 class="kv-no-repo-title">Open a repository</h2>
     <ul v-if="repoState.candidates.value.length > 0" class="kv-no-repo-list">
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
-        <KuiButton class="kv-no-repo-candidate" @click="openCandidate(candidate)">
+        <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
+             loop, a worktree switch elsewhere) is in flight — `RepoState.open`'s own sequence
+             token already discards whichever one loses the race, but a second click before that
+             is just wasted work and a confusing "which one did I pick" moment. -->
+        <KuiButton
+          class="kv-no-repo-candidate"
+          :disabled="repoState.opening.value"
+          @click="openCandidate(candidate)"
+        >
           {{ candidate.label }}
         </KuiButton>
       </li>
