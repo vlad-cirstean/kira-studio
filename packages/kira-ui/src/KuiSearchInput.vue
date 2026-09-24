@@ -22,8 +22,21 @@
  * explicitly for the same reason, rather than relying on Vue's default attrs inheritance (which
  * would put a `@keydown` listener on the root `<div>` — it would still see the event via
  * bubbling, but an explicit forward keeps the contract obvious).
+ *
+ * P110 A4: controls.css's `.kui-search-input`/`-icon`/`-field`(+`::placeholder`/`:focus-visible`)/
+ * `-clear`(+`:hover`) replaced by `kv:` utilities on this component's own elements. `class` is now
+ * a declared prop (root wrapper only — `SearchBox.vue`'s `kv-search-field`, `FileTree.vue`'s
+ * `kv-file-tree-filter`, `BranchPicker.vue`'s `kv-branch-filter`, `BaseSelector.vue`'s
+ * `kv-base-filter` all pass a width/margin-only override today, previously landing on this same
+ * root via Vue's default fallthrough), merged through `cn()` (§1.3). The clear button's 16px box
+ * is Tailwind's own default `size-4` (git-ui's kept default spacing scale, 4px steps — rung 1,
+ * §1.1), not `kui-icon-box`: the source literal was always a plain `16px`, never `var(--kui-icon-
+ * box, …)`, so reusing that token here would newly couple this button's size to a variable it
+ * never tracked, a behaviour change to disclose, not a bytes-identical value substitution.
  */
+import type { ClassValue } from 'clsx';
 import { computed, ref } from 'vue';
+import { cn } from './cn.ts';
 
 const props = defineProps<{
   modelValue: string;
@@ -44,6 +57,7 @@ const props = defineProps<{
   'aria-describedby'?: string;
   'aria-invalid'?: boolean;
   'aria-haspopup'?: string;
+  class?: ClassValue;
 }>();
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void;
@@ -73,11 +87,14 @@ defineExpose({ focus: () => inputEl.value?.focus() });
 </script>
 
 <template>
-  <div class="kui-search-input">
-    <span class="codicon codicon-search kui-search-input-icon" aria-hidden="true"></span>
+  <div :class="cn('kv:relative kv:inline-flex kv:items-center kv:h-kui-control', props.class)">
+    <span
+      class="codicon codicon-search kv:absolute kv:left-kui-2 kv:pointer-events-none kv:text-kui-icon kv:opacity-70"
+      aria-hidden="true"
+    ></span>
     <input
       ref="inputEl"
-      class="kui-search-input-field"
+      class="kv:w-full kv:h-full kv:py-0 kv:px-kui-6 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:[font-family:inherit] kv:text-kui-sm kv:placeholder:text-kui-fg-muted kv:focus-visible:border-kui-focus-border kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
       type="text"
       :value="props.modelValue"
       :placeholder="props.placeholder"
@@ -95,7 +112,7 @@ defineExpose({ focus: () => inputEl.value?.focus() });
     <button
       v-if="props.modelValue !== ''"
       type="button"
-      class="kui-search-input-clear"
+      class="kv:absolute kv:right-kui-1 kv:inline-flex kv:size-4 kv:items-center kv:justify-center kv:p-0 kv:bg-transparent kv:border-0 kv:text-kui-fg-muted kv:cursor-pointer kv:opacity-70 kv:hover:opacity-100"
       aria-label="Clear filter"
       v-kui-tooltip="'Clear filter'"
       @click="clear"
