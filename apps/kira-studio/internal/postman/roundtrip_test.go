@@ -471,6 +471,53 @@ func TestAnEditedParamDescriptionExportsAndShedsItsOrigin(t *testing.T) {
 	}
 }
 
+// TestObjectFormAliasesRoundTripUntouchedAndSurviveShedOrigin is P108 F7: buildRequest's and
+// ShedOrigin's object-form branches used to compare origin's raw, un-rewritten alias spelling
+// ({{$guid}}) against the stored request's already-rewritten spelling ({{fake.string.uuid}}),
+// so an object-form request using a Postman dynamic-variable alias in its url/header/body always
+// compared "changed" even when nobody edited it — export wrote a fresh member with the fake.*
+// spelling instead of origin's own bytes, and ShedOrigin dropped those members from origin on
+// first save.
+func TestObjectFormAliasesRoundTripUntouchedAndSurviveShedOrigin(t *testing.T) {
+	tree := parseFile(t, "aliases-object-form.json")
+	idx := itemIndex(t, tree, "untouched")
+
+	// The stored request itself carries the rewritten fake.* spelling (P28 D15(c)) — Send resolves
+	// against this app's own vocabulary, never Postman's.
+	if !strings.Contains(tree.Items[idx].Request.URL, "fake.string.uuid") {
+		t.Fatalf("Request.URL = %q, want the rewritten fake.string.uuid spelling", tree.Items[idx].Request.URL)
+	}
+
+	out := requestOf(t, items(exported(t, tree))["untouched"])
+	// The origin url member was a plain string (no query-param descriptions to preserve), so an
+	// untouched export keeps it exactly that shape — cloneOrigin's own verbatim-bytes rule.
+	rawURL, _ := out["url"].(string)
+	if !strings.Contains(rawURL, "{{$guid}}") {
+		t.Fatalf("exported url = %#v, want the untouched origin bytes ({{$guid}} intact)", out["url"])
+	}
+	headers := out["header"].([]any)[0].(map[string]any)
+	if headers["key"] != "X-Trace-{{$guid}}" || headers["value"] != "{{$timestamp}}" {
+		t.Fatalf("exported header = %#v, want origin's own {{$guid}}/{{$timestamp}} bytes untouched", headers)
+	}
+	body := out["body"].(map[string]any)
+	if body["raw"] != `{"id":"{{$guid}}"}` {
+		t.Fatalf("exported body = %#v, want origin's own {{$guid}} bytes untouched", body)
+	}
+
+	t.Run("ShedOrigin keeps an untouched request's url/header/body members", func(t *testing.T) {
+		origin := postman.ShedOrigin(tree.Items[idx].Origin, tree.Items[idx].Request)
+		var request map[string]json.RawMessage
+		if err := json.Unmarshal(origin["request"], &request); err != nil {
+			t.Fatalf("origin request: %v", err)
+		}
+		for _, member := range []string{"url", "header", "body"} {
+			if _, ok := request[member]; !ok {
+				t.Fatalf("ShedOrigin dropped the untouched %q member — F7 regression", member)
+			}
+		}
+	})
+}
+
 // TestExportStripsLocalFilePathsToTheirBaseName is P21 round 3 architecture/security finding 9:
 // buildBody (the "the body actually changed" branch) used to write a formdata file row's or a
 // file-mode body's real absolute local Path straight into `src` — the exact opposite of import's

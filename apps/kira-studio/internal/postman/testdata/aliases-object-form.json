@@ -1,0 +1,17 @@
+{
+  "info": {
+    "name": "Object-form aliases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "untouched",
+      "request": {
+        "method": "POST",
+        "url": "https://api.example.com/orders?id={{$guid}}",
+        "header": [{ "key": "X-Trace-{{$guid}}", "value": "{{$timestamp}}" }],
+        "body": { "mode": "raw", "raw": "{\"id\":\"{{$guid}}\"}" }
+      }
+    }
+  ]
+}

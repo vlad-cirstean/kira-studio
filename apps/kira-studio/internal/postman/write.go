@@ -92,6 +92,22 @@ func buildItem(t *Tree, idx int) json.RawMessage {
 	return mustRaw(obj)
 }
 
+// importedOriginForCompare re-imports origin — a request member's raw bytes, object or string
+// form, nil included — through the one real importer, importRequest, so its P28 D15(c) alias
+// rewrite ({{$guid}} -> {{fake.string.uuid}}) always runs before the result is compared against a
+// stored (and therefore already-rewritten) model.SavedRequest.
+//
+// F7: buildRequest's and ShedOrigin's object-form branches used to call ImportURL/importHeaders/
+// importBody directly on origin's members, bypassing rewriteRequestAliases entirely — origin's
+// alias spelling never matched saved's rewritten spelling, so every alias-bearing field compared
+// "changed" even when the user never touched it. Export wrote a fresh member
+// ({{fake.string.uuid}} replacing {{$guid}}) instead of the untouched origin bytes, and
+// ShedOrigin dropped those members from origin on first save. Both callers now compare against
+// this one rewritten baseline instead, so they cannot drift from each other again.
+func importedOriginForCompare(origin json.RawMessage) model.SavedRequest {
+	return importRequest(origin, nil)
+}
+
 // buildRequest applies D6's rule per member. The bare-string origin form gets the same rule one
 // level up: a string request that still imports to exactly what is stored is re-emitted verbatim.
 func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMessage {
@@ -111,10 +127,12 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 	// writing it unconditionally removes a comparison.
 	out["method"] = mustRaw(saved.Method)
 
+	imported := importedOriginForCompare(origin)
+
 	// P22b D7: a param description can change with the URL string untouched, so the origin `url`
 	// member has to be rebuilt on either change, not just the raw string comparison alone.
-	urlChanged := ImportURL(members["url"]) != saved.URL
-	descriptionsChanged := !maps.Equal(ImportParamDescriptions(members["url"]), saved.ParamDescriptions)
+	urlChanged := imported.URL != saved.URL
+	descriptionsChanged := !maps.Equal(imported.ParamDescriptions, saved.ParamDescriptions)
 	if urlChanged || descriptionsChanged {
 		if saved.URL == "" {
 			delete(out, "url")
@@ -123,7 +141,7 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 		}
 	}
 
-	if !headersEqual(importHeaders(members["header"]), saved.Headers) {
+	if !headersEqual(imported.Headers, saved.Headers) {
 		if len(saved.Headers) == 0 {
 			delete(out, "header")
 		} else {
@@ -131,7 +149,7 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 		}
 	}
 
-	if !bodyEqual(importBody(members["body"], nil), bodyOf(saved)) {
+	if !bodyEqual(bodyOf(imported), bodyOf(saved)) {
 		if built := buildBody(bodyOf(saved)); built != nil {
 			out["body"] = built
 		} else {
@@ -209,16 +227,17 @@ func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map
 		return out
 	}
 	request := cloneOrigin(members)
+	imported := importedOriginForCompare(raw)
 	// P22b D7: a param description can change with the URL string untouched (see buildRequest's
 	// own comment above) — the origin url member must be shed on either change.
-	if ImportURL(request["url"]) != saved.URL ||
-		!maps.Equal(ImportParamDescriptions(request["url"]), saved.ParamDescriptions) {
+	if imported.URL != saved.URL ||
+		!maps.Equal(imported.ParamDescriptions, saved.ParamDescriptions) {
 		delete(request, "url")
 	}
-	if !headersEqual(importHeaders(request["header"]), saved.Headers) {
+	if !headersEqual(imported.Headers, saved.Headers) {
 		delete(request, "header")
 	}
-	if !bodyEqual(importBody(request["body"], nil), bodyOf(saved)) {
+	if !bodyEqual(bodyOf(imported), bodyOf(saved)) {
 		delete(request, "body")
 	}
 	out["request"] = mustRaw(request)
