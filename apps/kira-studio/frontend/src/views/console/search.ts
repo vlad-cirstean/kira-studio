@@ -4,6 +4,7 @@ import {
   eachMatch,
   emptyScan,
   keyValueRowScanner,
+  REGEX_SCAN_TEXT_CAP,
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
@@ -47,10 +48,16 @@ function runSearch(
   // since only the active result set is ever rendered (and therefore reportable) at a time.
   const priority = { priority: visibleRowsOf(tabId) ?? undefined };
 
+  // P108 Part 11 F12: Part 10 F16 capped grid/search.ts and keyvalue/search.ts only, deliberately
+  // leaving these three branches uncapped — a user regex like `(a+)+$` against one long console
+  // cell still blocked the main thread. Same partial mitigation, same condition: only a regex
+  // search has user-controlled quantifiers to backtrack on.
+  const regexTextCap = q.regex ? REGEX_SCAN_TEXT_CAP : undefined;
+
   if (page.kind === 'tabular') {
     return runChunkedScan<Match>(
       page.rowCount,
-      tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end })),
+      tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end }), regexTextCap),
       q,
       onProgress,
       // P21 round 3 performance finding 1: cell-based chunk budget for the tabular branch only —
@@ -67,7 +74,12 @@ function runSearch(
       (row, pattern, out) => {
         if (isNull(bodies, row)) return;
         const text = cellText(bodies, row, decoder);
-        eachMatch(pattern, text, (start, end) => out.push({ row, col: 0, start, end }));
+        eachMatch(
+          pattern,
+          text,
+          (start, end) => out.push({ row, col: 0, start, end }),
+          regexTextCap,
+        );
       },
       q,
       onProgress,
@@ -81,7 +93,12 @@ function runSearch(
   if (page.kind !== 'keyvalue') return emptyScan();
   return runChunkedScan<Match>(
     page.rowCount,
-    keyValueRowScanner(page, [0, 1], (row, col, start, end) => ({ row, col, start, end })),
+    keyValueRowScanner(
+      page,
+      [0, 1],
+      (row, col, start, end) => ({ row, col, start, end }),
+      regexTextCap,
+    ),
     q,
     onProgress,
     priority,

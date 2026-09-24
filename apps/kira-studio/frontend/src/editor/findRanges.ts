@@ -1,3 +1,4 @@
+import { REGEX_SCAN_TEXT_CAP } from '../views/shared/page/scan';
 import type { RangeHighlight } from './ranges';
 import { compileSearchPattern, type SearchPatternOptions } from './searchPattern';
 
@@ -59,8 +60,15 @@ function matchPositions(doc: string, query: string, o: FindOptions): readonly Ma
     // not cached: the next keystroke usually makes it valid again.
     return positions;
   }
+  // P108 Part 11 F12: a user regex runs against a response/request body this app doesn't control —
+  // `(a+)+$` still blocked the main thread here, the same ReDoS shape scan.ts's own
+  // REGEX_SCAN_TEXT_CAP mitigates for a grid/console/document cell. A literal/whole-word search has
+  // no user-controlled quantifiers to backtrack on, so only regex mode truncates. `scanned` is a
+  // prefix of `doc`, so every offset below still indexes correctly into the real document.
+  const scanned =
+    o.regex && doc.length > REGEX_SCAN_TEXT_CAP ? doc.slice(0, REGEX_SCAN_TEXT_CAP) : doc;
   pattern.lastIndex = 0;
-  for (let m = pattern.exec(doc); m !== null; m = pattern.exec(doc)) {
+  for (let m = pattern.exec(scanned); m !== null; m = pattern.exec(scanned)) {
     // A zero-width match (`x*`, `(?:)`) would otherwise never advance lastIndex — the same guard
     // scan.ts's own walker carries, for the same reason.
     if (m[0] === '') {

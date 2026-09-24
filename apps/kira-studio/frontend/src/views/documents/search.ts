@@ -1,4 +1,10 @@
-import { eachMatch, runPageScan, type SearchHandle, type SearchQuery } from '../shared/page/scan';
+import {
+  eachMatch,
+  REGEX_SCAN_TEXT_CAP,
+  runPageScan,
+  type SearchHandle,
+  type SearchQuery,
+} from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
 import { documentRow, getPage, pageVersion } from './page';
 
@@ -35,6 +41,10 @@ function runSearch(
   const page = getPage(tabId);
   // P42 D39: runPageScan scans the rows DocumentView.vue's VirtualList currently has on screen
   // (D37) first.
+  // P108 Part 11 F12: Part 10 F16 left this branch uncapped on purpose — a user regex like
+  // `(a+)+$` against one long document body still blocks the main thread. Same partial
+  // mitigation grid/search.ts already applies, same condition (regex-only).
+  const regexTextCap = q.regex ? REGEX_SCAN_TEXT_CAP : undefined;
   return runPageScan(
     page,
     tabId,
@@ -42,7 +52,7 @@ function runSearch(
       const doc = documentRow(tabId, row);
       if (!doc) return;
       const text = previewLineFor(doc.body);
-      eachMatch(pattern, text, (start, end) => out.push({ row, start, end }));
+      eachMatch(pattern, text, (start, end) => out.push({ row, start, end }), regexTextCap);
     },
     q,
     onProgress,
