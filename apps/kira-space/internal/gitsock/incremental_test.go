@@ -611,6 +611,33 @@ func TestIntegration_ReviewRefusalsAreBadRequests(t *testing.T) {
 	assertBadRequest(t, resp, "branch")
 }
 
+// TestIntegration_ReviewMarkRejectsInvalidRanges is P108 Part 17 review F7's own regression guard:
+// gitreview.Normalize only drops a range where End < Start, and clampToLineCount only clamps the
+// UPPER bound, so a range like {Start:-9, End:0} on a real file used to be accepted and stored,
+// with CountLines then equalling the file's own line count — reading as "fully reviewed" with zero
+// actual lines marked. review.comment.add already enforces 1 <= start <= end (comments_test.go);
+// review.mark must reject the identical shape, and reject it for EVERY element, not just the
+// first.
+func TestIntegration_ReviewMarkRejectsInvalidRanges(t *testing.T) {
+	t.Parallel()
+	dir, _, _ := buildMainFeatureFixture(t)
+	server, sockPath, _, _ := newIntegrationServer(t)
+	client := pairAndReady(t, server, sockPath, "mark-refusals-client")
+	repoID := openRepoOK(t, client, dir).Repo.RepoID
+
+	resp := client.request("review.mark", gitrpc.ReviewMarkParams{
+		RepoID: repoID, Branch: "feature", Path: "a.txt", Reviewed: true,
+		Ranges: []gitreview.LineRange{{Start: -9, End: 0}},
+	})
+	assertBadRequest(t, resp, "range")
+
+	resp = client.request("review.mark", gitrpc.ReviewMarkParams{
+		RepoID: repoID, Branch: "feature", Path: "a.txt", Reviewed: true,
+		Ranges: []gitreview.LineRange{{Start: 1, End: 2}, {Start: 0, End: 1}},
+	})
+	assertBadRequest(t, resp, "range")
+}
+
 // TestIntegration_RefsChangedDoesNotDropReviewState is D14's own negative claim, and the one a
 // future contributor is most likely to break: force-moving an UNRELATED branch fires refsChanged,
 // and every mark is still there afterward.

@@ -101,6 +101,17 @@ func (r *Router) handleReviewMark(ctx context.Context, c *gitsession.Conn, param
 			if err := validRefArg("branch", p.Branch); err != nil {
 				return "", err
 			}
+			// F7 (P108 Part 17 review): gitreview.Normalize only drops a range where End < Start,
+			// and clampToLineCount only clamps the UPPER bound — so a range like {Start:-9, End:0}
+			// on a 10-line file was accepted and stored, and CountLines then equalled the file's
+			// own lineCount, reading as "fully reviewed" with zero actual lines marked. Every
+			// element is checked, not just the first — comments.go's own review.comment.add
+			// validation right above enforces the identical rule.
+			for _, rng := range p.Ranges {
+				if rng.Start < 1 || rng.End < rng.Start {
+					return "", ipcerr.BadRequest("gitrpc: review.mark: range must satisfy 1 <= start <= end")
+				}
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewMarkParams) (ReviewMarkResult, error) {
