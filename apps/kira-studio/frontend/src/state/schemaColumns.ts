@@ -150,12 +150,17 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
       // Same discipline as views/grid/state.ts's own loadMeta: a nicety that warms completion, not
       // something a failure here should block reading rows or opening a console over.
       //
-      // P4: memoized too, not just swallowed — an empty array is the same "nothing to offer" shape
-      // a genuinely-empty container already produces, and it stops a container the adapter rejects
-      // (or any other failure) from re-firing the same doomed fetch on every tab activation and
-      // reconnect. Cleared like any other container by dropSchemaColumns, so a later Refresh still
-      // gets a real retry.
-      state.byContainer[key] = [];
+      // P108 Part 12 F6: deliberately NOT memoized as `[]` (a prior comment here argued a failure
+      // should be cached the same as a genuinely-empty container, to stop it re-firing on every
+      // activation/reconnect) — but `byContainer[key] || pendingLoads.has(key)` above treats `[]`
+      // as "loaded", so a TRANSIENT failure (SchemaColumns's own Disconnected-on-cache-miss while a
+      // console restores before its connection finishes connecting, F3/F5) got permanently stuck
+      // empty: every later retry (a reconnect, F5's own generation bump) short-circuited on the
+      // cached `[]` and never called treeSchemaColumns again. Leaving `byContainer[key]` unset
+      // costs nothing extra: F5 already re-triggers this on every drop/reconnect, and a container
+      // the adapter genuinely, permanently rejects just keeps retrying on the same schedule a
+      // real empty container already gets polled on (once per mount/reconnect) — never on a
+      // keystroke (D5), so there is no tight retry loop to worry about.
     } finally {
       pendingLoads.delete(key);
     }
