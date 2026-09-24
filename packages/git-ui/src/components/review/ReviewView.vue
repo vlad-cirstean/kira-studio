@@ -29,6 +29,7 @@ import type {
   Transport,
   UiActionKind,
 } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
 // `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
 // ever reads it through `InstanceType<typeof KuiSearchInput>` — that is still a genuine *value*
@@ -117,6 +118,17 @@ let unsubscribeReconnect: (() => void) | undefined;
 // `RepoState`'s own open-sequence token (P108 F4) for the identical shape.
 let targetSequence = 0;
 
+/** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited) async
+ *  operation that rejects becomes a silent, unhandled rejection. Every fire-and-forget call in
+ *  this file routes its own rejection through this, into the same live region this file's other
+ *  `liveAnnouncement.value = ...` assignments already drive. `transport-closed` (the one code
+ *  `bridge.dispose()` itself produces, this file's own `onBeforeUnmount`) is ignored outright —
+ *  this view is already gone by the time it lands, so there is nothing left to announce it to. */
+function reportAsyncError(err: unknown, prefix: string): void {
+  if (err instanceof TransportError && err.code === 'transport-closed') return;
+  liveAnnouncement.value = `${prefix} — ${err instanceof Error ? err.message : String(err)}`;
+}
+
 async function applyTarget(nextRepoId: string, branch: string): Promise<number> {
   const token = ++targetSequence;
   repoId.value = nextRepoId;
@@ -172,7 +184,9 @@ async function bootstrap(): Promise<void> {
   reviewComments.value = new ReviewCommentsState(bridge);
 
   unsubscribeTarget = bridge.on('review.target', (event) => {
-    void applyTarget(event.repoId, event.branch);
+    applyTarget(event.repoId, event.branch).catch((err: unknown) =>
+      reportAsyncError(err, "Couldn't switch to the pushed target"),
+    );
   });
   // G11 D17: the palette's own route into this already-mounted webview — toggles the file
   // currently open in the Files pane, or announces there is none to toggle.
@@ -180,7 +194,7 @@ async function bootstrap(): Promise<void> {
     onUiAction(event.action);
   });
   unsubscribeReconnect = bridge.onReconnect(() => {
-    void handleReconnect();
+    handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't reconnect"));
   });
 
   if (props.target) {
@@ -244,7 +258,7 @@ function scheduleSessionSave(): void {
   sessionSaveScheduled = true;
   queueMicrotask(() => {
     sessionSaveScheduled = false;
-    void persistSession();
+    persistSession().catch((err: unknown) => reportAsyncError(err, "Couldn't save this session"));
   });
 }
 

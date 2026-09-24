@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RepoCandidate } from '@kira/git-ipc';
 /**
  * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." The main
  * content area itself when there is nothing else to show — renders the candidate list inline.
@@ -8,7 +9,7 @@
  * duplicated this list behind a popup, was removed — redundant with Studio's own left sidebar and
  * VS Code's one-repo-per-window model).
  */
-import type { RepoCandidate } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { onMounted, ref } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
@@ -31,9 +32,22 @@ function refreshCandidates(): void {
 
 onMounted(refreshCandidates);
 
+// P108 F10: this was `@click`-bound directly — Vue's own async-error handling stops the
+// rejection from becoming a true unhandled one, but with no `app.config.errorHandler` set it
+// never reached the user either.
+const pickError = ref<string | undefined>(undefined);
+
 async function openCandidate(candidate: RepoCandidate): Promise<void> {
-  const result = await props.repoState.open(candidate.path);
-  if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
+  pickError.value = undefined;
+  try {
+    const result = await props.repoState.open(candidate.path);
+    if (result.kind === 'ok') emit('repo-opened', result.repo.repoId);
+  } catch (err) {
+    // `transport-closed` (the host disconnecting mid-request) is ignored outright — this panel
+    // is about to be replaced by the boot-error banner (F8) rather than needing its own copy of it.
+    if (err instanceof TransportError && err.code === 'transport-closed') return;
+    pickError.value = err instanceof Error ? err.message : String(err);
+  }
 }
 </script>
 
@@ -68,6 +82,9 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         Retry
       </KuiButton>
     </template>
+    <p v-if="pickError" class="kv-no-repo-note" data-testid="no-repository-pick-error">
+      Couldn't open that repository — {{ pickError }}.
+    </p>
   </div>
 </template>
 

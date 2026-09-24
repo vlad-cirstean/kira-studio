@@ -15,6 +15,7 @@
  * row's `FileTree` renders no toolbar of its own (`show-toolbar="false"`).
  */
 import type { CommitStore } from '@kira/git-core';
+import { TransportError } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { useEventListener } from '@vueuse/core';
 import { computed, ref, useTemplateRef } from 'vue';
@@ -160,9 +161,22 @@ async function openAllChanges(): Promise<void> {
 // component in a Wails WebView with no `command:` handler at any layer. Now a real request both
 // hosts answer locally.
 async function revealInGraph(): Promise<void> {
-  const { revealed } = await props.actions.revealInGraph({ sha: props.sha });
-  if (!revealed) {
-    props.actions.announce("Couldn't reveal this commit — no graph is open for this repository.");
+  try {
+    const { revealed } = await props.actions.revealInGraph({ sha: props.sha });
+    if (!revealed) {
+      props.actions.announce(
+        "Couldn't reveal this commit — no graph is open for this repository.",
+      );
+    }
+  } catch (err) {
+    // P108 F10: a template handler — Vue's own async-error handling already stops this from
+    // becoming a true unhandled rejection, but with no `app.config.errorHandler` set it never
+    // reached the user either. `transport-closed` (this row's own host disconnecting mid-request)
+    // is ignored outright — nothing left to announce it to once the row is gone.
+    if (err instanceof TransportError && err.code === 'transport-closed') return;
+    props.actions.announce(
+      `Couldn't reveal this commit — ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -174,13 +188,22 @@ function onOpenFile(index: number, pinned: boolean): void {
   const exp = props.expansion;
   const file = exp?.detail.detail.value?.files[index];
   if (!exp || !file) return;
-  void exp.actions.openInEditor({
-    sha: props.sha,
-    path: file.path,
-    originalPath: file.originalPath,
-    parentIndex: exp.detail.parentIndex.value,
-    pinned,
-  });
+  // P108 F10: was fire-and-forget with no `.catch` — a rejection here (transport drop, a bad
+  // path on the host side) became a silent unhandled rejection.
+  exp.actions
+    .openInEditor({
+      sha: props.sha,
+      path: file.path,
+      originalPath: file.originalPath,
+      parentIndex: exp.detail.parentIndex.value,
+      pinned,
+    })
+    .catch((err: unknown) => {
+      if (err instanceof TransportError && err.code === 'transport-closed') return;
+      props.actions.announce(
+        `Couldn't open the file — ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
 }
 </script>
 

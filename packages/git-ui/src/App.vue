@@ -15,6 +15,7 @@
 import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
 import {
   computeFloatPosition,
   initTooltips,
@@ -303,6 +304,18 @@ watch(graphView.generation, () => {
   stashContextMenuState.value = undefined;
 });
 
+/** P108 F10: `main.ts` sets no `app.config.errorHandler`, so a `void`-called (or unawaited)
+ *  async operation that rejects becomes a silent, unhandled rejection — no feedback ever reaches
+ *  the user. Every fire-and-forget call in this file routes its own rejection through this, into
+ *  the same live region `detailState.announcement`/`opsState.announcement`/`graphView.announcement`
+ *  below already drive. `transport-closed` (the one code `bridge.dispose()` itself produces, this
+ *  file's own `onBeforeUnmount`) is ignored outright — this view is already gone by the time it
+ *  lands, so there is nothing left to announce it to. */
+function reportAsyncError(err: unknown, prefix: string): void {
+  if (err instanceof TransportError && err.code === 'transport-closed') return;
+  liveAnnouncement.value = `${prefix} — ${err instanceof Error ? err.message : String(err)}`;
+}
+
 watch(graphView.loadedRows, () => {
   const sha = pendingSelectionSha.value;
   if (sha === null) return;
@@ -311,7 +324,11 @@ watch(graphView.loadedRows, () => {
   pendingSelectionSha.value = null;
   // P93 §8.4: `scrollToRow` is `async` now — this callback itself is not, and a page-arrival
   // re-select has nothing further to sequence after the scroll, so fire-and-forget is correct.
-  if (selection.selectBySha(sha)) void commitGridRef.value?.scrollToRow(selection.row.value);
+  if (selection.selectBySha(sha)) {
+    commitGridRef.value
+      ?.scrollToRow(selection.row.value)
+      .catch((err: unknown) => reportAsyncError(err, "Couldn't scroll to the selected commit"));
+  }
 });
 
 // ---------------------------------------------------------------------------------------
@@ -525,7 +542,7 @@ async function handleReconnect(): Promise<void> {
 }
 
 const unsubscribeReconnect = bridge.onReconnect(() => {
-  void handleReconnect();
+  handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't reconnect"));
 });
 
 watch(detailState.announcement, (text) => {
@@ -615,7 +632,10 @@ async function handleSearchSelect(option: SearchOption): Promise<void> {
 // either nothing has been stepped to yet (`activeIndex` still `-1`) or `next()`/`previous()` was
 // a no-op on an empty hit list — neither reveals anything.
 watch(searchState.activeHit, (hit) => {
-  if (hit !== undefined) void revealAndSelectSha(hit.sha);
+  if (hit === undefined) return;
+  revealAndSelectSha(hit.sha).catch((err: unknown) =>
+    reportAsyncError(err, "Couldn't reveal the selected commit"),
+  );
 });
 
 function handleSearchFocusGrid(): void {
@@ -682,7 +702,9 @@ const gridOpenExternalCapability = computed(
 );
 
 function handleGridOpenPullRequest(number: number): void {
-  void actions.value?.openPullRequest({ number });
+  actions.value
+    ?.openPullRequest({ number })
+    .catch((err: unknown) => reportAsyncError(err, "Couldn't open the pull request"));
 }
 
 const commitMenuSections = computed<MenuSection[]>(() => {
@@ -1158,7 +1180,11 @@ function runUiAction(
       toolbarRef.value?.refresh();
       break;
     case 'revealCommit':
-      if (target) void revealCommitInGraph(target);
+      if (target) {
+        revealCommitInGraph(target).catch((err: unknown) =>
+          reportAsyncError(err, "Couldn't reveal the commit"),
+        );
+      }
       break;
     case 'stashChanges':
       stashCreateOpen.value = true;
