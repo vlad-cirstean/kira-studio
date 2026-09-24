@@ -3856,6 +3856,16 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   proportion to a threat this app doesn't defend against. Noted here so a future review doesn't
   re-flag it as new.
 
+- **A legitimate JSON/array column is over-refused on a masked connection** (F1, P108 Part 7).
+  `renderPage`'s fail-closed rule refuses any `TabularPage` column whose `TypeClass` is JSON or
+  Other on a masked connection outright, with no attempt to tell a genuinely unrelated JSON/array
+  column apart from one carrying a masked value through `row_to_json`/`json_agg`/a whole-row
+  composite. The stronger fix — resolving an output column back to its real source column via
+  Postgres's own `FieldDescription.TableOID`/`TableAttributeNumber` provenance — was declined as out
+  of proportion to this finding: it would span the adapter's `OpCtx`/statement-execution path and
+  `render.go`'s matching logic, a materially larger structural change than the finding itself.
+  Closing this needs that provenance wiring.
+
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
   `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
@@ -3870,8 +3880,8 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 **As of P100, every item from here through "No debounce on the quick-open palette's keystroke
 handler" below (including the Correctness: and Performance: subsections) describes Kira Space, not
 Kira Studio** — the native code workspace and git module both moved there in full, unchanged, so
-each limitation moved with the code it describes. Only the final item below (the dbmcp bearer
-token) is still Kira Studio's own.
+each limitation moved with the code it describes. The items after it are Kira Studio's own (or, for
+the workflow-coverage item, repo-wide).
 
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
@@ -3980,13 +3990,3 @@ Performance:
   cannot push a `.github/workflows/*.yml` change directly (an OAuth scope limit) and requires
   staging one under `docs/pending-changes/` for a session that can; that staging step is real,
   separate work this phase's own icon/docs/audit scope does not cover.
-- **The dbmcp bearer token reaches `claude mcp add` in plaintext argv** (`internal/mcpinstall/
-  install.go`'s `Install`/`Command`, M6 round-1 finding), visible to any other local process or
-  user that can list argv (`ps`, `/proc/<pid>/cmdline`) for the short window the `claude mcp add`
-  child runs. Checked directly against the installed `claude` CLI (`claude mcp add --help`): `-H/
-  --header` takes only a literal value, with no env-var or stdin form for an arbitrary header —
-  `--client-secret`'s `MCP_CLIENT_SECRET` env fallback is OAuth-specific and does not apply to a
-  custom `Authorization` header. Not fixed here per `CLAUDE.md`'s library-reuse rule: inventing a
-  side-channel (a temp file, a wrapper script) to work around a CLI's own flag surface is exactly
-  the hand-rolled-infrastructure case that rule declines. Closing this needs an upstream `claude
-  mcp add` flag (e.g. a header-from-env or header-from-file form) or a request to add one.
