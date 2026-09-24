@@ -1,14 +1,20 @@
 import type { Page } from '@shared/protocol/page';
 import { applyLoadFailure } from '../viewOp';
 
-// P107 I2-14: documents/state.ts, grid/state.ts, shared/keyvalue/state.ts and stream/state.ts
-// each wrote the same load() frame around their own `data.read` call — supersede/tab-closed
-// guards, a page-kind check thrown as an error, and the applyLoadFailure/onFailure catch tail.
-// What genuinely differs per view (the request payload, which runtime fields a successful page
-// populates, and any extra per-view reaction) stays with the caller: `apply` runs the caller's own
-// field assignments (including its own `rt.status`/`rt.opId` reset — grid's own extra
-// `position.strategy` check and `loadMeta` call happen there too, in the same place they always
-// have, after the kind check the frame already ran).
+// P107 I2-14: documents/state.ts, grid/state.ts and shared/keyvalue/state.ts each wrote the same
+// load() frame around their own `data.read` call — supersede/tab-closed guards, a page-kind check
+// thrown as an error, and the applyLoadFailure/onFailure catch tail. What genuinely differs per
+// view (the request payload, which runtime fields a successful page populates, and any extra
+// per-view reaction) stays with the caller: `apply` runs the caller's own field assignments
+// (including its own `rt.status`/`rt.opId` reset — grid's own extra `position.strategy` check and
+// `loadMeta` call happen there too, in the same place they always have, after the kind check the
+// frame already ran).
+//
+// F20 (P108 Part 10): stream/state.ts's own load() has this exact same shape (opId supersede,
+// stillMounted, kind check, applyLoadFailure tail) but is not one of this frame's callers — it's a
+// candidate for adopting `runPagedLoad`, not a current user of it. navigation.ts's own reason for
+// excluding stream from `createPageNavigation` (token-only cursor, no `pageIndex`) is unrelated:
+// that applies to page navigation, not to this load frame.
 
 interface LoadFrameRuntime {
   status: string;
