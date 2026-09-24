@@ -3,6 +3,7 @@ import { copyOrReportError, copyText } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
 import {
   columnsToTsv,
+  disambiguateNames,
   type RowSnapshot,
   rowsToCsv,
   rowsToJson,
@@ -66,13 +67,16 @@ export interface TabularRangeMenuContext {
 }
 
 function rangeSnapshots(ctx: TabularRangeMenuContext): RowSnapshot[] {
+  // P108 Part 11 F7: ctx.columnNames comes straight from page.columns' own names, which a console
+  // result can repeat — disambiguated for the same reason ConsoleSlickGrid.vue's rowSnapshotFor is.
+  const names = disambiguateNames(ctx.columnNames);
   return ctx.rows.map((row) => {
     const values: Record<string, string | null> = {};
     ctx.cols.forEach((col, i) => {
       const dc = ctx.cellAt(row, col);
-      values[ctx.columnNames[i] as string] = dc.isNull ? null : dc.text;
+      values[names[i] as string] = dc.isNull ? null : dc.text;
     });
-    return { columns: [...ctx.columnNames], values };
+    return { columns: names, values };
   });
 }
 

@@ -48,6 +48,30 @@ export function rowsToTsv(rows: RowSnapshot[]): string {
   return rows.map((r) => r.columns.map((c) => tsvField(r.values[c] ?? '')).join('\t')).join('\n');
 }
 
+// P108 Part 11 F7: a console result routinely repeats a column name (`SELECT a.id, b.id FROM a
+// JOIN b`, `SELECT 1 AS x, 2 AS x` — ConsoleSlickGrid.vue's own comment says so). RowSnapshot keys
+// `values` by name, so a repeated name's later occurrence silently overwrote the earlier one's
+// entry — row copy showed the same value under both headers, and JSON dropped a key entirely.
+// Every occurrence past a name's first is suffixed `_2`, `_3`, … skipping ahead past any generated
+// name that collides with a genuinely different column already using it — a positional fix at the
+// snapshot-building boundary, so rowsToTsv/rowsToCsv/rowsToJson stay name-keyed and unchanged.
+export function disambiguateNames(names: readonly string[]): string[] {
+  const used = new Set<string>();
+  const seenCount = new Map<string, number>();
+  return names.map((name) => {
+    let count = (seenCount.get(name) ?? 0) + 1;
+    seenCount.set(name, count);
+    let candidate = count === 1 ? name : `${name}_${count}`;
+    while (used.has(candidate)) {
+      count++;
+      seenCount.set(name, count);
+      candidate = `${name}_${count}`;
+    }
+    used.add(candidate);
+    return candidate;
+  });
+}
+
 interface CellText {
   text: string;
   isNull: boolean;

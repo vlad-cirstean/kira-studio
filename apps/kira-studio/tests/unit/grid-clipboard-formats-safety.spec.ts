@@ -16,8 +16,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
   columnsToTsv,
+  disambiguateNames,
   parseDelimited,
   rowsToCsv,
+  rowsToJson,
   rowsToTsv,
 } from '../../frontend/src/views/shared/clipboardFormats';
 
@@ -122,5 +124,36 @@ describe('single-cell copy/paste round trip (F5)', () => {
   test('a value containing a comma but no tab/quote/newline round-trips through copy and paste unchanged', () => {
     const rangeCopy = columnsToTsv([0], [0], () => ({ text: 'Main St, Apt 4', isNull: false }));
     expect(parseDelimited(rangeCopy)).toEqual([['Main St, Apt 4']]);
+  });
+});
+
+// P108 Part 11 F7: console results routinely repeat a column name (self-joins, `SELECT 1 AS x, 2
+// AS x`) — RowSnapshot keys `values` by name, so the later occurrence silently overwrote the
+// earlier one's entry unless names are disambiguated first.
+describe('disambiguateNames (F7)', () => {
+  test('leaves a set of already-unique names untouched', () => {
+    expect(disambiguateNames(['id', 'name', 'email'])).toEqual(['id', 'name', 'email']);
+  });
+
+  test('suffixes every occurrence of a repeated name past the first', () => {
+    expect(disambiguateNames(['id', 'id'])).toEqual(['id', 'id_2']);
+  });
+
+  test('suffixes three occurrences with three distinct names', () => {
+    expect(disambiguateNames(['x', 'x', 'x'])).toEqual(['x', 'x_2', 'x_3']);
+  });
+
+  test('skips a generated suffix that collides with a genuinely different real column', () => {
+    // Two `id` columns plus a real `id_2` column: the second `id` can't become `id_2` (taken), so
+    // it bumps past it.
+    expect(disambiguateNames(['id', 'id', 'id_2'])).toEqual(['id', 'id_2', 'id_2_2']);
+  });
+
+  test('a self-join style repeat feeds rowsToTsv/rowsToCsv/rowsToJson without losing a column', () => {
+    const names = disambiguateNames(['id', 'id']);
+    const row = { columns: names, values: { id: '1', id_2: '2' } };
+    expect(rowsToTsv([row])).toBe('1\t2');
+    expect(rowsToCsv([row])).toBe('1,2');
+    expect(JSON.parse(rowsToJson([row]))).toEqual([{ id: '1', id_2: '2' }]);
   });
 });

@@ -16,7 +16,12 @@ import { useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
-import { columnsToTsv, type RowSnapshot, rowsToTsv } from '../shared/clipboardFormats';
+import {
+  columnsToTsv,
+  disambiguateNames,
+  type RowSnapshot,
+  rowsToTsv,
+} from '../shared/clipboardFormats';
 import {
   alignmentFor,
   columnHeaderTooltip,
@@ -510,12 +515,15 @@ function cellAt(row: number, col: number): { text: string; isNull: boolean } {
 
 function rowSnapshotFor(row: number): RowSnapshot {
   if (!page) return { columns: [], values: {} };
+  // P108 Part 11 F7: a console result can repeat a column name (self-joins, `SELECT 1 AS x, 2 AS
+  // x`) — disambiguated so `values` never loses an occurrence to a same-named later one.
+  const names = disambiguateNames(page.columns.map((c) => c.name));
   const values: Record<string, string | null> = {};
-  page.columns.forEach((col, i) => {
+  page.columns.forEach((_col, i) => {
     const dc = cellAt(row, i);
-    values[col.name] = dc.isNull ? null : dc.text;
+    values[names[i] as string] = dc.isNull ? null : dc.text;
   });
-  return { columns: page.columns.map((c) => c.name), values };
+  return { columns: names, values };
 }
 
 // D9's own column-scoped rule — views/shared/slick/rowVisibility.ts's own pure functions (P107
