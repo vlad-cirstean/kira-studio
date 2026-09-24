@@ -4119,6 +4119,131 @@ full chain this phase touches): clean. `bunx biome check packages/git-core packa
 213 files. `bun test` in `packages/git-core`: 267 pass, 0 fail. `bun test` in `packages/git-ui`: 205
 pass, 0 fail. No red found anywhere in this pass — nothing pre-existing to root-cause or defer.
 
+## P108 Part 8 result
+
+Reviewed per `plans/P108-part8-studio-api-client-backend.md` (Opus reviewer, no fixing), 19 findings
+total across `apps/kira-studio/internal/{httpclient,grpcclient,apivars,postman}`, `packages/api-core/
+**`, and related `packages/shared/domain` files. One Sonnet fixer landed one commit per finding
+(F2/F3 share one pre-existing commit, `c5cf9d1`, from before this pass — see below), none dismissed
+or deferred.
+
+- **F1 `690b1ea`** — a cyclic proto dependency crashed the whole app via the reflection linker.
+  Guarded against the cycle.
+- **F2/F3 `c5cf9d1`** — a redirect kept secret headers across a host change (A to B to B) and across
+  an https-to-http same-host scheme downgrade. Both compared redirect hops against the origin and
+  strip on either change. Landed as one commit before this pass (pre-existing, not re-split — the
+  finding pair was already fixed together and re-splitting a shipped commit for numbering alone
+  wasn't worth undoing working history).
+- **F4 `bc2abf1`** — gRPC `Describe` had no deadline or cancel path; a hung reflection server hung
+  the call forever. Bound resolution with a default timeout.
+- **F5 `7f27187`** — an undecryptable or `NULL` env secret fell through and resolved to a different
+  scope's own secret of the same name instead of reporting unresolved. Made it shadow unresolved.
+- **F6 `dbcd7fe`** — a plain (non-secret) value containing literal `{{secretName}}` text was expanded
+  by stage 2 as if it were itself a secret reference. Reports it as deferred instead.
+- **F7 `b48afa4`** — Postman's object-form `{{$alias}}` rewrite ran on export but not before the
+  "unchanged from origin" comparison, so an untouched request with an alias reference always looked
+  edited and lost its verbatim origin. Applied the same rewrite before comparing.
+- **F8 `4e1bf44`** — plaintext `auth` blocks and secret-typed folder/item variables were kept in
+  `origin_json` at import and re-exported verbatim, defeating D16's export-time blanking (the origin
+  copy bypassed it entirely). Strip both at import, same as export already blanks them; extended
+  `roundtrip_test.go`'s fixture and assertions to cover it (`WarnVariablesInert`'s count moved 1 → 2,
+  matching the added inert `folderSecret` fixture entry).
+- **F9 `2736d31`** — curl `-u user:pass` import used bare `btoa`, which throws on a non-Latin1
+  credential and silently destroys a `{{variable}}` reference by encoding its literal `{{`/`}}`
+  bytes. Added a UTF-8-correct `btoa` helper and keep a `{{var}}`-bearing credential unencoded with a
+  warning instead.
+- **F10 `879c922`** — curl `--json @file` was treated as literal body text instead of curl's own
+  file-reference handling (`--json` is `--data-binary` plus two headers) — an `@file` argument never
+  resolved to a file. Routed it through the same file-reference path as `-d`/`--data-binary`.
+- **F11 `20b4e3e`** — the descriptor cache had two races: a stale `Put` landing after `InvalidateCache`
+  could resurrect an invalidated entry, and concurrent identical resolutions each ran their own
+  reflection RPC instead of collapsing into one. Added a generation counter (`Put` checked against
+  the generation at resolve-start, bumped on invalidate) and `singleflight.Group` around resolution.
+  New tests: a deterministic stale-generation-skip test and a real-server concurrency test (20
+  goroutines behind a start barrier, a `grpc.StreamInterceptor` counting actual reflection RPCs,
+  asserting exactly one).
+- **F12 `c6bfc1a`** — the wire pane's D4 truncation cap ran before secret masking, so a secret
+  straddling the cut byte could leave its unmasked prefix in the kept text. Threaded a
+  `*strings.Replacer` (an opaque stdlib type, keeping `httpclient` from importing `apivars` — the
+  existing layering) down through `Options`/`renderRequest`/`renderFormDataBody` so masking runs
+  before the cap, not after. New tests cover the straddle case and a UTF-8 rune-boundary cut.
+- **F13 `8054985`** — a `protojson` unmarshal syntax error (introduced by a secret substituted into
+  request JSON, e.g. an unescaped quote inside the secret value) echoed the raw offending token back
+  in the error string, verbatim, to the renderer. `sanitizeUnmarshalError` keeps only the line:column
+  position for a syntax error, leaving a semantic error (e.g. "unknown field") — which only ever
+  names a field, never echoes input — untouched.
+- **F14 `75ff1a5`** — Go's `forgivingBase64Decode` unconditionally padded to a multiple of 4
+  regardless of any `=` already present, so `"YQ="` (a stray trailing `=` on a non-multiple-of-4
+  length) silently decoded where TS's `atob` rejects it — the two stages disagreed on the same
+  `{{name | base64decode}}` pipe. Rewrote to strip up to 2 trailing `=` only when the length is
+  already a multiple of 4, reject any `=` left over, and decode unpadded — matching the WHATWG
+  forgiving-base64 algorithm exactly (empirically verified against real `atob` behavior, not just
+  spec text). Added the failing/passing cases to the shared Go/TS corpus and a table-driven test
+  against the full truth table.
+- **F15 `d2e0100`** — `ARCHITECTURE.md` drift: said the history per-scope trim was 20 (code is 30),
+  and said the secret replacer masks `Wire.Request` only, never `Wire.ResponseHead` (code masks
+  both). Corrected both.
+- **F16 `80d4163`** — response bodies, gRPC response messages and jar cookies reach `kira.sqlite`
+  history unmasked — accepted by design (P8 OQ-6, P11), but absent from `ARCHITECTURE.md`'s Known
+  open items. Added an entry.
+- **F17 `8651451`** — the Go/TS parity extractors (`go-ts-api-parity.spec.ts`,
+  `go-ts-vocabulary-parity.spec.ts`) ended a map literal's body at the first `}` at any depth (a
+  comment or string could close it early) and matched an int const anywhere, comments included —
+  latent, not currently wrong. Strip `//` comments before scanning, close a map body with a
+  string-aware depth count, assert the extracted set/map is non-empty.
+- **F18 `4d78fef`** — `writeFileAtomically` created its temp file with `os.Create`'s
+  0666-minus-umask default and renamed straight onto the destination path: exporting over an
+  existing 0600 file loosened it, and exporting to a symlink replaced the link with a regular file
+  instead of writing through it. Resolves the destination through `filepath.EvalSymlinks` first and
+  mirrors an existing target's mode (0600 default for a fresh export), re-asserted with `Chmod`
+  since `OpenFile`'s own perm argument is still subject to umask. New tests cover mode preservation,
+  the fresh-file default, and writing through a symlink without replacing it.
+- **F19 `10827a5`** — when `ImportVariables` failed after `ImportTree` already committed, the
+  compensating `Delete`'s own failure was only logged; the returned error still named only
+  `ImportVariables`' failure, giving no indication a half-imported collection was left in the tree.
+  The returned error now names both failures and says the collection remains, needing manual
+  removal.
+
+**Nothing dismissed or deferred.** All 19 findings matched real, reachable code; every fix landed as
+specified. The findings file's own "Checked, nothing real" and "Informational" sections (reveal-gate
+plaintext exposure, substitution-corpus loop coverage, `capHopHeaders` whole-header drops,
+`cacheKey`/no-invalidation-on-schema-change already documented, unreachable lone-surrogate
+`urlencode` throw, `net/http` CR/LF header error, multipart text-part masking, transform case-mapping
+agreement, dotenv import parity, bounded `negotiateAndListServices` retries, and the informational
+cross-host 307/308 body re-send) needed no further action.
+
+**Cross-agent commit pollution, disclosed.** This chunk's own fixer ran concurrently with Part 18's
+fixer in the same shared (non-worktree) checkout. Three of Part 18's own commits absorbed this
+chunk's already-staged-but-not-yet-committed changes, caused by the shared full-monorepo pre-commit
+hook's run time creating a race window: F2's own fix (P108 F4 in this chunk's numbering — bound
+reflection resolution with a timeout) landed folded inside Part 18's `bc2abf1`; F6's own fix
+landed folded inside `dbcd7fe`; and this chunk's own F9 (curl `-u` UTF-8/`{{var}}` fix) itself
+absorbed Part 18's F9 (`git-ui` PrState warm-up guard) into `2736d31` — three files, one of them not
+this chunk's own. Every instance was caught, confirmed present in the tree afterward (`git show
+<hash>:<path>` and/or the resulting diff), and never resulted in lost or discarded work on either
+side — see Part 18's own result section above for its side of the same three incidents. From F10
+onward this chunk's own commits added an explicit `-- <pathspec>` to every `git commit` call itself
+(not just `git add`), which stopped the race from recurring for the remaining ten findings.
+
+**Verification, run for real:**
+
+- `cd apps/kira-studio && go build ./...`: exit 0.
+- `go vet ./internal/{httpclient,grpcclient,apivars,postman,bridge}/...`: 0 issues.
+- `go test -race ./internal/{httpclient,grpcclient,apivars,postman,bridge}/...`: clean, all pass.
+- `bun test packages/api-core/test/`: 250 pass, 0 fail (9 files).
+- `bun test apps/kira-studio/tests/unit`: 659 pass, 0 fail (82 files).
+- `bun run typecheck:api-core:studio`, `typecheck:unit:studio`: exit 0.
+- Every commit above ran `.githooks/pre-commit` for real (biome + full monorepo typecheck) and
+  passed clean — `--no-verify` never used.
+- Regression tests added and confirmed meaningful: F11's stale-generation/singleflight tests, F12's
+  mask-before-cap/rune-boundary tests, F13's syntax-error-token-stripping test, F14's
+  base64-truth-table test, and F18's mode-preservation/symlink tests are all new, with no pre-fix
+  equivalent — each fails against the pre-fix code (verified by construction: each asserts the exact
+  behavior the finding says was missing). F8's fix is covered by extending the existing
+  `roundtrip_test.go` fixture/assertions rather than a new file. F15/F16/F19 are doc/error-message
+  fixes with no dedicated test, per `CLAUDE.md`'s own bar (not complex/hard-to-get-right logic).
+- No pre-existing-but-out-of-scope red found in any of the above — nothing to root-cause or defer.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
