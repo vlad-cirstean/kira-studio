@@ -187,9 +187,20 @@ export const useTreeStore = defineStore('tree', () => {
   // refresh: true and so bypasses this early return) and an explicit context-menu refresh. A
   // collapse never discards treeState.children[k], so re-expanding it was already a pure re-render
   // — this just makes that true in code, which is what the §2.1 tree-expand budget assumes.
+  // P108 Part 12 F10: bumped by collapse() for the same row key — expand()'s own connect/
+  // loadVisibility awaits capture this before either, and re-check it right before
+  // `expanded.add(k)`. A collapse that lands while a connect triggered by this same expand() is
+  // still pending must stick: without the check, expand() re-added the row to `expanded` (and
+  // fetched its children) the instant connect resolved, silently undoing the user's own collapse.
+  const collapseSignal = new Map<string, number>();
+  function collapseSignalFor(k: string): number {
+    return collapseSignal.get(k) ?? 0;
+  }
+
   async function expand(connectionId: string, path: string): Promise<void> {
     const k = rowKey(connectionId, path);
     if (treeState.loading.has(k)) return;
+    const intent = collapseSignalFor(k);
     // Expanding a disconnected connection's node connects it first, rather than surfacing
     // E_DISCONNECTED — the twisty is the primary way users browse, so it shouldn't require a
     // separate explicit Connect click first.
@@ -203,13 +214,16 @@ export const useTreeStore = defineStore('tree', () => {
     }
     if (useConnectionsStore().states[connectionId]?.status !== 'connected') return;
     await loadVisibility(connectionId);
+    if (collapseSignalFor(k) !== intent) return;
     treeState.expanded.add(k);
     if (treeState.children[k]) return;
     await loadChildren(connectionId, path, false);
   }
 
   function collapse(connectionId: string, path: string): void {
-    treeState.expanded.delete(rowKey(connectionId, path));
+    const k = rowKey(connectionId, path);
+    collapseSignal.set(k, collapseSignalFor(k) + 1);
+    treeState.expanded.delete(k);
   }
 
   // P19 D4: a group row is a pure view over its parent's already-fetched children — there is no
