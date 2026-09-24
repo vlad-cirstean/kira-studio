@@ -3882,6 +3882,137 @@ subsystem (test infrastructure, not the git-RPC/socket contract this chunk owns)
   RequestAfterShutdownIsAbortedImmediately`, `TestBroker_QueueBoundedAgainstUnlimitedEnqueue`,
   updated in place to assert the new `PairingAborted` outcome rather than duplicated).
 
+## P108 Part 7 result
+
+Reviewed per `plans/P108-part7-studio-shell-bridge.md` (Opus reviewer, no fixing; tree surveyed at
+`bc365eb`), 14 findings total. F1 (`a24f02e`) and F2/F3 (`42f5ca3`, F2's own commit message names
+the name-collision/remove-before-add fix "F3") landed earlier in this phase; this pass fixed the
+remaining eleven, F4-F14, one commit per finding, none dismissed or deferred.
+
+- **F4 `3bf053c`** — ClickHouse `explain_query`/auto-explain always failed: `queryplan.StatementsFor`
+  composes `EXPLAIN PLAN json = 1, … <sql>` and `EXPLAIN ESTIMATE <sql>`, but
+  `classifyClickHouseSQL` classified the text right after `EXPLAIN`, whose leading word is
+  `PLAN`/`ESTIMATE` — always `unknown`, so every ClickHouse `explain_query` errored and `run_query`'s
+  auto-explain heavy-query gate never fired. Added `stripClickHouseExplainKindAndSettings`: skips one
+  optional kind keyword (`AST`/`SYNTAX`/`QUERY TREE`/`PLAN`/`PIPELINE`/`ESTIMATE`/`TABLE OVERRIDE`)
+  and its optional `k = v, …` settings list before classifying the real target. Tests built from
+  `queryplan.StatementsFor("clickhouse", …)` so composer and classifier stay in lockstep.
+- **F5 `b6dc480`** — `explain_query` returned plan text unmasked on masked connections: only the
+  error path was masked, while `Detail` (MySQL/MariaDB `attached_condition`, which reads real
+  const-folded values during optimization), condition-type metrics, and `Raw` all went back verbatim.
+  Added `maskPlanForMaskedConnection`/`maskPlanNode`: recursively blanks `Detail`, drops
+  `" condition"`-suffixed metrics, and blanks `Raw` whenever the connection has an active mask set —
+  matching `run_query`'s own masking precedent rather than inventing a new shape.
+- **F6 `fc155a3`** — `explain_query`'s prompt-approval path had no post-approval re-check, unlike
+  `run_query`'s `awaitApproval`. A read-mode-deny flip (or MCP exposure toggle) while the up-to-2-
+  minute approval dialog waited was invisible to a stale approve. Mirrored `awaitApproval`: after
+  `ApprovalApproved`, re-resolve `resolveEnabled` and the read verdict before executing.
+- **F7 `a51f844`** — a panic in any of the six MCP tool handlers crashed the whole desktop app: go-sdk
+  v1.8.0 runs each request unguarded (no `recover()` in the module), and only `Router.Execute` had
+  its own `safeRun`. Added a generic `withPanicRecovery[In any]` wrapping every `mcp.AddTool` call
+  (found via `codegraph_explore` tracing all six handler signatures) — logs the stack, returns a
+  generic "internal error" `IsError` result with no panic text (which could carry row data on a
+  masked connection).
+- **F8 `ad7babe`** — Command/Install stayed hidden after every restart inside the token's 7-day TTL:
+  they gated on `srv.Token()`'s in-memory `minted` flag, true only in the run that actually minted the
+  token, although F2's on-disk helper mirror survives restarts and stays valid. Re-gated on "helper
+  file exists and matches the current record" (`TokenRecord`/`LoadHelperToken`/
+  `helperTokenMatchesRecord`/`helperTokenValid`) instead of the mint flag; a missing or mismatched
+  helper file now reminds (writes record and helper together) rather than serving a record no client
+  can match. Dropped the now-unused in-memory plaintext (`SetToken` no longer takes one). Also fixed
+  `mcpauth/token.go`'s expiry message, stale after F2 ("re-register this server with the command it
+  shows" — no longer true once the header helper mechanism landed).
+- **F9 `4dfb8ee`** — an expired token had no remedy in the UI when a command was already shown
+  (minted-run branch): Regenerate only rendered in the `running && !command` branch, so the "Token
+  expired — regenerate it above" message pointed at nothing. Restructured
+  `DatabaseMcpPane.vue` so Regenerate renders whenever the server is running, regardless of which
+  sub-branch (command shown or not) is active.
+- **F10 `08761cb`** — the `headersHelper` path Claude Code runs through a shell was stored unquoted;
+  verified against the real CLI (2.1.281) that a path containing a space silently sends no
+  `Authorization` header at all (every call 401s with no hint why), reachable on macOS whenever
+  `KIRA_HOME`/`$HOME` has a space. Quoted with `shellSingleQuote` (F2's own helper) in both the
+  `add-json` payload and the displayed `Command` text; `Install` now also refuses outright on a
+  non-absolute helper path (`os.UserHomeDir` failure could otherwise yield one, resolving against
+  Claude Code's cwd instead of Kira's).
+- **F11 `aad4a84`** — a `DefaultPort` bind conflict silently fell back to an OS-assigned ephemeral
+  port, leaving every existing registration pointing at 8766 while the live server (and the bearer
+  token Claude Code's helper sends) sat on a different port any local uid could have bound first.
+  Of the finding's three named alternatives (surface the fallback as a status warning, rotate the
+  token on port mismatch, or refuse the fallback outright), picked refuse-outright: `bindHTTP` now
+  returns the bind error directly, surfacing through the exact same path an ordinary bind failure
+  already used (`DbMcpStatus.Error`, boot-time warn log) — no new status surface needed, and no
+  window where a registration can point at a port this app doesn't control.
+- **F12 `a1374c7`** — a confirmed race in `keepawake`'s Rearm path (Release immediately followed by
+  Acquire, the review's own overlay test measuring 1/40 failures at default `GOMAXPROCS`, 37/40 at
+  `GOMAXPROCS=1`): `reap` read the driver-wide `expected` flag independent of whether its own `cmd`
+  was still current, so the new `Acquire`'s reset could race ahead of the old child's `reap` and turn
+  an intentional kill into a false `onLost`, leaving the Mac awake with the real assertion's status
+  reporting "signal: killed". Gated the report on the same `d.cmd == cmd` identity check that clears
+  `d.cmd`. The review's own probabilistic timing didn't reproduce in this sandbox at all (fork/exec
+  for the new child is slower here than the kernel reaping a `SIGKILL`ed one) — added
+  `TestCaffeinateDriverReapIgnoresSupersededChild`, which forces the exact interleaving
+  deterministically (holds `d.mu` itself across the kill-then-replace window) instead of hoping for
+  it. Confirmed it fails reliably (5/5, including under `-race`) against the reverted bug and passes
+  reliably (20/20 under `-race`) against the fix.
+- **F13 `b98a9e4`** — teardown could orphan a preconnect sidecar and let DB MCP outlive connection
+  shutdown: `main.go` stopped DB MCP/agenthooks *after* `connectionsSvc.Shutdown()`, so a `run_query`
+  mid-quit could still dial a preconnect target the supervisor was already tearing down; separately,
+  `Shutdown` only called `Preconnect.StopAll`, which kills tracked entries only — an attempt whose
+  `Preconnect.Start` was still inside its 2s settle window wasn't tracked yet, so a click-Connect-
+  then-quit within that window could leave its `Setpgid` sidecar (e.g. an ssh tunnel) to start being
+  tracked moments after `StopAll` already ran, orphaned. Reordered `main.go`'s teardown (DB MCP and
+  agenthooks stop first, each blocking on its own in-flight handlers) and gave `Service` a `closed`
+  flag: `Shutdown` now refuses new `Connect`s, cancels every in-flight attempt, waits for each to
+  actually unwind (`finalizeAbortedAttempt`'s own teardown, or the settle-window abort inside
+  `Preconnect.Start`), then calls `StopAll` — nothing this service started is left outside `StopAll`'s
+  final snapshot.
+- **F14 `f138dd0`** — docs-only. Deleted the `ARCHITECTURE.md` known-open item about the dbmcp bearer
+  token on argv (resolved by F2, per `CLAUDE.md`'s "delete once resolved" rule) and fixed the
+  now-dangling "final item below" cross-reference in the P100 migration note. Added the over-
+  refusing-JSON/array-column known-open item F1's own commit message said it had documented but
+  never actually added.
+
+**Nothing dismissed or deferred** — all 11 findings in this pass (F4-F14) matched real, reachable
+code; every fix landed as specified, including picking among F11's three named alternatives and
+choosing F12's own primary suggested fix.
+
+**"Areas checked, nothing real found" accounts for the rest of the chunk's own scope** (findings
+doc §4.1-§4.9, §5: token handling beyond F8-F11, masking beyond F1/F5, approval gates beyond F6,
+the read-gate preamble, lifecycle beyond F12/F13, wire mirrors, update-check/links, metrics) — F1-F14
+plus that section together cover the whole review plan's own surface.
+
+**Verification, run for real:**
+
+- `cd apps/kira-studio && go build ./...`: exit 0.
+- `go vet ./...`: 0 issues.
+- `gofmt -l` on every Go file this phase touched (`adapters/clickhouse/console.go` +
+  `console_internal_test.go`, `bridge/dbmcp.go` + `dbmcp_test.go`, `connections/service.go` +
+  `service_test.go`, `dbmcp/explain.go`, `dbmcp/explain_approval_test.go`, `dbmcp/explain_test.go`,
+  `dbmcp/http.go` + `http_test.go`, `dbmcp/run_query_approval_test.go`, `dbmcp/server.go` +
+  `server_test.go`, `dbmcp/tools.go`, `keepawake/caffeinate.go` + `caffeinate_test.go`,
+  `mcpauth/token.go`, `mcpinstall/install.go` + `install_test.go`, `main.go`): clean.
+- `go test -race ./internal/adapters/clickhouse/... ./internal/bridge/... ./internal/connections/...
+  ./internal/dbmcp/... ./internal/keepawake/... ./internal/mcpauth/... ./internal/mcpinstall/...
+  ./internal/preconnect/...`: clean, no failures, no data races.
+- `go test ./...` (whole `kira-studio` module): 0 failures.
+- `bun run typecheck:web:studio` (`vue-tsc` over the frontend covering `DatabaseMcpPane.vue`, F9):
+  exit 0.
+- `biome check` on `DatabaseMcpPane.vue`: 0 issues.
+- Every commit above ran `.githooks/pre-commit` for real (biome + `check-tokens.sh` +
+  the full parallel `typecheck:*` split) and passed clean — `--no-verify` never used.
+- Regression tests added and confirmed meaningful against the pre-fix code, not just passing on the
+  fixed tree: F4/F5/F7/F8/F10/F11's new tests are definitional (no pre-fix equivalent to diff
+  against). F6's `TestExplainQueryRefusesApprovedReadAfterReadModeDeniedMidWait` and F12's
+  `TestCaffeinateDriverReapIgnoresSupersededChild` were both confirmed to fail against the reverted
+  bug before confirming they pass against the fix. F13's two new tests
+  (`TestConnectRefusesAfterShutdown`, `TestShutdownWaitsOutInFlightConnectBeforeStoppingPreconnect`)
+  exercise the new `closed`-flag/wait behavior directly; no pre-fix equivalent existed to diff
+  against since `Shutdown` had no such behavior before.
+
+**Working-tree note.** P108 Part 17's own fixer (gitsock) was running concurrently in this same
+checkout while this pass's commits landed — each commit here was staged and verified to touch only
+its own intended file(s) before committing, with Part 17's in-progress files shielded out.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
