@@ -29,6 +29,29 @@ test('collections empty state has no duplicate action buttons (D6)', async ({ re
   await expect(page.locator('.side-empty .p-dlgbtn')).toHaveCount(0);
 });
 
+// Minimal schema for the D12 test below — needs only enough for findMethod to resolve
+// demo.Echo/SayHello, mirroring grpc-request.spec.ts's own UNARY_SCHEMA.
+const UNARY_SCHEMA = {
+  services: [
+    {
+      name: 'demo.Echo',
+      methods: [
+        {
+          name: 'SayHello',
+          fullName: 'demo.Echo/SayHello',
+          clientStreaming: false,
+          serverStreaming: false,
+          inputType: 'demo.HelloRequest',
+          outputType: 'demo.HelloReply',
+          requestTemplate: '{\n  "name": ""\n}',
+        },
+      ],
+    },
+  ],
+  mode: 'reflection',
+  warnings: [] as string[],
+};
+
 const GRPC_HISTORY_ENTRY = {
   id: 'call-1',
   itemId: null,
@@ -75,7 +98,17 @@ test('gRPC history Clear tracks whether there is anything to clear (D12)', async
   // hasHistory` gate response-pane.vue's HTTP twin has.
   const empty = await relaunch({
     control: [
-      { channel: IPC.tabsList, response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })] },
+      {
+        channel: IPC.tabsList,
+        response: [
+          grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
+        ],
+      },
+      // Pre-existing bug, unrelated to P112: a restored tab with no target never triggers
+      // loadSchema's own watch (GrpcRequestView.vue's `mode === 'reflection' && !target` early
+      // return), so `methodResolved` never resolves and Call stays disabled forever —
+      // grpc-request.spec.ts's own comment on this exact fix has the full rationale.
+      { channel: IPC.grpcDescribe, response: UNARY_SCHEMA },
       {
         channel: IPC.grpcCall,
         response: {
