@@ -17,6 +17,18 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
+// P112: loadSchema now awaits apiIdsForTab (variables.ts) before ever reaching grpcDescribe, which
+// awaits loadCollectionsTree/loadEnvironments (apiQueries.ts) — control.collectionsList/
+// variablesListEnvironments are otherwise unmocked, and wailsRuntime.ts's mocked transport
+// deliberately never settles an unmocked call, so loadSchema would hang before either test's own
+// grpcDescribe mock is ever reached. staleTime: Infinity caches this default for the whole file —
+// one resolve is enough, no afterEach restore needed (api-variables-delete-eviction.spec.ts's own
+// precedent).
+(
+  control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
+).variablesListEnvironments = async () => [];
+(control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+  async () => ({ collections: [], items: [] });
 const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
   '../../frontend/src/api/tabs'
 );
@@ -36,6 +48,16 @@ function schemaNamed(name: string): GrpcSchemaWire {
   return { services: [{ name, methods: [] }], mode: 'proto', warnings: [] };
 }
 
+// P112: loadSchema now awaits apiIdsForTab before ever reaching grpcDescribe, so the two
+// loadSchema() calls below no longer push onto `calls` synchronously the way they did before that
+// await existed — a setTimeout(0) macrotask (api-variables-delete-eviction.spec.ts's own `flush`
+// precedent) drains every pending microtask first, guaranteeing both calls have reached
+// grpcDescribe (and pushed their own deferred) by the time it resolves, without pinning the exact
+// number of ticks apiIdsForTab's own chain takes.
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('views/grpcrequest/state.ts loadSchema supersession guard (finding 13)', () => {
   test('a stale response for an older load does not clobber a newer one', async () => {
     const id = openGrpcRequestTab();
@@ -53,6 +75,7 @@ describe('views/grpcrequest/state.ts loadSchema supersession guard (finding 13)'
 
     const older = grpcRequestViewStore.loadSchema(id); // genId 1
     const newer = grpcRequestViewStore.loadSchema(id); // genId 2
+    await flush();
     expect(calls).toHaveLength(2);
 
     // The newer call lands first; the older one resolves after it.
@@ -82,6 +105,8 @@ describe('views/grpcrequest/state.ts loadSchema supersession guard (finding 13)'
 
     const older = grpcRequestViewStore.loadSchema(id); // genId 1 — will fail
     const newer = grpcRequestViewStore.loadSchema(id); // genId 2 — will succeed
+    await flush();
+    expect(calls).toHaveLength(2);
     calls[1]?.resolve(schemaNamed('Good'));
     await newer;
     expect(grpcRequestViewStore.schemaRuntime[id]?.status).toBe('idle');
