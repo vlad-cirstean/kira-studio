@@ -4333,6 +4333,135 @@ after every fix. `bunx biome check`: clean (auto-sorted imports twice, no substa
 including the F1 test (`graph-initial-scroll-row.spec.ts`) re-run once more at the end per task
 instructions. No red found anywhere in this pass — nothing pre-existing to root-cause or defer.
 
+## P108 Part 9 result
+
+Reviewed per `plans/P108-part9-findings.md` (Opus reviewer, no fixing), 18 findings across
+`apps/kira-studio/frontend/src/{api/**, views/httprequest/**, views/grpcrequest/**}`. One Sonnet
+fixer landed one commit per finding, F1-F18 in order, 17 fixed and F12 deferred by explicit
+instruction (the review's own fix note: too large a migration for this chunk).
+
+- **F1 `f9d54bb`** — history store `load` retried forever on overlapping loads: two concurrent
+  loads each bumped `latestSeq` on entry, so each superseded the other and both retried
+  indefinitely, `loading` stuck true. Separated "superseded by a newer load" (discard, no retry)
+  from "marked stale during this load" (retry only if no newer load exists); `noteGrpcCallRecorded`
+  now fires from one call site instead of two.
+- **F2 `63ff4f9`** — `ensureVariablesLoaded` had no dedupe or sequencing: a slow concurrent call
+  could overwrite a fresher `loadVariableSetRows` write with stale rows. Added a per-key in-flight
+  promise map plus a per-key generation counter; a load only commits if its generation is still
+  current.
+- **F3 `5959435`** — reloading `rows` blanked a revealed secret's draft to `''` while
+  `revealedValues` stayed set, so pressing the eye again re-revealed the same string with the mirror
+  watch never firing (same-value set). `syncDrafts` now seeds a secret row's draft from
+  `revealedValues` when present.
+- **F4 `927adb9`** — a restored request/gRPC tab never loaded its saved side (`savedRequestFor` null
+  forever), so the dirty dot never lit and Save silently created a duplicate row. Views now call
+  `ensureSavedRequestLoaded`/`ensureSavedGrpcRequestLoaded` on mount and on `itemId` change, with an
+  orphan/not-loaded-yet distinction gating Save.
+- **F5 `d2c762d`** — `collectionIdFor` read `''` until `CollectionsPanel` mounted (project panel
+  hidden, or app opened outside Api mode), silently dropping collection-scoped plain values and
+  secrets from resolution. Request views now call `initCollections()` on mount.
+- **F6 `9d06dbf`** — the Cookies pane and its badge read `tab.state.url` unresolved, so a templated
+  host (`{{baseUrl}}/login`) always showed zero cookies though the jar held them from the resolved
+  send. Passes the same stage-1-resolved URL `send` uses, with a note when the host still carries a
+  deferred secret.
+- **F7 `73a3867`** — the cookies store had three races: `fetchCookiesNow` wrote whichever reply
+  landed last regardless of order, `debounceTimers` outlived a closed tab and could recreate its
+  runtime, and `clearCookies` refetched only the calling tab. Added a per-tab request sequence
+  (write only latest), cleared the debounce timer on tab cleanup, and refetch every open tab after a
+  clear.
+- **F8 `e6e3dc6`** — closing an HTTP tab mid-send leaked its op and history runtime: cleanup never
+  called `stopOp`, so a slow send kept running and recorded history for a closed tab, recreating its
+  runtime forever. Cleanup now stops the op first; `send`'s post-await path and `noteRecorded` both
+  return early once the tab is gone.
+- **F9 `e334637`** — deleting an environment or a collection left `incognitoEnvByTab` and
+  `listCache` pointing at the deleted id, so an incognito tab kept substituting a deleted
+  environment's stale plain values forever. Env delete now drops matching incognito overrides and
+  evicts `listCache[environment:<id>]`; collection delete evicts `listCache[collection:<id>]`.
+- **F10 `83919a0`** — mutations, import and export had no error path: every bridge error vanished
+  (`void`d promise, no `unhandledrejection` handler), a failed import never reloaded the tree, and a
+  failed rename/delete/duplicate/save/variable upsert left the UI claiming success. Added
+  `state.error`/`dismissError` on both `useCollectionsStore` and `useVariablesStore` (the
+  variable-set half reuses the existing `variableSetError` channel), wrapped every mutation, and
+  moved `importCollection`'s reload into `finally` so a partial import is visible immediately.
+- **F11 `66dd395`** — export ignored `ExportReport.skippedGrpc`, silently omitting gRPC requests
+  from a Postman export with no warning — the case Go's own comment calls "the worst possible
+  reading". `exportWarning` now includes both the secret-count and skipped-gRPC-count notes.
+- **F12 — deferred, see follow-up note below.**
+- **F13 `f7c9522`** — `openHistoryMenu` had no stale guard: opening row A's menu then quickly row B's
+  could show A's entries in B's popover, and closing the tab left `historyMenuState` populated.
+  Captures `variableId` and writes only if it still matches; tab cleanup now resets the menu state.
+- **F14 `2e9ac94`** — a gRPC Call before schema load sent a streaming method as unary (Go refused
+  with an unhelpful error). The button-level disable alone was insufficient (Enter and the command
+  palette both bypass it), so the real guard lives in `call()` itself: it now errors clearly when
+  `findMethod` hasn't resolved yet, instead of silently defaulting `streaming` to `false`. The view's
+  own `methodResolved` computed disables the Call button and swaps its tooltip as a secondary UX fix.
+- **F15 `b7246f2`** — `.strip-warn`/`.strip-note` alert-tone CSS was duplicated byte-for-byte across
+  12 files (21 copies app-wide), against `CLAUDE.md`'s own Tailwind rule. Added first-class
+  `warn`/`note` variants to the shared shadcn `Alert` (`packages/theme`), mirroring the existing
+  `destructive` variant's `*:data-[slot=alert-description]:` targeting, and deleted every per-file
+  copy.
+- **F16 `c574a21`** — the collections store held save-dialog UI state alongside tree/search/
+  selection/caches/import-export, breaking `CLAUDE.md`'s one-store-one-concern rule (every sibling
+  dialog already has its own store). Moved `open`/`tabId`/`suggestedName`/`payload` and
+  `openSaveDialog`/`openSaveGrpcDialog`/`closeSaveDialog` into a new `useSaveRequestDialogStore`;
+  `submitSaveDialog` stays in `useCollectionsStore` (it reaches into the tree's own load/reveal/cache
+  machinery) but now reads from and closes through the new store.
+- **F17 `bd3f0c9`** — `ImportReportStrip.vue`'s own comment said an auth block "is kept but never
+  applied", stale since F8 (P108 Part 8) made the values not kept either. Reworded to match current
+  behavior.
+- **F18 `cf65221`** — the gRPC history view dropped each stored message's own `truncated` flag (a
+  message over the 64 KiB per-message cap renders its cut prefix in Monaco as if it were complete,
+  valid JSON, with no note). Carried `truncated` through the message map (live messages map in
+  `false` — the cap only applies to what History stores) and added a warning-icon tooltip on a
+  truncated message's header. `requestMessageTruncated` also had zero frontend readers; since this
+  pane has never rendered the stored request message body itself, surfaced it instead as a note next
+  to the "viewing a history call" band rather than building that display now.
+
+**Nothing dismissed — F12 is the sole, explicitly justified exception.** Every other finding (F1-F11,
+F13-F18) matched real, reachable code and was fixed as specified. F12 ("no cross-window
+invalidation; hand-rolled server-state caches") is real but the review's own fix note calls it too
+large a migration for this chunk (`listCache`, environment list/active environment, and the
+collections tree/saved-request caches all need to move onto TanStack Query, invalidated by a new
+Go-broadcast `api-data-changed` event) — named as a new follow-up phase, **P112**, appended to this
+chapter's phasing table above, per `CLAUDE.md`'s own exception for exactly this shape of finding
+(the same one P110/P111 already use). F2's and F9's own point fixes (in-flight dedupe/generation
+guard, cache eviction on delete) land in this pass regardless and are unaffected by P112.
+
+**Verification, run for real:**
+
+- `bun run typecheck:web:studio` (`vue-tsc` over the whole Studio frontend): exit 0, run after every
+  commit in this pass.
+- `bunx biome check` on every file this pass touched: clean. A full-repo `bunx biome check .` run at
+  the end of the pass reports 4 pre-existing warnings (`noExplicitAny`) confined to
+  `apps/kira-space-vscode/tests/interaction/review-target-race.spec.ts` — confirmed via `git diff
+  --stat d221449..HEAD` to be a file this phase never touched (added whole by the concurrent P108
+  Part 19 fixer), so out of scope per `CLAUDE.md`'s own pre-existing-failure rule; warnings only, no
+  errors, and every commit's own pre-commit hook ran this same check clean.
+- `bun run build:studio`: clean build, exit 0 (only pre-existing chunk-size/dynamic-import
+  advisories, unrelated to this pass).
+- `bun test apps/kira-studio/tests/unit/api-*.spec.ts apps/kira-studio/tests/unit/grpc-*.spec.ts
+  apps/kira-studio/tests/unit/history-runtime-reactivity.spec.ts` (the `api/`/`httprequest`/
+  `grpcrequest` scoped suite, not the full monorepo suite): 34 pass, 0 fail, 11 files — up from the
+  findings doc's own pre-pass count of 24 (F1-F4/F7-F9's own regression tests, added earlier in this
+  pass, account for the difference).
+- Every commit above ran `.githooks/pre-commit` for real (biome + `check-tokens.sh` + the full
+  parallel `typecheck:*` split) and passed clean — `--no-verify` never used.
+- Regression tests: F1-F4 and F7-F9 each added a test confirmed meaningful against the pre-fix code
+  (per the findings doc's own "likely deserve regression tests" call and this pass's own earlier
+  work). F10 is a repetitive try/catch error-surfacing pattern across many call sites — no dedicated
+  test added, per `CLAUDE.md`'s own CRUD-round-trip exclusion bar (stated in F10's own commit
+  message). F11, F13-F18 are small, contained fixes (a warning-count read, a stale-guard capture, a
+  view-level disable/error path, a CSS-to-variant fold, a store split, a comment reword, a flag
+  carried through a map) with no complex/hard-to-get-right logic warranting one either.
+
+**Working-tree note.** This pass's own fixer ran concurrently with the P108 Part 19 fixer (`git-ui`
+findings, see its own result section above) in the same shared, non-worktree checkout throughout,
+disjoint files on both sides. Every commit here used an explicit `-- <pathspec>` scoping it to this
+pass's own files; two commits (F14, F15) waited out a live `.git/index.lock` and a transient
+repo-wide `biome check .` failure in the other fixer's own in-progress files respectively (confirmed
+via `ps aux`/`git status --short` before acting, polled via `Monitor` rather than a fixed sleep,
+neither file touched or reverted) before landing. No commit pollution occurred on either side.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
