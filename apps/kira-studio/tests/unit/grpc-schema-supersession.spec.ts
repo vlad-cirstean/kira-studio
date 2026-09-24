@@ -8,7 +8,7 @@
 // guard.
 import '@workbench/testing/unit/window';
 
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
 import { deferred } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
@@ -17,13 +17,24 @@ import { pinia } from '../../frontend/src/state/pinia';
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
+// control is a shared, process-wide singleton (bun test runs every spec file in one process) —
+// bridge-unwrap.spec.ts reflectively calls every function it finds on it, so a method left
+// monkey-patched here would leak into that file's own assertions
+// (restoreAfterEach.ts's own documented hazard class). Captured once, restored in afterAll —
+// grpcDescribe is per-test-overridden too (afterEach below), but collectionsList/
+// variablesListEnvironments are only ever set once, file-wide, so afterAll alone is enough for them.
+const originalCollectionsList = control.collectionsList;
+const originalVariablesListEnvironments = control.variablesListEnvironments;
+afterAll(() => {
+  control.collectionsList = originalCollectionsList;
+  control.variablesListEnvironments = originalVariablesListEnvironments;
+});
 // P112: loadSchema now awaits apiIdsForTab (variables.ts) before ever reaching grpcDescribe, which
 // awaits loadCollectionsTree/loadEnvironments (apiQueries.ts) — control.collectionsList/
 // variablesListEnvironments are otherwise unmocked, and wailsRuntime.ts's mocked transport
 // deliberately never settles an unmocked call, so loadSchema would hang before either test's own
 // grpcDescribe mock is ever reached. staleTime: Infinity caches this default for the whole file —
-// one resolve is enough, no afterEach restore needed (api-variables-delete-eviction.spec.ts's own
-// precedent).
+// one resolve is enough.
 (
   control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
 ).variablesListEnvironments = async () => [];
@@ -35,10 +46,6 @@ const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
 const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
-// control is a shared, process-wide singleton (bun test runs every spec file in one process) —
-// bridge-unwrap.spec.ts reflectively calls every function it finds on it, so a method left
-// monkey-patched here would leak into that file's own assertions. Captured once, restored after
-// every test.
 const originalGrpcDescribe = control.grpcDescribe;
 afterEach(() => {
   control.grpcDescribe = originalGrpcDescribe;

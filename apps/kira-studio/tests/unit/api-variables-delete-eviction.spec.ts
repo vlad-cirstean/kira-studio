@@ -10,7 +10,7 @@
 // `collections.ts`'s own migration (commit 5) wires `deleteRow` through `afterTreeListChange`.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
 import type { ApiEnvironment, ApiVariable } from '@shared/domain/variables';
 import { queryClient } from '@workbench/state/queryClient';
@@ -27,6 +27,20 @@ const { control } = await import('../../frontend/src/bridge/control');
 // own initial fetch hangs forever and wedges every later invalidateQueries-triggered refetch behind
 // it. Set before restoreAfterEach's own snapshot, so each test's afterEach restores to this benign
 // default rather than reintroducing the hang.
+//
+// P112: restoreAfterEach's own snapshot is taken *after* these two overrides (deliberately, so the
+// per-test reset keeps the benign default rather than reintroducing the hang) — which means it
+// never restores the *true* originals, and `control` is one process-wide singleton (restoreAfterEach.ts's
+// own documented hazard: a spec's stub that outlives its file leaks into whatever runs next in the
+// same bun test process). Captured here and restored in afterAll, so bridge-unwrap.spec.ts's
+// generic "every control method rejects" check never sees this file's own defaults once this file's
+// own tests are done.
+const originalVariablesListEnvironments = control.variablesListEnvironments;
+const originalCollectionsList = control.collectionsList;
+afterAll(() => {
+  control.variablesListEnvironments = originalVariablesListEnvironments;
+  control.collectionsList = originalCollectionsList;
+});
 (
   control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
 ).variablesListEnvironments = async () => [];

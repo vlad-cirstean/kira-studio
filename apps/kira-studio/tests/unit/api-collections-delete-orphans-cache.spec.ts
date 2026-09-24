@@ -15,7 +15,7 @@
 // what deleteRow itself now writes `null` into for the whole orphaned subtree.
 import '@workbench/testing/unit/window';
 
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
 import { queryClient } from '@workbench/state/queryClient';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
@@ -36,6 +36,17 @@ const { control } = await import('../../frontend/src/bridge/control');
 // initial fetch hangs forever and wedges every later invalidateQueries-triggered refetch (deleteRow
 // → afterTreeListChange → refreshApiQuery) behind it. Set before restoreAfterEach's own snapshot,
 // so each test's afterEach restores to this benign default rather than reintroducing the hang.
+//
+// P112: restoreAfterEach's own snapshot is taken *after* this override (deliberately, so the
+// per-test reset keeps the benign default) — which never restores the *true* original, and
+// `control` is one process-wide singleton (restoreAfterEach.ts's own documented hazard: a spec's
+// stub that outlives its file leaks into whatever runs next in the same bun test process).
+// Captured here and restored in afterAll, so bridge-unwrap.spec.ts's generic "every control method
+// rejects" check never sees this file's own default once this file's own tests are done.
+const originalCollectionsList = control.collectionsList;
+afterAll(() => {
+  control.collectionsList = originalCollectionsList;
+});
 (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
   async () => ({ collections: [], items: [] });
 restoreAfterEach(control);
