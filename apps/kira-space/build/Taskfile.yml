@@ -105,14 +105,17 @@ tasks:
       - apps/kira-space-vscode/package.json
       - apps/kira-space-vscode/.vscodeignore
       - apps/kira-space-vscode/LICENSE
+      - apps/kira-space-vscode/README.md
       - apps/kira-space-vscode/src/**/*
       - apps/kira-space-vscode/resources/**/*
       - packages/git-core/src/**/*
       - packages/git-ipc/src/**/*
       - packages/git-ui/src/**/*
+      - packages/git-ui/vite.config.ts
       - packages/kira-ui/src/**/*
       - scripts/build-vscode.ts
       - scripts/package-vscode.ts
+      - bun.lock
       - exclude: apps/kira-space-vscode/dist/**/*
     generates:
       - apps/kira-space/bin/kira-space.vsix
