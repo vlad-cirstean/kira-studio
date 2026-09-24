@@ -1254,19 +1254,26 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 </script>
 
 <template>
-  <div class="kv-commit-grid" data-testid="commit-grid">
+  <div
+    class="kv-commit-grid kv:relative kv:h-full kv:w-full kv:min-h-row kv:overflow-hidden kv:text-base kv:text-row-fg kv:[font-family:var(--kv-font-family)]"
+    data-testid="commit-grid"
+  >
     <!-- SlickGrid's own `init()` (`Utils.emptyElement(this._container)`) wipes out whatever was
          inside its container the moment it constructs — including these resize handles, if they
          were this element's own children. `host` is SlickGrid's *exclusive* DOM: the handles are
          its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
-    <div ref="host" class="kv-grid-host"></div>
+    <div ref="host" class="kv:h-full kv:w-full"></div>
     <!-- G21 D6b: an off-screen probe carrying .kv-cell-date's own font-affecting rules, purely so
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
-    <span ref="dateWidthProbe" class="kv-cell-date kv-date-width-probe" aria-hidden="true"></span>
+    <span
+      ref="dateWidthProbe"
+      class="kv-cell-date kv:absolute kv:invisible kv:pointer-events-none kv:whitespace-nowrap"
+      aria-hidden="true"
+    ></span>
     <KuiColumnResizeHandle
-      class="kv-resize-handle"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
       :value="widths.graph"
@@ -1276,7 +1283,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv-resize-handle"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
       :value="widths.author"
@@ -1286,7 +1293,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv-resize-handle"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
       :value="widths.date"
@@ -1304,36 +1311,11 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
  * positioning live here, mapped only to the --kv-* token layer. This file is the only place in
  * the repository where a .slick-* selector appears (W6's own "Done when").
  */
-.kv-commit-grid {
-  position: relative;
-  height: 100%;
-  width: 100%;
-  /* §6.3's own "Done when": a panel dragged to zero height is a real thing a user can do, and a
-     grid asked to lay out a zero-height viewport is where a division-by-viewport-height bug
-     would live. One row's worth of floor keeps that arithmetic away from zero. */
-  min-height: var(--kv-row-height);
-  overflow: hidden;
-  font-family: var(--kv-font-family);
-  font-size: var(--kv-font-size);
-  color: var(--kv-row-fg);
-}
-
-/* SlickGrid's own container, sized to fill `.kv-commit-grid` exactly — see the template's own
-   comment on why this cannot be `.kv-commit-grid` itself. */
-.kv-grid-host {
-  height: 100%;
-  width: 100%;
-}
-
-/* G21 D6b: never painted, never laid out into the visible flow — `remeasureDateWidth`'s only use
-   for this element is `getComputedStyle(…).font`, which needs a connected element to resolve the
-   cascade but nothing about its own box. */
-.kv-date-width-probe {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-  white-space: nowrap;
-}
+/* P110 A13: `.kv-commit-grid`'s own base box (position/height/width/min-height/overflow/font/
+   color) moved onto the template's own `kv:` utilities — the classname itself stays, here and on
+   the root `<div>`, since every `.kv-commit-grid .xxx` descendant rule below still needs it as a
+   scoping ancestor for SlickGrid's JS-built DOM. `.kv-grid-host`/`.kv-date-width-probe` had no
+   descendant rule of their own, so those two convert and drop their classnames entirely. */
 
 /* SlickGrid's own dynamic stylesheet (`createCssRules`, `applyColumnWidths`) only ever writes
    `height`/`left`/`right` onto these elements — never `position`. Its own upstream CSS (not
@@ -1753,23 +1735,7 @@ button.kv-badge-pr {
   text-overflow: ellipsis;
 }
 
-/* §6.1's own resize handles (showColumnHeader: false costs SlickGrid's built-in header resize
-   handles, which live in the header this grid doesn't render) — 5px wide, absolutely positioned
-   over the grid, spanning its full height. */
-.kv-resize-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  margin-left: -2px;
-  cursor: col-resize;
-  z-index: 2;
-  background: transparent;
-}
-
-.kv-resize-handle:hover,
-.kv-resize-handle:focus-visible {
-  background-color: var(--kv-focus-border);
-  outline: none;
-}
+/* P110 A13: §6.1's own resize handles moved onto the template's own `kv:` utilities directly on
+   each `<KuiColumnResizeHandle>` — nothing else in this file selects `.kv-resize-handle`, so the
+   classname itself is dropped, unlike `.kv-commit-grid` above. */
 </style>
