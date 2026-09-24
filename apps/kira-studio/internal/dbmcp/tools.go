@@ -507,9 +507,20 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		if errors.Is(err, queryplan.ErrTruncated) {
 			return errResult("the query plan was too large to parse — try a narrower statement")
 		}
+		if mk != nil {
+			// F5: a parse failure carries the server's own raw EXPLAIN text in err — the same
+			// value-bearing data Raw itself is, withheld below for the successful-parse case.
+			return errResult("could not parse the EXPLAIN result")
+		}
 		return errResult(fmt.Sprintf("could not parse the EXPLAIN result: %s", err.Error()))
 	}
-	if !args.IncludeRaw {
+	// F5: on a masked connection, MySQL/MariaDB's attached_condition (Node.Detail) and
+	// ClickHouse's index condition metrics substitute real row values from const-evaluated tables
+	// into the plan text, and Raw is the server's own EXPLAIN output verbatim — none of that is
+	// column-name maskable, so all of it is stripped outright, IncludeRaw notwithstanding.
+	if mk != nil {
+		plan = maskPlanForMaskedConnection(plan)
+	} else if !args.IncludeRaw {
 		plan.Raw = ""
 	}
 	return jsonResult(explainQueryResult{Plan: plan, ThresholdRows: threshold})

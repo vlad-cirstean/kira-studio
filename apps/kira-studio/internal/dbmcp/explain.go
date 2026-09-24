@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -67,6 +68,42 @@ func summaryOf(plan *queryplan.Plan, thresholdRows int) *planSummary {
 		OverThreshold:     plan.OverThreshold,
 		Issues:            plan.Issues,
 	}
+}
+
+// maskPlanForMaskedConnection strips whatever an EXPLAIN plan can carry of real row data when the
+// connection has active mask rules (F5): MySQL/MariaDB substitute real column values from a
+// const-evaluated table into another table's own attached_condition (surfaced as Node.Detail), and
+// ClickHouse's index metrics carry the same kind of evaluated condition text (Metric.Label ending
+// " condition"). Column-name masking cannot see through either — they are plan prose, not a result
+// set row — so both are blanked outright rather than filtered by column name. Raw is dropped
+// unconditionally too, regardless of IncludeRaw: it is the server's own EXPLAIN text verbatim, the
+// same data by construction.
+func maskPlanForMaskedConnection(plan queryplan.Plan) queryplan.Plan {
+	plan.Raw = ""
+	plan.Root = maskPlanNode(plan.Root)
+	return plan
+}
+
+func maskPlanNode(n queryplan.Node) queryplan.Node {
+	n.Detail = ""
+	if len(n.Metrics) > 0 {
+		kept := make([]queryplan.Metric, 0, len(n.Metrics))
+		for _, m := range n.Metrics {
+			if strings.HasSuffix(m.Label, " condition") {
+				continue
+			}
+			kept = append(kept, m)
+		}
+		n.Metrics = kept
+	}
+	if len(n.Children) > 0 {
+		children := make([]queryplan.Node, len(n.Children))
+		for i, c := range n.Children {
+			children[i] = maskPlanNode(c)
+		}
+		n.Children = children
+	}
+	return n
 }
 
 // assertComposedStatementsAreReads is §8.3's checkable defense in depth: before executing a
