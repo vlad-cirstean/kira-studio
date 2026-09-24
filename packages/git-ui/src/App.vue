@@ -12,7 +12,7 @@
  * picker's own label, the rendered rows themselves).
  */
 
-import type { FileChangeKind, TipRef } from '@kira/git-core';
+import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import {
@@ -291,6 +291,11 @@ const pendingSelectionSha = ref<string | null>(null);
 watch(graphView.generation, () => {
   const sha = selection.sha.value;
   pendingSelectionSha.value = sha;
+  // P108 F2: a re-walk (auto-refresh restart, repo switch, reconnect) invalidates any row a menu
+  // captured before this point — close both context menus rather than let a select act on
+  // whatever now happens to sit at the old row/sha.
+  contextMenuState.value = undefined;
+  stashContextMenuState.value = undefined;
 });
 
 watch(graphView.loadedRows, () => {
@@ -436,6 +441,16 @@ watch(
  *  explicitly — a reconnect almost always re-opens the *same* `repoId`, so the `watch` below
  *  (keyed on `repoId` identity) never re-fires on its own, even though every one of these states
  *  needs to drop whatever it cached against the old, now-dead connection and re-fetch fresh. */
+// P108 F2: `applyRepoIdToStates` below runs via `watch(..., { immediate: true })` — its very
+// first call fires synchronously during this component's own setup, before the menu/dialog refs
+// further down this file exist yet (a `<script setup>` block is one function body top to bottom;
+// referencing a later `const` from an immediately-invoked callback is a genuine TDZ error, not
+// just a logical no-op). Nothing needs closing on that first call anyway — every one of those
+// refs is freshly created and already in its own default "closed" state — so this flag skips the
+// clearing block only for that one call and runs it normally on every real repo switch/reconnect
+// after.
+let repoIdStatesAppliedOnce = false;
+
 function applyRepoIdToStates(repoId: string | undefined): void {
   detailState.setRepoId(repoId);
   refsState.setRepoId(repoId);
@@ -448,6 +463,16 @@ function applyRepoIdToStates(repoId: string | undefined): void {
   prState.setRepoId(repoId);
   // G26: after prState (StackState.reload calls prState.ensureSnapshot, F13).
   stackState.setRepoId(repoId);
+  if (repoIdStatesAppliedOnce) {
+    // P108 F2: the commit/stash context menus resolved against the *old* repo — a genuinely
+    // different repo (or a reconnect that re-opens the same one against a fresh `Conn`) makes
+    // a captured commit/stash entry stale; closing both here, at the one lifecycle point both a
+    // repo switch and a reconnect always run through, catches a reconnect that never bumps
+    // `graphView.generation` (the other closing point, above) on its own.
+    contextMenuState.value = undefined;
+    stashContextMenuState.value = undefined;
+  }
+  repoIdStatesAppliedOnce = true;
 }
 
 watch(() => repoState.value?.activeRepo.value?.repoId, applyRepoIdToStates, { immediate: true });
@@ -603,7 +628,12 @@ function toggleSearchRow(): void {
 // row and where to open it (own doc comment on its `contextMenu` emit) — this is the one place
 // with both `opsState` and the commit store's own decorations at hand to build the menu itself.
 // ---------------------------------------------------------------------------------------
-const contextMenuState = ref<{ row: number; x: number; y: number } | undefined>(undefined);
+// P108 F2: captures the commit itself, not the row — an auto-refresh (restart-at-zero), a repo
+// switch or a reconnect can land while this menu is open, and a store row is only ever a claim
+// about "whichever commit sits there right now". `commit` is `CommitStore.commitAt`'s own plain,
+// immutable snapshot (P108 F2's own doc comment on `CommitRecord`), so `commitMenuSections`/
+// `onCommitMenuSelect` below never re-resolve `state.row` against a store that may have moved on.
+const contextMenuState = ref<{ commit: CommitRecord; x: number; y: number } | undefined>(undefined);
 const tagDialogState = ref<{ open: boolean; target: string }>({ open: false, target: '' });
 const branchDialogState = ref<{ open: boolean; startPoint: string }>({
   open: false,
@@ -611,7 +641,9 @@ const branchDialogState = ref<{ open: boolean; startPoint: string }>({
 });
 
 function handleGridContextMenu(detail: { row: number; x: number; y: number }): void {
-  contextMenuState.value = detail;
+  // P108 F2: resolved once, here, at the real click — `CommitGrid.vue`'s own emit fires
+  // synchronously off a real DOM event, so the store is exactly as fresh as the click itself.
+  contextMenuState.value = { commit: graphView.store.commitAt(detail.row), x: detail.x, y: detail.y };
 }
 
 /** P74 §3.3: mirrors `AppToolbar.vue`'s own `openExternalCapability` computed — the same
@@ -628,12 +660,11 @@ function handleGridOpenPullRequest(number: number): void {
 const commitMenuSections = computed<MenuSection[]>(() => {
   const state = contextMenuState.value;
   if (!state) return [];
-  const commit = graphView.store.commitAt(state.row);
   const clipboardEnabled = actions.value?.capabilities.clipboard ?? false;
   return actions.value?.capabilities.write
     ? buildRowMenu({
-        sha: commit.sha,
-        decorations: commit.decoration,
+        sha: state.commit.sha,
+        decorations: state.commit.decoration,
         inProgress: opsState.statusSummary.value?.inProgress ?? null,
         clipboardEnabled,
       })
@@ -644,7 +675,9 @@ async function onCommitMenuSelect(id: string): Promise<void> {
   const state = contextMenuState.value;
   contextMenuState.value = undefined;
   if (!state) return;
-  const commit = graphView.store.commitAt(state.row);
+  // P108 F2: the commit captured when the menu opened, not re-resolved by row — see
+  // `contextMenuState`'s own doc comment above.
+  const commit = state.commit;
   switch (id) {
     case 'checkoutDetached':
       await opsState.runCheckout(commit.sha, 'detach');
@@ -691,36 +724,41 @@ async function onCommitMenuSelect(id: string): Promise<void> {
 // against `stashState.entries` (`commitAt`/`decorationAt` alone only give sha + stack index, not
 // `message`/`timestamp`/`baseSubject`/etc.).
 // ---------------------------------------------------------------------------------------
-const stashContextMenuState = ref<{ row: number; x: number; y: number } | undefined>(undefined);
+// P108 F2: the entry is resolved once, here, at open time — not re-derived from `row` at select
+// time. A stash drop/pop between open and select (auto-refresh, another action) must not let a
+// stale row resolve to whatever stash now sits there; capturing `entry` itself makes a vanished
+// stash simply not found by `onStashMenuSelect`; further re-checked against `stashState.entries` there.
+const stashContextMenuState = ref<{ entry: StashEntry; x: number; y: number } | undefined>(
+  undefined,
+);
 const stashBranchTarget = ref<StashEntry | undefined>(undefined);
 
 function handleStashContextMenu(detail: { row: number; x: number; y: number }): void {
-  stashContextMenuState.value = detail;
+  const commit = graphView.store.commitAt(detail.row);
+  const entry = stashState.entries.value.find((e) => e.sha === commit.sha);
+  if (!entry) return; // nothing resolvable at the real click target — no menu, as before.
+  stashContextMenuState.value = { entry, x: detail.x, y: detail.y };
 }
 
 const stashMenuSections = computed<MenuSection[]>(() => {
-  if (!stashContextMenuState.value) return [];
-  const entry = stashEntryForContextMenu();
-  if (!entry) return [];
+  const state = stashContextMenuState.value;
+  if (!state) return [];
   return actions.value?.capabilities.write
     ? buildStashMenu(
         opsState.statusSummary.value?.inProgress ?? null,
-        entry,
+        state.entry,
         refsState.currentBranchName.value,
       )
     : buildReadOnlyStashMenu();
 });
 
-function stashEntryForContextMenu(): StashEntry | undefined {
-  const state = stashContextMenuState.value;
-  if (!state) return undefined;
-  const commit = graphView.store.commitAt(state.row);
-  return stashState.entries.value.find((entry) => entry.sha === commit.sha);
-}
-
 async function onStashMenuSelect(id: string): Promise<void> {
-  const entry = stashEntryForContextMenu();
+  const state = stashContextMenuState.value;
   stashContextMenuState.value = undefined;
+  if (!state) return;
+  // P108 F2: re-check the captured entry still exists — it may have been dropped/popped while
+  // the menu was open (auto-refresh between open and select).
+  const entry = stashState.entries.value.find((e) => e.sha === state.entry.sha);
   if (!entry) return;
   switch (id) {
     case 'stashApply':
