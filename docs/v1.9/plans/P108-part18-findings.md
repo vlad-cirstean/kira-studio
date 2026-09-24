@@ -158,6 +158,43 @@ finding. Line numbers are at commit `4863cf1`.
   prefix, same as `graphView`'s `graph.status` catch) and, where the class has an error ref,
   sets it. Keep user-initiated calls rethrowing.
 
+## F11 — Full-history relayout per 500-row chunk makes large loads quadratic
+
+- `packages/git-ui/src/state/graphView.ts:474-490` (`#applyChunk`), `:418-454`
+  (`#rebuildLayout`); chunk size `apps/kira-space/internal/gitrpc/graph.go:18`
+  (`ChunkRows = 500`); serial apply in `packages/git-ipc/src/rpc.ts:221-236`.
+- Every chunk runs `#order.rebuild` (row plan over whole store, main thread),
+  `projectLayoutInput` over all rows, then a full-history worker layout from row 0. `rpc.ts`
+  awaits `onChunk` before the next chunk, so the stream is throttled by that round trip.
+- Rehydrate of a 200k-row cached history (`openStream` with `resumeThroughRow` 0 on remount) is
+  400 chunks, each laying out the whole store so far: about 40M row layouts plus 400 O(N)
+  main-thread plan rebuilds. `loadAll` pays 10 full relayouts per 5000-row page. The stale
+  mechanism in `LayoutClient` discards nothing here because each submit is awaited before the
+  next starts.
+- Fix: coalesce relayout per stream burst. Let `#applyChunk` fold rows and schedule one
+  `#rebuildLayout` (next animation frame or microtask after the queue drains) instead of
+  awaiting one per chunk; listeners fire once per landed rebuild with the full range. Keep the
+  `generation`/stale checks as they are.
+
+## F12 — git-core structural copies drifted from `contract.ts`
+
+- `packages/git-core/src/model/operation.ts` `OpErrorKind` lacks `'BranchChanged'`;
+  `model/stash.ts` `StashEntry` lacks `scope: 'stack' | 'global'` and `ref`;
+  `preflight/types.ts` `CheckoutPreflight.routes` lacks `'autoStash' | 'detachHere'`;
+  `settings/schema.ts:18` `HostKind` lacks `'kira'`. Contract lines 18, 398, 1029.
+- Doc comments on these copies (e.g. `settings/schema.ts:14-17`) claim
+  `tests/unit/ipc/wireConformance.test.ts` keeps them honest; that file does not exist
+  (`contract.ts:646-651` says so), so nothing catches drift.
+- Latent today: every consumer in `git-ui` and the vscode tests imports these types from
+  `@kira/git-ipc`, not `@kira/git-core`. Inside git-core only `graph/stashRows.ts` (reads
+  `sha`/`baseSha`/`indexSha`) and `model/remote.ts` (`OpErrorKind`) use them. A future
+  `@kira/git-core` consumer would silently miss the new members.
+- Fix: bring the four copies in line with the contract, and correct the doc comments that cite
+  the missing conformance test. Optionally add a compile-time mutual-assignability check for
+  each copied type in a module that may import both packages (git-ui), so `typecheck:git`
+  catches the next drift. Where a git-core export has no git-core consumer
+  (`HostKind`, `CheckoutPreflight` re-export), deleting the copy is an equal fix.
+
 ## Checked, nothing real
 
 - Edge 4, async `onChunk` rejection: `packages/git-ipc/src/rpc.ts:221-236` awaits `onChunk`
@@ -174,5 +211,13 @@ finding. Line numbers are at commit `4863cf1`.
 - `stack.progress` append by spread: bounded by stack branch count.
 - `BridgeClient` `connection.changed` subscription: `dispose()` disposes the owned transport,
   which drops every handler. No leak.
-- `InProgressOperation`, `InProgressKind`, `DiffHunk`, `DiffLine` git-core copies match
-  `contract.ts` field by field.
+- All other git-core copies match `contract.ts` after comment stripping: commit, diff,
+  `InProgress*`, `ResetMode`, `OpRequest`, `UndoSlotSnapshot`, `OpResult`, ref, remote,
+  `HeadState`, `LineRange`, `BaseResolutionReason`, `BaseCandidate`, `StatusSummary`,
+  `RepoCandidate`, every other preflight type (`RevertPrediction` alias equals the inline
+  union), `PackedCommitChunk`.
+- Repo settings: the 11 `source: 'repo'` keys in `settings/schema.ts` match Go
+  `DefaultGitRepoSettings` defaults, `validGraphPageSize` (100-50000), `ValidGraphScope`,
+  `ValidPullStrategy` and `appsettings.ValidLogLevel` member for member.
+- `CommitStore.layoutInput` clearing `resolvedParentSlots` on a stale-dropped submit: every
+  rebuild lays out from row 0 against the patched `parentRows`, so no patch is lost.
