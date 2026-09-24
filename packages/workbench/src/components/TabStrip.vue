@@ -301,11 +301,11 @@ useEventListener(stripRef, 'dragend', onDragEnd);
     </div>
     <!-- P83 §9.1/P91 §8: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s
          own leading-edge fix at the other end. Per-app "new tab" affordance — the whole
-         `.tab-strip-actions`/`data-testid="tab-strip-actions"` wrapper is slot content (not a
-         wrapper this component owns), so each app keeps its own `v-if="showNewTab"` gating the
-         element's very presence in the DOM, exactly as before (`.tab-strip-actions`/`.tab-new`
-         publish from `workbench.css`, the same "class published, markup stays in the app" shape
-         `.title-action` uses). -->
+         `data-testid="tab-strip-actions"` wrapper is slot content (not a wrapper this component
+         owns), so each app keeps its own `v-if="showNewTab"` gating the element's very presence in
+         the DOM. P110 B13: the wrapper and button are now plain Tailwind utility classes inlined in
+         each app's own WorkbenchShell.vue, not a tab strip actions/tab new class published
+         from workbench.css — the data-testid is what's shared now. -->
     <slot name="new-tab" />
   </div>
 </template>

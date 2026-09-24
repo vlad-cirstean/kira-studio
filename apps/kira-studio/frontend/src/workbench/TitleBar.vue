@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed } from 'vue';
@@ -78,13 +79,13 @@ const keepAwakeTooltip = computed(() => {
     <!-- Panel toggles and Settings read as title-bar chrome alongside the mode switcher. Filled
          icon + accent colour when a panel is visible, the codicon "-off" companion glyph plus the
          muted colour when it's not. -->
-    <div class="title-bar-actions">
+    <div class="flex items-center gap-0.5 ml-auto wails-no-drag">
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
-            :class="{ 'is-on': layoutStore.panel.project.visible }"
+          <Button
+            variant="title"
+            size="title"
+            :aria-pressed="layoutStore.panel.project.visible"
             data-testid="toggle-project-panel"
             aria-label="Connections"
             @click="layoutStore.toggleProjectPanel"
@@ -93,16 +94,16 @@ const keepAwakeTooltip = computed(() => {
               :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
               :size="15"
             />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Connections</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
-            :class="{ 'is-on': layoutStore.panel.operations.visible }"
+          <Button
+            variant="title"
+            size="title"
+            :aria-pressed="layoutStore.panel.operations.visible"
             data-testid="toggle-operations-panel"
             aria-label="Operations"
             @click="layoutStore.toggleOperationsPanel"
@@ -111,49 +112,48 @@ const keepAwakeTooltip = computed(() => {
               :name="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
               :size="15"
             />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Operations</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
+          <Button
+            variant="title"
+            size="title"
             data-testid="open-settings"
             aria-label="Settings"
             @click="settingsStore.settingsOpen = true"
           >
             <CodiconIcon name="settings-gear" :size="15" />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Settings</TooltipContent>
       </Tooltip>
       <Tooltip v-if="keepAwakeStore.status.supported">
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
-            :class="{ 'is-on': keepAwakeStore.status.manual }"
+          <Button
+            variant="title"
+            size="title"
             :aria-pressed="keepAwakeStore.status.manual"
             data-testid="toggle-keep-awake"
             aria-label="Keep this Mac awake"
             @click="onToggleKeepAwake"
           >
             <CodiconIcon name="coffee" :size="15" />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>{{ keepAwakeTooltip }}</TooltipContent>
       </Tooltip>
-      <button
-        type="button"
-        class="title-action title-action--labelled"
+      <Button
+        variant="title"
+        size="title-labelled"
         data-testid="new-window"
         @click="onNewWindow"
       >
         <CodiconIcon name="empty-window" :size="15" />
         <span>New window</span>
-      </button>
+      </Button>
     </div>
 
     <template #settings>

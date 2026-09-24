@@ -3,10 +3,11 @@
 // chrome only: height, insets, background, the `--wails-draggable: drag` region this root carries
 // (drag.ts's own doc comment — dragging the bar moves the window, inert everywhere without a real
 // Wails window). Every interactive child (mode tabs, action buttons) is per-app content, passed
-// through the default slot; `.title-bar-actions`/`.title-action`(`--labelled`)/`.is-on` publish
-// from `workbench.css` so each app's own `.title-bar-actions` wrapper and `.title-action` buttons
-// keep resolving them, unmoved and untouched — P104's job to swap that markup for shadcn-vue's
-// Button, not this phase's.
+// through the default slot. P110 B13: the old title bar actions wrapper class and title action
+// button class (plus its labelled variant and its is-on toggle class) are gone from
+// `workbench.css` — each app's own action row is now plain Tailwind utilities plus
+// `<Button variant="title" size="title">` (packages/theme/src/components/ui/button), with
+// `aria-pressed` replacing the old class toggle.
 //
 // The Settings mount: each app's own `<SettingsDialog v-if="settingsStore.settingsOpen"
 // @close="...">` stays entirely in the app (the settings store's own shape is per-app, §5.5's own

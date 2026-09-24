@@ -33,6 +33,10 @@ export const buttonVariants = cva(
         'dialog-danger':
           'justify-center rounded-kira-sm border border-error bg-error/10 text-error hover:bg-error/20 disabled:opacity-45',
         danger: 'rounded-kira-sm text-error hover:bg-hover',
+        // P110 B13: TitleBar.vue's own action row -- `aria-pressed` replaces `.is-on`'s own class
+        // toggle, fixing the state's previously unexposed accessibility gap.
+        title:
+          'rounded-kira-sm border border-transparent bg-transparent text-muted-foreground hover:bg-hover wails-no-drag aria-pressed:bg-elevated aria-pressed:border-border-strong aria-pressed:text-fg aria-pressed:hover:bg-hover',
       },
       size: {
         default:
@@ -53,6 +57,9 @@ export const buttonVariants = cva(
         'kira-lg':
           'h-control-lg gap-1.5 px-3 text-kira-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         'kira-icon': 'size-control',
+        // P110 B13
+        title: 'size-5.5',
+        'title-labelled': 'h-5.5 px-1 gap-1 text-kira-sm',
       },
     },
     defaultVariants: {

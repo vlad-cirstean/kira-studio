@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { useLayoutStore } from '../state/layout';
@@ -16,13 +17,13 @@ const layoutStore = useLayoutStore();
 
 <template>
   <TitleBarBase>
-    <div class="title-bar-actions">
+    <div class="flex items-center gap-0.5 ml-auto wails-no-drag">
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
-            :class="{ 'is-on': layoutStore.panel.project.visible }"
+          <Button
+            variant="title"
+            size="title"
+            :aria-pressed="layoutStore.panel.project.visible"
             data-testid="toggle-project-panel"
             aria-label="Repositories"
             @click="layoutStore.toggleProjectPanel"
@@ -31,21 +32,21 @@ const layoutStore = useLayoutStore();
               :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
               :size="15"
             />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Repositories</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="title-action"
+          <Button
+            variant="title"
+            size="title"
             data-testid="open-settings"
             aria-label="Settings"
             @click="settingsStore.settingsOpen = true"
           >
             <CodiconIcon name="settings-gear" :size="15" />
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent>Settings</TooltipContent>
       </Tooltip>

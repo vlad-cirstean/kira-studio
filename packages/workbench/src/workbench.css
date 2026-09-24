@@ -15,76 +15,14 @@
  * "don't couple theme to workbench" rule is about the reverse edge (base.css importing this file)
  * and still holds; nothing here adds that edge. Each app's main.ts now imports only this file, not
  * `@theme/base.css` directly — importing both would compile base.css as two separate roots and
- * double every one of its utilities in the output. */
+ * double every one of its utilities in the output.
+ *
+ * P110 B7-B13 emptied every rule this file used to carry (dead selectors, the settings field
+ * vocabulary, the title bar/tab-strip chrome) onto Tailwind utility classes and `Button` variants
+ * directly in their own consumers' templates -- this file's own job is now only pulling the
+ * compiled Tailwind root in, per the comment above. Kept as its own file (not folded into
+ * `@theme/base.css`) since this package's own `@source "./"` scan root, scoped to this package's
+ * files, only takes effect through a file that itself imports the Tailwind root -- exactly what
+ * this file's own history above already explains. */
 @import "@theme/base.css";
 @source "./";
-
-/* P103 Part 2 (§5.4): TabStrip.vue's own trailing "new tab" affordance is per-app slot content
- * (`#new-tab`) — each app keeps its own `v-if` gating the wrapper's presence in the DOM (Kira
- * Studio: the Terminal module only; Kira Space: any open repository) — but the wrapper's classes
- * are published here, plain CSS rather than `@apply`, so they don't depend on Tailwind's `@apply`
- * seeing this file as part of a scoped component's own reference chain. */
-.tab-strip-actions {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 2px 4px 0 2px;
-}
-.tab-new {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-}
-.tab-new:hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-
-/* TitleBar.vue's own action row and its buttons — `.title-action`'s own markup stays in each app
- * (P104's job to swap it for shadcn-vue's Button), but the shared TitleBar.vue chrome needs both
- * classes resolvable from its own default slot's content. */
-.title-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  --wails-draggable: none;
-}
-.title-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: var(--kira-radius-sm);
-  --wails-draggable: none;
-  height: var(--kira-h-sm);
-  width: var(--kira-h-sm);
-  border: var(--kira-border-width) solid transparent;
-  background: none;
-  color: var(--kira-fg-muted);
-}
-.title-action:hover {
-  background: var(--kira-hover);
-}
-.title-action--labelled {
-  width: auto;
-  padding: 0 var(--kira-s-2);
-  gap: var(--kira-s-2);
-  font-size: var(--kira-t-sm);
-}
-.title-action.is-on {
-  background: var(--kira-bg-elevated);
-  border-color: var(--kira-border-strong);
-  color: var(--kira-fg);
-}
-.title-action.is-on:hover {
-  background: var(--kira-hover);
-}

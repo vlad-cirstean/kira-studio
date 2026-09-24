@@ -66,13 +66,17 @@ function onNewTab(): void {
     <template #tab-strip>
       <TabStrip>
         <template #new-tab>
-          <div v-if="showNewTab" class="tab-strip-actions" data-testid="tab-strip-actions">
+          <div
+            v-if="showNewTab"
+            class="h-full flex items-center shrink-0 pt-0.5 pr-1 pl-0.5"
+            data-testid="tab-strip-actions"
+          >
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
                   ref="newTabBtn"
                   type="button"
-                  class="tab-new"
+                  class="flex items-center justify-center size-5.5 bg-transparent border-0 cursor-pointer rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg"
                   aria-label="New terminal"
                   data-testid="tab-strip-new"
                   @click="onNewTab"

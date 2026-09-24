@@ -69,6 +69,17 @@ check_class 'field-head' 'flex items-center justify-between gap-1'
 check_class 'checkbox-row' 'FieldGroup (packages/theme/src/components/ui/field)'
 check_class 'sec-label' 'FieldLegend (packages/theme/src/components/ui/field)'
 check_class 'settings-pane' 'class="contents" (a SettingsShell.vue pane) or plain utility classes (a standalone panel, e.g. RequestSettingsPane.vue)'
+# P110 B13: TitleBar.vue's own action row and WorkbenchShell.vue's own "new tab" button, deleted
+# from workbench.css. Guards only the names with zero legitimate survivors repo-wide --
+# `tab-strip-actions` is deliberately NOT guarded here: both apps' WorkbenchShell.vue keep
+# `data-testid="tab-strip-actions"`, the same string now published as a test id, not a class, so
+# it's a real ongoing use, not a retired one. `is-on` is also NOT guarded: AutocompleteField.vue's
+# own unrelated `:class="{ 'is-on': ... }"` and primitives.css's own `.p-status.is-on`/
+# `.p-completion-row.is-on` (a later B-item's own job) are real, unrelated survivors.
+check_class 'title-action' 'Button variant="title" size="title" (packages/theme/src/components/ui/button)'
+check_class 'title-action--labelled' 'Button variant="title" size="title-labelled"'
+check_class 'title-bar-actions' 'flex items-center gap-0.5 ml-auto wails-no-drag'
+check_class 'tab-new' 'inline utility classes on the new-tab button (see WorkbenchShell.vue)'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
