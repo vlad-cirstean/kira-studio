@@ -138,18 +138,32 @@ export const useTreeStore = defineStore('tree', () => {
     );
   }
 
+  // P108 Part 12 F9: bumped by dropConnectionState — a connection-scoped epoch, not a per-key
+  // request token (F11 owns that, separately). A load in flight when the connection is dropped
+  // (disconnect, delete) must not write its result back afterward: the drop already cleared
+  // `children`/`errors` for this connection, and a late write undoes that with nothing left to
+  // correct it (a later expand()'s own `if (treeState.children[k]) return` guard would then treat
+  // the stale entry as already loaded).
+  const connectionEpoch = new Map<string, number>();
+  function connectionEpochFor(connectionId: string): number {
+    return connectionEpoch.get(connectionId) ?? 0;
+  }
+
   async function loadChildren(connectionId: string, path: string, refresh: boolean): Promise<void> {
     const k = rowKey(connectionId, path);
+    const epoch = connectionEpochFor(connectionId);
     treeState.loading.add(k);
     delete treeState.errors[k];
     try {
       const result = await control.treeChildren(connectionId, path, refresh);
+      if (connectionEpochFor(connectionId) !== epoch) return;
       // P43 iter2 D23: `result.truncated` is deliberately unread here — no level the project tree
       // ever renders can truncate (every SQL/Mongo/Kafka/SQS catalog enumerates a bounded
       // set in one round trip, and Redis/S3 stop expanding at the database/bucket, P41 D5). Only
       // views/browse/state.ts's own levels can, and it's the only place that shows the strip.
       treeState.children[k] = result.nodes;
     } catch (err) {
+      if (connectionEpochFor(connectionId) !== epoch) return;
       treeState.errors[k] = err instanceof Error ? err.message : String(err);
     } finally {
       treeState.loading.delete(k);
@@ -313,6 +327,7 @@ export const useTreeStore = defineStore('tree', () => {
   // path is covered — the context menu, a direct IPC call, a future bulk delete — the same
   // reasoning state/connections.ts:44-50 records for that channel.
   function dropConnectionState(connectionId: string): void {
+    connectionEpoch.set(connectionId, connectionEpochFor(connectionId) + 1);
     const prefix = `${connectionId}|`;
     for (const k of Object.keys(treeState.children)) {
       if (k.startsWith(prefix)) delete treeState.children[k];
