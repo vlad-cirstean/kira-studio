@@ -10,6 +10,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 func echoSource(t *testing.T) (Source, string) {
@@ -283,4 +285,44 @@ func TestServerStream_CoalescingUnderRace(t *testing.T) {
 			t.Errorf("Seq %d was never delivered", i)
 		}
 	}
+}
+
+// TestUnmarshalRequestJSON_SyntaxErrorDropsTheOffendingToken is P108 F13: a request JSON built by
+// stage 2's own {{secret}} substitution can have a secret's raw value break the JSON string
+// literal it landed in (an embedded quote or backslash) — protojson's own syntax-error message
+// quotes that broken token straight from the input, which is then a fragment of the secret too
+// short for bridge/grpc.go's own full-value replacer to mask. unmarshalRequestJSON must keep only
+// the line:col position for a genuine syntax error, never the token, while a semantic error (an
+// unknown field, covered by TestUnary_RequestJSONStrictness above) still names itself in full —
+// field names are never secret material.
+func TestUnmarshalRequestJSON_SyntaxErrorDropsTheOffendingToken(t *testing.T) {
+	_, protoPath := echoSource(t)
+	md := compileService(t, protoPath).Methods().ByName("Unary").Input()
+
+	// The secret's value ("s3cr3t-value) carries a raw, unescaped quote that breaks out of the
+	// "text" field's own string literal — exactly the shape a substituted {{secret}} can produce.
+	const secretFragment = "s3cr3t-value"
+	bad := `{"text": "` + secretFragment + `"oops"}`
+
+	err := unmarshalRequestJSON(bad, dynamicMsg(t, md))
+	if err == nil {
+		t.Fatal("unmarshalRequestJSON: want an error for malformed JSON, got nil")
+	}
+	gerr, ok := err.(*Error)
+	if !ok || gerr.Code != CodeBadRequest {
+		t.Fatalf("error = %v, want a *Error with code %s", err, CodeBadRequest)
+	}
+	if strings.Contains(gerr.Message, secretFragment) {
+		t.Errorf("message = %q, leaked the secret fragment %q from protojson's own syntax error", gerr.Message, secretFragment)
+	}
+	if !strings.Contains(gerr.Message, "line") {
+		t.Errorf("message = %q, want it to still name a line:col position", gerr.Message)
+	}
+}
+
+// dynamicMsg builds a fresh *dynamicpb.Message for md — a one-line helper so the test above reads
+// as "build a message, then unmarshal into it" without importing dynamicpb itself.
+func dynamicMsg(t *testing.T, md protoreflect.MessageDescriptor) *dynamicpb.Message {
+	t.Helper()
+	return dynamicpb.NewMessage(md)
 }

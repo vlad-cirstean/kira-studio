@@ -3,6 +3,7 @@ package grpcclient
 import (
 	"context"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
@@ -58,9 +59,33 @@ func unmarshalRequestJSON(js string, msg *dynamicpb.Message) error {
 	// user is authoring must be an error, not a silently dropped field, and the error carries its
 	// own line:col.
 	if err := (protojson.UnmarshalOptions{}).Unmarshal([]byte(js), msg); err != nil {
-		return BadRequest(err.Error())
+		return BadRequest(sanitizeUnmarshalError(err))
 	}
 	return nil
+}
+
+// protojsonSyntaxErrorPos pulls the "(line N:M)" position out of a protojson syntax error's own
+// message text — the one part of it that is always safe to keep (P108 F13).
+var protojsonSyntaxErrorPos = regexp.MustCompile(`\(line \d+:\d+\)`)
+
+// sanitizeUnmarshalError is P108 F13: protojson's own JSON *syntax* error — as opposed to a
+// semantic one like "unknown field", which only ever quotes a field name the user typed — quotes
+// the offending token straight from the input (e.g. "proto: syntax error (line 1:15): invalid
+// value abc"). js is built by stage 2's own {{secret}} substitution (resolve.go); a secret whose
+// value carries a raw quote or backslash breaks the JSON string literal it landed in, and the
+// quoted token in that case is a FRAGMENT of the secret — too short for the full-value replacer
+// bridge/grpc.go's maskGrpcError builds to match, so it would otherwise reach the UI and error
+// text unmasked. Keep only the line:col position, drop the token entirely, whenever the error
+// names itself a syntax error; a semantic error never quotes a value and stays verbatim.
+func sanitizeUnmarshalError(err error) string {
+	msg := err.Error()
+	if !strings.Contains(msg, "syntax error") {
+		return msg
+	}
+	if pos := protojsonSyntaxErrorPos.FindString(msg); pos != "" {
+		return "request JSON is invalid after variable substitution " + pos
+	}
+	return "request JSON is invalid after variable substitution"
 }
 
 func marshalResponseJSON(msg *dynamicpb.Message) (string, error) {
