@@ -125,29 +125,11 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
 /** One named stream per repo workspace, each its own `gitsession.Conn`/repo hold on the Go side
  *  (`handlers.go`'s own per-connection design, §8) — independent even for two workspaces open on
  *  the same repository. */
-// P62 §4.5: the blame annotation's click-through needs to push `ui.action` the same way
-// review.open's own handler does (§8.1's local event bus) — but from
-// views/repo/blameAnnotation.ts, which is not a hostHandlers.ts request handler and so has no
-// `emitLocal` closure of its own. Keyed by codeRepoId (not the git repoId) so this module — the
-// one that actually owns each repo workspace's local emitter — can be asked directly.
-const localEmittersByCodeRepoId = new Map<string, ReturnType<typeof createLocalEmitter>>();
-
 function createNativeGitTransport(codeRepoId: string): Transport {
   const channel = createStreamChannel(Stream('git'));
   const remote = createRpcClient(channel);
   const local = createLocalEmitter();
 
-  // F3: the channel closing (including a self-inflicted close from a decodeFrame failure) used to
-  // go unnoticed entirely — nothing ever subscribed to onClose, so every already-in-flight
-  // request/stream on this client hung forever, and a stale entry in sharedClientsByCodeRepoId
-  // kept handing the now-dead transport to every later gitTransportFor call. remote.dispose()
-  // rejects every pending request/stream immediately; evicting the map entry makes the next
-  // gitTransportFor call dial a fresh connection instead of reusing this one.
-  channel.onClose(() => {
-    remote.dispose();
-    sharedClientsByCodeRepoId.delete(codeRepoId);
-  });
-  localEmittersByCodeRepoId.set(codeRepoId, local);
   const host = createHostHandlers({
     remoteRequest: remote.request,
     codeRepoId,
@@ -173,7 +155,7 @@ function createNativeGitTransport(codeRepoId: string): Transport {
     });
   });
 
-  return {
+  const transport: Transport = {
     request<K extends RequestKey>(
       method: K,
       params: ParamsOf<K>,
@@ -222,6 +204,29 @@ function createNativeGitTransport(codeRepoId: string): Transport {
       remote.dispose();
     },
   };
+
+  // F3: the channel closing (including a self-inflicted close from a decodeFrame failure) used to
+  // go unnoticed entirely — nothing ever subscribed to onClose, so every already-in-flight
+  // request/stream on this client hung forever, and a stale entry in sharedClientsByCodeRepoId
+  // kept handing the now-dead transport to every later gitTransportFor call. remote.dispose()
+  // rejects every pending request/stream immediately; evicting the map entry makes the next
+  // gitTransportFor call dial a fresh connection instead of reusing this one.
+  //
+  // The identity check guards a narrower race this fix adds (P108 Part 20 F3): `onClose` fires
+  // asynchronously, from the socket's own close event, strictly after `channel.close()` returns —
+  // so `disposeGitTransport(id)` followed by a same-tick `gitTransportFor(id)` (collapse/re-expand
+  // a worktree, or close/reopen a workspace) can install a NEW shared client for `codeRepoId`
+  // before this stale handler runs. Deleting unconditionally would evict that new, live entry
+  // instead of this dead one, orphaning it: still open (socket, Go `gitsession.Conn`, repo hold),
+  // but unreachable from `sharedClientsByCodeRepoId` for the rest of the window's life.
+  channel.onClose(() => {
+    remote.dispose();
+    if (sharedClientsByCodeRepoId.get(codeRepoId)?.transport === transport) {
+      sharedClientsByCodeRepoId.delete(codeRepoId);
+    }
+  });
+
+  return transport;
 }
 
 /** An `AbortController` that aborts as soon as either input signal does. Not `AbortSignal.any` —
@@ -321,7 +326,6 @@ export function disposeGitTransport(codeRepoId: string): void {
   const shared = sharedClientsByCodeRepoId.get(codeRepoId);
   if (!shared) return;
   sharedClientsByCodeRepoId.delete(codeRepoId);
-  localEmittersByCodeRepoId.delete(codeRepoId);
   gitCredentialStore.dropCredentialRequests(codeRepoId);
   // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
   // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this

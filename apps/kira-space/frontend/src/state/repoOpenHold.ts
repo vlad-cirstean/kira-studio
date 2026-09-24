@@ -36,8 +36,8 @@ export function ensureRepoOpen(transport: Transport, gitRepoId: string): Promise
  * scoped to one `gitsession.Conn` (one per shared client per repo workspace), but this memo used
  * to outlive it: closing a repo workspace and reopening it creates a NEW `Conn`, yet a stale
  * resolved entry here made `ensureRepoOpen` short-circuit without ever calling `repo.open` on it,
- * so every `blame.line` call then failed with `E_REPO_NOT_HELD` for that file. Call this
- * alongside `localEmittersByCodeRepoId.delete(...)` there.
+ * so every `blame.line` call then failed with `E_REPO_NOT_HELD` for that file. Called from
+ * `disposeGitTransport`'s own cleanup there.
  */
 export function forgetRepoOpen(gitRepoId: string): void {
   repoOpenMemo.delete(gitRepoId);
