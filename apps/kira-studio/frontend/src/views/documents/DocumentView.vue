@@ -1004,7 +1004,11 @@ onUnmounted(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <div v-if="needsReconnect" class="p-empty" data-testid="document-reconnect">
+    <div
+      v-if="needsReconnect"
+      class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
+      data-testid="document-reconnect"
+    >
       <Button
         variant="dialog-primary"
         size="kira-lg"

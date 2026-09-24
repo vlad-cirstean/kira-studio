@@ -62,7 +62,7 @@ defineSlots<{
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestId">
     <div class="saved-list-menu-inner">
-      <div class="p-menu-label">{{ title }}</div>
+      <div class="h-control-sm flex items-center px-1.5 text-kira-xs text-subtle uppercase tracking-wider">{{ title }}</div>
       <div v-if="saved.length === 0" class="empty-row text-kira-sm text-subtle">{{ emptySavedText }}</div>
       <div v-else role="listbox" :aria-label="title">
         <div
@@ -105,7 +105,7 @@ defineSlots<{
 
       <template v-if="recent">
         <Separator class="my-1" />
-        <div class="p-menu-label">Recent</div>
+        <div class="h-control-sm flex items-center px-1.5 text-kira-xs text-subtle uppercase tracking-wider">Recent</div>
         <div v-if="recent.length === 0" class="empty-row text-kira-sm text-subtle">{{ emptyRecentText }}</div>
         <div v-else role="listbox" aria-label="Recent">
           <div

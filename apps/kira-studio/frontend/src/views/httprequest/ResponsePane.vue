@@ -464,9 +464,9 @@ onUnmounted(() => {
           {{ filteredHeaders.length }} of {{ response.headers.length }} headers
         </span>
         <div class="response-headers">
-          <div v-for="(h, i) in filteredHeaders" :key="i" class="p-kv-row">
-            <span class="p-kv-name font-data">{{ h.name }}</span>
-            <span class="p-kv-value font-data">{{ h.value }}</span>
+          <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-xs" data-testid="response-header-row">
+            <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
+            <span class="wrap-anywhere font-data">{{ h.value }}</span>
           </div>
         </div>
       </template>

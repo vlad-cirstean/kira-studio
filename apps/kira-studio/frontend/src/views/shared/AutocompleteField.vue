@@ -564,7 +564,7 @@ const fieldAttrs = computed(
         side="bottom"
         align="start"
         :side-offset="4"
-        class="autocomplete-suggestions p-completion bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden z-[var(--kira-z-autocomplete)] m-0 list-none"
+        class="autocomplete-suggestions bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-x-hidden overflow-y-auto z-[var(--kira-z-autocomplete)] m-0 list-none font-data p-0.5 min-w-50 max-w-completion-max-w max-h-60"
         @mousedown.prevent
       >
         <ComboboxViewport>
@@ -574,14 +574,14 @@ const fieldAttrs = computed(
             :key="c.label"
             as="li"
             :value="i"
-            class="p-completion-row"
-            :class="{ 'is-on': i === activeIndex }"
+            class="flex items-center gap-1 py-1 px-1.5 rounded-kira-sm text-kira-sm cursor-pointer whitespace-nowrap"
+            :class="i === activeIndex ? 'bg-select text-fg' : ''"
             @mouseenter="activeIndex = i"
             @mousedown.prevent="accept(c)"
           >
-            <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="p-completion-icon" />
-            <span class="p-completion-label">{{ c.label }}</span>
-            <span v-if="c.detail" class="p-completion-detail">{{ c.detail }}</span>
+            <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="shrink-0 text-muted-foreground" />
+            <span class="overflow-hidden text-ellipsis">{{ c.label }}</span>
+            <span v-if="c.detail" class="ml-auto pl-1.5 text-muted-foreground text-kira-xs shrink-0">{{ c.detail }}</span>
           </ComboboxItem>
         </ComboboxViewport>
       </ComboboxContent>

@@ -170,6 +170,26 @@ check_class 'p-th' 'flex items-center gap-1 px-2 border-r border-border text-kir
 check_class 'p-td' 'flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate (plus the gutter variant)'
 check_class 'p-statusbar' 'h-statusbar shrink-0 flex items-center justify-between px-1.5'
 check_class 'p-status' 'h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover'
+# P110 B30: the rest -- empty state, menu label, AutocompleteField's completion popup, the
+# <details> disclosure marker and the shared kv-row/definition-table families.
+check_class 'p-empty' 'flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle'
+check_class 'p-menu-label' 'h-control-sm flex items-center px-1.5 text-kira-xs text-subtle uppercase tracking-wider'
+check_class 'p-completion' 'font-data p-0.5 min-w-50 max-w-completion-max-w max-h-60 overflow-x-hidden overflow-y-auto'
+check_class 'p-completion-row' 'flex items-center gap-1 py-1 px-1.5 rounded-kira-sm text-kira-sm cursor-pointer whitespace-nowrap (plus bg-select text-fg via a ternary for the active row)'
+check_class 'p-completion-icon' 'shrink-0 text-muted-foreground'
+check_class 'p-completion-label' 'overflow-hidden text-ellipsis'
+check_class 'p-completion-detail' 'ml-auto pl-1.5 text-muted-foreground text-kira-xs shrink-0'
+check_class 'p-disclosure' 'a `group` marker on <details>, with the codicon before: escape (allowlisted) moved onto <summary> itself'
+check_class 'p-kv-row' 'flex gap-1.5 text-kira-xs'
+check_class 'p-kv-name' 'text-muted-foreground shrink-0 min-w-40'
+check_class 'p-kv-value' 'wrap-anywhere'
+check_class 'def-section' 'flex flex-col gap-1.5'
+check_class 'def-section-head' 'flex items-center gap-1.5'
+check_class 'def-section-title' 'text-kira-sm text-muted-foreground uppercase tracking-wider'
+check_class 'def-empty' 'text-muted-foreground m-0'
+check_class 'def-table' 'w-full border-collapse text-kira-md (plus a local `.definition-table` hook where a scoped column-divider override needs one)'
+check_class 'def-head-row' 'per-th px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap (plus border-r border-border except the last column)'
+check_class 'def-row' 'border-b border-border hover:bg-hover'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

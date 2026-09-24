@@ -790,9 +790,13 @@ test('filtering the response headers pane, and filtering the request headers tab
   // D12: the response headers pane's own filter, by name or value.
   await page.click('[data-testid="http-send"]');
   await page.click('[data-testid="http-response-pane-headers"]');
-  await expect(page.locator('[data-testid="http-response-headers"] .p-kv-row')).toHaveCount(3);
+  await expect(
+    page.locator('[data-testid="http-response-headers"] [data-testid="response-header-row"]'),
+  ).toHaveCount(3);
   await page.fill('[data-testid="http-response-headers-filter"]', 'no-store');
-  await expect(page.locator('[data-testid="http-response-headers"] .p-kv-row')).toHaveCount(1);
+  await expect(
+    page.locator('[data-testid="http-response-headers"] [data-testid="response-header-row"]'),
+  ).toHaveCount(1);
   await expect(page.locator('[data-testid="http-response-headers-count"]')).toHaveText(
     '1 of 3 headers',
   );

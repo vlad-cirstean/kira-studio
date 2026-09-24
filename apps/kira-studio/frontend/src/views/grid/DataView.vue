@@ -372,7 +372,7 @@ function onCloseSearch(): void {
       <SplitterPanel class="grid-split-top" :order="1">
         <div
           v-if="needsReconnect"
-          class="p-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-subtle"
+          class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
           data-testid="reconnect-panel"
         >
           <Button

@@ -145,7 +145,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
     '[data-testid="definition-properties"][data-title="Attributes"]',
   );
   await expect(attributesSection).toBeVisible({ timeout: 10_000 });
-  await expect(attributesSection.locator('.def-row')).not.toHaveCount(0);
+  await expect(attributesSection.locator('[data-testid="definition-row"]')).not.toHaveCount(0);
   await queueDef.locator('[data-testid="definition-refresh"]').click();
   await expect(attributesSection).toBeVisible({ timeout: 10_000 });
 

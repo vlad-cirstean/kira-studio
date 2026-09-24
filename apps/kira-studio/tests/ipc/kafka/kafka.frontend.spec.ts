@@ -121,14 +121,14 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
     '[data-testid="definition-properties"][data-title="Partitions"]',
   );
   await expect(partitionsSection).toBeVisible({ timeout: 10_000 });
-  await expect(partitionsSection.locator('.def-row')).toHaveCount(2);
+  await expect(partitionsSection.locator('[data-testid="definition-row"]')).toHaveCount(2);
   const configSection = topicDef.locator(
     '[data-testid="definition-properties"][data-title="Configuration"]',
   );
   await expect(configSection).toBeVisible();
   // P58e E11 / P58f cutover: the Go adapter's DescribeTopicConfigs call actually works, unlike the
   // deleted engine's kafkajs binding — the fixture now carries the topic's real config rows.
-  await expect(configSection.locator('.def-row')).toHaveCount(33);
+  await expect(configSection.locator('[data-testid="definition-row"]')).toHaveCount(33);
 
   // --- a consumer group's definition shows Group/Members/Committed offsets --------------------
   await openRowMenu(page, CONSUMER_GROUP_PATH);
@@ -139,7 +139,7 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
     '[data-testid="definition-properties"][data-title="Committed offsets"]',
   );
   await expect(offsetsSection).toBeVisible({ timeout: 10_000 });
-  await expect(offsetsSection.locator('.def-row')).toHaveCount(2);
+  await expect(offsetsSection.locator('[data-testid="definition-row"]')).toHaveCount(2);
 
   expect(consoleErrors).toEqual([]);
 });

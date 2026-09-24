@@ -255,9 +255,10 @@ onUnmounted(() => {
   @apply flex flex-1 min-h-0 flex-col;
 }
 
-/* No new primitive (F12): reuses primitives.css's own .def-section-title idiom (uppercase/muted/
-   t-sm/letter-spacing) — promote to primitives.css only if a second panel wants this exact
-   category shape (P18's own "promote when a second consumer appears" rule). */
+/* No new primitive (F12): reuses the definition-section-title idiom (uppercase/muted/t-sm/
+   letter-spacing) the views/definition/*Section.vue components share — promote to a real
+   component only if a second panel wants this exact category shape (P18's own "promote when a
+   second consumer appears" rule). */
 .panel-category-head {
   all: unset;
   @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted-foreground uppercase tracking-wider h-control text-kira-sm;

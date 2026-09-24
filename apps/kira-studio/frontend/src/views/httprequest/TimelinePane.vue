@@ -280,21 +280,29 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
           </div>
 
-          <details v-if="hop.headers && hop.headers.length > 0" class="p-disclosure hop-headers">
-            <summary class="text-kira-xs text-subtle">Response headers</summary>
-            <div v-for="(h, i) in hop.headers" :key="i" class="p-kv-row hop-header-row">
-              <span class="p-kv-name font-data">{{ h.name }}</span>
-              <span class="p-kv-value font-data">{{ h.value }}</span>
+          <details v-if="hop.headers && hop.headers.length > 0" class="group hop-headers">
+            <summary
+              class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+            >
+              Response headers
+            </summary>
+            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-xs hop-header-row">
+              <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
+              <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
           </details>
           <details
             v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
-            class="p-disclosure hop-headers"
+            class="group hop-headers"
           >
-            <summary class="text-kira-xs text-subtle">Response headers</summary>
-            <div v-for="(h, i) in response!.headers" :key="i" class="p-kv-row hop-header-row">
-              <span class="p-kv-name font-data">{{ h.name }}</span>
-              <span class="p-kv-value font-data">{{ h.value }}</span>
+            <summary
+              class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+            >
+              Response headers
+            </summary>
+            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-xs hop-header-row">
+              <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
+              <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
           </details>
         </div>
@@ -379,7 +387,8 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
   @apply mt-0.5;
 }
 
-/* p-kv-row supplies display/gap/font-size; this row also carries its own vertical breathing room. */
+/* The name/value row's own display/gap/font-size utilities live on the template class list;
+   this local hook only adds vertical breathing room. */
 .hop-header-row {
   @apply py-0.5;
 }

@@ -397,17 +397,17 @@ onUnmounted(() => {
     <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
       <div class="metadata-group">
         <div class="metadata-group-title text-kira-xs text-muted-foreground">Header</div>
-        <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
-          <span class="p-kv-name font-data">{{ h.name }}</span>
-          <span class="p-kv-value font-data">{{ h.value }}</span>
+        <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-xs">
+          <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
+          <span class="wrap-anywhere font-data">{{ h.value }}</span>
         </div>
         <div v-if="header.length === 0" class="text-kira-xs text-subtle">No header metadata</div>
       </div>
       <div class="metadata-group">
         <div class="metadata-group-title text-kira-xs text-muted-foreground">Trailer</div>
-        <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
-          <span class="p-kv-name font-data">{{ t.name }}</span>
-          <span class="p-kv-value font-data">{{ t.value }}</span>
+        <div v-for="(t, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-xs">
+          <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ t.name }}</span>
+          <span class="wrap-anywhere font-data">{{ t.value }}</span>
         </div>
         <div v-if="trailer.length === 0" class="text-kira-xs text-subtle">No trailer metadata</div>
       </div>

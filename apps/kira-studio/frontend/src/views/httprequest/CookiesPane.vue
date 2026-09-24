@@ -130,10 +130,10 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies
       </span>
       <div v-if="requestCookies.length > 0" class="cookies-list">
-        <div v-for="c in filteredRequestCookies" :key="c.name" class="p-kv-row cookie-row">
+        <div v-for="c in filteredRequestCookies" :key="c.name" class="flex gap-1.5 text-kira-xs cookie-row">
           <div class="cookie-body">
-            <span class="p-kv-name font-data">{{ c.name }}</span>
-            <span class="p-kv-value font-data">{{ c.value }}</span>
+            <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
+            <span class="wrap-anywhere font-data">{{ c.value }}</span>
             <span v-if="attributeLine(c)" class="cookie-attributes">{{ attributeLine(c) }}</span>
           </div>
           <Tooltip>
@@ -166,10 +166,10 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         <div v-if="sentCookies.length > 0" class="cookies-group">
           <h3 class="cookies-group-head">Sent</h3>
           <div class="cookies-list">
-            <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="p-kv-row cookie-row">
+            <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="flex gap-1.5 text-kira-xs cookie-row">
               <div class="cookie-body">
-                <span class="p-kv-name font-data">{{ c.name }}</span>
-                <span class="p-kv-value font-data">{{ c.value }}</span>
+                <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
+                <span class="wrap-anywhere font-data">{{ c.value }}</span>
                 <span class="cookie-attributes">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
@@ -182,10 +182,10 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         <div v-if="receivedCookies.length > 0" class="cookies-group">
           <h3 class="cookies-group-head">Received</h3>
           <div class="cookies-list">
-            <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="p-kv-row cookie-row">
+            <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="flex gap-1.5 text-kira-xs cookie-row">
               <div class="cookie-body">
-                <span class="p-kv-name font-data">{{ c.name }}</span>
-                <span class="p-kv-value font-data">{{ c.value }}</span>
+                <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
+                <span class="wrap-anywhere font-data">{{ c.value }}</span>
                 <span class="cookie-attributes">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>

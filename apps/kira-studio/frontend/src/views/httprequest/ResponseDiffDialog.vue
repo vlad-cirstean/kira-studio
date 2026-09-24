@@ -308,8 +308,12 @@ onUnmounted(() => {
           <span class="font-data diff-header-value">{{ row.a ?? '—' }}</span>
           <span class="font-data diff-header-value">{{ row.b ?? '—' }}</span>
         </div>
-        <details v-if="unchangedHeaderRows.length > 0" class="p-disclosure diff-header-unchanged">
-          <summary class="text-kira-xs text-subtle">{{ unchangedHeaderRows.length }} unchanged</summary>
+        <details v-if="unchangedHeaderRows.length > 0" class="group diff-header-unchanged">
+          <summary
+            class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+          >
+            {{ unchangedHeaderRows.length }} unchanged
+          </summary>
           <div
             v-for="row in unchangedHeaderRows"
             :key="row.name"

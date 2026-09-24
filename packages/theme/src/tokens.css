@@ -240,5 +240,10 @@
   --kira-z-dialog: 200;
   --kira-z-menu: 300;
   --kira-z-autocomplete: 350;
+  /* P110 B30: this same popup's own max-width -- a deliberate single-purpose seam, same reasoning
+     as the z-index rung directly above (AutocompleteField.vue's completion list is the only
+     consumer). Keeps the 90vw narrow-viewport clamp exact instead of dropping it for a nearest
+     Tailwind step or an unlisted arbitrary value. */
+  --kira-completion-max-w: min(480px, 90vw);
   --kira-z-tooltip: 400;
 }

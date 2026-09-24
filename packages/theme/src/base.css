@@ -99,6 +99,9 @@
   --spacing-tabbar: var(--kira-tabbar-h);
   --spacing-statusbar: var(--kira-statusbar-h);
   --spacing-titlebar-inset: var(--kira-titlebar-inset-left);
+  /* P110 B30: AutocompleteField's own completion popup width cap -- rung 3, matches
+     --kira-z-autocomplete's existing precedent for this same, single popup. */
+  --spacing-completion-max-w: var(--kira-completion-max-w);
 
   --text-kira-xs: var(--kira-t-xs);
   --text-kira-sm: var(--kira-t-sm);

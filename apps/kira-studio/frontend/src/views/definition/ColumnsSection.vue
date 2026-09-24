@@ -10,6 +10,17 @@ import { columnsSectionMenu } from './columnsMenu';
 
 const contextMenuStore = useContextMenuStore();
 
+// P110 B30: the shared definition-table header/body cell shape, folded off primitives.css's old
+// shared header-row and body-cell rules into these two constants -- the class string repeats
+// across 7 columns in this file alone (plan §5.11's "4+ times, extract a const" rule). DEF_TH_LAST
+// omits the column-divider border for the last header cell, matching the old rule's own
+// last-child exception.
+const DEF_TH =
+  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
+const DEF_TH_LAST =
+  'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
+const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
+
 const props = defineProps<{
   columns: ColumnMeta[];
   foreignKeyColumnNames: ReadonlySet<string>;
@@ -32,43 +43,44 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 </script>
 
 <template>
-  <section class="def-section" data-testid="definition-columns">
-    <header class="def-section-head">
-      <span class="def-section-title">Columns</span>
+  <section class="flex flex-col gap-1.5" data-testid="definition-columns">
+    <header class="flex items-center gap-1.5">
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Columns</span>
       <Badge>{{ columns.length }}</Badge>
     </header>
-    <table class="def-table">
+    <table class="w-full border-collapse text-kira-md definition-table">
       <thead>
-        <tr class="def-head-row">
-          <th class="def-col-icon"></th>
-          <th class="def-col-name">Name</th>
-          <th class="def-col-key">Key</th>
-          <th class="def-col-type">Type</th>
-          <th class="def-col-null">Null?</th>
-          <th class="def-col-default">Default</th>
-          <th class="def-col-comment">Comment</th>
+        <tr>
+          <th :class="DEF_TH" class="def-col-icon"></th>
+          <th :class="DEF_TH" class="def-col-name">Name</th>
+          <th :class="DEF_TH" class="def-col-key">Key</th>
+          <th :class="DEF_TH" class="def-col-type">Type</th>
+          <th :class="DEF_TH" class="def-col-null">Null?</th>
+          <th :class="DEF_TH" class="def-col-default">Default</th>
+          <th :class="DEF_TH_LAST" class="def-col-comment">Comment</th>
         </tr>
       </thead>
       <tbody>
         <tr
           v-for="col in columns"
           :key="col.name"
-          class="def-row"
+          class="border-b border-border hover:bg-hover"
+          data-testid="definition-row"
           @contextmenu="onContextMenu($event, col)"
         >
-          <td class="def-col-icon">
+          <td :class="DEF_TD" class="def-col-icon">
             <CodiconIcon
               :name="columnTypeIcon(col.dataType)"
               :size="13"
               :style="{ color: columnTypeColor(col.dataType) }"
             />
           </td>
-          <td class="def-col-name">{{ col.name }}</td>
-          <td class="def-col-key">
+          <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
+          <td :class="DEF_TD" class="def-col-key">
             <span v-if="keyLabel(col) === 'PK'" class="header-key">PK</span>
             <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk">FK</span>
           </td>
-          <td class="def-col-type font-data">
+          <td :class="DEF_TD" class="def-col-type font-data">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
@@ -79,9 +91,9 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
             </Tooltip>
           </td>
-          <td class="def-col-null font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
-          <td class="def-col-default font-data">{{ col.defaultExpr ?? '' }}</td>
-          <td class="def-col-comment">{{ col.comment ?? '' }}</td>
+          <td :class="DEF_TD" class="def-col-null font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
+          <td :class="DEF_TD" class="def-col-default font-data">{{ col.defaultExpr ?? '' }}</td>
+          <td :class="DEF_TD" class="def-col-comment">{{ col.comment ?? '' }}</td>
         </tr>
       </tbody>
     </table>
@@ -91,12 +103,12 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* Only these two — the vertical column dividers — aren't in the shared .def-table td rule
-   (primitives.css): Validation/Properties are plain key-value tables that don't want them. */
-.def-table td {
+/* Only these two — the vertical column dividers — aren't in the shared cell utility list above:
+   Validation/Properties are plain key-value tables that don't want them. */
+.definition-table td {
   @apply border-r border-border;
 }
-.def-table td:last-child {
+.definition-table td:last-child {
   @apply border-r-0;
 }
 

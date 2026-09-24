@@ -154,7 +154,7 @@ function selectMethod(service: string, method: string): void {
     </div>
 
     <div v-if="tab.state.descriptorMode === 'proto'" class="import-paths" data-testid="grpc-import-paths">
-      <span class="def-section-title">Import paths</span>
+      <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Import paths</span>
       <div class="import-path-list">
         <div v-for="(p, i) in tab.state.importPaths" :key="i" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
           <Tooltip>
@@ -217,7 +217,7 @@ function selectMethod(service: string, method: string): void {
     <div class="service-list" data-testid="grpc-service-list">
       <template v-if="rt?.schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.name" class="service-group">
-          <div class="def-section-title service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
+          <div class="text-kira-sm text-muted-foreground uppercase tracking-wider service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
           <button
             v-for="m in svc.methods"
             :key="m.name"
