@@ -148,6 +148,18 @@ export const useVariablesStore = defineStore('variables', () => {
   async function deleteEnvironment(id: string): Promise<void> {
     await control.variablesDeleteEnvironment(id);
     closeVariableSetTabsForOwner('environment', id);
+    // P108 F9: an incognito tab's own override (above) is never cleared by anything else — left in
+    // place, it kept substituting the deleted environment's plain values in stage 1 while Go
+    // resolved no secrets for the (now missing) environment id, and the selector showed nothing
+    // selected while send still used the stale pick. Falling back drops it back to the app-wide
+    // selection, same as a non-incognito tab already reads once this environment is gone.
+    for (const [tabId, envId] of incognitoEnvByTab) {
+      if (envId === id) incognitoEnvByTab.delete(tabId);
+    }
+    // listCache's own eviction (useVariableSetStore) — nothing else ever drops a deleted owner's
+    // cached rows, so a later ensureVariablesLoaded('environment', id) call (a stale watch, a
+    // reused id) would otherwise keep reading them back forever.
+    useVariableSetStore().evictListCache('environment', id);
     await loadEnvironments();
   }
 
@@ -356,6 +368,19 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   function cachedVariables(scope: VariableScope, ownerId: string): ApiVariable[] {
     if (!ownerId) return [];
     return listCache[cacheKey(scope, ownerId)] ?? [];
+  }
+
+  /** P108 F9: `listCache` was never evicted — deleting an environment or a collection left its own
+   *  rows cached under the old owner id forever, so a request sent afterward against a different
+   *  owner that happened to share the id space (or a since-recreated environment reusing the same
+   *  route through `ensureVariablesLoaded`'s cache-hit guard) kept substituting stale plain values.
+   *  Bumping the generation too matters exactly like `loadVariableSetRows`'s own bump: an
+   *  `ensureVariablesLoaded` call already in flight for this key must not resurrect the deleted rows
+   *  once its reply lands. */
+  function evictListCache(scope: VariableScope, ownerId: string): void {
+    const key = cacheKey(scope, ownerId);
+    delete listCache[key];
+    bumpListCacheGen(key);
   }
 
   /** id: '' creates a new row (D19). value is three-state (F2, P108 Part 3): null means "leave the
@@ -661,6 +686,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     setVariableSetError,
     ensureVariablesLoaded,
     cachedVariables,
+    evictListCache,
     upsertVariable,
     deleteVariable,
     reorderVariables,
