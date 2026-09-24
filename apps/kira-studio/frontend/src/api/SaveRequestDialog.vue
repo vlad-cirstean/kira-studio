@@ -7,13 +7,15 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
+import { useSaveRequestDialogStore } from './state/saveRequestDialog';
 
 const collectionsStore = useCollectionsStore();
+const saveDialogStore = useSaveRequestDialogStore();
 
 // P4 D15: Save as… — one TextField for the name and one indented <select> of every collection and
-// folder as the target, on the existing DialogFrame. Driven by the store's own saveDialog state so
-// the request view can open it without importing this component (the same shape
-// state/objectStore.ts's own upload dialog uses).
+// folder as the target, on the existing DialogFrame. Driven by useSaveRequestDialogStore's own
+// open/suggestedName state (P108 F16) so the request view can open it without importing this
+// component (the same shape state/objectStore.ts's own upload dialog uses).
 const name = ref('');
 const target = ref('');
 const saving = ref(false);
@@ -35,10 +37,10 @@ const firstTargetValue = computed(() => {
 });
 
 watch(
-  () => collectionsStore.open,
+  () => saveDialogStore.open,
   (open) => {
     if (!open) return;
-    name.value = collectionsStore.suggestedName;
+    name.value = saveDialogStore.suggestedName;
     target.value = firstTargetValue.value;
     saving.value = false;
     error.value = null;
@@ -69,7 +71,7 @@ function splitTarget(value: string): [string, string | null] {
 </script>
 
 <template>
-  <Dialog :open="true" @update:open="(v) => !v && collectionsStore.closeSaveDialog()">
+  <Dialog :open="true" @update:open="(v) => !v && saveDialogStore.closeSaveDialog()">
     <DialogContent
       :show-close-button="false"
       data-testid="save-request-dialog"
@@ -85,7 +87,7 @@ function splitTarget(value: string): [string, string | null] {
             class="ml-auto"
             aria-label="Close"
             data-testid="save-request-close"
-            @click="collectionsStore.closeSaveDialog"
+            @click="saveDialogStore.closeSaveDialog"
           >
             <CodiconIcon name="close" :size="13" />
           </Button>
@@ -117,7 +119,7 @@ function splitTarget(value: string): [string, string | null] {
 
       <DialogFooter class="border-t border-border">
         <span class="p-dialog-actions p-push">
-          <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</Button>
+          <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"

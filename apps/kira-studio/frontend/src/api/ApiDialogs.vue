@@ -9,20 +9,20 @@ import DynamicValuesDialog from './DynamicValuesDialog.vue';
 import EditRawRequestDialog from './EditRawRequestDialog.vue';
 import ImportCurlDialog from './ImportCurlDialog.vue';
 import SaveRequestDialog from './SaveRequestDialog.vue';
-import { useCollectionsStore } from './state/collections';
 import { useCopyAsCurlStore, useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
 import { useEditRawStore } from './state/raw';
+import { useSaveRequestDialogStore } from './state/saveRequestDialog';
 
 const dynamicValuesStore = useDynamicValuesStore();
 const editRawStore = useEditRawStore();
-const collectionsStore = useCollectionsStore();
+const saveRequestDialogStore = useSaveRequestDialogStore();
 const importCurlStore = useImportCurlStore();
 const copyAsCurlStore = useCopyAsCurlStore();
 </script>
 
 <template>
-  <SaveRequestDialog v-if="collectionsStore.open" />
+  <SaveRequestDialog v-if="saveRequestDialogStore.open" />
   <DynamicValuesDialog v-if="dynamicValuesStore.open" />
   <ImportCurlDialog v-if="importCurlStore.open" />
   <CopyAsCurlDialog v-if="copyAsCurlStore.open" />

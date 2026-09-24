@@ -40,6 +40,7 @@ import MethodSelect from '../../api/MethodSelect.vue';
 import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
+import { useSaveRequestDialogStore } from '../../api/state/saveRequestDialog';
 import { variableSupport } from '../../api/state/variableCompletion';
 import { useVariableSetStore } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -70,6 +71,7 @@ const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
+const saveRequestDialogStore = useSaveRequestDialogStore();
 const copyAsCurlStore = useCopyAsCurlStore();
 const variableSetStore = useVariableSetStore();
 const cookiesStore = useCookiesStore();
@@ -206,7 +208,7 @@ const { onSave } = useRequestTabSave({
   name: () => props.tab.state.name || title.value,
   toSaved: () => toSavedRequest(props.tab.state),
   save: (itemId, name, body) => collectionsStore.saveRequest(itemId, name, body),
-  openSaveDialog: (tabId, name, body) => collectionsStore.openSaveDialog(tabId, name, body),
+  openSaveDialog: (tabId, name, body) => saveRequestDialogStore.openSaveDialog(tabId, name, body),
 });
 
 function onSend(): void {

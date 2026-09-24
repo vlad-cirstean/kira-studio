@@ -19,6 +19,7 @@ import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useCollectionsStore } from '../../api/state/collections';
+import { useSaveRequestDialogStore } from '../../api/state/saveRequestDialog';
 import {
   variableCompletionSource,
   variableHoverSource,
@@ -43,6 +44,7 @@ import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './stat
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
 const collectionsStore = useCollectionsStore();
+const saveRequestDialogStore = useSaveRequestDialogStore();
 const variableSetStore = useVariableSetStore();
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
@@ -163,7 +165,8 @@ const { onSave } = useRequestTabSave({
   name: () => props.tab.state.name || title.value,
   toSaved: () => toSavedGrpcRequest(props.tab.state),
   save: (itemId, name, body) => collectionsStore.saveGrpcRequest(itemId, name, body),
-  openSaveDialog: (tabId, name, body) => collectionsStore.openSaveGrpcDialog(tabId, name, body),
+  openSaveDialog: (tabId, name, body) =>
+    saveRequestDialogStore.openSaveGrpcDialog(tabId, name, body),
 });
 
 function onCall(): void {

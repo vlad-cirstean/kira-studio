@@ -21,6 +21,7 @@ import {
   renameGrpcRequestTabs,
   renameVariableSetTabs,
 } from '../tabs';
+import { useSaveRequestDialogStore } from './saveRequestDialog';
 import { useVariableSetStore } from './variables';
 
 // P4 D13: Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
@@ -102,22 +103,10 @@ interface CollectionsState {
 
 // ---- saving a request into a collection (D15) ----
 //
-// Kept in this same store rather than split off: submitSaveDialog reaches deep into the tree's
-// own load/reveal/cache machinery below (state/fakeData.ts's own dialog is genuinely standalone —
-// this one is not), so a split would only trade one store for two stores calling each other for
-// everything that matters.
-
-type SaveDialogPayload =
-  | { protocol: 'http'; request: HttpSavedRequest }
-  | { protocol: 'grpc'; request: GrpcSavedRequest };
-
-interface SaveDialogState {
-  open: boolean;
-  /** The tab being saved. */
-  tabId: string | null;
-  suggestedName: string;
-  payload: SaveDialogPayload | null;
-}
+// The dialog's own open/tabId/suggestedName/payload UI state lives in useSaveRequestDialogStore
+// (P108 F16 — one-store-one-concern). submitSaveDialog stays here: it reaches deep into the
+// tree's own load/reveal/cache machinery below, so a full split would only trade one store for
+// two stores calling each other for everything that matters.
 
 export const useCollectionsStore = defineStore('collections', () => {
   const state = reactive<CollectionsState>({
@@ -141,13 +130,6 @@ export const useCollectionsStore = defineStore('collections', () => {
   function dismissError(): void {
     state.error = null;
   }
-
-  const saveDialog = reactive<SaveDialogState>({
-    open: false,
-    tabId: null,
-    suggestedName: '',
-    payload: null,
-  });
 
   /** Re-reads the whole tree. One call per panel mount (and after every mutation) — the tree is
    *  rows in a local table, so there is nothing to fetch lazily and nothing to be incomplete
@@ -557,39 +539,14 @@ export const useCollectionsStore = defineStore('collections', () => {
     state.renamingKey = null;
   }
 
-  /** Save as… — the request view opens this without importing the dialog component. */
-  function openSaveDialog(tabId: string, suggestedName: string, request: HttpSavedRequest): void {
-    saveDialog.tabId = tabId;
-    saveDialog.suggestedName = suggestedName;
-    saveDialog.payload = { protocol: 'http', request };
-    saveDialog.open = true;
-  }
-
-  /** openSaveDialog's own gRPC sibling (P11 D12). */
-  function openSaveGrpcDialog(
-    tabId: string,
-    suggestedName: string,
-    request: GrpcSavedRequest,
-  ): void {
-    saveDialog.tabId = tabId;
-    saveDialog.suggestedName = suggestedName;
-    saveDialog.payload = { protocol: 'grpc', request };
-    saveDialog.open = true;
-  }
-
-  function closeSaveDialog(): void {
-    saveDialog.open = false;
-    saveDialog.payload = null;
-    saveDialog.tabId = null;
-  }
-
   /** Creates the row, caches it as the tab's saved side, and binds the tab to it. */
   async function submitSaveDialog(
     collectionId: string,
     parentId: string | null,
     name: string,
   ): Promise<void> {
-    const { tabId, payload } = saveDialog;
+    const saveDialogStore = useSaveRequestDialogStore();
+    const { tabId, payload } = saveDialogStore;
     if (!tabId || !payload) return;
 
     try {
@@ -609,7 +566,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         patchGrpcRequestTabState(tabId, { itemId: item.id, name });
         await loadCollections();
         revealItem(collectionId, parentId);
-        closeSaveDialog();
+        saveDialogStore.closeSaveDialog();
         state.error = null;
         return;
       }
@@ -638,7 +595,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       patchHttpRequestTabState(tabId, { itemId: item.id, name });
       await loadCollections();
       revealItem(collectionId, parentId);
-      closeSaveDialog();
+      saveDialogStore.closeSaveDialog();
       state.error = null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
@@ -806,7 +763,6 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   return {
     ...toRefs(state),
-    ...toRefs(saveDialog),
     activeSearchQuery,
     visibleRows,
     initCollections,
@@ -830,9 +786,6 @@ export const useCollectionsStore = defineStore('collections', () => {
     duplicateRow,
     beginRename,
     cancelRename,
-    openSaveDialog,
-    openSaveGrpcDialog,
-    closeSaveDialog,
     submitSaveDialog,
     saveRequest,
     saveGrpcRequest,
