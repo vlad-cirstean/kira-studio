@@ -89,6 +89,30 @@ function plural(n: number, noun: string): string {
       </Tooltip>
     </AlertDescription>
   </Alert>
+  <!-- P108 F10: every tree mutation (create/rename/delete/duplicate/save/import/export) used to
+       let its own failure throw uncaught from a fire-and-forget `void` call — nothing told the
+       user why a row didn't change. `variant="destructive"` mirrors the existing pattern
+       VariableSetView.vue/BulkVariablesEditor.vue already use for their own store-level errors. -->
+  <Alert v-if="collectionsStore.error" variant="destructive" data-testid="collections-error">
+    <AlertDescription class="flex items-start gap-1.5">
+      <div class="report">{{ collectionsStore.error }}</div>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="ml-auto shrink-0"
+            aria-label="Dismiss"
+            data-testid="collections-error-dismiss"
+            @click="collectionsStore.dismissError"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Dismiss</TooltipContent>
+      </Tooltip>
+    </AlertDescription>
+  </Alert>
 </template>
 
 <style scoped>

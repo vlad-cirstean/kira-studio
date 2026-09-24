@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import {
@@ -232,6 +232,22 @@ useEventListener(listEl, 'dragend', onDragEnd);
         </Button>
       </div>
     </div>
+
+    <Alert v-if="variablesStore.error" variant="destructive" data-testid="environments-error">
+      <AlertDescription class="flex items-start gap-1.5">
+        <div class="flex-1">{{ variablesStore.error }}</div>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          class="shrink-0"
+          aria-label="Dismiss"
+          data-testid="environments-error-dismiss"
+          @click="variablesStore.dismissError"
+        >
+          <CodiconIcon name="close" :size="13" />
+        </Button>
+      </AlertDescription>
+    </Alert>
 
     <div ref="listEl" class="p-dialog-body list">
         <div

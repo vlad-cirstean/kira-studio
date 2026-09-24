@@ -30,13 +30,23 @@ import { createRevealExpiry } from './revealExpiry';
 interface VariablesState {
   environments: ApiEnvironment[];
   loaded: boolean;
+  /** P108 F10: an environment CRUD call's own failure message — every mutation below used to let
+   *  this throw uncaught (a fire-and-forget `void` call from EnvironmentsView.vue), so a failed
+   *  create/rename/delete/duplicate/reorder/activate left the row exactly as it was with nothing
+   *  telling the user why. Cleared on the next successful mutation. */
+  error: string | null;
 }
 
 export const useVariablesStore = defineStore('variables', () => {
   const state = reactive<VariablesState>({
     environments: [],
     loaded: false,
+    error: null,
   });
+
+  function dismissError(): void {
+    state.error = null;
+  }
 
   /** D3: the app-global selection, or null when none is active ("No environment"). */
   const activeEnvironment = computed<ApiEnvironment | null>(
@@ -78,8 +88,13 @@ export const useVariablesStore = defineStore('variables', () => {
 
   /** id: '' selects "No environment" (D3). */
   async function setActiveEnvironment(id: string): Promise<void> {
-    await control.variablesSetActiveEnvironment(id);
-    await loadEnvironments();
+    try {
+      await control.variablesSetActiveEnvironment(id);
+      await loadEnvironments();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   // ---- P71 §3.3: the per-tab environment override ----
@@ -122,10 +137,16 @@ export const useVariablesStore = defineStore('variables', () => {
     name: string,
     description = '',
     color: PaletteColor = 'none',
-  ): Promise<ApiEnvironment> {
-    const env = await control.variablesCreateEnvironment(name, description, color);
-    await loadEnvironments();
-    return env;
+  ): Promise<ApiEnvironment | undefined> {
+    try {
+      const env = await control.variablesCreateEnvironment(name, description, color);
+      await loadEnvironments();
+      state.error = null;
+      return env;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return undefined;
+    }
   }
 
   /** P17 D14/P18 D19: replaces renameEnvironment — renaming, describing and colouring an
@@ -137,37 +158,53 @@ export const useVariablesStore = defineStore('variables', () => {
     description: string,
     color: PaletteColor = 'none',
   ): Promise<void> {
-    await control.variablesUpdateEnvironment(id, name, description, color);
-    renameVariableSetTabs('environment', id, name);
-    await loadEnvironments();
+    try {
+      await control.variablesUpdateEnvironment(id, name, description, color);
+      renameVariableSetTabs('environment', id, name);
+      await loadEnvironments();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   /** Deleting the active environment leaves none active (D3) — there is nothing to reassign.
    *  Closes any open variable-set tab for it too (D16) — unlike a request tab, it has no state of
    *  its own worth preserving once its owner is gone. */
   async function deleteEnvironment(id: string): Promise<void> {
-    await control.variablesDeleteEnvironment(id);
-    closeVariableSetTabsForOwner('environment', id);
-    // P108 F9: an incognito tab's own override (above) is never cleared by anything else — left in
-    // place, it kept substituting the deleted environment's plain values in stage 1 while Go
-    // resolved no secrets for the (now missing) environment id, and the selector showed nothing
-    // selected while send still used the stale pick. Falling back drops it back to the app-wide
-    // selection, same as a non-incognito tab already reads once this environment is gone.
-    for (const [tabId, envId] of incognitoEnvByTab) {
-      if (envId === id) incognitoEnvByTab.delete(tabId);
+    try {
+      await control.variablesDeleteEnvironment(id);
+      closeVariableSetTabsForOwner('environment', id);
+      // P108 F9: an incognito tab's own override (above) is never cleared by anything else — left
+      // in place, it kept substituting the deleted environment's plain values in stage 1 while Go
+      // resolved no secrets for the (now missing) environment id, and the selector showed nothing
+      // selected while send still used the stale pick. Falling back drops it back to the app-wide
+      // selection, same as a non-incognito tab already reads once this environment is gone.
+      for (const [tabId, envId] of incognitoEnvByTab) {
+        if (envId === id) incognitoEnvByTab.delete(tabId);
+      }
+      // listCache's own eviction (useVariableSetStore) — nothing else ever drops a deleted owner's
+      // cached rows, so a later ensureVariablesLoaded('environment', id) call (a stale watch, a
+      // reused id) would otherwise keep reading them back forever.
+      useVariableSetStore().evictListCache('environment', id);
+      await loadEnvironments();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
     }
-    // listCache's own eviction (useVariableSetStore) — nothing else ever drops a deleted owner's
-    // cached rows, so a later ensureVariablesLoaded('environment', id) call (a stale watch, a
-    // reused id) would otherwise keep reading them back forever.
-    useVariableSetStore().evictListCache('environment', id);
-    await loadEnvironments();
   }
 
   /** P17 D17/item 4: a raw-ciphertext duplicate — no history copied, never active. */
-  async function duplicateEnvironment(id: string): Promise<ApiEnvironment> {
-    const env = await control.variablesDuplicateEnvironment(id);
-    await loadEnvironments();
-    return env;
+  async function duplicateEnvironment(id: string): Promise<ApiEnvironment | undefined> {
+    try {
+      const env = await control.variablesDuplicateEnvironment(id);
+      await loadEnvironments();
+      state.error = null;
+      return env;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return undefined;
+    }
   }
 
   // ---- the environments surface (D3/D11, re-homed to a tab by P28 D16(c)) ----
@@ -183,8 +220,13 @@ export const useVariablesStore = defineStore('variables', () => {
   }
 
   async function reorderEnvironmentsList(ids: string[]): Promise<void> {
-    await control.variablesReorderEnvironments(ids);
-    await loadEnvironments();
+    try {
+      await control.variablesReorderEnvironments(ids);
+      await loadEnvironments();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   return {
@@ -192,6 +234,7 @@ export const useVariablesStore = defineStore('variables', () => {
     activeEnvironment,
     activeEnvironmentId,
     activeEnvironmentColor,
+    dismissError,
     initVariables,
     setActiveEnvironment,
     environmentIdForTab,
@@ -388,6 +431,13 @@ export const useVariableSetStore = defineStore('variableSet', () => {
    *  one it sends; every other caller here (restoreHistoryEntry) always has a real value in hand.
    *  Re-lists afterward — the same "one call, always correct" discipline http/state/collections.ts's
    *  own mutations use. */
+  /** P108 F10: this (and deleteVariable/reorderVariables below) used to let a failed IPC call
+   *  throw uncaught — VariableSetView.vue's own call sites (commitDraft, row delete, drag/keyboard
+   *  reorder) have no try/catch of their own, so a rejected edit vanished with nothing telling the
+   *  user why the row snapped back. Reuses the tab's own `variableSetError`/setVariableSetError —
+   *  already wired to an `Alert` in VariableSetView.vue for reveal failures — rather than inventing
+   *  a second error channel. applyBulkVariables is deliberately left alone: its one call site
+   *  (BulkVariablesEditor.vue's onApply) already has its own try/catch and local error display. */
   async function upsertVariable(
     tabId: string,
     scope: VariableScope,
@@ -400,8 +450,13 @@ export const useVariableSetStore = defineStore('variableSet', () => {
       description?: string;
     },
   ): Promise<void> {
-    await control.variablesUpsert({ scope, ownerId, ...args });
-    await loadVariableSetRows(tabId, scope, ownerId);
+    try {
+      await control.variablesUpsert({ scope, ownerId, ...args });
+      await loadVariableSetRows(tabId, scope, ownerId);
+      setVariableSetError(tabId, null);
+    } catch (err) {
+      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function deleteVariable(
@@ -410,8 +465,13 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     ownerId: string,
     id: string,
   ): Promise<void> {
-    await control.variablesDelete(id);
-    await loadVariableSetRows(tabId, scope, ownerId);
+    try {
+      await control.variablesDelete(id);
+      await loadVariableSetRows(tabId, scope, ownerId);
+      setVariableSetError(tabId, null);
+    } catch (err) {
+      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+    }
   }
 
   /** D14: the full new order, in full — ConnectionsService.Reorder's own shape. */
@@ -421,8 +481,13 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     ownerId: string,
     ids: string[],
   ): Promise<void> {
-    await control.variablesReorder(scope, ownerId, ids);
-    await loadVariableSetRows(tabId, scope, ownerId);
+    try {
+      await control.variablesReorder(scope, ownerId, ids);
+      await loadVariableSetRows(tabId, scope, ownerId);
+      setVariableSetError(tabId, null);
+    } catch (err) {
+      setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
+    }
   }
 
   /** P17 D21-D23/item 5: applies a parsed `.env` entry list atomically (VariablesRepo.ApplyBulk),

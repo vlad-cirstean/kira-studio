@@ -93,6 +93,11 @@ interface CollectionsState {
    *  least one, shown alongside the import report strip. */
   exportWarning: string | null;
   loaded: boolean;
+  /** P108 F10: a tree mutation's (create/rename/delete/duplicate/save/import/export) own failure
+   *  message — every one of them used to let this throw uncaught from a fire-and-forget `void`
+   *  call in CollectionsPanel.vue/CollectionsTree.vue, so a failed write left the row exactly as it
+   *  was with nothing telling the user why. Cleared on the next attempt that succeeds. */
+  error: string | null;
 }
 
 // ---- saving a request into a collection (D15) ----
@@ -130,7 +135,12 @@ export const useCollectionsStore = defineStore('collections', () => {
     report: null,
     exportWarning: null,
     loaded: false,
+    error: null,
   });
+
+  function dismissError(): void {
+    state.error = null;
+  }
 
   const saveDialog = reactive<SaveDialogState>({
     open: false,
@@ -365,11 +375,16 @@ export const useCollectionsStore = defineStore('collections', () => {
   // VS Code's own explorer behaviour, which is the tree this panel is modelled on.
 
   async function createCollection(): Promise<void> {
-    const collection = await control.collectionsCreateCollection('New collection');
-    await loadCollections();
-    const key = collectionKey(collection.id);
-    state.selected = key;
-    state.renamingKey = key;
+    try {
+      const collection = await control.collectionsCreateCollection('New collection');
+      await loadCollections();
+      const key = collectionKey(collection.id);
+      state.selected = key;
+      state.renamingKey = key;
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   async function createItem(
@@ -377,44 +392,59 @@ export const useCollectionsStore = defineStore('collections', () => {
     parentId: string | null,
     kind: CollectionItemKind,
   ): Promise<void> {
-    const item = await control.collectionsCreateItem({
-      collectionId,
-      parentId,
-      kind,
-      name: kind === 'folder' ? 'New folder' : 'New request',
-    });
-    await loadCollections();
-    revealItem(collectionId, parentId);
-    const key = itemKey(item.id);
-    state.selected = key;
-    state.renamingKey = key;
+    try {
+      const item = await control.collectionsCreateItem({
+        collectionId,
+        parentId,
+        kind,
+        name: kind === 'folder' ? 'New folder' : 'New request',
+      });
+      await loadCollections();
+      revealItem(collectionId, parentId);
+      const key = itemKey(item.id);
+      state.selected = key;
+      state.renamingKey = key;
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   /** createItem's own gRPC sibling (P11 D12) — always a request, never a folder. */
   async function createGrpcItem(collectionId: string, parentId: string | null): Promise<void> {
-    const item = await control.collectionsCreateGrpcItem({
-      collectionId,
-      parentId,
-      name: 'New gRPC request',
-    });
-    await loadCollections();
-    revealItem(collectionId, parentId);
-    const key = itemKey(item.id);
-    state.selected = key;
-    state.renamingKey = key;
+    try {
+      const item = await control.collectionsCreateGrpcItem({
+        collectionId,
+        parentId,
+        name: 'New gRPC request',
+      });
+      await loadCollections();
+      revealItem(collectionId, parentId);
+      const key = itemKey(item.id);
+      state.selected = key;
+      state.renamingKey = key;
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   async function renameRow(row: CollectionRowVm, name: string): Promise<void> {
     state.renamingKey = null;
-    const target = row.kind === 'collection' ? 'collection' : 'item';
-    await control.collectionsRename(row.id, target, name);
-    // Every tab bound to this row follows immediately, so the view header and the tab strip never
-    // disagree with the tree (D14).
-    if (row.kind === 'request' && row.protocol === 'grpc') renameGrpcRequestTabs(row.id, name);
-    else if (row.kind === 'request') renameApiRequestTabs(row.id, name);
-    // P17 D16: a collection's own variable-set tab follows a rename too.
-    else if (row.kind === 'collection') renameVariableSetTabs('collection', row.id, name);
-    await loadCollections();
+    try {
+      const target = row.kind === 'collection' ? 'collection' : 'item';
+      await control.collectionsRename(row.id, target, name);
+      // Every tab bound to this row follows immediately, so the view header and the tab strip
+      // never disagree with the tree (D14).
+      if (row.kind === 'request' && row.protocol === 'grpc') renameGrpcRequestTabs(row.id, name);
+      else if (row.kind === 'request') renameApiRequestTabs(row.id, name);
+      // P17 D16: a collection's own variable-set tab follows a rename too.
+      else if (row.kind === 'collection') renameVariableSetTabs('collection', row.id, name);
+      await loadCollections();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   /** P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
@@ -446,65 +476,76 @@ export const useCollectionsStore = defineStore('collections', () => {
   async function deleteRow(row: CollectionRowVm): Promise<void> {
     const target = row.kind === 'collection' ? 'collection' : 'item';
     const orphaned = subtreeItemIds(row);
-    await control.collectionsDelete(row.id, target);
-    // Deleting a request does **not** close its open tabs (D14's orphan rule): a tab is an editing
-    // surface with its own persisted state, and silently closing one because a tree row went away
-    // would lose work. Its cached saved request goes, though, so the tab reads as unsaved — and
-    // (finding 4) so does every *descendant* request's cache entry a folder/collection delete just
-    // cascaded away, so `savedRequestFor` correctly reports null for all of them instead of a stale
-    // entry that `onSave` would fail against with no visible error.
-    for (const id of orphaned) {
-      delete state.requests[id];
-      delete state.grpcRequests[id];
-      // P108 F4: known-gone rather than merely uncached — spares any still-open tab's own
-      // ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest round trip that would only
-      // reach the same conclusion via a caught error.
-      state.orphanRequests[id] = true;
-      state.orphanGrpcRequests[id] = true;
+    try {
+      await control.collectionsDelete(row.id, target);
+      // Deleting a request does **not** close its open tabs (D14's orphan rule): a tab is an
+      // editing surface with its own persisted state, and silently closing one because a tree row
+      // went away would lose work. Its cached saved request goes, though, so the tab reads as
+      // unsaved — and (finding 4) so does every *descendant* request's cache entry a
+      // folder/collection delete just cascaded away, so `savedRequestFor` correctly reports null
+      // for all of them instead of a stale entry that `onSave` would fail against with no visible
+      // error.
+      for (const id of orphaned) {
+        delete state.requests[id];
+        delete state.grpcRequests[id];
+        // P108 F4: known-gone rather than merely uncached — spares any still-open tab's own
+        // ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest round trip that would only
+        // reach the same conclusion via a caught error.
+        state.orphanRequests[id] = true;
+        state.orphanGrpcRequests[id] = true;
+      }
+      // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
+      // once its owner (the collection) is gone — deleting it closes any open tab for it.
+      if (row.kind === 'collection') {
+        closeVariableSetTabsForOwner('collection', row.id);
+        // P108 F9: listCache's own eviction — nothing else ever drops a deleted collection's
+        // cached variable rows, so a later ensureVariablesLoaded('collection', row.id) call (a
+        // stale watch, a reused id) would otherwise keep reading them back forever.
+        useVariableSetStore().evictListCache('collection', row.id);
+      }
+      if (state.selected === row.key) state.selected = null;
+      await loadCollections();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
     }
-    // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
-    // once its owner (the collection) is gone — deleting it closes any open tab for it.
-    if (row.kind === 'collection') {
-      closeVariableSetTabsForOwner('collection', row.id);
-      // P108 F9: listCache's own eviction — nothing else ever drops a deleted collection's cached
-      // variable rows, so a later ensureVariablesLoaded('collection', row.id) call (a stale watch,
-      // a reused id) would otherwise keep reading them back forever.
-      useVariableSetStore().evictListCache('collection', row.id);
-    }
-    if (state.selected === row.key) state.selected = null;
-    await loadCollections();
   }
 
   /** Duplicating a folder or a request copies the row itself, not its subtree — moving and
    *  reordering are D18/§8 OQ-9's, and a deep copy would need both. */
   async function duplicateRow(row: CollectionRowVm): Promise<void> {
     const name = `${row.name} copy`;
-    if (row.kind === 'folder') {
-      await control.collectionsCreateItem({
-        collectionId: row.collectionId,
-        parentId: row.parentId,
-        kind: 'folder',
-        name,
-      });
-    } else if (row.protocol === 'grpc') {
-      const saved = await fetchSavedGrpcRequest(row.id);
-      await control.collectionsCreateGrpcItem({
-        collectionId: row.collectionId,
-        parentId: row.parentId,
-        name,
-        request: saved,
-      });
-    } else {
-      const saved = await fetchSavedRequest(row.id);
-      await control.collectionsCreateItem({
-        collectionId: row.collectionId,
-        parentId: row.parentId,
-        kind: 'request',
-        name,
-        request: saved,
-      });
+    try {
+      if (row.kind === 'folder') {
+        await control.collectionsCreateItem({
+          collectionId: row.collectionId,
+          parentId: row.parentId,
+          kind: 'folder',
+          name,
+        });
+      } else if (row.protocol === 'grpc') {
+        const saved = await fetchSavedGrpcRequest(row.id);
+        await control.collectionsCreateGrpcItem({
+          collectionId: row.collectionId,
+          parentId: row.parentId,
+          name,
+          request: saved,
+        });
+      } else {
+        const saved = await fetchSavedRequest(row.id);
+        await control.collectionsCreateItem({
+          collectionId: row.collectionId,
+          parentId: row.parentId,
+          kind: 'request',
+          name,
+          request: saved,
+        });
+      }
+      await loadCollections();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
     }
-    await loadCollections();
   }
 
   function beginRename(row: CollectionRowVm): void {
@@ -551,51 +592,57 @@ export const useCollectionsStore = defineStore('collections', () => {
     const { tabId, payload } = saveDialog;
     if (!tabId || !payload) return;
 
-    if (payload.protocol === 'grpc') {
-      const item = await control.collectionsCreateGrpcItem({
+    try {
+      if (payload.protocol === 'grpc') {
+        const item = await control.collectionsCreateGrpcItem({
+          collectionId,
+          parentId,
+          name,
+          request: payload.request,
+        });
+        state.grpcRequests[item.id] = payload.request;
+        try {
+          await control.grpcHistoryAdopt(tabId, item.id);
+        } catch (err) {
+          console.warn('adopting grpc call history into the saved request failed', err);
+        }
+        patchGrpcRequestTabState(tabId, { itemId: item.id, name });
+        await loadCollections();
+        revealItem(collectionId, parentId);
+        closeSaveDialog();
+        state.error = null;
+        return;
+      }
+
+      const item = await control.collectionsCreateItem({
         collectionId,
         parentId,
+        kind: 'request',
         name,
         request: payload.request,
       });
-      state.grpcRequests[item.id] = payload.request;
+      state.requests[item.id] = payload.request;
+      // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
+      // itemId is patched below. Best-effort, the same posture D2's own Go-side Record call takes
+      // — Save as… itself must succeed regardless of whether adopting its history did.
+      // ResponsePane.vue's own watch on tab.state.itemId is what refetches the list under the new
+      // scope once the patch below actually lands (http/** may not import views/**, so the
+      // refetch can't be triggered from here).
       try {
-        await control.grpcHistoryAdopt(tabId, item.id);
+        await control.historyAdopt(tabId, item.id);
       } catch (err) {
-        console.warn('adopting grpc call history into the saved request failed', err);
+        console.warn('adopting response history into the saved request failed', err);
       }
-      patchGrpcRequestTabState(tabId, { itemId: item.id, name });
+      // The tab is now bound to a real row, so its title becomes the saved name and Save stops
+      // falling back to Save as…
+      patchHttpRequestTabState(tabId, { itemId: item.id, name });
       await loadCollections();
       revealItem(collectionId, parentId);
       closeSaveDialog();
-      return;
-    }
-
-    const item = await control.collectionsCreateItem({
-      collectionId,
-      parentId,
-      kind: 'request',
-      name,
-      request: payload.request,
-    });
-    state.requests[item.id] = payload.request;
-    // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
-    // itemId is patched below. Best-effort, the same posture D2's own Go-side Record call takes —
-    // Save as… itself must succeed regardless of whether adopting its history did.
-    // ResponsePane.vue's own watch on tab.state.itemId is what refetches the list under the new
-    // scope once the patch below actually lands (http/** may not import views/**, so the refetch
-    // can't be triggered from here).
-    try {
-      await control.historyAdopt(tabId, item.id);
+      state.error = null;
     } catch (err) {
-      console.warn('adopting response history into the saved request failed', err);
+      state.error = err instanceof Error ? err.message : String(err);
     }
-    // The tab is now bound to a real row, so its title becomes the saved name and Save stops
-    // falling back to Save as…
-    patchHttpRequestTabState(tabId, { itemId: item.id, name });
-    await loadCollections();
-    revealItem(collectionId, parentId);
-    closeSaveDialog();
   }
 
   /** Save — writes an already-bound request back to its own row. */
@@ -604,11 +651,16 @@ export const useCollectionsStore = defineStore('collections', () => {
     name: string,
     request: HttpSavedRequest,
   ): Promise<void> {
-    await control.collectionsSaveRequest(itemId, name, request);
-    // The cache is the dirty comparison's saved side, so it must move in step with the write or the
-    // mark would stay lit after a successful save.
-    state.requests[itemId] = request;
-    await loadCollections();
+    try {
+      await control.collectionsSaveRequest(itemId, name, request);
+      // The cache is the dirty comparison's saved side, so it must move in step with the write or
+      // the mark would stay lit after a successful save.
+      state.requests[itemId] = request;
+      await loadCollections();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   /** saveRequest's own gRPC sibling. */
@@ -617,9 +669,14 @@ export const useCollectionsStore = defineStore('collections', () => {
     name: string,
     request: GrpcSavedRequest,
   ): Promise<void> {
-    await control.collectionsSaveGrpcRequest(itemId, name, request);
-    state.grpcRequests[itemId] = request;
-    await loadCollections();
+    try {
+      await control.collectionsSaveGrpcRequest(itemId, name, request);
+      state.grpcRequests[itemId] = request;
+      await loadCollections();
+      state.error = null;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   // ---- import (D11/D12) ----
@@ -643,14 +700,24 @@ export const useCollectionsStore = defineStore('collections', () => {
     // the op log — that machinery is per tab (ViewChrome + useRunState) and an import started from
     // the left panel has no tab, so a row there would buy nothing the user is looking at.
     state.busy = true;
+    state.error = null;
     try {
       const report = await control.collectionsImport(chosen.file.path);
       state.report = { ...report, warnings: report.warnings ?? [] };
-      await loadCollections();
       state.expanded.add(collectionKey(report.collectionId));
       state.selected = collectionKey(report.collectionId);
       return true;
+    } catch (err) {
+      // P108 F10: this used to let the error propagate uncaught, and (since it ran only in the
+      // try's success path) never reloaded the tree on failure either — a partially-applied import
+      // (Go's own import is not one transaction; some rows can land before a later one fails) left
+      // the panel showing the pre-import tree until something else happened to reload it.
+      state.error = err instanceof Error ? err.message : String(err);
+      return false;
     } finally {
+      // Always reloads, success or failure (P108 F10), before clearing `busy` — a partial import's
+      // rows must be visible immediately, not just after the next unrelated refresh.
+      await loadCollections();
       state.busy = false;
     }
   }
@@ -675,6 +742,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     const chosen = await control.filesChooseSave(`${name}.postman_collection.json`);
     if (chosen.canceled || !chosen.filePath) return false;
     state.busy = true;
+    state.error = null;
     try {
       const report = await control.collectionsExport(collectionId, chosen.filePath);
       state.exportWarning =
@@ -682,6 +750,9 @@ export const useCollectionsStore = defineStore('collections', () => {
           ? `${report.secretCount} secret value${report.secretCount === 1 ? ' was' : 's were'} not written to the file.`
           : null;
       return true;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return false;
     } finally {
       state.busy = false;
     }
@@ -756,6 +827,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     importCollection,
     dismissReport,
     dismissExportWarning,
+    dismissError,
     exportCollection,
     itemRecord,
     collectionIdFor,
