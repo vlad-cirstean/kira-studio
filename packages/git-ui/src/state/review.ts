@@ -96,6 +96,13 @@ export class ReviewSessionState {
   #resolveController: AbortController | undefined;
   #streamController: AbortController | undefined;
   #loadController: AbortController | undefined;
+  #checkController: AbortController | undefined;
+  /** F8: bumped by every `setTarget`/`setBase`/`dispose` (`swapBaseAndBranch` bumps it twice,
+   *  transitively, since it calls both) — `#checkForChange`'s own session-identity guard,
+   *  alongside `resolution`'s object identity below. A background re-resolve started before one
+   *  of those landed must never apply (or even flag a banner for) a comparison the user has
+   *  already moved past. */
+  #sessionGeneration = 0;
   /** The base actually in effect — `undefined` until a `ready`/`unrelated`/`empty` resolution
    *  lands (never set while `reason: "none"`, since there is no base at all then). Distinct
    *  from `resolution.value.base` only in that this is what `loadMore`/re-open/the background
@@ -141,6 +148,7 @@ export class ReviewSessionState {
    *  "how the view learns which branch to review" arms (D40): a cold bootstrap target, a
    *  `review.target` push, and the palette's own branch picker once it has one to hand over. */
   async setTarget(repoId: string, branch: string): Promise<void> {
+    this.#sessionGeneration++;
     this.#abortAll();
     this.#clearExpansions();
     this.#packed.reset();
@@ -199,9 +207,11 @@ export class ReviewSessionState {
     const repoId = this.repoId.value;
     const branch = this.branch.value;
     if (!repoId || !branch) return;
+    this.#sessionGeneration++;
     this.#resolveController?.abort();
     this.#streamController?.abort();
     this.#loadController?.abort();
+    this.#checkController?.abort();
     this.#clearExpansions();
     this.#packed.reset();
     this.resolveError.value = undefined;
@@ -397,21 +407,36 @@ export class ReviewSessionState {
     const branch = this.branch.value;
     const current = this.resolution.value;
     if (!repoId || !branch || !current) return;
+    // F8: a real setTarget/setBase (a user picking a different base than the one this check
+    // started against) landing while this request is in flight must never have its OWN resolve's
+    // fresh-but-now-stale result flag a banner for, or (via a since-superseded #pendingResolution)
+    // silently apply on click, a comparison the user has already moved past. The session token
+    // catches "the target/base changed"; `current`'s own object identity is the narrower guard —
+    // `setBase` reassigns `resolution.value` to a NEW object on the SAME repoId/branch, which the
+    // token alone already covers, but checking identity too costs nothing and matches this
+    // class's own "supersede and verify" discipline (the class doc comment) exactly.
+    const generation = this.#sessionGeneration;
+    this.#checkController?.abort();
+    const controller = new AbortController();
+    this.#checkController = controller;
     try {
-      const fresh = await this.#bridge.request('review.resolveBase', {
-        repoId,
-        branch,
-        ...(this.#base !== undefined ? { base: this.#base } : {}),
-      });
-      // Superseded by a real setTarget/setBase (or another background check) while this one
-      // was in flight — the newer call's own resolution already reflects reality.
+      const fresh = await this.#bridge.request(
+        'review.resolveBase',
+        { repoId, branch, ...(this.#base !== undefined ? { base: this.#base } : {}) },
+        controller.signal,
+      );
+      if (generation !== this.#sessionGeneration) return;
+      if (this.resolution.value !== current) return;
       if (this.repoId.value !== repoId || this.branch.value !== branch) return;
       if (!resolutionsDiffer(current, fresh)) return;
       this.#pendingResolution = fresh;
       this.staleReview.value = true;
-    } catch {
+    } catch (error) {
+      if (error instanceof TransportError && error.code === 'cancelled') return;
       // A background check nobody asked for failing is not itself surfaced — the view stays
       // exactly as it was, silently, until the next `refsChanged` tries again.
+    } finally {
+      if (this.#checkController === controller) this.#checkController = undefined;
     }
   }
 
@@ -460,9 +485,11 @@ export class ReviewSessionState {
     this.#resolveController?.abort();
     this.#streamController?.abort();
     this.#loadController?.abort();
+    this.#checkController?.abort();
   }
 
   dispose(): void {
+    this.#sessionGeneration++;
     this.#abortAll();
     this.#clearExpansions();
     this.#unsubscribeChanged();
