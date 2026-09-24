@@ -21,7 +21,7 @@ import { createPageNavigation } from '../shared/page/navigation';
 import type { Selection } from '../shared/slick/selection';
 import { beginOp, createRuntimeStore, runPagedCount } from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
-import { setPage } from './page';
+import { getPage, setPage } from './page';
 import { usePendingChangesStore } from './pendingChanges';
 
 // P19 D7: the type itself moved to views/shared/slick/selection.ts (the file that already owns
@@ -236,6 +236,22 @@ export const useGridViewStore = defineStore('gridView', () => {
     if (!tab?.connectionId) return;
     await data.invalidate(tab.connectionId, tab.path, 'pages');
     await load(tabId, { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize });
+    // F12 (P108 Part 10): a commit that deletes every row on the current page left this reload
+    // showing an empty grid still labelled page N — nothing else corrects it (goLast/the count
+    // chip both still read the pre-delete total until a fresh count runs). Step back one page,
+    // same as a manual Previous click, when the reload above came back empty.
+    const reloadedTab = useTabsStore().findDataTab(tabId);
+    const reloadedPage = getPage(tabId);
+    if (
+      reloadedPage &&
+      reloadedPage.rowCount === 0 &&
+      reloadedTab &&
+      reloadedTab.state.pageIndex > 0
+    ) {
+      const prevIndex = reloadedTab.state.pageIndex - 1;
+      useTabsStore().patchDataTabState(tabId, { pageIndex: prevIndex });
+      await load(tabId, { mode: 'offset', offset: prevIndex * tab.state.pageSize });
+    }
     // §7's "immediately marked stale" needs the toolbar's own `rt.count` mirror to pick up the
     // server-side mark, which nothing else here does. `rt.count?.stale` is still false at this
     // point, so runCount's own `refresh` flag stays false too — this reads the now-stale L3 entry
