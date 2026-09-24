@@ -20,6 +20,7 @@ import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
+import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
@@ -78,12 +79,16 @@ const runStateLabel = computed(() => {
 
 onMounted(() => {
   collectionsStore.initCollections();
-  // P112: no environments init call left here — useVariablesStore's own app-lifetime query
-  // observer fetches the list on store creation.
-  void variableSetStore.loadVariableSetRows(props.tab.id, scope.value, ownerId.value);
+  // P112: no environments/variables init call left here — useVariablesStore's own app-lifetime
+  // query observer fetches the environments list on store creation, and rowsQuery below (a
+  // useVariableRows observer) fetches this tab's own scope on creation the same way.
 });
 
-const rows = computed<ApiVariable[]>(() => variableSetStore.variableSetRows(props.tab.id));
+// P112: the scope is fixed per tab (VariableSetTabRecord never changes it), so this observer is
+// created once, for `ownerId`'s own live value (a rename never changes the id, but a future
+// re-target would still be tracked correctly).
+const rowsQuery = useVariableRows(scope.value, ownerId);
+const rows = computed<ApiVariable[]>(() => rowsQuery.data.value ?? []);
 const error = computed(() => variableSetStore.variableSetError(props.tab.id));
 
 // ---- environment scope only: name + description + Duplicate (D16/D17) ----
@@ -392,11 +397,12 @@ async function onRemove(id: string): Promise<void> {
 // shape — the scroller is `.p-dialog-body.list` (not `.field-rows-table`), the row class is
 // `.variable-row` (not `.field-row`), and the watched count is `allRealRows` (this view's own
 // real-row list) rather than a `rows` prop. One real difference from FieldRowsTable's own copy:
-// `allRealRows` starts at 0 and is populated *asynchronously* by loadVariableSetRows (a tab's
-// rows prop, by contrast, is already the real count the moment this component mounts) — so the
-// watcher's very first invocation is that initial load resolving, not a user adding a row, and
-// must not scroll a freshly opened set straight to its own bottom. `hasLoadedOnce` distinguishes
-// the two: false for that first invocation only, true for every real add after it.
+// `allRealRows` starts at 0 and is populated *asynchronously* once rowsQuery's own fetch resolves
+// (P112: a useVariableRows observer) — a tab's rows prop, by contrast, is already the real count
+// the moment this component mounts — so the watcher's very first invocation is that initial load
+// resolving, not a user adding a row, and must not scroll a freshly opened set straight to its own
+// bottom. `hasLoadedOnce` distinguishes the two: false for that first invocation only, true for
+// every real add after it.
 const listRef = ref<HTMLElement | null>(null);
 let hasLoadedOnce = false;
 watch(

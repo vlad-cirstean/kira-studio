@@ -10,8 +10,7 @@ import type {
 } from '@shared/domain/http';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
-import { useCollectionsStore } from '../../api/state/collections';
-import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
+import { variablesForSend } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
@@ -167,17 +166,17 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
     rt.opId = opId;
     rt.error = null;
 
-    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-    const environmentId = useVariablesStore().environmentIdForTab(tabId);
-    const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-      collectionId,
-      environmentId,
+    // P112: variablesForSend awaits the tree/environments/variable-row queries (cache-first;
+    // refetches only when a broadcast invalidated them) instead of reading a sync in-store cache.
+    const { collectionId, environmentId, values, secretNames } = await variablesForSend(
+      tabId,
+      tab.state.itemId,
     );
-    // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
-    // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
-    // references a dynamic value pays for a second pass (over a handful of short strings — the
-    // identical computation the live-preview chip already runs on every keystroke, F2) and the one
-    // memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
+    // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour
+    // past this point: no await, no dynamic-generators chunk fetched or parsed. Only a request that
+    // actually references a dynamic value pays for a second pass (over a handful of short strings —
+    // the identical computation the live-preview chip already runs on every keystroke, F2) and the
+    // one memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
     const first = resolveTabState(tab.state, values, secretNames);
     const resolved = first.refs.some((r) => r.kind === 'dynamic')
       ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
@@ -266,12 +265,7 @@ export async function resolveForExport(tabId: string): Promise<ExportResolution 
   const tab = findHttpRequestTab(tabId);
   if (!tab) return null;
 
-  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = useVariablesStore().environmentIdForTab(tabId);
-  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-    collectionId,
-    environmentId,
-  );
+  const { values, secretNames } = await variablesForSend(tabId, tab.state.itemId);
   const first = resolveTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
     ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())

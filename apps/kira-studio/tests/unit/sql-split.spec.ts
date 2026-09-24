@@ -136,3 +136,29 @@ describe('statementAtCursor (P44 F43)', () => {
     expect(statementAtCursor(source, source.length + 50)?.text).toBe('SELECT 3');
   });
 });
+
+// P108 Part 11 F3: a caret right after a statement's own `;`, on the blank line between two
+// statements, or in trailing whitespace at the end of the document, must resolve to the *preceding*
+// statement — that is where the caret lands after typing `;` or pressing End. Boundary arithmetic
+// over statementAtCursor's own range logic, not a restated function body.
+describe('statementAtCursor: caret in whitespace belongs to the preceding statement (P108 Part 11 F3)', () => {
+  const source = 'SELECT 1;\n\nDELETE FROM t;\n';
+  const firstSemicolon = source.indexOf(';');
+  const secondStatementStart = source.indexOf('DELETE');
+
+  test('a caret right after the first `;` stays on the first statement', () => {
+    expect(statementAtCursor(source, firstSemicolon + 1)?.text).toBe('SELECT 1');
+  });
+
+  test('a caret on the blank line between the two statements stays on the first statement', () => {
+    expect(statementAtCursor(source, firstSemicolon + 2)?.text).toBe('SELECT 1');
+  });
+
+  test('a caret at the second statement’s own first character resolves to it', () => {
+    expect(statementAtCursor(source, secondStatementStart)?.text).toBe('DELETE FROM t');
+  });
+
+  test('a caret in trailing whitespace at end of document stays on the last statement', () => {
+    expect(statementAtCursor(source, source.length)?.text).toBe('DELETE FROM t');
+  });
+});

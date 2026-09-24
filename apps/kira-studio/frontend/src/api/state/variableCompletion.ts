@@ -10,15 +10,18 @@ import {
   TRANSFORM_NAMES,
   type TransformName,
 } from '@kira/api-core';
+import type { ApiVariable } from '@shared/domain/variables';
 import type { EditorCompletionSource } from '../../editor/completion';
 import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
 import type { RangeHighlight } from '../../editor/ranges';
 import { type Completion, templateToken } from '../../theme/completion';
-import { useVariableSetStore } from './variables';
+import { mergeVariableRows } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's
-// own finding that mergedValuesAndSecrets is already synchronous, already cached, and already
-// fired on mount/collection/environment change by HttpRequestView.vue. This module builds three
+// own finding that the merged values/secrets were already synchronous, already cached, and already
+// fired on mount/collection/environment change by HttpRequestView.vue (P112: now each request
+// view's own useVariableRows observers, passed straight into variableSupport below). This module
+// builds three
 // pure, DOM-free lookups over that same data for D2/D3's editor seams to call: colouring
 // (rangeHighlights), the hover panel's lines (hoverAt), and the `{{…}}` completion list
 // (candidates). May import @kira/api-core and api/state/variables.ts; may not import
@@ -80,17 +83,12 @@ function badTransformMessage(fullName: string): string {
   return `"${bad ?? ''}" is not a transform — try ${TRANSFORM_NAMES.join(', ')}`;
 }
 
-/** Which scope a resolved name came from, for the hover's second line (D4) — re-reads
- *  `cachedVariables('environment', …)` to test membership rather than widening
- *  `mergedValuesAndSecrets` with a parallel `origin` map: the one call site that needs this is
- *  here, and widening a store function `send()` depends on for a tooltip caption is the wrong
- *  direction of dependency. */
-function scopeOf(name: string, environmentId: string): 'collection' | 'environment' {
-  return useVariableSetStore()
-    .cachedVariables('environment', environmentId)
-    .some((v) => v.name === name)
-    ? 'environment'
-    : 'collection';
+/** Which scope a resolved name came from, for the hover's second line (D4) — tests membership in
+ *  the caller's own environment rows directly rather than widening `mergeVariableRows` with a
+ *  parallel `origin` map: the one call site that needs this is here, and widening a function
+ *  `send()` also depends on for a tooltip caption is the wrong direction of dependency. */
+function scopeOf(name: string, environmentRows: ApiVariable[]): 'collection' | 'environment' {
+  return environmentRows.some((v) => v.name === name) ? 'environment' : 'collection';
 }
 
 export interface VariableSupport {
@@ -137,11 +135,11 @@ function isAfterPipe(text: string, from: number): boolean {
   return before.indexOf('|', open) !== -1;
 }
 
-export function variableSupport(collectionId: string, environmentId: string): VariableSupport {
-  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-    collectionId,
-    environmentId,
-  );
+export function variableSupport(
+  collectionRows: ApiVariable[],
+  environmentRows: ApiVariable[],
+): VariableSupport {
+  const { values, secretNames } = mergeVariableRows(collectionRows, environmentRows);
 
   function rangeHighlights(doc: string): readonly RangeHighlight[] {
     return splitTemplateSpans(doc)
@@ -181,7 +179,7 @@ export function variableSupport(collectionId: string, environmentId: string): Va
             : formatted;
         return {
           value: truncated,
-          lines: [`${scopeOf(span.name, environmentId)} variable`, ...chainLine],
+          lines: [`${scopeOf(span.name, environmentRows)} variable`, ...chainLine],
         };
       }
       case 'deferred':

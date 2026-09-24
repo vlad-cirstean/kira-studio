@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { EditorLanguageId } from '@shared/domain/editor';
-import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
+import { splitSqlStatements, statementAtCursor, statementAtOffset } from '@shared/domain/sql-split';
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -223,12 +223,11 @@ const splitStatementsForText = computed(() => {
 // move, so it must stay cheap regardless of document size.
 const statementAtCursorText = computed<string | undefined>(() => {
   if (dialect.value === undefined) return undefined;
-  const statements = splitStatementsForText.value;
-  const cursor = cursorPos.value;
-  for (const s of statements) {
-    if (cursor >= s.start && cursor <= s.end) return s.text;
-  }
-  return statements[statements.length - 1]?.text;
+  // P108 Part 11 F3: shares statementAtCursor's own boundary rule (sql-split.ts) rather than
+  // duplicating it — a caret right after a statement's `;`, or on the blank line before the next
+  // one, must resolve to the preceding statement here exactly as it does for Run statement/Explain.
+  return statementAtOffset(splitStatementsForText.value, props.tab.state.text, cursorPos.value)
+    ?.text;
 });
 // D12: disabled-with-tooltip, not hidden — Explain applies to this *console*, just not to this
 // statement, which is a state (like the format button's own disabled-on-empty-text), not a

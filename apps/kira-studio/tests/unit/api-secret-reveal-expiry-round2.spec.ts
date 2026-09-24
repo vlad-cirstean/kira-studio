@@ -19,6 +19,7 @@ const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { useVariableSetStore } = await import('../../frontend/src/api/state/variables');
 const { useCopyAsCurlStore } = await import('../../frontend/src/api/state/curl');
+const { loadVariableRows } = await import('../../frontend/src/api/state/apiQueries');
 
 const variableSetStore = useVariableSetStore();
 const copyAsCurlStore = useCopyAsCurlStore();
@@ -84,7 +85,8 @@ describe('Copy-as-curl revealed secret grace-window expiry (round 2 finding 5)',
     (control as unknown as { variablesReveal: typeof control.variablesReveal }).variablesReveal =
       async () => ({ outcome: 'revealed', value: 'sk_live_curl_secret', error: null });
 
-    await variableSetStore.ensureVariablesLoaded('environment', 'env-curl-1');
+    // P112: ensureVariablesLoaded is gone — loadVariableRows (cache-first) seeds the same row.
+    await loadVariableRows('environment', 'env-curl-1');
 
     copyAsCurlStore.openCopyAsCurlDialog(
       'GET',

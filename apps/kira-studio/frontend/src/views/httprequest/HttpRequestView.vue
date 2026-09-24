@@ -37,12 +37,13 @@ import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
+import { useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
 import { useSaveRequestDialogStore } from '../../api/state/saveRequestDialog';
 import { variableSupport } from '../../api/state/variableCompletion';
-import { useVariableSetStore } from '../../api/state/variables';
+import { mergeVariableRows } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
@@ -73,7 +74,6 @@ const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
 const saveRequestDialogStore = useSaveRequestDialogStore();
 const copyAsCurlStore = useCopyAsCurlStore();
-const variableSetStore = useVariableSetStore();
 const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
 const httpRequestViewStore = useHttpRequestViewStore();
@@ -272,23 +272,21 @@ function onEditRaw(): void {
 // catalogued $name is told apart from an unrecognised one by isDynamicName's Set lookup alone, so
 // the preview stays a pure function of the tab's text: no await, no chunk load, nothing generated.
 const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));
-watch(
-  [collectionId, envId],
-  ([cid, eid]) => {
-    void variableSetStore.ensureVariablesLoaded('collection', cid);
-    void variableSetStore.ensureVariablesLoaded('environment', eid);
-  },
-  { immediate: true },
-);
-// P15b D4: one computed, over the same collectionId/envId this file already watches (immediately
-// above) — rangeHighlights/hoverAt/candidates for the URL field, the request body editor, and (via
+// P112: useVariableRows observes each scope's query directly — no explicit ensureVariablesLoaded
+// call; TanStack fetches on first observer and refetches on a kira:api:dataChanged invalidation.
+const colRows = useVariableRows('collection', collectionId);
+const envRows = useVariableRows('environment', envId);
+// P15b D4: one computed, over the same colRows/envRows this file now observes directly —
+// rangeHighlights/hoverAt/candidates for the URL field, the request body editor, and (via
 // FieldRowsTable's own props) the header/param/form-data value cells.
-const variables = computed(() => variableSupport(collectionId.value, envId.value));
+const variables = computed(() =>
+  variableSupport(colRows.data.value ?? [], envRows.data.value ?? []),
+);
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
-    collectionId.value,
-    envId.value,
+  const { values, secretNames } = mergeVariableRows(
+    colRows.data.value ?? [],
+    envRows.data.value ?? [],
   );
   const refs = resolveTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
@@ -411,9 +409,9 @@ const effectiveDisableCookieJar = computed(
 // rule) — a URL whose host is still a deferred secret resolves to the unresolved template, which
 // cookies.ts's own fetchCookiesNow already treats as "nothing to fetch yet", not an error.
 const resolvedCookiesUrl = computed(() => {
-  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
-    collectionId.value,
-    envId.value,
+  const { values, secretNames } = mergeVariableRows(
+    colRows.data.value ?? [],
+    envRows.data.value ?? [],
   );
   return resolveTabState(props.tab.state, values, secretNames).url;
 });

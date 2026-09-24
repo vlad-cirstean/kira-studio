@@ -11,6 +11,7 @@ import { copyText } from '@workbench/util/clipboard';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
+import { loadVariableRows } from './apiQueries';
 import { createRevealExpiry } from './revealExpiry';
 import { useVariableSetStore } from './variables';
 
@@ -243,20 +244,19 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
   }
 
   /** D10 step 1's precedence, over the id a deferred *name* actually belongs to — environment wins
-   *  over collection, mirroring mergedValuesAndSecrets' own merge order (./variables.ts). */
-  function findSecretVariableId(
+   *  over collection, mirroring mergeVariableRows' own merge order (./variables.ts). P112: async
+   *  now — loadVariableRows is cache-first (queryClient.query), so this only actually awaits a
+   *  fetch when a broadcast invalidated the cache since the dialog opened. */
+  async function findSecretVariableId(
     name: string,
     collectionId: string,
     environmentId: string,
-  ): string | null {
-    const variableSetStore = useVariableSetStore();
-    const env = variableSetStore
-      .cachedVariables('environment', environmentId)
-      .find((v) => v.isSecret && v.name === name);
+  ): Promise<string | null> {
+    const envRows = await loadVariableRows('environment', environmentId);
+    const env = envRows.find((v) => v.isSecret && v.name === name);
     if (env) return env.id;
-    const col = variableSetStore
-      .cachedVariables('collection', collectionId)
-      .find((v) => v.isSecret && v.name === name);
+    const colRows = await loadVariableRows('collection', collectionId);
+    const col = colRows.find((v) => v.isSecret && v.name === name);
     return col?.id ?? null;
   }
 
@@ -272,7 +272,7 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     try {
       for (const name of deferredNames) {
         if (state.revealedSecretValues[name] !== undefined) continue;
-        const id = findSecretVariableId(name, collectionId, environmentId);
+        const id = await findSecretVariableId(name, collectionId, environmentId);
         if (!id) continue;
         // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
         // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a

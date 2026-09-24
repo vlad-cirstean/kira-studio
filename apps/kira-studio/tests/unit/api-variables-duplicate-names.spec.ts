@@ -4,22 +4,13 @@
 // findSecretVariableId (curl.ts) already matched it; mergedValuesAndSecrets (this file) used to
 // overwrite on every iteration (last-wins). This pins the fix: given two same-named variables, the
 // one with the lower sort_order — the one control.variablesList returns first — is the value
-// mergedValuesAndSecrets actually reports, exactly what a live send or a copied curl command uses.
-import '@workbench/testing/unit/window';
-
+// mergeVariableRows actually reports, exactly what a live send or a copied curl command uses.
+//
+// P112: mergeVariableRows is a pure function over two already-loaded row arrays (no store, no
+// cache) — this spec calls it directly rather than going through ensureVariablesLoaded/a store.
 import { describe, expect, test } from 'bun:test';
 import type { ApiVariable } from '@shared/domain/variables';
-import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
-import { setActivePinia } from 'pinia';
-import { pinia } from '../../frontend/src/state/pinia';
-
-setActivePinia(pinia);
-
-const { control } = await import('../../frontend/src/bridge/control');
-restoreAfterEach(control);
-const { useVariableSetStore } = await import('../../frontend/src/api/state/variables');
-
-const variableSetStore = useVariableSetStore();
+import { mergeVariableRows } from '../../frontend/src/api/state/variables';
 
 function variable(overrides: Partial<ApiVariable>): ApiVariable {
   return {
@@ -35,54 +26,45 @@ function variable(overrides: Partial<ApiVariable>): ApiVariable {
   };
 }
 
-describe('mergedValuesAndSecrets duplicate-name resolution (D12)', () => {
-  test('a duplicate name within one scope resolves first-wins by sort_order', async () => {
-    const collectionId = 'col-dup-1';
-    (control as unknown as { variablesList: typeof control.variablesList }).variablesList =
-      async () => [
-        variable({
-          id: 'v1',
-          ownerId: collectionId,
-          name: 'token',
-          value: 'first-value',
-          sortOrder: 0,
-        }),
-        variable({
-          id: 'v2',
-          ownerId: collectionId,
-          name: 'token',
-          value: 'second-value',
-          sortOrder: 1,
-        }),
-      ];
+describe('mergeVariableRows duplicate-name resolution (D12)', () => {
+  test('a duplicate name within one scope resolves first-wins by sort_order', () => {
+    const collectionRows = [
+      variable({
+        id: 'v1',
+        ownerId: 'col-dup-1',
+        name: 'token',
+        value: 'first-value',
+        sortOrder: 0,
+      }),
+      variable({
+        id: 'v2',
+        ownerId: 'col-dup-1',
+        name: 'token',
+        value: 'second-value',
+        sortOrder: 1,
+      }),
+    ];
 
-    await variableSetStore.ensureVariablesLoaded('collection', collectionId);
-    const { values } = variableSetStore.mergedValuesAndSecrets(collectionId, '');
+    const { values } = mergeVariableRows(collectionRows, []);
 
     expect(values.token).toBe('first-value');
   });
 
-  test('environment still overrides collection for the same name, despite within-scope first-wins', async () => {
-    const collectionId = 'col-dup-2';
-    const environmentId = 'env-dup-2';
-    (control as unknown as { variablesList: typeof control.variablesList }).variablesList = async (
-      scope,
-      ownerId,
-    ) => {
-      if (scope === 'collection' && ownerId === collectionId) {
-        return [
-          variable({ id: 'c1', ownerId: collectionId, name: 'token', value: 'collection-value' }),
-        ];
-      }
-      if (scope === 'environment' && ownerId === environmentId) {
-        return [variable({ id: 'e1', ownerId: environmentId, name: 'token', value: 'env-value' })];
-      }
-      return [];
-    };
+  test('environment still overrides collection for the same name, despite within-scope first-wins', () => {
+    const collectionRows = [
+      variable({ id: 'c1', ownerId: 'col-dup-2', name: 'token', value: 'collection-value' }),
+    ];
+    const environmentRows = [
+      variable({
+        id: 'e1',
+        scope: 'environment',
+        ownerId: 'env-dup-2',
+        name: 'token',
+        value: 'env-value',
+      }),
+    ];
 
-    await variableSetStore.ensureVariablesLoaded('collection', collectionId);
-    await variableSetStore.ensureVariablesLoaded('environment', environmentId);
-    const { values } = variableSetStore.mergedValuesAndSecrets(collectionId, environmentId);
+    const { values } = mergeVariableRows(collectionRows, environmentRows);
 
     expect(values.token).toBe('env-value');
   });

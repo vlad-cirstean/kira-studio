@@ -18,6 +18,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
+import { useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
 import { useSaveRequestDialogStore } from '../../api/state/saveRequestDialog';
 import {
@@ -25,7 +26,7 @@ import {
   variableHoverSource,
   variableSupport,
 } from '../../api/state/variableCompletion';
-import { useVariableSetStore } from '../../api/state/variables';
+import { mergeVariableRows } from '../../api/state/variables';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
@@ -45,7 +46,6 @@ const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
 const collectionsStore = useCollectionsStore();
 const saveRequestDialogStore = useSaveRequestDialogStore();
-const variableSetStore = useVariableSetStore();
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
 const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
@@ -178,23 +178,21 @@ function onStop(): void {
 }
 
 const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));
-watch(
-  [collectionId, envId],
-  ([cid, eid]) => {
-    void variableSetStore.ensureVariablesLoaded('collection', cid);
-    void variableSetStore.ensureVariablesLoaded('environment', eid);
-  },
-  { immediate: true },
+// P112: useVariableRows observes each scope's query directly — no explicit ensureVariablesLoaded
+// call; TanStack fetches on first observer and refetches on a kira:api:dataChanged invalidation.
+const colRows = useVariableRows('collection', collectionId);
+const envRows = useVariableRows('environment', envId);
+// P18 D10: HttpRequestView.vue's own one-line computed, over the colRows/envRows this view now
+// observes directly — rangeHighlights/hoverAt/candidates for the target field, the metadata value
+// cells, and (rangeHighlights only) the message editor.
+const variables = computed(() =>
+  variableSupport(colRows.data.value ?? [], envRows.data.value ?? []),
 );
-// P18 D10: HttpRequestView.vue's own one-line computed, over the collection/envId watch this view
-// already runs (immediately above) — rangeHighlights/hoverAt/candidates for the target field, the
-// metadata value cells, and (rangeHighlights only) the message editor.
-const variables = computed(() => variableSupport(collectionId.value, envId.value));
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
-    collectionId.value,
-    envId.value,
+  const { values, secretNames } = mergeVariableRows(
+    colRows.data.value ?? [],
+    envRows.data.value ?? [],
   );
   const refs = resolveGrpcTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(

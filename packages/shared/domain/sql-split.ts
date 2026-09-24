@@ -64,15 +64,43 @@ export function splitSqlStatements(source: string, options?: SplitSqlOptions): S
   return statements;
 }
 
+/** Where `s`'s own trimmed text actually starts within its raw (untrimmed) `[start, end)` span —
+ *  `s.start` alone is not that boundary: it sits right after the *previous* statement's `;`, so it
+ *  still includes any blank line/whitespace between the two statements. */
+function trimmedStart(source: string, s: SqlStatement): number {
+  const raw = source.slice(s.start, s.end);
+  return s.start + (raw.length - raw.trimStart().length);
+}
+
+/** The statement whose range contains `cursor`, over an already-split statement list — P108 Part
+ *  11 F3: the position right after a statement's own `;`, and any whitespace up to the next
+ *  statement's first non-space character (a blank line between two statements, or trailing
+ *  whitespace at the end of the document), belongs to the *preceding* statement. That is where the
+ *  caret lands after typing `;` or pressing End, and it must never silently resolve to the
+ *  following statement instead. `source` must be the exact text `statements` was split from.
+ *  Exported so a caller that already has its own cached split (`ConsoleView.vue`'s
+ *  `statementAtCursorText`, kept cheap on every caret move by not re-splitting) can reuse this
+ *  logic instead of duplicating it. */
+export function statementAtOffset(
+  statements: SqlStatement[],
+  source: string,
+  cursor: number,
+): SqlStatement | null {
+  for (let i = 0; i < statements.length; i++) {
+    const s = statements[i];
+    if (!s) continue;
+    const next = statements[i + 1];
+    const ownedEnd = next ? trimmedStart(source, next) - 1 : source.length;
+    if (cursor <= ownedEnd) return s;
+  }
+  return statements[statements.length - 1] ?? null;
+}
+
 /** The statement whose source range contains `cursor`, or the last statement past the end. */
 export function statementAtCursor(
   source: string,
   cursor: number,
   options?: SplitSqlOptions,
 ): SqlStatement | null {
-  const statements = splitSqlStatements(source, options);
-  for (const s of statements) {
-    if (cursor >= s.start && cursor <= s.end) return s;
-  }
-  return statements[statements.length - 1] ?? null;
+  return statementAtOffset(splitSqlStatements(source, options), source, cursor);
 }

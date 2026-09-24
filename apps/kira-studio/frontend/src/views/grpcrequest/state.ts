@@ -10,8 +10,7 @@ import type {
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
-import { useCollectionsStore } from '../../api/state/collections';
-import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
+import { apiIdsForTab, variablesForSend } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
@@ -141,12 +140,7 @@ async function resolveForDescribe(
 ): Promise<{ target: string; metadata: { name: string; value: string }[] } | null> {
   const tab = findGrpcRequestTab(tabId);
   if (!tab) return null;
-  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = useVariablesStore().environmentIdForTab(tabId);
-  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-    collectionId,
-    environmentId,
-  );
+  const { values, secretNames } = await variablesForSend(tabId, tab.state.itemId);
   const first = resolveGrpcTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
     ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
@@ -228,8 +222,9 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     // otherwise land after a newer one and clobber it.
     const myGen = ++rt.genId;
 
-    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-    const environmentId = useVariablesStore().environmentIdForTab(tabId);
+    // P112: this call needs only the two owner ids (GrpcService.Describe resolves values itself),
+    // never a variable value — apiIdsForTab is variablesForSend's ids-only half.
+    const { collectionId, environmentId } = await apiIdsForTab(tabId, tab.state.itemId);
     try {
       let target = tab.state.target;
       let metadata: { name: string; value: string }[] = [];
@@ -320,11 +315,9 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
     rt.messageBytes = 0;
     rt.streaming = streaming;
 
-    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-    const environmentId = useVariablesStore().environmentIdForTab(tabId);
-    const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-      collectionId,
-      environmentId,
+    const { collectionId, environmentId, values, secretNames } = await variablesForSend(
+      tabId,
+      tab.state.itemId,
     );
     const first = resolveGrpcTabState(tab.state, values, secretNames);
     const resolved = first.refs.some((r) => r.kind === 'dynamic')

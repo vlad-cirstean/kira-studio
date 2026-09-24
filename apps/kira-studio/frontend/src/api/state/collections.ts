@@ -22,7 +22,6 @@ import {
   renameVariableSetTabs,
 } from '../tabs';
 import { useSaveRequestDialogStore } from './saveRequestDialog';
-import { useVariableSetStore } from './variables';
 
 // P4 D13: Api's own tree store. Studio's tree is lazy because its data is remote — expanding a
 // node connects a connection and issues an IPC call, which is what its children cache, loading
@@ -480,10 +479,9 @@ export const useCollectionsStore = defineStore('collections', () => {
       // once its owner (the collection) is gone — deleting it closes any open tab for it.
       if (row.kind === 'collection') {
         closeVariableSetTabsForOwner('collection', row.id);
-        // P108 F9: listCache's own eviction — nothing else ever drops a deleted collection's
-        // cached variable rows, so a later ensureVariablesLoaded('collection', row.id) call (a
-        // stale watch, a reused id) would otherwise keep reading them back forever.
-        useVariableSetStore().evictListCache('collection', row.id);
+        // P108 F9's own listCache eviction is gone with listCache itself (P112) — this whole
+        // function moves onto the query cache, with reconcileTree's own eviction covering this
+        // case, in a later commit of the same phase.
       }
       if (state.selected === row.key) state.selected = null;
       await loadCollections();

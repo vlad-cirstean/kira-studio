@@ -19,9 +19,14 @@ import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTab
 import {
   apiEnvironmentsKey,
   apiEnvironmentsQueryOptions,
+  apiVariablesKey,
+  loadCollectionsTree,
+  loadEnvironments,
+  loadVariableRows,
   reconcileEnvironments,
   refreshApiQuery,
 } from './apiQueries';
+import { useCollectionsStore } from './collections';
 import { createRevealExpiry } from './revealExpiry';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
@@ -311,20 +316,20 @@ export const useVariablesStore = defineStore('variables', () => {
 // since a variable-set tab, unlike the dialog it replaces, can now be open more than once at a
 // time (one per collection/environment).
 //
-// Kept as one store together with the send-time cache, the merged value/secret cache, the gated
-// reveal and the history popover (rather than split further): loadVariableSetRows writes into both
-// variableSetRuntime and listCache in the same call, and revealHistoryEntry/restoreHistoryEntry
-// reach into setVariableSetError/variableSetRows/upsertVariable/openHistoryMenu — a further split
-// would only trade this one store for several calling each other for every operation that matters.
+// P112: the row list itself moved to a TanStack Query cache (apiVariablesQueryOptions) — a
+// component observes it directly with useVariableRows; non-component code reads it through
+// loadVariableRows/getQueryData (§3.5). This store keeps only what a query cache cannot hold: a
+// mutation's own per-tab error (F10), the gated reveal, and the history popover — reachable from
+// each other (revealHistoryEntry/restoreHistoryEntry into setVariableSetError/upsertVariable/
+// openHistoryMenu), which is why they still share one store rather than three.
 
 interface VariableSetRuntime {
-  rows: ApiVariable[];
-  /** A reveal failure's message (D10) — shown in the view's own MessageStrip. */
+  /** A mutation or reveal failure's message (D10/F10) — shown in the view's own MessageStrip. */
   error: string | null;
 }
 
 function defaultVariableSetRuntime(): VariableSetRuntime {
-  return { rows: [], error: null };
+  return { error: null };
 }
 
 export interface VariableOverviewRow {
@@ -343,12 +348,116 @@ export interface VariableOverviewRow {
 interface HistoryMenuState {
   open: boolean;
   /** Which tab's own row this popover is restoring into — restoreHistoryEntry's own lookup key,
-   *  since rows now live in a per-tab runtime rather than one singleton dialog's own list. */
+   *  since rows now live in the query cache rather than one singleton dialog's own list. */
   tabId: string | null;
   scope: VariableScope | null;
   ownerId: string;
   variableId: string | null;
   entries: ApiVariableHistoryEntry[];
+}
+
+// ---- the merged value/secret cache, shared by both protocols (P12 D9/F10) ----
+//
+// P112: pure functions over rows now, not store members reading a scope/owner-keyed cache —
+// mergedValuesAndSecrets/overviewRows used to call `cachedVariables` internally; every caller now
+// already holds its own rows (a useVariableRows observer's `.data`, or a loadVariableRows/
+// getQueryData read) and passes them in directly.
+
+/** D12: a duplicate name within one scope resolves first-wins by sort_order — the caller's own
+ *  rows are already in that order, so the first row claiming a name is the one that wins; a later
+ *  same-named row is skipped rather than overwriting it. */
+function firstWinsByName(rows: ApiVariable[]): Map<string, { value: string; isSecret: boolean }> {
+  const out = new Map<string, { value: string; isSecret: boolean }>();
+  for (const v of rows) {
+    if (!out.has(v.name)) out.set(v.name, { value: v.value, isSecret: v.isSecret });
+  }
+  return out;
+}
+
+/** D2's precedence (environment over collection). */
+export function mergeVariableRows(
+  collectionRows: ApiVariable[],
+  environmentRows: ApiVariable[],
+): { values: Record<string, string>; secretNames: string[] } {
+  const merged = firstWinsByName(collectionRows);
+  for (const [name, entry] of firstWinsByName(environmentRows)) {
+    merged.set(name, entry); // environment wins over collection (D2), regardless of within-scope order
+  }
+  const values: Record<string, string> = {};
+  const secretNames: string[] = [];
+  for (const [name, entry] of merged) {
+    if (entry.isSecret) secretNames.push(name);
+    else values[name] = entry.value;
+  }
+  return { values, secretNames };
+}
+
+// P17 D20/item 8: one row of the read-only overview panel — every stored row from both scopes
+// (not deduplicated into a single resolved value the way mergeVariableRows is, since the panel's
+// whole point is to make D2's precedence *visible*: a shadowed collection row still appears,
+// dimmed, rather than disappearing the way it would in the merged map above).
+
+/** D20: environment rows first (the scope that wins precedence, D2), then collection rows, each
+ *  group in its own `sort_order` (the caller's own row order) — read-only, no dedup within a
+ *  scope, since collapsing same-named rows is `mergeVariableRows`'s job, not this list's. */
+export function overviewRowsOf(
+  collectionRows: ApiVariable[],
+  environmentRows: ApiVariable[],
+): VariableOverviewRow[] {
+  const envNames = new Set(environmentRows.map((v) => v.name));
+  const toRow = (v: ApiVariable, scope: VariableScope, shadowed: boolean): VariableOverviewRow => ({
+    id: v.id,
+    name: v.name,
+    value: v.value,
+    isSecret: v.isSecret,
+    description: v.description,
+    scope,
+    shadowed,
+  });
+  return [
+    ...environmentRows.map((v) => toRow(v, 'environment', false)),
+    ...collectionRows.map((v) => toRow(v, 'collection', envNames.has(v.name))),
+  ];
+}
+
+/** variablesForSend's own ids-only half — grpcrequest/state.ts's loadSchema needs the two owner
+ *  ids for GrpcService.Describe but never touches a variable's value. */
+export async function apiIdsForTab(
+  tabId: string,
+  itemId: string | null,
+): Promise<{ collectionId: string; environmentId: string }> {
+  // Awaits the tree and environments queries first (cache-first; a fetch only actually happens
+  // before either store's own app-lifetime observer has resolved once) — closes F5's "tree not
+  // loaded yet" gap at send/describe time, rather than reading whatever the store happened to have
+  // synchronously.
+  await Promise.all([loadCollectionsTree(), loadEnvironments()]);
+  return {
+    collectionId: useCollectionsStore().collectionIdFor({ itemId }),
+    environmentId: useVariablesStore().environmentIdForTab(tabId),
+  };
+}
+
+/** P112: replaces five duplicated sync blocks in views/httprequest/state.ts, views/grpcrequest/
+ *  state.ts and (via variableCompletion.ts) both request views — each used to read
+ *  collectionIdFor/environmentIdForTab then mergedValuesAndSecrets over a store cache that
+ *  ensureVariablesLoaded had to be trusted to already have populated. Awaiting loadVariableRows
+ *  means a send after an invalidation always refetches first, so stale plain values can never
+ *  substitute — the concrete F12 symptom this closes. */
+export async function variablesForSend(
+  tabId: string,
+  itemId: string | null,
+): Promise<{
+  collectionId: string;
+  environmentId: string;
+  values: Record<string, string>;
+  secretNames: string[];
+}> {
+  const { collectionId, environmentId } = await apiIdsForTab(tabId, itemId);
+  const [collectionRows, environmentRows] = await Promise.all([
+    loadVariableRows('collection', collectionId),
+    loadVariableRows('environment', environmentId),
+  ]);
+  return { collectionId, environmentId, ...mergeVariableRows(collectionRows, environmentRows) };
 }
 
 export const useVariableSetStore = defineStore('variableSet', () => {
@@ -375,28 +484,6 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     clearRevealed();
   });
 
-  /** Loads (or reloads) one scope's variable list into `tabId`'s own runtime — the tab-scoped
-   *  replacement for the old singleton dialog's reloadVariablesDialog. Also keeps the send-time
-   *  cache (below) in step, exactly as the dialog's own edits used to. */
-  async function loadVariableSetRows(
-    tabId: string,
-    scope: VariableScope,
-    ownerId: string,
-  ): Promise<void> {
-    const rows = await control.variablesList(scope, ownerId);
-    ensureVariableSetRuntime(tabId).rows = rows;
-    const key = cacheKey(scope, ownerId);
-    listCache[key] = rows;
-    // P108 F2: this is an authoritative write (a fresh list right after a mutation) — bump so any
-    // ensureVariablesLoaded that started before it, and is still in flight, discards its own reply
-    // instead of clobbering these rows with a pre-edit snapshot.
-    bumpListCacheGen(key);
-  }
-
-  function variableSetRows(tabId: string): ApiVariable[] {
-    return variableSetRuntime[tabId]?.rows ?? [];
-  }
-
   function variableSetError(tabId: string): string | null {
     return variableSetRuntime[tabId]?.error ?? null;
   }
@@ -405,87 +492,29 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     ensureVariableSetRuntime(tabId).error = message;
   }
 
-  // ---- the send-time value cache (D6/D7) ----
-  //
-  // send() needs each scope's non-secret values (and which names are secret, to defer them) without
-  // a fresh round trip on every keystroke of a live "unresolved reference" preview — this is that
-  // cache, kept in step with VariablesDialog's own edits above (the one place these rows change).
+  // ---- mutations (P112: each is a useMutation now; onSuccess refreshes exactly the touched
+  // apiVariablesKey, replacing the old loadVariableSetRows re-list) ----
 
-  function cacheKey(scope: VariableScope, ownerId: string): string {
-    return `${scope}:${ownerId}`;
-  }
-
-  // Returned as a named property directly (not toRefs-spread) — same Record-with-dynamic-keys
-  // reasoning as variableSetRuntime above.
-  const listCache = reactive<Record<string, ApiVariable[]>>({});
-
-  // P108 F2: per-key generation counter, bumped by every authoritative write to a `listCache` key
-  // (loadVariableSetRows below; the cache-eviction sites F9 adds). ensureVariablesLoaded compares
-  // against this to tell "nothing else has touched this key since I started" from "I'm answering a
-  // question a fresher write already superseded" — the same opId-supersession shape the request
-  // views' own runtimes use, applied to this cache instead of a per-tab runtime.
-  const listCacheGen = new Map<string, number>();
-  function bumpListCacheGen(key: string): void {
-    listCacheGen.set(key, (listCacheGen.get(key) ?? 0) + 1);
-  }
-
-  // P108 F2: concurrent ensureVariablesLoaded calls for the same key each used to fire their own
-  // control.variablesList request. A slow first reply landing after a later loadVariableSetRows
-  // (a post-edit refresh) overwrote the just-written fresh rows with the pre-edit list — silently:
-  // every subsequent send for that scope substituted stale plain values until the next edit. One
-  // in-flight promise per key so concurrent callers share a single request, and a generation check
-  // on the reply so a superseded one never overwrites a fresher write.
-  const ensureInFlight = new Map<string, Promise<void>>();
-
-  /** Populates the cache for one scope if it is not already loaded — safe to call on every render;
-   *  a no-op for '' (a scratch tab's collection, or no active environment). */
-  async function ensureVariablesLoaded(scope: VariableScope, ownerId: string): Promise<void> {
-    if (!ownerId) return;
-    const key = cacheKey(scope, ownerId);
-    if (listCache[key]) return;
-    const existing = ensureInFlight.get(key);
-    if (existing) return existing;
-    const startGen = listCacheGen.get(key) ?? 0;
-    const promise = control
-      .variablesList(scope, ownerId)
-      .then((rows) => {
-        // Only commit if nothing (a loadVariableSetRows post-edit refresh, or a cache eviction)
-        // has touched this key since this fetch started — otherwise this reply is an answer to a
-        // question already superseded by a fresher one.
-        if (!listCache[key] && (listCacheGen.get(key) ?? 0) === startGen) {
-          listCache[key] = rows;
-        }
-      })
-      .finally(() => {
-        ensureInFlight.delete(key);
-      });
-    ensureInFlight.set(key, promise);
-    return promise;
-  }
-
-  function cachedVariables(scope: VariableScope, ownerId: string): ApiVariable[] {
-    if (!ownerId) return [];
-    return listCache[cacheKey(scope, ownerId)] ?? [];
-  }
-
-  /** P108 F9: `listCache` was never evicted — deleting an environment or a collection left its own
-   *  rows cached under the old owner id forever, so a request sent afterward against a different
-   *  owner that happened to share the id space (or a since-recreated environment reusing the same
-   *  route through `ensureVariablesLoaded`'s cache-hit guard) kept substituting stale plain values.
-   *  Bumping the generation too matters exactly like `loadVariableSetRows`'s own bump: an
-   *  `ensureVariablesLoaded` call already in flight for this key must not resurrect the deleted rows
-   *  once its reply lands. */
-  function evictListCache(scope: VariableScope, ownerId: string): void {
-    const key = cacheKey(scope, ownerId);
-    delete listCache[key];
-    bumpListCacheGen(key);
-  }
+  const upsertVariableMutation = useMutation(
+    {
+      mutationKey: ['apiVariables', 'upsert'],
+      mutationFn: (args: {
+        scope: VariableScope;
+        ownerId: string;
+        id: string;
+        name: string;
+        value: string | null;
+        isSecret: boolean;
+        description?: string;
+      }) => control.variablesUpsert(args),
+      onSuccess: (_data, vars) => refreshApiQuery(apiVariablesKey(vars.scope, vars.ownerId)),
+    },
+    queryClient,
+  );
 
   /** id: '' creates a new row (D19). value is three-state (F2, P108 Part 3): null means "leave the
    *  stored value untouched" — VariableSetView.vue's own valueTouched flag is what decides which
-   *  one it sends; every other caller here (restoreHistoryEntry) always has a real value in hand.
-   *  Re-lists afterward — the same "one call, always correct" discipline http/state/collections.ts's
-   *  own mutations use. */
+   *  one it sends; every other caller here (restoreHistoryEntry) always has a real value in hand. */
   /** P108 F10: this (and deleteVariable/reorderVariables below) used to let a failed IPC call
    *  throw uncaught — VariableSetView.vue's own call sites (commitDraft, row delete, drag/keyboard
    *  reorder) have no try/catch of their own, so a rejected edit vanished with nothing telling the
@@ -506,13 +535,22 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     },
   ): Promise<void> {
     try {
-      await control.variablesUpsert({ scope, ownerId, ...args });
-      await loadVariableSetRows(tabId, scope, ownerId);
+      await upsertVariableMutation.mutateAsync({ scope, ownerId, ...args });
       setVariableSetError(tabId, null);
     } catch (err) {
       setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
     }
   }
+
+  const deleteVariableMutation = useMutation(
+    {
+      mutationKey: ['apiVariables', 'delete'],
+      mutationFn: (args: { scope: VariableScope; ownerId: string; id: string }) =>
+        control.variablesDelete(args.id),
+      onSuccess: (_data, vars) => refreshApiQuery(apiVariablesKey(vars.scope, vars.ownerId)),
+    },
+    queryClient,
+  );
 
   async function deleteVariable(
     tabId: string,
@@ -521,13 +559,22 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     id: string,
   ): Promise<void> {
     try {
-      await control.variablesDelete(id);
-      await loadVariableSetRows(tabId, scope, ownerId);
+      await deleteVariableMutation.mutateAsync({ scope, ownerId, id });
       setVariableSetError(tabId, null);
     } catch (err) {
       setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
     }
   }
+
+  const reorderVariablesMutation = useMutation(
+    {
+      mutationKey: ['apiVariables', 'reorder'],
+      mutationFn: (args: { scope: VariableScope; ownerId: string; ids: string[] }) =>
+        control.variablesReorder(args.scope, args.ownerId, args.ids),
+      onSuccess: (_data, vars) => refreshApiQuery(apiVariablesKey(vars.scope, vars.ownerId)),
+    },
+    queryClient,
+  );
 
   /** D14: the full new order, in full — ConnectionsService.Reorder's own shape. */
   async function reorderVariables(
@@ -537,28 +584,38 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     ids: string[],
   ): Promise<void> {
     try {
-      await control.variablesReorder(scope, ownerId, ids);
-      await loadVariableSetRows(tabId, scope, ownerId);
+      await reorderVariablesMutation.mutateAsync({ scope, ownerId, ids });
       setVariableSetError(tabId, null);
     } catch (err) {
       setVariableSetError(tabId, err instanceof Error ? err.message : String(err));
     }
   }
 
-  /** P17 D21-D23/item 5: applies a parsed `.env` entry list atomically (VariablesRepo.ApplyBulk),
-   *  then re-lists — the same "one call, always correct" discipline every other mutation here uses.
+  const applyBulkVariablesMutation = useMutation(
+    {
+      mutationKey: ['apiVariables', 'applyBulk'],
+      mutationFn: (args: {
+        scope: VariableScope;
+        ownerId: string;
+        entries: ApiVariableBulkEntry[];
+      }) => control.variablesApplyBulk(args.scope, args.ownerId, args.entries),
+      onSuccess: (_data, vars) => refreshApiQuery(apiVariablesKey(vars.scope, vars.ownerId)),
+    },
+    queryClient,
+  );
+
+  /** P17 D21-D23/item 5: applies a parsed `.env` entry list atomically (VariablesRepo.ApplyBulk).
    *  The returned counts are ApplyBulk's own, from the server-side reconcile — BulkVariablesEditor's
    *  own live summary is computed independently (dotenv.ts#reconcileEnv) for the pre-Apply preview,
-   *  and the two are expected to agree (§4 of the plan). */
+   *  and the two are expected to agree (§4 of the plan). `_tabId` is unused now that the write goes
+   *  straight through the query cache — kept so this call's shape matches the three mutations above. */
   async function applyBulkVariables(
-    tabId: string,
+    _tabId: string,
     scope: VariableScope,
     ownerId: string,
     entries: ApiVariableBulkEntry[],
   ): Promise<ApiVariableBulkResult> {
-    const result = await control.variablesApplyBulk(scope, ownerId, entries);
-    await loadVariableSetRows(tabId, scope, ownerId);
-    return result;
+    return applyBulkVariablesMutation.mutateAsync({ scope, ownerId, entries });
   }
 
   /** D12: a duplicate name within one scope is allowed by the schema and resolved first-wins by
@@ -568,79 +625,6 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     const name = rows[index]?.name.trim();
     if (!name) return false;
     return rows.slice(0, index).some((r) => r.name.trim() === name);
-  }
-
-  // ---- the merged value/secret cache, shared by both protocols (P12 D9/F10) ----
-  //
-  // mergedValuesAndSecrets used to be hand-copied into views/grpcrequest/state.ts, which said so in
-  // so many words ("the coupling P12 would have to unpick") — both views already import this module
-  // for cachedVariables, so the fix is a move, not an abstraction.
-
-  /** D12: a duplicate name within one scope resolves first-wins by sort_order — cachedVariables
-   *  already returns each scope's rows in that order, so the first row claiming a name is the one
-   *  that wins; a later same-named row is skipped rather than overwriting it. */
-  function firstWinsByName(rows: ApiVariable[]): Map<string, { value: string; isSecret: boolean }> {
-    const out = new Map<string, { value: string; isSecret: boolean }>();
-    for (const v of rows) {
-      if (!out.has(v.name)) out.set(v.name, { value: v.value, isSecret: v.isSecret });
-    }
-    return out;
-  }
-
-  /** D2's precedence (environment over collection), read from the cache this module keeps in step
-   *  with its own dialog edits — a fresh IPC round trip on every keystroke of a live
-   *  "unresolved reference" preview would be needless. Correction (round-2 review): neither send()
-   *  nor call() calls ensureVariablesLoaded themselves — HttpRequestView.vue/GrpcRequestView.vue
-   *  each fire it, unawaited, on mount and on collection/environment change, well before this ever
-   *  runs for the same tab in the ordinary case. This function does not itself guarantee the cache
-   *  is loaded; a scope this call site has genuinely never seen simply reads as empty here (§0's own
-   *  "an honest unresolved reference is fine" posture), same as before any load ever ran. */
-  function mergedValuesAndSecrets(
-    collectionId: string,
-    environmentId: string,
-  ): { values: Record<string, string>; secretNames: string[] } {
-    const merged = firstWinsByName(cachedVariables('collection', collectionId));
-    for (const [name, entry] of firstWinsByName(cachedVariables('environment', environmentId))) {
-      merged.set(name, entry); // environment wins over collection (D2), regardless of within-scope order
-    }
-    const values: Record<string, string> = {};
-    const secretNames: string[] = [];
-    for (const [name, entry] of merged) {
-      if (entry.isSecret) secretNames.push(name);
-      else values[name] = entry.value;
-    }
-    return { values, secretNames };
-  }
-
-  // P17 D20/item 8: one row of the read-only overview panel — every stored row from both scopes
-  // (not deduplicated into a single resolved value the way mergedValuesAndSecrets is, since the
-  // panel's whole point is to make D2's precedence *visible*: a shadowed collection row still
-  // appears, dimmed, rather than disappearing the way it would in the merged map above).
-
-  /** D20: environment rows first (the scope that wins precedence, D2), then collection rows, each
-   *  group in its own `sort_order` (`cachedVariables`'s own order) — read-only, no dedup within a
-   *  scope, since collapsing same-named rows is `mergedValuesAndSecrets`' job, not this list's. */
-  function overviewRows(collectionId: string, environmentId: string): VariableOverviewRow[] {
-    const envRows = cachedVariables('environment', environmentId);
-    const colRows = cachedVariables('collection', collectionId);
-    const envNames = new Set(envRows.map((v) => v.name));
-    const toRow = (
-      v: ApiVariable,
-      scope: VariableScope,
-      shadowed: boolean,
-    ): VariableOverviewRow => ({
-      id: v.id,
-      name: v.name,
-      value: v.value,
-      isSecret: v.isSecret,
-      description: v.description,
-      scope,
-      shadowed,
-    });
-    return [
-      ...envRows.map((v) => toRow(v, 'environment', false)),
-      ...colRows.map((v) => toRow(v, 'collection', envNames.has(v.name))),
-    ];
   }
 
   // ---- the gated reveal (D5/D8/D9) ----
@@ -762,10 +746,10 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   }
 
   // P108 F13: closing the tab this popover belongs to used to leave historyMenuState pointing at
-  // it — restoreHistoryEntry's own `variableSetRows(tabId)` lookup then reads the now-gone tab's
-  // runtime (ensure() would silently recreate an empty one), and the popover itself, still `open`,
-  // would keep showing a dead tab's history. Same "this tab's own leftover state is this store's
-  // job to clear" discipline registerTabRuntimeCleanup already applies to variableSetRuntime.
+  // it — restoreHistoryEntry's own row lookup would keep resolving against a dead tab's scope/owner,
+  // and the popover itself, still `open`, would keep showing a dead tab's history. Same "this tab's
+  // own leftover state is this store's job to clear" discipline registerTabRuntimeCleanup already
+  // applies to variableSetRuntime.
   registerTabRuntimeCleanup((tabId) => {
     if (historyMenuState.tabId === tabId) closeHistoryMenu();
   });
@@ -792,7 +776,10 @@ export const useVariableSetStore = defineStore('variableSet', () => {
   async function restoreHistoryEntry(entry: ApiVariableHistoryEntry): Promise<void> {
     const { tabId, scope, ownerId } = historyMenuState;
     if (!tabId || !scope) return;
-    const row = variableSetRows(tabId).find((r) => r.id === entry.variableId);
+    // P112: reads the query cache directly (§3.5's imperative-reader rule) rather than a per-tab
+    // rows array — the popover only ever opens once loadVariableRows has already populated this key.
+    const rows = queryClient.getQueryData<ApiVariable[]>(apiVariablesKey(scope, ownerId)) ?? [];
+    const row = rows.find((r) => r.id === entry.variableId);
     if (!row) return;
     let value = entry.value;
     if (entry.isSecret) {
@@ -815,24 +802,16 @@ export const useVariableSetStore = defineStore('variableSet', () => {
 
   return {
     variableSetRuntime,
-    listCache,
     revealedValues,
     revealedHistoryValues,
     ...toRefs(historyMenuState),
-    loadVariableSetRows,
-    variableSetRows,
     variableSetError,
     setVariableSetError,
-    ensureVariablesLoaded,
-    cachedVariables,
-    evictListCache,
     upsertVariable,
     deleteVariable,
     reorderVariables,
     applyBulkVariables,
     isDuplicateName,
-    mergedValuesAndSecrets,
-    overviewRows,
     clearRevealed,
     revealVariable,
     openHistoryMenu,

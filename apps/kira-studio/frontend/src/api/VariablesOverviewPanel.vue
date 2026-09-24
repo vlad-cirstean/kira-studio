@@ -7,13 +7,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { connColorVar } from '@theme/connColor';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
+import { useVariableRows } from './state/apiQueries';
 import { useCollectionsStore } from './state/collections';
-import { useVariableSetStore, useVariablesStore, type VariableOverviewRow } from './state/variables';
+import { overviewRowsOf, useVariablesStore, type VariableOverviewRow } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
 const collectionsStore = useCollectionsStore();
 const variablesStore = useVariablesStore();
-const variableSetStore = useVariableSetStore();
 
 // P17 D20/item 8: a read-only popover over the already-merged data (`overviewRows`) — one panel,
 // reachable from any request tab (HttpRequestView.vue and GrpcRequestView.vue both mount this
@@ -34,8 +34,10 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ close: [] }>();
 
+const colRows = useVariableRows('collection', () => props.collectionId);
+const envRows = useVariableRows('environment', () => props.environmentId);
 const rows = computed<VariableOverviewRow[]>(() =>
-  variableSetStore.overviewRows(props.collectionId, props.environmentId),
+  overviewRowsOf(colRows.data.value ?? [], envRows.data.value ?? []),
 );
 
 // P16 D14's rule, restated here (D20): name-only, never value — a value-matching filter over a
