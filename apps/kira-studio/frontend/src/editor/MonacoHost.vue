@@ -16,7 +16,11 @@ import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
-import type { ConsoleHoverInfo } from './hoverInfo';
+import {
+  type ConsoleHoverInfo,
+  escapeMarkdownSyntaxTokens,
+  fenceMarkdownValue,
+} from './hoverInfo';
 import { monacoLanguageIdFor } from './monacoLanguages';
 import type { RangeHighlight } from './ranges';
 
@@ -257,13 +261,18 @@ function buildHoverProvider(): HoverProvider {
       const start = candidateModel.getPositionAt(info.from);
       const end = candidateModel.getPositionAt(info.to);
       const contents: MarkdownString[] = [];
-      // §4.4: `value` -> one fenced block, so a pretty-printed value keeps its line breaks; fenced
-      // content is never interpolated as markup, so this is safe even for arbitrary app data.
+      // §4.4/P108 Part 11 F8: `value` -> one fenced block, so a pretty-printed value keeps its line
+      // breaks; the fence length itself is content-aware (fenceMarkdownValue) so a value containing
+      // its own triple backtick can't close the fence early and spill the rest as Markdown.
       if (info.value !== undefined) {
-        contents.push({ value: `\`\`\`\n${info.value}\n\`\`\`` });
+        contents.push({ value: fenceMarkdownValue(info.value) });
       }
+      // F8: `supportHtml: false` blocks raw HTML only — Markdown syntax inside `line` (a table/
+      // column name, a COMMENT ON COLUMN description, …) still rendered: a `[text](url)` comment
+      // became a clickable link, `_x_`/`__init__` names rendered as italic/bold. Escaped so `line`
+      // always renders as the literal text it is.
       for (const line of info.lines) {
-        contents.push({ value: line, supportHtml: false });
+        contents.push({ value: escapeMarkdownSyntaxTokens(line), supportHtml: false });
       }
       return {
         range: {

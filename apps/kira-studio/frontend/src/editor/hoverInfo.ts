@@ -37,3 +37,30 @@ export function formatHoverValue(raw: string): string {
     return raw;
   }
 }
+
+// P108 Part 11 F8: MonacoHost.vue renders every ConsoleHoverInfo/HoverInfo `lines` entry as a
+// Markdown string (`supportHtml: false` blocks raw HTML, not Markdown). `lines` is built from
+// database content this app doesn't control — table/column names, a column's `COMMENT ON COLUMN`
+// description, a resolved variable's value — so a column comment reading `[docs](https://…)`
+// rendered as a clickable link, `_x_`/`__init__`-style names rendered as italic/bold, and a
+// backslash or backtick in a name or type changed the text actually shown. Backslash-escapes every
+// Markdown syntax token, mirroring VS Code's own `escapeMarkdownSyntaxTokens` (including the
+// backslash character itself, so a literal backslash already in the text can't combine with the
+// next escaped character and produce a different escape than intended).
+const MARKDOWN_SYNTAX_TOKENS = /[\\`*_{}[\]()#+\-.!|<>~]/g;
+
+export function escapeMarkdownSyntaxTokens(text: string): string {
+  return text.replace(MARKDOWN_SYNTAX_TOKENS, '\\$&');
+}
+
+// P108 Part 11 F8: `value` used to be wrapped in a fixed triple-backtick fence — a variable value
+// containing its own triple backtick closed that fence early, and the rest of the value rendered
+// as Markdown instead of as the pre-wrapped literal text it's meant to be. CommonMark's own rule: a
+// fenced code block's fence must be longer than the longest backtick run inside it (and at least 3
+// backticks to be a fence at all, not inline-code syntax).
+export function fenceMarkdownValue(value: string): string {
+  const runs = value.match(/`+/g) ?? [];
+  const longestRun = runs.reduce((max, run) => Math.max(max, run.length), 0);
+  const fence = '`'.repeat(Math.max(3, longestRun + 1));
+  return `${fence}\n${value}\n${fence}`;
+}
