@@ -18,7 +18,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
-import { useVariableRows } from '../../api/state/apiQueries';
+import { useSavedGrpcRequest, useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
 import { useSaveRequestDialogStore } from '../../api/state/saveRequestDialog';
 import {
@@ -134,23 +134,16 @@ watch(
   { immediate: true },
 );
 
-const saved = computed(() => collectionsStore.savedGrpcRequestFor(props.tab.state.itemId));
+// P112: HttpRequestView.vue's own useSavedRequest rewrite, mirrored — see its comment for the full
+// rationale (§3.5's reactive-reader rule; subsumes the old ensureSavedGrpcRequestLoaded watch).
+const savedQuery = useSavedGrpcRequest(() => props.tab.state.itemId);
+const saved = computed(() => savedQuery.data.value ?? null);
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
-// P108 F4: HttpRequestView.vue's own fix, mirrored — see its comment for the full rationale. A
-// restored tab's itemId never got its saved side fetched, leaving `saved` null forever, the same
-// shape as D14's genuine orphan. `unresolved` stays true only until that fetch settles.
-const unresolved = computed(() => {
-  const itemId = props.tab.state.itemId;
-  return itemId !== null && saved.value === null && !collectionsStore.isOrphanGrpcRequest(itemId);
-});
-watch(
-  () => props.tab.state.itemId,
-  (itemId) => {
-    if (itemId) void collectionsStore.ensureSavedGrpcRequestLoaded(itemId);
-  },
-  { immediate: true },
+// P108 F4, subsumed by P112: HttpRequestView.vue's own fix, mirrored — see its comment.
+const unresolved = computed(
+  () => props.tab.state.itemId !== null && savedQuery.data.value === undefined,
 );
 
 // P71 §3.2/P107 T1-16: HttpRequestView.vue's own pair — see views/shared/request/useRequestTabSave.ts.

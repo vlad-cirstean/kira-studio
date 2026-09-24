@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defaultGrpcSavedRequest, defaultHttpSavedRequest } from '@shared/domain/collections';
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -9,6 +10,7 @@ import { computed, ref, useTemplateRef } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
+import { loadSavedGrpcRequest, loadSavedRequest } from './state/apiQueries';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -59,12 +61,17 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
   }
   // P11 D12: a gRPC row opens the 'grpc-request' kind, never 'http-request' — the tree's own
   // protocol column is what tells the two apart, since kind alone (D12's own reasoning) does not.
+  // P112: loadSavedRequest/loadSavedGrpcRequest never throw — a row deleted between the tree
+  // listing this open and the fetch landing (another window, or this one) answers `null` (D14's
+  // orphan case), which opens the tab as if it were a brand-new saved row rather than failing the
+  // open outright; the tab's own unresolved/orphan handling (HttpRequestView.vue/
+  // GrpcRequestView.vue) takes it from there.
   if (row.protocol === 'grpc') {
-    const saved = await collectionsStore.fetchSavedGrpcRequest(row.id);
+    const saved = (await loadSavedGrpcRequest(row.id)) ?? defaultGrpcSavedRequest();
     openCollectionGrpcRequestTab(row.id, row.name, saved);
     return;
   }
-  const saved = await collectionsStore.fetchSavedRequest(row.id);
+  const saved = (await loadSavedRequest(row.id)) ?? defaultHttpSavedRequest();
   openCollectionRequestTab(row.id, row.name, saved);
 }
 

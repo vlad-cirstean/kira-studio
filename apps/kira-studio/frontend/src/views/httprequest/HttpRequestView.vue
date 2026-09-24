@@ -37,7 +37,7 @@ import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
-import { useVariableRows } from '../../api/state/apiQueries';
+import { useSavedRequest, useVariableRows } from '../../api/state/apiQueries';
 import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
@@ -169,28 +169,25 @@ function onUrlPaste(text: string, e: ClipboardEvent): void {
 
 // P4 D15: dirtiness is a computation over two things already in memory — the tab's own state and
 // the cached saved document — not a stored flag there would be something to set, clear, migrate or
-// get wrong. `savedRequestFor` answers null for a tab bound to nothing, and for D14's orphan case
-// (a row deleted in this window or another), which is what makes Save fall back to Save as…
-const saved = computed(() => collectionsStore.savedRequestFor(props.tab.state.itemId));
+// get wrong. `saved` reads null for a tab bound to nothing, and for D14's orphan case (a row
+// deleted in this window or another), which is what makes Save fall back to Save as…
+//
+// P112: useSavedRequest is a reactive reader (§3.5) — a component computed over its own `.data` is
+// exactly the shape that rule calls for, unlike collections.ts's own imperative readers. It fetches
+// on first observer and refetches on a kira:api:dataChanged invalidation, subsuming the old
+// ensureSavedRequestLoaded mount/itemId watch below entirely.
+const savedQuery = useSavedRequest(() => props.tab.state.itemId);
+const saved = computed(() => savedQuery.data.value ?? null);
 const dirty = computed(() => isDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
-// P108 F4: a restored tab (itemId set from persisted state, never opened through
-// CollectionsTree.vue's own onOpen) never had its saved side fetched at all — `saved` above read
-// null forever, indistinguishable from D14's genuine orphan case. Fetches once per itemId (on
-// mount and on any later itemId change, e.g. after Save as… rebinds this tab); `unresolved` stays
-// true only for the window before that fetch settles one way or the other, keeping Save disabled
-// (rather than misreading "not loaded yet" as "orphan" and rerouting into Save as…).
-const unresolved = computed(() => {
-  const itemId = props.tab.state.itemId;
-  return itemId !== null && saved.value === null && !collectionsStore.isOrphanRequest(itemId);
-});
-watch(
-  () => props.tab.state.itemId,
-  (itemId) => {
-    if (itemId) void collectionsStore.ensureSavedRequestLoaded(itemId);
-  },
-  { immediate: true },
+// P108 F4, subsumed by P112: `undefined` data (apiQueries.ts's own not-loaded-yet convention) is
+// exactly the old orphanRequests-vs-not-fetched split — true only for the window before the query
+// settles one way or the other (a fetch not yet answered, never a genuine orphan, which is `null`),
+// keeping Save disabled rather than misreading "not loaded yet" as "orphan" and rerouting into Save
+// as….
+const unresolved = computed(
+  () => props.tab.state.itemId !== null && savedQuery.data.value === undefined,
 );
 
 // P71 §3.2/P107 T1-16: an incognito tab has no route into a persisting editor — Save/Save as…

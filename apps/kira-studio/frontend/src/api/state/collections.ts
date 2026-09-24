@@ -1,13 +1,11 @@
-import {
-  type CollectionItemKind,
-  type CollectionItemProtocol,
-  type CollectionItemSummary,
-  type CollectionSummary,
-  type GrpcSavedRequest,
-  grpcSavedRequestSchema,
-  type HttpSavedRequest,
-  httpSavedRequestSchema,
-  type ImportReport,
+import type {
+  CollectionItemKind,
+  CollectionItemProtocol,
+  CollectionItemSummary,
+  CollectionSummary,
+  GrpcSavedRequest,
+  HttpSavedRequest,
+  ImportReport,
 } from '@shared/domain/collections';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { refDebounced } from '@vueuse/core';
@@ -27,6 +25,10 @@ import {
   type ApiCollectionsTree,
   apiCollectionsTreeKey,
   apiCollectionsTreeQueryOptions,
+  apiSavedGrpcRequestKey,
+  apiSavedRequestKey,
+  loadSavedGrpcRequest,
+  loadSavedRequest,
   reconcileTree,
   refreshApiQuery,
 } from './apiQueries';
@@ -77,23 +79,16 @@ function rowMatches(name: string, url: string, query: string): boolean {
   return name.toLowerCase().includes(query) || url.toLowerCase().includes(query);
 }
 
+// P112: state.requests/grpcRequests/orphanRequests/orphanGrpcRequests are gone — a saved request's
+// dirty-comparison cache and its D14 orphan status both live in the apiSavedRequest(Grpc)Key query
+// now (null data === confirmed orphan, undefined === not loaded yet, apiQueries.ts's own
+// convention), not a second local Record.
 interface CollectionsState {
   expanded: Set<string>;
   selected: string | null;
   search: string;
   /** The row key whose label is currently an inline rename input, if any. */
   renamingKey: string | null;
-  /** Saved requests read on demand by GetRequest, keyed by item id — the dirty comparison's
-   *  other half (D15) and the reason opening an already-open request costs no call. */
-  requests: Record<string, HttpSavedRequest>;
-  /** P11 D12: GetGrpcRequest's own cache — grpcRequests' own sibling of `requests` above. */
-  grpcRequests: Record<string, GrpcSavedRequest>;
-  /** P108 F4: itemIds `ensureSavedRequestLoaded` has confirmed no longer resolve (GetRequest threw
-   *  — the row was deleted, in this window or another) — distinct from an itemId simply not yet
-   *  fetched, which `requests` alone cannot tell apart from a genuine orphan. */
-  orphanRequests: Record<string, true>;
-  /** `orphanRequests`' own gRPC sibling. */
-  orphanGrpcRequests: Record<string, true>;
   busy: boolean;
   report: ImportReport | null;
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
@@ -119,10 +114,6 @@ export const useCollectionsStore = defineStore('collections', () => {
     selected: null,
     search: '',
     renamingKey: null,
-    requests: {},
-    grpcRequests: {},
-    orphanRequests: {},
-    orphanGrpcRequests: {},
     busy: false,
     report: null,
     exportWarning: null,
@@ -157,36 +148,41 @@ export const useCollectionsStore = defineStore('collections', () => {
     reconcileTree();
   }
 
-  /** Reads a saved request, caching it by item id. The cache is the dirty comparison's other half
-   *  (D15) as well as an open-cost saving: re-opening an already-open request costs no call. */
-  async function fetchSavedRequest(itemId: string): Promise<HttpSavedRequest> {
-    const cached = state.requests[itemId];
-    if (cached) return cached;
-    const saved = httpSavedRequestSchema.parse(await control.collectionsGetRequest(itemId));
-    state.requests[itemId] = saved;
-    return saved;
+  // P112: fetchSavedRequest/savedRequestFor/isOrphanRequest/ensureSavedRequestLoaded (and their
+  // gRPC siblings) are now thin readers over the apiSavedRequest(Grpc)Key query cache rather than a
+  // second local Record — loadSavedRequest is cache-first (queryClient.query, staleTime: Infinity)
+  // and its queryFn already catches a failed GetRequest into `null` (apiQueries.ts's own orphan
+  // convention), so there is no separate fetch-then-catch or orphan flag left to maintain here.
+  // CollectionsTree.vue's own onOpen and both request views now call loadSavedRequest/
+  // useSavedRequest directly; these remain as the store's own compatibility surface (D14's original
+  // call sites) until nothing needs them.
+
+  /** Reads a saved request, cache-first — the dirty comparison's other half (D15) as well as an
+   *  open-cost saving: re-opening an already-open request costs no call. `null` is a confirmed
+   *  orphan (D14), never a thrown error. */
+  async function fetchSavedRequest(itemId: string): Promise<HttpSavedRequest | null> {
+    return loadSavedRequest(itemId);
   }
 
   /** The saved side of the dirty comparison, or null when this tab's row has never been read (or no
-   *  longer resolves — D14's orphan rule). */
+   *  longer resolves — D14's orphan rule). An imperative reader (§3.5): callers wanting this to stay
+   *  live across a fetch should observe useSavedRequest's own `.data` instead. */
   function savedRequestFor(itemId: string | null): HttpSavedRequest | null {
     if (!itemId) return null;
-    return state.requests[itemId] ?? null;
+    return queryClient.getQueryData<HttpSavedRequest | null>(apiSavedRequestKey(itemId)) ?? null;
   }
 
   /** fetchSavedRequest's own gRPC sibling. */
-  async function fetchSavedGrpcRequest(itemId: string): Promise<GrpcSavedRequest> {
-    const cached = state.grpcRequests[itemId];
-    if (cached) return cached;
-    const saved = grpcSavedRequestSchema.parse(await control.collectionsGetGrpcRequest(itemId));
-    state.grpcRequests[itemId] = saved;
-    return saved;
+  async function fetchSavedGrpcRequest(itemId: string): Promise<GrpcSavedRequest | null> {
+    return loadSavedGrpcRequest(itemId);
   }
 
   /** savedRequestFor's own gRPC sibling. */
   function savedGrpcRequestFor(itemId: string | null): GrpcSavedRequest | null {
     if (!itemId) return null;
-    return state.grpcRequests[itemId] ?? null;
+    return (
+      queryClient.getQueryData<GrpcSavedRequest | null>(apiSavedGrpcRequestKey(itemId)) ?? null
+    );
   }
 
   // P108 F4: a restored request/gRPC tab (itemId set from persisted state, never opened through
@@ -194,39 +190,30 @@ export const useCollectionsStore = defineStore('collections', () => {
   // all) read `savedRequestFor` as null forever: not because the row was deleted, but because
   // nothing had ever fetched it. isDirty(state, null) reads that as "nothing to diff, not dirty",
   // and onSave's own `saved() === null` check reads it as "no saved row — Save as…", silently
-  // creating a duplicate row and rebinding the tab to it on first Save. `orphanRequests`/
-  // `orphanGrpcRequests` (above) distinguish a confirmed-gone row from one merely not fetched yet;
-  // `isOrphanRequest`/`isOrphanGrpcRequest` below let the view disable Save (not reroute it) while
-  // that's still unknown.
+  // creating a duplicate row and rebinding the tab to it on first Save. `isOrphanRequest`/
+  // `isOrphanGrpcRequest` below (now the query cache's own null-vs-undefined convention) let the
+  // view disable Save (not reroute it) while that's still unknown.
 
   function isOrphanRequest(itemId: string): boolean {
-    return !!state.orphanRequests[itemId];
+    return queryClient.getQueryData<HttpSavedRequest | null>(apiSavedRequestKey(itemId)) === null;
   }
 
   function isOrphanGrpcRequest(itemId: string): boolean {
-    return !!state.orphanGrpcRequests[itemId];
+    return (
+      queryClient.getQueryData<GrpcSavedRequest | null>(apiSavedGrpcRequestKey(itemId)) === null
+    );
   }
 
   /** Fetches a restored tab's saved side exactly once — a no-op once something has already
-   *  resolved this itemId, whether a cache hit or a confirmed orphan. Safe to call on every mount
-   *  and on every itemId change; idempotent regardless of how many views call it for the same id. */
+   *  resolved this itemId, whether a cache hit or a confirmed orphan (loadSavedRequest's own
+   *  cache-first contract). Safe to call on every mount and on every itemId change. */
   async function ensureSavedRequestLoaded(itemId: string): Promise<void> {
-    if (state.requests[itemId] || state.orphanRequests[itemId]) return;
-    try {
-      await fetchSavedRequest(itemId);
-    } catch {
-      state.orphanRequests[itemId] = true;
-    }
+    await loadSavedRequest(itemId);
   }
 
   /** ensureSavedRequestLoaded's own gRPC sibling. */
   async function ensureSavedGrpcRequestLoaded(itemId: string): Promise<void> {
-    if (state.grpcRequests[itemId] || state.orphanGrpcRequests[itemId]) return;
-    try {
-      await fetchSavedGrpcRequest(itemId);
-    } catch {
-      state.orphanGrpcRequests[itemId] = true;
-    }
+    await loadSavedGrpcRequest(itemId);
   }
 
   // ---- the row model ----
@@ -540,18 +527,15 @@ export const useCollectionsStore = defineStore('collections', () => {
       // folder/collection delete just cascaded away, so `savedRequestFor` correctly reports null
       // for all of them instead of a stale entry that `onSave` would fail against with no visible
       // error.
-      // P112: this local Record-based eviction moves onto the query cache (setQueryData(...,
-      // null)) in this phase's own saved-request commit — left as-is here so this commit stays
-      // self-contained and the file keeps compiling against the still-local requests/grpcRequests
-      // caches until that later commit removes them.
+      // P112: writes `null` into each orphaned id's own query directly rather than only relying on
+      // afterTreeListChange's reconcileTree (already awaited above, inside onSuccess, by the time
+      // mutateAsync resolves) — explicit and idempotent either way, and it never depends on exactly
+      // when reconcileTree ran relative to this line. `null` is itself the orphan marker (D14) —
+      // spares any still-open tab's own ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest
+      // round trip that would only reach the same conclusion via a fetch.
       for (const id of orphaned) {
-        delete state.requests[id];
-        delete state.grpcRequests[id];
-        // P108 F4: known-gone rather than merely uncached — spares any still-open tab's own
-        // ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest round trip that would only
-        // reach the same conclusion via a caught error.
-        state.orphanRequests[id] = true;
-        state.orphanGrpcRequests[id] = true;
+        queryClient.setQueryData(apiSavedRequestKey(id), null);
+        queryClient.setQueryData(apiSavedGrpcRequestKey(id), null);
       }
       // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
       // once its owner (the collection) is gone — deleting it closes any open tab for it.
@@ -581,7 +565,8 @@ export const useCollectionsStore = defineStore('collections', () => {
           name,
         });
       } else if (row.protocol === 'grpc') {
-        const saved = await fetchSavedGrpcRequest(row.id);
+        const saved = await loadSavedGrpcRequest(row.id);
+        if (!saved) throw new Error('This request no longer exists.');
         await control.collectionsCreateGrpcItem({
           collectionId: row.collectionId,
           parentId: row.parentId,
@@ -589,7 +574,8 @@ export const useCollectionsStore = defineStore('collections', () => {
           request: saved,
         });
       } else {
-        const saved = await fetchSavedRequest(row.id);
+        const saved = await loadSavedRequest(row.id);
+        if (!saved) throw new Error('This request no longer exists.');
         await control.collectionsCreateItem({
           collectionId: row.collectionId,
           parentId: row.parentId,
@@ -632,7 +618,7 @@ export const useCollectionsStore = defineStore('collections', () => {
           name,
           request: payload.request,
         });
-        state.grpcRequests[item.id] = payload.request;
+        queryClient.setQueryData(apiSavedGrpcRequestKey(item.id), payload.request);
         try {
           await control.grpcHistoryAdopt(tabId, item.id);
         } catch (err) {
@@ -653,7 +639,7 @@ export const useCollectionsStore = defineStore('collections', () => {
         name,
         request: payload.request,
       });
-      state.requests[item.id] = payload.request;
+      queryClient.setQueryData(apiSavedRequestKey(item.id), payload.request);
       // P8 D14: a scratch tab's response history follows it into the collection, before the tab's
       // itemId is patched below. Best-effort, the same posture D2's own Go-side Record call takes
       // — Save as… itself must succeed regardless of whether adopting its history did.
@@ -687,7 +673,7 @@ export const useCollectionsStore = defineStore('collections', () => {
       await control.collectionsSaveRequest(itemId, name, request);
       // The cache is the dirty comparison's saved side, so it must move in step with the write or
       // the mark would stay lit after a successful save.
-      state.requests[itemId] = request;
+      queryClient.setQueryData(apiSavedRequestKey(itemId), request);
       await afterTreeListChange();
       state.error = null;
     } catch (err) {
@@ -703,7 +689,7 @@ export const useCollectionsStore = defineStore('collections', () => {
   ): Promise<void> {
     try {
       await control.collectionsSaveGrpcRequest(itemId, name, request);
-      state.grpcRequests[itemId] = request;
+      queryClient.setQueryData(apiSavedGrpcRequestKey(itemId), request);
       await afterTreeListChange();
       state.error = null;
     } catch (err) {
