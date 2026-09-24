@@ -1161,14 +1161,30 @@ export class OpsState {
   async runRestack(branch: string): Promise<RestackResult | undefined> {
     if (this.#stack === undefined) return undefined;
     if (this.busy.value) throw new Error('ops: another operation is already running');
+    // F3: captured for the same reason `#applyResult`'s own doc comment gives every other
+    // caller's identity guard — `#stack.runRestack` awaits real git work (one rebase per
+    // branch), long enough for the active repo to have changed underneath it.
+    const repoId = this.#repoId;
     this.busy.value = true;
     try {
       const result = await this.#stack.runRestack(branch);
-      if (result !== undefined) {
+      if (result !== undefined && repoId !== undefined) {
+        // F3: route through the same reconcile every other mutating op uses — this used to
+        // apply only `head` via `#refs.applyHead`, so a restack's own undo record never
+        // appeared (the Undo button kept showing the previous op's, now-superseded, label) and
+        // a restack paused on conflict left `statusSummary.inProgress` null (wrong `canRun`
+        // conflict gating) until the next `repo.changed` round trip. `#applyResult` itself
+        // re-checks repo identity, so this is safe even if the repo changed mid-restack.
+        this.#applyResult(repoId, {
+          ok: result.ok,
+          error: result.error,
+          undo: result.undo ?? null,
+          head: result.head,
+          inProgress: result.inProgress,
+        });
         this.announcement.value = result.ok
           ? composeRestackAnnouncement(result.restacked, undefined, [])
           : composeRestackAnnouncement(result.restacked, result.stoppedAt, result.remaining);
-        this.#refs.applyHead(result.head);
       }
       return result;
     } finally {
