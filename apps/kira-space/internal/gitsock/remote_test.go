@@ -982,6 +982,10 @@ func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
 	client := pairAndReady(t, server, sockPath, "pull-preflight-client")
 	repoID := openRepoOK(t, client, f.workDir).Repo.RepoID
 
+	// P111 acceptance 1, setting half: git config ALSO says "merges", but the stored setting
+	// (not config) is what decides to rebase -- rebaseMerges must not apply on config's say-so.
+	runRemoteGit(t, f.workDir, "config", "pull.rebase", "merges")
+
 	// No strategySetting field at all — exactly what proxyHandlers.ts now sends (D6's own
 	// simplification: a plain forward(), no per-field injection).
 	resp := requestOK(t, client, "remote.pullPreflight", map[string]any{
@@ -994,5 +998,8 @@ func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
 	}
 	if preflight.Strategy != gitpreflight.PullRebase || preflight.Source != gitpreflight.SourceSetting {
 		t.Fatalf("preflight = %+v, want strategy=rebase source=setting (this repo's own stored kiraSpace.pull.strategy)", preflight)
+	}
+	if preflight.RebaseMerges != false {
+		t.Fatalf("preflight.RebaseMerges = %v, want false -- the stored setting, not config, decided to rebase", preflight.RebaseMerges)
 	}
 }

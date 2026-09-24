@@ -149,6 +149,72 @@ func TestWantsRebaseMerges(t *testing.T) {
 	}
 }
 
+// TestResolveRebaseMerges is P111's own table test: strategy x source x two config keys is a
+// decision structure with interacting rules, replacing five real-git subtests
+// (gitsession.wantsRebaseMerges's own deleted TestWantsRebaseMerges) that tested the same rules
+// through I/O.
+func TestResolveRebaseMerges(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		strategy gitpreflight.PullStrategy
+		source   gitpreflight.PullStrategySource
+		cfg      gitpreflight.PullConfigValues
+		want     bool
+	}{
+		{
+			name: "rebase/pullConfig/pull.rebase=merges", strategy: gitpreflight.PullRebase,
+			source: gitpreflight.SourcePullConfig, cfg: gitpreflight.PullConfigValues{PullRebase: strp("merges")},
+			want: true,
+		},
+		{
+			name: "rebase/pullConfig/pull.rebase=m", strategy: gitpreflight.PullRebase,
+			source: gitpreflight.SourcePullConfig, cfg: gitpreflight.PullConfigValues{PullRebase: strp("m")},
+			want: true,
+		},
+		{
+			name: "rebase/branchConfig/branch.x.rebase=merges", strategy: gitpreflight.PullRebase,
+			source: gitpreflight.SourceBranchConfig, cfg: gitpreflight.PullConfigValues{BranchRebase: strp("merges")},
+			want: true,
+		},
+		{
+			name:     "rebase/branchConfig/branch.x.rebase=true wins over pull.rebase=merges (not the winning key)",
+			strategy: gitpreflight.PullRebase, source: gitpreflight.SourceBranchConfig,
+			cfg:  gitpreflight.PullConfigValues{BranchRebase: strp("true"), PullRebase: strp("merges")},
+			want: false,
+		},
+		{
+			name:     "rebase/setting/both keys merges -- the setting, not config, decided to rebase",
+			strategy: gitpreflight.PullRebase, source: gitpreflight.SourceSetting,
+			cfg:  gitpreflight.PullConfigValues{BranchRebase: strp("merges"), PullRebase: strp("merges")},
+			want: false,
+		},
+		{
+			name:     "rebase/explicit/both keys merges -- an explicit pick, not config, decided to rebase",
+			strategy: gitpreflight.PullRebase, source: gitpreflight.SourceExplicit,
+			cfg:  gitpreflight.PullConfigValues{BranchRebase: strp("merges"), PullRebase: strp("merges")},
+			want: false,
+		},
+		{
+			name: "rebase/default/nothing set", strategy: gitpreflight.PullRebase,
+			source: gitpreflight.SourceDefault, cfg: gitpreflight.PullConfigValues{}, want: false,
+		},
+		{
+			name: "merge/pullConfig/pull.rebase=false -- not a rebase at all", strategy: gitpreflight.PullMerge,
+			source: gitpreflight.SourcePullConfig, cfg: gitpreflight.PullConfigValues{PullRebase: strp("false")},
+			want: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := gitpreflight.ResolveRebaseMerges(c.strategy, c.source, c.cfg)
+			if got != c.want {
+				t.Fatalf("ResolveRebaseMerges(%q, %q, %+v) = %v, want %v", c.strategy, c.source, c.cfg, got, c.want)
+			}
+		})
+	}
+}
+
 func TestClassifyPull_CleanNoBlockers(t *testing.T) {
 	t.Parallel()
 	got := gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{

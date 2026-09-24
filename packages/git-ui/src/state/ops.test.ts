@@ -367,3 +367,64 @@ describe('OpsState — a stale confirm dialog no-ops if the active repo changed 
     expect(revertAttempted).toBe(false);
   });
 });
+
+// P111: rebaseMerges travels with the preflight-resolved strategy; an explicit override always
+// sends false, never derived here from strategy === 'rebase' -- the same pick-vs-ladder confusion
+// already slipped past two review rounds (Part 15 F6, Part 16 F6) before it moved server-side.
+describe('OpsState — runPull carries rebaseMerges from the preflight, not a client-side guess', () => {
+  function setUp(): { ops: OpsState; transport: FakeTransport } {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const refs = new RefsState(bridge);
+    const ops = new OpsState(bridge, refs);
+    transport.onRequest = (method) => {
+      switch (method) {
+        case 'status.get':
+          return STATUS;
+        case 'undo.peek':
+          return { slot: null };
+        case 'remote.pullPreflight':
+          return {
+            strategy: 'rebase',
+            source: 'pullConfig',
+            rebaseMerges: true,
+            upstream: 'origin/main',
+            ahead: 0,
+            behind: 1,
+            dirty: false,
+            routes: [],
+            blockers: [],
+          } satisfies PullPreflight;
+        case 'remote.run':
+          return {
+            ok: true,
+            error: undefined,
+            updates: [],
+            head: { kind: 'branch', name: 'main' },
+            inProgress: null,
+          } satisfies RemoteOpResult;
+        default:
+          throw new Error(`unscripted request: ${method}`);
+      }
+    };
+    ops.setRepoId(REPO);
+    return { ops, transport };
+  }
+
+  function remoteRunRebaseMerges(transport: FakeTransport): unknown {
+    const call = transport.calls.find((c) => c.method === 'remote.run');
+    return (call?.params as { rebaseMerges?: unknown } | undefined)?.rebaseMerges;
+  }
+
+  test("running the preflight-resolved strategy sends the preflight's own rebaseMerges", async () => {
+    const { ops, transport } = setUp();
+    await ops.runPull('origin', 'main');
+    expect(remoteRunRebaseMerges(transport)).toBe(true);
+  });
+
+  test('an explicit override always sends rebaseMerges: false', async () => {
+    const { ops, transport } = setUp();
+    await ops.runPull('origin', 'main', 'rebase');
+    expect(remoteRunRebaseMerges(transport)).toBe(false);
+  });
+});
