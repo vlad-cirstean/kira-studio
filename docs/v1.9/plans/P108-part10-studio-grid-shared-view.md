@@ -36,10 +36,10 @@ Paths repo-relative. `SF` = `apps/kira-studio/frontend/src`, `SI` = `apps/kira-s
   view; a signature change there needs a caller sweep.
 - **Read closed chunks first.** Part 4 (`SI/adapters/sqlmutate.go`: `AssertKeyIsPrimaryKey`,
   `ValidateMutationOps`; ClickHouse `quoteIdent` in `SI/adapters/clickhouse/read.go`) is the Go
-  backstop for §4.2 and §4.10. Part 6 closed `SF/bridge` and `@shared/protocol/page`. Part 2's
+  backstop for §4.2 and §4.10. Part 6 closed `SF/bridge` and `@shared/protocol/page`. Part 13's
   result hands one item here: `VG/FkPreviewPopover.vue:132` hand-rolls the backdrop-ancestor
-  `aria-hidden="true"` wrapper that Part 2 F4 fixed in `KuiDialog.vue`/`KuiPopoverPanel.vue`
-  (SPEC "P108 Part 2 result", note 2). It is in scope here and is a finding by default.
+  `aria-hidden="true"` wrapper that Part 13 F4 fixed in `KuiDialog.vue`/`KuiPopoverPanel.vue`
+  (SPEC "P108 Part 13 result", note 2). It is in scope here and is a finding by default.
 - **Premise correction, stated up front.** The pre-plan's watch line reads "P99 Part 4
   migration" as if server state moved to TanStack Query. For this chunk it did not. P99 Part 4
   (`1056b0d` shared, 13 files; `c05271e` grid, 7 files) moved scoped CSS to `@apply` and swapped
