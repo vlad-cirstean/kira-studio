@@ -87,3 +87,96 @@ func TestWriteFileAtomically_SuccessReplacesExistingFileWhole(t *testing.T) {
 		t.Fatalf("directory has %d entries after a successful write, want exactly 1 (no leftover temp file)", len(entries))
 	}
 }
+
+// P108 F18: os.Create(tmpPath)'s 0666-minus-umask default used to replace an existing 0600 export
+// target's mode with whatever the process umask allowed, loosening it.
+func TestWriteFileAtomically_PreservesExistingFileMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "collection.json")
+	if err := os.WriteFile(path, []byte("old content"), 0o600); err != nil {
+		t.Fatalf("seed original file: %v", err)
+	}
+
+	if err := writeFileAtomically(path, func(f *os.File) error {
+		_, err := f.WriteString("new content")
+		return err
+	}); err != nil {
+		t.Fatalf("writeFileAtomically: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("mode after overwrite = %o, want %o (the existing file's own mode preserved)", got, 0o600)
+	}
+}
+
+// P108 F18: a fresh export (no existing target) gets a private 0600 default rather than whatever
+// os.Create's 0666-minus-umask happened to leave.
+func TestWriteFileAtomically_FreshFileGetsPrivateDefaultMode(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "collection.json")
+
+	if err := writeFileAtomically(path, func(f *os.File) error {
+		_, err := f.WriteString("new content")
+		return err
+	}); err != nil {
+		t.Fatalf("writeFileAtomically: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("mode for a fresh export = %o, want %o", got, 0o600)
+	}
+}
+
+// P108 F18: exporting to a path that is a symlink used to replace the link itself with a regular
+// file (the rename target was the link's own path); it must instead write through the link, onto
+// its real target, leaving the link itself intact.
+func TestWriteFileAtomically_WritesThroughASymlinkRatherThanReplacingIt(t *testing.T) {
+	dir := t.TempDir()
+	realPath := filepath.Join(dir, "real-collection.json")
+	if err := os.WriteFile(realPath, []byte("old content"), 0o600); err != nil {
+		t.Fatalf("seed real file: %v", err)
+	}
+	linkPath := filepath.Join(dir, "collection.json")
+	if err := os.Symlink(realPath, linkPath); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if err := writeFileAtomically(linkPath, func(f *os.File) error {
+		_, err := f.WriteString("new content")
+		return err
+	}); err != nil {
+		t.Fatalf("writeFileAtomically: %v", err)
+	}
+
+	linkInfo, err := os.Lstat(linkPath)
+	if err != nil {
+		t.Fatalf("Lstat(linkPath): %v", err)
+	}
+	if linkInfo.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("writeFileAtomically replaced the symlink with a regular file instead of writing through it")
+	}
+
+	got, err := os.ReadFile(realPath)
+	if err != nil {
+		t.Fatalf("ReadFile(realPath): %v", err)
+	}
+	if string(got) != "new content" {
+		t.Fatalf("real target content = %q, want %q", got, "new content")
+	}
+
+	gotViaLink, err := os.ReadFile(linkPath)
+	if err != nil {
+		t.Fatalf("ReadFile(linkPath): %v", err)
+	}
+	if string(gotViaLink) != "new content" {
+		t.Fatalf("content read via the symlink = %q, want %q", gotViaLink, "new content")
+	}
+}

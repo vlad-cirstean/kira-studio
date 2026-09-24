@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -330,15 +331,31 @@ type CollectionsExportArgs struct {
 	Path         string `json:"path"`
 }
 
-// writeFileAtomically writes to a sibling `path + ".kira-partial-<uuid>"` temp file via write,
-// then Syncs, Closes and os.Renames it onto path only once write has fully succeeded — mirroring
+// writeFileAtomically writes to a sibling `target + ".kira-partial-<uuid>"` temp file via write,
+// then Syncs, Closes and os.Renames it onto target only once write has fully succeeded — mirroring
 // internal/adapters/s3/transfer.go's downloadObject (P21 round 3 finding 7). Extracted out of
-// Export so the atomicity guarantee itself — path is only ever replaced by a complete file, and a
-// failure at any step cleans up the temp file rather than leaving it, or path, half-written — can
+// Export so the atomicity guarantee itself — target is only ever replaced by a complete file, and a
+// failure at any step cleans up the temp file rather than leaving it, or target, half-written — can
 // be exercised directly with an injectable write step, not just through a full DB-backed export.
+//
+// P108 F18: target is path with any symlink resolved first (EvalSymlinks errors when path doesn't
+// exist yet, a fresh export, in which case path is used as-is) — otherwise the rename below would
+// replace the link itself with a regular file instead of writing through it, same as `cp` or `mv`
+// onto an existing symlink would. The temp file's mode also mirrors an existing target's mode
+// rather than os.Create's 0666-minus-umask default, which would loosen e.g. a 0600 export target to
+// 0644; a fresh target with nothing to mirror gets a private 0600.
 func writeFileAtomically(path string, write func(*os.File) error) error {
-	tmpPath := path + ".kira-partial-" + uuid.NewString()
-	f, err := os.Create(tmpPath)
+	target := path
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		target = resolved
+	}
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(target); err == nil {
+		mode = info.Mode().Perm()
+	}
+
+	tmpPath := target + ".kira-partial-" + uuid.NewString()
+	f, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return ipcerr.BadRequest(fmt.Sprintf("could not write %s: %s", path, err))
 	}
@@ -358,7 +375,14 @@ func writeFileAtomically(path string, write func(*os.File) error) error {
 		cleanup()
 		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
+	// Belt-and-braces: OpenFile's own perm argument is still subject to umask on creation, which
+	// could strip a bit mirrored from an existing target's mode (e.g. group-write under umask 022).
+	// Chmod sets the exact mode regardless.
+	if err := os.Chmod(tmpPath, mode); err != nil {
+		cleanup()
+		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
+	}
+	if err := os.Rename(tmpPath, target); err != nil {
 		cleanup()
 		return ipcerr.Internal(fmt.Sprintf("could not finish writing %s: %s", path, err))
 	}
