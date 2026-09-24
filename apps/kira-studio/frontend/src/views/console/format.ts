@@ -85,6 +85,15 @@ function formatMongoStatement(
 
   const openParen = match.index + full.length - 1;
   const closeParen = findMatchingParen(stmt, openParen);
+  // P108 Part 11 F9: the return below rebuilds the statement from the parsed collection/method/args
+  // alone — anything after the closing paren (a chained `.limit(5)`, a trailing comment) used to be
+  // silently dropped, turning `db.c.find({}).limit(5)` into `db.c.find({})`. The Go console rejects
+  // that trailing content outright (mongo/console.go's own "unexpected trailing content after
+  // statement") — refusing here instead keeps the statement verbatim, the same D5 contract every
+  // other refusal in this function already follows, rather than Format silently changing the query.
+  if (stmt.slice(closeParen + 1).trim().length > 0) {
+    return { reason: 'unexpected trailing content after statement' };
+  }
   const rawArgs = splitTopLevelArgs(stmt, openParen + 1, closeParen)
     .map((a) => a.text.trim())
     .filter((t) => t.length > 0);
@@ -110,6 +119,33 @@ function formatMongoStatement(
     )
     .join(',\n');
   return { text: `db.${collection}.${method}(\n${indented}\n)` };
+}
+
+// P108 Part 11 F9: `stmt.text` never carries its own ';' (D12's own note below) — when a formatted
+// statement's own last line holds a line comment (sql-formatter keeps a trailing `--`/`#` comment
+// last, and a failed statement is emitted verbatim, comment included), a plain join(';\n\n') places
+// the ';' inside that comment. The splitter then sees one statement instead of two on the next Run
+// all/Format press — Format silently changed what Run all/Run statement execute, and pressing
+// Format again can't undo it (the merged text re-splits the exact same way). Mirrors
+// adapters.JoinConsoleStatements' own fix for the identical defect in the op-log join (P108 Part 11
+// F5): an extra '\n' before such a statement's own separator moves the ';' onto its own line, out
+// of the comment's reach. Over-triggering on a false positive (the prefix text inside a string
+// literal on the last line, not actually a comment) only adds a harmless blank line, never changes
+// what re-splits into — a cheap substring check, not a real lexical scan, same trade-off
+// JoinConsoleStatements makes.
+export function joinFormattedStatements(
+  statements: readonly string[],
+  hashComments: boolean,
+): string {
+  return statements
+    .map((stmt, index) => {
+      if (index === statements.length - 1) return stmt;
+      const lastLine = stmt.slice(stmt.lastIndexOf('\n') + 1);
+      const hasTrailingComment =
+        lastLine.includes('--') || (hashComments && lastLine.includes('#'));
+      return hasTrailingComment ? `${stmt}\n` : stmt;
+    })
+    .join(';\n\n');
 }
 
 interface FormatFailure {
@@ -212,6 +248,6 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   // every ';' it was given. The terminator is now a property of the SOURCE, not of the join: a
   // document that ended in ';' still does, one that did not still does not.
   const endedWithTerminator = /;\s*$/.test(text);
-  const joined = out.join(';\n\n');
+  const joined = joinFormattedStatements(out, hashCommentsFor(dialect));
   return { text: endedWithTerminator ? `${joined};` : joined, ok: true, failures };
 }

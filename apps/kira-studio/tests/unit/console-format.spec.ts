@@ -11,7 +11,10 @@
 // no longer takes its neighbours down with it, and the statement COUNT survives every case
 // (what D12's caret-by-index mapping in ConsoleView.onFormat depends on).
 import { describe, expect, test } from 'bun:test';
-import { formatConsoleText } from '../../frontend/src/views/console/format';
+import {
+  formatConsoleText,
+  joinFormattedStatements,
+} from '../../frontend/src/views/console/format';
 
 describe('formatConsoleText — mongodb', () => {
   test('one argument', async () => {
@@ -183,5 +186,72 @@ describe("formatConsoleText — D12 preserves the document's own trailing termin
     const result = await formatConsoleText('mongodb', input);
     expect(result.ok).toBe(false);
     expect(result.text).toBe(input);
+  });
+});
+
+// P108 Part 11 F9: `stmt.text` never carries its own ';' — when a formatted statement's own last
+// line holds a line comment, a plain join(';\n\n') put the ';' inside that comment, and the
+// splitter then saw one statement instead of two on the next Run all/Format press. Splitter rules
+// (what counts as "the last line's own comment") interacting with the rejoin — the bar this
+// codebase's unit tests apply.
+describe('joinFormattedStatements — F9', () => {
+  test('no trailing comment: an ordinary join, unchanged', () => {
+    expect(joinFormattedStatements(['SELECT 1', 'SELECT 2'], false)).toBe('SELECT 1;\n\nSELECT 2');
+  });
+
+  test('a "--" comment on the statement\'s own last line moves the ";" onto its own line', () => {
+    expect(joinFormattedStatements(['SELECT 1 -- first', 'SELECT 2'], false)).toBe(
+      'SELECT 1 -- first\n;\n\nSELECT 2',
+    );
+  });
+
+  test('a "#" comment only triggers the same fix when hashComments is true (MySQL/ClickHouse)', () => {
+    expect(joinFormattedStatements(['SELECT 1 # first', 'SELECT 2'], false)).toBe(
+      'SELECT 1 # first;\n\nSELECT 2', // sqlite/postgres: '#' is not a comment, plain join is correct
+    );
+    expect(joinFormattedStatements(['SELECT 1 # first', 'SELECT 2'], true)).toBe(
+      'SELECT 1 # first\n;\n\nSELECT 2',
+    );
+  });
+
+  test('a comment on a non-last line needs no fix — only the last line reaches the separator', () => {
+    expect(
+      joinFormattedStatements(['SELECT\n  1 -- comment on line 1\nFROM t', 'SELECT 2'], false),
+    ).toBe('SELECT\n  1 -- comment on line 1\nFROM t;\n\nSELECT 2');
+  });
+
+  test('the last statement never gets a trailing separator or the extra newline', () => {
+    expect(joinFormattedStatements(['SELECT 1', 'SELECT 2 -- last'], false)).toBe(
+      'SELECT 1;\n\nSELECT 2 -- last',
+    );
+  });
+});
+
+describe('formatConsoleText — F9 end to end, real sql-formatter output', () => {
+  test('SQLite: a "--" comment right before the original ";" no longer merges the next statement in', async () => {
+    const result = await formatConsoleText('sqlite', 'SELECT 1 -- first\n;\nSELECT 2;');
+    expect(result.ok).toBe(true);
+    // The bug: sql-formatter keeps the comment on SELECT 1's own last line — a plain join put the
+    // rejoin's ';' right after "first" on that same line, so the whole document re-split as ONE
+    // statement. Fixed: the ';' lands on its own line, right after the comment, never inside it.
+    expect(result.text).toContain('-- first\n;');
+    expect(result.text).not.toMatch(/-- first;/);
+  });
+
+  test('MySQL: the same fix applies to a "#" comment, MySQL\'s own line-comment syntax', async () => {
+    const result = await formatConsoleText('mysql', 'SELECT 1 # first\n;\nSELECT 2;');
+    expect(result.ok).toBe(true);
+    expect(result.text).toContain('# first\n;');
+    expect(result.text).not.toMatch(/# first;/);
+  });
+
+  test('Mongo: a chained call after the closing paren is refused, not silently dropped', async () => {
+    const input = 'db.c.find({}).limit(5)';
+    const result = await formatConsoleText('mongodb', input);
+    expect(result.ok).toBe(false);
+    expect(result.text).toBe(input); // verbatim — .limit(5) is never lost
+    expect(result.failures).toEqual([
+      { index: 0, reason: 'unexpected trailing content after statement' },
+    ]);
   });
 });
