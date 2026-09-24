@@ -264,10 +264,11 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	}
 
 	l := &linker{
-		transport: transport,
-		reg:       new(protoregistry.Files),
-		known:     map[string]*descriptorpb.FileDescriptorProto{},
-		linked:    map[string]bool{},
+		transport:  transport,
+		reg:        new(protoregistry.Files),
+		known:      map[string]*descriptorpb.FileDescriptorProto{},
+		linked:     map[string]bool{},
+		inProgress: map[string]bool{},
 	}
 
 	for _, svc := range services {
@@ -292,16 +293,33 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 // link step, a method rather than an inline closure so the recursion has a receiver to call
 // through.
 type linker struct {
-	transport reflectionTransport
-	reg       *protoregistry.Files
-	known     map[string]*descriptorpb.FileDescriptorProto
-	linked    map[string]bool
+	transport  reflectionTransport
+	reg        *protoregistry.Files
+	known      map[string]*descriptorpb.FileDescriptorProto
+	linked     map[string]bool
+	inProgress map[string]bool
+	stack      []string
 }
 
 func (l *linker) link(path string) error {
 	if l.linked[path] {
 		return nil
 	}
+	if l.inProgress[path] {
+		// F1: a reflection server controls the descriptors it returns, so a cyclic import
+		// (a.proto -> b.proto -> a.proto) is untrusted input, not a programming error. Reject
+		// it explicitly instead of recursing forever into a Go stack overflow, which is fatal
+		// and unrecoverable — it would kill the whole process, not just this request.
+		cycle := append(append([]string{}, l.stack...), path)
+		return fmt.Errorf("cyclic proto dependency: %s", strings.Join(cycle, " -> "))
+	}
+	l.inProgress[path] = true
+	l.stack = append(l.stack, path)
+	defer func() {
+		delete(l.inProgress, path)
+		l.stack = l.stack[:len(l.stack)-1]
+	}()
+
 	raw, ok := l.known[path]
 	if !ok {
 		protos, err := l.transport.fetch(byFilename, path)
