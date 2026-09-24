@@ -172,6 +172,24 @@ const saved = computed(() => collectionsStore.savedRequestFor(props.tab.state.it
 const dirty = computed(() => isDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
+// P108 F4: a restored tab (itemId set from persisted state, never opened through
+// CollectionsTree.vue's own onOpen) never had its saved side fetched at all — `saved` above read
+// null forever, indistinguishable from D14's genuine orphan case. Fetches once per itemId (on
+// mount and on any later itemId change, e.g. after Save as… rebinds this tab); `unresolved` stays
+// true only for the window before that fetch settles one way or the other, keeping Save disabled
+// (rather than misreading "not loaded yet" as "orphan" and rerouting into Save as…).
+const unresolved = computed(() => {
+  const itemId = props.tab.state.itemId;
+  return itemId !== null && saved.value === null && !collectionsStore.isOrphanRequest(itemId);
+});
+watch(
+  () => props.tab.state.itemId,
+  (itemId) => {
+    if (itemId) void collectionsStore.ensureSavedRequestLoaded(itemId);
+  },
+  { immediate: true },
+);
+
 // P71 §3.2/P107 T1-16: an incognito tab has no route into a persisting editor — Save/Save as…
 // no-op, and the #head-trailing button (below) is disabled with a tooltip naming why. This early
 // return also covers registerCommand('api.save', onSave) and the command palette entry it
@@ -183,6 +201,7 @@ const { onSave } = useRequestTabSave({
   incognito: () => incognito.value,
   itemId: () => props.tab.state.itemId,
   saved: () => saved.value,
+  unresolved: () => unresolved.value,
   name: () => props.tab.state.name || title.value,
   toSaved: () => toSavedRequest(props.tab.state),
   save: (itemId, name, body) => collectionsStore.saveRequest(itemId, name, body),
@@ -488,7 +507,7 @@ onUnmounted(() => {
                 variant="toolbar"
                 size="kira"
                 data-testid="http-save"
-                :disabled="incognito || (canSave && !dirty)"
+                :disabled="incognito || unresolved || (canSave && !dirty)"
                 @click="onSave"
               >
                 <CodiconIcon name="save" :size="13" />
@@ -496,7 +515,7 @@ onUnmounted(() => {
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
+          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
       </span>
     </div>

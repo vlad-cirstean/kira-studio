@@ -125,6 +125,21 @@ const saved = computed(() => collectionsStore.savedGrpcRequestFor(props.tab.stat
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
+// P108 F4: HttpRequestView.vue's own fix, mirrored — see its comment for the full rationale. A
+// restored tab's itemId never got its saved side fetched, leaving `saved` null forever, the same
+// shape as D14's genuine orphan. `unresolved` stays true only until that fetch settles.
+const unresolved = computed(() => {
+  const itemId = props.tab.state.itemId;
+  return itemId !== null && saved.value === null && !collectionsStore.isOrphanGrpcRequest(itemId);
+});
+watch(
+  () => props.tab.state.itemId,
+  (itemId) => {
+    if (itemId) void collectionsStore.ensureSavedGrpcRequestLoaded(itemId);
+  },
+  { immediate: true },
+);
+
 // P71 §3.2/P107 T1-16: HttpRequestView.vue's own pair — see views/shared/request/useRequestTabSave.ts.
 // onSaveAs is only ever reached from onSave's own no-saved-row fallback — no separate UI trigger
 // in this view, so it isn't destructured here.
@@ -133,6 +148,7 @@ const { onSave } = useRequestTabSave({
   incognito: () => incognito.value,
   itemId: () => props.tab.state.itemId,
   saved: () => saved.value,
+  unresolved: () => unresolved.value,
   name: () => props.tab.state.name || title.value,
   toSaved: () => toSavedGrpcRequest(props.tab.state),
   save: (itemId, name, body) => collectionsStore.saveGrpcRequest(itemId, name, body),
@@ -297,7 +313,7 @@ onUnmounted(() => {
                 variant="toolbar"
                 size="kira"
                 data-testid="grpc-save"
-                :disabled="incognito || (canSave && !dirty)"
+                :disabled="incognito || unresolved || (canSave && !dirty)"
                 @click="onSave"
               >
                 <CodiconIcon name="save" :size="13" />
@@ -305,7 +321,7 @@ onUnmounted(() => {
               </Button>
             </TooltipDisabledTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
+          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
       </span>
     </div>

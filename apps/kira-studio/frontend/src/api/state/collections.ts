@@ -80,6 +80,12 @@ interface CollectionsState {
   requests: Record<string, HttpSavedRequest>;
   /** P11 D12: GetGrpcRequest's own cache — grpcRequests' own sibling of `requests` above. */
   grpcRequests: Record<string, GrpcSavedRequest>;
+  /** P108 F4: itemIds `ensureSavedRequestLoaded` has confirmed no longer resolve (GetRequest threw
+   *  — the row was deleted, in this window or another) — distinct from an itemId simply not yet
+   *  fetched, which `requests` alone cannot tell apart from a genuine orphan. */
+  orphanRequests: Record<string, true>;
+  /** `orphanRequests`' own gRPC sibling. */
+  orphanGrpcRequests: Record<string, true>;
   busy: boolean;
   report: ImportReport | null;
   /** D16: "N secret values were not written to the file" — set after an export that stripped at
@@ -117,6 +123,8 @@ export const useCollectionsStore = defineStore('collections', () => {
     renamingKey: null,
     requests: {},
     grpcRequests: {},
+    orphanRequests: {},
+    orphanGrpcRequests: {},
     busy: false,
     report: null,
     exportWarning: null,
@@ -175,6 +183,46 @@ export const useCollectionsStore = defineStore('collections', () => {
   function savedGrpcRequestFor(itemId: string | null): GrpcSavedRequest | null {
     if (!itemId) return null;
     return state.grpcRequests[itemId] ?? null;
+  }
+
+  // P108 F4: a restored request/gRPC tab (itemId set from persisted state, never opened through
+  // CollectionsTree.vue's own onOpen — the only call site that used to run fetchSavedRequest at
+  // all) read `savedRequestFor` as null forever: not because the row was deleted, but because
+  // nothing had ever fetched it. isDirty(state, null) reads that as "nothing to diff, not dirty",
+  // and onSave's own `saved() === null` check reads it as "no saved row — Save as…", silently
+  // creating a duplicate row and rebinding the tab to it on first Save. `orphanRequests`/
+  // `orphanGrpcRequests` (above) distinguish a confirmed-gone row from one merely not fetched yet;
+  // `isOrphanRequest`/`isOrphanGrpcRequest` below let the view disable Save (not reroute it) while
+  // that's still unknown.
+
+  function isOrphanRequest(itemId: string): boolean {
+    return !!state.orphanRequests[itemId];
+  }
+
+  function isOrphanGrpcRequest(itemId: string): boolean {
+    return !!state.orphanGrpcRequests[itemId];
+  }
+
+  /** Fetches a restored tab's saved side exactly once — a no-op once something has already
+   *  resolved this itemId, whether a cache hit or a confirmed orphan. Safe to call on every mount
+   *  and on every itemId change; idempotent regardless of how many views call it for the same id. */
+  async function ensureSavedRequestLoaded(itemId: string): Promise<void> {
+    if (state.requests[itemId] || state.orphanRequests[itemId]) return;
+    try {
+      await fetchSavedRequest(itemId);
+    } catch {
+      state.orphanRequests[itemId] = true;
+    }
+  }
+
+  /** ensureSavedRequestLoaded's own gRPC sibling. */
+  async function ensureSavedGrpcRequestLoaded(itemId: string): Promise<void> {
+    if (state.grpcRequests[itemId] || state.orphanGrpcRequests[itemId]) return;
+    try {
+      await fetchSavedGrpcRequest(itemId);
+    } catch {
+      state.orphanGrpcRequests[itemId] = true;
+    }
   }
 
   // ---- the row model ----
@@ -407,6 +455,11 @@ export const useCollectionsStore = defineStore('collections', () => {
     for (const id of orphaned) {
       delete state.requests[id];
       delete state.grpcRequests[id];
+      // P108 F4: known-gone rather than merely uncached — spares any still-open tab's own
+      // ensureSavedRequestLoaded a doomed GetRequest/GetGrpcRequest round trip that would only
+      // reach the same conclusion via a caught error.
+      state.orphanRequests[id] = true;
+      state.orphanGrpcRequests[id] = true;
     }
     // P17 D16: unlike a request tab, a variable-set tab has no state of its own worth preserving
     // once its owner (the collection) is gone — deleting it closes any open tab for it.
@@ -671,6 +724,10 @@ export const useCollectionsStore = defineStore('collections', () => {
     savedRequestFor,
     fetchSavedGrpcRequest,
     savedGrpcRequestFor,
+    isOrphanRequest,
+    isOrphanGrpcRequest,
+    ensureSavedRequestLoaded,
+    ensureSavedGrpcRequestLoaded,
     selectRow,
     toggleRow,
     expandRow,
