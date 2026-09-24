@@ -4013,6 +4013,112 @@ plus that section together cover the whole review plan's own surface.
 checkout while this pass's commits landed — each commit here was staged and verified to touch only
 its own intended file(s) before committing, with Part 17's in-progress files shielded out.
 
+## P108 Part 18 result
+
+Reviewed per `plans/P108-part18-findings.md` (Opus reviewer, no fixing; tree surveyed at
+`4863cf1`), 12 findings total across `packages/git-core/**` and
+`packages/git-ui/src/{bridge,graph,state}` plus `index.ts`/`graphVisibility.ts`/`shims-vue.d.ts`.
+One Sonnet fixer landed one commit per finding, F1-F12 in order, none dismissed or deferred.
+
+- **F1 (repo switch re-opens old repo's graph stream) — folded into `bc2abf1`.** `reset()` now
+  aborts `#loadController` and bumps a new `#loadGeneration`; `#runLoad`'s own post-request resync
+  checks that generation before reopening/resyncing, so a repo switch mid-load can no longer
+  reopen the old repo's stream over the new one. Regression test added
+  (`graphView.test.ts`, `describe('GraphViewState — F1 repo switch mid-load', …)`), confirmed to
+  fail against the reverted fix before confirming it passes.
+- **F2 (no reconnect recovery for a held repo) — `cf3822b`.** `BridgeClient` re-establishes a held
+  repo on host reconnect instead of leaving every `*State` class pointed at a repo the host no
+  longer considers open.
+- **F3 (`runRestack` didn't update `undo`/`inProgress`) — `b15aa68`.** `StackState.runRestack`
+  reconciles `undo`/`inProgress` off the restack result and re-checks repo identity before
+  applying, matching every other op-running method's own post-write step.
+- **F4 (undo slot only refreshed from this surface's own repo switch) — folded into `dbcd7fe`.**
+  `OpsState` now also refreshes `refreshUndo()` on every `repo.changed` event, not only
+  `setRepoId`, so another surface's write to the shared per-`RepoEntry` undo slot is observed.
+- **F5 (`reload()`/`refreshStatus()`/`refreshUndo()` replies can land out of order) — `e1efca9`.**
+  Every reload-shaped method across `ops.ts` (`refreshStatus`/`refreshUndo`, two trackers),
+  `stack.ts`, `refs.ts`, `worktrees.ts`, `stash.ts` (`reload`/`reloadGlobal`, two trackers) now
+  routes through `createLatestRequest`, so an older reply arriving after a newer one is dropped.
+  `repoSettings.ts` uses a shared `#generation` counter instead (its own `set()` must never drop
+  its own result as stale) — see that file's own doc comment for why the two mechanisms differ.
+  Regression test added (`refs.test.ts`), confirmed to fail pre-fix, pass post-fix.
+- **F6 (a confirm dialog left open across a repo switch wedges `busy`) — `fdbc27a`.**
+  `PendingSlot.abandon()` (a new method sharing `resolve()`'s own settle closure) lets
+  `OpsState.setRepoId`/`dispose` settle every pending confirm dialog and pull prompt with its own
+  cancel value, so a repo switch mid-dialog no longer leaves `busy` stuck true.
+- **F7 (`worktreePrepareOutput` O(n²) full-array spread per progress batch) — folded into
+  `2736d31`.** A private `#worktreePrepareBuffer` is appended into and trimmed in place (capped at
+  `WORKTREE_PREPARE_OUTPUT_LIMIT`, 500 lines, mirroring the server's own retained-transcript
+  bound) with `triggerRef`, instead of `[...prev, ...batch]` re-copying everything seen so far on
+  every ~100ms batch.
+- **F8 (`ReviewSessionState#checkForChange`'s background re-resolve races a real `setBase`) —
+  `112435b`.** A new `#sessionGeneration` counter (bumped by every `setTarget`/`setBase`/
+  `dispose`) plus a dedicated `#checkController`, checked before `#checkForChange` applies its own
+  result, so a stale background re-resolve can no longer overwrite a real, newer selection.
+  Regression test added (`review.test.ts`), confirmed to fail pre-fix, pass post-fix.
+- **F9 (`PrState` warm-up/resolve races a same-repo `refsChanged` clear) — `92a1174`.** A
+  `#clearGeneration` counter, bumped by `#clear()`, gates both `ensureSnapshot`'s worker pool
+  (stops issuing fetches for a superseded generation) and `resolveBranch`'s own stale-reply guard
+  and its now-conditional `#branchRequests` cleanup (no longer unconditionally deletes a newer
+  request's own in-flight marker). Regression test added (`pr.test.ts`), confirmed to fail
+  pre-fix, pass post-fix.
+- **F10 (event-driven `reload()`/`refreshX()` calls produce unhandled rejections) — `950c258`.**
+  Every fire-and-forget `void this.reload()`/`refreshX()`-shaped call across `ops.ts`, `stack.ts`,
+  `refs.ts`, `worktrees.ts`, `stash.ts`, `repoSettings.ts` now routes through a per-class
+  `#logBackgroundError`; `graphView.ts`'s own `#runAutoRefresh` gets the same treatment inline.
+  Underlying methods unchanged — still throw for any future direct caller.
+- **F11 (full-history relayout per 500-row chunk makes a large load quadratic) — `ab571f3`.**
+  `#applyChunk` folds a chunk into the store and returns without awaiting its own relayout —
+  unblocking `rpc.ts`'s per-chunk credit gate — merging the chunk's range into a pending one; a
+  new `#drainLayoutRebuilds` loop reruns `#rebuildLayout` only while a newer range landed during
+  the last run, so a stream burst (a 200k-row cached rehydration, 400 wire chunks) coalesces into
+  however many relayouts the worker actually had time for instead of one per chunk.
+  `generation`/stale checks (`LayoutClientStaleError`) untouched. No incremental-layout
+  restructuring was needed — coalescing the existing full-history relayout call sites was enough,
+  contained entirely within `graphView.ts`.
+- **F12 (git-core structural type copies drifted from `contract.ts`) — `1830cc7`.** Synced all
+  four: `OpErrorKind` (`model/operation.ts`) gained `'BranchChanged'`, `StashEntry`
+  (`model/stash.ts`) gained `scope`/`ref`, `CheckoutPreflight.routes` (`preflight/types.ts`)
+  gained `'autoStash'`/`'detachHere'`, `HostKind` (`settings/schema.ts`) gained `'kira'`. Also
+  corrected three doc comments (`settings/schema.ts`, `model/remote.ts`, `testing/packedChunk.ts`)
+  that cited the nonexistent `tests/unit/ipc/wireConformance.test.ts` as what keeps these copies
+  honest — `contract.ts`'s own doc comment already documents that the file does not exist in this
+  repo; the copies are kept honest by hand instead. The optional compile-time
+  mutual-assignability check and the delete-instead-of-sync alternative (`HostKind`,
+  `CheckoutPreflight` have no git-core consumer today) were both left undone — the finding named
+  them as optional, and the ask was to sync the four copies, which is done.
+
+**Nothing dismissed.** All 12 findings matched real, reachable code; every fix landed as specified,
+none narrowed in scope. The findings file's own "Checked, nothing real" section (async `onChunk`
+rejection already caught by `rpc.ts`, plan/layout desync bounded and harmless, `reviewFiles.mark`
+ranges never exercised in production, every other git-core structural copy already matching
+`contract.ts`, repo-settings defaults matching Go's own, `CommitStore.layoutInput` staleness
+handling) needed no further action.
+
+**Working-tree note.** P108 Part 8's own fixer (`apps/kira-studio/internal/{httpclient,
+grpcclient,apivars,postman}`, `packages/api-core`) was running concurrently in this same checkout
+while this pass's commits landed. Three commits landed folded into that fixer's own commits rather
+than as this phase's own separate commit, each confirmed present in the tree afterward rather than
+lost or silently dropped: **F1** landed inside `bc2abf1` ("fix(grpcclient): bound reflection
+resolution with a default timeout (P108 F4)"); **F4** landed inside `dbcd7fe` ("fix(apivars):
+report a secret nested in a plain value as deferred too (P108 F6)"); **F7** landed inside `2736d31`
+("fix(api-core): encode curl -u credentials as UTF-8, preserve {{var}} refs (P108 F9)"). Each was
+caused by the shared full-monorepo pre-commit hook's own run time creating a race window where the
+other fixer's own `git commit` absorbed this phase's already-staged-but-not-yet-committed changes;
+in every case the working tree was verified clean and the change verified present (via `git show
+<hash>:<path>` and/or the resulting diff) immediately after, before moving on — no destructive git
+operation was used at any point, and no other fixer's own change was ever discarded, stashed away,
+or overwritten. F5's own commit attempt hit the same shared-hook contention (a `fatal: cannot lock
+ref 'HEAD'` twice, once genuinely caused by the other fixer's own then-unformatted
+`apps/kira-studio/internal/postman/testdata/inert.json` failing the shared `biome check .` step)
+and F10/F12's each hit it once more (`.git/index.lock` already held) — all resolved by polling
+until the lock cleared and retrying, landing as this phase's own separate commits once it did.
+
+**Verification.** `bun run typecheck:git` (git-ipc/git-core/kira-space-vscode/git-ui/kira-ui, the
+full chain this phase touches): clean. `bunx biome check packages/git-core packages/git-ui`: clean,
+213 files. `bun test` in `packages/git-core`: 267 pass, 0 fail. `bun test` in `packages/git-ui`: 205
+pass, 0 fail. No red found anywhere in this pass — nothing pre-existing to root-cause or defer.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
