@@ -10,7 +10,18 @@ const twMerge = extendTailwindMerge({
   extend: {
     theme: {
       text: ['kira-xs', 'kira-sm', 'kira-md', 'kira-lg', 'kira-xl'],
-      spacing: ['control', 'control-lg', 'control-sm', 'row', 'bar'],
+      spacing: [
+        'control',
+        'control-lg',
+        'control-sm',
+        'row',
+        'bar',
+        // P110 B6
+        'titlebar',
+        'tabbar',
+        'statusbar',
+        'titlebar-inset',
+      ],
       radius: ['kira-sm', 'kira', 'kira-lg', 'kira-pill'],
       shadow: ['kira', 'kira-dialog'],
     },

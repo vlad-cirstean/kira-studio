@@ -781,7 +781,7 @@
 }
 .p-run-state.is-running .ring {
   border-color: var(--kira-accent) transparent var(--kira-accent) var(--kira-accent);
-  animation: p-spin 0.7s linear infinite;
+  animation: kira-spin 0.7s linear infinite;
 }
 .p-run-state.is-error {
   color: var(--kira-error);
@@ -789,11 +789,7 @@
 .p-run-state.is-error .ring {
   border-color: var(--kira-error);
 }
-@keyframes p-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* P110 B6: @keyframes p-spin moved to base.css's @theme as kira-spin, next to --animate-kira-spin. */
 
 /* ---------- strips: error / warning / note ---------- */
 .p-strip {

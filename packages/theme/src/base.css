@@ -50,6 +50,21 @@
   --color-state-on: var(--kira-state-on);
   --color-warn-text: var(--kira-warn-text);
   --color-note-text: var(--kira-note-text);
+  --color-error-text: var(--kira-error-text);
+  /* P110 B6: the grid/document/keyvalue/stream search toolbars' match tint, promoted to real
+     utilities ahead of their scoped-block conversions (B34+). 7 and 5 recurring uses. */
+  --color-search-match: var(--kira-search-match);
+  --color-search-match-current: var(--kira-search-match-current);
+  /* P110 B6: "this {{reference}} will produce a value" -- 4 recurring uses. */
+  --color-var-resolved: var(--kira-var-resolved);
+  /* P110 B6: the CodeMirror/Monaco syntax palette, shared across MonacoHost, AutocompleteField and
+     DocumentTree/slickTheme -- one set of names instead of each file's own literal var(). */
+  --color-syntax-property: var(--kira-syntax-property);
+  --color-syntax-string: var(--kira-syntax-string);
+  --color-syntax-number: var(--kira-syntax-number);
+  --color-syntax-keyword: var(--kira-syntax-keyword);
+  --color-syntax-function: var(--kira-syntax-function);
+  --color-syntax-meta: var(--kira-syntax-meta);
 
   --color-conn-red: var(--kira-conn-red);
   --color-conn-orange: var(--kira-conn-orange);
@@ -78,6 +93,12 @@
   --spacing-control-sm: var(--kira-control-h-sm);
   --spacing-row: var(--kira-row-height);
   --spacing-bar: var(--kira-bar-h);
+  /* P110 B6: deliberate per-bar seams (tokens.css:94-105) -- a plain h-bar would collapse them onto
+     one measurement and lose the ability for a single bar to diverge later. */
+  --spacing-titlebar: var(--kira-titlebar-h);
+  --spacing-tabbar: var(--kira-tabbar-h);
+  --spacing-statusbar: var(--kira-statusbar-h);
+  --spacing-titlebar-inset: var(--kira-titlebar-inset-left);
 
   --text-kira-xs: var(--kira-t-xs);
   --text-kira-sm: var(--kira-t-sm);
@@ -94,8 +115,48 @@
   /* v1.9 tailwind-declines deep dive: names primitives.css's own `@keyframes p-spin` as a real
      `animate-kira-spin` utility, replacing a dozen `animate-[spin_0.7s_linear_infinite]` arbitrary
      values with the app's existing spinner speed (0.7s) instead of falling back to Tailwind's
-     default `animate-spin` (1s), which would be a real timing change with no real benefit. */
-  --animate-kira-spin: p-spin 0.7s linear infinite;
+     default `animate-spin` (1s), which would be a real timing change with no real benefit.
+     P110 B6: the keyframes themselves move here from primitives.css (renamed p-spin -> kira-spin,
+     Tailwind v4 supports @keyframes inside @theme), so primitives.css loses its last @theme-adjacent
+     rule. */
+  --animate-kira-spin: kira-spin 0.7s linear infinite;
+
+  @keyframes kira-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+/* P110 B6: recurring multi-declaration patterns, promoted to @utility ahead of the scoped-block
+   conversions that use them (B32-B37). Each replaces an identical block copied across 3+ files. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ColorPicker's "no colour" swatch: a diagonal slash, never a 13th hue standing in for "nothing
+   chosen". Copied byte-identical across ConnectionDialog/ScriptsPane/VariableSetView. */
+@utility swatch-none {
+  border: 1.5px solid var(--kira-fg-muted);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
+}
+
+/* Wails' own drag-region contract: an element (or its --wails-draggable-inheriting descendant)
+   becomes part of the native title bar when this custom property is `drag`, never when `none`. */
+@utility wails-drag {
+  --wails-draggable: drag;
+}
+@utility wails-no-drag {
+  --wails-draggable: none;
 }
 
 html,

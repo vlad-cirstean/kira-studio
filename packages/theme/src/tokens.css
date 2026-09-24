@@ -230,6 +230,10 @@
      --kira-* tokens yet, not because they shouldn't be; naming them here is that follow-through. */
   --kira-warn-text: #d9c47a;
   --kira-note-text: #a8c8ee;
+  /* P110 B6: sibling of the two above -- .p-strip.err's own text colour, promoted off its literal
+     hex so the Alert component (B23) can keep it exact through a real token instead of falling
+     back to text-error (a different value). */
+  --kira-error-text: #f3a3a3;
   --kira-z-popover: 100;
   --kira-z-dialog: 200;
   --kira-z-menu: 300;
