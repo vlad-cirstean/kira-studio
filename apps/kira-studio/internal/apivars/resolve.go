@@ -181,71 +181,107 @@ func resolveWithSanitizer(text string, values map[string]string, secretNames []s
 			continue
 		}
 		parsed := ParseReference(inner)
-		name := parsed.Name
-		pipeline := parsed.Pipeline
-
-		pushRef := func(kind ReferenceKind) Reference {
-			ref := Reference{Name: name, Kind: kind, Pipeline: pipeline}
-			refs = append(refs, ref)
-			return ref
-		}
-
-		switch {
-		case IsDynamicReference(name):
-			// D6 dynamic row: Go never generates a `{{$name}}`/`{{fake.x.y}}` value itself (P6's
-			// generator is JS-only) — so a dynamic reference here is always left verbatim, with
-			// its own pipeline untouched, exactly as stage 1's own uncatalogued-generator branch
-			// does.
-			pushRef(KindDynamic)
-			out.WriteString(sanitizeOrVerbatim(span))
-		case secrets[name]:
-			// Never sanitized, never transformed here: stage 2 (Resolver.text below) is the pass
-			// that finds this exact span, decrypts the secret and applies its pipeline.
-			pushRef(KindDeferred)
-			out.WriteString(span)
-		default:
-			if value, ok := values[name]; ok {
-				rendered, applyOk := ApplyPipeline(pipeline, value)
-				if !applyOk {
-					// D5: a transform that cannot be applied leaves the entire span verbatim and
-					// classifies the reference unknown.
-					pushRef(KindUnknown)
-					out.WriteString(sanitizeOrVerbatim(span))
-					break
-				}
-				ref := pushRef(KindResolved)
-				if onResolved != nil {
-					onResolved(ref, rendered, parsed.Normalized)
-				}
-				out.WriteString(rendered)
-				// F6: a plain value can itself contain a `{{secretName}}` span verbatim (typed or
-				// pasted, e.g. an "auth" variable whose value is "Bearer {{apiKey}}"). Stage 2
-				// (ResolveRequest below) rescans this function's own combined output and resolves
-				// such a span there — a real second pass across the pipeline as a whole, even
-				// though this one call never re-expands its own output (the "one pass only" line
-				// above is about this call). A caller that decides what to reveal from refs alone
-				// (curl.ts's Copy-as-curl dialog) must be told about that name too, or its preview
-				// disagrees with what Send actually sends. Only meaningful with no pipeline: a
-				// transform on the outer reference consumes the raw text, so any nested `{{...}}`
-				// syntax would already be mangled before stage 2 ever sees it. Classification-only
-				// — resolveWithSanitizer is called with a nil values map so nothing here is itself
-				// substituted; a genuinely nested *plain* reference still stays unknown, matching
-				// the one-pass contract.
-				if len(pipeline) == 0 && len(secrets) > 0 && strings.Contains(value, "{{") {
-					nested := resolveWithSanitizer(value, nil, secretNames, nil, nil)
-					for _, nref := range nested.Refs {
-						if nref.Kind == KindDeferred {
-							refs = append(refs, nref)
-						}
-					}
-				}
-			} else {
-				pushRef(KindUnknown)
-				out.WriteString(sanitizeOrVerbatim(span))
-			}
-		}
+		written, spanRefs := resolveOneSpan(parsed, span, values, secrets, secretNames, sanitizeOrVerbatim, onResolved)
+		refs = append(refs, spanRefs...)
+		out.WriteString(written)
 	}
 	return SubstitutionResult{Text: out.String(), Refs: refs}
+}
+
+// resolveOneSpan classifies and resolves one already-parsed `{{...}}` occurrence — the per-span
+// body resolveWithSanitizer's own walk delegates to, pulled out so the walk itself stays under the
+// repo's gocognit threshold. Returns the text to write in the span's place and every Reference the
+// span produces (itself, plus — for a resolved plain value — F6's nested-deferred-secret reports
+// from nestedDeferredSecretRefs).
+func resolveOneSpan(
+	parsed ParsedReference,
+	span string,
+	values map[string]string,
+	secrets map[string]bool,
+	secretNames []string,
+	sanitizeOrVerbatim func(string) string,
+	onResolved func(ref Reference, rendered, placeholder string),
+) (string, []Reference) {
+	name := parsed.Name
+	pipeline := parsed.Pipeline
+
+	switch {
+	case IsDynamicReference(name):
+		// D6 dynamic row: Go never generates a `{{$name}}`/`{{fake.x.y}}` value itself (P6's
+		// generator is JS-only) — so a dynamic reference here is always left verbatim, with its
+		// own pipeline untouched, exactly as stage 1's own uncatalogued-generator branch does.
+		ref := Reference{Name: name, Kind: KindDynamic, Pipeline: pipeline}
+		return sanitizeOrVerbatim(span), []Reference{ref}
+	case secrets[name]:
+		// Never sanitized, never transformed here: stage 2 (Resolver.text below) is the pass
+		// that finds this exact span, decrypts the secret and applies its pipeline.
+		ref := Reference{Name: name, Kind: KindDeferred, Pipeline: pipeline}
+		return span, []Reference{ref}
+	default:
+		return resolvePlainOrUnknown(parsed, span, values, secrets, secretNames, sanitizeOrVerbatim, onResolved)
+	}
+}
+
+// resolvePlainOrUnknown handles resolveOneSpan's default case: a name that names neither a dynamic
+// generator nor a secret, so it is looked up in values and either resolved or classified unknown.
+func resolvePlainOrUnknown(
+	parsed ParsedReference,
+	span string,
+	values map[string]string,
+	secrets map[string]bool,
+	secretNames []string,
+	sanitizeOrVerbatim func(string) string,
+	onResolved func(ref Reference, rendered, placeholder string),
+) (string, []Reference) {
+	name := parsed.Name
+	pipeline := parsed.Pipeline
+
+	value, ok := values[name]
+	if !ok {
+		ref := Reference{Name: name, Kind: KindUnknown, Pipeline: pipeline}
+		return sanitizeOrVerbatim(span), []Reference{ref}
+	}
+
+	rendered, applyOk := ApplyPipeline(pipeline, value)
+	if !applyOk {
+		// D5: a transform that cannot be applied leaves the entire span verbatim and classifies
+		// the reference unknown.
+		ref := Reference{Name: name, Kind: KindUnknown, Pipeline: pipeline}
+		return sanitizeOrVerbatim(span), []Reference{ref}
+	}
+
+	ref := Reference{Name: name, Kind: KindResolved, Pipeline: pipeline}
+	if onResolved != nil {
+		onResolved(ref, rendered, parsed.Normalized)
+	}
+	refs := append([]Reference{ref}, nestedDeferredSecretRefs(value, pipeline, secrets, secretNames)...)
+	return rendered, refs
+}
+
+// nestedDeferredSecretRefs is F6: a plain value can itself contain a `{{secretName}}` span
+// verbatim (typed or pasted, e.g. an "auth" variable whose value is "Bearer {{apiKey}}"). Stage 2
+// (ResolveRequest below) rescans this function's own combined output and resolves such a span
+// there — a real second pass across the pipeline as a whole, even though a single
+// resolveWithSanitizer call never re-expands its own output (the "one pass only" line on Resolve
+// above is about that one call). A caller that decides what to reveal from refs alone (curl.ts's
+// Copy-as-curl dialog) must be told about that name too, or its preview disagrees with what Send
+// actually sends. Only meaningful with no pipeline: a transform on the outer reference consumes
+// the raw text, so any nested `{{...}}` syntax would already be mangled before stage 2 ever sees
+// it. Classification-only — the recursive call is made with a nil values map so nothing here is
+// itself substituted; a genuinely nested *plain* reference still stays unknown, matching the
+// one-pass contract.
+func nestedDeferredSecretRefs(value string, pipeline []string, secrets map[string]bool, secretNames []string) []Reference {
+	if len(pipeline) != 0 || len(secrets) == 0 || !strings.Contains(value, "{{") {
+		return nil
+	}
+	nested := resolveWithSanitizer(value, nil, secretNames, nil, nil)
+	var out []Reference
+	for _, nref := range nested.Refs {
+		if nref.Kind == KindDeferred {
+			out = append(out, nref)
+		}
+	}
+	return out
 }
 
 // Names returns every distinct {{name}} reference in text, in first-seen order — the same scan
