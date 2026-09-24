@@ -38,7 +38,18 @@ export function sqlDialectFor(kind: ConnectionKind | undefined): SqlDialect | un
 const BACKTICK_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
 
 export function quoteIdent(dialect: SqlDialect | undefined, name: string): string {
-  if (dialect && BACKTICK_DIALECTS.has(dialect)) return `\`${name.replace(/`/g, '``')}\``;
+  if (dialect && BACKTICK_DIALECTS.has(dialect)) {
+    // F11 (P108 Part 10): ClickHouse's lexer reads a backtick-quoted identifier with the same
+    // backslash-escape rules as a string literal (clickhouse/read.go's own quoteIdent) — MySQL
+    // does not, so doubling backticks alone (the pre-fix behaviour, still correct for MySQL) left
+    // a ClickHouse name containing `\` able to escape its own closing backtick, corrupting the
+    // query. Escape `\` first, matching Go, before doubling backticks. A NUL byte has no quoted
+    // spelling in either grammar (Go panics on it); stripped here rather than thrown, since this
+    // builds a generated SQL string for the user to see, not a request that can fail loudly.
+    const safe =
+      dialect === 'clickhouse' ? name.split('\u0000').join('').replace(/\\/g, '\\\\') : name;
+    return `\`${safe.replace(/`/g, '``')}\``;
+  }
   return `"${name.replace(/"/g, '""')}"`;
 }
 
