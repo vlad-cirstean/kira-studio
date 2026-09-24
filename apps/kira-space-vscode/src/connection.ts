@@ -46,7 +46,7 @@ export type ConnectionState =
   | { readonly kind: 'connecting' }
   | { readonly kind: 'pairing' }
   | { readonly kind: 'connected' }
-  | { readonly kind: 'denied'; readonly reason: 'denied' | 'timeout' }
+  | { readonly kind: 'denied'; readonly reason: 'denied' | 'timeout' | 'remote' }
   | {
       readonly kind: 'versionMismatch';
       readonly expected: number;
@@ -71,7 +71,12 @@ export function toWireConnectionState(state: ConnectionState): {
     case 'denied':
       return {
         kind: 'denied',
-        detail: state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
+        detail:
+          state.reason === 'timeout'
+            ? 'Pairing request timed out'
+            : state.reason === 'remote'
+              ? 'Kira Space runs on this Mac; remote workspaces are not supported'
+              : 'Pairing was denied',
       };
     case 'versionMismatch':
       return {
@@ -98,7 +103,10 @@ interface HandshakeResponse {
   readonly reason?: string;
 }
 
-function socketPath(): string {
+// Exported (F10): extension.ts's own status text used to hardcode the literal `~/.kira-space/git.sock`
+// form, which is wrong the moment KIRA_SPACE_HOME is set and gives no hint at all under a remote
+// workspace (below) — the actual resolved path is worth one accessor, not a second guess at it.
+export function socketPath(): string {
   const home = process.env.KIRA_SPACE_HOME ?? path.join(os.homedir(), '.kira-space');
   return path.join(home, 'git.sock');
 }
@@ -165,6 +173,17 @@ export class ConnectionManager implements vscode.Disposable {
     this.#logger = logger;
     this.#appVersion = appVersion;
     this.#clientId = resolveClientId(context);
+    // F10: under Remote-SSH/WSL/Dev Containers, this code runs on the remote host and would dial
+    // the REMOTE's own ~/.kira-space/git.sock, which never exists (Kira Space itself only ever
+    // runs on the user's own Mac) — an endless connecting/backoff loop with no way to ever
+    // succeed. Skip the dial loop entirely and go straight to a terminal state that explains why,
+    // rather than let #dial's own backoff spin forever against a socket path nothing will ever
+    // create.
+    if (vscode.env.remoteName) {
+      this.#stopped = true;
+      this.#state = { kind: 'denied', reason: 'remote' };
+      return;
+    }
     void this.#dial();
   }
 
@@ -279,6 +298,10 @@ export class ConnectionManager implements vscode.Disposable {
    *  either state ever leaves itself, since disconnection alone does not retry them. */
   retry(): void {
     if (this.#state.kind !== 'denied' && this.#state.kind !== 'versionMismatch') return;
+    // F10: a remote workspace's own "denied" is permanent (vscode.env.remoteName never changes
+    // for a running window) — retrying would only re-enter the same dial loop this constructor
+    // chose never to start.
+    if (this.#state.kind === 'denied' && this.#state.reason === 'remote') return;
     this.#backoffMs = INITIAL_BACKOFF_MS;
     this.#setState({ kind: 'connecting' });
     void this.#dial();

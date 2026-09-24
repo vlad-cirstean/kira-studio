@@ -34,7 +34,12 @@ import {
 } from './blameWidget.ts';
 import type { OtherCommandId } from './commands.ts';
 import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.ts';
-import { ConnectionManager, type ConnectionState, toWireConnectionState } from './connection.ts';
+import {
+  ConnectionManager,
+  type ConnectionState,
+  socketPath,
+  toWireConnectionState,
+} from './connection.ts';
 import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
 import { VsCodeBrowser } from './ports/browser.ts';
@@ -244,7 +249,7 @@ function updateStatusBar(
   switch (state.kind) {
     case 'connecting': {
       item.text = '$(sync~spin)';
-      tooltipLines = ['**Kira Space**', 'Connecting…', '`~/.kira-space/git.sock`'];
+      tooltipLines = ['**Kira Space**', 'Connecting…', `\`${socketPath()}\``];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
@@ -295,11 +300,14 @@ function updateStatusBar(
     }
     case 'denied': {
       item.text = '$(error) Kira';
-      tooltipLines = [
-        '**Kira Space**',
-        state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
-        'Click to retry',
-      ];
+      tooltipLines =
+        state.reason === 'remote'
+          ? ['**Kira Space**', 'Runs on your Mac — remote workspaces are not supported']
+          : [
+              '**Kira Space**',
+              state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
+              'Click to retry',
+            ];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       item.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       break;
@@ -681,7 +689,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 async function showConnectionStatus(manager: ConnectionManager): Promise<void> {
   const state = manager.state;
-  const socketNote = `Socket: ~/.kira-space/git.sock`;
+  const socketNote = `Socket: ${socketPath()}`;
   switch (state.kind) {
     case 'connected': {
       await vscode.window.showInformationMessage(`Kira Space: connected. ${socketNote}`);
@@ -698,6 +706,15 @@ async function showConnectionStatus(manager: ConnectionManager): Promise<void> {
       return;
     }
     case 'denied': {
+      if (state.reason === 'remote') {
+        await vscode.window.showWarningMessage(
+          'Kira Space runs on this Mac; remote workspaces are not supported. ' +
+            `This window would need to reach ${socketPath()} on ${
+              vscode.env.remoteName
+            }, which does not exist there.`,
+        );
+        return;
+      }
       const action = await vscode.window.showWarningMessage(
         state.reason === 'timeout'
           ? `Kira Space: pairing request timed out. ${socketNote}`
