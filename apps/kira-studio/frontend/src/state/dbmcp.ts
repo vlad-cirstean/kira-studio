@@ -44,16 +44,22 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
     unsubscribeApproval = control.onDbMcpApprovalChanged(applyApprovalSnapshot);
   }
 
-  // approveQuery/denyQuery apply the returned snapshot directly (bridge/dbmcp.go's own contract: the
-  // current snapshot, not an action-result enum) so the clicking window updates immediately, without
-  // waiting for its own broadcast to arrive — the broadcast still arrives and reapplies the same
-  // value, a harmless no-op.
+  // P108 Part 12 F2 (minor, same file family): approveQuery/denyQuery used to apply the RPC's own
+  // returned snapshot directly, so the clicking window updated without waiting for its own
+  // onDbMcpApprovalChanged broadcast to arrive. But the broker emits that broadcast synchronously
+  // inside Approve/Deny (internal/dbmcp/approval.go), before the RPC handler even returns its own
+  // snapshot — so a second broadcast (e.g. another window's concurrent answer to the next request)
+  // could already be in flight and land here *after* this call's own (now older) returned snapshot,
+  // overwriting the newer queue state with a stale one until the following change. Ignoring the
+  // returned snapshot and relying solely on the broadcast (same source for every window, always
+  // freshest-applied last since state/dbmcp.ts subscribes once) removes that ordering hazard
+  // entirely; the round trip is local IPC, not worth a race for.
   async function approveQuery(requestId: string): Promise<void> {
-    applyApprovalSnapshot(await control.dbMcpApproveQuery(requestId));
+    await control.dbMcpApproveQuery(requestId);
   }
 
   async function denyQuery(requestId: string): Promise<void> {
-    applyApprovalSnapshot(await control.dbMcpDenyQuery(requestId));
+    await control.dbMcpDenyQuery(requestId);
   }
 
   // C3 §7.1/D7: the toggle applies immediately, bypassing the dialog's draft/Save flow entirely,

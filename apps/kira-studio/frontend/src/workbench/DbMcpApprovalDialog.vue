@@ -34,10 +34,15 @@ const { pause: pauseTick, resume: resumeTick } = useIntervalFn(
 // that same app-boot mount — with DialogFrame's v-if false and nothing in the DOM yet, so
 // denyButton.value was always null there and Deny was never actually focused. nextTick here runs
 // it after each approval's own DOM update instead, so it sticks for real.
+//
+// P108 Part 12 F2: watches requestId, not just pending-vs-not — a queue advance (A approved/denied
+// while B is already queued) swaps pending from A straight to B with no null in between. The old
+// boolean source never re-fired for that swap, so focus silently stayed on Approve for B (a second
+// Enter or key repeat could then approve a request the user never reviewed).
 watch(
-  () => dbMcpStore.approval.pending !== null,
-  (isPending) => {
-    if (isPending) {
+  () => dbMcpStore.approval.pending?.requestId ?? null,
+  (requestId) => {
+    if (requestId) {
       now.value = Date.now();
       resumeTick();
       // Deny is the default focus, an approval dialog whose Enter key runs a write or DDL
@@ -83,19 +88,27 @@ const heavyLede = computed(() => {
   return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${plan.estimatedRowsRead.toLocaleString()} rows — over your threshold of ${plan.thresholdRows.toLocaleString()}.`;
 });
 
-async function onDeny(): Promise<void> {
-  const id = dbMcpStore.approval.pending?.requestId;
-  if (id) await dbMcpStore.denyQuery(id);
+// P108 Part 12 F2: takes the request id as an explicit argument, bound in the template from the
+// currently-rendered request (below), rather than re-reading dbMcpStore.approval.pending fresh at
+// click time — combined with the Dialog's own :key (below), a queue swap mid-click destroys and
+// recreates the buttons, so a click that started on request A's button can no longer complete as a
+// click on request B's.
+async function onDeny(requestId: string): Promise<void> {
+  await dbMcpStore.denyQuery(requestId);
 }
 
-async function onApprove(): Promise<void> {
-  const id = dbMcpStore.approval.pending?.requestId;
-  if (id) await dbMcpStore.approveQuery(id);
+async function onApprove(requestId: string): Promise<void> {
+  await dbMcpStore.approveQuery(requestId);
 }
 </script>
 
 <template>
-  <Dialog v-if="dbMcpStore.approval.pending" :open="true" @update:open="(v) => !v && onDeny()">
+  <Dialog
+    v-if="dbMcpStore.approval.pending"
+    :key="dbMcpStore.approval.pending.requestId"
+    :open="true"
+    @update:open="(v) => !v && onDeny(dbMcpStore.approval.pending!.requestId)"
+  >
     <DialogContent
       :show-close-button="false"
       data-testid="db-mcp-approval-dialog"
@@ -105,7 +118,13 @@ async function onApprove(): Promise<void> {
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">{{ dialogTitle }}</DialogTitle>
         <DialogClose as-child>
-          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" @click="onDeny">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            @click="onDeny(dbMcpStore.approval.pending!.requestId)"
+          >
             <CodiconIcon name="close" :size="13" />
           </Button>
         </DialogClose>
@@ -153,14 +172,20 @@ async function onApprove(): Promise<void> {
 
       <DialogFooter class="border-t border-border">
         <span class="flex items-center gap-1 ml-auto">
-          <Button ref="denyButton" variant="dialog" size="kira-lg" data-testid="db-mcp-approval-deny" @click="onDeny">
+          <Button
+            ref="denyButton"
+            variant="dialog"
+            size="kira-lg"
+            data-testid="db-mcp-approval-deny"
+            @click="onDeny(dbMcpStore.approval.pending!.requestId)"
+          >
             Deny
           </Button>
           <Button
             variant="dialog-primary"
             size="kira-lg"
             data-testid="db-mcp-approval-approve"
-            @click="onApprove"
+            @click="onApprove(dbMcpStore.approval.pending!.requestId)"
           >
             Approve
           </Button>
