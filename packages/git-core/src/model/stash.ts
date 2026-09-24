@@ -51,4 +51,10 @@ export interface StashEntry {
   /** `untrackedSha !== undefined` — see that field's own doc comment on why this, not
    *  `hasUntracked`, is the honest name. */
   readonly includedUntracked: boolean;
+  /** G28 D17: which bucket this entry lives in — `'stack'` (an ordinary `refs/stash` entry) or
+   *  `'global'` (`refs/kira/globalstash/<sha>`). */
+  readonly scope: 'stack' | 'global';
+  /** G28 D8/D17: `''` for a stack entry (addressed by position, never by ref); the entry's own
+   *  `refs/kira/globalstash/<sha>` for a global one. */
+  readonly ref: string;
 }

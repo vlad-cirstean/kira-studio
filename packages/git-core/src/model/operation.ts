@@ -405,6 +405,12 @@ export type OpErrorKind =
   /** G28 D10: `globalStashSave` from the current working tree with nothing dirty — `git stash
    *  create` answers exit 0 with empty output on a clean tree (probe P4). */
   | 'NothingToStash'
+  /** G30 round-1 functional-correctness review, finding #2: `remote.run`'s pull integrate phase
+   *  (merge/rebase) re-checks HEAD is still the branch the pull was started for, immediately
+   *  before that write — a fetch can take arbitrary wall-clock time, during which another
+   *  window/terminal can check out a different branch, and without this the merge/rebase would
+   *  silently land on whatever is checked out now instead. */
+  | 'BranchChanged'
   | 'Unknown';
 
 export interface UndoSlotSnapshot {

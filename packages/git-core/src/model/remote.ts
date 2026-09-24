@@ -1,9 +1,10 @@
 /**
  * P8's remote-op vocabulary. `PullStrategy`/`PullStrategySource`/`RemoteOpKind`/`RefUpdate`/
  * `RemoteOpRequest`/`RemoteOpResult` are structural copies of `@kira/git-ipc`'s own (B3 —
- * `core` and `ipc` both depend on nothing, per §3.1, so neither imports the other);
- * `tests/unit/ipc/wireConformance.test.ts` is what keeps the two in step, the same discipline
- * `HeadState`/`DecorationRef` already follow.
+ * `core` and `ipc` both depend on nothing, per §3.1, so neither imports the other). This repo
+ * carries no `wireConformance.test.ts` (`@kira/git-ipc`'s own `contract.ts` doc comment says
+ * why) — kept honest by hand instead, the same discipline `HeadState`/`DecorationRef` already
+ * follow.
  */
 import type { InProgressOperation, OpErrorKind } from './operation.ts';
 import type { HeadState } from './repo.ts';

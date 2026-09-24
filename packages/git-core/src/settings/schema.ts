@@ -12,10 +12,10 @@
 import { assert } from '../util/assert.ts';
 
 /** Which shell mounted the UI bundle — a structural copy of `@kira/git-ipc`'s `HostKind`
- *  (ipc may not import core and core may not import ipc, per §3.1's B3; kept honest by
- *  `tests/unit/ipc/wireConformance.test.ts`, same as `SettingsSnapshot`/`HeadState`/
- *  `DecorationRef`). */
-export type HostKind = 'vscode' | 'harness';
+ *  (ipc may not import core and core may not import ipc, per §3.1's B3). This repo carries no
+ *  `wireConformance.test.ts` (`@kira/git-ipc`'s own `contract.ts` doc comment says why) — kept
+ *  honest by hand instead, same as `SettingsSnapshot`/`HeadState`/`DecorationRef`. */
+export type HostKind = 'vscode' | 'harness' | 'kira';
 
 /** `docs/plans/P7.md` W7/D43: `"stringArray"` is the first array-valued setting type — added for
  *  `kiraSpace.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it

@@ -46,7 +46,9 @@ export interface BuildPackedChunkOptions {
  *
  * Returns `packages/git-core`'s own `PackedCommitChunk` (B3: this package may not import
  * `@kira/git-ipc`'s copy) — structurally identical, so it drops straight into any caller's own
- * `PackedCommitChunk`-typed slot; `wireConformance.test.ts` is what keeps the two shapes in step.
+ * `PackedCommitChunk`-typed slot. This repo carries no `wireConformance.test.ts`
+ * (`@kira/git-ipc`'s own `contract.ts` doc comment says why) — the two shapes are kept in step
+ * by hand instead.
  */
 export function buildPackedChunk(
   rows: readonly PackedChunkRow[],

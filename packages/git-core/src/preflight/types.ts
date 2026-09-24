@@ -43,8 +43,14 @@ export interface CheckoutPreflight {
   readonly verdict: 'clean' | 'cleanCarry' | 'blocked';
   /** Which routes the UI may offer for a `blockedByTracked` verdict. P6 emits `["discard"]` (or
    *  `[]` when an untracked block is also present — discard cannot clear that, probe P9). P9
-   *  adds `"stashAndCarry"` here rather than in the component (§7.5). */
-  readonly routes: readonly ('discard' | 'stashAndCarry')[];
+   *  adds `"stashAndCarry"` here rather than in the component (§7.5). G28 D2 adds two more:
+   *  `"autoStash"` (whole-tree `stash push [-u]`, tagged with the CURRENT branch, never popped
+   *  back — offered whenever EITHER dirty-blocker kind is present, unlike the two routes above,
+   *  which the untracked case suppresses) and `"detachHere"` (offered whenever a
+   *  `worktreeConflict` blocker is present for a `switch`-mode request to a branch/remote-branch
+   *  target — composes freely with `"autoStash"` when both blocker kinds are present at once,
+   *  D6). */
+  readonly routes: readonly ('discard' | 'stashAndCarry' | 'autoStash' | 'detachHere')[];
 }
 
 export interface RevertParentChoice {
