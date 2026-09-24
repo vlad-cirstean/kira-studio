@@ -13,36 +13,18 @@ defineProps<{ branchName: string }>();
 </script>
 
 <template>
-  <div class="kv-empty-repo-panel" data-testid="empty-repository-panel">
-    <span class="codicon kv-empty-repo-icon" :class="STATE_ICONS.commit" aria-hidden="true"></span>
-    <p class="kv-empty-repo-text">
+  <div
+    class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
+    data-testid="empty-repository-panel"
+  >
+    <span
+      class="codicon kv:text-[24px] kv:text-muted"
+      :class="STATE_ICONS.commit"
+      aria-hidden="true"
+    ></span>
+    <p class="kv:m-0 kv:max-w-[420px] kv:text-muted">
       This repository has no commits yet. Create the first one on
       <strong>{{ branchName }}</strong> to see it here.
     </p>
   </div>
 </template>
-
-<style>
-.kv-empty-repo-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-4);
-  height: 100%;
-  padding: var(--kv-s-6);
-  text-align: center;
-  color: var(--kv-app-fg);
-}
-
-.kv-empty-repo-icon {
-  font-size: 24px;
-  color: var(--kv-description-fg);
-}
-
-.kv-empty-repo-text {
-  margin: 0;
-  max-width: 420px;
-  color: var(--kv-description-fg);
-}
-</style>

@@ -52,17 +52,27 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
 </script>
 
 <template>
-  <div class="kv-no-repo-panel" data-testid="no-repository-panel">
-    <span class="codicon kv-no-repo-icon" :class="STATE_ICONS.repo" aria-hidden="true"></span>
-    <h2 class="kv-no-repo-title">Open a repository</h2>
-    <ul v-if="repoState.candidates.value.length > 0" class="kv-no-repo-list">
+  <div
+    class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-fg"
+    data-testid="no-repository-panel"
+  >
+    <span
+      class="codicon kv:text-[32px] kv:text-muted"
+      :class="STATE_ICONS.repo"
+      aria-hidden="true"
+    ></span>
+    <h2 class="kv:m-0 kv:text-lg kv:font-semibold">Open a repository</h2>
+    <ul
+      v-if="repoState.candidates.value.length > 0"
+      class="kv:flex kv:flex-col kv:gap-0.5 kv:m-0 kv:p-0 kv:list-none kv:max-w-[420px] kv:w-full"
+    >
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
         <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
              loop, a worktree switch elsewhere) is in flight — `RepoState.open`'s own sequence
              token already discards whichever one loses the race, but a second click before that
              is just wasted work and a confusing "which one did I pick" moment. -->
         <KuiButton
-          class="kv-no-repo-candidate"
+          class="kv:w-full kv:text-left kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap"
           :disabled="repoState.opening.value"
           @click="openCandidate(candidate)"
         >
@@ -71,10 +81,14 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
       </li>
     </ul>
     <template v-else>
-      <p v-if="refreshError" class="kv-no-repo-note" data-testid="no-repository-refresh-error">
+      <p
+        v-if="refreshError"
+        class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center"
+        data-testid="no-repository-refresh-error"
+      >
         Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
       </p>
-      <p v-else class="kv-no-repo-note">
+      <p v-else class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center">
         Kira Space follows the folders open in this VS Code window. None of them is a Git
         repository — open one with File → Open Folder.
       </p>
@@ -82,60 +96,12 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         Retry
       </KuiButton>
     </template>
-    <p v-if="pickError" class="kv-no-repo-note" data-testid="no-repository-pick-error">
+    <p
+      v-if="pickError"
+      class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center"
+      data-testid="no-repository-pick-error"
+    >
       Couldn't open that repository — {{ pickError }}.
     </p>
   </div>
 </template>
-
-<style>
-.kv-no-repo-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-4);
-  height: 100%;
-  padding: var(--kv-s-6);
-  color: var(--kv-app-fg);
-}
-
-.kv-no-repo-icon {
-  font-size: 32px;
-  color: var(--kv-description-fg);
-}
-
-.kv-no-repo-title {
-  margin: 0;
-  font-size: 1.1em;
-  font-weight: 600;
-}
-
-.kv-no-repo-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  max-width: 420px;
-  width: 100%;
-}
-
-/* G34: box geometry (padding/border/border-radius) no longer re-declared here — the default
-   `KuiButton` box is this shape now; only the full-width-list-item layout survives. */
-.kv-no-repo-candidate {
-  width: 100%;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-no-repo-note {
-  max-width: 420px;
-  margin: 0;
-  color: var(--kv-description-fg);
-  text-align: center;
-}
-</style>

@@ -85,15 +85,27 @@ const PATH_DISPLAY_CAP = 20;
 </script>
 
 <template>
-  <div v-if="inProgress" class="kv-conflict-banner" role="status" data-testid="conflict-banner">
-    <div class="kv-conflict-banner-row">
-      <span class="codicon codicon-warning kv-conflict-banner-icon" aria-hidden="true"></span>
-      <span class="kv-conflict-banner-title">{{ describeInProgress(inProgress) }}</span>
-      <span v-if="inProgress.unmergedCount > 0" class="kv-conflict-banner-count">
+  <!-- W20: `bg-panel`, not `--kv-overlay-bg` — that token is a translucent modal-backdrop scrim,
+       meant to sit behind an opaque dialog, not host text of its own; over a light theme it fails
+       contrast against this banner's own text (axe's color-contrast scan, vscode-light/
+       high-contrast-light). This is persistent chrome, so it gets an opaque panel background. -->
+  <div
+    v-if="inProgress"
+    class="kv:shrink-0 kv:py-1 kv:px-2 kv:bg-panel kv:border-b kv:border-panel-border"
+    role="status"
+    data-testid="conflict-banner"
+  >
+    <div class="kv:flex kv:items-center kv:gap-1">
+      <span
+        class="codicon codicon-warning kv:text-diff-modified"
+        aria-hidden="true"
+      ></span>
+      <span class="kv:font-semibold">{{ describeInProgress(inProgress) }}</span>
+      <span v-if="inProgress.unmergedCount > 0" class="kv:text-muted kv:text-sm">
         {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
       </span>
 
-      <span class="kv-conflict-banner-spacer"></span>
+      <span class="kv:flex-1"></span>
 
       <KuiButton
         v-if="resolveConflictEnabled"
@@ -130,7 +142,7 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
       :id="CONTINUE_REASON_ID"
-      class="kv-conflict-banner-reason"
+      class="kv:mt-0.5 kv:text-xs kv:text-muted"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
@@ -140,87 +152,29 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-else-if="inProgress.unmergedCount > 0"
       :id="CONTINUE_REASON_ID"
-      class="kv-conflict-banner-reason"
+      class="kv:mt-0.5 kv:text-xs kv:text-muted"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
       then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
     </p>
-    <p v-else-if="inProgress.canSkip" class="kv-conflict-banner-reason">
+    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-xs kv:text-muted">
       No conflicts remain. Continue to commit this change, or Skip if it is already present.
     </p>
 
-    <ul v-if="inProgress.conflictedPaths.length > 0" class="kv-conflict-banner-paths">
+    <ul
+      v-if="inProgress.conflictedPaths.length > 0"
+      class="kv:mt-0.5 kv:pl-3 kv:max-h-20 kv:overflow-y-auto kv:font-data kv:text-xs"
+    >
       <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
         <code>{{ path }}</code>
       </li>
-      <li v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP" class="kv-conflict-banner-more">
+      <li
+        v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
+        class="kv:text-muted"
+      >
         +{{ inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }} more
       </li>
     </ul>
   </div>
 </template>
-
-<style>
-.kv-conflict-banner {
-  flex-shrink: 0;
-  padding: var(--kv-s-2) var(--kv-s-4);
-  /* W20: not `--kv-overlay-bg` — that token is a translucent modal-backdrop scrim (rgba black at
-   * a fixed alpha, meant to sit *behind* an opaque dialog, not to host text of its own); over a
-   * light theme's own bright app background it blends to a middling gray that this banner's own
-   * `--kv-description-fg`/`--kv-diff-deleted-fg` text (both tuned for contrast against a real
-   * panel background) fails against (axe's own `color-contrast` scan, vscode-light/
-   * high-contrast-light). This banner is persistent chrome, not a transient dimmer, so it gets
-   * the same opaque panel background every other persistent, text-bearing surface in this app
-   * already renders correctly on.
-   */
-  background-color: var(--kv-panel-bg);
-  border-bottom: 1px solid var(--kv-panel-border);
-}
-
-.kv-conflict-banner-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-}
-
-.kv-conflict-banner-icon {
-  color: var(--kv-diff-modified-fg);
-}
-
-.kv-conflict-banner-title {
-  font-weight: 600;
-}
-
-.kv-conflict-banner-count {
-  color: var(--kv-description-fg);
-  font-size: 0.9em;
-}
-
-.kv-conflict-banner-spacer {
-  flex: 1;
-}
-
-/* G34: `.kv-conflict-banner-button` is gone — it re-declared a `KuiButton`'s own box (F9's class
-   of defect in the G34 plan, found by its own exit-criteria sweep rather than its file-by-file
-   table); the default `KuiButton` box, `variant="danger"` for Abort, is this shape already. */
-
-.kv-conflict-banner-reason {
-  margin: var(--kv-s-1) 0 0;
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-}
-
-.kv-conflict-banner-paths {
-  margin: var(--kv-s-1) 0 0;
-  padding-left: var(--kv-s-5);
-  max-height: 80px;
-  overflow-y: auto;
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.85em;
-}
-
-.kv-conflict-banner-more {
-  color: var(--kv-description-fg);
-}
-</style>

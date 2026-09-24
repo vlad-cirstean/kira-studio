@@ -18,40 +18,18 @@ const copy = computed(() => {
 </script>
 
 <template>
-  <div v-if="copy" class="kv-blocked-panel" role="alert" data-testid="git-blocked-panel">
-    <span class="codicon kv-blocked-icon" :class="STATE_ICONS.warning" aria-hidden="true"></span>
-    <h2 class="kv-blocked-title">{{ copy.title }}</h2>
-    <p class="kv-blocked-detail">{{ copy.detail }}</p>
+  <div
+    v-if="copy"
+    class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
+    role="alert"
+    data-testid="git-blocked-panel"
+  >
+    <span
+      class="codicon kv:text-[32px] kv:text-error"
+      :class="STATE_ICONS.warning"
+      aria-hidden="true"
+    ></span>
+    <h2 class="kv:m-0 kv:text-lg kv:font-semibold">{{ copy.title }}</h2>
+    <p class="kv:m-0 kv:max-w-[480px] kv:text-muted">{{ copy.detail }}</p>
   </div>
 </template>
-
-<style>
-.kv-blocked-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-4);
-  height: 100%;
-  padding: var(--kv-s-6);
-  text-align: center;
-  color: var(--kv-app-fg);
-}
-
-.kv-blocked-icon {
-  font-size: 32px;
-  color: var(--kv-error-fg);
-}
-
-.kv-blocked-title {
-  margin: 0;
-  font-size: 1.1em;
-  font-weight: 600;
-}
-
-.kv-blocked-detail {
-  margin: 0;
-  max-width: 480px;
-  color: var(--kv-description-fg);
-}
-</style>

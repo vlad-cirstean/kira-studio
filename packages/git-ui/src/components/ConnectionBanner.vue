@@ -80,37 +80,17 @@ const detail = computed(() => props.state?.detail);
 </script>
 
 <template>
-  <div v-if="visible" class="kv-connection-banner" role="status" data-testid="connection-banner">
+  <div
+    v-if="visible"
+    class="kv:shrink-0 kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-panel kv:border-b kv:border-panel-border"
+    role="status"
+    data-testid="connection-banner"
+  >
     <span
-      class="codicon codicon-debug-disconnect kv-connection-banner-icon"
+      class="codicon codicon-debug-disconnect kv:text-diff-deleted"
       aria-hidden="true"
     ></span>
-    <span class="kv-connection-banner-title">{{ title }}</span>
-    <span v-if="detail" class="kv-connection-banner-detail">{{ detail }}</span>
+    <span class="kv:font-semibold">{{ title }}</span>
+    <span v-if="detail" class="kv:text-muted kv:text-sm">{{ detail }}</span>
   </div>
 </template>
-
-<style>
-.kv-connection-banner {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-4);
-  background-color: var(--kv-panel-bg);
-  border-bottom: 1px solid var(--kv-panel-border);
-}
-
-.kv-connection-banner-icon {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-connection-banner-title {
-  font-weight: 600;
-}
-
-.kv-connection-banner-detail {
-  color: var(--kv-description-fg);
-  font-size: 0.9em;
-}
-</style>
