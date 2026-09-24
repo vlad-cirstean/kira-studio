@@ -305,6 +305,14 @@ export class ConnectionManager implements vscode.Disposable {
 
   async #dial(): Promise<void> {
     if (this.#stopped) return;
+    // F14: any dial supersedes a pending reconnect timer — without this, a timer armed by an
+    // #onDisconnected call this same dial attempt is about to race (see the tokenRejected branch
+    // below) survives to fire a second, redundant #dial() later, destroying this one's socket
+    // while it still sits in the server's pairing queue.
+    if (this.#reconnectTimer) {
+      clearTimeout(this.#reconnectTimer);
+      this.#reconnectTimer = undefined;
+    }
     // A previous attempt's socket — still open because its own dialToken is about to go stale,
     // or because the 3x #onDisconnected bug (finding #4, see #disconnectHandledFor) once let a
     // second/third #dial() race ahead of this one — must never linger un-destroyed: an
@@ -400,6 +408,13 @@ export class ConnectionManager implements vscode.Disposable {
       case 'tokenRejected': {
         // D18's loop: a revoked token is cleared and re-dialed immediately, no backoff — this is
         // what turns a revocation into a fresh pairing prompt within about one round trip.
+        // F14: mark this dialToken's disconnect as already handled *synchronously*, before the
+        // await below. The server's own deferred close (row 5's own nc.Close()) can land this
+        // socket's close event during the secrets IPC round trip, and unguarded that would let
+        // #onDisconnected race this branch — arming its own reconnect timer AND leaving this
+        // branch's own immediate #dial() to run too, two dials racing over one dialToken, one of
+        // them left sitting in the server's pairing queue as a dead entry (F12) beside the other.
+        this.#disconnectHandledFor = dialToken;
         await this.#context.secrets.delete(TOKEN_SECRET_KEY);
         socket.destroy();
         if (dialToken === this.#dialToken) void this.#dial();
