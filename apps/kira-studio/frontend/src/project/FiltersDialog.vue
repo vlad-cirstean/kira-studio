@@ -144,8 +144,7 @@ const connectionName = computed(
     <DialogContent
       :show-close-button="false"
       data-testid="filters-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 560px; max-width: min(560px, calc(100% - 2rem)); max-height: 80vh"
+      class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>

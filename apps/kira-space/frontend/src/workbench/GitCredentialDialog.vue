@@ -55,8 +55,7 @@ function onCancel(): void {
     <DialogContent
       :show-close-button="false"
       data-testid="git-credential-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 440px; max-width: min(440px, calc(100% - 2rem)); max-height: 80vh"
+      class="flex flex-col p-0 gap-0 w-110 max-h-4/5"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">Git credentials</DialogTitle>

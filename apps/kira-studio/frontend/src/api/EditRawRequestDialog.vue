@@ -71,8 +71,7 @@ function close(): void {
     <DialogContent
       :show-close-button="false"
       data-testid="edit-raw-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 680px; max-width: min(680px, calc(100% - 2rem)); max-height: 80vh"
+      class="flex flex-col p-0 gap-0 w-170 max-h-4/5"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">Edit as raw HTTP</DialogTitle>

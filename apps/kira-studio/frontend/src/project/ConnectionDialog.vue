@@ -600,8 +600,7 @@ const preconnectText = computed({
     <DialogContent
       :show-close-button="false"
       data-testid="connection-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 620px; max-width: min(620px, calc(100% - 2rem)); height: 544px"
+      class="flex flex-col p-0 gap-0 w-155 h-136"
     >
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
       <DialogHeader v-if="step === 'engine'" class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">

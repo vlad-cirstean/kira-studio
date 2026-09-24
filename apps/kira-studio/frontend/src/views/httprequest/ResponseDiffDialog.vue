@@ -223,8 +223,7 @@ onUnmounted(() => {
     <DialogContent
       :show-close-button="false"
       data-testid="http-diff-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 900px; max-width: min(900px, calc(100% - 2rem)); height: 640px"
+      class="flex flex-col p-0 gap-0 w-225 h-160"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">Compare responses</DialogTitle>

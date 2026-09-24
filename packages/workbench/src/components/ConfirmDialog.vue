@@ -31,13 +31,10 @@ function onConfirm(): void {
        Losing the closing fade (v-if unmounts immediately, no exit transition) is the accepted
        trade-off for correct stacking when nested under another open dialog. -->
   <Dialog v-if="confirmDialogStore.open" :open="true" @update:open="(v) => !v && onCancel()">
-    <!-- DialogContent's own base classes cap max-width at sm:max-w-sm (384px < w-100's 400px) —
-         max-w-100/sm:max-w-100 replace both the bare and the sm: rule (twMerge needs the same
-         variant to dedupe a conflict). -->
     <DialogContent
       :show-close-button="false"
       data-testid="confirm-dialog"
-      class="w-100 max-w-100 sm:max-w-100"
+      class="w-100"
     >
       <DialogHeader>
         <DialogTitle>Confirm</DialogTitle>

@@ -36,7 +36,7 @@ function onOpenChange(open: boolean): void {
     :open="paletteStore.open"
     title="Command Palette"
     description="Search for a command to run…"
-    class="w-105 sm:max-w-105"
+    class="w-105"
     @update:open="onOpenChange"
   >
     <CommandInput

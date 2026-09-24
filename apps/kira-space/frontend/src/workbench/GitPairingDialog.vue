@@ -69,8 +69,7 @@ async function onApprove(): Promise<void> {
     <DialogContent
       :show-close-button="false"
       data-testid="git-pairing-dialog"
-      class="flex flex-col p-0 gap-0"
-      style="width: 420px; max-width: min(420px, calc(100% - 2rem)); max-height: 80vh"
+      class="flex flex-col p-0 gap-0 w-105 max-h-4/5"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">Editor wants to connect</DialogTitle>

@@ -184,16 +184,12 @@ async function onSave(): Promise<void> {
 
 <template>
   <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
-    <!-- DialogContent's own base classes cap max-width at sm:max-w-sm (384px) — an inline
-         max-width (always wins over a class, at any breakpoint) is the only way to actually get
-         the requested width. -->
     <DialogContent
       :show-close-button="false"
       data-testid="settings-dialog"
       class="flex flex-col p-0 gap-0"
       :style="{
         width: `${width ?? 640}px`,
-        maxWidth: `${width ?? 640}px`,
         height: height !== undefined ? `${height}px` : undefined,
         maxHeight: height === undefined ? '80vh' : undefined,
       }"
