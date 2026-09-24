@@ -2,6 +2,7 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
@@ -686,13 +687,16 @@ const statusLine = computed(() => {
             @update:doc="onDecodedInput"
           />
         </div>
-        <div
+        <Alert
           v-else
-          class="p-strip note translate-pane-empty"
+          variant="note"
+          class="translate-pane-empty"
           data-testid="cell-editor-decoded-empty"
         >
-          Not valid UTF-8 text — showing the raw {{ FORMAT_LABEL[effectiveFormat] }} value only.
-        </div>
+          <AlertDescription>
+            Not valid UTF-8 text — showing the raw {{ FORMAT_LABEL[effectiveFormat] }} value only.
+          </AlertDescription>
+        </Alert>
       </template>
 
       <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable

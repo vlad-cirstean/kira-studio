@@ -329,16 +329,18 @@ const breadcrumb = computed(() => {
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
       <AlertDescription><span class="err-message">{{ rt.error }}</span></AlertDescription>
     </Alert>
-    <div
+    <Alert
       v-if="pane === 'source' && definition && definition.notes.length > 0"
-      class="p-strip note"
+      variant="note"
       data-testid="definition-notes"
     >
-      <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
-      <ul class="notes-list">
-        <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
-      </ul>
-    </div>
+      <AlertDescription class="flex items-start gap-1.5">
+        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
+        <ul class="notes-list">
+          <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
+        </ul>
+      </AlertDescription>
+    </Alert>
     <InputGroup v-if="searchOpen && pane === 'structure'">
       <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
       <InputGroupInput

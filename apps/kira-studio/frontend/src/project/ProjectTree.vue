@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -229,13 +230,15 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         </div>
       </div>
     </div>
-    <div
+    <Alert
       v-if="treeStore.searchIncomplete"
-      class="p-strip note search-incomplete-note"
+      variant="note"
       data-testid="search-incomplete-note"
     >
-      Searching cached nodes only — expand more of the tree to include it.
-    </div>
+      <AlertDescription>
+        Searching cached nodes only — expand more of the tree to include it.
+      </AlertDescription>
+    </Alert>
   </div>
 </template>
 
@@ -261,13 +264,5 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
 
 .virtual-row {
   @apply absolute top-0 left-0 w-full;
-}
-
-/* P24 D34: reuses .p-strip.note (primitives.css) for padding/font-size/colour/background — this
-   note sits at the bottom of the tree, so its divider flips to the top edge, opposite .p-strip's
-   own default. */
-.search-incomplete-note {
-  @apply border-b-0;
-  border-top: var(--kira-border-width) solid var(--kira-border);
 }
 </style>

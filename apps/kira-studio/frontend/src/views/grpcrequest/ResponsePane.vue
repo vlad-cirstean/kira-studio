@@ -346,7 +346,6 @@ onUnmounted(() => {
         <Button
           variant="toolbar"
           size="kira"
-          class="strip-action"
           data-testid="grpc-history-back"
           @click="onBackToLatest"
         >

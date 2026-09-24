@@ -124,6 +124,16 @@ check_class 'icon-box' 'size-4 flex items-center justify-center shrink-0'
 check_class 'p-badge' 'Badge (packages/theme/src/components/ui/badge)'
 check_class 'p-chip' 'Badge variant="chip"/"warn"/"err"/"ok"/"info"'
 check_class 'p-count' 'Badge variant="count"'
+# P110 B23: the raw error/warn/note strip primitive, folded into the Alert component's own
+# warn/note/err variants (packages/theme/src/components/ui/alert) -- along with every scoped
+# per-file `.strip-warn/-note/-err` (+ `-text`) duplicate of those same tones. None read as prose.
+check_class 'p-strip' 'Alert variant="warn"/"note"/"err" (packages/theme/src/components/ui/alert)'
+check_class 'strip-warn' 'Alert variant="warn"'
+check_class 'strip-warn-text' 'the warn variant'"'"'s own built-in AlertDescription/svg colour targeting'
+check_class 'strip-note' 'Alert variant="note"'
+check_class 'strip-note-text' 'the note variant'"'"'s own built-in AlertDescription/svg colour targeting'
+check_class 'strip-err' 'Alert variant="err"'
+check_class 'strip-err-text' 'the err variant'"'"'s own built-in AlertDescription/svg colour targeting'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

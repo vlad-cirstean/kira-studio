@@ -1030,23 +1030,28 @@ onUnmounted(() => {
     </div>
 
     <!-- The one destructive truth of this view, stated once at the top. -->
-    <Alert v-if="isBatch" class="strip-warn" data-testid="stream-poll-warning">
-      <CodiconIcon name="warning" :size="13" class="strip-warn-text" />
-      <AlertDescription class="strip-warn-text">
+    <Alert v-if="isBatch" variant="warn" data-testid="stream-poll-warning">
+      <CodiconIcon name="warning" :size="13" class="text-warn-text" />
+      <AlertDescription>
         Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
         above) — it does not browse a stable position.
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="rt?.status === 'error' && rt.error" class="strip-err" data-testid="stream-error">
-      <CodiconIcon name="error" :size="13" class="strip-err-text" />
-      <AlertDescription class="strip-err-text">{{ rt.error.message }}</AlertDescription>
+    <!-- This view's error tone keeps its own brighter text-error (not the shared err variant's
+         softer text-error-text) -- its retired scoped tone class chose the base error token, not
+         the "-text" one every other tone consumer uses. Put the color on a plain child instead of
+         AlertDescription itself: the variant's own `*:data-[slot=alert-description]:text-error-
+         text` selector out-specifies a bare `.text-error` on that same [data-slot] element. -->
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="err" data-testid="stream-error">
+      <CodiconIcon name="error" :size="13" class="text-error" />
+      <AlertDescription><span class="text-error">{{ rt.error.message }}</span></AlertDescription>
     </Alert>
 
     <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-    <Alert v-if="rt?.actionError" class="strip-err" data-testid="stream-action-error">
-      <CodiconIcon name="error" :size="13" class="strip-err-text" />
-      <AlertDescription class="strip-err-text">{{ rt.actionError }}</AlertDescription>
+    <Alert v-if="rt?.actionError" variant="err" data-testid="stream-action-error">
+      <CodiconIcon name="error" :size="13" class="text-error" />
+      <AlertDescription><span class="text-error">{{ rt.actionError }}</span></AlertDescription>
     </Alert>
 
     <StreamSearchToolbar
@@ -1325,24 +1330,6 @@ onUnmounted(() => {
 
 .virtual-row {
   @apply absolute top-0 left-0 w-full;
-}
-
-/* GenerateDataDialog.vue's own local warn-strip pattern, reused here since Alert's `destructive`
-   variant assumes an `<svg>` icon child (`has-[>svg]:grid-cols-[auto_1fr]`) — CodiconIcon isn't
-   one. .strip-err is the same shape on the error tone (that dialog has no error-tone strip of its
-   own to mirror). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
-}
-
-.strip-err {
-  @apply bg-error/10 border-error/20;
-}
-.strip-err-text {
-  @apply text-error;
 }
 
 .stream-row {

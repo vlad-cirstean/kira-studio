@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -191,16 +192,21 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         <TooltipContent>Search</TooltipContent>
       </Tooltip>
     </div>
-    <div v-if="error" class="p-strip note error-note" data-testid="repo-search-error">
-      {{ error }}
-    </div>
-    <div
+    <!-- Note-tinted background, error-tinted text -- the span carries text-error directly rather
+         than on AlertDescription itself: the note variant's own
+         `*:data-[slot=alert-description]:text-note-text` selector out-specifies a bare class on
+         that same [data-slot] element. -->
+    <Alert v-if="error" variant="note" data-testid="repo-search-error">
+      <AlertDescription><span class="text-error">{{ error }}</span></AlertDescription>
+    </Alert>
+    <Alert
       v-else-if="statusLine"
-      class="p-strip note repo-search-status"
+      variant="note"
+      class="repo-search-status"
       data-testid="repo-search-status"
     >
-      {{ statusLine }}
-    </div>
+      <AlertDescription>{{ statusLine }}</AlertDescription>
+    </Alert>
     <div
       ref="scrollEl"
       class="repo-search-list overflow-auto"
@@ -247,10 +253,6 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 
 .repo-search-status {
   @apply mt-0 mx-2 mb-1;
-}
-
-.error-note {
-  @apply text-error;
 }
 
 .repo-search-list {

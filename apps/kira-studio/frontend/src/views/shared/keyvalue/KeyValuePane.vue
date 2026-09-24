@@ -1034,10 +1034,10 @@ onUnmounted(() => {
            the adapter used, not a parsed string. -->
       <Alert
         v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
-        class="strip-warn"
+        variant="warn"
         data-testid="keyvalue-object-too-large"
       >
-        <AlertDescription class="strip-warn-text">
+        <AlertDescription>
           Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
           {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
         </AlertDescription>
@@ -1045,8 +1045,8 @@ onUnmounted(() => {
       <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
            onEdit stages into objectDraft, never writing to S3 directly) — this strip is the
            explicit Save/Discard step that turns the staged draft into a real PutObject. -->
-      <Alert v-if="objectDraft !== null" class="strip-warn" data-testid="keyvalue-object-edit-pending">
-        <AlertDescription class="strip-warn-text flex items-start gap-1.5">
+      <Alert v-if="objectDraft !== null" variant="warn" data-testid="keyvalue-object-edit-pending">
+        <AlertDescription class="flex items-start gap-1.5">
           <span data-testid="keyvalue-object-edit-note"
             >Unsaved changes to this object's body<template v-if="objectSaveError">
               — {{ objectSaveError }}</template
@@ -1290,14 +1290,5 @@ onUnmounted(() => {
 
 .empty-state {
   @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
-   tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

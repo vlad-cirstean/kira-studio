@@ -2,7 +2,7 @@
 import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
@@ -568,20 +568,24 @@ onUnmounted(() => {
                 </ToggleGroup>
               </div>
               <template v-if="view === 'files'">
-                <div
+                <!-- Note-tinted background, error-tinted text -- the span carries text-error
+                     directly rather than on AlertDescription itself: the note variant's own
+                     `*:data-[slot=alert-description]:text-note-text` selector out-specifies a
+                     bare class on that same [data-slot] element. -->
+                <Alert
                   v-if="fileTreeStore.repoTreeError(repoId)"
-                  class="p-strip note error-note"
+                  variant="note"
                   data-testid="repo-tree-error"
                 >
-                  {{ fileTreeStore.repoTreeError(repoId) }}
-                </div>
-                <div
+                  <AlertDescription><span class="text-error">{{ fileTreeStore.repoTreeError(repoId) }}</span></AlertDescription>
+                </Alert>
+                <Alert
                   v-if="fileTreeStore.repoTreeTruncated(repoId)"
-                  class="p-strip note"
+                  variant="note"
                   data-testid="repo-tree-truncated"
                 >
-                  Showing the first 200,000 files.
-                </div>
+                  <AlertDescription>Showing the first 200,000 files.</AlertDescription>
+                </Alert>
                 <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
                      is what calls ensureRepoTreeLoaded in the first place; gating on the state it
                      sets would mean it never gets the chance to. Its own `rows` computed is empty
@@ -742,9 +746,5 @@ onUnmounted(() => {
 
 .repo-tree {
   @apply flex-1 min-h-0;
-}
-
-.error-note {
-  @apply text-error;
 }
 </style>

@@ -2,6 +2,7 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -265,12 +266,14 @@ const connectionName = computed(
         </div>
       </section>
 
-      <div class="p-strip note preview-strip" data-testid="filters-preview">
-        <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
-        <span>
-          Will show <b>{{ preview.shown }}</b> of <b>{{ preview.total }}</b> cached nodes.
-        </span>
-      </div>
+      <Alert variant="note" class="preview-strip" data-testid="filters-preview">
+        <AlertDescription class="flex items-start gap-1.5">
+          <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
+          <span>
+            Will show <b>{{ preview.shown }}</b> of <b>{{ preview.total }}</b> cached nodes.
+          </span>
+        </AlertDescription>
+      </Alert>
 
       <span class="help cached-note">
         Only cached nodes are listed here — expand more of the tree to include them.

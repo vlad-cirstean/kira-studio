@@ -412,9 +412,9 @@ onMounted(() => {
         </Alert>
         <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
              nothing failed, the listing is real, it's just incomplete. -->
-        <Alert v-if="rt?.truncated" class="strip-warn" data-testid="browse-truncated">
-          <CodiconIcon name="warning" :size="13" class="strip-warn-text" />
-          <AlertDescription class="strip-warn-text">
+        <Alert v-if="rt?.truncated" variant="warn" data-testid="browse-truncated">
+          <CodiconIcon name="warning" :size="13" class="text-warn-text" />
+          <AlertDescription>
             This level stopped short of the full listing — Refresh to try again.
           </AlertDescription>
         </Alert>
@@ -634,15 +634,6 @@ onMounted(() => {
 
 .empty {
   @apply h-full flex items-center justify-center text-kira-sm;
-}
-
-/* Alert tone class replacing MessageStrip's own warn-tone colors (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 
 /* Replaces EmptyState.vue's own `.p-empty` shape for the detail pane's unselected state. */

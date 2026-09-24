@@ -225,14 +225,15 @@
      tie at 200, so DOM order decided which won). Rungs are 50 apart so a surface can be inserted
      between two without renumbering the ladder. */
   /* v1.9 tailwind-declines deep dive: promoted off `text-[#d9c47a]`/`text-[#a8c8ee]` literals
-     repeated across 30 call sites (`.strip-warn-text`/`.strip-note-text`, each file's own alert
-     tone class) — P104 §9 rule 5 had kept them as literal hex specifically because they weren't
-     --kira-* tokens yet, not because they shouldn't be; naming them here is that follow-through. */
+     repeated across 30 call sites (each file's own scoped warn/note alert-tone class, since
+     retired in P110 B23) — P104 §9 rule 5 had kept them as literal hex specifically because they
+     weren't --kira-* tokens yet, not because they shouldn't be; naming them here is that
+     follow-through. */
   --kira-warn-text: #d9c47a;
   --kira-note-text: #a8c8ee;
-  /* P110 B6: sibling of the two above -- .p-strip.err's own text colour, promoted off its literal
-     hex so the Alert component (B23) can keep it exact through a real token instead of falling
-     back to text-error (a different value). */
+  /* P110 B6: sibling of the two above -- the old raw error-strip's own text colour, promoted off
+     its literal hex so the Alert component (B23) can keep it exact through a real token instead
+     of falling back to text-error (a different value). */
   --kira-error-text: #f3a3a3;
   --kira-z-popover: 100;
   --kira-z-dialog: 200;

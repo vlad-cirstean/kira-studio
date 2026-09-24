@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
@@ -160,14 +161,16 @@ async function onSave(): Promise<void> {
           @update:doc="onDocChange"
         />
       </div>
-      <div class="p-strip note summary-strip" data-testid="schema-parse-summary">
-        <span v-if="parseSummary">{{ parseSummary }}</span>
-        <span v-else class="empty-note">
-          Paste output from <span class="font-data">pg_dump --schema-only</span>,
-          <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
-          whichever your connection's own engine gives you.
-        </span>
-      </div>
+      <Alert variant="note" class="summary-strip" data-testid="schema-parse-summary">
+        <AlertDescription>
+          <span v-if="parseSummary">{{ parseSummary }}</span>
+          <span v-else class="empty-note">
+            Paste output from <span class="font-data">pg_dump --schema-only</span>,
+            <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
+            whichever your connection's own engine gives you.
+          </span>
+        </AlertDescription>
+      </Alert>
     </div>
 
       <DialogFooter class="border-t border-border">

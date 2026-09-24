@@ -1325,9 +1325,9 @@ const preconnectText = computed({
               <Alert
                 v-if="secretStatus?.insecureFallback"
                 data-testid="mask-key-credential-note"
-                class="strip-warn"
+                variant="warn"
               >
-                <AlertDescription class="strip-warn-text">
+                <AlertDescription>
                   Development fallback: the correlation key is obfuscated with a built-in key, not a
                   real keychain, on this platform — an attacker with filesystem access could recover
                   it. The redaction itself is unaffected; it stays uninvertible regardless.
@@ -1361,9 +1361,9 @@ const preconnectText = computed({
             <Alert
               v-else-if="secretStatus?.insecureFallback"
               data-testid="connection-credential-note"
-              class="strip-warn"
+              variant="warn"
             >
-              <AlertDescription class="strip-warn-text">
+              <AlertDescription>
                 Development fallback: credentials on this platform are obfuscated with a built-in
                 key, not a real keychain.
               </AlertDescription>
@@ -1691,15 +1691,6 @@ const preconnectText = computed({
 
 .mask-rule-add {
   align-items: center;
-}
-
-/* Alert tone classes replacing MessageStrip's own warn-tone colors (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 
 /* P104 §3: ColorPicker's own "none" swatch -- a diagonal slash, never a 13th hue standing in for

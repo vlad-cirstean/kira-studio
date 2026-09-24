@@ -165,9 +165,9 @@ async function onConfirm(): Promise<void> {
       <Alert
         v-if="secretStatus && !secretStatus.available"
         data-testid="datagrip-secrets-unavailable"
-        class="strip-warn"
+        variant="warn"
       >
-        <AlertDescription class="strip-warn-text">
+        <AlertDescription>
           {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
         </AlertDescription>
       </Alert>
@@ -246,11 +246,8 @@ async function onConfirm(): Promise<void> {
          at all — every per-row outcome (created, password imported, or the specific reason it
          wasn't) is now shown here instead of auto-closing. -->
     <div v-else class="p-dialog-body">
-      <Alert
-        data-testid="datagrip-report-summary"
-        :class="reportTone === 'warn' ? 'strip-warn' : 'strip-note'"
-      >
-        <AlertDescription :class="reportTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">
+      <Alert data-testid="datagrip-report-summary" :variant="reportTone">
+        <AlertDescription>
           {{ reportSummary }}
         </AlertDescription>
       </Alert>
@@ -366,20 +363,5 @@ async function onConfirm(): Promise<void> {
   @apply text-center;
   padding: var(--kira-s-5);
   color: var(--kira-fg-muted);
-}
-
-/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (now --kira-warn-
-   text/--kira-note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
-}
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

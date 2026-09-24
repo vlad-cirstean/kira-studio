@@ -437,22 +437,22 @@ function onSequenceStartChange(index: number, start: number): void {
         </div>
       </div>
 
-      <Alert v-if="noColumnsLoaded" class="strip-warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
-        <AlertDescription class="strip-warn-text">
+      <Alert v-if="noColumnsLoaded" variant="warn" data-testid="generate-data-no-columns">
+        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <AlertDescription>
           No column information available yet. Close this dialog, let the page load, then try again.
         </AlertDescription>
       </Alert>
-      <Alert v-else-if="allColumnsSkipped" class="strip-warn" data-testid="generate-data-no-columns">
-        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
-        <AlertDescription class="strip-warn-text">
+      <Alert v-else-if="allColumnsSkipped" variant="warn" data-testid="generate-data-no-columns">
+        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <AlertDescription>
           Every column is set to Skip — pick a recipe for at least one column to generate rows.
         </AlertDescription>
       </Alert>
 
-      <Alert v-if="warnings.length" class="strip-warn" data-testid="generate-data-warnings">
-        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
-        <AlertDescription class="strip-warn-text">
+      <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
+        <CodiconIcon name="warning" :size="14" class="text-warn-text" />
+        <AlertDescription>
           <ul class="warning-list">
             <li v-for="w in warnings" :key="w">{{ w }}</li>
           </ul>
@@ -583,14 +583,5 @@ function onSequenceStartChange(index: number, start: number): void {
 .preview-body {
   @apply h-52;
   margin-top: var(--kira-s-2);
-}
-
-/* Alert tone classes replacing MessageStrip's own warn-tone colors (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

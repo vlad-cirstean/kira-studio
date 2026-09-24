@@ -409,9 +409,9 @@ function onCloseSearch(): void {
                stored data — a preview convenience (§6.1), not the security boundary, but a user
                switching tabs or taking a screenshot must not mistake a bucket string for a literal
                value. -->
-          <Alert v-if="rt?.maskPreview" class="strip-note" data-testid="mask-preview-strip">
+          <Alert v-if="rt?.maskPreview" variant="note" data-testid="mask-preview-strip">
             <CodiconIcon name="eye-closed" :size="16" />
-            <AlertDescription class="strip-note-text">
+            <AlertDescription>
               Values shown are masked for this preview — not the stored data. Editing is off while it's on.
             </AlertDescription>
           </Alert>
@@ -419,9 +419,9 @@ function onCloseSearch(): void {
                pending changes staged — the fan-out marked this page stale instead of reloading it,
                to protect the staged edits. Commit or discard resolves it; Refresh then updates the
                page and clears this. -->
-          <Alert v-if="rt?.pageStale" class="strip-note" data-testid="page-stale-strip">
+          <Alert v-if="rt?.pageStale" variant="note" data-testid="page-stale-strip">
             <CodiconIcon name="sync" :size="16" />
-            <AlertDescription class="strip-note-text">
+            <AlertDescription>
               Another tab committed changes to this table. Commit or discard pending changes, then
               refresh to see them.
             </AlertDescription>
@@ -480,14 +480,5 @@ function onCloseSearch(): void {
 
 .preview-anchor {
   @apply relative;
-}
-
-/* Alert tone class replacing MessageStrip's own note-tone color (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

@@ -97,8 +97,8 @@ watch(calendarOpen, (open) => {
 
 <template>
   <div class="ts-pane" data-testid="cell-editor-timestamp-pane">
-    <Alert class="ts-readings strip-note" data-testid="cell-editor-timestamp">
-      <AlertDescription class="strip-note-text flex items-center gap-1">
+    <Alert class="ts-readings" variant="note" data-testid="cell-editor-timestamp">
+      <AlertDescription class="flex items-center gap-1">
         <CodiconIcon name="clock" :size="13" />
         <template v-if="reading">
           <span
@@ -211,14 +211,5 @@ watch(calendarOpen, (open) => {
 
 .ts-calendar-anchor {
   @apply relative shrink-0;
-}
-
-/* Alert tone class replacing the raw .p-strip note marker (now --kira-warn-text/--kira-note-text
-   in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

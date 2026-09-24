@@ -7,6 +7,7 @@
 // it (§5.3's own corroborating fact), so there is no per-mount state to persist through a
 // TabViewStateStore the way the graph needs one.
 import type { MountHandle } from '@kira/git-ui';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from './git/gitUiModule';
 import { takePendingReviewTarget } from './git/hostHandlers';
@@ -65,7 +66,12 @@ onUnmounted(() => {
     class="repo-review-host"
     data-testid="repo-review-host"
   />
-  <p v-else class="p-strip note error-note">{{ errorMessage }}</p>
+  <!-- error-note here never had a backing rule in this file's own scoped block (unlike
+       GitPanel.vue/RepoSearchView.vue's own local .error-note{text-error}), so it was already
+       plain note-tinted text -- kept that way, not given a tint it never actually had. -->
+  <Alert v-else variant="note">
+    <AlertDescription>{{ errorMessage }}</AlertDescription>
+  </Alert>
 </template>
 
 <style scoped>

@@ -155,8 +155,8 @@ onUnmounted(() => {
           <CodiconIcon name="loading" class="spin" :size="14" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
-        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" class="strip-note" data-testid="fk-preview-empty">
-          <AlertDescription class="strip-note-text">No matching row in {{ tableLabel }}</AlertDescription>
+        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">
+          <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
         <table v-else-if="state.status === 'ready'" class="fk-preview-table">
           <tbody>
@@ -242,14 +242,5 @@ onUnmounted(() => {
 
 .fk-preview-actions {
   @apply flex border-b border-border-strong flex-none gap-1 p-1.5;
-}
-
-/* Alert tone class replacing the raw `.p-strip note` marker (now --kira-warn-text/--kira-note-
-   text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

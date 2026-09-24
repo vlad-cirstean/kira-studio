@@ -865,19 +865,19 @@ const statusLine = computed(() => {
     <Alert v-if="formatError" variant="destructive" data-testid="console-format-error">
       <AlertDescription>{{ formatError }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatWarning" class="strip-warn" data-testid="console-format-warning">
-      <AlertDescription class="strip-warn-text">{{ formatWarning }}</AlertDescription>
+    <Alert v-if="formatWarning" variant="warn" data-testid="console-format-warning">
+      <AlertDescription>{{ formatWarning }}</AlertDescription>
     </Alert>
-    <Alert v-if="formatNote" class="strip-note" data-testid="console-format-note">
-      <AlertDescription class="strip-note-text">{{ formatNote }}</AlertDescription>
+    <Alert v-if="formatNote" variant="note" data-testid="console-format-note">
+      <AlertDescription>{{ formatNote }}</AlertDescription>
     </Alert>
     <Alert v-if="explainError" variant="destructive" data-testid="console-explain-error">
       <AlertDescription>{{ explainError }}</AlertDescription>
     </Alert>
     <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
          running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
-    <Alert v-if="rt?.autoExplain" class="strip-warn" data-testid="console-auto-explain">
-      <AlertDescription class="strip-warn-text flex items-center gap-1.5">
+    <Alert v-if="rt?.autoExplain" variant="warn" data-testid="console-auto-explain">
+      <AlertDescription class="flex items-center gap-1.5">
         <span class="auto-explain-message">{{ autoExplainMessage }}</span>
         <button
           v-if="canShowAutoExplainPlan"
@@ -1068,21 +1068,6 @@ const statusLine = computed(() => {
 
 .saved-anchor {
   @apply relative;
-}
-
-/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (now --kira-warn-
-   text/--kira-note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
-}
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 
 .auto-explain-message {
