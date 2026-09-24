@@ -53,6 +53,7 @@ reason v1.6/v1.8 give: independent, unrelated phases, not one cohesive subsystem
 | **P109 True up `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, every README and `CLAUDE.md`'s own stale pointers against the chapter's final state** | Every prior phase in this chapter updated the doc it directly touched (P99 Part 4's Stack row, P100 Part 4's seven git sections plus both READMEs, P103's own hoists, P104's primitive-swap notes, P106's renamed scripts, whatever P108's chunk reviews surfaced) — this phase is the closing cross-check, not a first pass: read every claim in `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, the root `README.md`, and each app/package README (`apps/kira-studio`, `apps/kira-space`, `apps/kira-space-vscode`, and any `packages/*` carrying its own) against the actual repo state as it stands after P108 — not against any phase's own result-section prose, which P100 Part 4's own investigation already found three cases of going stale (`startupfail` listed as a git package, a stale command count, a stale `ContractVersion`). Concretely: re-verify every dependency/library list, every script name (post-P106's rename), every file/directory inventory or count a doc states as fact, every "P99 migrates"/"P103 will"/"handed to a later phase" forward-reference that a later phase already landed, and `docs/ARCHITECTURE.md`'s own "Known open items" section — delete every entry this chapter resolved, confirm every entry that remains is still genuinely true today, add any real currently-true limitation this chapter's own phases introduced and never recorded. Also sweeps `CLAUDE.md` itself for the stale pointers its own "prune as you go" rule asks for (a reference to a file/subsystem this chapter deleted, a question a later phase already answered) — process rules stay, only dead pointers go. No app behavior changes; `.vue`/`.ts`/`.go` source is out of scope entirely | Closing phase for the whole chapter — appended last, after P108, so the docs are trued up once against the chapter's actual final shape instead of chasing a moving target phase by phase; every earlier phase's own doc edit stays exactly where it landed, this only catches what drifted or was never entered |
 | **P110 Fix the `--color-muted` custom-property collision between `packages/theme/src/base.css` and `packages/theme/src/shadcn-bridge.css`** | `base.css:33` defines `--color-muted: var(--kira-fg-muted)` — the original app's foreground-gray text token. `shadcn-bridge.css:67` separately defines `--color-muted: var(--muted)` — shadcn's own semantic background token, backing every `bg-muted`/`data-[state=on]:bg-muted` consumer (`ToggleGroup`, `DropdownMenu`, and others P104's primitive swap wired in). Same custom-property name, two unrelated meanings; since `base.css`'s `@theme` block loads after its own import of `shadcn-bridge.css`, the foreground-gray value silently wins app-wide, so every shadcn `bg-muted` consumer renders gray text instead of the intended dark background. Confirmed pre-existing (predates P104: `base.css` at `8602d41`, `shadcn-bridge.css` at `5864d79`, both via `git log`) and confirmed live (direct grep of both files; the one non-font-drift `test:visual` failure P104 left open traces to exactly this). The real fix needs the legacy `.muted`/`text-muted`-style consumers — roughly 100 files — renamed off `--color-muted` so the name is free for shadcn's own semantic value; that rename is a real design decision (naming scheme, scope of what counts as "legacy" vs. shadcn-owned), not a mechanical single-file fix, so it doesn't land inside P104 itself. Acceptance: `--color-muted` resolves to shadcn's `--muted` value app-wide with zero second definition (a grep for `--color-muted:` across `packages/theme/src` returns exactly one hit), the renamed legacy consumers keep their original foreground-gray behavior under their own distinct token, and the `test:visual` baseline this bug caused re-records clean | Found and root-caused during P104 Stream A's own closing verification — real, pre-existing, not a P104 regression, but needs an out-of-scope legacy-token rename `CLAUDE.md`'s own exception reserves for a named follow-up phase rather than a same-pass fix. Appended last, after P109, since it surfaced only during P104's own verification, after every other row in this chapter was already written |
 | **P111 Thread the pull-strategy ladder's resolution source through the `git-ipc` wire contract, so a config-derived `--rebase-merges` never applies to an explicit strategy override** | `gitsession/remote.go`'s `wantsRebaseMerges` (fixed in P108 Part 16's own F6) can now only apply `--rebase-merges` when `ResolvePullStrategy`'s ladder result is genuinely config-derived — but the ladder itself has no wire-level way to say *why* it picked "rebase": an explicit `kiraSpace.pull.strategy` override and a git-config-derived one currently look identical once they reach `remote.pullPreflight`'s result. The real fix needs `@kira/git-ipc`'s contract extended — either carrying the resolution's source (`"override" | "config" | "default"`) or a plain `rebaseMerges` boolean — from `remote.pullPreflight`'s response through `remote.run`'s own request params, so the executor can tell the two cases apart without guessing. That is a wire-contract change (new/changed fields on both the Go and TS sides of `packages/git-ipc`, plus `gitrpc`'s handler and `git-core`'s client), a real design decision (exact field shape, whether to version the contract), not a mechanical fix — so it doesn't land inside Part 16 itself, per `CLAUDE.md`'s own exception for exactly this shape of finding. Acceptance: an explicit Kira Space `pull.strategy` override of "rebase" never adds `--rebase-merges` even when the repo's git config says `pull.rebase=merges`; a git-config-derived "merges" resolution still does | Found and confirmed still-live during P108 Part 16's own review (re-verifying Part 15's own F6 deferral note) — real, needs an out-of-scope `git-ipc` contract change `CLAUDE.md`'s own exception reserves for a named follow-up phase rather than a same-pass fix. Appended last, after P110, since it surfaced during P108's own review, after every other row in this chapter was already written |
+| **P112 Move Studio API-client server state (collections tree, saved requests, variable rows, environments, active environment) onto TanStack Query, with a Go-broadcast `api-data-changed` event per scope as its invalidation signal** | `api/state/variables.ts`'s `listCache`, environment list and active environment, and `api/state/collections.ts`'s tree and saved-request caches are hand-rolled server-state caches fetched over the bridge with their own ad hoc loading/error/cache logic — exactly what `CLAUDE.md` routes through TanStack Query, with no named decline on record for any of them. None of the four invalidate across windows: an edit in window B never reaches window A, `listCache` never refetches once filled (so a stale entry substitutes plain values into every send until something else happens to refresh that scope), the active environment (`is_active`, app-wide) stays stale in the other window, and the tree stays stale until a manual reload. The fix needs Go to broadcast a scoped event (naming what changed — a collection id, an environment id, or "environments list changed") whenever a mutation lands, and every one of these caches replaced by a TanStack Query `useQuery`/`useMutation` pair keyed by scope, invalidated by that event rather than by a hand-rolled generation counter. P108 Part 9's own F2/F9 point fixes (per-key in-flight dedupe and generation guard on `ensureVariablesLoaded`, evicting a deleted owner's `listCache` entry) stay as landed — this phase replaces the caching mechanism underneath them, not those two fixes' own correctness | Found during P108 Part 9's own review (`P108-part9-findings.md` F12) — real, but the review's own instruction was explicit: too large a migration for that review-fix chunk itself, name a follow-up phase instead of a same-pass fix, the same `CLAUDE.md` exception P110/P111 already use. Appended last, after P111, since it surfaced during P108's own review, after every other row in this chapter was already written |
 
 ## P96 result
 
@@ -4243,6 +4244,94 @@ onward this chunk's own commits added an explicit `-- <pathspec>` to every `git 
   `roundtrip_test.go` fixture/assertions rather than a new file. F15/F16/F19 are doc/error-message
   fixes with no dedicated test, per `CLAUDE.md`'s own bar (not complex/hard-to-get-right logic).
 - No pre-existing-but-out-of-scope red found in any of the above — nothing to root-cause or defer.
+
+## P108 Part 19 result
+
+Reviewed per `plans/P108-part19-findings.md` (Opus reviewer, no fixing; tree surveyed at `32980a5`),
+12 findings total across `packages/git-ui/src/components/**`, `App.vue` and `main.ts`. One Sonnet
+fixer landed one commit per finding, F1-F12 in order, none dismissed or deferred.
+
+- **F1 (`CommitGrid` row conversion against a stale row plan) — `31068ad`.** Guarded row
+  conversion against a plan that no longer matches the current chunk state on a cold-boot
+  `scrollRow` restore. Regression test added, confirmed to fail pre-fix, pass post-fix
+  (`apps/kira-space-vscode/tests/interaction/graph-initial-scroll-row.spec.ts`).
+- **F2 (context menu can outlive the row it targeted) — `98a4923`.** Context-menu targets are
+  captured at open time and the menu closes on a `graph.refresh`/repo switch instead of trusting a
+  live row lookup, hooked into `App.vue`'s `handleRepoOpened`/`applyRepoIdToStates` lifecycle
+  point. Regression test added (`graph-context-menu-refresh.spec.ts`), confirmed to fail pre-fix.
+- **F3 (repo-settings dialog/menu refs survive a repo switch or reconnect) — `769b83a`.** Same
+  lifecycle point as F2 now also clears the repo-settings dialog and any open menu refs, so a
+  destructive action (reset, stash drop) can no longer fire against the wrong repo's state.
+  Regression test added (`graph-dialog-reconnect.spec.ts`), confirmed to fail pre-fix.
+- **F4 (overlapping repo opens resolved last-response-wins) — `b4826e6`.** `RepoState.open` now
+  sequences with an `openSequence` token, mirroring Part 18's own `GraphViewState#loadGeneration`
+  pattern — a stale open can no longer clobber a newer one. Regression test added, confirmed to
+  fail pre-fix.
+- **F5 (selection/scroll lost across a reconnect) — `30cbdcc`.** Preserved selection and scroll
+  position across a reconnect instead of resetting to a cold-boot default.
+- **F6 (`ReviewView` bootstrap races a `review.target` push during `repo.list`) — `baf0990`.** A
+  `targetSequence` counter, same generation-counter shape as F4/Part 18's F1, so a push landing
+  mid-`repo.list` is never overwritten by the workspace default that resolves after it. Regression
+  test added (`review-target-race.spec.ts`), confirmed to fail pre-fix.
+- **F7 (bootstrap retry leaks subscriptions/state, drops `pendingUiAction`) — `a9c6b2c`.** Both
+  `App.vue`'s and `ReviewView.vue`'s `bootstrap()` now dispose/unsubscribe prior state at entry,
+  before recreating it. `state/bootstrap.ts`'s shared `retryBootstrap` helper grew an optional
+  `onSuccess` callback so `App.vue`'s cold-bootstrap `pendingUiAction` fires exactly once,
+  whichever attempt (first or retry) actually succeeds.
+- **F8 (misleading empty state after a bootstrap failure, no error/Retry surfaced) — `ff1e2a7`.**
+  The boot-error banner now renders above every `repoState` sub-branch instead of only the
+  full-graph one. `NoRepositoryPanel.vue` gained its own `refreshError`/Retry so a failed
+  `refreshList()` reads distinctly from "none of your folders is a Git repository".
+- **F9 (review row copy menu broken on a never-expanded row) — `7ab77ce`.** `ReviewCommitRow.vue`'s
+  `menuSections`/`onMenuSelect` now build off `props.actions` (always available) instead of
+  `props.expansion?.actions` (`undefined` until first expansion), the same fix shape
+  `openAllChanges` already had.
+- **F10 (unhandled async rejections across ~10 fire-and-forget sites) — `ba07ce2`.** Every named
+  site across `App.vue`, `ReviewView.vue`, `ReviewCommitRow.vue` and `NoRepositoryPanel.vue` now
+  routes its rejection through a `reportAsyncError`/local try-catch that ignores
+  `TransportError('transport-closed')` (component already torn down) and otherwise surfaces the
+  message on the existing announcement/live-region surface.
+- **F11 (detail-pane resize handle stuck-drag, pre-existing, predates P105) — `99bca83`.** Fixed in
+  this pass rather than deferred. `App.vue`'s `startDetailResize` now uses pointer events plus
+  `setPointerCapture`, with VueUse's `useEventListener` for the window-level listeners — the same
+  shape `KuiColumnResizeHandle.vue` already used for the identical bug. Confirmed via
+  `git diff 32980a5 -- packages/git-ui/src/App.vue` that this code was untouched by F1-F10 this
+  phase, i.e. genuinely pre-existing and not caused by this pass.
+- **F12 (document-wide keydown/onClickOutside handlers act across every mount) — `8f5a1da`.**
+  `App.vue`'s `onDocumentKeydown` now checks the event landed inside this instance's own root, or
+  falls back to this instance's own `graphVisible` flag (`useGraphVisible()`) when focus is
+  elsewhere; its `onClickOutside` now targets a template ref scoped to this instance's own overlay
+  `<aside>` instead of `document.querySelector`, which could resolve to a different mount's
+  identically-testid'd element. `ReviewView.vue`'s `onDocumentKeydown` scoped the same way via a
+  `rootEl` template ref (no KeepAlive/visibility concept there, so root-containment alone is
+  enough). Confirmed via `main.ts` that `GRAPH_VISIBLE_KEY` is provided unconditionally for every
+  mount (`view: 'graph'` or `'review'`), so the fallback behaves identically regardless of host.
+
+**Nothing dismissed.** All 12 findings matched real, reachable code; every fix landed as specified,
+none narrowed in scope. F11 is called out explicitly per task: a pre-existing bug (predates P105),
+fixed in this pass rather than deferred to a follow-up phase.
+
+**Regression tests.** Added for F1, F2, F3, F4, F6 (the races/sequencing bugs), each confirmed to
+fail against the pre-fix code before confirming it passes post-fix. Skipped for F9 (straightforward
+prop fix), F11 (pre-existing trivial bug fix) and F12 (scoping fix) per task instructions and
+`CLAUDE.md`'s own unit-test bar — none is complex/hard-to-get-right logic.
+
+**Shared-checkout contention, disclosed.** This chunk's own fixer ran concurrently with the Part 9
+fixer (`apps/kira-studio/frontend/src/{api,views/httprequest,views/grpcrequest}`) in the same shared
+(non-worktree) checkout — disjoint files throughout, no cross-agent commit pollution. Three
+transient incidents, all resolved by polling until clear and retrying, never by `--no-verify` or a
+destructive git operation: two separate `.git/index.lock` waits (before F8's and F9's own staging)
+and two transient pre-commit-hook failures caused by the Part 9 fixer's own in-progress
+`apps/kira-studio/frontend/src/views/grpcrequest/state.ts` (a TS2322 typecheck error, then a biome
+formatting error) during F8's commit attempts — confirmed via `git diff --stat` each time that the
+failing file was never one this chunk touched.
+
+**Verification.** `bun run typecheck:git` (git-ipc/git-core/kira-space-vscode/git-ui/kira-ui): clean
+after every fix. `bunx biome check`: clean (auto-sorted imports twice, no substantive changes).
+`bun test` in `packages/git-ui`: 207 pass, 0 fail. `bun run build:vscode`: succeeds. Playwright
+`webview-interaction` project (`apps/kira-space-vscode`, real built bundle): 57 pass, 0 fail,
+including the F1 test (`graph-initial-scroll-row.spec.ts`) re-run once more at the end per task
+instructions. No red found anywhere in this pass — nothing pre-existing to root-cause or defer.
 
 ## Layout
 
