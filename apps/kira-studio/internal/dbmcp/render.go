@@ -393,6 +393,91 @@ func newMaskMentionedButAbsentRefusedError(column string) error {
 	)}
 }
 
+// riskyResultTypeClasses is F1's own generic guard (P108 Part 7 review, finding #1): a column's
+// own name matching a mask rule is not the only way a masked value reaches the client — any
+// column whose type can itself carry a whole row or several columns' worth of data bypasses
+// name-based matching entirely once the real value is wrapped inside it, with no per-column
+// textual trace maskedColumnRenamedOrHidden's word-scan could ever catch: verified real against
+// Postgres (`SELECT json_agg(t) FROM (SELECT * FROM customers LIMIT 10) t`, `SELECT row_to_json(c)
+// FROM customers c`, `SELECT to_jsonb(c) FROM customers c`, `SELECT c FROM customers c` — the last
+// one a composite/row value, which postgres/console.go's own pg_type.typtype check now tags
+// TypeClassOther specifically so it lands here too) and ClickHouse (an array/JSON aggregate over
+// *). Fails closed, with no "is this actually safe" exception: this project's document/stream page
+// refusal (renderPage's DocumentPage/StreamPage cases, above) already takes exactly this stance —
+// refused outright on any masked connection, never conditionally.
+func riskyResultTypeClasses(columns []page.ColumnDescriptor) (name string, found bool) {
+	for _, c := range columns {
+		if c.TypeClass == page.TypeClassJSON || c.TypeClass == page.TypeClassOther {
+			return c.Name, true
+		}
+	}
+	return "", false
+}
+
+func newMaskRiskyColumnRefusedError(column string) error {
+	return &maskingRefusedError{msg: fmt.Sprintf(
+		"this connection has PII masking rules, and result column %q has a type (JSON, array, composite/row, or another type this app cannot inspect column-by-column) that can carry a whole row or several columns' worth of data — masking rules match by column name and cannot see inside a value like that, so it could hide a masked value unredacted; select individual columns by their real names instead, or remove the rules in the connection's Privacy tab",
+		column,
+	)}
+}
+
+// castTypeNames excludes an ordinary `CAST(x AS numeric(10,2))`/`CAST(x AS varchar(255))` shape
+// from riskyPositionalColumnAliasList's own match below — a type name immediately followed by a
+// parenthesized precision/scale is extremely common, ordinary SQL, not a FROM-clause column-alias
+// list; every entry here is a type keyword that commonly takes a parenthesized argument.
+var castTypeNames = map[string]bool{
+	"char": true, "character": true, "varchar": true, "nchar": true, "nvarchar": true,
+	"decimal": true, "numeric": true, "float": true, "double": true, "real": true,
+	"number": true, "bit": true, "interval": true, "time": true, "timestamp": true,
+	"varbinary": true, "binary": true, "varying": true,
+}
+
+var (
+	riskyUnicodeEscapedIdent       = regexp.MustCompile(`(?i)U&"`)
+	riskyPositionalColumnAliasList = regexp.MustCompile(`(?i)\bas\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+	riskyClickHouseColumnTransform = regexp.MustCompile(`(?i)\b(apply|columns)\s*\(`)
+)
+
+// hasPositionalColumnAliasList reports whether statement contains a FROM-clause column-alias list
+// (`FROM t AS a(b, c, d)`, Postgres/standard SQL) — every selected column is renamed positionally
+// with no "AS <realname>" textual trace at all, so a masked column reached this way carries no
+// evidence maskedColumnRenamedOrHidden's word-scan could ever find.
+func hasPositionalColumnAliasList(statement string) bool {
+	for _, m := range riskyPositionalColumnAliasList.FindAllStringSubmatch(statement, -1) {
+		if !castTypeNames[strings.ToLower(m[1])] {
+			return true
+		}
+	}
+	return false
+}
+
+// refuseRiskyStatementSyntax is F1's own third guard: three concrete SQL shapes verified against
+// real engines that rename or transform selected columns with no per-column textual trace a
+// word-scan could catch (a Postgres Unicode-escaped identifier reaching a masked column under a
+// name that never appears in the statement as plain text; the FROM-clause positional alias list
+// above; ClickHouse's own APPLY(fn)/COLUMNS(...) transforming every column a query selects).
+// Refused outright on a masked connection regardless of what the result set's own columns look
+// like — the statement's own syntax is the evidence, not the result.
+func refuseRiskyStatementSyntax(statement string) (reason string, found bool) {
+	switch {
+	case riskyUnicodeEscapedIdent.MatchString(statement):
+		return `a Postgres Unicode-escaped identifier (U&"...")`, true
+	case hasPositionalColumnAliasList(statement):
+		return "a FROM-clause positional column-alias list (`AS alias(...)`)", true
+	case riskyClickHouseColumnTransform.MatchString(statement):
+		return "ClickHouse's APPLY(...)/COLUMNS(...) column transform", true
+	default:
+		return "", false
+	}
+}
+
+func newMaskRiskySyntaxRefusedError(reason string) error {
+	return &maskingRefusedError{msg: fmt.Sprintf(
+		"this connection has PII masking rules, and this statement uses %s — a construct this app's column-name-based masking cannot safely see through; rewrite the query to select individual columns by their real names, or remove the rules in the connection's Privacy tab",
+		reason,
+	)}
+}
+
 // newMaskColumnlessKeyValueRefusedError is renderKeyValuePage's own refusal (finding #3, M7): a
 // keyvalue page whose Field values carry no genuine per-entry identifier (page.KeyValuePage's own
 // FieldsAreColumns=false — a Redis list/set's synthetic display index, a stream entry id, a
@@ -415,6 +500,14 @@ func newMaskColumnlessKeyValueRefusedError() error {
 func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statement string) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
+		if mk != nil && !mk.Empty() {
+			if reason, found := refuseRiskyStatementSyntax(statement); found {
+				return nil, newMaskRiskySyntaxRefusedError(reason)
+			}
+			if name, found := riskyResultTypeClasses(pg.Columns); found {
+				return nil, newMaskRiskyColumnRefusedError(name)
+			}
+		}
 		if name, hidden, viaAlias := maskedColumnRenamedOrHidden(statement, mk, pg.Columns); hidden {
 			if viaAlias {
 				return nil, newMaskRenameRefusedError(name)

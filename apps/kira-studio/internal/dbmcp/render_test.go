@@ -541,6 +541,117 @@ func TestRenderKeyValuePageMasksByFieldName(t *testing.T) {
 	}
 }
 
+// TestRenderPageRefusesRiskyResultColumns is F1 (P108 Part 7 review, finding #1): a masked
+// connection must refuse a tabular result column whose type can itself carry a whole row or
+// several columns' worth of data (JSON, array, composite/"other") — matching by output column
+// name alone cannot see a masked value smuggled inside one of these, and the existing statement
+// text-scan (maskedColumnRenamedOrHidden) never fires either, since the masked column's own name
+// never appears as plain text in a statement like `SELECT json_agg(t) FROM (...) t`.
+func TestRenderPageRefusesRiskyResultColumns(t *testing.T) {
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	cases := []struct {
+		name      string
+		typeClass page.TypeClass
+	}{
+		{"json_agg whole-row JSON column", page.TypeClassJSON},
+		{"composite/row column (Postgres pg_type.typtype='c', tagged Other)", page.TypeClassOther},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+				{Name: "json_agg", DataType: "json", TypeClass: tc.typeClass},
+			})
+			leak := `[{"email":"person@example.com"}]`
+			if err := b.AppendRow([]*string{&leak}); err != nil {
+				t.Fatalf("AppendRow: %v", err)
+			}
+			pg := b.Finish(page.UnpagedPosition(1))
+
+			if _, err := renderPage(pg, 200, nil, &set, "SELECT json_agg(t) FROM (SELECT * FROM customers LIMIT 10) t"); err == nil {
+				t.Fatal("renderPage(risky-typed column, rules exist) = nil error, want a refusal")
+			} else if !strings.Contains(err.Error(), "json_agg") {
+				t.Fatalf("renderPage error = %q, want it to name the risky column", err.Error())
+			}
+		})
+	}
+
+	// No rules at all: the same risky-typed column renders normally, unaffected — this guard is
+	// masking-gated, never a general restriction on JSON/array columns.
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "metadata", DataType: "jsonb", TypeClass: page.TypeClassJSON},
+	})
+	v := `{"plan":"premium"}`
+	if err := b.AppendRow([]*string{&v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg := b.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg, 200, nil, nil, "SELECT metadata FROM accounts"); err != nil {
+		t.Fatalf("renderPage(JSON column, no rules) = %v, want no error", err)
+	}
+}
+
+// TestRefuseRiskyStatementSyntax is F1's own second and third guards (P108 Part 7 review, finding
+// #1): three concrete SQL shapes verified against real engines that rename or transform every
+// selected column with no per-column textual trace maskedColumnRenamedOrHidden's word-scan could
+// ever find.
+func TestRefuseRiskyStatementSyntax(t *testing.T) {
+	risky := []struct {
+		name      string
+		statement string
+	}{
+		{"Postgres Unicode-escaped identifier", `SELECT U&"\0065mail" AS x FROM customers`},
+		{"FROM-clause positional column-alias list", `SELECT e FROM customers AS c(i, n, e)`},
+		{"ClickHouse APPLY column transform", `SELECT * APPLY(toString) FROM customers`},
+		{"ClickHouse COLUMNS transform", `SELECT COLUMNS('.*') APPLY(toString) FROM customers`},
+	}
+	for _, tc := range risky {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, found := refuseRiskyStatementSyntax(tc.statement); !found {
+				t.Fatalf("refuseRiskyStatementSyntax(%q) = not found, want a refusal", tc.statement)
+			}
+		})
+	}
+
+	safe := []struct {
+		name      string
+		statement string
+	}{
+		{"ordinary CAST with precision", "SELECT CAST(price AS numeric(10,2)) FROM orders"},
+		{"ordinary CAST to varchar with length", "SELECT CAST(name AS varchar(255)) FROM customers"},
+		{"plain select, no risky syntax", "SELECT id, email FROM customers WHERE id = 1"},
+	}
+	for _, tc := range safe {
+		t.Run(tc.name, func(t *testing.T) {
+			if reason, found := refuseRiskyStatementSyntax(tc.statement); found {
+				t.Fatalf("refuseRiskyStatementSyntax(%q) = refused (%q), want not found", tc.statement, reason)
+			}
+		})
+	}
+
+	// End to end through renderPage: the Unicode-escaped-identifier bypass reaches a masked column
+	// ("email") under an output name ("x") with no plain-text trace of "email" anywhere in the
+	// statement — the pre-existing word-scan refusal (maskedColumnRenamedOrHidden) cannot fire here
+	// at all, so this statement-syntax guard is the only thing that catches it.
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "x", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	v := "person@example.com"
+	if err := b.AppendRow([]*string{&v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg := b.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg, 200, nil, &set, `SELECT U&"\0065mail" AS x FROM customers`); err == nil {
+		t.Fatal(`renderPage(U&"..." identifier bypass) = nil error, want a refusal`)
+	}
+
+	// No rules at all: the same risky syntax renders normally, unaffected.
+	if _, err := renderPage(pg, 200, nil, nil, `SELECT U&"\0065mail" AS x FROM customers`); err != nil {
+		t.Fatalf("renderPage(risky syntax, no rules) = %v, want no error", err)
+	}
+}
+
 // TestRenderPageRefusesColumnlessKeyValuePage is finding #3 (M7): a keyvalue page whose Field
 // values carry no real per-entry identifier (page.KeyValuePage.FieldsAreColumns=false — a Redis
 // list/set's synthetic display index, a generic console reply with no per-command shape) must be

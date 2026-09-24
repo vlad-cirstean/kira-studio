@@ -83,8 +83,20 @@ func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op
 	})
 }
 
+// pgTypeMeta is lookupTypeNames' own per-OID result: the type's name plus whether pg_type reports
+// it as composite (typtype = 'c') — a table or view's own implicit row type, or an explicit CREATE
+// TYPE AS composite, either way a single result column carrying every one of ITS OWN columns'
+// worth of data behind one name (P108 Part 7 review, finding #1: `SELECT c FROM customers c`'s own
+// "c" column has DataType "customers", which typeClassFor's name-based guess has no way to tell
+// apart from an ordinary unrecognised scalar type — pg_type is the one place that distinction is
+// actually knowable).
+type pgTypeMeta struct {
+	name      string
+	composite bool
+}
+
 // buildPage is console.ts's buildPage.
-func buildPage(result rawResult, typeNames map[uint32]string) page.TabularPage {
+func buildPage(result rawResult, typeMeta map[uint32]pgTypeMeta) page.TabularPage {
 	if len(result.fields) == 0 {
 		command := result.command
 		if command == "" {
@@ -95,12 +107,20 @@ func buildPage(result rawResult, typeNames map[uint32]string) page.TabularPage {
 
 	columns := make([]page.ColumnDescriptor, len(result.fields))
 	for i, f := range result.fields {
-		dataType := typeNames[f.dataTypeOID]
+		meta := typeMeta[f.dataTypeOID]
+		dataType := meta.name
 		if dataType == "" {
 			dataType = "unknown"
 		}
+		typeClass := typeClassFor(dataType)
+		if meta.composite {
+			// Overrides typeClassFor's own guess outright — dbmcp/render.go's masking gate refuses
+			// a TypeClassOther tabular column on a masked connection (finding #1), and a composite
+			// value is exactly the "carries a whole row" shape that gate exists to catch.
+			typeClass = page.TypeClassOther
+		}
 		columns[i] = page.ColumnDescriptor{
-			Name: f.name, DataType: dataType, TypeClass: typeClassFor(dataType),
+			Name: f.name, DataType: dataType, TypeClass: typeClass,
 			// execute() never consults the catalog (no target relation to describe), so
 			// nullability and PK-ness are unknowable here — console results are always
 			// read-only regardless.
@@ -127,21 +147,21 @@ func buildPage(result rawResult, typeNames map[uint32]string) page.TabularPage {
 	return builder.Finish(page.UnpagedPosition(len(result.rows)))
 }
 
-func lookupTypeNames(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, oids []uint32) (map[uint32]string, error) {
-	result, err := runRaw(ctx, conn, "SELECT oid, typname FROM pg_type WHERE oid = ANY($1::oid[])", []any{oids}, op, track)
+func lookupTypeNames(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, oids []uint32) (map[uint32]pgTypeMeta, error) {
+	result, err := runRaw(ctx, conn, "SELECT oid, typname, typtype FROM pg_type WHERE oid = ANY($1::oid[])", []any{oids}, op, track)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[uint32]string, len(result.rows))
+	out := make(map[uint32]pgTypeMeta, len(result.rows))
 	for _, row := range result.rows {
-		if len(row) < 2 || row[0] == nil || row[1] == nil {
+		if len(row) < 3 || row[0] == nil || row[1] == nil || row[2] == nil {
 			continue
 		}
 		oid, err := parseUint32(*row[0])
 		if err != nil {
 			continue
 		}
-		out[oid] = *row[1]
+		out[oid] = pgTypeMeta{name: *row[1], composite: *row[2] == "c"}
 	}
 	return out, nil
 }
@@ -215,22 +235,22 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 			oidSet[f.dataTypeOID] = struct{}{}
 		}
 	}
-	typeNames := map[uint32]string{}
+	typeMeta := map[uint32]pgTypeMeta{}
 	if len(oidSet) > 0 {
 		oids := make([]uint32, 0, len(oidSet))
 		for o := range oidSet {
 			oids = append(oids, o)
 		}
-		names, err := lookupTypeNames(ctx, conn, op, track, oids)
+		meta, err := lookupTypeNames(ctx, conn, op, track, oids)
 		if err != nil {
 			return nil, err
 		}
-		typeNames = names
+		typeMeta = meta
 	}
 
 	pages := make([]page.Page, len(results))
 	for i, r := range results {
-		pages[i] = buildPage(r, typeNames)
+		pages[i] = buildPage(r, typeMeta)
 	}
 	return pages, nil
 }
