@@ -301,9 +301,18 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	// one statement) keeps what's on disk matching the reported outcome.
 	if len(tree.Variables) > 0 {
 		if err := s.Deps.Repos.Variables.ImportVariables(collection.ID, tree.Variables); err != nil {
+			// P108 F19: a failed compensating Delete used to only be logged — the returned error
+			// still just named ImportVariables' own failure, so the renderer reported "import
+			// failed" while the collection ImportTree already committed stayed in the tree,
+			// visible in the panel, with nothing telling the user it was there. Folding the delete
+			// failure into the returned error message lets the UI say so.
 			if delErr := s.Deps.Repos.Collections.Delete(collection.ID, "collection"); delErr != nil {
 				slog.Error("rolling back a collection import after ImportVariables failed",
 					"scope", "bridge/collections", "collectionId", collection.ID, "importVariablesErr", err, "deleteErr", delErr)
+				return ImportReport{}, ipcerr.Internal(fmt.Sprintf(
+					"%s (also failed to remove the partially imported collection %q: %s — it remains visible and must be deleted manually)",
+					err.Error(), collection.Name, delErr,
+				))
 			}
 			return ImportReport{}, ipcerr.Internal(err.Error())
 		}
