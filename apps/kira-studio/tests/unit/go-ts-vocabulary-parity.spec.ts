@@ -20,26 +20,73 @@ import { opKindSchema } from '../../../../packages/shared/domain/ops';
 import { HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/response-history';
 import { STUDIO_RENDERABLE_TAB_KINDS } from '../../frontend/src/state/tabDomain';
 
+/** P108 F17: strips a Go `//` line comment from each line before any extractor scans the source —
+ *  without this, a `}` or a `name = N` pattern inside a comment can end a map body early or satisfy
+ *  extractGoIntConst's match instead of the real declaration. None of this file's map/const
+ *  declarations put `//` inside a string literal, so a per-line strip is sufficient. */
+function stripGoLineComments(source: string): string {
+  return source
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n');
+}
+
+/** P108 F17: finds the `}` that actually closes the map literal opened at `bodyStart` (already past
+ *  its `{`), depth-counting braces and skipping over string-literal contents — `source.indexOf('}',
+ *  bodyStart)` stopped at the first `}` at any depth, which a nested struct value or a `}` inside a
+ *  quoted string would close early. */
+function findMapBodyEnd(source: string, bodyStart: number): number {
+  let depth = 1;
+  let inString = false;
+  for (let i = bodyStart; i < source.length; i++) {
+    const c = source[i];
+    if (inString) {
+      if (c === '\\') {
+        i++;
+        continue;
+      }
+      if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
  *  tolerant of comments and multi-entries-per-line (both present in the real source), not a full
  *  Go parser. */
 function extractGoStringSet(source: string, varName: string): Set<string> {
+  const stripped = stripGoLineComments(source);
   const header = new RegExp(`var\\s+${varName}\\s*=\\s*map\\[string\\]bool\\{`);
-  const headerMatch = header.exec(source);
+  const headerMatch = header.exec(stripped);
   if (!headerMatch) {
     throw new Error(`could not find "var ${varName} = map[string]bool{" in the Go source`);
   }
   const bodyStart = headerMatch.index + headerMatch[0].length;
-  const bodyEnd = source.indexOf('}', bodyStart);
+  const bodyEnd = findMapBodyEnd(stripped, bodyStart);
   if (bodyEnd < 0) throw new Error(`unterminated "${varName}" map literal`);
-  const body = source.slice(bodyStart, bodyEnd);
-  return new Set([...body.matchAll(/"([^"]+)":\s*true/g)].map((m) => m[1]));
+  const body = stripped.slice(bodyStart, bodyEnd);
+  const result = new Set([...body.matchAll(/"([^"]+)":\s*true/g)].map((m) => m[1]));
+  if (result.size === 0) throw new Error(`"${varName}" map literal parsed to zero entries`);
+  return result;
 }
 
 /** Pulls a `<name> = <integer>` constant literal out of a Go source file (F22's technique) —
- *  tolerant of it living inside a `const ( ... )` block with a comment above it. */
+ *  tolerant of it living inside a `const ( ... )` block with a comment above it. P108 F17: matched
+ *  against comment-stripped source, so a comment mentioning "name = N" in prose can't satisfy this
+ *  before the real declaration does. */
 function extractGoIntConst(source: string, constName: string): number {
-  const m = new RegExp(`\\b${constName}\\s*=\\s*(\\d+)\\b`).exec(source);
+  const stripped = stripGoLineComments(source);
+  const m = new RegExp(`\\b${constName}\\s*=\\s*(\\d+)\\b`).exec(stripped);
   if (!m) throw new Error(`could not find "${constName} = <n>" in the Go source`);
   return Number(m[1]);
 }
