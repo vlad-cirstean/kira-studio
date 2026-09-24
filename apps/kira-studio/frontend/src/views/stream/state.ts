@@ -267,6 +267,10 @@ export const useStreamViewStore = defineStore('streamView', () => {
     // wrong one under a `stale` label that would still be visible until the next Σ click.
     rt.count = null;
     rt.countOpId = null;
+    // P108 Part 11 F15: grid/state.ts's own setFilter (and documents/state.ts's setSearch) clear
+    // this alongside count/countOpId — left out here, a count failure from before this filter
+    // change kept showing in the Σ tooltip under a total this filter never produced.
+    rt.countError = null;
     tabsStore.patchStreamTabState(tabId, {
       offsetFilter: filter.offset,
       partitions: filter.partitions,

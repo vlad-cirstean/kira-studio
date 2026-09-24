@@ -751,6 +751,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
+              :style="rt?.countError ? { color: 'var(--kira-error)' } : undefined"
               aria-label="Run an exact count"
               data-testid="document-count"
               @click="documentViewStore.runCount(tab.id)"
@@ -758,7 +759,13 @@ onUnmounted(() => {
               <CodiconIcon name="symbol-number" :size="13" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Run an exact countDocuments() — the estimate above is metadata</TooltipContent>
+          <!-- P108 Part 11 F15: mirrors grid/DataToolbar.vue's own count tooltip — a failed count
+               is no longer silent. -->
+          <TooltipContent data-testid="document-count-tooltip">{{
+            rt?.countError
+              ? `Count failed: ${rt.countError}`
+              : 'Run an exact countDocuments() — the estimate above is metadata'
+          }}</TooltipContent>
         </Tooltip>
         <div class="projection-anchor">
           <Tooltip>

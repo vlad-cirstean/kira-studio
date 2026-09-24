@@ -700,6 +700,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
+              :style="rt?.countError ? { color: 'var(--kira-error)' } : undefined"
               aria-label="Count"
               data-testid="stream-count"
               @click="streamViewStore.runCount(tab.id)"
@@ -707,7 +708,12 @@ onUnmounted(() => {
               <CodiconIcon name="symbol-number" :size="13" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Count</TooltipContent>
+          <!-- P108 Part 11 F15: mirrors grid/DataToolbar.vue's own count tooltip — a failed count
+               is no longer silent (applyStreamFilter now clears countError the same way it already
+               clears count/countOpId, so a stale message never outlives the filter it was for). -->
+          <TooltipContent data-testid="stream-count-tooltip">{{
+            rt?.countError ? `Count failed: ${rt.countError}` : 'Count'
+          }}</TooltipContent>
         </Tooltip>
         <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
         <Tooltip v-if="isBatch">
