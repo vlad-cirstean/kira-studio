@@ -735,7 +735,11 @@ export const useCollectionsStore = defineStore('collections', () => {
   /** Opens the native save dialog and writes the collection there as Collection v2.1 JSON. As with
    *  import, only the path crosses the bridge — Go writes the file. Returns false when cancelled.
    *  D16: a secret exports valueless, and ExportReport.secretCount is what surfaces that once,
-   *  rather than it being a fact only discoverable by opening the file. */
+   *  rather than it being a fact only discoverable by opening the file. P108 F11: Postman
+   *  Collection v2.1 has no representation for a gRPC request (P11 D12/F22), so Go's own Export
+   *  skips every protocol='grpc' item and reports the count in ExportReport.skippedGrpc — this used
+   *  to read secretCount only, silently dropping the skipped-request half of the same report the
+   *  Go side already produces. */
   async function exportCollection(collectionId: string, name: string): Promise<boolean> {
     // The extension Postman's own exporter writes, so the file is recognisable on disk and
     // re-importable without renaming.
@@ -745,10 +749,18 @@ export const useCollectionsStore = defineStore('collections', () => {
     state.error = null;
     try {
       const report = await control.collectionsExport(collectionId, chosen.filePath);
-      state.exportWarning =
-        report.secretCount > 0
-          ? `${report.secretCount} secret value${report.secretCount === 1 ? ' was' : 's were'} not written to the file.`
-          : null;
+      const notes: string[] = [];
+      if (report.secretCount > 0) {
+        notes.push(
+          `${report.secretCount} secret value${report.secretCount === 1 ? ' was' : 's were'} not written to the file.`,
+        );
+      }
+      if (report.skippedGrpc > 0) {
+        notes.push(
+          `${report.skippedGrpc} gRPC request${report.skippedGrpc === 1 ? '' : 's'} ${report.skippedGrpc === 1 ? 'was' : 'were'} skipped — Postman collections cannot represent gRPC requests.`,
+        );
+      }
+      state.exportWarning = notes.length > 0 ? notes.join(' ') : null;
       return true;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
