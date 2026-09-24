@@ -178,9 +178,11 @@ export function initialWidthsByIndex(page: TabularPage): number[] {
 
 // P30 §3.6 C7: columnOffsets/columnRangeExtractor/observeScrollElementRect/
 // observeScrollElementOffset/MAX_OVERSCAN_COLUMNS — the tanstack-vue-virtual column axis these
-// four served — retired with @tanstack/vue-virtual itself once ConsoleResultGrid.vue's tabular
-// branch (their only remaining caller after P22 Pass B's own cutover) moved onto SlickGrid's own
-// native column virtualization (P30 §3). See git history for the deleted implementations.
+// four served retired once ConsoleResultGrid.vue's tabular branch (their only remaining caller
+// after P22 Pass B's own cutover) moved onto SlickGrid's own native column virtualization (P30
+// §3). Only this column axis retired — @tanstack/vue-virtual itself is still a real dependency
+// elsewhere (views/shared/keyvalue/KeyValuePane.vue, views/grpcrequest/ResponsePane.vue). See git
+// history for the deleted implementations.
 
 // P22 iter2 D3: velocity-adaptive, direction-biased row overscan ("runway") — see the plan's §5 D3.
 // The row axis's overscan was symmetric and direction-blind (`overscan: Math.ceil(OVERSCAN_PX /
