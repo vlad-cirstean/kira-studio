@@ -755,8 +755,16 @@ test('gRPC request — the history pane gets a real Clear action', async ({ rela
     // than this fixture needed before that fix, which is why there are three answers, not two.
     {
       channel: IPC.tabsList,
-      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+      response: [
+        grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
+      ],
     },
+    // Pre-existing bug, unrelated to P112: a restored tab with no target never triggers
+    // loadSchema's own watch (GrpcRequestView.vue's `mode === 'reflection' && !target` early
+    // return), so `methodResolved` never resolves and Call stays disabled forever. Every sibling
+    // test in this file that clicks Call already sets `target` + a grpcDescribe snapshot (e.g.
+    // line 234's own pattern); this test never did.
+    { channel: IPC.grpcDescribe, response: UNARY_SCHEMA },
     {
       channel: IPC.grpcCall,
       response: {
@@ -911,8 +919,13 @@ test('gRPC request — the history list refreshes after a call made while anothe
   const CONTROL: ControlSnapshot[] = [
     {
       channel: IPC.tabsList,
-      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+      response: [
+        grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
+      ],
     },
+    // Pre-existing bug, unrelated to P112: see the Clear-action test's own comment above — a
+    // restored tab with no target never triggers loadSchema, so Call stays disabled forever.
+    { channel: IPC.grpcDescribe, response: UNARY_SCHEMA },
     // Same two-answer shape as http-history.spec.ts's own D1 case: the first is the response
     // pane's own mount-time "does this tab have any history" probe (empty), before either call;
     // the second is what reopening History actually fetches after both calls.
@@ -985,8 +998,13 @@ test('gRPC request — calling while viewing a stored call shows the new one (P1
   const CONTROL: ControlSnapshot[] = [
     {
       channel: IPC.tabsList,
-      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+      response: [
+        grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
+      ],
     },
+    // Pre-existing bug, unrelated to P112: see the Clear-action test's own comment above — a
+    // restored tab with no target never triggers loadSchema, so Call stays disabled forever.
+    { channel: IPC.grpcDescribe, response: UNARY_SCHEMA },
     { channel: IPC.grpcHistoryList, args: scope, response: [STORED] },
     { channel: IPC.grpcHistoryGet, args: { id: 'stored-1' }, response: STORED_SNAPSHOT },
     {
@@ -1045,8 +1063,13 @@ test('a non-OK status shows what the code means and what the server said (P18 D1
   const CONTROL: ControlSnapshot[] = [
     {
       channel: IPC.tabsList,
-      response: [grpcTab({ service: 'demo.Echo', method: 'SayHello' })],
+      response: [
+        grpcTab({ target: 'demo.example.com:443', service: 'demo.Echo', method: 'SayHello' }),
+      ],
     },
+    // Pre-existing bug, unrelated to P112: see the Clear-action test's own comment above — a
+    // restored tab with no target never triggers loadSchema, so Call stays disabled forever.
+    { channel: IPC.grpcDescribe, response: UNARY_SCHEMA },
     {
       channel: IPC.grpcCall,
       response: {
