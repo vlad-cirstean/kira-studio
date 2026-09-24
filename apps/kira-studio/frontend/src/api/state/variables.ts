@@ -670,7 +670,14 @@ export const useVariableSetStore = defineStore('variableSet', () => {
    *  row.id`, so switching from one row's history button to another's unmounts the first popover
    *  without ever firing its own `@close` — closeHistoryMenu below would never run for it. Clearing
    *  here too, before the new popover's own state lands, closes that gap regardless of whether the
-   *  previous popover ever closes "cleanly". */
+   *  previous popover ever closes "cleanly".
+   *
+   *  P108 F13: this had no guard against a *second* call landing before the first's own
+   *  `variablesHistory` await resolved — opening one row's history, then another's before the
+   *  first reply arrived, let the first call's stale reply win the race and overwrite `entries`
+   *  with the wrong row's history right after the second call had already set `variableId` to the
+   *  new row. `variableId` is captured up front and the write only commits if nothing (a newer
+   *  open, or a close) has changed it since. */
   async function openHistoryMenu(
     tabId: string,
     scope: VariableScope,
@@ -683,7 +690,10 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     historyMenuState.ownerId = ownerId;
     historyMenuState.variableId = variableId;
     historyMenuState.open = true;
-    historyMenuState.entries = await control.variablesHistory(variableId);
+    const entries = await control.variablesHistory(variableId);
+    if (historyMenuState.variableId === variableId) {
+      historyMenuState.entries = entries;
+    }
   }
 
   function closeHistoryMenu(): void {
@@ -695,6 +705,15 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     historyMenuState.entries = [];
     clearRevealedHistory();
   }
+
+  // P108 F13: closing the tab this popover belongs to used to leave historyMenuState pointing at
+  // it — restoreHistoryEntry's own `variableSetRows(tabId)` lookup then reads the now-gone tab's
+  // runtime (ensure() would silently recreate an empty one), and the popover itself, still `open`,
+  // would keep showing a dead tab's history. Same "this tab's own leftover state is this store's
+  // job to clear" discipline registerTabRuntimeCleanup already applies to variableSetRuntime.
+  registerTabRuntimeCleanup((tabId) => {
+    if (historyMenuState.tabId === tabId) closeHistoryMenu();
+  });
 
   /** P12 D13: runReveal's own second instantiation, over api_variable_history instead of
    *  api_variables. */
