@@ -335,6 +335,14 @@ export class OpsState {
     this.activeWorktreePreparePath.value = undefined;
     this.worktreePrepareOutput.value = [];
     this.worktreePrepareResult.value = undefined;
+    // F6: every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
+    // slot's `ask()` — nothing else ever settles that Promise. Without abandoning it here, a repo
+    // switch mid-dialog leaves the OLD repo's dialog open over the new repo, and `busy` stuck true
+    // (every op button disabled) until the user dismisses it — confirming then does nothing (the
+    // post-`ask()` repo guard each of those methods already has returns), which reads as a silent
+    // failure. `this.#repoId` is already the NEW repoId above, so each guard sees the mismatch and
+    // its own `finally` clears `busy` the same way a real cancel would.
+    this.#abandonPending();
     if (repoId === undefined) {
       this.statusSummary.value = undefined;
       this.undoSlot.value = null;
@@ -342,6 +350,19 @@ export class OpsState {
     }
     void this.refreshStatus();
     void this.refreshUndo();
+  }
+
+  /** F6: settles every pending confirm dialog and pull prompt with its own cancel value — shared
+   *  by `setRepoId` (a repo switch) and `dispose` (the whole class going away). */
+  #abandonPending(): void {
+    this.#checkoutSlot.abandon(null);
+    this.#revertSlot.abandon(null);
+    this.#resetSlot.abandon(null);
+    this.#cherryPickSlot.abandon(null);
+    this.#stashPopSlot.abandon(false);
+    this.#forcePushSlot.abandon(null);
+    this.resolvePullDialog(false);
+    this.resolvePostCheckoutPullDialog(false);
   }
 
   /** Pure predicate over `(inProgress, opKind)` (§7.11) — the gate every dialog and menu entry's
@@ -1789,5 +1810,6 @@ export class OpsState {
     this.#unsubscribeWorktreeProgress();
     this.#statusRequest.abort();
     this.#undoRequest.abort();
+    this.#abandonPending();
   }
 }
