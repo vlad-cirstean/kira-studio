@@ -129,7 +129,15 @@ function onOpen(row: TreeRowVm): void {
 async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
   // The "Saved filters ▸" submenu (Step 13) is built synchronously by menuForRow() from
   // treeStore.savedQueries, so it must already be populated by the time the menu opens.
-  if (OPENABLE_KINDS.has(row.kind)) await treeStore.loadSavedQueries(row.connectionId, row.path);
+  if (OPENABLE_KINDS.has(row.kind)) {
+    try {
+      await treeStore.loadSavedQueries(row.connectionId, row.path);
+    } catch {
+      // P108 Part 12 F11: a queriesList rejection (DB failure) must not leave the menu unopened
+      // and an unhandled rejection behind — menuForRow() just renders an empty "Saved filters ▸"
+      // submenu (treeStore.savedQueries has no entry for this row) instead.
+    }
+  }
   contextMenuStore.openContextMenu(event, menuForRow(row));
 }
 

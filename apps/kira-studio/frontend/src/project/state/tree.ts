@@ -149,33 +149,70 @@ export const useTreeStore = defineStore('tree', () => {
     return connectionEpoch.get(connectionId) ?? 0;
   }
 
+  // P108 Part 12 F11: a per-key request token — overlapping loadChildren calls for the same row
+  // (e.g. a Refresh fired while an earlier load for the same path is still in flight) used to have
+  // no sequencing at all: whichever response arrived LAST won, not whichever was issued last, and
+  // the FIRST call's own `finally` cleared `loading` the moment it settled even if a later call was
+  // still running. Bumped on every call for a key; only the call still holding the latest token may
+  // write children/errors or clear the spinner.
+  const loadToken = new Map<string, number>();
+  function nextLoadToken(k: string): number {
+    const token = (loadToken.get(k) ?? 0) + 1;
+    loadToken.set(k, token);
+    return token;
+  }
+  function isLatestLoadToken(k: string, token: number): boolean {
+    return loadToken.get(k) === token;
+  }
+
   async function loadChildren(connectionId: string, path: string, refresh: boolean): Promise<void> {
     const k = rowKey(connectionId, path);
     const epoch = connectionEpochFor(connectionId);
+    const token = nextLoadToken(k);
     treeState.loading.add(k);
     delete treeState.errors[k];
     try {
       const result = await control.treeChildren(connectionId, path, refresh);
-      if (connectionEpochFor(connectionId) !== epoch) return;
+      if (connectionEpochFor(connectionId) !== epoch || !isLatestLoadToken(k, token)) return;
       // P43 iter2 D23: `result.truncated` is deliberately unread here — no level the project tree
       // ever renders can truncate (every SQL/Mongo/Kafka/SQS catalog enumerates a bounded
       // set in one round trip, and Redis/S3 stop expanding at the database/bucket, P41 D5). Only
       // views/browse/state.ts's own levels can, and it's the only place that shows the strip.
       treeState.children[k] = result.nodes;
     } catch (err) {
-      if (connectionEpochFor(connectionId) !== epoch) return;
+      if (connectionEpochFor(connectionId) !== epoch || !isLatestLoadToken(k, token)) return;
       treeState.errors[k] = err instanceof Error ? err.message : String(err);
     } finally {
-      treeState.loading.delete(k);
+      if (isLatestLoadToken(k, token)) treeState.loading.delete(k);
     }
   }
 
+  // P108 Part 12 F11: single-flight (a plain presence check let two concurrent expand()s for
+  // different paths under the same not-yet-loaded connection both issue filtersList) and generation-
+  // guarded — saveVisibility bumps `visibilityGeneration` on every explicit save, so a filtersList
+  // read already in flight when the user saves new visibility settings discards its now-stale
+  // result on resolve instead of overwriting the save.
+  const pendingVisibilityLoads = new Set<string>();
+  const visibilityGeneration = new Map<string, number>();
+  function visibilityGenerationFor(connectionId: string): number {
+    return visibilityGeneration.get(connectionId) ?? 0;
+  }
+
   async function loadVisibility(connectionId: string): Promise<void> {
-    if (treeState.visibility[connectionId]) return;
-    treeState.visibility[connectionId] = await control.filtersList(connectionId);
+    if (treeState.visibility[connectionId] || pendingVisibilityLoads.has(connectionId)) return;
+    pendingVisibilityLoads.add(connectionId);
+    const generation = visibilityGenerationFor(connectionId);
+    try {
+      const result = await control.filtersList(connectionId);
+      if (visibilityGenerationFor(connectionId) !== generation) return;
+      treeState.visibility[connectionId] = result;
+    } finally {
+      pendingVisibilityLoads.delete(connectionId);
+    }
   }
 
   async function saveVisibility(connectionId: string, visibility: TreeVisibility): Promise<void> {
+    visibilityGeneration.set(connectionId, visibilityGenerationFor(connectionId) + 1);
     treeState.visibility[connectionId] = await control.filtersReplace(connectionId, visibility);
   }
 
