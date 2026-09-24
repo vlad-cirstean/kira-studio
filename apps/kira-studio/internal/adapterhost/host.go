@@ -182,6 +182,8 @@ type opEndPayload struct {
 	Rows       *int    `json:"rows"`
 	Command    *string `json:"command"`
 	Error      *string `json:"error"`
+	// Path (P108 Part 11 F5): see model.OpRecord.Path.
+	Path *string `json:"path"`
 }
 
 // RunOp is scheduler/ops.ts's runOp: mint or accept an op id, refuse a duplicate (a duplicate id
@@ -259,6 +261,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	}
 	h.emitJSON(oplog.EventOpEnd, opEndPayload{
 		OpID: opID, Status: status, DurationMs: durationMs, Rows: op.Rows(), Command: command, Error: errMsg,
+		Path: op.Path(),
 	})
 
 	return opID, value, err

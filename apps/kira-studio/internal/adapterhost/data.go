@@ -209,6 +209,10 @@ func (d *Dispatcher) Execute(ctx context.Context, req ExecuteRequestWire) (Execu
 	connID := req.ConnectionID
 	_, value, err := d.host.RunOp(ctx, OpSpec{ConnectionID: &connID, Kind: "execute", OpID: req.OpID, TabID: req.TabID},
 		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			// P108 Part 11 F5: req.Path is already the encoded string tabs.ts's own openConsoleTab
+			// takes — recorded as-is so a re-run can reopen at the exact same path, no NodePath
+			// round-trip needed.
+			op.SetPath(req.Path)
 			pages, err := adapter.Execute(ctx, model.ConsoleRequest{Path: path, Statements: req.Statements}, op)
 			if err != nil {
 				return nil, err

@@ -4,15 +4,14 @@
 // the environment-scope variables query cached forever (a later read for that owner id would keep
 // reading the deleted rows back). This pins both evictions.
 //
-// P112: `listCache` is gone — eviction is `reconcileEnvironments` (apiQueries.ts), run from
-// `afterEnvironmentsListChange` after every environments-list mutation. The collection-delete half
-// of the original spec (`reconcileTree`'s own eviction) moves with `collections.ts`'s own
-// migration (commit 5 of this phase) — collectionsStore.deleteRow does not evict variable queries
-// yet, so that case is re-added alongside reconcileTree's wiring rather than tested against
-// not-yet-existing behaviour here.
+// P112: `listCache` is gone — eviction is `reconcileEnvironments`/`reconcileTree` (apiQueries.ts),
+// run from `afterEnvironmentsListChange`/`afterTreeListChange` after every list mutation. The
+// collection-delete case below is `reconcileTree`'s own half, re-added now that
+// `collections.ts`'s own migration (commit 5) wires `deleteRow` through `afterTreeListChange`.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
 import type { ApiEnvironment, ApiVariable } from '@shared/domain/variables';
 import { queryClient } from '@workbench/state/queryClient';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
@@ -23,28 +22,51 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 // wailsRuntime.ts's mocked transport deliberately never settles an unmocked call — useVariablesStore
-// below mounts a permanent, eager `useQuery` for the environments list (apiQueries.ts) the moment
-// the store is created, so it needs a resolving default in place *before* that first call, or its
+// and useCollectionsStore below each mount a permanent, eager `useQuery` (apiQueries.ts) the moment
+// the store is created, so both need a resolving default in place *before* that first call, or its
 // own initial fetch hangs forever and wedges every later invalidateQueries-triggered refetch behind
 // it. Set before restoreAfterEach's own snapshot, so each test's afterEach restores to this benign
 // default rather than reintroducing the hang.
 (
   control as unknown as { variablesListEnvironments: typeof control.variablesListEnvironments }
 ).variablesListEnvironments = async () => [];
+(control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+  async () => ({ collections: [], items: [] });
 restoreAfterEach(control);
 const { useVariablesStore } = await import('../../frontend/src/api/state/variables');
-const { apiVariablesKey, apiEnvironmentsKey, loadVariableRows } = await import(
-  '../../frontend/src/api/state/apiQueries'
-);
+const { apiVariablesKey, apiEnvironmentsKey, apiCollectionsTreeKey, loadVariableRows } =
+  await import('../../frontend/src/api/state/apiQueries');
 const { useTabIncognitoStore } = await import('../../frontend/src/state/tabIncognito');
+const { useCollectionsStore } = await import('../../frontend/src/api/state/collections');
 
 const variablesStore = useVariablesStore();
-// Lets the store's own eager initial fetch (above) actually settle before any test runs, so
+const collectionsStore = useCollectionsStore();
+// Lets both stores' own eager initial fetch (above) actually settle before any test runs, so
 // `refreshApiQuery`'s own in-flight capture never mistakes it for a test's own mocked fetch.
 await new Promise((resolve) => setTimeout(resolve, 0));
 
 function environment(id: string): ApiEnvironment {
   return { id, name: id, description: '', color: 'none', sortOrder: 0, isActive: false };
+}
+
+function collection(id: string, name: string): CollectionSummary {
+  return { id, name, sortOrder: 0, createdAt: '', updatedAt: '' };
+}
+
+function folder(id: string, collectionId: string): CollectionItemSummary {
+  return {
+    id,
+    collectionId,
+    parentId: null,
+    kind: 'folder',
+    name: id,
+    sortOrder: 0,
+    method: '',
+    url: '',
+    protocol: 'http',
+    createdAt: '',
+    updatedAt: '',
+  };
 }
 
 function variable(id: string, ownerId: string): ApiVariable {
@@ -132,5 +154,50 @@ describe('deleteEnvironment evicts the incognito override and the cached variabl
     const rows = await loadVariableRows('environment', envId);
     expect(calls).toBe(1);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe('deleteRow (collections.ts) evicts the collection-scope variables query on a collection delete (reconcileTree, P112)', () => {
+  test('deleting a collection evicts its cached variables query, not just the tree', async () => {
+    const collectionId = 'col-to-delete-1';
+    queryClient.setQueryData(apiCollectionsTreeKey, {
+      collections: [collection(collectionId, 'Orders API')],
+      items: [folder('folder-1', collectionId)],
+    });
+
+    (control as unknown as { variablesList: typeof control.variablesList }).variablesList =
+      async () => [variable('v1', collectionId)];
+    await loadVariableRows('collection', collectionId);
+    expect(queryClient.getQueryData(apiVariablesKey('collection', collectionId))).toHaveLength(1);
+
+    (
+      control as unknown as { collectionsDelete: typeof control.collectionsDelete }
+    ).collectionsDelete = async () => {};
+    (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+      async () => ({ collections: [], items: [] });
+
+    await collectionsStore.deleteRow({
+      key: `c:${collectionId}`,
+      depth: 0,
+      hasChildren: true,
+      expanded: true,
+      kind: 'collection',
+      id: collectionId,
+      collectionId,
+      parentId: null,
+      name: 'Orders API',
+      method: '',
+      url: '',
+      protocol: 'http',
+      matched: false,
+    });
+
+    // reconcileTree reads the query cache directly (an imperative reader, §3.5) — no reactivity
+    // lag to wait out here.
+    expect(queryClient.getQueryData(apiVariablesKey('collection', collectionId))).toBeUndefined();
+    expect(
+      queryClient.getQueryData<{ collections: CollectionSummary[] }>(apiCollectionsTreeKey)
+        ?.collections,
+    ).toEqual([]);
   });
 });

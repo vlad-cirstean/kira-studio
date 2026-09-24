@@ -48,5 +48,10 @@ export const opRecordSchema = /*#__PURE__*/ z.object({
   // Optional: a record built before this field existed (or a hand-written test fixture) has no
   // opinion, which OperationsPanel.vue treats as "not truncated" via plain falsy access.
   commandTruncated: z.boolean().optional(),
+  // P108 Part 11 F5: the encoded console path (database/schema) this op ran against — null for
+  // every op kind that isn't a console execute() batch and for a pre-F5 row (op_log.path). Nullable
+  // (Go's *string always marshals the key) and optional (a hand-written test fixture predating this
+  // field has no opinion) — OperationsPanel.vue's re-run treats either as "no recorded path".
+  path: z.string().nullable().optional(),
 });
 export type OpRecord = z.infer<typeof opRecordSchema>;

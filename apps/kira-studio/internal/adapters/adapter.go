@@ -156,6 +156,7 @@ type OpCtx struct {
 	mu      sync.Mutex
 	command string
 	rows    *int
+	path    *string
 }
 
 // NewOpCtx constructs an OpCtx for opID.
@@ -189,4 +190,20 @@ func (c *OpCtx) Rows() *int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.rows
+}
+
+// SetPath records the encoded console path (database/schema) a console execute() batch ran
+// against — P108 Part 11 F5: the Operations panel's re-run needs this to reopen at the same path,
+// not the connection's bare default. No other op kind calls this.
+func (c *OpCtx) SetPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.path = &path
+}
+
+// Path returns the most recently set path, or nil if none was ever set.
+func (c *OpCtx) Path() *string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.path
 }

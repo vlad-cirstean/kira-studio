@@ -13,17 +13,36 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { queryClient } from '@workbench/state/queryClient';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
+import { apiCollectionsTreeKey } from '../../frontend/src/api/state/apiQueries';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
+// wailsRuntime.ts's mocked transport deliberately never settles an unmocked call —
+// useCollectionsStore below mounts a permanent, eager `useQuery` for the tree the moment the store
+// is created, so it needs a resolving default in place *before* that first call, or its own
+// initial fetch hangs forever and wedges every later invalidateQueries-triggered refetch (deleteRow
+// → afterTreeListChange → refreshApiQuery) behind it. Set before restoreAfterEach's own snapshot,
+// so each test's afterEach restores to this benign default rather than reintroducing the hang.
+(control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
+  async () => ({ collections: [], items: [] });
 restoreAfterEach(control);
 const { useCollectionsStore } = await import('../../frontend/src/api/state/collections');
 
 const collectionsStore = useCollectionsStore();
+// Lets the store's own eager initial fetch (above) actually settle before any test runs, so
+// `refreshApiQuery`'s own in-flight capture never mistakes it for a test's own mocked fetch.
+await new Promise((resolve) => setTimeout(resolve, 0));
+
+// P112: collections/items are now a computed view over the TanStack Query cache, not a settable
+// field — seed the tree the same way a real List response would land.
+function seedTree(collections: CollectionSummary[], items: CollectionItemSummary[]): void {
+  queryClient.setQueryData(apiCollectionsTreeKey, { collections, items });
+}
 
 function collection(id: string, name: string): CollectionSummary {
   return { id, name, sortOrder: 0, createdAt: '', updatedAt: '' };
@@ -87,14 +106,16 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     //     folder-2 ("Nested")
     //       req-2 ("Refresh token") <- grandchild, via a nested folder
     //   req-3 ("Health check")      <- sibling, must survive
-    collectionsStore.collections = [collection('col-1', 'Orders API')];
-    collectionsStore.items = [
-      folder('folder-1', 'col-1', null, 'Auth'),
-      request('req-1', 'col-1', 'folder-1', 'Login'),
-      folder('folder-2', 'col-1', 'folder-1', 'Nested'),
-      request('req-2', 'col-1', 'folder-2', 'Refresh token'),
-      request('req-3', 'col-1', null, 'Health check'),
-    ];
+    seedTree(
+      [collection('col-1', 'Orders API')],
+      [
+        folder('folder-1', 'col-1', null, 'Auth'),
+        request('req-1', 'col-1', 'folder-1', 'Login'),
+        folder('folder-2', 'col-1', 'folder-1', 'Nested'),
+        request('req-2', 'col-1', 'folder-2', 'Refresh token'),
+        request('req-3', 'col-1', null, 'Health check'),
+      ],
+    );
 
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
@@ -147,11 +168,13 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
   });
 
   test('deleting a whole collection purges every item in it, regardless of nesting depth', async () => {
-    collectionsStore.collections = [collection('col-2', 'Widgets API')];
-    collectionsStore.items = [
-      folder('folder-3', 'col-2', null, 'Top'),
-      request('req-4', 'col-2', 'folder-3', 'List widgets'),
-    ];
+    seedTree(
+      [collection('col-2', 'Widgets API')],
+      [
+        folder('folder-3', 'col-2', null, 'Top'),
+        request('req-4', 'col-2', 'folder-3', 'List widgets'),
+      ],
+    );
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
     ).collectionsGetRequest = async (id: string) => savedRequest(id);

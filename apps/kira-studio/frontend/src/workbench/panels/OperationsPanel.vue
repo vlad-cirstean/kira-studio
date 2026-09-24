@@ -28,6 +28,7 @@ import {
   postgresEscapeStringsFor,
   sqlDialectFor,
 } from '../../views/shared/sqlIdent';
+import { useConnectionGate } from '../../views/shared/useConnectionGate';
 
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
@@ -132,7 +133,20 @@ function opSqlDialect(record: OpRecord) {
 // produced the row. P23 D1(c): commandTruncated means record.command is only a 64 KiB prefix of
 // what actually ran, so re-running it would silently execute part of a script as though it were
 // the whole thing — refused here too, not only via the disabled context-menu item below.
-function onRerun(record: OpRecord): void {
+//
+// P108 Part 11 F5: two fixes on top of D10's original shape. (1) The tab now opens at
+// record.path — the same database/schema the op actually ran against (op_log.path, F5) — not the
+// connection's bare default, which could silently replay unqualified DML against a different
+// database's same-named table. A pre-F5 row has no recorded path (null/undefined); it falls back
+// to '' exactly as D10 always did. There is no separate "does this path still exist" pre-check:
+// the reconnect step below dials this exact path the same way Run always does, so a path that no
+// longer resolves (a dropped database/schema) surfaces as that same real, descriptive connect
+// error instead of silently running somewhere else — refusing to run against the wrong target
+// covers the finding's own "refuse" requirement without a second, parallel existence check. (2)
+// Routes through the console's own reconnect gate (useConnectionGate, the exact composable
+// ConsoleView.vue's ensureConnectedForRun already wraps) before running — Run itself never fires
+// against a disconnected connection, and Re-run must not either.
+async function onRerun(record: OpRecord): Promise<void> {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
   const dialect = opSqlDialect(record);
   const statements = splitSqlStatements(record.command, {
@@ -145,8 +159,13 @@ function onRerun(record: OpRecord): void {
     slashSlashComments: connectionFor(record)?.kind === 'mongodb',
   }).map((s) => s.text);
   if (statements.length === 0) return;
-  const tabId = tabsStore.openConsoleTab(record.connectionId, '');
-  void consoleViewStore.run(tabId, statements);
+  const tabId = tabsStore.openConsoleTab(record.connectionId, record.path ?? '');
+  const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => ({
+    id: tabId,
+    connectionId: record.connectionId,
+  }));
+  if (needsReconnect.value) await onReconnectAndLoad();
+  await consoleViewStore.run(tabId, statements);
 }
 
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
@@ -184,7 +203,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       // P23 D1(c): a truncated command is only a 64 KiB prefix of what actually ran — Copy
       // command stays enabled (copying a prefix is honest and useful), but Re-run must not.
       disabled: !record.command || !canSql || record.commandTruncated,
-      run: () => onRerun(record),
+      run: () => void onRerun(record),
     },
     {
       type: 'item',

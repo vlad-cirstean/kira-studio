@@ -498,7 +498,7 @@ func execute(ctx context.Context, db *mongodriver.Database, readOnly bool, op *a
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
-	op.SetCommand(strings.Join(statements, ";\n"))
+	op.SetCommand(adapters.JoinConsoleStatements(statements, "//"))
 
 	parsed := make([]parsedStatement, len(statements))
 	for i, text := range statements {

@@ -427,3 +427,67 @@ func TestWhereClause_TrailingLineCommentDoesNotEatClosingParen(t *testing.T) {
 		t.Fatalf("WhereClause(%q) = %q, the trailing `--` comment still swallows the closing paren", filter, got)
 	}
 }
+
+// P108 Part 11 F5: a console statement whose own last line ends in a line comment used to have its
+// joining ";\n" separator land on that same line — the ";" reads as part of the comment, and
+// sql-split.ts's own re-split then merges this statement with the next one (Operations panel
+// re-run). JoinConsoleStatements must insert an extra "\n" whenever that would happen, for every
+// dialect's own comment prefix(es), and must never insert one when no prefix is present.
+func TestJoinConsoleStatements(t *testing.T) {
+	cases := []struct {
+		name     string
+		stmts    []string
+		prefixes []string
+		want     string
+	}{
+		{
+			name:     "no comment: plain join, unchanged",
+			stmts:    []string{"SELECT 1", "SELECT 2"},
+			prefixes: []string{"--"},
+			want:     "SELECT 1;\nSELECT 2",
+		},
+		{
+			name:     "trailing -- comment on the last line gets an extra newline before the separator",
+			stmts:    []string{"SELECT 1 -- note", "SELECT 2"},
+			prefixes: []string{"--"},
+			want:     "SELECT 1 -- note\n;\nSELECT 2",
+		},
+		{
+			name:     "a comment on an earlier line, not the last, needs no extra newline",
+			stmts:    []string{"SELECT 1 -- note\nFROM t", "SELECT 2"},
+			prefixes: []string{"--"},
+			want:     "SELECT 1 -- note\nFROM t;\nSELECT 2",
+		},
+		{
+			name:     "the final statement never gets a trailing separator, comment or not",
+			stmts:    []string{"SELECT 1", "SELECT 2 -- note"},
+			prefixes: []string{"--"},
+			want:     "SELECT 1;\nSELECT 2 -- note",
+		},
+		{
+			name:     "MySQL/ClickHouse: a trailing # comment is caught by its own prefix",
+			stmts:    []string{"SELECT 1 # note", "SELECT 2"},
+			prefixes: []string{"--", "#"},
+			want:     "SELECT 1 # note\n;\nSELECT 2",
+		},
+		{
+			name:     "Mongo: a trailing // comment is caught by its own prefix",
+			stmts:    []string{"db.t.find({}) // note", "db.t.find({})"},
+			prefixes: []string{"//"},
+			want:     "db.t.find({}) // note\n;\ndb.t.find({})",
+		},
+		{
+			name:     "three statements: only the commented middle one gets the extra newline",
+			stmts:    []string{"SELECT 1", "SELECT 2 -- note", "SELECT 3"},
+			prefixes: []string{"--"},
+			want:     "SELECT 1;\nSELECT 2 -- note\n;\nSELECT 3",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := JoinConsoleStatements(tc.stmts, tc.prefixes...); got != tc.want {
+				t.Errorf("JoinConsoleStatements(%q, %q) = %q, want %q", tc.stmts, tc.prefixes, got, tc.want)
+			}
+		})
+	}
+}

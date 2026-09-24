@@ -3,7 +3,6 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -162,7 +161,7 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 			return nil, err
 		}
 	}
-	op.SetCommand(strings.Join(statements, ";\n"))
+	op.SetCommand(adapters.JoinConsoleStatements(statements, "--", "#"))
 
 	if readOnly {
 		if _, err := conn.ExecContext(ctx, "START TRANSACTION READ ONLY"); err != nil {

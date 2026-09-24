@@ -34,13 +34,10 @@ const variablesStore = useVariablesStore();
 // panel shows collections and nothing else, so an environment must not keep the empty state away.
 const empty = computed(() => collectionsStore.collections.length === 0);
 
-// The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
-// non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
-// no collections, no tree, no call, no collections.
-onMounted(collectionsStore.initCollections);
-// P112: the header's Environments action and the active-environment select both read
-// variablesStore.environments — useVariablesStore's own app-lifetime query observer fetches it on
-// store creation, so there is nothing left to trigger on mount here.
+// P112: useCollectionsStore's own app-lifetime query observer fetches the tree on store creation
+// (same as useVariablesStore's own environments query below) — there is nothing left to trigger
+// on mount here. PanelShell still renders #body only once `empty` reads false, which now follows
+// the query's own data rather than a mount-triggered fetch.
 
 // P22b D8: runtime-only collapse state for the two categories — a panel section is not a
 // preference worth a storage round trip (ConsoleViewRuntime's own "runtime-only, never saved"

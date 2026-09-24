@@ -136,7 +136,7 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 	}
 	// One op-log row for the whole batch (P5 D9's precedent) — StreamQuery/RunCommand deliberately
 	// never call op.SetCommand() themselves so this one call is authoritative.
-	op.SetCommand(strings.Join(statements, ";\n"))
+	op.SetCommand(adapters.JoinConsoleStatements(statements, "--", "#"))
 
 	pages := make([]page.Page, len(statements))
 	for i, sql := range statements {

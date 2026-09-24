@@ -15,6 +15,10 @@ type OpRecord struct {
 	// CommandTruncated (P23 D1(c)): Command was truncated to maxOpCommandBytes at storage time, so
 	// it is no longer the whole script that ran — Re-run must refuse rather than replay a prefix.
 	CommandTruncated bool `json:"commandTruncated"`
+	// Path (P108 Part 11 F5): the encoded console path (database/schema) this op ran against — nil
+	// for every op kind that isn't a console execute() batch, and for a pre-P108-Part-11 row. Set
+	// by adapterhost.Dispatcher.Execute (op.SetPath), the one op kind that has a path at all.
+	Path *string `json:"path"`
 }
 
 // OpAppend is ops.ts's AppendOpInput.
@@ -33,6 +37,8 @@ type OpFinish struct {
 	Rows       *int
 	Command    *string
 	Error      *string
+	// Path (P108 Part 11 F5): see OpRecord.Path.
+	Path *string
 }
 
 // opKinds mirrors ops.ts's opKindSchema. Note 'ddl' is deliberately absent (P52 §4.3 / P53 §3.1):

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -194,7 +193,7 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 			return nil, err
 		}
 	}
-	op.SetCommand(strings.Join(statements, ";\n"))
+	op.SetCommand(adapters.JoinConsoleStatements(statements, "--"))
 
 	if readOnly {
 		if _, err := conn.Exec(ctx, "BEGIN READ ONLY"); err != nil {

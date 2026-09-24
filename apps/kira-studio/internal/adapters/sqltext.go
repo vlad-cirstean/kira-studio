@@ -352,6 +352,37 @@ func StripOneTrailingSemicolon(text string) string {
 	return text[:loc[0]]
 }
 
+// JoinConsoleStatements is every console adapter's own op-log join: statements separated by ";\n",
+// the same separator "Run all" sent — this is what the Operations panel's re-run (P108 Part 11 F5)
+// re-splits with sql-split.ts. A statement whose own last line contains one of lineCommentPrefixes
+// (a trailing "--"/"#"/"//" line comment) swallows the very ";\n" separator that follows it on that
+// same line — the semicolon reads as part of the comment, and re-splitting merges this statement
+// with the next one. Appending an extra "\n" before such a statement's own separator moves the ";"
+// onto its own line, out of the comment's reach. Over-triggering on a false positive (the prefix
+// text appearing inside a string literal on the last line, not actually a comment) only adds a
+// harmless blank line, never changes what re-splits into — so this stays a cheap substring check
+// rather than a real lexical scan.
+func JoinConsoleStatements(statements []string, lineCommentPrefixes ...string) string {
+	parts := make([]string, len(statements))
+	for i, stmt := range statements {
+		parts[i] = stmt
+		if i == len(statements)-1 {
+			continue
+		}
+		lastLine := stmt
+		if idx := strings.LastIndexByte(stmt, '\n'); idx >= 0 {
+			lastLine = stmt[idx+1:]
+		}
+		for _, prefix := range lineCommentPrefixes {
+			if strings.Contains(lastLine, prefix) {
+				parts[i] += "\n"
+				break
+			}
+		}
+	}
+	return strings.Join(parts, ";\n")
+}
+
 // SingleStatusPage ports sql-text.ts's singleStatusPage: the one-column, one-row "status" page a
 // console statement with no result set returns. dataType varies (ClickHouse spells it "String").
 func SingleStatusPage(text, dataType string) page.TabularPage {

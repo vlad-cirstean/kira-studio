@@ -39,7 +39,7 @@ var opLogByteBudget = 32 * 1024 * 1024
 const (
 	opsInsertSQL = `INSERT INTO op_log (id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error)
 		 VALUES (?, ?, ?, ?, NULL, ?, 'running', NULL, NULL, NULL)`
-	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ?, stored_bytes = ?, command_truncated = ? WHERE id = ?`
+	opsUpdateSQL = `UPDATE op_log SET status = ?, duration_ms = ?, rows = ?, command = ?, error = ?, stored_bytes = ?, command_truncated = ?, path = ? WHERE id = ?`
 )
 
 // InterruptedOpError is the message a still-'running' op_log row gets stamped with by
@@ -120,9 +120,9 @@ func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated b
 	}
 
 	if r.update != nil {
-		_, err = r.update.Exec(patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), opID)
+		_, err = r.update.Exec(patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), patch.Path, opID)
 	} else {
-		_, err = r.DB.Exec(opsUpdateSQL, patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), opID)
+		_, err = r.DB.Exec(opsUpdateSQL, patch.Status, patch.DurationMs, patch.Rows, patch.Command, patch.Error, storedBytes, boolToInt(commandTruncated), patch.Path, opID)
 	}
 	if err != nil {
 		return false, fmt.Errorf("repos/ops: finish %s: %w", opID, err)
@@ -135,7 +135,7 @@ func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated b
 // one) — an unrecognised kind or status is simply dropped, logged, like any other bad row.
 func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 	rows, err := r.DB.Query(`
-		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, command_truncated
+		SELECT id, connection_id, tab_id, started_at, duration_ms, kind, status, rows, command, error, command_truncated, path
 		  FROM op_log
 		 ORDER BY started_at DESC, rowid DESC
 		 LIMIT ?
@@ -153,8 +153,9 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 			durationMs, opRows  sql.NullInt64
 			command, opErr      sql.NullString
 			commandTruncated    int
+			path                sql.NullString
 		)
-		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr, &commandTruncated); err != nil {
+		if err := rows.Scan(&o.ID, &connectionID, &tabID, &o.StartedAt, &durationMs, &o.Kind, &o.Status, &opRows, &command, &opErr, &commandTruncated, &path); err != nil {
 			return nil, fmt.Errorf("repos/ops: scan: %w", err)
 		}
 		if !model.ValidOpKind(o.Kind) {
@@ -186,6 +187,9 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 			o.Error = &opErr.String
 		}
 		o.CommandTruncated = commandTruncated != 0
+		if path.Valid {
+			o.Path = &path.String
+		}
 		out = append(out, o)
 	}
 	if err := rows.Err(); err != nil {

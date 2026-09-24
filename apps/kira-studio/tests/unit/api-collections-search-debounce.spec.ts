@@ -8,8 +8,10 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { queryClient } from '@workbench/state/queryClient';
 import { sleep } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
+import { apiCollectionsTreeKey } from '../../frontend/src/api/state/apiQueries';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
@@ -17,6 +19,12 @@ setActivePinia(pinia);
 const { useCollectionsStore } = await import('../../frontend/src/api/state/collections');
 
 const collectionsStore = useCollectionsStore();
+
+// P112: collections/items are now a computed view over the TanStack Query cache, not a settable
+// field — seed the tree the same way a real List response would land.
+function seedTree(collections: CollectionSummary[], items: CollectionItemSummary[]): void {
+  queryClient.setQueryData(apiCollectionsTreeKey, { collections, items });
+}
 
 function collection(id: string, name: string, sortOrder = 0): CollectionSummary {
   return { id, name, sortOrder, createdAt: '', updatedAt: '' };
@@ -68,11 +76,13 @@ function request(
 
 describe('api/state/collections.ts search debounce and indexed childrenOf (finding 14)', () => {
   test('the search box value updates immediately, but the query rows filter on stays stale until the debounce settles', async () => {
-    collectionsStore.collections = [collection('col-1', 'Orders API')];
-    collectionsStore.items = [
-      folder('folder-1', 'col-1', null, 'Auth', 0),
-      request('req-1', 'col-1', null, 'Health check', 1),
-    ];
+    seedTree(
+      [collection('col-1', 'Orders API')],
+      [
+        folder('folder-1', 'col-1', null, 'Auth', 0),
+        request('req-1', 'col-1', null, 'Health check', 1),
+      ],
+    );
     collectionsStore.expanded = new Set(['c:col-1']);
     collectionsStore.search = '';
     // Let any debounce timer left over from a previous test in this file settle first.
@@ -95,8 +105,10 @@ describe('api/state/collections.ts search debounce and indexed childrenOf (findi
   });
 
   test("a request row's own search never looks for children it can never have", async () => {
-    collectionsStore.collections = [collection('col-2', 'Widgets API')];
-    collectionsStore.items = [request('req-2', 'col-2', null, 'List widgets', 0)];
+    seedTree(
+      [collection('col-2', 'Widgets API')],
+      [request('req-2', 'col-2', null, 'List widgets', 0)],
+    );
     collectionsStore.expanded = new Set(['c:col-2']);
     collectionsStore.search = '';
     await sleep(200);

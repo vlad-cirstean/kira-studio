@@ -15,7 +15,7 @@ import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useDragReorder } from '@workbench/util/useDragReorder';
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
@@ -77,12 +77,9 @@ const runStateLabel = computed(() => {
     : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
 });
 
-onMounted(() => {
-  collectionsStore.initCollections();
-  // P112: no environments/variables init call left here — useVariablesStore's own app-lifetime
-  // query observer fetches the environments list on store creation, and rowsQuery below (a
-  // useVariableRows observer) fetches this tab's own scope on creation the same way.
-});
+// P112: no init call left here — useCollectionsStore's and useVariablesStore's own app-lifetime
+// query observers fetch the tree and the environments list on store creation, and rowsQuery below
+// (a useVariableRows observer) fetches this tab's own scope on creation the same way.
 
 // P112: the scope is fixed per tab (VariableSetTabRecord never changes it), so this observer is
 // created once, for `ownerId`'s own live value (a rename never changes the id, but a future

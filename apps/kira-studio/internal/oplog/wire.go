@@ -206,6 +206,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 		Rows       *int    `json:"rows"`
 		Command    *string `json:"command"`
 		Error      *string `json:"error"`
+		Path       *string `json:"path"`
 	}
 	if err := json.Unmarshal(payload, &evt); err != nil || !opEndStatuses[evt.Status] {
 		return completedSincePrune
@@ -213,6 +214,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 
 	patch := model.OpFinish{
 		Status: evt.Status, DurationMs: evt.DurationMs, Rows: evt.Rows, Command: evt.Command, Error: evt.Error,
+		Path: evt.Path,
 	}
 
 	// P71 §4.3: the inFlight lookup moves above Finish (oplog.ts:80-84's exact fallbacks for an
@@ -242,7 +244,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 
 	record := model.OpRecord{
 		ID: evt.OpID, DurationMs: &evt.DurationMs, Status: evt.Status, Rows: evt.Rows,
-		Command: patch.Command, Error: patch.Error, CommandTruncated: commandTruncated,
+		Command: patch.Command, Error: patch.Error, CommandTruncated: commandTruncated, Path: patch.Path,
 	}
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
