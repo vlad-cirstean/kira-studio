@@ -63,7 +63,11 @@ function stagePastedRow(
       if (insertId && !columnIsGenerated(page, name)) {
         pendingChangesStore.stageInsertValue(tabId, insertId, name, cols[ci] as string);
       }
-    } else {
+    } else if (!columnIsGenerated(page, name)) {
+      // F3 (P108 Part 10): this branch used to stage unconditionally — the server computes a
+      // generated column's value, so an existing-row paste into one staged an UPDATE the engine
+      // refuses at commit, the one paste path the doc comment above already (wrongly) claimed
+      // skipped it.
       pendingChangesStore.stageEdit(tabId, row, name, cols[ci] as string);
     }
   }

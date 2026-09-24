@@ -126,6 +126,10 @@ const readOnlyChipText = computed(() => {
       return 'Connection is read-only';
     case 'value-truncated':
       return 'truncated — not editable';
+    case 'generated-column':
+      return 'Generated column';
+    case 'pending-delete':
+      return 'Row pending delete';
     case 'no-primary-key':
       return 'No primary key';
     default:
@@ -143,6 +147,10 @@ const readOnlyChipTitle = computed(() => {
       // P24 D27: the value stays fully readable and copyable — only writing it back is refused,
       // since the buffer only ever holds the first 64 KB (§0 note 9).
       return 'Only the first 64 KB was fetched — committing it would overwrite the full value.';
+    case 'generated-column':
+      return "The server computes this column's value — an edit here would be refused at commit.";
+    case 'pending-delete':
+      return 'This row is staged for delete — revert the delete before editing it.';
     case 'no-primary-key':
       return "This table has no primary key, so a row can't be identified to write.";
     default:

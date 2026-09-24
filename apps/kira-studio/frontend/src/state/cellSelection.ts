@@ -28,6 +28,15 @@ export interface SelectedCell {
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
    *  page has one is grid-only knowledge and `views/shared/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;
+  /** F3 (P108 Part 10): the server computes a generated column's value — an UPDATE into one is
+   *  refused at commit. `readOnlyReasonFor` reads this to block the dock the same way the grid's
+   *  own `onBeforeEditCell` does; `undefined` means "this view has no generated-column concept"
+   *  (every publisher other than the grid), treated identically to `false`. */
+  generated?: boolean;
+  /** F3: this row is staged for delete right now. Republished whenever that changes (not just
+   *  when the selection itself moves) so the dock can't go on offering Save for a row the grid
+   *  would refuse it for — `pendingChanges.ts`'s own `stageEdit` already refuses it silently. */
+  pendingDelete?: boolean;
   /** Set only by a publisher that can genuinely stage a write for this exact cell — today only
    *  `DataGrid.vue`, closing over `stageEdit(tabId, row, columnName, newValue)`, and
    *  `KeyValueView.vue`, for an S3 object's own editable `Body` row. `StreamView.vue` and

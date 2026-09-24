@@ -11,10 +11,15 @@ import type { CellFormat } from './formats';
 // M5 §6.5 adds 'masked' — the grid's own preview toggle is showing a redaction, not the stored
 // value, in this exact cell. Checked first (below): it is the one reason the user can fix
 // immediately, by turning the preview off, unlike every other reason here.
+// F3 (P108 Part 10) adds 'generated-column' and 'pending-delete' — readOnlyReasonFor used to say
+// nothing was wrong with either, so the dock looked editable while the grid's own onBeforeEditCell/
+// stageEdit would refuse (silently, for a pending delete) the exact same write.
 export type ReadOnlyReason =
   | 'masked'
   | 'connection-read-only'
   | 'value-truncated'
+  | 'generated-column'
+  | 'pending-delete'
   | 'no-primary-key'
   | 'not-editable-yet';
 
@@ -45,6 +50,10 @@ export const useCellEditorFormatStore = defineStore('cellEditorFormat', () => {
     if (cell.masked) return 'masked';
     const record = useConnectionsStore().connectionRecord(cell.connectionId);
     if (record?.readOnly) return 'connection-read-only';
+    // F3: same order the grid gate uses (onBeforeEditCell: !canEditTable() || isDeleted, then
+    // generated, then truncated) — connection-read-only above is canEditTable()'s own veto.
+    if (cell.pendingDelete) return 'pending-delete';
+    if (cell.generated) return 'generated-column';
     if (cell.truncated) return 'value-truncated';
     if (!cell.hasPrimaryKey) return 'no-primary-key';
     return null;

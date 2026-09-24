@@ -235,6 +235,9 @@ export interface CellMenuContext {
   /** P36 D26: separate from canEdit — an engine can offer update without delete (or vice versa). */
   canDelete: boolean;
   isDeleted: boolean;
+  /** F3 (P108 Part 10): the server computes a generated column's value — Edit/Set NULL must
+   *  refuse it the same way onBeforeEditCell does, not just the insert paths. */
+  isGenerated: boolean;
   startEdit: () => void;
   /** P21 D12: DataGrid.vue's own onPaste — an existing, guarded handler this menu had no row for. */
   onPaste: () => void;
@@ -246,7 +249,7 @@ export interface CellMenuContext {
 // D4: Copy / Copy with header / Copy as JSON / Paste / Edit / Set NULL / Filter by this value / Go
 // to referenced row / Referenced by (P7).
 export function cellMenu(ctx: CellMenuContext): MenuItem[] {
-  const editDisabled = !ctx.canEdit || ctx.isDeleted;
+  const editDisabled = !ctx.canEdit || ctx.isDeleted || ctx.isGenerated;
   const filterExpr = ctx.isNull
     ? `${quoteIdent(ctx.dialect, ctx.columnName)} IS NULL`
     : `${quoteIdent(ctx.dialect, ctx.columnName)} = ${quoteLiteral(ctx.dialect, ctx.text)}`;

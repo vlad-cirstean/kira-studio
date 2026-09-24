@@ -1583,8 +1583,15 @@ function onBeforeEditCell(_e: SlickEventData, args: OnBeforeEditCellEventArgs): 
   if (item?.insertId !== undefined) return false;
   const row = item?.row ?? args.row ?? -1;
   if (!canEditTable() || isDeleted(row)) return false;
-  const displayCol = currentOrder().indexOf(String(args.column.field));
+  const order = currentOrder();
+  const displayCol = order.indexOf(String(args.column.field));
   if (displayCol < 0) return false;
+  // F3 (P108 Part 10): the server computes a generated column's value — an UPDATE into one is
+  // refused at commit (Postgres/MySQL). The insert paths already skip generated columns
+  // (duplicateAsInsert, applyPastedCells, fake data); this existing-row inline-edit path didn't.
+  const p = getPage(props.tabId);
+  const pageCol = p ? pageColumnIndexFor(p, order, displayCol) : -1;
+  if (pageCol >= 0 && p?.columns[pageCol]?.generated) return false;
   // P24 D27: a value the engine truncated is not editable — committing the buffer verbatim
   // (stageEdit's own contract) would write the truncated text over the real value.
   if (displayCell(row, displayCol).truncated) return false;
@@ -1702,6 +1709,8 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
   const dc = displayCell(row, displayCol);
   const name = order[displayCol] ?? '';
   const t = tab();
+  const p = getPage(props.tabId);
+  const pageCol = p ? pageColumnIndexFor(p, order, displayCol) : -1;
   contextMenuStore.openContextMenu(
     e,
     cellMenu({
@@ -1714,6 +1723,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       canEdit: canEditTable(),
       canDelete: canDeleteRows(),
       isDeleted: isDeleted(row),
+      isGenerated: pageCol >= 0 ? (p?.columns[pageCol]?.generated ?? false) : false,
       startEdit: () => startEditCell(row, displayCol),
       onPaste: () => void onPaste(),
       meta: rt()?.meta ?? null,
@@ -2450,7 +2460,20 @@ function selectionTarget(): { row: number; col: number } | null {
 watch(
   // M5 §6.5: `rt()?.maskPreview` added so toggling the preview republishes the current selection
   // (and its `masked` flag/`value`) even when the selection itself hasn't changed.
-  [() => rt()?.selection, () => pageVersion.n, () => props.tabId, () => rt()?.maskPreview],
+  // F3 (P108 Part 10): the pending-delete source below republishes the same way when a row already
+  // selected gets marked (or unmarked) for delete without the selection itself moving — the row
+  // menu's/toolbar's own stageDelete/discardRowChange never touch `selection` or `pageVersion`, so
+  // without this the dock kept offering Save against a row the grid would already refuse it for.
+  [
+    () => rt()?.selection,
+    () => pageVersion.n,
+    () => props.tabId,
+    () => rt()?.maskPreview,
+    () => {
+      const t = selectionTarget();
+      return t ? isDeleted(t.row) : false;
+    },
+  ],
   () => {
     const p = getPage(props.tabId);
     const t = tab();
@@ -2488,15 +2511,20 @@ watch(
       truncated: view.truncated,
       masked,
       hasPrimaryKey: hasPrimaryKey(),
+      // F3: the server computes a generated column — readOnlyReasonFor blocks the dock the same
+      // way onBeforeEditCell below blocks the grid's own inline edit.
+      generated: column.generated,
+      pendingDelete: isDeleted(targetRow),
       // Same eligibility as the grid's own inline (double-click) edit (D8/C8): writable connection,
       // a primary key to identify the row, and the row isn't already staged for delete. Stages into
       // the exact same pending-change set the inline editor already feeds, so the panel's save and
       // the grid's own inline edit can never disagree about a cell's value. `canEditTable()`
       // already folds in `!maskPreviewOn()` (M5 §6.4), so onEdit/onRevert are undefined for free
       // whenever `masked` above is true — the panel's own read-only lockout and this cell's own
-      // masked-ness can never disagree.
+      // masked-ness can never disagree. F3: `!column.generated` too, matching onBeforeEditCell —
+      // `isEditable` already blocks this via `readOnlyReasonFor` above, this is defense in depth.
       onEdit:
-        canEditTable() && !isDeleted(targetRow)
+        canEditTable() && !isDeleted(targetRow) && !column.generated
           ? (newValue: string) =>
               pendingChangesStore.stageEdit(props.tabId, targetRow, column.name, newValue)
           : undefined,
