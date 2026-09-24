@@ -31,6 +31,7 @@ import type {
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
+import { createLatestRequest } from './latestRequest.ts';
 import {
   type CherryPickPredictionMismatch,
   composeAutoDetachAnnouncement,
@@ -285,6 +286,12 @@ export class OpsState {
   readonly #unsubscribe: () => void;
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
+  /** F5: the server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
+   *  quick succession (two `repo.changed` events back to back) can reply out of order — each its
+   *  own tracker, so a stale status reply can never be mistaken for a stale undo reply or vice
+   *  versa. */
+  readonly #statusRequest = createLatestRequest<StatusSummary>();
+  readonly #undoRequest = createLatestRequest<UndoSlotSnapshot | null>();
 
   constructor(
     bridge: BridgeClient,
@@ -346,17 +353,24 @@ export class OpsState {
   async refreshStatus(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const result = await this.#bridge.request('status.get', { repoId });
-    if (this.#repoId !== repoId) return;
-    this.statusSummary.value = result;
+    const outcome = await this.#statusRequest.run(
+      (signal) => this.#bridge.request('status.get', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'ok') this.statusSummary.value = outcome.value;
+    else if (outcome.status === 'error') throw new Error(outcome.message);
   }
 
   async refreshUndo(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const { slot } = await this.#bridge.request('undo.peek', { repoId });
-    if (this.#repoId !== repoId) return;
-    this.undoSlot.value = slot;
+    const outcome = await this.#undoRequest.run(
+      (signal) =>
+        this.#bridge.request('undo.peek', { repoId }, signal).then((result) => result.slot),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'ok') this.undoSlot.value = outcome.value;
+    else if (outcome.status === 'error') throw new Error(outcome.message);
   }
 
   /** `docs/plans/P7.md` W14: "Review branch changes", from either menu `buildRefMenu` puts it on
@@ -1773,5 +1787,7 @@ export class OpsState {
     this.#unsubscribe();
     this.#unsubscribeProgress();
     this.#unsubscribeWorktreeProgress();
+    this.#statusRequest.abort();
+    this.#undoRequest.abort();
   }
 }

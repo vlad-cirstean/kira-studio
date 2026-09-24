@@ -2,11 +2,13 @@ import type {
   RestackPreflight,
   RestackProgress,
   RestackResult,
+  ResultOf,
   StackBranch,
   StackSummary,
 } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest } from './latestRequest.ts';
 import type { PrState } from './pr.ts';
 
 /** Every branch name across a `stack.list` result — `StackList.vue`'s own row set, and F13's own
@@ -54,6 +56,9 @@ export class StackState {
   #repoId: string | undefined;
   readonly #unsubscribeChanged: () => void;
   readonly #unsubscribeProgress: () => void;
+  /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
+   *  latest issued `reload()` is ever allowed to apply. */
+  readonly #reloadRequest = createLatestRequest<ResultOf<'stack.list'>>();
 
   constructor(bridge: BridgeClient, pr?: PrState) {
     this.#bridge = bridge;
@@ -88,10 +93,13 @@ export class StackState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const result = await this.#bridge.request('stack.list', { repoId });
-    // A repo switch (or close) that lands while this request was in flight must not let a stale
-    // reply overwrite the newer repo's own state — the same guard `WorktreeState.reload` makes.
-    if (this.#repoId !== repoId) return;
+    const outcome = await this.#reloadRequest.run(
+      (signal) => this.#bridge.request('stack.list', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status !== 'ok') return;
+    const result = outcome.value;
     this.stacks.value = result.stacks;
     this.orphans.value = result.orphans;
     this.generation.value++;
@@ -140,5 +148,6 @@ export class StackState {
   dispose(): void {
     this.#unsubscribeChanged();
     this.#unsubscribeProgress();
+    this.#reloadRequest.abort();
   }
 }

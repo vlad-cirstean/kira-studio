@@ -1,6 +1,12 @@
-import type { WorktreeAddPreflight, WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
+import type {
+  ResultOf,
+  WorktreeAddPreflight,
+  WorktreeEntry,
+  WorktreeRemovePreflight,
+} from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest } from './latestRequest.ts';
 
 /** P76 §9.1: what a "Create worktree here…" row action pre-fills `WorktreeDialog.vue`'s create
  *  phase with. Every field optional: the toolbar/palette entry point opens with `{}` and keeps
@@ -25,6 +31,9 @@ export class WorktreeState {
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   readonly #unsubscribe: () => void;
+  /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
+   *  latest issued `reload()` is ever allowed to apply. */
+  readonly #reloadRequest = createLatestRequest<ResultOf<'worktree.list'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -50,11 +59,16 @@ export class WorktreeState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const { worktrees } = await this.#bridge.request('worktree.list', { repoId });
     // A repo switch (or close) that lands while this request was in flight must not let a stale
-    // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes.
-    if (this.#repoId !== repoId) return;
-    this.entries.value = worktrees;
+    // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes — and
+    // F5: two `refsChanged` events in quick succession must not let the older one land last.
+    const outcome = await this.#reloadRequest.run(
+      (signal) => this.#bridge.request('worktree.list', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status !== 'ok') return;
+    this.entries.value = outcome.value.worktrees;
   }
 
   /** `WorktreeDialog.vue`'s own live preflight (D4), re-run as the user edits the path/mode/
@@ -81,5 +95,6 @@ export class WorktreeState {
 
   dispose(): void {
     this.#unsubscribe();
+    this.#reloadRequest.abort();
   }
 }

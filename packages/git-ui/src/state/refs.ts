@@ -1,6 +1,7 @@
-import type { HeadState, RefRow } from '@kira/git-ipc';
+import type { HeadState, RefRow, ResultOf } from '@kira/git-ipc';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest } from './latestRequest.ts';
 
 /**
  * `docs/plans/P6.md` W12: the ref list as reactive state. Loads once a repo is open, reloads on
@@ -31,6 +32,9 @@ export class RefsState {
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   readonly #unsubscribe: () => void;
+  /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
+   *  latest issued `reload()` is ever allowed to apply. */
+  readonly #reloadRequest = createLatestRequest<ResultOf<'refs.list'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -80,11 +84,17 @@ export class RefsState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const result = await this.#bridge.request('refs.list', { repoId });
     // A repo switch (or close) that lands while this request was in flight must not let a
     // stale reply overwrite the newer repo's own state — the same "does this answer still apply"
-    // guard `GraphViewState`'s own doc comment names for exactly this race.
-    if (this.#repoId !== repoId) return;
+    // guard `GraphViewState`'s own doc comment names for exactly this race — and F5: two
+    // `refsChanged` events in quick succession must not let the older one's reply land last.
+    const outcome = await this.#reloadRequest.run(
+      (signal) => this.#bridge.request('refs.list', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status !== 'ok') return;
+    const result = outcome.value;
     this.branches.value = result.branches;
     this.remoteBranches.value = result.remoteBranches;
     this.tags.value = result.tags;
@@ -109,5 +119,6 @@ export class RefsState {
 
   dispose(): void {
     this.#unsubscribe();
+    this.#reloadRequest.abort();
   }
 }

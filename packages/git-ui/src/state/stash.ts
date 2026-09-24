@@ -1,8 +1,9 @@
-import type { FileChange, StashEntry } from '@kira/git-ipc';
+import type { FileChange, ResultOf, StashEntry } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import type { FileListMode } from './detail.ts';
+import { createLatestRequest } from './latestRequest.ts';
 
 /**
  * `docs/plans/P9.md` W13: the stash stack as reactive state, mirroring `RefsState`'s own shape
@@ -58,6 +59,10 @@ export class StashState {
   #repoId: string | undefined;
   #showController: AbortController | undefined;
   readonly #unsubscribe: () => void;
+  /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — separate
+   *  trackers so `reload()`'s own ordering never interferes with `reloadGlobal()`'s. */
+  readonly #reloadRequest = createLatestRequest<ResultOf<'stash.list'>>();
+  readonly #reloadGlobalRequest = createLatestRequest<ResultOf<'globalStash.list'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -96,20 +101,29 @@ export class StashState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const { entries } = await this.#bridge.request('stash.list', { repoId });
     // A repo switch (or close) that lands while this request was in flight must not let a stale
-    // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes.
-    if (this.#repoId !== repoId) return;
-    this.entries.value = entries;
+    // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes — and
+    // F5: two `refsChanged` events in quick succession must not let the older one land last.
+    const outcome = await this.#reloadRequest.run(
+      (signal) => this.#bridge.request('stash.list', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status !== 'ok') return;
+    this.entries.value = outcome.value.entries;
   }
 
   /** G28 D13: the global bucket's own reload — same shape as `reload()`, same stale-reply guard. */
   async reloadGlobal(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
-    const { entries } = await this.#bridge.request('globalStash.list', { repoId });
-    if (this.#repoId !== repoId) return;
-    this.globalEntries.value = entries;
+    const outcome = await this.#reloadGlobalRequest.run(
+      (signal) => this.#bridge.request('globalStash.list', { repoId }, signal),
+      () => this.#repoId === repoId,
+    );
+    if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status !== 'ok') return;
+    this.globalEntries.value = outcome.value.entries;
   }
 
   /** `StashList.vue`/`GlobalStashList.vue`'s row click/Enter, and the graph's own stash-node
@@ -185,5 +199,7 @@ export class StashState {
   dispose(): void {
     this.#unsubscribe();
     this.#showController?.abort();
+    this.#reloadRequest.abort();
+    this.#reloadGlobalRequest.abort();
   }
 }

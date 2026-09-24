@@ -40,6 +40,14 @@ export class RepoSettingsState {
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
   readonly #unsubscribe: () => void;
+  /** F5: one shared generation across `reload()`, `set()` and this event handler — bumped by
+   *  whichever of the three settles or arrives last, so a `reload()` (or a `set()`) left in
+   *  flight when a fresher write settles or a live push arrives can never overwrite it with an
+   *  older snapshot. Unlike `reload()`/`set()` elsewhere in this file, `set()`'s own result must
+   *  never be silently dropped as "superseded" — the user is waiting on it — so this is a bare
+   *  counter rather than `createLatestRequest` (which would also cancel `set()`'s own in-flight
+   *  request out from under it when a `reload()` starts). */
+  #generation = 0;
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -48,6 +56,7 @@ export class RepoSettingsState {
       // A different repo's own write — every field in event.settings belongs to a repository
       // that is not this one and must not overwrite this repo's own values.
       if (event.repoId !== this.#repoId) return;
+      this.#generation++;
       this.settings.value = event.settings;
     });
   }
@@ -67,21 +76,30 @@ export class RepoSettingsState {
   async reload(): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
+    // F5: claims this reload as the latest of the three writers of `settings` (this method,
+    // `set()`, the `repoSettings.changed` handler above) before awaiting — a second `reload()`,
+    // a `set()` result or a live push that lands first bumps `#generation` further, so THIS
+    // reply is recognized as stale once it finally does arrive.
+    const generation = ++this.#generation;
     const settings = await this.#bridge.request('repoSettings.get', { repoId });
     // A repo switch (or close) that lands while this request was in flight must not let a stale
     // response overwrite whatever is current now — StashState.reload's own guard, restated.
-    if (this.#repoId !== repoId) return;
+    if (this.#repoId !== repoId || generation !== this.#generation) return;
     this.settings.value = settings;
   }
 
   /** `RepoSettingsDialog.vue`'s own save path — patches only the field(s) actually changed
    *  (`RepoSettingsPatch`'s own `.partial()` shape) and adopts the server's own resulting
-   *  snapshot as the new value, rather than optimistically applying the patch locally. */
+   *  snapshot as the new value, rather than optimistically applying the patch locally. F5: always
+   *  applies its own result (the user is waiting on it, unlike a background `reload()`) but bumps
+   *  `#generation` first, so an in-flight `reload()` started before this call can never land on
+   *  top of it afterward. */
   async set(patch: RepoSettingsPatch): Promise<void> {
     const repoId = this.#repoId;
     if (repoId === undefined) return;
     const settings = await this.#bridge.request('repoSettings.set', { repoId, patch });
     if (this.#repoId !== repoId) return;
+    this.#generation++;
     this.settings.value = settings;
   }
 
