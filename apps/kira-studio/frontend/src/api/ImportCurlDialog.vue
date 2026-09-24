@@ -70,7 +70,7 @@ onMounted(() => {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div ref="bodyEl" class="p-dialog-body">
+    <div ref="bodyEl" class="flex flex-col gap-2 p-3">
       <Textarea
         v-model="text"
         class="font-data curl-textarea"
@@ -99,8 +99,8 @@ onMounted(() => {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions ml-auto">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
           <Button
             variant="dialog-primary"

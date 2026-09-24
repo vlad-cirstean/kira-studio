@@ -91,7 +91,7 @@ function onCancel(): void {
         />
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
             Cancel

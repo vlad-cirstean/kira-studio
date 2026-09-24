@@ -528,7 +528,7 @@ test('a new variable row scrolls into view when it appears (D16)', async ({ rela
   const { window: page } = await relaunch({ control: CONTROL });
   await openVariablesDialog(page);
 
-  const list = page.locator('.p-dialog-body.list');
+  const list = page.locator('[data-testid="variables-list"]');
   const rows = page.locator('[data-testid="variable-row"]');
   await expect(rows).toHaveCount(31); // 30 real rows plus the trailing draft
 
@@ -573,7 +573,7 @@ test('deleting a variable row does not scroll (D16 guard)', async ({ relaunch })
   const { window: page } = await relaunch({ control: CONTROL });
   await openVariablesDialog(page);
 
-  const list = page.locator('.p-dialog-body.list');
+  const list = page.locator('[data-testid="variables-list"]');
   await expect(list.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 
   const rows = page.locator('[data-testid="variable-row"]');

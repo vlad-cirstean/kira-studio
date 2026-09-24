@@ -169,7 +169,7 @@ async function onApprove(requestId: string): Promise<void> {
         </p>
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span class="flex items-center gap-1 ml-auto">
           <Button
             ref="denyButton"

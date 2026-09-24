@@ -89,7 +89,7 @@ function close(): void {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="p-dialog-body">
+    <div class="flex flex-col gap-2 p-3">
       <div class="text-kira-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
 
       <div class="raw-editor">
@@ -126,8 +126,8 @@ function close(): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions ml-auto">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
           <Button
             variant="dialog-primary"

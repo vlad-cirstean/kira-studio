@@ -339,8 +339,8 @@ onUnmounted(() => {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions end">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 justify-end w-full">
           <Button variant="dialog" size="kira" data-testid="http-diff-close" @click="emit('close')">Close</Button>
         </span>
       </DialogFooter>

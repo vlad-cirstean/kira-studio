@@ -87,7 +87,7 @@ function close(): void {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="p-dialog-body list dynamic-values-body">
+    <div class="flex flex-col gap-0.5 p-1 dynamic-values-body">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter" data-testid="dynamic-values-filter" />
@@ -127,8 +127,8 @@ function close(): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions end">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 justify-end w-full">
           <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
         </span>
       </DialogFooter>
@@ -139,8 +139,8 @@ function close(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* p-dialog-body.list supplies display/flex-direction/padding/gap; this body also needs to scroll
-   within the dialog's own fixed max-height. */
+/* The body's own flex/gap/padding utilities live inline in the template now (P110 B27); this body
+   also needs to scroll within the dialog's own fixed max-height. */
 .dynamic-values-body {
   @apply overflow-y-auto;
 }

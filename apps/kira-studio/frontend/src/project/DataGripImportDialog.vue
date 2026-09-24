@@ -161,7 +161,7 @@ async function onConfirm(): Promise<void> {
       </DialogHeader>
 
       <div class="flex-1 min-h-0 overflow-auto">
-    <div v-if="!report" class="p-dialog-body">
+    <div v-if="!report" class="flex flex-col gap-2 p-3">
       <Alert
         v-if="secretStatus && !secretStatus.available"
         data-testid="datagrip-secrets-unavailable"
@@ -245,7 +245,7 @@ async function onConfirm(): Promise<void> {
     <!-- Review finding: the report Import returns used to be discarded on close with no display
          at all — every per-row outcome (created, password imported, or the specific reason it
          wasn't) is now shown here instead of auto-closing. -->
-    <div v-else class="p-dialog-body">
+    <div v-else class="flex flex-col gap-2 p-3">
       <Alert data-testid="datagrip-report-summary" :variant="reportTone">
         <AlertDescription>
           {{ reportSummary }}
@@ -275,7 +275,7 @@ async function onConfirm(): Promise<void> {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <template v-if="!report">
           <span class="help">{{ datagripImportStore.projectPath }}</span>
           <span class="flex items-center gap-1 ml-auto">

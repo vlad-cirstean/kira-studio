@@ -662,7 +662,7 @@ const preconnectText = computed({
 
       <div class="flex-1 min-h-0 overflow-auto" data-testid="connection-dialog-body">
     <template v-if="step === 'engine'">
-      <div class="p-dialog-body engine-body">
+      <div class="flex flex-col gap-2 p-3 engine-body">
         <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-field px-2">
           <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
           <Input
@@ -706,7 +706,7 @@ const preconnectText = computed({
       </div>
     </template>
     <template v-else>
-      <div class="p-dialog-body">
+      <div class="flex flex-col gap-2 p-3">
           <div class="p-tab-strip" role="tablist" aria-label="Connection detail tabs">
             <button
               type="button"
@@ -1384,7 +1384,7 @@ const preconnectText = computed({
     </template>
       </div>
 
-      <DialogFooter v-if="step === 'engine'" class="border-t border-border">
+      <DialogFooter v-if="step === 'engine'" class="border-t border-border bg-transparent">
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
@@ -1393,7 +1393,7 @@ const preconnectText = computed({
           </Button>
         </span>
       </DialogFooter>
-      <DialogFooter v-else class="border-t border-border">
+      <DialogFooter v-else class="border-t border-border bg-transparent">
         <div class="test-area">
           <Button variant="dialog" size="kira-lg" data-testid="connection-test" @click="onTest">
             <CodiconIcon name="plug" :size="13" />
@@ -1601,12 +1601,6 @@ const preconnectText = computed({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* p-dialog-actions supplies display/align-items/gap; this dialog's footer-actions can sit beside
-   a variable-width .test-area sibling, so it still needs its own flex-shrink guard. */
-.footer-actions {
-  flex-shrink: 0;
 }
 
 /* ---------- engine picker (parts/_kindcss.html) ---------- */

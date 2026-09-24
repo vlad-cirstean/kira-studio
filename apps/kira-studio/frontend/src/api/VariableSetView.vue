@@ -420,7 +420,8 @@ async function onRemove(id: string): Promise<void> {
 }
 
 // P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
-// shape — the scroller is `.p-dialog-body.list` (not `.field-rows-table`), the row class is
+// shape — the scroller is `listRef` (this view's own utility-classed div, not `.field-rows-table`),
+// the row class is
 // `.variable-row` (not `.field-row`), and the watched count is `allRealRows` (this view's own
 // real-row list) rather than a `rows` prop. One real difference from FieldRowsTable's own copy:
 // `allRealRows` starts at 0 and is populated *asynchronously* once rowsQuery's own fetch resolves
@@ -539,7 +540,12 @@ function onBulkClose(): void {
       :rows="rows"
       @close="onBulkClose"
     />
-    <div v-else ref="listRef" class="p-dialog-body list">
+    <div
+      v-else
+      ref="listRef"
+      class="flex flex-col gap-0.5 p-1 flex-1 min-h-0 overflow-y-auto"
+      data-testid="variables-list"
+    >
       <Alert v-if="error" variant="destructive" data-testid="variables-error">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
@@ -675,10 +681,6 @@ function onBulkClose(): void {
     var(--kira-fg-muted) calc(50% + 0.75px),
     transparent calc(50% + 0.75px)
   );
-}
-
-.p-dialog-body.list {
-  @apply flex-1 min-h-0 overflow-y-auto;
 }
 
 .env-fields {

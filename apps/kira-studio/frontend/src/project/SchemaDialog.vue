@@ -139,7 +139,7 @@ async function onSave(): Promise<void> {
         </DialogClose>
       </DialogHeader>
 
-    <div class="p-dialog-body schema-dialog-body">
+    <div class="flex flex-col gap-2 p-3 schema-dialog-body">
       <span class="help">
         Table and column completion for this connection normally fills in on its own from the
         connection's own cached schema metadata — no setup needed. Paste a schema here only to
@@ -173,7 +173,7 @@ async function onSave(): Promise<void> {
       </Alert>
     </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
           saveError
         }}</span>

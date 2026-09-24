@@ -492,7 +492,7 @@ function onSequenceStartChange(index: number, start: number): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span class="flex items-center gap-1 ml-auto">
           <!-- P104 §3: RunState inlined -- status is always 'running' here (elapsedMs is always
                null, so the label is always the em dash RunState's own computed would give it). -->

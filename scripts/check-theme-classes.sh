@@ -143,6 +143,13 @@ check_class 'p-select' 'NativeSelect (packages/theme/src/components/ui/native-se
 # toolbar/toolbar-primary/dialog/dialog-primary variants (packages/theme/src/components/ui/button).
 check_class 'p-btn' 'Button variant="toolbar"/"toolbar-primary"'
 check_class 'p-dlgbtn' 'Button variant="dialog"/"dialog-primary"'
+# P110 B27: the dialog body wrapper and footer-actions row, both folded into plain utilities
+# (flex flex-col gap-2 p-3 / flex flex-col gap-0.5 p-1 for .list; flex items-center gap-1.5 /
+# justify-end w-full for .end). DialogFooter's own per-call-site override also picked up
+# `bg-transparent` here, cancelling the shadcn registry default's `bg-muted/50` fill (the plan's
+# own named target: "not bg-muted/50: today's actions have no fill").
+check_class 'p-dialog-body' 'flex flex-col gap-2 p-3 (or gap-0.5 p-1 for the .list variant)'
+check_class 'p-dialog-actions' 'flex items-center gap-1.5 (plus justify-end w-full for .end)'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

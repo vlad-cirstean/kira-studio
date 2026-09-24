@@ -167,7 +167,7 @@ const connectionName = computed(
       </DialogHeader>
 
       <div class="overflow-auto">
-    <div class="p-dialog-body">
+    <div class="flex flex-col gap-2 p-3">
       <span class="help">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
@@ -281,7 +281,7 @@ const connectionName = computed(
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span class="help">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>

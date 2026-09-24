@@ -98,7 +98,7 @@ async function onApprove(): Promise<void> {
         </p>
       </div>
 
-      <DialogFooter class="border-t border-border">
+      <DialogFooter class="border-t border-border bg-transparent">
         <span class="flex items-center gap-1 ml-auto">
           <Button ref="denyButton" variant="dialog" size="kira-lg" data-testid="git-pairing-deny" @click="onDeny">
             Deny

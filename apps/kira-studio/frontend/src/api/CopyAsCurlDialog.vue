@@ -87,7 +87,7 @@ function close(): void {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="p-dialog-body">
+    <div class="flex flex-col gap-2 p-3">
       <Textarea
         class="font-data min-h-44"
         :model-value="command"
@@ -127,8 +127,8 @@ function close(): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions ml-auto">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
           <Button
             variant="dialog-primary"

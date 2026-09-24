@@ -30,14 +30,15 @@ import { computed, reactive, ref } from 'vue';
 //    script; Kira Space: revoking a paired editor) — never `onDismiss`. Adding a guard neither app
 //    has today would be a behaviour change this phase doesn't own; `onDismiss` here stays the
 //    plain `emit('close')` both apps already ship.
-// 2. The footer markup itself (the `.p-dialog-actions` wrapper around Cancel/Save, and
-//    `.footer-status`'s own scoped rule) differs by one class and an inline style between the two
-//    apps (Kira Space's wrapper carries `class="end" style="gap: var(--kira-s-2)"`; Kira Studio's
-//    doesn't) — not documented as a real difference anywhere, only found by diffing the two
-//    `<template #footer>` blocks. Rather than pick one app's markup as canonical for both (a real,
-//    if small, visual change for whichever app didn't have it), the footer stays a `#footer`
-//    scoped slot each app fills with its own existing markup, the same "markup that differs stays
-//    app-side, state that doesn't moves here" split §5.4 already used for TabStrip's "+" button.
+// 2. The footer markup itself — the Cancel/Save wrapper is byte-identical between the two apps
+//    (`class="flex items-center gap-1"`), but `.footer-status` differs: Kira Studio's uses
+//    FieldError/FieldDescription (P110 B12's own component swap), Kira Space's keeps plain spans
+//    with the equivalent utility classes (see that file's own P110 B12 comment for why) — not
+//    documented as a real difference anywhere, only found by diffing the two `<template #footer>`
+//    blocks. Rather than pick one app's markup as canonical for both (a real, if small, behaviour
+//    change for whichever app didn't have it), the footer stays a `#footer` scoped slot each app
+//    fills with its own existing markup, the same "markup that differs stays app-side, state that
+//    doesn't moves here" split §5.4 already used for TabStrip's "+" button.
 //
 // Field validity comes up from the panes rather than this file knowing any app's own leaves: the
 // `#pane` slot exposes `registerFieldError`, which each pane calls once (its own component's

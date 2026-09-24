@@ -287,7 +287,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
       </AlertDescription>
     </Alert>
 
-    <div ref="listEl" class="p-dialog-body list">
+    <div ref="listEl" class="flex flex-col gap-0.5 p-1">
         <div
           v-for="(env, i) in displayEnvironments"
           :key="env.id"

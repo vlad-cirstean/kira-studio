@@ -94,7 +94,7 @@ function splitTarget(value: string): [string, string | null] {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="p-dialog-body">
+    <div class="flex flex-col gap-2 p-3">
       <Label class="text-kira-sm text-muted-foreground mt-1">Name</Label>
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
@@ -117,8 +117,8 @@ function splitTarget(value: string): [string, string | null] {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border">
-        <span class="p-dialog-actions ml-auto">
+      <DialogFooter class="border-t border-border bg-transparent">
+        <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
           <Button
             variant="dialog-primary"
