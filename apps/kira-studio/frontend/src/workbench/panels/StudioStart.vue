@@ -54,7 +54,7 @@ function openRecent(entry: RecentTableEntry): void {
   <!-- FirstRun.html — no connections at all: one button, no duplicate engine grid. -->
   <div v-if="!hasConnections" class="start" data-testid="first-run">
     <div class="start-inner first-run">
-      <span class="start-mark dim"><CodiconIcon name="database" :size="32" /></span>
+      <span class="start-mark text-subtle"><CodiconIcon name="database" :size="32" /></span>
       <div class="start-title">No connections yet</div>
       <div class="start-sub text-muted-foreground">
         Kira Studio needs somewhere to connect before it can show you anything.
@@ -84,7 +84,7 @@ function openRecent(entry: RecentTableEntry): void {
       <div class="start-sub text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
 
       <template v-if="recentTablesStore.entries.length > 0">
-        <div class="col-label dim">Recent tables</div>
+        <div class="col-label text-subtle">Recent tables</div>
         <div class="start-list">
           <button
             v-for="entry in recentTablesStore.entries"
@@ -101,7 +101,7 @@ function openRecent(entry: RecentTableEntry): void {
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="entry-path">{{ entry.path }}</span>
-            <span class="p-push p-xs dim">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
+            <span class="p-push p-xs text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
           </button>
         </div>
       </template>

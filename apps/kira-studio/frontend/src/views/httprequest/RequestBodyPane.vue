@@ -189,7 +189,7 @@ const caption = computed(() =>
       </Tooltip>
     </div>
 
-    <div v-if="caption" class="p-xs dim body-caption" data-testid="http-body-content-type-caption">
+    <div v-if="caption" class="p-xs text-subtle body-caption" data-testid="http-body-content-type-caption">
       {{ caption }}
     </div>
 

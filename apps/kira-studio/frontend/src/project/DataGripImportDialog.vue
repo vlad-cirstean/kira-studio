@@ -196,15 +196,15 @@ async function onConfirm(): Promise<void> {
           <span v-if="row.importable" class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
             <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
           </span>
-          <span v-else class="engine-mark dim"><CodiconIcon name="circle-slash" :size="15" /></span>
+          <span v-else class="engine-mark text-subtle"><CodiconIcon name="circle-slash" :size="15" /></span>
 
           <span class="ds-name">{{ row.name }}</span>
 
           <template v-if="row.importable">
-            <span class="ds-target dim">
+            <span class="ds-target text-subtle">
               {{ row.host ? `${row.host}:${row.port}` : '' }}<span v-if="row.database">/{{ row.database }}</span>
             </span>
-            <span v-if="row.username" class="ds-username dim">{{ row.username }}</span>
+            <span v-if="row.username" class="ds-username text-subtle">{{ row.username }}</span>
             <Tooltip v-if="looksAlreadyImported(row)">
               <TooltipTrigger as-child>
                 <span class="p-chip warn" data-testid="datagrip-row-duplicate">
@@ -229,7 +229,7 @@ async function onConfirm(): Promise<void> {
           <span v-if="row.warnings.length > 0" class="ds-warnings">
             <Tooltip v-for="w in row.warnings" :key="w">
               <TooltipTrigger as-child>
-                <span class="icon-box dim">
+                <span class="icon-box text-subtle">
                   <CodiconIcon name="warning" :size="12" />
                 </span>
               </TooltipTrigger>

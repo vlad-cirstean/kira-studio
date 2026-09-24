@@ -103,23 +103,23 @@ watch(calendarOpen, (open) => {
         <template v-if="reading">
           <span
             class="ts-reading"
-            :class="{ dim: zone !== 'local' }"
+            :class="{ 'text-subtle': zone !== 'local' }"
             data-testid="cell-editor-timestamp-local"
             >{{ reading.local }}</span
           >
           <span class="ts-sep">·</span>
           <span
             class="ts-reading"
-            :class="{ dim: zone !== 'utc' }"
+            :class="{ 'text-subtle': zone !== 'utc' }"
             data-testid="cell-editor-timestamp-utc"
             >{{ reading.utc }}</span
           >
           <span class="ts-sep">·</span>
-          <span class="ts-reading dim" data-testid="cell-editor-timestamp-relative">{{
+          <span class="ts-reading text-subtle" data-testid="cell-editor-timestamp-relative">{{
             reading.relative
           }}</span>
         </template>
-        <span v-else class="ts-reading dim" data-testid="cell-editor-timestamp-unparseable"
+        <span v-else class="ts-reading text-subtle" data-testid="cell-editor-timestamp-unparseable"
           >Not a recognizable {{ format }} value</span
         >
       </AlertDescription>

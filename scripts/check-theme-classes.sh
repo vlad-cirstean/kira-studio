@@ -108,6 +108,9 @@ check_class 'mono' 'font-data'
 # P110 B15: `muted` is common prose too (design-idiom comments, docs) -- uses the attribute-scoped
 # variant above instead of reworking every legitimate comment.
 check_class_in_attrs 'muted' 'text-muted-foreground'
+# P110 B16: `dim` is common prose too (api-ui-consistency.spec.ts's own test name/comment describe
+# it conceptually, no actual `.locator('.dim')` call exists there to move to a data-testid).
+check_class_in_attrs 'dim' 'text-subtle'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

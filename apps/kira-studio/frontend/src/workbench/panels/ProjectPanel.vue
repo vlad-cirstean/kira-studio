@@ -93,8 +93,8 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
       v-else
       class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
     >
-      <span class="dim"><CodiconIcon name="database" :size="24" /></span>
-      <span class="p-xs dim leading-normal">Everything you connect to<br />shows up here.</span>
+      <span class="text-subtle"><CodiconIcon name="database" :size="24" /></span>
+      <span class="p-xs text-subtle leading-normal">Everything you connect to<br />shows up here.</span>
     </div>
   </div>
   <FiltersDialog />

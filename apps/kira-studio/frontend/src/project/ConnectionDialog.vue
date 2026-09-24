@@ -609,7 +609,7 @@ const preconnectText = computed({
         <span class="title-mid p-push">
           <span v-if="!isEdit" class="steps">
             <span class="step on"><span class="n">1</span>Engine</span>
-            <span class="dim">›</span>
+            <span class="text-subtle">›</span>
             <span class="step"><span class="n">2</span>Details</span>
           </span>
         </span>
@@ -1023,7 +1023,7 @@ const preconnectText = computed({
           </Label>
 
           <div class="field">
-            <Label>Throttle commands <span class="dim">— per second</span></Label>
+            <Label>Throttle commands <span class="text-subtle">— per second</span></Label>
             <div class="size-input" ref="throttleGroupRef">
               <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
                 <InputGroupInput
@@ -1079,7 +1079,7 @@ const preconnectText = computed({
 
           <div v-else-if="activeTab === 'Pre-connect'" class="tab-pane" role="tabpanel">
           <div class="field">
-            <Label>Pre-connect command <span class="dim">— optional</span></Label>
+            <Label>Pre-connect command <span class="text-subtle">— optional</span></Label>
             <Textarea
               v-model="preconnectText"
               class="font-data"
@@ -1137,7 +1137,7 @@ const preconnectText = computed({
           <div class="field">
             <Label
               >Description
-              <span class="dim">— what this database is for, read verbatim by an AI client</span></Label
+              <span class="text-subtle">— what this database is for, read verbatim by an AI client</span></Label
             >
             <Textarea
               v-model="draft.mcpDescription"
@@ -1168,7 +1168,7 @@ const preconnectText = computed({
           </Label>
 
           <div class="field">
-            <Label>Read <span class="dim">— SELECT and its engine equivalents</span></Label>
+            <Label>Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpReadMode"
@@ -1187,7 +1187,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="field">
-            <Label>Write <span class="dim">— INSERT/UPDATE/DELETE and equivalents</span></Label>
+            <Label>Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpWriteMode"
@@ -1206,7 +1206,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="field">
-            <Label>DDL <span class="dim">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
+            <Label>DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpDdlMode"

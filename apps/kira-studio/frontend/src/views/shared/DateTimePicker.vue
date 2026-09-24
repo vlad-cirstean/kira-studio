@@ -293,7 +293,7 @@ const secondText = computed<string>({
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
-            :class="{ 'is-selected': cell.isSelected, 'is-today': cell.isToday, dim: !cell.inMonth }"
+            :class="{ 'is-selected': cell.isSelected, 'is-today': cell.isToday, 'text-subtle': !cell.inMonth }"
             @click="pickDay(cell)"
           >
             {{ cell.day }}

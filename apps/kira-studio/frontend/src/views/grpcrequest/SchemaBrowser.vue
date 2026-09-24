@@ -177,7 +177,7 @@ function selectMethod(service: string, method: string): void {
             <TooltipContent>Remove</TooltipContent>
           </Tooltip>
         </div>
-        <div v-if="tab.state.importPaths.length === 0" class="p-xs dim">
+        <div v-if="tab.state.importPaths.length === 0" class="p-xs text-subtle">
           No import paths — the .proto file's own directory is used
         </div>
       </div>

@@ -91,12 +91,12 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ row.path }}</TooltipContent>
     </Tooltip>
-    <span class="p-xs dim match-count" data-testid="repo-search-match-count">{{
+    <span class="p-xs text-subtle match-count" data-testid="repo-search-match-count">{{
       row.matchCount
     }}</span>
     <Tooltip v-if="row.fileTruncated">
       <TooltipTrigger as-child>
-        <span class="p-xs dim">+</span>
+        <span class="p-xs text-subtle">+</span>
       </TooltipTrigger>
       <TooltipContent>This file hit the per-file match cap — not every match is shown</TooltipContent>
     </Tooltip>
@@ -115,7 +115,7 @@ function onKeydown(e: KeyboardEvent): void {
     @dblclick="onDblClick"
     @keydown="onKeydown"
   >
-    <span class="p-xs dim match-line">{{ row.line }}:{{ row.column }}</span>
+    <span class="p-xs text-subtle match-line">{{ row.line }}:{{ row.column }}</span>
     <span class="preview"
       >{{ previewParts.before
       }}<span class="preview-match">{{ previewParts.match }}</span

@@ -45,7 +45,7 @@ function onOpenChange(open: boolean): void {
       @keydown="wrapSelectionOnType"
     />
     <CommandList class="max-h-72">
-      <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
+      <CommandEmpty class="text-subtle" data-testid="command-palette-empty">No matching commands</CommandEmpty>
       <CommandItem
         v-for="command in paletteStore.paletteCommands"
         :key="command.id"

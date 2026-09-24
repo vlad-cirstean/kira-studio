@@ -237,7 +237,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
       <template v-for="section in rawSections" :key="section.key">
         <div class="raw-section">
           <div class="raw-section-header">
-            <span class="p-xs dim font-data raw-caption" :data-testid="section.captionTestid">
+            <span class="p-xs text-subtle font-data raw-caption" :data-testid="section.captionTestid">
               {{ section.caption }}
             </span>
             <span class="p-push" />
