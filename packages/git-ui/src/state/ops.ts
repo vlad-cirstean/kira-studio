@@ -28,7 +28,7 @@ import type {
   WorktreePrepareLine,
   WorktreePrepareResult,
 } from '@kira/git-ipc';
-import { type ShallowRef, shallowRef } from 'vue';
+import { type ShallowRef, shallowRef, triggerRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
 import { createLatestRequest } from './latestRequest.ts';
@@ -60,6 +60,12 @@ export type { StashPredictionMismatch } from './liveAnnouncements.ts';
  *  at each of its two call sites rather than given its own top-level name — §7.10/§7.6 both do
  *  this). */
 type StashPrediction = StashPopPreflight['prediction'];
+
+/** F7: mirrors the server's own retained-transcript bound (`maxRetainedLines`,
+ *  `apps/kira-space/internal/gitprepare/output.go`) — the live `worktree.progress` stream forwards
+ *  every line for up to `PrepareTimeout` (15 minutes) with no cap of its own, so a chatty script
+ *  otherwise grows `worktreePrepareOutput` without bound. */
+const WORKTREE_PREPARE_OUTPUT_LIMIT = 500;
 
 /** `StashDialog.vue`'s own pending state for the shared apply/pop confirmation (OQ7: one dialog,
  *  the verb and one sentence differing) — opened only when `preflight.stashPop`'s verdict is not
@@ -265,6 +271,10 @@ export class OpsState {
   readonly worktreePrepareOutput: ShallowRef<readonly WorktreePrepareLine[]> = shallowRef([]);
   readonly worktreePrepareResult: ShallowRef<WorktreePrepareResult | undefined> =
     shallowRef(undefined);
+  /** F7: the SAME array `worktreePrepareOutput.value` currently points to — appended into and
+   *  trimmed in place (`#setWorktreePrepareOutput`/the `worktree.progress` handler below), so a
+   *  batch never re-copies everything seen so far the way `[...prev, ...batch]` did. */
+  #worktreePrepareBuffer: WorktreePrepareLine[] = [];
 
   readonly #bridge: BridgeClient;
   readonly #refs: RefsState;
@@ -323,8 +333,24 @@ export class OpsState {
     this.#unsubscribeWorktreeProgress = bridge.on('worktree.progress', (event) => {
       if (this.#repoId !== event.repoId) return;
       if (this.activeWorktreePreparePath.value === undefined) return;
-      this.worktreePrepareOutput.value = [...this.worktreePrepareOutput.value, ...event.lines];
+      // F7: appended and trimmed in place — a full `[...prev, ...batch]` spread per batch (every
+      // ~100ms, for up to `PrepareTimeout`) is itself O(n) per batch and, with no cap, unbounded
+      // memory over a long run; `triggerRef` since mutating `#worktreePrepareBuffer` in place
+      // never changes the ref's own value identity.
+      this.#worktreePrepareBuffer.push(...event.lines);
+      const overflow = this.#worktreePrepareBuffer.length - WORKTREE_PREPARE_OUTPUT_LIMIT;
+      if (overflow > 0) this.#worktreePrepareBuffer.splice(0, overflow);
+      triggerRef(this.worktreePrepareOutput);
     });
+  }
+
+  /** F7: the one place that replaces `worktreePrepareOutput` wholesale (a fresh run starting, or
+   *  the final authoritative transcript replacing the streamed partial view) — keeps
+   *  `#worktreePrepareBuffer` the same array `worktreePrepareOutput.value` points to, so the next
+   *  `worktree.progress` batch appends onto the right buffer instead of a stale or aliased one. */
+  #setWorktreePrepareOutput(lines: readonly WorktreePrepareLine[]): void {
+    this.#worktreePrepareBuffer = [...lines];
+    this.worktreePrepareOutput.value = this.#worktreePrepareBuffer;
   }
 
   setRepoId(repoId: string | undefined): void {
@@ -333,7 +359,7 @@ export class OpsState {
     this.remoteProgress.value = undefined;
     this.pullStrategy.value = undefined;
     this.activeWorktreePreparePath.value = undefined;
-    this.worktreePrepareOutput.value = [];
+    this.#setWorktreePrepareOutput([]);
     this.worktreePrepareResult.value = undefined;
     // F6: every `run*` method that opens a confirm dialog sets `busy = true` then awaits its own
     // slot's `ask()` — nothing else ever settles that Promise. Without abandoning it here, a repo
@@ -1153,7 +1179,7 @@ export class OpsState {
       return undefined;
     }
     this.activeWorktreePreparePath.value = path;
-    this.worktreePrepareOutput.value = [];
+    this.#setWorktreePrepareOutput([]);
     this.worktreePrepareResult.value = undefined;
     try {
       const result = await this.#bridge.request('worktree.prepare', {
@@ -1164,7 +1190,7 @@ export class OpsState {
       if (this.#repoId !== repoId) return result;
       // The final, capped/sanitized transcript always wins over whatever partial view streamed
       // in (this method's own doc comment on worktreePrepareOutput's field).
-      this.worktreePrepareOutput.value = result.output;
+      this.#setWorktreePrepareOutput(result.output);
       this.worktreePrepareResult.value = result;
       return result;
     } finally {

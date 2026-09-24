@@ -376,6 +376,40 @@
       "warnings": ["credential-in-command"]
     },
     {
+      "name": "P108 F9: -u with a non-Latin1 credential encodes as UTF-8, not Latin-1, and never throws",
+      "command": "curl https://x.test/a -u 'user:pässwörd'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Basic dXNlcjpww6Rzc3fDtnJk",
+            "enabled": true,
+            "description": ""
+          }
+        ]
+      },
+      "warnings": ["credential-in-command"]
+    },
+    {
+      "name": "P108 F9: -u with a {{variable}} reference is kept unencoded, not destroyed",
+      "command": "curl https://x.test/a -u '{{user}}:{{pass}}'",
+      "want": {
+        "method": "GET",
+        "url": "https://x.test/a",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Basic {{user}}:{{pass}}",
+            "enabled": true,
+            "description": ""
+          }
+        ]
+      },
+      "warnings": ["credential-in-command"]
+    },
+    {
       "name": "--oauth2-bearer becomes an Authorization header and warns",
       "command": "curl https://x.test/a --oauth2-bearer sometoken123",
       "want": {

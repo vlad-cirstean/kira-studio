@@ -40,6 +40,19 @@ function basename(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+/** UTF-8-correct, never-throwing base64 encode. `btoa` alone only handles Latin-1 code points: it
+ *  throws `InvalidCharacterError` outside that range (breaking `parseCurl`'s "never throws"
+ *  contract) and, for the codepoints it does accept, encodes them as Latin-1 bytes rather than the
+ *  UTF-8 bytes curl itself sends (F9) — wrong credentials, silently. Encoding to UTF-8 bytes first
+ *  and feeding `btoa` each byte as its own Latin-1 code unit sidesteps both: every byte is < 256,
+ *  so `btoa` never throws. */
+function utf8Base64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 /** D7's "parses as k=v" test: a non-empty name before the first '='. Splitting happens on the raw
  *  (possibly percent-encoded) text — an encoded '=' would already read back as '%3D', never a
  *  literal '=', so the real separator is never ambiguous with an encoded one. */
@@ -315,7 +328,19 @@ function handle(
       }
       return;
     case 'user':
-      pushHeader(acc, 'Authorization', `Basic ${btoa(v)}`);
+      if (v.includes('{{')) {
+        // F9: base64-encoding a value that still carries a {{variable}} reference would encode
+        // the literal braces and destroy the reference — curl never sees {{...}}, so this is
+        // this app's own template syntax pasted into -u's value, meaningful only unencoded. Keep
+        // the header unencoded and warn instead of silently destroying the reference.
+        pushHeader(acc, 'Authorization', `Basic ${v}`);
+        acc.warnings.push({
+          kind: 'credential-in-command',
+          detail: `-u/--user '${v}' contains a {{variable}} reference — base64-encoding it here would destroy the reference, so the header was left unencoded. Base64-encode "user:pass" before sending, or reference a secret variable through its own {{name | base64}} pipe.`,
+        });
+        return;
+      }
+      pushHeader(acc, 'Authorization', `Basic ${utf8Base64(v)}`);
       acc.warnings.push({
         kind: 'credential-in-command',
         detail:
