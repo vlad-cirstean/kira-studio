@@ -43,10 +43,18 @@ export function createPageNavigation<R extends PageNavRuntime>(
 
   // D7's cursor choice: prefer the token when one is available, falling back to offset — the
   // pager position (pageIndex) always advances by one regardless of which strategy served it.
+  //
+  // F7 (P108 Part 10): a second Next click landing before the first click's read returns used to
+  // reuse the *first* click's stale nextToken (the successful load hadn't refreshed it yet) while
+  // pageIndex had already been bumped twice — the pager showed page 3 over page 2's actually-
+  // requested-but-not-yet-applied rows. rt.opId !== null means a load for this tab is still in
+  // flight; ignoring the stray click until it resolves means prevIndex below is always the index
+  // of the last page that actually landed, not a second optimistic guess stacked on the first.
   async function goNext(id: string): Promise<void> {
     const tab = host.tab(id);
     if (!tab) return;
     const rt = host.ensureRuntime(id);
+    if (rt.opId !== null) return;
     const prevIndex = tab.pageIndex;
     const nextIndex = prevIndex + 1;
     const cursor: PageCursor = rt.nextToken
@@ -56,10 +64,13 @@ export function createPageNavigation<R extends PageNavRuntime>(
     await host.load(id, cursor, prevIndex);
   }
 
+  // F7 (P108 Part 10): same in-flight guard as goNext, same reason — a stray second click must
+  // not stack a second optimistic pageIndex move on top of one whose load hasn't landed yet.
   async function goPrev(id: string): Promise<void> {
     const tab = host.tab(id);
     if (!tab) return;
     const rt = host.ensureRuntime(id);
+    if (rt.opId !== null) return;
     const prevIndex = tab.pageIndex;
     const targetIndex = Math.max(0, prevIndex - 1);
     const cursor: PageCursor = rt.prevToken
