@@ -401,8 +401,21 @@ const effectiveSslVerify = computed(
 const effectiveDisableCookieJar = computed(
   () => props.tab.state.settings.disableCookieJar ?? settingsStore.api.disableCookieJar,
 );
+// P108 F6: `state.url` is the raw template (`{{baseUrl}}/login`) — parses to no host, so both this
+// pane and the toolbar badge always read zero cookies for a templated URL even though the jar holds
+// them from the resolved send. Same resolution as `unresolvedRefs` above (stage 1, no dynamic-name
+// generation — a live host preview must stay a pure function of the tab's text, P6 F2/D8's own
+// rule) — a URL whose host is still a deferred secret resolves to the unresolved template, which
+// cookies.ts's own fetchCookiesNow already treats as "nothing to fetch yet", not an error.
+const resolvedCookiesUrl = computed(() => {
+  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
+    collectionId.value,
+    envId.value,
+  );
+  return resolveTabState(props.tab.state, values, secretNames).url;
+});
 watch(
-  () => props.tab.state.url,
+  resolvedCookiesUrl,
   (url) => {
     if (effectiveDisableCookieJar.value) return;
     cookiesStore.scheduleCookiesFetch(props.tab.id, url);
@@ -411,7 +424,7 @@ watch(
 );
 const unsubscribeSendCompleted = onSendCompleted((tabId) => {
   if (tabId !== props.tab.id || effectiveDisableCookieJar.value) return;
-  cookiesStore.scheduleCookiesFetch(props.tab.id, props.tab.state.url);
+  cookiesStore.scheduleCookiesFetch(props.tab.id, resolvedCookiesUrl.value);
 });
 onUnmounted(unsubscribeSendCompleted);
 function toggleFieldFilter(): void {
@@ -783,7 +796,7 @@ onUnmounted(() => {
           v-else-if="tab.state.requestPane === 'cookies'"
           mode="request"
           :tab-id="tab.id"
-          :url="tab.state.url"
+          :url="resolvedCookiesUrl"
           :disable-cookie-jar="effectiveDisableCookieJar"
         />
         <RequestBodyPane
