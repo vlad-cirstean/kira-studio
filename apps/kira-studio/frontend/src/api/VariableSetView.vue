@@ -78,7 +78,8 @@ const runStateLabel = computed(() => {
 
 onMounted(() => {
   collectionsStore.initCollections();
-  variablesStore.initVariables();
+  // P112: no environments init call left here — useVariablesStore's own app-lifetime query
+  // observer fetches the list on store creation.
   void variableSetStore.loadVariableSetRows(props.tab.id, scope.value, ownerId.value);
 });
 

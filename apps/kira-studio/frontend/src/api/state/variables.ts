@@ -7,13 +7,21 @@ import type {
   ApiVariableHistoryEntry,
   VariableScope,
 } from '@shared/domain/variables';
+import { useMutation, useQuery } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
-import { computed, reactive, toRefs } from 'vue';
+import { computed, reactive, toRefs, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { runReveal } from '../reveal';
 import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTabs } from '../tabs';
+import {
+  apiEnvironmentsKey,
+  apiEnvironmentsQueryOptions,
+  reconcileEnvironments,
+  refreshApiQuery,
+} from './apiQueries';
 import { createRevealExpiry } from './revealExpiry';
 
 // P5 D3/D11: the environment list and the app-global active selection — read-only at this point
@@ -28,8 +36,6 @@ import { createRevealExpiry } from './revealExpiry';
 // machinery, and nothing there reaches back into environment CRUD.
 
 interface VariablesState {
-  environments: ApiEnvironment[];
-  loaded: boolean;
   /** P108 F10: an environment CRUD call's own failure message — every mutation below used to let
    *  this throw uncaught (a fire-and-forget `void` call from EnvironmentsView.vue), so a failed
    *  create/rename/delete/duplicate/reorder/activate left the row exactly as it was with nothing
@@ -39,8 +45,6 @@ interface VariablesState {
 
 export const useVariablesStore = defineStore('variables', () => {
   const state = reactive<VariablesState>({
-    environments: [],
-    loaded: false,
     error: null,
   });
 
@@ -48,9 +52,19 @@ export const useVariablesStore = defineStore('variables', () => {
     state.error = null;
   }
 
+  // P112: the environments list is now TanStack Query's cache, not a store field — this observer
+  // is app-lifetime (created once, with the setup store's own effect scope owning it), so
+  // invalidateQueries always has an active observer to refetch. queryClient is passed explicitly
+  // (not injected): main.ts creates stores before app.use(VueQueryPlugin), and unit tests mount no
+  // app at all — useBaseQuery.js falls back to inject() only when no explicit client is given.
+  const envQuery = useQuery(apiEnvironmentsQueryOptions(), queryClient);
+
+  const environments = computed<ApiEnvironment[]>(() => envQuery.data.value ?? []);
+  const loaded = computed(() => envQuery.data.value !== undefined);
+
   /** D3: the app-global selection, or null when none is active ("No environment"). */
   const activeEnvironment = computed<ApiEnvironment | null>(
-    () => state.environments.find((e) => e.isActive) ?? null,
+    () => environments.value.find((e) => e.isActive) ?? null,
   );
 
   /** '' when no environment is active — the same convention SetActiveEnvironment's own id arg
@@ -66,31 +80,27 @@ export const useVariablesStore = defineStore('variables', () => {
     () => activeEnvironment.value?.color ?? 'none',
   );
 
-  async function loadEnvironments(): Promise<void> {
-    state.environments = await control.variablesListEnvironments();
-    state.loaded = true;
+  /** Every list mutation below refreshes this one key then reconciles — reconcileEnvironments
+   *  (F9's successor) evicts any cached environment-scope variables query whose owner no longer
+   *  exists in the fresh list, local mutation or remote push alike. */
+  async function afterEnvironmentsListChange(): Promise<void> {
+    await refreshApiQuery(apiEnvironmentsKey);
+    reconcileEnvironments();
   }
 
-  // P22b D8 regression: CollectionsPanel.vue now calls initVariables() on its own mount, alongside
-  // EnvironmentSelect.vue's pre-existing call — both fire in the same tick on a fresh Api-mode
-  // mount, before either's own loadEnvironments() await resolves and sets `loaded = true`, so the
-  // `if (loaded) return` guard let both through and this fired variablesListEnvironments() twice
-  // instead of once. `initInFlight` closes that window: a second caller during the first's own
-  // in-flight load reuses its promise instead of starting a second real fetch.
-  let initInFlight: Promise<void> | null = null;
-
-  function initVariables(): void {
-    if (state.loaded || initInFlight) return;
-    initInFlight = loadEnvironments().finally(() => {
-      initInFlight = null;
-    });
-  }
+  const setActiveEnvironmentMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'setActive'],
+      mutationFn: (id: string) => control.variablesSetActiveEnvironment(id),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
 
   /** id: '' selects "No environment" (D3). */
   async function setActiveEnvironment(id: string): Promise<void> {
     try {
-      await control.variablesSetActiveEnvironment(id);
-      await loadEnvironments();
+      await setActiveEnvironmentMutation.mutateAsync(id);
       state.error = null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
@@ -117,7 +127,7 @@ export const useVariablesStore = defineStore('variables', () => {
     if (!useTabIncognitoStore().isIncognito(tabId) || !incognitoEnvByTab.has(tabId))
       return activeEnvironmentColor.value;
     const id = incognitoEnvByTab.get(tabId);
-    return state.environments.find((e) => e.id === id)?.color ?? 'none';
+    return environments.value.find((e) => e.id === id)?.color ?? 'none';
   }
 
   /** In-memory when the tab is incognito, else the ordinary app-wide write (setActiveEnvironment). */
@@ -133,14 +143,36 @@ export const useVariablesStore = defineStore('variables', () => {
     incognitoEnvByTab.delete(tabId);
   });
 
+  // P108 F9, kept under a new mechanism: an incognito tab's own override is never cleared by
+  // anything else — left in place after its environment is deleted, it kept substituting the
+  // deleted environment's plain values while Go resolved no secrets for the (now missing) id. This
+  // now also fires for a delete made in *another* window, which F9's own local-only loop never
+  // saw. Skipped while envQuery.data.value is undefined, so an unloaded list never wipes overrides.
+  watch(environments, (list) => {
+    if (envQuery.data.value === undefined) return;
+    const ids = new Set(list.map((e) => e.id));
+    for (const [tabId, envId] of incognitoEnvByTab) {
+      if (!ids.has(envId)) incognitoEnvByTab.delete(tabId);
+    }
+  });
+
+  const createEnvironmentMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'create'],
+      mutationFn: (args: { name: string; description: string; color: PaletteColor }) =>
+        control.variablesCreateEnvironment(args.name, args.description, args.color),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
+
   async function createEnvironment(
     name: string,
     description = '',
     color: PaletteColor = 'none',
   ): Promise<ApiEnvironment | undefined> {
     try {
-      const env = await control.variablesCreateEnvironment(name, description, color);
-      await loadEnvironments();
+      const env = await createEnvironmentMutation.mutateAsync({ name, description, color });
       state.error = null;
       return env;
     } catch (err) {
@@ -148,6 +180,16 @@ export const useVariablesStore = defineStore('variables', () => {
       return undefined;
     }
   }
+
+  const updateEnvironmentMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'update'],
+      mutationFn: (args: { id: string; name: string; description: string; color: PaletteColor }) =>
+        control.variablesUpdateEnvironment(args.id, args.name, args.description, args.color),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
 
   /** P17 D14/P18 D19: replaces renameEnvironment — renaming, describing and colouring an
    *  environment are one row update. Also patches any open variable-set tab for this environment
@@ -159,46 +201,52 @@ export const useVariablesStore = defineStore('variables', () => {
     color: PaletteColor = 'none',
   ): Promise<void> {
     try {
-      await control.variablesUpdateEnvironment(id, name, description, color);
+      await updateEnvironmentMutation.mutateAsync({ id, name, description, color });
       renameVariableSetTabs('environment', id, name);
-      await loadEnvironments();
       state.error = null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
     }
   }
 
+  const deleteEnvironmentMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'delete'],
+      mutationFn: (id: string) => control.variablesDeleteEnvironment(id),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
+
   /** Deleting the active environment leaves none active (D3) — there is nothing to reassign.
    *  Closes any open variable-set tab for it too (D16) — unlike a request tab, it has no state of
-   *  its own worth preserving once its owner is gone. */
+   *  its own worth preserving once its owner is gone. The incognito-override drop (F9) and the
+   *  cached variable-rows eviction (F9) both now happen reactively — the `environments` watch
+   *  above and `reconcileEnvironments` (afterEnvironmentsListChange) — rather than as explicit
+   *  steps here. */
   async function deleteEnvironment(id: string): Promise<void> {
     try {
-      await control.variablesDeleteEnvironment(id);
+      await deleteEnvironmentMutation.mutateAsync(id);
       closeVariableSetTabsForOwner('environment', id);
-      // P108 F9: an incognito tab's own override (above) is never cleared by anything else — left
-      // in place, it kept substituting the deleted environment's plain values in stage 1 while Go
-      // resolved no secrets for the (now missing) environment id, and the selector showed nothing
-      // selected while send still used the stale pick. Falling back drops it back to the app-wide
-      // selection, same as a non-incognito tab already reads once this environment is gone.
-      for (const [tabId, envId] of incognitoEnvByTab) {
-        if (envId === id) incognitoEnvByTab.delete(tabId);
-      }
-      // listCache's own eviction (useVariableSetStore) — nothing else ever drops a deleted owner's
-      // cached rows, so a later ensureVariablesLoaded('environment', id) call (a stale watch, a
-      // reused id) would otherwise keep reading them back forever.
-      useVariableSetStore().evictListCache('environment', id);
-      await loadEnvironments();
       state.error = null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
     }
   }
+
+  const duplicateEnvironmentMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'duplicate'],
+      mutationFn: (id: string) => control.variablesDuplicateEnvironment(id),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
 
   /** P17 D17/item 4: a raw-ciphertext duplicate — no history copied, never active. */
   async function duplicateEnvironment(id: string): Promise<ApiEnvironment | undefined> {
     try {
-      const env = await control.variablesDuplicateEnvironment(id);
-      await loadEnvironments();
+      const env = await duplicateEnvironmentMutation.mutateAsync(id);
       state.error = null;
       return env;
     } catch (err) {
@@ -210,19 +258,25 @@ export const useVariablesStore = defineStore('variables', () => {
   // ---- the environments surface (D3/D11, re-homed to a tab by P28 D16(c)) ----
   //
   // The dialog flag and its open/close pair are gone. `openEnvironments()` is the one entry point
-  // every caller uses; it opens (or focuses) the environments tab and refreshes the list, which is
-  // exactly what openEnvironmentsDialog did minus the flag. It lives here rather than in api/tabs.ts
-  // so that a caller wanting "the environments UI" keeps importing one module, and so the
-  // loadEnvironments() refresh cannot be forgotten at a call site.
+  // every caller uses; it opens (or focuses) the environments tab. It used to also refresh the
+  // list explicitly — the observer created above is always live, so there is nothing left to
+  // trigger here.
   function openEnvironments(): void {
     openEnvironmentsTab();
-    void loadEnvironments();
   }
+
+  const reorderEnvironmentsMutation = useMutation(
+    {
+      mutationKey: ['apiEnvironments', 'reorder'],
+      mutationFn: (ids: string[]) => control.variablesReorderEnvironments(ids),
+      onSuccess: afterEnvironmentsListChange,
+    },
+    queryClient,
+  );
 
   async function reorderEnvironmentsList(ids: string[]): Promise<void> {
     try {
-      await control.variablesReorderEnvironments(ids);
-      await loadEnvironments();
+      await reorderEnvironmentsMutation.mutateAsync(ids);
       state.error = null;
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
@@ -231,11 +285,12 @@ export const useVariablesStore = defineStore('variables', () => {
 
   return {
     ...toRefs(state),
+    environments,
+    loaded,
     activeEnvironment,
     activeEnvironmentId,
     activeEnvironmentColor,
     dismissError,
-    initVariables,
     setActiveEnvironment,
     environmentIdForTab,
     environmentColorForTab,

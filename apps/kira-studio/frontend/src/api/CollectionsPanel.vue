@@ -38,10 +38,9 @@ const empty = computed(() => collectionsStore.collections.length === 0);
 // non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
 // no collections, no tree, no call, no collections.
 onMounted(collectionsStore.initCollections);
-// The header's Environments action and the active-environment select both read this; initVariables()
-// is idempotent (state/variables.ts's own guard), so mounting it here as well as wherever else
-// needs it is safe.
-onMounted(variablesStore.initVariables);
+// P112: the header's Environments action and the active-environment select both read
+// variablesStore.environments — useVariablesStore's own app-lifetime query observer fetches it on
+// store creation, so there is nothing left to trigger on mount here.
 
 // P22b D8: runtime-only collapse state for the two categories — a panel section is not a
 // preference worth a storage round trip (ConsoleViewRuntime's own "runtime-only, never saved"

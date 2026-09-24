@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { connColorVar } from '@theme/connColor';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useVariablesStore } from './state/variables';
 
 const variablesStore = useVariablesStore();
@@ -31,7 +31,9 @@ const variablesStore = useVariablesStore();
 // `appearance: base-select` and only where the engine implements it, and this control now needs a
 // colour dot per row (D17). The closed state stays `.p-select.bordered` either way, so its height/
 // border/padding do not change at all (P16 D6's rule, api-ui-consistency.spec.ts's own guard).
-onMounted(variablesStore.initVariables);
+//
+// P112: no onMounted fetch left here — useVariablesStore's own app-lifetime query observer fetches
+// the environments list on store creation.
 
 // P71 §3.3: an optional tabId — present from both request views, so their own selection can be an
 // incognito tab's own in-memory override instead of the app-wide active environment.
