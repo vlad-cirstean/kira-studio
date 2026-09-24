@@ -19,8 +19,8 @@ const collectionsStore = useCollectionsStore();
 // the cost. Import is not undoable in P4; deleting the collection is the undo, one context-menu
 // item away.
 //
-// P104 §9: Alert with the `.strip-warn`/`.strip-note` tone classes, dynamic per warning count —
-// the same tone vocabulary RawExchangePane.vue's own dynamic-tone strip uses.
+// P104 §9: Alert with the `warn`/`note` tone variants, dynamic per warning count — the same tone
+// vocabulary RawExchangePane.vue's own dynamic-tone strip uses.
 const report = computed(() => collectionsStore.report);
 
 const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' : 'note'));
@@ -37,11 +37,8 @@ function plural(n: number, noun: string): string {
 </script>
 
 <template>
-  <Alert v-if="report" :class="tone === 'warn' ? 'strip-warn' : 'strip-note'" data-testid="import-report">
-    <AlertDescription
-      :class="tone === 'warn' ? 'strip-warn-text' : 'strip-note-text'"
-      class="flex items-start gap-1.5"
-    >
+  <Alert v-if="report" :variant="tone" data-testid="import-report">
+    <AlertDescription class="flex items-start gap-1.5">
       <div class="report">
         <div data-testid="import-report-summary">{{ summary }}</div>
         <ul v-if="report.warnings.length > 0" class="warnings">
@@ -69,8 +66,8 @@ function plural(n: number, noun: string): string {
   </Alert>
   <!-- P5 D16: the export path's own strip, independent of the import one above (a session can
        export without ever having imported). -->
-  <Alert v-if="collectionsStore.exportWarning" class="strip-warn" data-testid="export-warning">
-    <AlertDescription class="strip-warn-text flex items-start gap-1.5">
+  <Alert v-if="collectionsStore.exportWarning" variant="warn" data-testid="export-warning">
+    <AlertDescription class="flex items-start gap-1.5">
       <div class="report">{{ collectionsStore.exportWarning }}</div>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -124,20 +121,5 @@ function plural(n: number, noun: string): string {
 
 .warnings {
   @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-
-/* Alert tone classes replacing the raw `.p-strip` warn/note markers (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

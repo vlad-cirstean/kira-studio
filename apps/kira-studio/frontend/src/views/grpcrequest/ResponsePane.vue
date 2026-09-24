@@ -327,8 +327,8 @@ onUnmounted(() => {
          restatement of the code, so it stays on its own line free to wrap. -->
     <div v-if="statusMessage" class="p-xs dim status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
-    <Alert v-if="viewing" class="strip-note" data-testid="grpc-history-band">
-      <AlertDescription class="strip-note-text flex items-center gap-3">
+    <Alert v-if="viewing" variant="note" data-testid="grpc-history-band">
+      <AlertDescription class="flex items-center gap-3">
         Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
         <Button
           variant="toolbar"
@@ -347,23 +347,23 @@ onUnmounted(() => {
          actually fills Messages/MessageCount in. -->
     <Alert
       v-if="viewing?.snapshot.messagesElided"
-      class="strip-note"
+      variant="note"
       data-testid="grpc-history-messages-elided"
     >
-      <AlertDescription class="strip-note-text">
+      <AlertDescription>
         Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="rt?.status === 'cancelled'" class="strip-warn" data-testid="grpc-stopped-strip">
-      <AlertDescription class="strip-warn-text">
+    <Alert v-if="rt?.status === 'cancelled'" variant="warn" data-testid="grpc-stopped-strip">
+      <AlertDescription>
         Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
       </AlertDescription>
     </Alert>
 
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
-    <Alert v-if="liveMessagesElided" class="strip-note" data-testid="grpc-live-messages-elided">
-      <AlertDescription class="strip-note-text">
+    <Alert v-if="liveMessagesElided" variant="note" data-testid="grpc-live-messages-elided">
+      <AlertDescription>
         Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
       </AlertDescription>
     </Alert>
@@ -506,21 +506,6 @@ onUnmounted(() => {
 
 .history-hint-link {
   @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
-}
-
-/* Alert tone classes replacing MessageStrip's own tone colors (now --kira-warn-text/--kira-note-
-   text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 
 .empty-state {

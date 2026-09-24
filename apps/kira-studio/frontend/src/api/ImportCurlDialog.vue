@@ -85,10 +85,10 @@ onMounted(() => {
       </Alert>
       <template v-else-if="text.trim() !== ''">
         <div class="p-sm muted" data-testid="import-curl-summary">{{ preview.summary }}</div>
-        <!-- D12: the same `.strip-warn` + `<li :data-kind>` shape ImportReportStrip.vue
+        <!-- D12: the same `warn` variant + `<li :data-kind>` shape ImportReportStrip.vue
              established — shown live, before Import is pressed, rather than as a post-hoc report. -->
-        <Alert v-if="preview.warnings.length > 0" class="strip-warn" data-testid="import-curl-warnings">
-          <AlertDescription class="strip-warn-text">
+        <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="import-curl-warnings">
+          <AlertDescription>
             <ul class="warnings">
               <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
                 {{ warning.detail }}
@@ -127,14 +127,5 @@ onMounted(() => {
 
 .warnings {
   @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-
-/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
-   tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

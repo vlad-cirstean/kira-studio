@@ -206,8 +206,8 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           The steps below are what completed before it did.
         </AlertDescription>
       </Alert>
-      <Alert v-else-if="viewingStored" class="strip-note" data-testid="http-timeline-stored-note">
-        <AlertDescription class="strip-note-text">
+      <Alert v-else-if="viewingStored" variant="note" data-testid="http-timeline-stored-note">
+        <AlertDescription>
           This timeline was recorded when the response was received.
         </AlertDescription>
       </Alert>
@@ -398,14 +398,5 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 
 .empty-state {
   @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-/* Alert tone class replacing the raw MessageStrip note marker (now --kira-warn-text/--kira-note-
-   text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

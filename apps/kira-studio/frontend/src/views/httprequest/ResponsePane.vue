@@ -398,8 +398,8 @@ onUnmounted(() => {
       @close="closeFind"
     />
 
-    <Alert v-if="viewing" class="strip-note" data-testid="http-history-band">
-      <AlertDescription class="strip-note-text flex items-start gap-1.5">
+    <Alert v-if="viewing" variant="note" data-testid="http-history-band">
+      <AlertDescription class="flex items-start gap-1.5">
         <span>
           Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
           {{ viewing?.snapshot.entry.url }}
@@ -410,18 +410,18 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <Alert v-if="response?.bodyTruncated" class="strip-warn" data-testid="http-body-truncated">
-      <AlertDescription class="strip-warn-text">
+    <Alert v-if="response?.bodyTruncated" variant="warn" data-testid="http-body-truncated">
+      <AlertDescription>
         Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyStorageTruncated" class="strip-note" data-testid="http-history-truncated">
-      <AlertDescription class="strip-note-text">
+    <Alert v-if="bodyStorageTruncated" variant="note" data-testid="http-history-truncated">
+      <AlertDescription>
         Only the first 256 KB of this response was kept in history.
       </AlertDescription>
     </Alert>
-    <Alert v-if="bodyNotStored" class="strip-note" data-testid="http-history-binary-note">
-      <AlertDescription class="strip-note-text">
+    <Alert v-if="bodyNotStored" variant="note" data-testid="http-history-binary-note">
+      <AlertDescription>
         This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
       </AlertDescription>
     </Alert>
@@ -571,20 +571,5 @@ onUnmounted(() => {
 
 .empty-state {
   @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-/* Alert tone classes replacing the raw MessageStrip note/warn markers (now --kira-warn-
-   text/--kira-note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

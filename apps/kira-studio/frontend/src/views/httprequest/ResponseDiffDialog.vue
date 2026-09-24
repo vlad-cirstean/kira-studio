@@ -324,8 +324,8 @@ onUnmounted(() => {
         </details>
       </div>
 
-      <Alert v-if="!bothStored" class="strip-note" data-testid="http-diff-not-comparable">
-        <AlertDescription class="strip-note-text">
+      <Alert v-if="!bothStored" variant="note" data-testid="http-diff-not-comparable">
+        <AlertDescription>
           At least one response's body was not kept in history, so it can't be compared.
         </AlertDescription>
       </Alert>
@@ -422,14 +422,5 @@ onUnmounted(() => {
 
 .diff-merge-host :deep(.monaco-diff-editor) {
   @apply h-full;
-}
-
-/* Alert tone class replacing the raw MessageStrip note marker (now --kira-warn-text/--kira-note-
-   text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
 }
 </style>

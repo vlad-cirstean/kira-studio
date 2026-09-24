@@ -104,8 +104,8 @@ function splitTarget(value: string): [string, string | null] {
         </optgroup>
       </select>
 
-      <Alert v-if="collectionTargets.length === 0" class="strip-warn" data-testid="save-request-no-target">
-        <AlertDescription class="strip-warn-text">
+      <Alert v-if="collectionTargets.length === 0" variant="warn" data-testid="save-request-no-target">
+        <AlertDescription>
           Create a collection first — a request needs somewhere to live.
         </AlertDescription>
       </Alert>
@@ -133,15 +133,3 @@ function splitTarget(value: string): [string, string | null] {
   </Dialog>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
-   tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
-}
-</style>

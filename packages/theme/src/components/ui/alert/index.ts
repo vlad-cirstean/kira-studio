@@ -14,6 +14,14 @@ export const alertVariants = cva(
         default: 'bg-card text-card-foreground',
         destructive:
           'text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+        // P108 F15: `warn`/`note` fold in the `.strip-warn`/`.strip-note` (+ `-text`) tone classes
+        // that used to be hand-copied, byte-for-byte, into 12 separate `<style scoped>` blocks
+        // (ImportReportStrip.vue's own D16 comment named it "the same tone vocabulary
+        // RawExchangePane.vue's own dynamic-tone strip uses" — it was never actually shared code,
+        // just a convention). Same tokens, same destructive-style
+        // `*:data-[slot=alert-description]:…` targeting.
+        warn: 'bg-warn/10 border-warn/20 *:data-[slot=alert-description]:text-warn-text *:[svg]:text-current',
+        note: 'bg-info/8 border-info/20 *:data-[slot=alert-description]:text-note-text *:[svg]:text-current',
       },
     },
     defaultVariants: {

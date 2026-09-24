@@ -511,10 +511,10 @@ function onBulkClose(): void {
       </Alert>
       <Alert
         v-else-if="connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
-        class="strip-warn"
+        variant="warn"
         data-testid="variables-secrets-unavailable"
       >
-        <AlertDescription class="strip-warn-text">{{ connectionsStore.secretStorage.reason }}</AlertDescription>
+        <AlertDescription>{{ connectionsStore.secretStorage.reason }}</AlertDescription>
       </Alert>
 
       <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
@@ -671,14 +671,5 @@ function onBulkClose(): void {
 
 .empty-state {
   @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
-   tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

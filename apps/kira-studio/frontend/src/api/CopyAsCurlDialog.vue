@@ -12,7 +12,7 @@ const copyAsCurlStore = useCopyAsCurlStore();
 // P7 D10: the generated command, masked by default. Secrets are still {{token}} until Show secret
 // values is pressed — the gate is `revealSecretValues`'s own `revealVariable` calls
 // (http/state/variables.ts's existing four-outcome flow), not anything here. Built on ui/dialog
-// + the `.strip-note`/`.strip-warn` tone classes (ImportReportStrip.vue's own technique).
+// + the shared Alert `note`/`warn` variants (ImportReportStrip.vue's own technique).
 const command = computed(() => copyAsCurlStore.currentCurlCommand());
 
 const maskedNames = computed(() =>
@@ -99,13 +99,10 @@ function close(): void {
 
       <Alert
         v-if="copyAsCurlStore.deferredNames.length > 0"
-        :class="stripTone === 'warn' ? 'strip-warn' : 'strip-note'"
+        :variant="stripTone"
         data-testid="copy-as-curl-strip"
       >
-        <AlertDescription
-          :class="stripTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'"
-          class="flex items-start gap-1.5"
-        >
+        <AlertDescription class="flex items-start gap-1.5">
           <span>{{ stripText }}</span>
           <Button
             v-if="maskedNames.length > 0"
@@ -148,21 +145,3 @@ function close(): void {
   </Dialog>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-/* Alert tone classes replacing MessageStrip's note/warn markers (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
-}
-</style>

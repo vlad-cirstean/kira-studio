@@ -107,15 +107,15 @@ function close(): void {
         <AlertDescription>{{ preview.error }}</AlertDescription>
       </Alert>
       <template v-else>
-        <Alert v-if="preview.modeChanged" class="strip-warn" data-testid="edit-raw-mode-changed">
-          <AlertDescription class="strip-warn-text">
+        <Alert v-if="preview.modeChanged" variant="warn" data-testid="edit-raw-mode-changed">
+          <AlertDescription>
             The body mode changes from <strong>{{ preview.modeChanged.from }}</strong> to
             <strong>{{ preview.modeChanged.to }}</strong> — the bytes and headers this sends are
             unchanged, only the editor for the body is.
           </AlertDescription>
         </Alert>
-        <Alert v-if="preview.warnings.length > 0" class="strip-warn" data-testid="edit-raw-warnings">
-          <AlertDescription class="strip-warn-text">
+        <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="edit-raw-warnings">
+          <AlertDescription>
             <ul class="warnings">
               <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
                 {{ warning.detail }}
@@ -154,14 +154,5 @@ function close(): void {
 
 .warnings {
   @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-
-/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
-   tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

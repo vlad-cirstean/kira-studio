@@ -210,11 +210,11 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
   <div class="raw-exchange-pane" data-testid="http-raw-pane">
     <template v-if="wire || showReconstructed">
       <template v-if="wire">
-        <Alert :class="fidelityTone === 'warn' ? 'strip-warn' : 'strip-note'" data-testid="http-wire-fidelity">
-          <AlertDescription :class="fidelityTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">{{ fidelityText }}</AlertDescription>
+        <Alert :variant="fidelityTone" data-testid="http-wire-fidelity">
+          <AlertDescription>{{ fidelityText }}</AlertDescription>
         </Alert>
-        <Alert v-if="maskingNote" class="strip-note" data-testid="http-wire-masking-note">
-          <AlertDescription class="strip-note-text">{{ maskingNote }}</AlertDescription>
+        <Alert v-if="maskingNote" variant="note" data-testid="http-wire-masking-note">
+          <AlertDescription>{{ maskingNote }}</AlertDescription>
         </Alert>
       </template>
       <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
@@ -222,13 +222,13 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
            as one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so
            this gets its own honest strip rather than a fourth, misleading fidelity value. -->
       <template v-else>
-        <Alert class="strip-note" data-testid="http-raw-reconstructed">
-          <AlertDescription class="strip-note-text">
+        <Alert variant="note" data-testid="http-raw-reconstructed">
+          <AlertDescription>
             Reconstructed from what this request was recorded as — not the exact bytes on the wire.
           </AlertDescription>
         </Alert>
-        <Alert v-if="requestBodyStorageTruncated" class="strip-note" data-testid="http-history-request-truncated">
-          <AlertDescription class="strip-note-text">
+        <Alert v-if="requestBodyStorageTruncated" variant="note" data-testid="http-history-request-truncated">
+          <AlertDescription>
             Only the first 256 KB of this request's body was kept in history.
           </AlertDescription>
         </Alert>
@@ -250,8 +250,8 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               <TooltipContent>{{ section.copyLabel }}</TooltipContent>
             </Tooltip>
           </div>
-          <Alert v-if="section.noteBefore" class="strip-note" :data-testid="section.noteBeforeTestid">
-            <AlertDescription class="strip-note-text">{{ section.noteBefore }}</AlertDescription>
+          <Alert v-if="section.noteBefore" variant="note" :data-testid="section.noteBeforeTestid">
+            <AlertDescription>{{ section.noteBefore }}</AlertDescription>
           </Alert>
           <div class="raw-editor">
             <MonacoHost
@@ -263,8 +263,8 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               :data-testid="section.editorTestid"
             />
           </div>
-          <Alert v-if="section.noteAfter" class="strip-note" :data-testid="section.noteAfterTestid">
-            <AlertDescription class="strip-note-text">{{ section.noteAfter }}</AlertDescription>
+          <Alert v-if="section.noteAfter" variant="note" :data-testid="section.noteAfterTestid">
+            <AlertDescription>{{ section.noteAfter }}</AlertDescription>
           </Alert>
         </div>
       </template>
@@ -308,20 +308,5 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
 
 .empty-state {
   @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-/* Alert tone classes replacing the raw MessageStrip note/warn markers (now --kira-warn-
-   text/--kira-note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>

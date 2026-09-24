@@ -114,8 +114,8 @@ function onCancel(): void {
 
 <template>
   <div class="bulk-editor" data-testid="variables-bulk-editor">
-    <Alert class="strip-note" data-testid="variables-bulk-hint">
-      <AlertDescription class="strip-note-text">
+    <Alert variant="note" data-testid="variables-bulk-hint">
+      <AlertDescription>
         Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
         line always creates a non-secret variable, and a secret's own line stays
         <code>KEY=</code> with its value left unchanged unless you type one. Use the row's own
@@ -138,8 +138,8 @@ function onCancel(): void {
     </Alert>
     <template v-else-if="diff">
       <div class="bulk-summary" data-testid="variables-bulk-summary">{{ summary }}</div>
-      <Alert v-if="diff.hasRenameRisk" class="strip-warn" data-testid="variables-bulk-rename-warning">
-        <AlertDescription class="strip-warn-text">
+      <Alert v-if="diff.hasRenameRisk" variant="warn" data-testid="variables-bulk-rename-warning">
+        <AlertDescription>
           Renaming a key here removes the old one and its value history. Rename in the table to
           keep it.
         </AlertDescription>
@@ -182,20 +182,5 @@ function onCancel(): void {
 
 .bulk-actions {
   @apply flex justify-end gap-1;
-}
-
-/* Alert tone classes replacing MessageStrip's note/warn markers (now --kira-warn-text/--kira-
-   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
-.strip-note {
-  @apply bg-info/8 border-info/20;
-}
-.strip-note-text {
-  @apply text-note-text;
-}
-.strip-warn {
-  @apply bg-warn/10 border-warn/20;
-}
-.strip-warn-text {
-  @apply text-warn-text;
 }
 </style>
