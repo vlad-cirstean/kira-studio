@@ -8,7 +8,7 @@ import { reactive, toRefs } from 'vue';
 // useCollectionsStore (it reaches deep into the tree's own load/reveal/cache machinery), reading
 // tabId/payload from here and calling closeSaveDialog() here on completion.
 
-export type SaveDialogPayload =
+type SaveDialogPayload =
   | { protocol: 'http'; request: HttpSavedRequest }
   | { protocol: 'grpc'; request: GrpcSavedRequest };
 

@@ -42,7 +42,7 @@ export const OTHER_REPO_ID = '/fake/other-repo';
 // viewport.clientWidth a vertical scrollbar leaves behind). SlickGrid only renders rows within (or
 // just past) its own viewport, so a big count costs this fixture nothing at boot — 300 rows
 // comfortably overflows this suite's default 720px viewport at any plausible row height.
-export const MANY_ROWS_COUNT = 300;
+const MANY_ROWS_COUNT = 300;
 function manyRowsSha(row: number): string {
   return `aa${row.toString(16).padStart(8, '0')}`.padEnd(40, '0');
 }
