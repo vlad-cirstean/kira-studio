@@ -1,8 +1,11 @@
-/* P16 design system (docs/design/kira-design-system) translated into reusable
-   classes on the real token set (tokens.css), so every view consumes the same
-   thirteen primitives and composition laws instead of redefining its own
-   button/input/row/toolbar. Ported 1:1 from parts/_style.css's P1-P12 and its
-   named LAWs — see that file for the rationale behind each measurement. */
+/* P16 design system (docs/design/kira-design-system), ported 1:1 from parts/_style.css's P1-P12
+   and its named LAWs at P71-P104 into reusable classes on the real token set (tokens.css). P110
+   converted every primitive here to a Tailwind utility string or a component variant — see
+   docs/v1.9/plans/P110-css-tailwind-migration.md §5.11 (commits B14-B30) and
+   scripts/check-theme-classes.sh for the retired-name-to-replacement list. Only the P4 input law's
+   `.p-input.is-grow` remains (B31): no Tailwind utility captures its auto-grow math, and it must
+   stay unlayered CSS to keep beating a layered utility by construction — see its own comment
+   below. */
 
 /* ---------- P4 input ---------- */
 /* P110 B25: the box rule, focus/invalid states, spin-button hide and stepper block that used to
@@ -70,10 +73,3 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-/* ---------- P12 panel ---------- */
-/* P110 B8: the old panel-head primitive converted to utilities on its 6 consumers -- see
-   flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm
-   text-muted-foreground uppercase tracking-wider. P110 B28 folded the panel/toolbar/view-header
-   primitives themselves into plain utilities the same way; see the P110 plan's own commit list
-   (§7.1 B28) and scripts/check-theme-classes.sh for the exact per-family utility strings. */
