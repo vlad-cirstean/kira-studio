@@ -50,7 +50,11 @@ import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
+import {
+  type AppMetricsSample,
+  CHANNEL,
+  type MaskRulesChangedEvent,
+} from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -173,6 +177,11 @@ const studioControl = {
   // the grid preview's own local tag computation. "" means the connection needs no key.
   maskRulesCorrelationKey: (connectionId: string): Promise<string> =>
     unwrap(MaskRulesService.CorrelationKey({ connectionId })),
+  // P108 Part 12 F18: schemaChanged's own shape — state/maskRules.ts's initMaskRulesSync is the
+  // one subscriber, so a rule changed in one window's Privacy tab/header menu reaches every other
+  // window's own query cache instead of staying stale until something else happens to refetch it.
+  onMaskRulesChanged: (cb: (event: MaskRulesChangedEvent) => void): (() => void) =>
+    on(CHANNEL.maskRulesChanged, cb),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
     on(CHANNEL.connectionState, cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>

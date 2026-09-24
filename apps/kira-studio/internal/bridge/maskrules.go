@@ -26,6 +26,34 @@ func (s *MaskRulesService) List(args MaskRulesListArgs) ([]model.MaskRule, error
 	return s.Deps.MaskRules.List(args.ConnectionID)
 }
 
+// MaskRulesChangedEvent is ChannelMaskRulesChanged's own payload — schemaChanged's per-connection
+// shape: every window's own `['maskRules', connectionId]` query cache entry (state/maskRules.ts's
+// applyRemote) is written straight from this, no refetch. KeyRegenerated is set only by
+// RegenerateKey below — the one case a receiving window must also drop its own cached correlation
+// key (state/maskRules.ts's correlationKeys), matching what regenerateMaskKey already does for the
+// window that triggered it.
+type MaskRulesChangedEvent struct {
+	ConnectionID   string           `json:"connectionId"`
+	Rules          []model.MaskRule `json:"rules"`
+	KeyRegenerated bool             `json:"keyRegenerated"`
+}
+
+// broadcastRules re-lists connectionID's own rules and emits them — called after every mutation
+// below, so a caller never reads a snapshot older than what it just wrote. Mirrors
+// CustomScriptsService's own broadcastList (bridge/customscripts.go), scoped to one connection
+// since mask rules are per-connection state, not a flat app-wide list.
+func (s *MaskRulesService) broadcastRules(connectionID string, keyRegenerated bool) {
+	rows, err := s.Deps.MaskRules.List(connectionID)
+	if err != nil {
+		return
+	}
+	s.Deps.Events.Emit(ChannelMaskRulesChanged, MaskRulesChangedEvent{
+		ConnectionID:   connectionID,
+		Rules:          rows,
+		KeyRegenerated: keyRegenerated,
+	})
+}
+
 type MaskRulesUpsertArgs struct {
 	ConnectionID string               `json:"connectionId"`
 	Fields       model.MaskRuleFields `json:"fields"`
@@ -39,6 +67,7 @@ func (s *MaskRulesService) Upsert(args MaskRulesUpsertArgs) (model.MaskRule, err
 	if err != nil {
 		return model.MaskRule{}, ipcerr.BadRequest(err.Error())
 	}
+	s.broadcastRules(args.ConnectionID, false)
 	return rec, nil
 }
 
@@ -50,7 +79,21 @@ func (s *MaskRulesService) Remove(args MaskRulesRemoveArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	return s.Deps.MaskRules.Remove(args.ID)
+	// Removed by id alone — the connection it belonged to has to be resolved before the row is gone,
+	// so broadcastRules below still knows which connection's cache to refresh. (nil, nil) when the
+	// id is already gone (maskrules.Service.Remove's own idempotent-remove semantics): nothing to
+	// broadcast then, since nothing actually changed.
+	existing, err := s.Deps.Repos.MaskRules.Get(args.ID)
+	if err != nil {
+		return ipcerr.Internal(err.Error())
+	}
+	if err := s.Deps.MaskRules.Remove(args.ID); err != nil {
+		return ipcerr.BadRequest(err.Error())
+	}
+	if existing != nil {
+		s.broadcastRules(existing.ConnectionID, false)
+	}
+	return nil
 }
 
 type MaskRulesRegenerateKeyArgs struct {
@@ -61,7 +104,11 @@ func (s *MaskRulesService) RegenerateKey(args MaskRulesRegenerateKeyArgs) error 
 	if args.ConnectionID == "" {
 		return ipcerr.BadRequest("connectionId is required")
 	}
-	return s.Deps.MaskRules.RegenerateKey(args.ConnectionID)
+	if err := s.Deps.MaskRules.RegenerateKey(args.ConnectionID); err != nil {
+		return err
+	}
+	s.broadcastRules(args.ConnectionID, true)
+	return nil
 }
 
 // Counts is the Settings glance's own backend (§7.5) — every connection id with at least one rule,

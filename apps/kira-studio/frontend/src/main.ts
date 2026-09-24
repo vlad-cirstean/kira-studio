@@ -18,7 +18,7 @@ import { useConnectionsStore } from './state/connections';
 import { useCustomScriptsStore } from './state/customScripts';
 import { useDbMcpStore } from './state/dbmcp';
 import { useKeepAwakeStore } from './state/keepAwake';
-import { loadMaskRuleCounts } from './state/maskRules';
+import { initMaskRulesSync, loadMaskRuleCounts } from './state/maskRules';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { useSchemaColumnsStore } from './state/schemaColumns';
@@ -326,6 +326,9 @@ async function mountShell(): Promise<void> {
   treeStore.initTreeSync();
   initSchemaSync();
   schemaColumnsStore.initSchemaColumnsSync();
+  // P108 Part 12 F18: initSchemaSync's own precedent above — live before any Privacy tab, header
+  // menu or grid preview ever mounts, whether or not one does this session.
+  initMaskRulesSync();
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();

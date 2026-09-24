@@ -66,6 +66,12 @@ const (
 	// Create/Update/Remove Emit (not EmitTo) the full list, ChannelConnectionsChanged's own shape,
 	// so every window's tab-strip dropdown stays in sync with a script added or removed elsewhere.
 	ChannelCustomScriptsChanged = "kira:customScripts:changed"
+	// ChannelMaskRulesChanged is P108 Part 12 F18's own push channel — MaskRulesService's own
+	// Upsert/Remove/RegenerateKey Emit (not EmitTo) one connection's own rule set, ChannelSchemaChanged's
+	// own per-connection shape rather than ChannelCustomScriptsChanged's flat app-wide list, so a
+	// second window's Privacy tab / grid header menu / grid preview stay in sync with a rule changed
+	// elsewhere.
+	ChannelMaskRulesChanged = "kira:maskRules:changed"
 	// ChannelAgentSessions is P86 §11's own app-wide broadcast — every live Claude Code session
 	// across every window, Emit'd (not EmitTo) whenever terminal.Registry.OnChange fires, so the
 	// status-bar widget in every window agrees on the same count.

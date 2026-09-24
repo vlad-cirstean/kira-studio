@@ -1,3 +1,4 @@
+import type { MaskRule } from '../domain/mask';
 import type { VariableScope } from '../domain/variables';
 
 /** The Go→renderer push channels (`apps/kira-studio/internal/bridge/events.go`'s constants, verbatim).
@@ -50,6 +51,10 @@ export const CHANNEL = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape (Emit, not EmitTo,
   // so every window's tab-strip dropdown stays in sync).
   customScriptsChanged: 'kira:customScripts:changed',
+  // P108 Part 12 F18: one connection's mask-rule set changed (Upsert/Remove/RegenerateKey) —
+  // schemaChanged's own per-connection shape (Emit, not EmitTo), so a second window's Privacy tab,
+  // grid header menu and grid preview all stay in sync rather than reading a stale rule list.
+  maskRulesChanged: 'kira:maskRules:changed',
   // P86 §11: every live Claude Code session across every window, Emit'd (not EmitTo) whenever
   // terminal.Registry.OnChange fires — customScriptsChanged's own shape, app-wide by definition.
   agentSessions: 'kira:agent:sessions',
@@ -109,4 +114,14 @@ export interface TerminalEvent {
   exited: boolean;
   exitCode?: number;
   error?: string;
+}
+
+/** `kira:maskRules:changed`'s own payload (internal/bridge/maskrules.go's MaskRulesChangedEvent,
+ *  field for field) — one connection's own rule set, sent whole on every Upsert/Remove/
+ *  RegenerateKey. `keyRegenerated` is set only by RegenerateKey — the one case
+ *  state/maskRules.ts's own applyRemote must also drop that connection's cached correlation key. */
+export interface MaskRulesChangedEvent {
+  connectionId: string;
+  rules: MaskRule[];
+  keyRegenerated: boolean;
 }

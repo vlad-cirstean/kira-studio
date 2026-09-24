@@ -11,6 +11,7 @@
 // whose own `enabled`/auto-fetch subsumes the old explicit "loaded?" check.
 
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
+import type { MaskRulesChangedEvent } from '@shared/protocol/events';
 import { queryClient } from '@workbench/state/queryClient';
 import { control } from '../bridge/control';
 
@@ -107,4 +108,36 @@ export async function loadMaskRuleCounts(): Promise<Record<string, number>> {
   const counts = await control.maskRulesCounts();
   queryClient.setQueryData(maskRuleCountsQueryKey, counts);
   return counts;
+}
+
+// P108 Part 12 F18: the push already carries the fresh rule list (bridge/maskrules.go's own
+// broadcastRules re-lists before emitting), so this writes straight into the cache — loadMaskRules'
+// own two-cache-write shape (rules + counts, kept in lockstep), just from a pushed payload instead
+// of an IPC round trip. No writeGeneration guard (state/schemas.ts's own fuller shape): this module
+// has no local draft to race against a fetch already in flight — a rule takes effect immediately
+// (this file's own header comment), so there is nothing an incoming push here could ever clobber.
+function applyRemote(event: MaskRulesChangedEvent): void {
+  queryClient.setQueryData(maskRulesQueryKey(event.connectionId), event.rules);
+  queryClient.setQueryData<Record<string, number>>(maskRuleCountsQueryKey, (old) => ({
+    ...old,
+    [event.connectionId]: event.rules.length,
+  }));
+  // regenerateMaskKey's own cross-window counterpart: a key rotation elsewhere makes this window's
+  // own cached correlation key wrong (still importable, just no longer the key run_query's render
+  // path or a fresh CorrelationKey call would return), so drop it — the next correlationKeyFor call
+  // re-fetches the new one, same as a local regenerate already forces for the window that ran it.
+  if (event.keyRegenerated) delete correlationKeys[event.connectionId];
+}
+
+let unsubscribeChanged: (() => void) | null = null;
+
+/** main.ts's boot sequence, beside initSchemaSync — live before any Privacy tab, header menu or
+ *  grid preview ever mounts, whether or not one does this session (initSchemaSync's own precedent,
+ *  P108 Part 12 F3). Without this, a rule added/removed/regenerated in one window never reached any
+ *  other window's own `['maskRules', connectionId]` cache — the Settings glance's counts, the
+ *  Privacy tab's list and the grid preview's tags all stayed stale until something unrelated
+ *  happened to refetch them. */
+export function initMaskRulesSync(): void {
+  unsubscribeChanged?.();
+  unsubscribeChanged = control.onMaskRulesChanged(applyRemote);
 }
