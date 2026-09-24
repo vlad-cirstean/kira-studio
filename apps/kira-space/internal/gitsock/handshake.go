@@ -98,7 +98,8 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	sessionID = uuid.NewString()
 
 	if hello.Token != nil {
-		if verifyClientToken(deps.Clients, clientID, *hello.Token) {
+		switch verifyClientToken(deps.Clients, clientID, *hello.Token) {
+		case tokenVerified:
 			now := deps.Now().UnixMilli()
 			if err := deps.Clients.TouchLastSeen(clientID, now); err != nil {
 				slog.Warn("gitsock: touch last seen", "scope", "gitsock", "client", clientID, "err", err)
@@ -108,9 +109,16 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 				ServerVersion: deps.ServerVersion, SessionID: sessionID,
 			})
 			return clientID, sessionID, label, true // row 4
+		case tokenLookupFailed:
+			// F10: a transient trust-store error is not a rejection — answering it as one makes the
+			// extension delete its still-valid token and re-pair. Close without a frame, the row-1
+			// posture, so the extension's ordinary backoff-reconnect path runs instead and its stored
+			// token survives.
+			return "", "", "", false
+		default: // tokenInvalid
+			sendHandshake(c, handshakeResponse{Kind: "tokenRejected"})
+			return "", "", "", false // row 5
 		}
-		sendHandshake(c, handshakeResponse{Kind: "tokenRejected"})
-		return "", "", "", false // row 5
 	}
 
 	if deps.Broker.InCooldown(clientID) {
@@ -190,23 +198,41 @@ func sendHandshake(c *conn, resp handshakeResponse) error {
 	return c.Send(b)
 }
 
+// tokenVerifyOutcome is verifyClientToken's tri-state result (F10): a lookup failure is neither an
+// accept nor a real reject, and must be told apart from both so runHandshake can answer it
+// differently.
+type tokenVerifyOutcome int
+
+const (
+	tokenVerified tokenVerifyOutcome = iota
+	tokenInvalid
+	tokenLookupFailed
+)
+
 // verifyClientToken implements D6's timing discipline: a missing row and a wrong/revoked token
 // take an identical path doing an identical amount of work — the presented token is always run
 // through verifyToken, against the real row's hash/salt when one exists and a fixed dummy pair
-// when it does not.
-func verifyClientToken(store TrustStore, clientID, presented string) bool {
+// when it does not or a lookup error prevents knowing (F10). A lookup error itself is reported as
+// tokenLookupFailed rather than folded into tokenInvalid — a transient store failure (busy/locked,
+// closed DB during shutdown) is not a rejection of the presented token.
+func verifyClientToken(store TrustStore, clientID, presented string) tokenVerifyOutcome {
 	row, found, err := store.ByID(clientID)
 	if err != nil {
 		slog.Warn("gitsock: trust store lookup", "scope", "gitsock", "client", clientID, "err", err)
+		verifyToken(presented, dummyHash, dummySalt) // D6: uniform timing even on a lookup failure.
+		return tokenLookupFailed
 	}
 	if !found {
 		verifyToken(presented, dummyHash, dummySalt)
-		return false
+		return tokenInvalid
 	}
 	if !verifyToken(presented, row.TokenHash, row.TokenSalt) {
-		return false
+		return tokenInvalid
 	}
-	return row.RevokedAt == nil
+	if row.RevokedAt != nil {
+		return tokenInvalid
+	}
+	return tokenVerified
 }
 
 // clampLabel is D7's 200-byte clamp, cut on a rune boundary so a truncated multi-byte character at
