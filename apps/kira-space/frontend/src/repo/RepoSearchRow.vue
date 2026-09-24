@@ -103,7 +103,7 @@ function onKeydown(e: KeyboardEvent): void {
   </div>
   <div
     v-else
-    class="repo-search-row match-row mono"
+    class="repo-search-row match-row font-data"
     :class="{ selected }"
     data-testid="repo-search-match-row"
     :data-path="row.path"

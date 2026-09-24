@@ -64,7 +64,7 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
       </p>
       <p
         v-else-if="agentHooksStore.status.running"
-        class="mono command-text"
+        class="font-data command-text"
         data-testid="claude-code-hooks-path"
       >
         {{ agentHooksStore.status.settingsPath }}

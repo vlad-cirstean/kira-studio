@@ -986,7 +986,7 @@ const preconnectText = computed({
                 @blur="refreshUriNote"
               />
             </div>
-            <p class="mono uri-note">{{ uriNote }}</p>
+            <p class="font-data uri-note">{{ uriNote }}</p>
           </template>
           </div>
 
@@ -1243,7 +1243,7 @@ const preconnectText = computed({
           <template v-else>
             <div v-if="maskRules.length" class="mask-rule-list" data-testid="mask-rule-list">
               <div v-for="rule in maskRules" :key="rule.id" class="mask-rule-row" :data-testid="`mask-rule-${rule.id}`">
-                <span class="mask-rule-target mono" :title="`${rule.tableName}.${rule.columnName}`"
+                <span class="mask-rule-target font-data" :title="`${rule.tableName}.${rule.columnName}`"
                   >{{ rule.tableName }}.{{ rule.columnName }}</span
                 >
                 <select
@@ -1498,10 +1498,6 @@ const preconnectText = computed({
   gap: var(--kira-s-3);
   flex-wrap: wrap;
   cursor: pointer;
-}
-
-.mono {
-  font-family: var(--kira-font-data);
 }
 
 .password-row {

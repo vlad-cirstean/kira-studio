@@ -464,8 +464,8 @@ onUnmounted(() => {
         </span>
         <div class="response-headers">
           <div v-for="(h, i) in filteredHeaders" :key="i" class="p-kv-row">
-            <span class="p-kv-name mono">{{ h.name }}</span>
-            <span class="p-kv-value mono">{{ h.value }}</span>
+            <span class="p-kv-name font-data">{{ h.name }}</span>
+            <span class="p-kv-value font-data">{{ h.value }}</span>
           </div>
         </div>
       </template>

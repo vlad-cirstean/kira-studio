@@ -37,8 +37,8 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
     <table v-else-if="fields" class="def-table">
       <tbody>
         <tr v-for="f in fields" :key="f.name" class="def-row">
-          <td class="def-val-name mono">{{ f.name }}</td>
-          <td class="def-val-type mono">{{ f.bsonType ?? '' }}</td>
+          <td class="def-val-name font-data">{{ f.name }}</td>
+          <td class="def-val-type font-data">{{ f.bsonType ?? '' }}</td>
           <td class="def-val-required">
             <span v-if="f.required" class="p-badge">required</span>
           </td>
@@ -47,7 +47,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
       </tbody>
     </table>
 
-    <pre v-else-if="showRaw" class="def-raw mono">{{ documentSchema?.validator }}</pre>
+    <pre v-else-if="showRaw" class="def-raw font-data">{{ documentSchema?.validator }}</pre>
   </section>
 </template>
 

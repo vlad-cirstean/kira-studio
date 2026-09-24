@@ -54,7 +54,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
           <span v-if="notYetRevealed(entry)" class="entry-value masked" data-testid="variable-history-masked">
             ••••••••
           </span>
-          <span v-else class="entry-value mono" data-testid="variable-history-value">{{
+          <span v-else class="entry-value font-data" data-testid="variable-history-value">{{
             displayValue(entry)
           }}</span>
         </div>

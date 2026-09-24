@@ -160,10 +160,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   color: var(--kira-fg);
 }
 
-.mono {
-  font-family: var(--kira-font-data);
-}
-
 /* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown
    ahead of every Install button that follows one. */
 .command-text {

@@ -113,7 +113,7 @@ const rawLanguage = computed(() =>
           <TooltipContent>Not comparable to another engine’s own cost figure — see the plan doc’s F17.</TooltipContent>
         </Tooltip>
       </div>
-      <p class="statement-excerpt mono" data-testid="explain-statement">{{ result.statement }}</p>
+      <p class="statement-excerpt font-data" data-testid="explain-statement">{{ result.statement }}</p>
 
       <ul v-if="plan.issues.length > 0" class="issue-list" data-testid="explain-issues">
         <li v-for="(issue, i) in plan.issues" :key="i" :class="issue.severity" :data-severity="issue.severity">
@@ -146,7 +146,7 @@ const rawLanguage = computed(() =>
             >~{{ row.node.estimatedRows.toLocaleString() }} rows</span
           >
           <span v-if="row.node.cost" class="plan-meta muted">cost {{ row.node.cost.total.toLocaleString() }}</span>
-          <span v-if="row.node.detail" class="plan-detail mono muted">{{ row.node.detail }}</span>
+          <span v-if="row.node.detail" class="plan-detail font-data muted">{{ row.node.detail }}</span>
           <span v-if="row.node.metrics.length" class="plan-metrics muted">{{ metricsLine(row.node) }}</span>
         </div>
       </div>

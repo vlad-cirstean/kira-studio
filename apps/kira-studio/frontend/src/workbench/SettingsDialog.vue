@@ -122,7 +122,7 @@ async function save(patch: SettingsPatch): Promise<void> {
       <span class="footer-status">
         <FieldError v-if="f.saveError" data-testid="settings-save-error">{{ f.saveError }}</FieldError>
         <FieldDescription v-else data-testid="settings-footer-status"
-          >Stored in <span class="mono">~/.kira-studio/kira.sqlite</span><template v-if="f.isDirty">
+          >Stored in <span class="font-data">~/.kira-studio/kira.sqlite</span><template v-if="f.isDirty">
           · Unsaved changes</template></FieldDescription
         >
       </span>
@@ -192,10 +192,6 @@ async function save(patch: SettingsPatch): Promise<void> {
   @apply overflow-hidden text-ellipsis whitespace-nowrap;
   font-size: var(--kira-t-sm);
   color: var(--kira-fg);
-}
-
-.mono {
-  font-family: var(--kira-font-data);
 }
 
 /* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown

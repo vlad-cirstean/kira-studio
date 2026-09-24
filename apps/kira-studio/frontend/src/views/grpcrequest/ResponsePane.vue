@@ -398,16 +398,16 @@ onUnmounted(() => {
       <div class="metadata-group">
         <div class="metadata-group-title p-xs muted">Header</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="p-kv-row">
-          <span class="p-kv-name mono">{{ h.name }}</span>
-          <span class="p-kv-value mono">{{ h.value }}</span>
+          <span class="p-kv-name font-data">{{ h.name }}</span>
+          <span class="p-kv-value font-data">{{ h.value }}</span>
         </div>
         <div v-if="header.length === 0" class="p-xs dim">No header metadata</div>
       </div>
       <div class="metadata-group">
         <div class="metadata-group-title p-xs muted">Trailer</div>
         <div v-for="(t, i) in trailer" :key="`t${i}`" class="p-kv-row">
-          <span class="p-kv-name mono">{{ t.name }}</span>
-          <span class="p-kv-value mono">{{ t.value }}</span>
+          <span class="p-kv-name font-data">{{ t.name }}</span>
+          <span class="p-kv-value font-data">{{ t.value }}</span>
         </div>
         <div v-if="trailer.length === 0" class="p-xs dim">No trailer metadata</div>
       </div>

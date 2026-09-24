@@ -138,7 +138,7 @@ async function onApprove(requestId: string): Promise<void> {
           ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
           MCP server.
         </p>
-        <pre class="mono statement" data-testid="db-mcp-approval-statement">{{
+        <pre class="font-data statement" data-testid="db-mcp-approval-statement">{{
           dbMcpStore.approval.pending.statement
         }}</pre>
 

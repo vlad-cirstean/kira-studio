@@ -78,7 +78,7 @@ function onCancel(): void {
           {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
         </p>
         <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
-        <p class="mono whitespace-pre-wrap mb-0.5" data-testid="git-credential-prompt">
+        <p class="font-data whitespace-pre-wrap mb-0.5" data-testid="git-credential-prompt">
           {{ gitCredentialStore.active.prompt }}
         </p>
         <Input

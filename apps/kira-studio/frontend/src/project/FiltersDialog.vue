@@ -279,7 +279,7 @@ const connectionName = computed(
       </div>
 
       <DialogFooter class="border-t border-border">
-        <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+        <span class="help">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>
@@ -296,10 +296,6 @@ const connectionName = computed(
   @apply leading-normal;
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-subtle);
-}
-
-.mono {
-  font-family: var(--kira-font-data);
 }
 
 .filter-section {

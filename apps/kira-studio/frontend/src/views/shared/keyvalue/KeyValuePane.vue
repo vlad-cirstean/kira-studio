@@ -840,7 +840,7 @@ onUnmounted(() => {
             </TooltipTrigger>
             <TooltipContent>Previous page</TooltipContent>
           </Tooltip>
-          <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
+          <span class="font-data p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
               <TooltipDisabledTrigger>

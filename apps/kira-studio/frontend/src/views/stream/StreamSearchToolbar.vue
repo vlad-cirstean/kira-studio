@@ -114,7 +114,7 @@ onUnmounted(() => {
     </div>
     <span class="p-sm muted search-count" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
-        <b class="mono">{{ entry.index + 1 }}</b> of <b class="mono">{{ entry.matches.length }}</b>
+        <b class="font-data">{{ entry.index + 1 }}</b> of <b class="font-data">{{ entry.matches.length }}</b>
       </template>
       <template v-else>0 of 0</template>
     </span>

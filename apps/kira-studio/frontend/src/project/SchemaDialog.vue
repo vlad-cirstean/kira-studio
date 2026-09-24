@@ -163,8 +163,8 @@ async function onSave(): Promise<void> {
       <div class="p-strip note summary-strip" data-testid="schema-parse-summary">
         <span v-if="parseSummary">{{ parseSummary }}</span>
         <span v-else class="empty-note">
-          Paste output from <span class="mono">pg_dump --schema-only</span>,
-          <span class="mono">SHOW CREATE TABLE</span> or <span class="mono">.schema</span> —
+          Paste output from <span class="font-data">pg_dump --schema-only</span>,
+          <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
           whichever your connection's own engine gives you.
         </span>
       </div>
@@ -174,7 +174,7 @@ async function onSave(): Promise<void> {
         <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
           saveError
         }}</span>
-        <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+        <span v-else class="help">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
@@ -203,10 +203,6 @@ async function onSave(): Promise<void> {
   @apply leading-normal;
   font-size: var(--kira-t-xs);
   color: var(--kira-error);
-}
-
-.mono {
-  font-family: var(--kira-font-data);
 }
 
 .editor-wrap {

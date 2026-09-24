@@ -66,7 +66,7 @@ const vsixOutcomeMessage = computed(() => {
         The extension ships inside the packaged app. This build has none.
       </p>
       <template v-else>
-        <p class="mono command-text" data-testid="git-vsix-command">
+        <p class="font-data command-text" data-testid="git-vsix-command">
           {{ gitClientsStore.vsix.command }}
         </p>
         <Button
@@ -92,14 +92,14 @@ const vsixOutcomeMessage = computed(() => {
         class="muted-note"
         data-testid="git-vsix-probed"
       >
-        Looked for VS Code's <span class="mono">code</span> command at:
-        <span class="mono">{{ gitClientsStore.vsix.probed.join(', ') }}</span>
+        Looked for VS Code's <span class="font-data">code</span> command at:
+        <span class="font-data">{{ gitClientsStore.vsix.probed.join(', ') }}</span>
       </p>
     </div>
 
     <p v-if="gitClientsStore.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
       No editors have been paired yet. A VS Code editor pairs by connecting to
-      <span class="mono">~/.kira-space/git.sock</span>.
+      <span class="font-data">~/.kira-space/git.sock</span>.
     </p>
     <ul v-else class="git-clients-list">
       <li

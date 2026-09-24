@@ -136,13 +136,12 @@ test('font-roles — data surfaces render in the data font, not the interface fo
   expect(cmFont.startsWith(dataFont)).toBe(true);
   expect(cmFont).not.toBe(uiFont);
 
-  // Operations panel's .mono command/duration column (F6, "a query, a duration").
+  // Operations panel's font-data command/duration column (F6, "a query, a duration").
   await page.click('[data-testid="toggle-operations-panel"]');
   const opRow = page.locator('[data-testid="op-row"]').first();
   await expect(opRow).toBeVisible();
   const opMonoFont = await opRow
-    .locator('.mono')
-    .first()
+    .locator('[data-testid="op-time-cell"]')
     .evaluate((el) => getComputedStyle(el).fontFamily);
   expect(opMonoFont).toBe(dataFont);
   expect(opMonoFont).not.toBe(uiFont);

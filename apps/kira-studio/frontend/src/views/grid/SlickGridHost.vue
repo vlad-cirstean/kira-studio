@@ -1216,7 +1216,7 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   const label = keyLabelFor(descriptor, name, foreignKeyNamesFor(rt()?.meta ?? null));
   if (label) {
     const badge = document.createElement('span');
-    badge.className = label === 'FK' ? 'header-key mono is-fk' : 'header-key mono';
+    badge.className = label === 'FK' ? 'header-key font-data is-fk' : 'header-key font-data';
     badge.textContent = label;
     args.node.appendChild(badge);
   }

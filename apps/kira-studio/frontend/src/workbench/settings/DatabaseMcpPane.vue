@@ -111,7 +111,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
-          <p class="mono command-text" data-testid="db-mcp-command">
+          <p class="font-data command-text" data-testid="db-mcp-command">
             {{ dbMcpStore.status.command }}
           </p>
           <Button

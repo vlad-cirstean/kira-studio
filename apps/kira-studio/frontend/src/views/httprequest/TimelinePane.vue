@@ -232,7 +232,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           class="timeline-hop"
           data-testid="http-timeline-hop"
         >
-          <div class="hop-caption mono" data-testid="http-timeline-hop-caption">
+          <div class="hop-caption font-data" data-testid="http-timeline-hop-caption">
             <span class="hop-index">{{ hop.index + 1 }}</span>
             <span>{{ hop.method }}</span>
             <span class="hop-url">{{ hop.url }}</span>
@@ -282,8 +282,8 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           <details v-if="hop.headers && hop.headers.length > 0" class="p-disclosure hop-headers">
             <summary class="p-xs dim">Response headers</summary>
             <div v-for="(h, i) in hop.headers" :key="i" class="p-kv-row hop-header-row">
-              <span class="p-kv-name mono">{{ h.name }}</span>
-              <span class="p-kv-value mono">{{ h.value }}</span>
+              <span class="p-kv-name font-data">{{ h.name }}</span>
+              <span class="p-kv-value font-data">{{ h.value }}</span>
             </div>
           </details>
           <details
@@ -292,8 +292,8 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           >
             <summary class="p-xs dim">Response headers</summary>
             <div v-for="(h, i) in response!.headers" :key="i" class="p-kv-row hop-header-row">
-              <span class="p-kv-name mono">{{ h.name }}</span>
-              <span class="p-kv-value mono">{{ h.value }}</span>
+              <span class="p-kv-name font-data">{{ h.name }}</span>
+              <span class="p-kv-value font-data">{{ h.value }}</span>
             </div>
           </details>
         </div>

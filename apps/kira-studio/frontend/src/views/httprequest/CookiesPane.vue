@@ -132,8 +132,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       <div v-if="requestCookies.length > 0" class="cookies-list">
         <div v-for="c in filteredRequestCookies" :key="c.name" class="p-kv-row cookie-row">
           <div class="cookie-body">
-            <span class="p-kv-name mono">{{ c.name }}</span>
-            <span class="p-kv-value mono">{{ c.value }}</span>
+            <span class="p-kv-name font-data">{{ c.name }}</span>
+            <span class="p-kv-value font-data">{{ c.value }}</span>
             <span v-if="attributeLine(c)" class="cookie-attributes">{{ attributeLine(c) }}</span>
           </div>
           <Tooltip>
@@ -168,8 +168,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           <div class="cookies-list">
             <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="p-kv-row cookie-row">
               <div class="cookie-body">
-                <span class="p-kv-name mono">{{ c.name }}</span>
-                <span class="p-kv-value mono">{{ c.value }}</span>
+                <span class="p-kv-name font-data">{{ c.name }}</span>
+                <span class="p-kv-value font-data">{{ c.value }}</span>
                 <span class="cookie-attributes">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
@@ -184,8 +184,8 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           <div class="cookies-list">
             <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="p-kv-row cookie-row">
               <div class="cookie-body">
-                <span class="p-kv-name mono">{{ c.name }}</span>
-                <span class="p-kv-value mono">{{ c.value }}</span>
+                <span class="p-kv-name font-data">{{ c.name }}</span>
+                <span class="p-kv-value font-data">{{ c.value }}</span>
                 <span class="cookie-attributes">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>

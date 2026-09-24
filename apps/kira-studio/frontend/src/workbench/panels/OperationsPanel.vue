@@ -311,7 +311,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               @keydown="onRowKeydown($event, listItems[vi.index].record)"
               @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
             >
-              <span class="mono">{{ formatTime(listItems[vi.index].record.startedAt) }}</span>
+              <span class="font-data" data-testid="op-time-cell">{{ formatTime(listItems[vi.index].record.startedAt) }}</span>
               <span class="connection-cell">
                 <span
                   v-if="connectionFor(listItems[vi.index].record)"
@@ -339,13 +339,13 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span>{{ listItems[vi.index].record.rows ?? '—' }}</span>
               <Tooltip v-if="listItems[vi.index].record.status === 'error'">
                 <TooltipTrigger as-child>
-                  <span class="mono truncate error-text block">{{ listItems[vi.index].record.error }}</span>
+                  <span class="font-data truncate error-text block">{{ listItems[vi.index].record.error }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ listItems[vi.index].record.error ?? '' }}</TooltipContent>
               </Tooltip>
               <Tooltip v-else>
                 <TooltipTrigger as-child>
-                  <span class="mono truncate block">{{ listItems[vi.index].record.command ?? '—' }}</span>
+                  <span class="font-data truncate block">{{ listItems[vi.index].record.command ?? '—' }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
               </Tooltip>
@@ -460,10 +460,6 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 
 .truncate {
   @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
-}
-
-.mono {
-  font-family: var(--kira-font-data);
 }
 
 .error-text {

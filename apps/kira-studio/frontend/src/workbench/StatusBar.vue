@@ -134,9 +134,9 @@ const agentTooltip = computed(() =>
         <TooltipTrigger as-child>
           <span class="p-status" data-testid="app-metrics">
             <CodiconIcon name="pulse" :size="13" />
-            <span class="metric-value mono" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
+            <span class="metric-value font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
             <span class="metric-sep">·</span>
-            <span class="metric-value metric-mem mono" data-testid="app-metrics-mem">{{
+            <span class="metric-value metric-mem font-data" data-testid="app-metrics-mem">{{
               memLabel
             }}</span>
           </span>

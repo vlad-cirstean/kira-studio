@@ -369,8 +369,8 @@ onUnmounted(() => {
       <span class="p-sm muted search-count" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">
-          <b class="mono">{{ entry.index + 1 }}</b> of
-          <b class="mono">{{ (entry.found ?? entry.matches.length).toLocaleString() }}</b>
+          <b class="font-data">{{ entry.index + 1 }}</b> of
+          <b class="font-data">{{ (entry.found ?? entry.matches.length).toLocaleString() }}</b>
           <!-- P5 C4/F6: `found` only exceeds `matches.length` once a scan hit MAX_SCAN_MATCHES —
                a user cannot act on the un-shown remainder, so this says plainly that only the
                first N are on offer for Prev/Next/highlight. -->

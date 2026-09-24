@@ -4,9 +4,6 @@
    button/input/row/toolbar. Ported 1:1 from parts/_style.css's P1-P12 and its
    named LAWs — see that file for the rationale behind each measurement. */
 
-.mono {
-  font-family: var(--kira-font-data);
-}
 .muted {
   color: var(--kira-fg-muted);
 }

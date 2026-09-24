@@ -22,8 +22,8 @@ defineProps<{
     <table v-else class="def-table">
       <tbody>
         <tr v-for="row in section.rows" :key="row.name" class="def-row">
-          <td class="def-prop-name mono">{{ row.name }}</td>
-          <td class="def-prop-value mono">{{ row.value }}</td>
+          <td class="def-prop-name font-data">{{ row.name }}</td>
+          <td class="def-prop-value font-data">{{ row.value }}</td>
           <td class="def-prop-detail">{{ row.detail ?? '' }}</td>
         </tr>
       </tbody>

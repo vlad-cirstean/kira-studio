@@ -303,9 +303,9 @@ onUnmounted(() => {
           data-testid="http-diff-header-row"
         >
           <span class="diff-header-status p-xs">{{ row.status }}</span>
-          <span class="mono diff-header-name">{{ row.name }}</span>
-          <span class="mono diff-header-value">{{ row.a ?? '—' }}</span>
-          <span class="mono diff-header-value">{{ row.b ?? '—' }}</span>
+          <span class="font-data diff-header-name">{{ row.name }}</span>
+          <span class="font-data diff-header-value">{{ row.a ?? '—' }}</span>
+          <span class="font-data diff-header-value">{{ row.b ?? '—' }}</span>
         </div>
         <details v-if="unchangedHeaderRows.length > 0" class="p-disclosure diff-header-unchanged">
           <summary class="p-xs dim">{{ unchangedHeaderRows.length }} unchanged</summary>
@@ -316,9 +316,9 @@ onUnmounted(() => {
             data-testid="http-diff-header-row-unchanged"
           >
             <span class="diff-header-status p-xs">{{ row.status }}</span>
-            <span class="mono diff-header-name">{{ row.name }}</span>
-            <span class="mono diff-header-value">{{ row.a }}</span>
-            <span class="mono diff-header-value">{{ row.b }}</span>
+            <span class="font-data diff-header-name">{{ row.name }}</span>
+            <span class="font-data diff-header-value">{{ row.a }}</span>
+            <span class="font-data diff-header-value">{{ row.b }}</span>
           </div>
         </details>
       </div>

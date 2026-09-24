@@ -28,8 +28,8 @@ defineProps<{
             <span v-if="idx.primary" class="p-badge">primary</span>
             <span v-else-if="idx.unique" class="p-badge">unique</span>
           </td>
-          <td class="def-idx-method mono">{{ idx.method ?? '' }}</td>
-          <td class="def-idx-columns mono">({{ idx.columns.join(', ') }})</td>
+          <td class="def-idx-method font-data">{{ idx.method ?? '' }}</td>
+          <td class="def-idx-columns font-data">({{ idx.columns.join(', ') }})</td>
         </tr>
       </tbody>
     </table>

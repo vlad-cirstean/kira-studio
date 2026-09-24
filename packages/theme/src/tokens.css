@@ -115,9 +115,9 @@
 
   /* P26: two font roles over the one channel above, restoring the design system's own
      --font-ui / --font-mono pair (docs/design/kira-design-system/parts/_style.css:29-30) that the
-     port to this file collapsed into one token. LAW 08 decides which a surface gets: "Mono is for
-     data. If a string came out of a database — a value, an identifier, a query, a duration — it is
-     mono. If the app wrote it, it is UI."
+     port to this file collapsed into one token. LAW 08 decides which a surface gets: data (a
+     value, an identifier, a query, a duration — anything that came out of a database) takes the
+     font-data role; anything the app itself wrote takes the font-ui role.
      --kira-font-data is user-customizable (it is --kira-font-family); --kira-font-ui is FIXED and
      has no Settings control by design — see docs/v1.2/plans/P26-interface-font-split.md D3. */
   --kira-font-data: var(--kira-font-family);

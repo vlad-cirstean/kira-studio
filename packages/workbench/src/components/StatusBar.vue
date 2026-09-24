@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue and Kira Space's, unified — the
-// bar chrome (`.p-statusbar`/`.side`/`.p-status`/`.mono`/`.xs`/`.muted`, all global classes from
+// bar chrome (`.p-statusbar`/`.side`/`.p-status`/`.xs`/`.muted`, global classes from
 // `packages/theme` already, not redeclared by either app's own `<style scoped>`) and LAW 14's own
 // left "caret status" readout, identical prose in both files. Everything else — Kira Studio's
 // update/agent-sessions/app-metrics/cache-size/engine-status items on the right, Kira Space's
@@ -14,7 +14,7 @@
          selection" is the honest default. -->
     <div class="side">
       <span class="p-status" data-testid="caret-status">
-        <span class="mono xs muted">no selection</span>
+        <span class="font-data xs muted">no selection</span>
       </span>
       <slot name="left-extra" />
     </div>

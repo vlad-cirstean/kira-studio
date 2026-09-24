@@ -63,7 +63,7 @@ function onNavigate(c: ConstraintRow): void {
             <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="header-key is-fk">FK</span>
             <span v-else class="p-badge">{{ TYPE_LABEL[c.type] }}</span>
           </td>
-          <td class="def-con-detail mono">{{ c.detail }}</td>
+          <td class="def-con-detail font-data">{{ c.detail }}</td>
           <td class="def-con-table">
             <Tooltip v-if="c.referencedPath">
               <TooltipTrigger as-child>

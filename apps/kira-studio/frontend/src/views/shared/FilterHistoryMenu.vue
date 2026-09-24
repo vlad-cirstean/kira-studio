@@ -147,7 +147,7 @@ async function saveCurrent(): Promise<void> {
       </Tooltip>
       <Tooltip v-else>
         <TooltipTrigger as-child>
-          <span class="entry-name mono flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+          <span class="entry-name font-data flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
             summarize(entry.where, entry.orderBy)
           }}</span>
         </TooltipTrigger>

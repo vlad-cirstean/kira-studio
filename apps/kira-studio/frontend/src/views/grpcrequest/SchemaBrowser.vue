@@ -158,7 +158,7 @@ function selectMethod(service: string, method: string): void {
         <div v-for="(p, i) in tab.state.importPaths" :key="i" class="p-row">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="p-xs mono import-path-text">{{ p }}</span>
+              <span class="p-xs font-data import-path-text">{{ p }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
@@ -226,7 +226,7 @@ function selectMethod(service: string, method: string): void {
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
-            <span class="method-name mono">{{ m.name }}</span>
+            <span class="method-name font-data">{{ m.name }}</span>
             <span
               v-if="m.serverStreaming || m.clientStreaming"
               class="p-chip ok"

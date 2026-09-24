@@ -67,7 +67,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             <span v-if="keyLabel(col) === 'PK'" class="header-key">PK</span>
             <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk">FK</span>
           </td>
-          <td class="def-col-type mono">
+          <td class="def-col-type font-data">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
@@ -78,8 +78,8 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
               <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
             </Tooltip>
           </td>
-          <td class="def-col-null mono">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
-          <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
+          <td class="def-col-null font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
+          <td class="def-col-default font-data">{{ col.defaultExpr ?? '' }}</td>
           <td class="def-col-comment">{{ col.comment ?? '' }}</td>
         </tr>
       </tbody>

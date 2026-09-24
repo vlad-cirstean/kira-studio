@@ -160,7 +160,7 @@ async function onClear(): Promise<void> {
           </TooltipTrigger>
           <TooltipContent>{{ grpcCodeHint(entry.code) }}</TooltipContent>
         </Tooltip>
-        <span class="p-xs mono">{{ entry.method }}</span>
+        <span class="p-xs font-data">{{ entry.method }}</span>
         <Tooltip>
           <TooltipTrigger as-child>
             <span class="p-xs dim">{{ formatRelative(entry.calledAt) }}</span>

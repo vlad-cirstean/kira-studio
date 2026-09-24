@@ -80,6 +80,11 @@ check_class 'title-action' 'Button variant="title" size="title" (packages/theme/
 check_class 'title-action--labelled' 'Button variant="title" size="title-labelled"'
 check_class 'title-bar-actions' 'flex items-center gap-0.5 ml-auto wails-no-drag'
 check_class 'tab-new' 'inline utility classes on the new-tab button (see WorkbenchShell.vue)'
+# P110 B14: audit §3.6's alias classes, deleted from primitives.css one at a time. `mono` is a
+# common word outside class contexts too (tokens.css's own LAW 08 prose, a stray doc comment) --
+# both were reworded to drop the bare word rather than excluding a path, so this plain check_class
+# call has zero legitimate survivors left to false-positive against.
+check_class 'mono' 'font-data'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
