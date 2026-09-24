@@ -36,7 +36,10 @@
       "name": "Orders",
       "auth": { "type": "basic", "basic": [{ "key": "username", "value": "u" }] },
       "event": [{ "listen": "prerequest", "script": { "exec": ["// folder script"] } }],
-      "variable": [{ "key": "folderVar", "value": 7 }],
+      "variable": [
+        { "key": "folderVar", "value": 7 },
+        { "key": "folderSecret", "value": "sk-folder-secret", "type": "secret" }
+      ],
       "protocolProfileBehavior": { "followRedirects": false },
       "item": [
         {
@@ -47,6 +50,10 @@
             "method": "POST",
             "url": "{{baseUrl}}/v2/orders",
             "description": "creates one order",
+            "auth": {
+              "type": "apikey",
+              "apikey": [{ "key": "key", "value": "sk-request-secret" }]
+            },
             "proxy": { "host": "proxy.internal", "port": 8080 },
             "certificate": { "name": "client" },
             "body": {

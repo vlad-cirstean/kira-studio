@@ -251,8 +251,8 @@ var importWarningDetail = []struct {
 	detail string
 }{
 	{postman.WarnScriptsInert, "%d pre-request/test scripts were kept but are not run — they survive an export unchanged."},
-	{postman.WarnAuthInert, "%d requests or folders carry an auth block. It is kept but not applied — those requests will need an Authorization header."},
-	{postman.WarnVariablesInert, "%d folder- or item-level variables were kept but are not resolved yet."},
+	{postman.WarnAuthInert, "%d requests or folders carry an auth block. It is not applied and its values were not kept — those requests will need an Authorization header."},
+	{postman.WarnVariablesInert, "%d folder- or item-level variables were kept but are not resolved yet. A secret-typed one has its value stripped."},
 	{postman.WarnVariablesImported, "%d collection variables were imported."},
 	{postman.WarnGraphQLBody, "%d GraphQL bodies were imported as JSON bodies carrying the same query."},
 	{postman.WarnUnsupportedMethod, "%d requests use a method this builder cannot show yet and will open as GET."},

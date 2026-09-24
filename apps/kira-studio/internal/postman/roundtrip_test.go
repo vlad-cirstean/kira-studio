@@ -617,10 +617,16 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 	tree := parseFile(t, "inert.json")
 	in, out := decodeFile(t, "inert.json"), exported(t, tree)
 
-	for _, member := range []string{"auth", "event", "protocolProfileBehavior"} {
+	for _, member := range []string{"event", "protocolProfileBehavior"} {
 		if !reflect.DeepEqual(out[member], in[member]) {
 			t.Errorf("collection-level %q changed:\n got %#v\nwant %#v", member, out[member], in[member])
 		}
+	}
+	// F8: unlike the members above, a collection-level `auth` block is not merely inert — it is a
+	// plaintext credential, so it is stripped at import rather than surviving in origin. It must
+	// never reappear in exported output.
+	if out["auth"] != nil {
+		t.Errorf("collection-level auth survived (F8): got %#v, want stripped", out["auth"])
 	}
 	// P5 D15: the collection level's own `variable` is promoted, not inert — it re-exports from
 	// the rows (in order, names and values preserved) rather than surviving in origin untouched.
@@ -640,11 +646,29 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 
 	inItems, outItems := items(in), items(out)
 	for _, name := range []string{"Orders", "Create order"} {
-		for _, member := range []string{"auth", "event", "variable", "protocolProfileBehavior", "response"} {
+		for _, member := range []string{"event", "protocolProfileBehavior", "response"} {
 			if !reflect.DeepEqual(outItems[name][member], inItems[name][member]) {
 				t.Errorf("%s.%s changed:\n got %#v\nwant %#v", name, member, outItems[name][member], inItems[name][member])
 			}
 		}
+	}
+	// F8: folder-level auth is stripped the same as collection-level auth (checked above).
+	if outItems["Orders"]["auth"] != nil {
+		t.Errorf("Orders.auth survived (F8): got %#v, want stripped", outItems["Orders"]["auth"])
+	}
+	// F8: a folder/item `variable[]` entry of type "secret" has its value blanked at import — its
+	// plaintext must not reach origin_json — while a non-secret sibling entry stays untouched.
+	outVars, ok := outItems["Orders"]["variable"].([]any)
+	if !ok || len(outVars) != 2 {
+		t.Fatalf("Orders.variable after export: %#v", outItems["Orders"]["variable"])
+	}
+	if folderVar, ok := outVars[0].(map[string]any); !ok ||
+		!reflect.DeepEqual(folderVar, map[string]any{"key": "folderVar", "value": float64(7)}) {
+		t.Errorf("Orders.variable[0] (folderVar) changed: got %#v", outVars[0])
+	}
+	if folderSecret, ok := outVars[1].(map[string]any); !ok ||
+		folderSecret["key"] != "folderSecret" || folderSecret["type"] != "secret" || folderSecret["value"] != "" {
+		t.Errorf("Orders.variable[1] (folderSecret) not blanked: got %#v", outVars[1])
 	}
 	for _, member := range []string{"description", "proxy", "certificate"} {
 		got := requestOf(t, outItems["Create order"])[member]
@@ -652,6 +676,11 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Create order request.%s changed: got %#v, want %#v", member, got, want)
 		}
+	}
+	// F8: a request-level auth block (nested under `request`, distinct from collection/folder-level
+	// auth above) is stripped at import too — it never reaches origin_json or exported output.
+	if got := requestOf(t, outItems["Create order"])["auth"]; got != nil {
+		t.Errorf("Create order request.auth survived (F8): got %#v, want stripped", got)
 	}
 
 	if got := tree.Report.Warnings[postman.WarnScriptsInert]; got != 4 {
@@ -661,9 +690,10 @@ func TestPreservedButInertSurvivesAFullCycle(t *testing.T) {
 		t.Errorf("auth_inert = %d, want 2", got)
 	}
 	// P5 D15/F6: the collection level's 2 variables are promoted (counted below), not inert —
-	// only the "Orders" folder's own 1 variable stays inert.
-	if got := tree.Report.Warnings[postman.WarnVariablesInert]; got != 1 {
-		t.Errorf("variables_inert = %d, want 1", got)
+	// only the "Orders" folder's own variables stay inert: folderVar plus the F8 fixture's
+	// folderSecret (blanked above, but still counted as an inert folder variable).
+	if got := tree.Report.Warnings[postman.WarnVariablesInert]; got != 2 {
+		t.Errorf("variables_inert = %d, want 2", got)
 	}
 	if got := tree.Report.Warnings[postman.WarnVariablesImported]; got != 2 {
 		t.Errorf("variables_imported = %d, want 2", got)

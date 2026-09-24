@@ -68,6 +68,11 @@ func Parse(r io.Reader) (*Tree, error) {
 	infoOrigin := cloneOrigin(info)
 	delete(infoOrigin, "name")
 	origin["info"] = mustRaw(infoOrigin)
+	// F8: a collection-level `auth` block (bearer token, API key, password) is inert — kept but
+	// never applied (countScriptsAndAuth below) — but "inert" must not mean "kept unencrypted in
+	// kira.sqlite's origin_json forever". Stripped here, not merely blanked on export, so the
+	// plaintext never reaches storage at all.
+	delete(origin, "auth")
 
 	tree := &Tree{Name: name, Origin: origin, Report: Report{Warnings: map[string]int{}}}
 	// D15: the collection level is promoted, not inert — scripts and auth still count as inert
@@ -147,6 +152,15 @@ func walkItems(raw json.RawMessage, parent int, t *Tree) {
 
 		origin := cloneOrigin(obj)
 		delete(origin, "item")
+		// F8: folder/item `auth` and a secret-typed folder/item `variable[]` entry's own value are
+		// both inert (never applied, D9) but were kept verbatim in origin — plaintext credentials
+		// sitting unencrypted in kira.sqlite's origin_json, re-emitted on every export regardless of
+		// D16's own blank-on-export rule for a real, promoted (collection-level) secret variable.
+		// Stripped at import instead, same as the collection level above.
+		stripSensitiveOrigin(origin)
+		if raw, ok := origin["request"]; ok {
+			origin["request"] = stripRequestAuthOrigin(raw)
+		}
 		name, hasName := decodeString(obj["name"])
 		idx := len(t.Items)
 
@@ -197,6 +211,68 @@ func countInertMembers(obj map[string]json.RawMessage, rep *Report) {
 	if vars := decodeArray(obj["variable"]); len(vars) > 0 {
 		rep.warnN(WarnVariablesInert, len(vars))
 	}
+}
+
+// stripSensitiveOrigin is F8's own strip, applied to a folder or item's own origin clone (never
+// the collection's — Parse does that one inline, ahead of the `item`/`info.name` split it is
+// already doing). Removes `auth` entirely (its shape differs by type — bearer/apikey/basic/…—
+// deleting the whole member is simpler and safer than a per-type partial blank) and blanks the
+// `value` of any `variable[]` entry Postman marks `type: "secret"`, keeping its key/type so the
+// entry itself still round-trips. A no-op when neither member is present.
+func stripSensitiveOrigin(origin map[string]json.RawMessage) {
+	delete(origin, "auth")
+	if raw, ok := origin["variable"]; ok {
+		if blanked, changed := blankSecretVariableValues(raw); changed {
+			origin["variable"] = blanked
+		}
+	}
+}
+
+// stripRequestAuthOrigin is stripSensitiveOrigin's twin for a request item's own nested
+// `request.auth` — a request object, unlike a folder or item, is never itself the map
+// stripSensitiveOrigin walks (it is one raw member of it), so it gets its own pass. The string
+// request form (a bare URL) carries no auth and is returned unchanged.
+func stripRequestAuthOrigin(raw json.RawMessage) json.RawMessage {
+	obj := decodeObject(raw)
+	if obj == nil {
+		return raw
+	}
+	if _, ok := obj["auth"]; !ok {
+		return raw
+	}
+	clone := cloneOrigin(obj)
+	delete(clone, "auth")
+	return mustRaw(clone)
+}
+
+// blankSecretVariableValues decodes raw as a Postman `variable[]` array and blanks the `value` of
+// any entry whose `type` is `"secret"`, matching buildVariables' own export-time blank for a
+// promoted (collection-level) secret variable (D16) — a folder/item-level one is never promoted
+// (D15), so this is the only place its value is ever cleared. changed is false, and raw is
+// returned as-is, when nothing needed blanking (no entries, or none secret-typed) — a caller
+// keeps the exact original bytes rather than a re-encoded (but semantically identical) copy.
+func blankSecretVariableValues(raw json.RawMessage) (blanked json.RawMessage, changed bool) {
+	arr := decodeArray(raw)
+	if arr == nil {
+		return raw, false
+	}
+	out := make([]json.RawMessage, len(arr))
+	for i, entry := range arr {
+		obj := decodeObject(entry)
+		typ, _ := decodeString(obj["type"])
+		if obj == nil || typ != "secret" {
+			out[i] = entry
+			continue
+		}
+		changed = true
+		clone := cloneOrigin(obj)
+		clone["value"] = mustRaw("")
+		out[i] = mustRaw(clone)
+	}
+	if !changed {
+		return raw, false
+	}
+	return mustRaw(out), true
 }
 
 // defaultRequestName is D3's one place import *adds* a member the file lacked. A nameless item is
