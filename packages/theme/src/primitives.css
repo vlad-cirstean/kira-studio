@@ -747,50 +747,6 @@
   color: var(--kira-fg-subtle);
 }
 
-/* ---------- LAW: work-in-progress is a ring + elapsed time in the toolbar
-   that started the work, not a bar across the top of the view. Idle keeps
-   the same slot as a static ring holding the last duration, so the toolbar
-   never reflows when work starts. ---------- */
-.p-run-state {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-}
-/* LAW 12: the label's width changes as elapsed time ticks up (the widest is
-   "9999 ms", 7 characters); reserve that width so it never reflows controls
-   to its left. 7ch tracks the monospace font-family above with no token. */
-.p-run-state .label {
-  min-width: 7ch;
-  text-align: right;
-}
-.p-run-state .ring {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  /* v1.9 tailwind-declines deep dive: 2px, not 1.5px — kept numerically in sync with every
-     view's own `border-2` (was `border-[1.5px]`), which this rule's higher specificity
-     (two classes vs. one) otherwise silently overrides regardless of what those views set. */
-  border: 2px solid var(--kira-border-strong);
-}
-.p-run-state.is-running {
-  color: var(--kira-info);
-}
-.p-run-state.is-running .ring {
-  border-color: var(--kira-accent) transparent var(--kira-accent) var(--kira-accent);
-  animation: kira-spin 0.7s linear infinite;
-}
-.p-run-state.is-error {
-  color: var(--kira-error);
-}
-.p-run-state.is-error .ring {
-  border-color: var(--kira-error);
-}
-/* P110 B6: @keyframes p-spin moved to base.css's @theme as kira-spin, next to --animate-kira-spin. */
-
 /* ---------- strips: error / warning / note ---------- */
 .p-strip {
   flex-shrink: 0;

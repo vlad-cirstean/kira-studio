@@ -1082,7 +1082,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // renders ahead of #toolbar-end, whose only remaining content is the conditional pending-changes
   // group. Every control the user reads left-to-right now sits left of it. -----------------------
   const dataToolbarBox = await page.locator('[data-testid="data-toolbar"]').boundingBox();
-  const runStateBox = await page.locator('.p-run-state').first().boundingBox();
+  const runStateBox = await page.locator('[data-testid="run-state"]').first().boundingBox();
   if (!dataToolbarBox || !runStateBox) {
     throw new Error('data-toolbar or run-state has no bounding box');
   }
@@ -1097,7 +1097,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
 
   // --- P16 D2: the run-state label reserves its own width — the LAW-12 assertion, and the only
   // one that can catch the toolbar-reflow regression this phase's own D2 fixes. -----------------
-  const runStateLabel = page.locator('.p-run-state .label').first();
+  const runStateLabel = page.locator('[data-testid="run-state-label"]').first();
   await expect(runStateLabel).toBeVisible();
   const { offsetWidth: widthAfterFirstLoad, minWidth } = await runStateLabel.evaluate((el) => {
     const e = el as HTMLElement;

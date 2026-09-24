@@ -410,12 +410,13 @@ onUnmounted(() => {
       </Tooltip>
       <span class="p-push" />
       <span
-        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        data-testid="run-state"
+        class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
         :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
       >
-        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
         <span
-          class="ring h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
+          class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
           :class="{
             'animate-kira-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
             'border-error': runState.status === 'error',

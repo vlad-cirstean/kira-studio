@@ -52,6 +52,10 @@ check_class 'text-fg-muted' 'text-muted-foreground'
 # P110 B2: app code's own filled-control surface, renamed off shadcn's bg-input so the two never
 # collide in meaning.
 check_class 'bg-input' 'bg-field'
+# P110 B7: dead primitive -- every consumer already carries the equivalent utilities directly, and
+# the unlayered rule was winning over them (11px ring instead of 12px, an accidental box-shadow
+# from Tailwind's own `ring` utility name colliding with the `.ring` hook class).
+check_class 'p-run-state' 'data-testid="run-state"/"run-state-label" plus plain utilities'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
