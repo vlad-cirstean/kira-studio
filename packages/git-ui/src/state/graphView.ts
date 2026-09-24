@@ -95,6 +95,11 @@ export class GraphViewState {
   #loadController: AbortController | undefined;
   #repoId: string | undefined;
   #layoutSubmitMarked = false;
+  /** F1: bumped by `reset()` (repo switch). `#runLoad` captures this at entry and checks it again
+   *  before its post-request resync — a bump in between means the repo switched out from under
+   *  it, so its captured `repoId` is now stale and its resync must be skipped rather than
+   *  reopening/resyncing the *old* repo's stream over the new one. */
+  #loadGeneration = 0;
 
   readonly #unsubscribeChanged: () => void;
   readonly #unsubscribeLoading: () => void;
@@ -226,7 +231,10 @@ export class GraphViewState {
         if (this.loadedRows.value === before) break;
       }
     } finally {
-      this.#loadController = undefined;
+      // F1: same identity guard loadMore()/revealSha() already use — reset() (repo switch) may
+      // have already replaced #loadController with a newer one (or cleared it), which this call
+      // must not clobber.
+      if (this.#loadController === controller) this.#loadController = undefined;
     }
   }
 
@@ -301,6 +309,7 @@ export class GraphViewState {
   async #runLoad(state: LoadingState, request: () => Promise<unknown>): Promise<void> {
     const repoId = this.#repoId;
     if (!repoId) return;
+    const generation = this.#loadGeneration;
     this.loading.value = state;
     try {
       await request();
@@ -309,23 +318,29 @@ export class GraphViewState {
       // Cancelled mid-request: fall through to the resync below anyway, so whatever the host
       // already read before the abort lands on the client instead of being silently dropped.
     } finally {
-      try {
-        await this.openStream(repoId, this.loadedRows.value);
-        // G16 D7: closes F7's zero-chunk hole. A re-stream that emits nothing (the client
-        // already holds every row the host has) never calls #applyChunk, so
-        // exhausted/remaining would otherwise be stuck at whatever the last real chunk said —
-        // which is exactly "Load the last 0". graph.status already exists and answers exactly
-        // this (`{loaded, remaining, exhausted}` off the walk's own cached count), so this needs
-        // no CONTRACT_VERSION bump. A failed status call must not mask the load's own outcome or
-        // leave `loading` stuck, so it is caught and logged rather than rethrown.
+      // F1: a reset() (repo switch) landed while `request()` was in flight — `repoId` above is
+      // now the *old* repo's. This call no longer owns the load: the new repo's own reset() +
+      // openStream() already drives `loading` and the stream, so resyncing here would reopen the
+      // old repo's stream over it and stomp `loading` out from under it. Skip silently.
+      if (generation === this.#loadGeneration) {
         try {
-          const status = await this.#bridge.request('graph.status', { repoId });
-          this.#packed.applyStatus(status.remaining, status.exhausted);
-        } catch (statusError) {
-          console.error('graphView: graph.status failed after load', statusError);
+          await this.openStream(repoId, this.loadedRows.value);
+          // G16 D7: closes F7's zero-chunk hole. A re-stream that emits nothing (the client
+          // already holds every row the host has) never calls #applyChunk, so
+          // exhausted/remaining would otherwise be stuck at whatever the last real chunk said —
+          // which is exactly "Load the last 0". graph.status already exists and answers exactly
+          // this (`{loaded, remaining, exhausted}` off the walk's own cached count), so this needs
+          // no CONTRACT_VERSION bump. A failed status call must not mask the load's own outcome
+          // or leave `loading` stuck, so it is caught and logged rather than rethrown.
+          try {
+            const status = await this.#bridge.request('graph.status', { repoId });
+            this.#packed.applyStatus(status.remaining, status.exhausted);
+          } catch (statusError) {
+            console.error('graphView: graph.status failed after load', statusError);
+          }
+        } finally {
+          if (generation === this.#loadGeneration) this.loading.value = 'idle';
         }
-      } finally {
-        this.loading.value = 'idle';
       }
     }
   }
@@ -346,8 +361,21 @@ export class GraphViewState {
   }
 
   /** Clears every loaded row. Call before opening a stream for a newly *selected* repo — never
-   *  needed for a fresh mount or remount, whose store already starts empty. */
+   *  needed for a fresh mount or remount, whose store already starts empty.
+   *
+   *  F1: aborts whichever `loadMore`/`loadAll`/`revealSha` is in flight and bumps
+   *  `#loadGeneration`, so that call's own `#runLoad` resync (still keyed on the *old* repo)
+   *  skips itself instead of reopening/resyncing the old repo's stream over the caller's own
+   *  `openStream(newRepoId)` that always follows this (`App.vue`'s `handleRepoOpened`). Forces
+   *  `loading` back to `'idle'` too — a superseded `#runLoad` deliberately leaves it alone now
+   *  (see above), so this is what hands the state machine back to `openStream`, which otherwise
+   *  only flips `'idle'` -> `'streaming'` and would leave `loading` stuck at whatever load state
+   *  was running at switch time. */
   reset(): void {
+    this.#loadController?.abort();
+    this.#loadController = undefined;
+    this.#loadGeneration++;
+    this.loading.value = 'idle';
     this.#resetLayout();
     this.#packed.reset();
     this.#cancelAutoRefresh();

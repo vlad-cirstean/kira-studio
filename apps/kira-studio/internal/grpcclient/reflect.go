@@ -227,6 +227,16 @@ func filterServiceNames(services []*grpc_reflection_v1.ServiceResponse) []string
 	return out
 }
 
+// defaultReflectionTimeout bounds a whole reflection resolution (negotiate, ListServices, every
+// FileContainingSymbol/FileByFilename fetch and link) — P108 F4: Describe calls grpcclient.Describe
+// directly, not through the RunOp/Stop path, so nothing else in this package ever cancels a
+// reflection stream a server accepts and then never answers. Without this, that leaves the
+// goroutine and connection blocked forever and the UI spinner never ends. Matches httpclient's own
+// default request timeout (options.go).
+// A var, not a const, so reflect_test.go can lower it for a bounded regression test without a
+// real 30s wait.
+var defaultReflectionTimeout = 30 * time.Second
+
 // resolveReflection is D4's reflection source: one ServerReflectionInfo bidi stream, ListServices,
 // then FileContainingSymbol per service, linking every returned FileDescriptorProto into this
 // Source's own private registry (F14) — recursing through FileByFilename for any dependency the
@@ -235,6 +245,9 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 	if src.Target == "" {
 		return nil, BadRequest("a target is required")
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, defaultReflectionTimeout)
+	defer cancel()
 
 	conn, err := dialConn(src.Target, src.TLS)
 	if err != nil {
