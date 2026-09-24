@@ -290,13 +290,7 @@ function onDeleteRow(): void {
           variant="toolbar"
           size="kira-icon"
           data-testid="toolbar-count"
-          :style="
-            rt?.countError
-              ? { color: 'var(--kira-error)' }
-              : rt?.count?.stale
-                ? { color: 'var(--kira-warn)' }
-                : undefined
-          "
+          :class="rt?.countError ? 'text-error' : rt?.count?.stale ? 'text-warn' : ''"
           aria-label="Count all rows"
           @click="onCount"
         >

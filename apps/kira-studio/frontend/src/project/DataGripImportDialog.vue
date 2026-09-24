@@ -261,7 +261,7 @@ async function onConfirm(): Promise<void> {
           class="ds-row"
           :data-testid="`datagrip-report-row-${row.uuid}`"
         >
-          <span class="engine-mark" :style="{ color: row.created ? 'var(--kira-ok)' : 'var(--kira-error)' }">
+          <span class="engine-mark" :class="row.created ? 'text-ok' : 'text-error'">
             <CodiconIcon :name="row.created ? 'check' : 'error'" :size="15" />
           </span>
           <span class="ds-name">{{ row.name }}</span>

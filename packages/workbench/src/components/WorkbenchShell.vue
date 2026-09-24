@@ -128,10 +128,7 @@ function onOpsResize(percent: number): void {
        the content row and the status bar) both reproduce byte-identical geometry to the pre-P104
        CSS grid — found via a tree.spec.ts virtualization-boundary regression the grid version never
        had; SplitterGroup's own default alignment otherwise leaves this 2px unaccounted for. -->
-  <div
-    class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5"
-    style="padding: 0 var(--kira-window-inset) var(--kira-gap); background: var(--kira-bg-chrome)"
-  >
+  <div class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome">
     <SplitterGroup direction="horizontal" class="flex-1 min-h-0 gap-0.5">
       <SplitterPanel
         v-if="projectVisible"

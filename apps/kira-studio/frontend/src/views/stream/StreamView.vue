@@ -704,7 +704,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :style="rt?.countError ? { color: 'var(--kira-error)' } : undefined"
+              :class="rt?.countError ? 'text-error' : ''"
               aria-label="Count"
               data-testid="stream-count"
               @click="streamViewStore.runCount(tab.id)"
@@ -917,7 +917,7 @@ onUnmounted(() => {
                 variant="toolbar"
                 size="kira"
                 data-testid="stream-filter-partition"
-                :style="selectedPartitions.length ? { color: 'var(--kira-state-on)' } : undefined"
+                :class="selectedPartitions.length ? 'text-state-on' : ''"
                 @click="onTogglePartitionMenu"
               >
                 <CodiconIcon name="filter" :size="13" />
@@ -1103,7 +1103,7 @@ onUnmounted(() => {
       </Alert>
       <template v-else>
           <div class="p-thead">
-            <div class="p-th gutter" style="width: 40px" />
+            <div class="p-th gutter w-10" />
             <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
               <span class="name">key</span>
               <KuiColumnResizeHandle
@@ -1164,7 +1164,7 @@ onUnmounted(() => {
                 @click.stop
               />
             </div>
-            <div class="p-th" style="flex: 1"><span class="name">body</span></div>
+            <div class="p-th flex-1"><span class="name">body</span></div>
           </div>
           <div
             ref="scrollEl"
@@ -1189,8 +1189,7 @@ onUnmounted(() => {
                 }"
               >
                 <div
-                  class="p-td gutter"
-                  style="width: 40px"
+                  class="p-td gutter w-10"
                   role="option"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
@@ -1249,8 +1248,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
                 <div
-                  class="p-td msg-body"
-                  style="flex: 1"
+                  class="p-td msg-body flex-1"
                   data-testid="stream-body"
                   role="option"
                   tabindex="0"

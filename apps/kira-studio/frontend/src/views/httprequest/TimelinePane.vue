@@ -76,7 +76,6 @@ const PHASE_SEGMENTS: readonly PhaseSegment[] = [
   { key: 'wait', label: 'Wait', colorVar: 'var(--kira-conn-amber)' },
   { key: 'download', label: 'Download', colorVar: 'var(--kira-conn-green)' },
 ];
-const RESIDUE_COLOR = 'var(--kira-conn-grey)';
 // D12: a hop whose own total is a rounding sliver of the send still renders a visible bar, so a
 // sub-millisecond reused hop is seen rather than a hairline.
 const MIN_BAR_PCT = 2;
@@ -106,7 +105,7 @@ function hopSegments(hop: HttpTimelineHop): Array<{ colorVar: string; widthPct: 
   }));
   const measured = segs.reduce((sum, s) => sum + s.widthPct, 0);
   const residuePct = Math.max(0, 100 - measured);
-  return [...segs, { colorVar: RESIDUE_COLOR, widthPct: residuePct }];
+  return [...segs, { colorVar: 'var(--kira-conn-grey)', widthPct: residuePct }];
 }
 
 function residueMs(hop: HttpTimelineHop): number {
@@ -221,7 +220,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
           </span>
           <span class="legend-item">
-            <span class="legend-swatch" :style="{ backgroundColor: RESIDUE_COLOR }" />Unattributed
+            <span class="legend-swatch bg-conn-grey" />Unattributed
           </span>
         </div>
       </div>

@@ -754,7 +754,7 @@ onUnmounted(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :style="rt?.countError ? { color: 'var(--kira-error)' } : undefined"
+              :class="rt?.countError ? 'text-error' : ''"
               aria-label="Run an exact count"
               data-testid="document-count"
               @click="documentViewStore.runCount(tab.id)"

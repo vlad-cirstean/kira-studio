@@ -258,8 +258,7 @@ onUnmounted(() => {
   >
     <span
       class="icon-box"
-      :class="errorMessage ? undefined : 'muted'"
-      :style="errorMessage ? { color: 'var(--kira-error)' } : undefined"
+      :class="errorMessage ? 'text-error' : 'muted'"
     >
       <CodiconIcon name="search" :size="13" />
     </span>

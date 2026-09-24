@@ -158,7 +158,7 @@ const agentTooltip = computed(() =>
             <CodiconIcon
               name="circle-large-filled"
               :size="13"
-              :style="{ color: engineStore.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
+              :class="engineStore.status === 'ok' ? 'text-ok' : 'text-error'"
             />
             engine {{ engineStore.status }}
           </span>

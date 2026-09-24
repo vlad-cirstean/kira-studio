@@ -8,7 +8,7 @@
 </script>
 
 <template>
-  <div class="p-statusbar" :style="{ color: 'var(--kira-fg-muted)' }">
+  <div class="p-statusbar text-muted-foreground">
     <!-- LAW 14: this readout answers "where is the caret" and nothing else — every fact a toolbar
          already carries stays there instead of accumulating here too. Not yet wired per-view; "no
          selection" is the honest default. -->
