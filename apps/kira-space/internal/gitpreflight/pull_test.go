@@ -150,9 +150,8 @@ func TestWantsRebaseMerges(t *testing.T) {
 }
 
 // TestResolveRebaseMerges is P111's own table test: strategy x source x two config keys is a
-// decision structure with interacting rules, replacing five real-git subtests
-// (gitsession.wantsRebaseMerges's own deleted TestWantsRebaseMerges) that tested the same rules
-// through I/O.
+// decision structure with interacting rules, replacing five real-git subtests gitsession's own
+// now-deleted executor-side re-derivation once ran through I/O.
 func TestResolveRebaseMerges(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
