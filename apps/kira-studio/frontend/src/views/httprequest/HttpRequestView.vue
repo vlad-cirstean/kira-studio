@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -414,19 +415,30 @@ const resolvedCookiesUrl = computed(() => {
   );
   return resolveTabState(props.tab.state, values, secretNames).url;
 });
+// P108 F7: this view's own debounce now, not a raw per-tab `setTimeout` the store used to keep
+// (GrpcRequestView.vue's schema-load debounce is the in-repo shape this copies) — one instance per
+// mounted view needs no cross-tab timer keying, and `.cancel()` on unmount (below) means a pending
+// fetch never fires for a tab that's already gone, closing the hole a bare timer left open.
+const COOKIES_FETCH_DEBOUNCE_MS = 300;
+const fetchCookiesDebounced = useDebounceFn((url: string) => {
+  void cookiesStore.fetchCookiesNow(props.tab.id, url);
+}, COOKIES_FETCH_DEBOUNCE_MS);
 watch(
   resolvedCookiesUrl,
   (url) => {
     if (effectiveDisableCookieJar.value) return;
-    cookiesStore.scheduleCookiesFetch(props.tab.id, url);
+    void fetchCookiesDebounced(url);
   },
   { immediate: true },
 );
 const unsubscribeSendCompleted = onSendCompleted((tabId) => {
   if (tabId !== props.tab.id || effectiveDisableCookieJar.value) return;
-  cookiesStore.scheduleCookiesFetch(props.tab.id, resolvedCookiesUrl.value);
+  void fetchCookiesDebounced(resolvedCookiesUrl.value);
 });
-onUnmounted(unsubscribeSendCompleted);
+onUnmounted(() => {
+  fetchCookiesDebounced.cancel();
+  unsubscribeSendCompleted();
+});
 function toggleFieldFilter(): void {
   fieldFilterOpen.value = !fieldFilterOpen.value;
   // D13's own rule: closing the row must restore every hidden row.

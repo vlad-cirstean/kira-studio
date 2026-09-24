@@ -65,8 +65,11 @@ async function onRemove(name: string): Promise<void> {
   await cookiesStore.deleteCookie(props.tabId, props.url, name);
 }
 async function onClearAll(): Promise<void> {
-  if (!props.tabId || !props.url) return;
-  await cookiesStore.clearCookies(props.tabId, props.url);
+  // P108 F7: clearCookies now empties every open tab's own list itself (Go's ClearJar is
+  // process-wide) — this only still gates on request mode being properly wired up, same as the
+  // other two actions.
+  if (!props.tabId) return;
+  await cookiesStore.clearCookies();
 }
 async function onRetry(): Promise<void> {
   if (!props.tabId || !props.url) return;

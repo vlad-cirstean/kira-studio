@@ -2,6 +2,7 @@ import type { HttpCookieWire } from '@shared/domain/http';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
+import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 
 // P90 item 2's request-mode runtime: what the shared jar would send for a tab's current URL right
@@ -13,62 +14,81 @@ import { control } from '../../bridge/control';
 interface CookiesRuntime {
   cookies: HttpCookieWire[];
   loading: boolean;
+  /** P108 F7: the last URL fetchCookiesNow was asked to fetch for this tab — clearCookies' own
+   *  refetch-every-open-tab pass reads it back; nothing here is persisted (§3.1 still holds). */
+  url: string;
 }
 
 export const useCookiesStore = defineStore('cookies', () => {
   const cookiesRuntime: Record<string, CookiesRuntime> = reactive({});
 
+  // P108 F7: each tab's own monotonic counter — a fetch only commits its reply if nothing newer
+  // (another fetch for the same tab) has started since. Without this, a late reply from an older
+  // URL could land after a newer fetch's reply and overwrite it, or undo deleteCookie's own
+  // refreshed list.
+  const fetchSeq = new Map<string, number>();
+
   registerTabRuntimeCleanup((tabId) => {
     delete cookiesRuntime[tabId];
+    fetchSeq.delete(tabId);
   });
 
   function ensure(tabId: string): CookiesRuntime {
-    if (!cookiesRuntime[tabId]) cookiesRuntime[tabId] = { cookies: [], loading: false };
+    if (!cookiesRuntime[tabId]) cookiesRuntime[tabId] = { cookies: [], loading: false, url: '' };
     return cookiesRuntime[tabId];
   }
 
   /** A URL that fails to parse (e.g. still carries an unresolved `{{host}}` template) is not an
    *  error state worth surfacing here — the pane just shows no cookies until the URL resolves to
-   *  something real, exactly like an empty jar. */
+   *  something real, exactly like an empty jar.
+   *
+   *  P108 F7: guards against a call that starts while its tab still exists but resolves after the
+   *  tab has closed — bails before `ensure()` would otherwise recreate a runtime entry cleanup
+   *  already deleted, and again before writing a reply back (the sequence check alone does not
+   *  catch this: a closed tab's own `fetchSeq` entry is gone too, and closing never happened to
+   *  bump it). */
   async function fetchCookiesNow(tabId: string, url: string): Promise<void> {
+    if (!findHttpRequestTab(tabId)) return;
     const rt = ensure(tabId);
+    rt.url = url;
+    const mySeq = (fetchSeq.get(tabId) ?? 0) + 1;
+    fetchSeq.set(tabId, mySeq);
     rt.loading = true;
     try {
-      rt.cookies = await control.httpCookies(url);
+      const cookies = await control.httpCookies(url);
+      if (!findHttpRequestTab(tabId) || fetchSeq.get(tabId) !== mySeq) return;
+      rt.cookies = cookies;
     } catch {
+      if (!findHttpRequestTab(tabId) || fetchSeq.get(tabId) !== mySeq) return;
       rt.cookies = [];
     } finally {
-      rt.loading = false;
+      if (findHttpRequestTab(tabId) && fetchSeq.get(tabId) === mySeq) rt.loading = false;
     }
   }
 
-  // P99 §9.3: not useDebounceFn — keyed per tabId (a tab's own pending fetch must not cancel or
-  // share a timer with another tab's), and useDebounceFn debounces one function identity. A
-  // per-key cache of debounced instances would be a new abstraction invented mid-pass for this one
-  // call site (§9.4 forbids that outside a genuine multi-site finding). Declined, named per
-  // CLAUDE.md's library rule.
-  const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
-
-  /** §3.1: the URL field fires per keystroke — SearchToolbar.vue's own debounce is the in-repo shape
-   *  this copies. */
-  function scheduleCookiesFetch(tabId: string, url: string): void {
-    const existing = debounceTimers[tabId];
-    if (existing) clearTimeout(existing);
-    debounceTimers[tabId] = setTimeout(() => {
-      delete debounceTimers[tabId];
-      void fetchCookiesNow(tabId, url);
-    }, 300);
-  }
+  // P108 F7: the debounce this store used to own itself (`debounceTimers`, one raw `setTimeout`
+  // per tab) is gone — HttpRequestView.vue now debounces its own call with `useDebounceFn`,
+  // cancelled `onUnmounted` (the same shape GrpcRequestView.vue's own schema-load debounce already
+  // uses). The decline this comment used to record ("sole caller is HttpRequestView, one instance
+  // per tab") is exactly why a raw per-key timer registry no longer earns its keep over the
+  // library the view-level caller can use directly — one `useDebounceFn` instance per mounted view
+  // needs no cross-tab keying at all.
 
   async function deleteCookie(tabId: string, url: string, name: string): Promise<void> {
     const rt = ensure(tabId);
     rt.cookies = await control.httpDeleteCookie(url, name);
   }
 
-  async function clearCookies(tabId: string, url: string): Promise<void> {
+  /** P108 F7: `httpclient.ClearJar()` (Go) empties the *whole* process-wide jar, not just this
+   *  tab's URL — every open tab's own cookies are gone too, not only the calling one's. Zeroing
+   *  every tracked runtime's list directly (rather than an IPC refetch per tab) is exact: a clear
+   *  cannot leave any URL with cookies left to report. */
+  async function clearCookies(): Promise<void> {
     await control.httpClearCookies();
-    await fetchCookiesNow(tabId, url);
+    for (const rt of Object.values(cookiesRuntime)) {
+      rt.cookies = [];
+    }
   }
 
-  return { cookiesRuntime, fetchCookiesNow, scheduleCookiesFetch, deleteCookie, clearCookies };
+  return { cookiesRuntime, fetchCookiesNow, deleteCookie, clearCookies };
 });
