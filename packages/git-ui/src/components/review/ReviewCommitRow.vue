@@ -104,17 +104,21 @@ function onContextMenu(event: MouseEvent): void {
   menuState.value = { x: event.clientX, y: event.clientY };
 }
 
+// P108 F9: `props.actions` (the session-level `rowActions` bundle, see this component's own doc
+// comment above) is reachable on a collapsed row exactly like an expanded one — `props.expansion`
+// is `undefined` until the row has been expanded at least once, so building this menu from
+// `expansion?.actions` left Copy SHA/Copy message disabled (or a no-op) on every never-expanded
+// row, the same bug `openAllChanges` above was already fixed for.
 const menuSections = computed(() =>
-  buildReviewRowMenu(props.expansion?.actions.capabilities.clipboard ?? false),
+  buildReviewRowMenu(props.actions.capabilities.clipboard),
 );
 
 function onMenuSelect(id: string): void {
   menuState.value = undefined;
   const c = commit.value;
-  const actions = props.expansion?.actions;
-  if (!c || !actions) return;
-  if (id === 'copySha') actions.copy(c.sha, 'full SHA');
-  else if (id === 'copyMessage') actions.copy(c.subject, 'commit message');
+  if (!c) return;
+  if (id === 'copySha') props.actions.copy(c.sha, 'full SHA');
+  else if (id === 'copyMessage') props.actions.copy(c.subject, 'commit message');
 }
 
 // G14 D8 row action 1 / G21 D8c: "Open all changes" — one awaited `openAllChanges` call rather
