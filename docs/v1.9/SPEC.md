@@ -4575,6 +4575,202 @@ session), Part 17 (Space git RPC/socket server/`git-ipc` contract), Part 18 (`gi
 logic), Part 19 (`git-ui` components), and this Part 20 (Kira Space hosts — the desktop app and the
 VS Code extension).
 
+## P108 Part 10 result
+
+Reviewed per `plans/P108-part10-findings.md` (Opus reviewer, no fixing) — chunk A9, "Studio grid and
+shared view machinery": `apps/kira-studio/frontend/src/views/{shared,grid}/**`. 21 findings total.
+One Sonnet fixer landed one commit per finding, F1-F21 in order, none dismissed or deferred.
+
+- **F1-F6** — landed in an earlier pass of this same run (before this segment's own work resumed);
+  see those commits' own messages for detail (`pageStale` reset on a tab's own successful load,
+  `clearPending` timing tied to a page actually landing, generated/pending-delete read-only reasons,
+  a masking-preview cell-menu literal-builder fix, etc.).
+- **F7 `2f6b61b`** (plus incidental fixes `f161abf`/`77b9169`) — `goNext`/`goPrev` had no in-flight
+  guard: a second call while a load was still in flight reused the same token and could double-advance
+  `pageIndex` or revert to the wrong previous index. Added `if (rt.opId !== null) return;` at the top
+  of both, before any optimistic `pageIndex` patch — once concurrent navigation is prevented outright,
+  a single call's own captured `prevIndex` is always correct, no separate "last landed page" tracking
+  needed. Discovered mid-pass that this fix broke `view-state.spec.ts` test 9, which had explicitly
+  encoded the old double-`goNext`-stacking race as correct behavior; rewrote it to assert the new
+  no-op-guard behavior instead (`f161abf`, with a small biome-comment follow-up `77b9169`), per
+  `CLAUDE.md`'s fix-on-the-spot rule.
+- **F8 `2458dc6`** — fake-data's `datatype.boolean` generator emitted `'true'`/`'false'` as text,
+  which fails MySQL's strict-mode `TINYINT` bind and lands as text (not `1`/`0`) in SQLite's
+  NUMERIC-affinity `BOOLEAN` column. MySQL/SQLite now get `'1'`/`'0'`; Postgres/ClickHouse keep
+  `true`/`false` (both accept it natively).
+- **F9 `199079b`** — `ejson.ts`'s `$numberLong` branch gated only on `Number.isFinite`, so a value
+  beyond `Number.MAX_SAFE_INTEGER` silently re-encoded as a rounded plain number instead of staying
+  wrapped. Gated on `Number.isSafeInteger` instead; added a regression test.
+- **F10 `756425b`** — `FkPreviewPopover.vue`'s backdrop carried `aria-hidden="true"`, hiding the
+  popover's own interactive backdrop from assistive tech. Removed, mirroring commit `e25e169`'s
+  identical P108 Part 13 F4 pattern.
+- **F11 `93af48d`** — `quoteIdent`'s backtick-dialect branch didn't escape a literal `\` before
+  doubling backticks for ClickHouse, and didn't strip embedded NUL bytes. Added `\` -> `\\` escaping
+  for `dialect === 'clickhouse'`; NUL-stripped via `name.split('\u0000').join('')` (a regex literal
+  containing `\u0000` trips biome's `noControlCharactersInRegex` rule even escaped).
+- **F12 `c075098`** — `reloadAfterMutation` could reload onto an empty page (e.g. the last row on the
+  last page just got deleted) with no recovery. Now steps back one page and reloads again when the
+  reloaded page comes back with `rowCount === 0` and `pageIndex > 0`.
+- **F13 `0101c69`** — a failed background count refresh silently reverted the toolbar's row-count
+  chip to nothing, with no distinction from "count not yet requested." Added `countError: string |
+  null` to `CountRuntime` and all four implementing runtimes (grid/documents/keyvalue/stream),
+  `runPagedCount`'s catch path setting it via the file's own `classifyLoadError`, and
+  `DataToolbar.vue` surfacing it (error-red style, tooltip text) ahead of the existing stale-amber
+  state. Fixed two hand-built test fixtures (`grid-commit-composite-pk-guard.spec.ts`,
+  `sqs-mutation-never-polls.spec.ts`) the new required field broke.
+- **F14 `72da059`** — `createImmediateMutator` let a successful write get reported as a failure
+  whenever any post-write step (`opts.reload`, `reloadTabsForTarget`, `after`) threw, since nothing
+  isolated those from the write itself. Wrapped each in its own try/catch, collecting messages into
+  one combined `saved, but refresh failed: ...` error thrown only if any of them actually failed.
+- **F15 `5ddecc4`** — `parseTimestamp`'s epoch branches read bare `Number(t)`, accepting hex (`0x10`),
+  exponent (`1e9`) and blank/empty text as valid epoch values; `encodeTimestamp`'s `epochSeconds`
+  branch unconditionally `Math.round`ed, silently dropping sub-second digits on the very first
+  re-encode of an untouched value (breaking the exact-round-trip contract the adjacent `iso8601`
+  branch already keeps). Added strict `/^-?\d+(?:\.(\d+))?$/` validation to parsing, and a
+  sign/absolute-value fraction split to encoding that reuses the original fraction text when nothing
+  actually changed. `fractionDigits`/`fractionRaw`'s doc comments corrected (they apply to both
+  `iso8601` and `epochSeconds`, not `iso8601` only). Added a regression test (sign-aware fraction
+  round-tripping is exactly the kind of easy-to-get-wrong arithmetic `CLAUDE.md`'s test bar calls
+  out).
+- **F16 `3e96d1b`** — `eachMatch`'s user-authored-regex path had no bound on the text scanned per
+  cell, a partial ReDoS surface. Added an optional `maxLength` parameter (truncates via `text.slice`
+  before scanning) plus a new `REGEX_SCAN_TEXT_CAP = 10_000` constant, threaded through
+  `tabularRowScanner`/`keyValueRowScanner`'s own new optional `regexTextCap` parameter and applied
+  only by `grid/search.ts` and `shared/keyvalue/search.ts` when `q.regex` is true — deliberately not
+  applied to `console/search.ts` or `documents/search.ts`, out of this finding's stated scope. Added a
+  regression test exercising a real catastrophic-backtracking pattern (`(a+)+b`) capped to 20 chars,
+  completing well under 1s.
+- **F17 `a175384`** — the `selectedCell` watch reseeded the edit buffer unconditionally on every cell
+  switch or same-cell background republish with a changed value, silently discarding an unsaved edit.
+  Mirrors this same file's own existing "stage on leave" rule (`onEditorBlur`, `onBeforeUnmount`,
+  `onEditorKeydown`'s Ctrl/Cmd+Enter): when the buffer is dirty and the previous cell is still
+  editable, stages it via `prevCell.onEdit(doc.value)` before reseeding for the new cell. No dedicated
+  unit test — reuses an already-covered pattern in this same file, not new branching complexity.
+- **F18 `7dd9f45`** — `PreviewCommandPanel.vue`'s preview-SQL query key carried no pending-set
+  version, so reopening after more edits briefly showed the previous open's stale cached statements.
+  `DataView.vue` mounts this panel with `v-if="previewOpen"` (full unmount on close), so `gcTime: 0`
+  lets the stale entry be discarded immediately instead of surviving to the next open.
+- **F19 `5662dc0`** — `finance.amount`'s `wholeDigits` floored at 1 via `Math.max(1, ...)`, so a
+  `numeric(p,p)` column (e.g. `numeric(2,2)`, max `0.99`) still got a max derived from `10 ** 1 - 1 =
+  9`, overflowing every batch. Allowed `wholeDigits = 0` and used `max = 1 - 10 ** -dec` in that case.
+  Extended the existing `finance.amount` bounds spec (finding 2's own describe block already covers
+  this code path) with a `numeric(2,2)` case rather than adding a new file.
+- **F20 `604e080`** — `load.ts`'s own header falsely listed `stream/state.ts` among `runPagedLoad`'s
+  callers; it isn't one (confirmed via grep — only documents/grid/keyvalue call it), though its own
+  hand-written `load()` has the identical shape. Corrected the header to name it as an unadopted
+  candidate instead of a current caller. `stream/state.ts` itself is Part 11's file, outside this
+  chunk's `views/{shared,grid}` scope (and under active edit by a concurrent Part 11 subagent in this
+  same shared checkout), so left untouched — actually adopting the frame there is a call for that
+  file's own phase.
+- **F21 `e345c1b`** — three doc-drift spots: `ARCHITECTURE.md:49` implied `@tanstack/vue-virtual`
+  itself was gone (false — `views/shared/keyvalue/KeyValuePane.vue` and
+  `views/grpcrequest/ResponsePane.vue` still import `useVirtualizer` from it, and line 35 already
+  names it this app's row-virtualization baseline); corrected to say the *grid* no longer uses it
+  (SlickGrid virtualizes there). `ARCHITECTURE.md:2117` named a nonexistent `Pager.vue`; renamed to
+  the real `PagerControls.vue`. `views/shared/page/columns.ts`'s own comment said the deleted column
+  axis "retired with `@tanstack/vue-virtual` itself"; corrected to say only that column axis retired.
+
+**Nothing dismissed.** Every one of the 21 findings matched real, reachable code and was fixed as
+specified — no deferrals, no follow-up phase needed. The findings doc's own "Examined, nothing real"
+section (quoted verbatim below) lists 24 items the reviewer checked and found already correct or
+already covered by an existing guard; none of them needed a fix, and none is repeated here as a
+finding:
+
+> - Mask-preview lockout: `canEditTable`, `canDeleteRows` (`SlickGridHost.vue:267-279`) and
+>   `DataToolbar` `isWritable` (`:60-65`) all include `!maskPreview`. Toggling preview is refused
+>   while pending exists. No menu or shortcut stages while masked.
+> - Navigation discard without a confirm (pager, sort, filter, projection, refresh): intended per D3
+>   (`state.ts:139-141`, `pendingChanges.ts:8-10`). F1 and F2 cover only background and failed loads.
+> - Partial PK: a projection hiding PK columns with `loadMeta` failed builds a partial key, but Go's
+>   `AssertKeyIsPrimaryKey` (`sqlmutate.go:57-74`) rejects any key that is not exactly the PK. A
+>   truncated PK cell yields a key matching zero rows; the affected-exactly-one assertion rejects it.
+>   Friendly message only; no wrong write.
+> - Edits to a PK column: `primaryKeyOf` reads `cell()`, the committed page value, not the staged
+>   one. Correct.
+> - No-op updates: the inline editor skips unchanged values (`slick/editor.ts:104-106`). Paste can
+>   stage a same-value UPDATE; paste is an explicit write, so intended.
+> - Commit partial failure: `Mutate` is one transaction per adapter contract
+>   (`adapters/adapter.go:78-81`) and `commitPending` clears only on success
+>   (`pendingChanges.ts:295-311`). `DataView.onCommit` shows the error (`:125-134`).
+> - Selection normalization: `selectionFromRanges` builds through `SlickRange`, which normalizes the
+>   anchor. `selectionCovers`, `selectionEdges`, `visibleRowsInSpan` and `resolvePasteTarget` all see
+>   anchor at top-left. `Math.min(...[])` is unreachable: a `row` selection always has one row.
+> - Empty filtered view: `displayPositionOf`/`pageRowAt`/`rowHandleAt` fall back safely; no action
+>   reaches a real row.
+> - `GUTTER_OFFSET` arithmetic agrees across `dataSource.ts` and `SlickGridHost.vue`.
+> - Pager bounds: `PagerControls.onJump` clamps to `pageCount` when a count exists (`:54-69`). Prev
+>   and First are disabled at index 0, Next by `!hasMore`, Last by `!pageCount`. `goToPage`'s low-only
+>   clamp is not reachable past the last page from the UI.
+> - `applyLoadFailure` with a stale `opId` returns before touching status; a superseding op owns the
+>   status. No stuck `loading`.
+> - Range paste spilling into insert rows past the filtered rows: intended per the `pasteTargetRows`
+>   doc (`rowValues.ts:79-85`).
+> - `useConnectionGate.onReconnectAndLoad` marks hydrated after a connect that lands in an error state
+>   (`connections/service.go:679-699` returns nil error). `needsReconnect` also checks
+>   `connectionStatus !== 'connected'`, so the gate stays up. The doomed `load` fails as disconnected
+>   and `applyLoadFailure` unmarks hydrated. Self-correcting; not reported.
+> - `ejsonToPlain` Long/Decimal precision loss: documented accepted tradeoff (`ejson.ts:418-435`).
+> - `rowsToInsert` writes a truncated column as NULL with a leading comment naming it
+>   (`clipboardFormats.ts:102-127`).
+> - `pageColumnIndexFor` last-wins on duplicate names: tables and views cannot expose duplicate
+>   column names in any supported engine (SQLite renames view duplicates), so the data grid never sees
+>   one. Console result pages are Part 11.
+> - `scrollTrace.ts` module-level `gridEl`: `unregisterGrid` only nulls on identity match, so a keyed
+>   remount in either order is safe. Probe-only code.
+> - `kiraSlickGrid.ts` teardown: `destroy()` removes the capture-phase scroll listener with the
+>   matching flag and cancels the chase rAF before `super.destroy()`. `editor.ts` add/remove are
+>   paired (`:68`, `:120`).
+> - TanStack Query mask rules (`SlickGridHost.vue:595-600`) and counts (`DataToolbar.vue:73-77`):
+>   getter form, key reactive to the tab's connection; `setQueryData` writes update them. `retry:
+>   false` and no focus refetch app-wide (`packages/workbench/src/state/queryClient.ts:20-32`).
+> - Tab-close cleanup: grid runtime, keyvalue runtime and `::preview` page, document rows, search and
+>   visible-rows state register `registerTabRuntimeCleanup`. Pending changes clear in
+>   `state/tabs.ts:149`. The `previewPending` query entry is inactive and expires on default
+>   `gcTime`.
+> - Disabled controls in `TooltipTrigger`: every `:disabled` button in `views/grid` and
+>   `views/shared` sits inside `TooltipDisabledTrigger`.
+> - `AutocompleteField.vue` `escapePlain` (`:121-123`) escapes `& < >` for text content; `"` matters
+>   only in attributes, which `paintOverlayHtml` (Part 11, `editor/paintSpans.ts`) builds from static
+>   class names.
+> - `detect.ts` detectors: anchored or linear regexes; no backtracking hazard found on 64 KiB input.
+> - `validate.ts` accepts an empty value for every format; an empty string on a NOT NULL numeric
+>   column fails server-side with the engine's message. Not a UI bug.
+> - Regex mode without the `u` flag can highlight half a surrogate pair for `.`-style patterns.
+>   Cosmetic only; not reported.
+
+**Verification, run for real:**
+
+- `bun run typecheck:web:studio` (`vue-tsc` over the whole Studio frontend): exit 0, run after every
+  commit in this pass.
+- `bunx biome check` on every file this pass touched: clean per-commit. A whole-repo `bunx biome
+  check .` at the end of the pass: clean, 0 findings.
+- `sh scripts/check-tokens.sh`: every `--kira-*`/`--kv-*`/`--kui-*` reference resolves.
+- `bun run typecheck` (the full parallel `typecheck:*` split across both apps and every package):
+  exit 0.
+- `bun test apps/kira-studio/tests/unit/`: 700 pass, 0 fail, across 90 files.
+- Every commit above ran `.githooks/pre-commit` for real (biome + `check-tokens.sh` + the full
+  parallel `typecheck:*` split) and passed clean — `--no-verify` never used.
+- Regression tests: F7's fix required rewriting a pre-existing test (`view-state.spec.ts` test 9)
+  that had encoded the exact race being fixed as correct behavior — fixed on the spot per
+  `CLAUDE.md`'s own rule, same commit's own follow-up (`f161abf`/`77b9169`). F9, F15 and F16 each add
+  a dedicated regression test (precision-loss boundary, sign-aware fraction round-tripping, and a
+  real catastrophic-backtracking pattern respectively) — exactly the "hard to get right" shape
+  `CLAUDE.md`'s test bar calls for. F19 extends an existing bounds spec rather than adding a new one.
+  Every other finding is a small, contained fix (a guard clause, a field threaded through an
+  interface, an aria attribute removed, a doc correction) with no complex/hard-to-get-right logic
+  warranting a dedicated test, stated per-commit where relevant.
+- Shared-checkout git races (this checkout is worked concurrently by other subagents under the same
+  session — confirmed via unrelated sibling commits, e.g. `d9be2b7` on `apps/kira-studio/main.go`,
+  and a live Part 11 `stream/state.ts` in-progress edit F20 explicitly routed around): `.git/index.lock`
+  contention (polled until clear, then retried), staged files reverting to unstaged between `git add`
+  and `git commit` (re-added and reverified via `git status --short`), a transient repo-wide `biome
+  check .` failure in another live subagent's own in-progress file (`packages/git-ui/src/state/
+  ops.test.ts`, polled until that subagent reformatted it, never touched directly), and one `fatal:
+  cannot lock ref 'HEAD'` after hooks had already passed (retried the identical commit command, which
+  re-ran the hook harmlessly and succeeded). Every commit's own "N files changed" summary line was
+  checked against its intended file set — no cross-contamination with any sibling subagent's work in
+  either direction.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
