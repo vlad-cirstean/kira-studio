@@ -80,6 +80,26 @@ func main() {
 	}
 	logging.Sweep(config.LogsDir())
 
+	// F7: an app-wide single-instance guard, before storage.Open — a second launch pointed at the
+	// same KIRA_SPACE_HOME (open -n, the binary run directly, or a dev build) would otherwise open
+	// the same kira.db, restore the same window rows, and last-writer-wins on every table the first
+	// instance also owns, while its own gitsock silently never listens (server.go:99-101). A
+	// distinct lock file from git.sock.lock (gitsock.Server acquires that one itself, inside
+	// wireGit below): flock is scoped to the open file description, not the process, so reusing the
+	// same path here would make wireGit's own acquireLock see this same process as "another
+	// instance" a few lines later. Not acquired here means a real other instance owns this home —
+	// exit quietly (D5's own posture for gitsock's identical case: this is a supported state, not a
+	// failure), never show a window over a database another process already owns.
+	instanceLock, acquired, err := gitsock.AcquireLock(filepath.Join(config.KiraSpaceHome(), "app.lock"))
+	if err != nil {
+		reporter.Fatal(startupfail.StepInstanceLock, err)
+	}
+	if !acquired {
+		slog.Info("kira-space: another instance already owns this home; exiting", "scope", "startup")
+		os.Exit(0)
+	}
+	_ = instanceLock // kept open for the process's lifetime (AcquireLock's own doc); closing it releases the lock.
+
 	db, err := storage.Open()
 	if err != nil {
 		reporter.Fatal(startupfail.StepStorage, err)

@@ -132,6 +132,14 @@ func Classify(step Step, err error, info Info) Message {
 				" may be read-only.",
 			Detail: detail,
 		}
+	case StepInstanceLock:
+		return Message{
+			Step: step, Expected: true,
+			Headline: app + " couldn't check for another running copy.",
+			Advice: "Check that " + info.home() +
+				" exists, is a folder you can write to, and that the disk isn't full.",
+			Detail: detail,
+		}
 	case StepRun:
 		return bugMessage(step, app+" couldn't open its main window.", detail)
 	case StepPlatform:

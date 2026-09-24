@@ -48,6 +48,7 @@ func allSteps() []startupfail.Step {
 		startupfail.StepSettings,
 		startupfail.StepWindowList,
 		startupfail.StepWindowCreate,
+		startupfail.StepInstanceLock,
 		startupfail.StepRun,
 		startupfail.StepPlatform,
 	}
@@ -81,6 +82,7 @@ func TestClassifyExpectedColumn(t *testing.T) {
 		startupfail.StepSettings:     false,
 		startupfail.StepWindowList:   false,
 		startupfail.StepWindowCreate: true,
+		startupfail.StepInstanceLock: true,
 		startupfail.StepRun:          false,
 		startupfail.StepPlatform:     false,
 	}

@@ -92,7 +92,7 @@ func (s *Server) notifyClientsChanged() {
 // error, is returned but never fatal to the caller (main.go logs and continues booting) — the app
 // must never fail to start because the git socket could not (D5).
 func (s *Server) Start() error {
-	lockFile, acquired, err := acquireLock(s.deps.LockPath)
+	lockFile, acquired, err := AcquireLock(s.deps.LockPath)
 	if err != nil {
 		return fmt.Errorf("gitsock: acquire lock: %w", err)
 	}

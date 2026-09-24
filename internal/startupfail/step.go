@@ -45,6 +45,10 @@ const (
 	StepWindowList Step = "windowList"
 	// StepWindowCreate is Windows.Create() failing when a fresh database has no window row yet.
 	StepWindowCreate Step = "windowCreate"
+	// StepInstanceLock is the app-wide single-instance flock (P108 Part 20 F7) failing with a real
+	// I/O error (permission denied, disk full) — not the "another copy already owns this lock" case,
+	// which is a clean os.Exit(0) before this Step is ever reached.
+	StepInstanceLock Step = "instanceLock"
 	// StepRun is app.Run() itself returning an error.
 	StepRun Step = "run"
 	// StepPlatform is Wails' own pre-window fatal path — application.New's transport-start
