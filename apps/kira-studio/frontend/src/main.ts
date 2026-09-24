@@ -4,6 +4,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { initApiDataSync } from './api/state/apiQueries';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { useTreeStore } from './project/state/tree';
@@ -288,6 +289,9 @@ if (__KIRA_DEBUG_HOOKS__) {
 }
 
 async function bootstrap(): Promise<void> {
+  // P112: live before any query exists, whether or not the Api panel ever mounts — needs no data,
+  // so it runs synchronously before the Promise.all below rather than joining it.
+  initApiDataSync();
   // Every store used here runs before app.use(pinia) below, so each needs the module-level
   // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
   const cacheStatsStore = useCacheStatsStore(pinia);

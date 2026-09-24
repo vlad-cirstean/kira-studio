@@ -217,4 +217,7 @@ export const IPC = {
   // (bridge/events.go's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
   // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.
   keepAwake: 'kira:keepAwake:changed',
+  // P112: every API-client mutation broadcasts the scopes it touched, Emit'd (not EmitTo) —
+  // customScriptsChanged's own shape, driven by emitWailsEvent(page, IPC.apiDataChanged, …).
+  apiDataChanged: 'kira:api:dataChanged',
 } as const;

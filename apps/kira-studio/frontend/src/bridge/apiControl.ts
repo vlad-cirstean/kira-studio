@@ -37,6 +37,7 @@ import type {
   RevealResult,
   VariableScope,
 } from '@shared/domain/variables';
+import type { ApiDataChangedEvent } from '@shared/protocol/events';
 import { CHANNEL } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 
@@ -154,6 +155,11 @@ export const apiControl = {
   // P11 D8: one server-streaming call's coalesced message batches — EmitTo'd to this window only,
   // so a stream in one window never wakes another.
   onGrpcCall: (cb: (event: GrpcCallEvent) => void): (() => void) => on(CHANNEL.grpcCall, cb),
+
+  // P112: every API-client mutation broadcasts the scopes it touched — the renderer-side
+  // apiQueries.ts sync layer is this channel's one subscriber.
+  onApiDataChanged: (cb: (event: ApiDataChangedEvent) => void): (() => void) =>
+    on(CHANNEL.apiDataChanged, cb),
 
   // P4 D11: nine wrappers over CollectionsService. These stay typed against the generated models
   // rather than `trust<T>()`-ing a domain type, because the one place a saved request's shape

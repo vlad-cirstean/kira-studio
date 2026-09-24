@@ -60,7 +60,7 @@ import { apiControl } from './apiControl';
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
 // every part of the app's own bound-call surface — the 20 methods §5.6 moved into
 // createCoreControl.ts (shared verbatim with Kira Space's own copy of this file), Studio's own 94
-// remaining methods, defined right here, and the Api module's 39 (apiControl.ts) — and combines
+// remaining methods, defined right here, and the Api module's 40 (apiControl.ts) — and combines
 // them into the one `control` object every other file in the app imports. None of the three
 // depends on either of the others; all three ultimately depend only on rpc.ts's shared
 // on/trust/unwrap/windowKey. control.ts itself is now a thin re-export of this module, so every
@@ -415,7 +415,7 @@ const studioControl = {
 
 // P103 Part 2 (§5.6): one exported object, composed from the 20 methods shared with Kira Space
 // (createCoreControl.ts), Studio's own 94 remaining methods (studioControl, above) and the module's
-// own 39 (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is
+// own 40 (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is
 // unchanged, and mockRuntime.ts's channel map is unchanged, since neither the method names nor
 // their bound-call FQNs moved. Spread order matters not at all here (the three objects' key sets
 // are disjoint by construction — §5.6's own 20-method survey), but studioControl last keeps this

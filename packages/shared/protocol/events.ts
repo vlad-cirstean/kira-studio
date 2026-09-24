@@ -1,3 +1,5 @@
+import type { VariableScope } from '../domain/variables';
+
 /** The Go→renderer push channels (`apps/kira-studio/internal/bridge/events.go`'s constants, verbatim).
  *  Formerly the push half of ipc.ts's IPC const; the request/response half retired with
  *  window.kira, and the wire types for bound calls now come from the generated bindings (P57 D7).
@@ -57,6 +59,10 @@ export const CHANNEL = {
   // P87 §3.2: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) exactly like
   // agentSessions — one machine, one assertion, so every window's button must agree.
   keepAwake: 'kira:keepAwake:changed',
+  // P112: every API-client mutation (collections, saved requests, variables, environments) Emits
+  // this with the scopes it touched, so every window's TanStack Query cache invalidates exactly
+  // those keys — customScriptsChanged's own shape, generalised to a batch of scopes per event.
+  apiDataChanged: 'kira:api:dataChanged',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout
@@ -77,6 +83,19 @@ export interface AppMetricsSample {
   memoryBytes: number;
   logicalCPUs: number;
   processCount: number;
+}
+
+// P112: `kira:api:dataChanged`'s own payload (internal/bridge/apidata.go's ApiDataChange/
+// ApiDataChanged, field for field). Never a bound-call arg or return type, so — AppMetricsSample's
+// own comment applies verbatim — there is no generated binding to reuse.
+export type ApiDataChange =
+  | { kind: 'tree' }
+  | { kind: 'savedRequest'; itemId: string }
+  | { kind: 'variables'; scope: VariableScope; ownerId: string }
+  | { kind: 'environments' };
+
+export interface ApiDataChangedEvent {
+  changes: ApiDataChange[];
 }
 
 /** `kira:terminal:data`'s own payload (internal/bridge/terminal.go's TerminalEvent, field for
