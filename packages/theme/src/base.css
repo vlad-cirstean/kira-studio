@@ -28,16 +28,14 @@
   --color-bg: var(--kira-bg);
   --color-elevated: var(--kira-bg-elevated);
   --color-chrome: var(--kira-bg-chrome);
-  --color-input: var(--kira-bg-input);
-  /* P110 B2: app code's own filled-control surface, separate from shadcn's --color-input (which
-     this file's duplicate above still shadows until B5 deletes it). bg-field is the legacy
-     bg-input's new name, so it never collides with shadcn's own bg-input/30 meaning. */
+  /* P110 B5: --color-input/-muted/-border are NOT redeclared here any more. shadcn-bridge.css's
+     own @theme inline already owns those three names (--input/--muted/--border, shadcn's own
+     meaning); this file redeclaring them used to win (later @theme wins) and silently shadow
+     shadcn's intended colour with a same-named but different one. See P110 plan §3. */
   --color-field: var(--kira-bg-input);
   --color-fg: var(--kira-fg);
-  --color-muted: var(--kira-fg-muted);
   --color-subtle: var(--kira-fg-subtle);
   --color-disabled: var(--kira-fg-disabled);
-  --color-border: var(--kira-border);
   --color-border-strong: var(--kira-border-strong);
   --color-focus: var(--kira-focus);
   --color-select: var(--kira-select);

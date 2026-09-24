@@ -33,9 +33,10 @@
   --destructive: var(--kira-error);
   --destructive-foreground: var(--kira-accent-fg);
   --border: var(--kira-border);
-  /* shadcn spends --input mostly as border-input on form controls; the bg-input/30 background use
-     is the minority case. App code reaches the same --kira-bg-input fill through bg-field
-     (base.css's @theme), a separate name so it never collides with shadcn's own --color-input. */
+  /* shadcn spends --input mostly as border-input on form controls; a 30%-opacity filled
+     background (shadcn's registry components use it directly) is the minority case. App code
+     reaches the same --kira-bg-input fill through bg-field (base.css's @theme), a separate name
+     so it never collides with shadcn's own --color-input. */
   --input: var(--kira-border-strong);
   --ring: var(--kira-focus);
   --chart-1: var(--kira-conn-blue);
