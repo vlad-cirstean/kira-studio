@@ -153,7 +153,14 @@ function onStop(): void {
 function onGenerateData(): void {
   // M5 §6.4: the same lockout DataToolbar.vue's own Generate button applies — this is the
   // command-palette/keyboard-shortcut path to the identical action, and must not bypass it.
-  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly) || rt.value?.maskPreview) return;
+  // F1 (P108 Part 10): also the same pending-changes lockout — Generate Data's own reload would
+  // clear this tab's staged edits, same as DataToolbar.vue's button.
+  if (
+    !canGenerateDataFor(caps.value, connRecord.value?.readOnly) ||
+    rt.value?.maskPreview ||
+    pendingChangesStore.hasPending(props.tab.id)
+  )
+    return;
   fakeDataStore.openGenerateDataDialog(props.tab.id);
 }
 
@@ -404,6 +411,17 @@ function onCloseSearch(): void {
             <CodiconIcon name="eye-closed" :size="16" />
             <AlertDescription class="strip-note-text">
               Values shown are masked for this preview — not the stored data. Editing is off while it's on.
+            </AlertDescription>
+          </Alert>
+          <!-- F1 (P108 Part 10): a sibling tab committed on this same table while this tab had
+               pending changes staged — the fan-out marked this page stale instead of reloading it,
+               to protect the staged edits. Commit or discard resolves it; Refresh then updates the
+               page and clears this. -->
+          <Alert v-if="rt?.pageStale" class="strip-note" data-testid="page-stale-strip">
+            <CodiconIcon name="sync" :size="16" />
+            <AlertDescription class="strip-note-text">
+              Another tab committed changes to this table. Commit or discard pending changes, then
+              refresh to see them.
             </AlertDescription>
           </Alert>
           <div class="grid-area">

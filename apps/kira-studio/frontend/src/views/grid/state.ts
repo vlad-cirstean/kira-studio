@@ -10,6 +10,8 @@ import type { DataTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import {
   registerDataQueryCommands,
+  registerPendingGuard,
+  registerStaleMarker,
   registerTabCount,
   registerTabReload,
   reloadTabsForTarget,
@@ -51,6 +53,10 @@ interface DataViewRuntime {
    *  numbers tomorrow). A preview convenience, not a security boundary (§6.1) — the MCP path is
    *  the real one. */
   maskPreview: boolean;
+  /** F1 (P108 Part 10): set when a sibling tab's commit skipped this tab's own reload because it
+   *  had pending changes staged (state/viewCommands.ts's own reloadTabsForTarget) — the page on
+   *  screen may no longer match what's stored. Cleared by this tab's own next successful load. */
+  pageStale: boolean;
 }
 
 function defaultRuntime(): DataViewRuntime {
@@ -69,6 +75,7 @@ function defaultRuntime(): DataViewRuntime {
     selection: null,
     searchOpen: false,
     maskPreview: false,
+    pageStale: false,
   };
 }
 
@@ -98,6 +105,12 @@ export const useGridViewStore = defineStore('gridView', () => {
     const rt = ensureRuntime(tabId);
     if (!rt.maskPreview && usePendingChangesStore().hasPending(tabId)) return;
     rt.maskPreview = !rt.maskPreview;
+  }
+
+  // F1 (P108 Part 10): state/viewCommands.ts's own stale-marker registration, called instead of a
+  // reload when a sibling commit's fan-out finds this tab has pending changes staged.
+  function markPageStale(tabId: string): void {
+    ensureRuntime(tabId).pageStale = true;
   }
 
   // D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
@@ -140,6 +153,9 @@ export const useGridViewStore = defineStore('gridView', () => {
     // sorting or refreshing all replace that page, so whatever was staged no longer identifies
     // anything real and must not silently reappear against different rows.
     usePendingChangesStore().clearPending(tabId);
+    // F1: this tab's own load (the user's own refresh, or any of the setters below) always
+    // supersedes whatever made the page stale — never left set past the very load that resolves it.
+    rt.pageStale = false;
 
     const effectiveCursor: PageCursor = cursor ?? {
       mode: 'offset',
@@ -314,6 +330,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     setColumnOrder,
     setMaskPreview,
     toggleMaskPreview,
+    markPageStale,
     setActionError,
     toggleSearchOpen,
     setSearchOpen,
@@ -332,6 +349,10 @@ usePendingChangesStore(pinia).registerFullPrimaryKeyAccessor(
 // setFilter/setProjection/setSort through state/viewCommands.ts's registry instead.
 registerTabReload('data', (tabId) => useGridViewStore(pinia).reload(tabId));
 registerTabCount('data', (tabId) => useGridViewStore(pinia).runCount(tabId));
+// F1: reloadTabsForTarget consults this before reloading a sibling 'data' tab, and marks it stale
+// instead of reloading when it has pending changes staged.
+registerPendingGuard('data', (tabId) => usePendingChangesStore(pinia).hasPending(tabId));
+registerStaleMarker('data', (tabId) => useGridViewStore(pinia).markPageStale(tabId));
 registerDataQueryCommands({
   setFilter: (tabId, filter) => useGridViewStore(pinia).setFilter(tabId, filter),
   setSort: (tabId, sort) => useGridViewStore(pinia).setSort(tabId, sort),

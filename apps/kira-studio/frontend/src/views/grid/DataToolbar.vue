@@ -127,13 +127,18 @@ const deleteRowTooltip = computed(() => {
 // M5 §6.4: canGenerateDataFor doesn't know about mask preview (fakeData/generate.ts's own
 // predicate, reused unchanged by DataView.vue's palette entry too) — checked separately here, and
 // named ahead of every reason that predicate itself covers.
+// F1 (P108 Part 10): Generate Data ends in reloadAfterMutation(props.tab.id) — this tab's own
+// reload, which clears this tab's own pending set (state.ts's load()). Gated the same way the
+// mask-preview toggle already is, above.
 const canGenerateData = computed(
   () =>
     canGenerateDataFor(caps.value, connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) &&
-    !rt.value?.maskPreview,
+    !rt.value?.maskPreview &&
+    !hasPendingChanges.value,
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return 'Generate data…';
+  if (hasPendingChanges.value) return 'Commit or discard pending changes first';
   if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
   if (connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
   return 'This connection does not support generating rows';

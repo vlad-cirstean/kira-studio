@@ -81,6 +81,24 @@ export function browseInvalidate(connectionId: string, path: string): void {
   void browseInvalidateFn?.(connectionId, path);
 }
 
+// F1 (P108 Part 10): a sibling reload used to fire unconditionally, silently clearing whatever
+// that sibling tab had staged (grid/pendingChanges.ts's own clearPending, run from inside its own
+// load()). A background refresh the user never asked for must not destroy work in progress the
+// way the user's own navigation is allowed to (D3, below). A kind with no staged-edit model of its
+// own (document/keyvalue/stream, all on immediateMutation.ts's write-then-reload path — no pending
+// set to lose) simply never registers a guard, so the map lookup is `undefined` and the reload
+// proceeds exactly as before.
+const pendingGuards = new Map<CommandTabKind, (tabId: string) => boolean>();
+const staleMarkers = new Map<CommandTabKind, (tabId: string) => void>();
+
+export function registerPendingGuard(kind: CommandTabKind, fn: (tabId: string) => boolean): void {
+  pendingGuards.set(kind, fn);
+}
+
+export function registerStaleMarker(kind: CommandTabKind, fn: (tabId: string) => void): void {
+  staleMarkers.set(kind, fn);
+}
+
 // P43 F10/D14: §7's "L2 is invalidated by any local mutation on the same target" is kept by the
 // engine (engine/data.ts's cache.invalidateAfterMutation), but the renderer's own per-tab page
 // stores are not — a second tab open on the same (connectionId, path) kept rendering rows a
@@ -101,6 +119,10 @@ export function reloadTabsForTarget(connectionId: string, path: string, exceptTa
       case 'document':
       case 'keyvalue':
       case 'stream':
+        if (pendingGuards.get(tab.kind)?.(tab.id)) {
+          staleMarkers.get(tab.kind)?.(tab.id);
+          break;
+        }
         reloadTab(tab.kind, tab.id);
         break;
       default:

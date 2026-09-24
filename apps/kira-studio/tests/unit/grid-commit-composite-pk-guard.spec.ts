@@ -86,6 +86,7 @@ describe('a staged change against a partially-hidden composite primary key fails
       selection: null,
       searchOpen: false,
       maskPreview: false,
+      pageStale: false,
     };
     setPage(tabId, compositeKeyPageWithOneColumnHidden());
     stageEdit(tabId, 0, 'name', 'alice2');
@@ -119,6 +120,7 @@ describe('a staged change against a partially-hidden composite primary key fails
       selection: null,
       searchOpen: false,
       maskPreview: false,
+      pageStale: false,
     };
     setPage(tabId, compositeKeyPageWithOneColumnHidden());
     stageDelete(tabId, [0]);
@@ -152,6 +154,7 @@ describe('a staged change against a partially-hidden composite primary key fails
       selection: null,
       searchOpen: false,
       maskPreview: false,
+      pageStale: false,
     };
     const columns = [pkColumn('tenant_id'), pkColumn('entity_id')];
     const builder = createTabularPageBuilder(columns);
