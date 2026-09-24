@@ -15,27 +15,45 @@ export interface PasteTarget {
   rowAt: (ri: number) => number | undefined;
 }
 
-/** D5/finding 3 round 2's target resolution: `startRow`/`startCol` come from the selection's own
- *  anchor (row-kind starts at its lowest row and column 0); only a `range` paste needs
- *  `pasteTargetRows`'s filtered-rows walk — a `cell` paste only ever grows downward from one
- *  already-visible row, and a `row` paste targets the user's own explicit gutter-click rows,
- *  neither affected by the active filter the same way a contiguous range would be. */
+/** D5/finding 3 round 2's target resolution, corrected by F4 (P108 Part 10): every kind now goes
+ *  through the same filter/selection-aware mapping `range` already used — `row` and `cell` used to
+ *  fall back to plain `startRow + ri` arithmetic, which is wrong on two counts: for `row`, it
+ *  ignored which rows were actually selected (a ctrl-click selection of rows 2, 7, 9 pasted into
+ *  2, 3, 4); for both, `startRow + ri` can land on a row the active search filter hides, staging an
+ *  invisible write the user never saw until the filter cleared.
+ *
+ *  `row` kind: clipboard row `ri` maps onto the `ri`-th selected row in ascending order. When the
+ *  clipboard has fewer rows than the selection, later selected rows are simply never reached (the
+ *  caller's own loop only ever calls `rowAt` for `ri < pastedRowCount`) — nothing to explicitly
+ *  stop. When the clipboard has *more* rows than the selection, the remainder continues into the
+ *  insert region right after the last real row, exactly like `range`'s own overflow.
+ *
+ *  `cell` kind: same filtered walk as `range`, starting from the one anchor cell/row — a multi-row
+ *  clipboard pasted from a single cell must skip hidden rows the same way a range paste already
+ *  does, not walk past them. */
 export function resolvePasteTarget(
   sel: Extract<Selection, { kind: 'cell' | 'range' | 'row' }>,
   page: TabularPage,
   displayRows: readonly number[] | null,
   pastedRowCount: number,
 ): PasteTarget {
-  const startRow =
-    sel.kind === 'row' ? Math.min(...sel.rows) : sel.kind === 'range' ? sel.anchorRow : sel.row;
-  const startCol = sel.kind === 'row' ? 0 : sel.kind === 'range' ? sel.anchorCol : sel.col;
-  const rangeTargetRows =
-    sel.kind === 'range'
-      ? pasteTargetRows(displayRows, page.rowCount, startRow, pastedRowCount)
-      : null;
+  if (sel.kind === 'row') {
+    const sortedRows = [...sel.rows].sort((a, b) => a - b);
+    const lastSelected = sortedRows[sortedRows.length - 1] ?? -1;
+    return {
+      startCol: 0,
+      rowAt: (ri) =>
+        ri < sortedRows.length
+          ? sortedRows[ri]
+          : Math.max(lastSelected + 1, page.rowCount) + (ri - sortedRows.length),
+    };
+  }
+  const startRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
+  const startCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
+  const targetRows = pasteTargetRows(displayRows, page.rowCount, startRow, pastedRowCount);
   return {
     startCol,
-    rowAt: (ri) => (rangeTargetRows ? rangeTargetRows[ri] : startRow + ri),
+    rowAt: (ri) => targetRows[ri],
   };
 }
 
