@@ -235,6 +235,57 @@ async function autoExplainCheck(
   }
 }
 
+// D19 rules 1-5's own pre-run gate, split out of run() (below) to keep its cognitive complexity in
+// bounds — P108 Part 11 F1 added one more branch there. Returns 'stop' when run() must return
+// without ever issuing the real statement: the EXPLAIN batch was cancelled, or the tab closed or
+// was superseded by a newer run while it was in flight. 'proceed' otherwise, with `rt.autoExplain`
+// already set to whatever the batch found.
+async function runAutoExplainGate(
+  tab: ConsoleTabRecord,
+  kind: ConnectionKind,
+  rt: ConsoleViewRuntime,
+  opId: string,
+  statements: string[],
+  isTabOpen: () => boolean,
+): Promise<'proceed' | 'stop'> {
+  const explainOpId = crypto.randomUUID();
+  rt.explainOpId = explainOpId;
+  let autoExplainResult: AutoExplainState | null;
+  try {
+    autoExplainResult = await autoExplainCheck(tab, kind, statements, explainOpId);
+  } catch (err) {
+    // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else) —
+    // Stop was pressed while this batch was the only op registered on the backend, so the real run
+    // must not fire at all, not just lose its warning.
+    // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
+    // (runStatement/runAll have no `running` guard against each other) may have already stamped
+    // its own explainOpId here by the time this catch runs; clearing unconditionally would discard
+    // *that* run's id, leaving Stop with nothing registered on the backend to cancel.
+    if (rt.explainOpId === explainOpId) rt.explainOpId = null;
+    applyLoadFailure(rt, opId, err, tab.id, {
+      onDisconnected: () => {
+        rt.status = 'idle';
+      },
+    });
+    return 'stop';
+  }
+  // P12 round 2 finding #4: same identity guard as above — an overlapping run's own explainOpId
+  // must survive this run's clear.
+  if (rt.explainOpId === explainOpId) rt.explainOpId = null;
+  // P108 Part 11 F1: same tab-liveness check the real execute's own guard makes below — status
+  // alone would already catch a tab close now that cleanup marks the detached rt 'cancelled', but
+  // this keeps the two guards symmetric rather than relying on that indirectly.
+  if (!isTabOpen()) return 'stop';
+  // Not only opId (a newer run superseding this one) — status too, since a Stop press during this
+  // batch is only visible through status, not through opId changing (finding #5).
+  if (rt.opId !== opId || rt.status !== 'running') return 'stop';
+  // P12 round 1 finding #6: assigned only after the supersession check above, not before — a
+  // superseded run's own (possibly slower) EXPLAIN result must never overwrite whatever the run
+  // that actually superseded it already put here (including having cleared it to null).
+  rt.autoExplain = autoExplainResult;
+  return 'proceed';
+}
+
 export const useConsoleViewStore = defineStore('consoleView', () => {
   const { runtime, ensureRuntime, toggleSearchOpen, setSearchOpen } =
     createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
@@ -257,6 +308,17 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
       // entries — QueryPlan.raw alone tens of KB each, nextSeq never reused — were retained in their
       // module-level maps for the life of the process.
       for (const result of rt.results) releaseResult(rt, result);
+      // P108 Part 11 F1: deleting the entry below detaches `rt` — it stays exactly as it is, so an
+      // in-flight run() or explain() awaiting on this same object still reads status 'running' and
+      // its own opId unchanged forever. Their post-await guards only check identity against that
+      // detached object, never `runtime[tabId]`'s own presence, so without this the real statement
+      // (or auto-explain's EXPLAIN batch) fires server-side after the tab is already gone. Cancel
+      // both possible in-flight ops and flip status so every such guard sees the close.
+      if (rt.status === 'running') {
+        if (rt.explainOpId) void control.opsCancel(rt.explainOpId);
+        if (rt.opId) void control.opsCancel(rt.opId);
+        rt.status = 'cancelled';
+      }
     }
     delete runtime[tabId];
   });
@@ -408,37 +470,10 @@ export const useConsoleViewStore = defineStore('consoleView', () => {
     // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
     const connection = useConnectionsStore().connectionRecord(tab.connectionId);
     if (connection?.autoExplain) {
-      const explainOpId = crypto.randomUUID();
-      rt.explainOpId = explainOpId;
-      let autoExplainResult: AutoExplainState | null;
-      try {
-        autoExplainResult = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
-      } catch (err) {
-        // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
-        // — Stop was pressed while this batch was the only op registered on the backend, so the
-        // real run must not fire at all, not just lose its warning.
-        // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
-        // (runStatement/runAll have no `running` guard against each other) may have already stamped
-        // its own explainOpId here by the time this catch runs; clearing unconditionally would
-        // discard *that* run's id, leaving Stop with nothing registered on the backend to cancel.
-        if (rt.explainOpId === explainOpId) rt.explainOpId = null;
-        applyLoadFailure(rt, opId, err, tabId, {
-          onDisconnected: () => {
-            rt.status = 'idle';
-          },
-        });
-        return;
-      }
-      // P12 round 2 finding #4: same identity guard as above — an overlapping run's own explainOpId
-      // must survive this run's clear.
-      if (rt.explainOpId === explainOpId) rt.explainOpId = null;
-      // Not only opId (a newer run superseding this one) — status too, since a Stop press during
-      // this batch is only visible through status, not through opId changing (finding #5).
-      if (rt.opId !== opId || rt.status !== 'running') return;
-      // P12 round 1 finding #6: assigned only after the supersession check above, not before —
-      // a superseded run's own (possibly slower) EXPLAIN result must never overwrite whatever the
-      // run that actually superseded it already put here (including having cleared it to null).
-      rt.autoExplain = autoExplainResult;
+      const gate = await runAutoExplainGate(tab, connection.kind, rt, opId, statements, () =>
+        Boolean(runtime[tabId]),
+      );
+      if (gate === 'stop') return;
     }
 
     try {

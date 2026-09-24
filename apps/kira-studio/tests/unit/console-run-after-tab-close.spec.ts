@@ -13,24 +13,17 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
-import { deferred } from '@workbench/testing/unit/async';
-import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
-import { setActivePinia } from 'pinia';
-import { pinia } from '../../frontend/src/state/pinia';
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
+import { deferred, sleep } from '@workbench/testing/unit/async';
+import { bootstrapConsole } from './support/consoleHarness.ts';
 
-setActivePinia(pinia);
-
-const { data } = await import('../../frontend/src/bridge/data');
-restoreAfterEach(data);
-const { cleanupTabRuntime } = await import('@workbench/state/tabRuntime');
-const { useTabsStore } = await import('../../frontend/src/state/tabs');
-const tabsStore = useTabsStore();
-const { useConsoleViewStore, resultPageKey } = await import(
-  '../../frontend/src/views/console/state'
-);
-const consoleViewStore = useConsoleViewStore();
+const { data, control, connectionsStore, tabsStore, consoleViewStore } = await bootstrapConsole({
+  control: true,
+});
+const { resultPageKey } = await import('../../frontend/src/views/console/state');
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
 
 function fakePage(): Page {
@@ -56,6 +49,56 @@ describe('console run() after the tab closes mid-run (P12 round 2 finding #3)', 
 
     expect(consoleViewStore.runtime[tabId]).toBeUndefined();
     // The leaked key run() would otherwise have written under, had it ignored the closed tab.
+    expect(getPage(resultPageKey(tabId, 0))).toBeNull();
+  });
+});
+
+// P108 Part 11 F1: closing a tab while its auto-explain pre-run EXPLAIN batch is in flight used to
+// leave the real statement free to fire once that batch settled — cleanup deleted runtime[tabId]
+// but never touched the detached `rt` object run()'s own post-await guard reads, so `rt.status`
+// still read 'running' forever and the guard passed. Drives the same auto-explain race
+// console-stop-auto-explain.spec.ts covers for a Stop press, but for a tab close instead.
+describe('console run() closed mid auto-explain (P108 Part 11 F1)', () => {
+  test('cancels the EXPLAIN batch and the real statement never fires', async () => {
+    const connectionId = 'conn-close-mid-auto-explain';
+    connectionsStore.records.push({
+      id: connectionId,
+      // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
+      ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),
+    } as ConnectionSummary);
+    const tabId = tabsStore.openConsoleTab(connectionId, 'db');
+
+    const explainCall = deferred<ExecuteResponse>();
+    const executeCalls: string[] = [];
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
+    (data as any).execute = (req: { opId: string; statements: string[] }) => {
+      executeCalls.push(req.opId);
+      return explainCall.promise; // only the EXPLAIN batch's own call should ever happen here
+    };
+    const cancelledOpIds: string[] = [];
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real control.opsCancel
+    (control as any).opsCancel = (opId: string) => {
+      cancelledOpIds.push(opId);
+      return Promise.resolve(true);
+    };
+
+    const running = consoleViewStore.run(tabId, ['SELECT * FROM big']);
+    await sleep(10); // let run() reach the EXPLAIN batch's own await
+    const explainOpId = consoleViewStore.runtime[tabId]?.explainOpId as string;
+    const runOpId = consoleViewStore.runtime[tabId]?.opId as string;
+    expect(explainOpId).toBeTruthy();
+
+    cleanupTabRuntime(tabId); // the real closeTab-time signal, fired while EXPLAIN is in flight
+    expect(consoleViewStore.runtime[tabId]).toBeUndefined();
+    // Cleanup must cancel both ops, same as a Stop press (console-stop-auto-explain.spec.ts) —
+    // not just delete the runtime entry and leave the backend op running.
+    expect(cancelledOpIds).toEqual([explainOpId, runOpId]);
+
+    explainCall.resolve({ pages: [] }); // the EXPLAIN batch settles after the tab is already gone
+    await running;
+
+    // The real statement must never fire: only the EXPLAIN batch's own execute() call happened.
+    expect(executeCalls).toEqual([explainOpId]);
     expect(getPage(resultPageKey(tabId, 0))).toBeNull();
   });
 });
