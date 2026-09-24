@@ -3868,6 +3868,16 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   `render.go`'s matching logic, a materially larger structural change than the finding itself.
   Closing this needs that provenance wiring.
 
+- **Response bodies, gRPC response messages and jar cookies reach `kira.sqlite` history unmasked**
+  (F16, P108 Part 8). `bridge/http.go`'s `maskSecrets` masks headers, redirect/final URLs and the
+  rendered `Wire` exchange, but never `resp.Body`; `bridge/grpc.go`'s `maskGrpcResult` never masks
+  `Messages[].JSON`; the jar-cookie bridge (`http.go`'s `Cookies`) returns `JarCookies` unmasked.
+  Accepted by design (P8 OQ-6, P11) — a request secret is masked because it's substituted from a
+  known name/value pair; a response body is opaque server output with no such pairing to mask
+  against. A server that echoes a secret back in its response body, a gRPC reply message, or a
+  `Set-Cookie` therefore stores that secret in plaintext in history. Closing this needs the same
+  substituted-secret value set applied as a body/message/cookie scan, not just a header/URL one.
+
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
   `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
