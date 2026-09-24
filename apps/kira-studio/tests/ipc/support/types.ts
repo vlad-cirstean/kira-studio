@@ -28,6 +28,10 @@ export interface ControlSnapshot<T = unknown> {
    *  optional `json.RawMessage` field, so far only ever set by HttpService.Send's own failed-send
    *  timeline; every other seeded error leaves it unset. */
   error?: { code: string; message: string; details?: unknown };
+  /** tests/ui/-only (P108 Part 12 F4): holds this call's reply until the spec calls
+   *  `control.release(channel)` — see `@workbench/testing/ui/mockRuntime`'s own doc comment on
+   *  `ControlSnapshot.hold`/`ControlMockHandle.release`. No `tests/ipc/**` fixture sets this. */
+  hold?: boolean;
 }
 
 /** One bulk-data snapshot. `payload` matches a PortRequest's own payload; `response` is logical,
