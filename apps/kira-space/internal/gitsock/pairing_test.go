@@ -193,13 +193,14 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	}
 }
 
-// TestBroker_RequestAfterShutdownIsDeniedImmediately is P108 Part 17 review F4(b)'s own regression
+// TestBroker_RequestAfterShutdownIsAbortedImmediately is P108 Part 17 review F4(b)'s own regression
 // guard: a handshake that already read hello but reaches Request only after Shutdown has already
 // cleared the queue used to enqueue a fresh entry and block forever on <-entry.result —
 // expireLoop has already exited by the time Shutdown runs (its closeCh is closed) so nothing would
 // ever resolve it, and closing the underlying net.Conn does nothing to unblock a plain channel
-// receive either.
-func TestBroker_RequestAfterShutdownIsDeniedImmediately(t *testing.T) {
+// receive either. F11: the outcome is Aborted, not Denied — the server going away is not a
+// decision about this client.
+func TestBroker_RequestAfterShutdownIsAbortedImmediately(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
@@ -212,8 +213,8 @@ func TestBroker_RequestAfterShutdownIsDeniedImmediately(t *testing.T) {
 
 	select {
 	case out := <-done:
-		if out != PairingDenied {
-			t.Fatalf("Request after Shutdown: got %v, want PairingDenied", out)
+		if out != PairingAborted {
+			t.Fatalf("Request after Shutdown: got %v, want PairingAborted", out)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Request after Shutdown never returned — it enqueued a fresh entry nothing will ever resolve")
@@ -295,9 +296,9 @@ func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 // finding #10: clientID is entirely client-supplied and unauthenticated at Request time (handshake
 // row 7), so nothing but maxQueueLen stops a local process from opening far more concurrent
 // connections than any real user could ever triage, each blocking a goroutine on its own result
-// channel for up to pairingTimeout. This proves Request denies immediately — no enqueue, no
-// onEnqueued call, matching the cooldown short-circuit's own contract — once the queue is already
-// at the cap, rather than growing without bound.
+// channel for up to pairingTimeout. This proves Request aborts immediately (F11: capacity, not a
+// user decision) — no enqueue, no onEnqueued call, matching the cooldown short-circuit's own
+// contract — once the queue is already at the cap, rather than growing without bound.
 func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	t.Parallel()
 	clock := newFakeClock()
@@ -321,8 +322,8 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	out := b.Request("one-too-many", "label", func(PairingRequest) {
 		t.Fatal("a request beyond maxQueueLen must not be enqueued")
 	})
-	if out != PairingDenied {
-		t.Fatalf("over-cap request outcome: got %v, want PairingDenied", out)
+	if out != PairingAborted {
+		t.Fatalf("over-cap request outcome: got %v, want PairingAborted", out)
 	}
 	if snap := b.Pending(); snap.Queued != maxQueueLen {
 		t.Fatalf("Queued after the over-cap attempt = %d, want unchanged %d", snap.Queued, maxQueueLen)

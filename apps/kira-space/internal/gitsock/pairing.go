@@ -22,8 +22,9 @@ const (
 // queued at once — nothing stops a local process from opening many concurrent connections and
 // enqueueing a pairing request on each one, growing the queue (and the goroutines blocked waiting
 // on each entry's own result channel) without bound for up to pairingTimeout before
-// ExpireOverdue reaps them. Beyond this cap, Request denies immediately rather than enqueueing —
-// the same short-circuit shape the cooldown check just above already uses.
+// ExpireOverdue reaps them. Beyond this cap, Request aborts immediately rather than enqueueing —
+// the same short-circuit shape the cooldown check just above already uses (F11: aborted, not
+// denied — capacity is not a decision about this particular client).
 const maxQueueLen = 200
 
 // PairingOutcome is Broker.Request's own vocabulary — never a Go error (F7's precedent: a pairing
@@ -34,6 +35,13 @@ const (
 	PairingApproved PairingOutcome = iota
 	PairingDenied
 	PairingTimedOut
+	// PairingAborted is F11's outcome for a request resolved by something that is not a user
+	// decision — the server shutting down, the queue already at its cap, or Request being called
+	// after Shutdown — as distinct from PairingDenied, which is always a real user Deny (and its
+	// cooldown). runHandshake answers it with the row-1 posture (close, no frame) rather than a
+	// "denied" frame, so the client's ordinary backoff-reconnect path runs instead of its terminal,
+	// manual-retry-only denied state.
+	PairingAborted
 )
 
 // PairingActionResult is what Approve/Deny report — also never an error (D19).
@@ -146,19 +154,22 @@ func (b *Broker) InCooldown(clientID string) bool {
 // client mid-cooldown gets an immediate, silent "denied".
 func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)) PairingOutcome {
 	b.mu.Lock()
-	// F4(b): a handshake that already read hello but reaches Request only after Shutdown has
-	// already cleared the queue must not enqueue a fresh entry nobody will ever resolve.
+	// F4(b)/F11: a handshake that already read hello but reaches Request only after Shutdown has
+	// already cleared the queue must not enqueue a fresh entry nobody will ever resolve. Aborted,
+	// not Denied — the server going away is not a user decision about this client.
 	if b.closed {
 		b.mu.Unlock()
-		return PairingDenied
+		return PairingAborted
 	}
+	// A real Deny's own cooldown: this IS a user decision (D8), so it stays Denied.
 	if until, ok := b.cooldown[clientID]; ok && b.now().Before(until) {
 		b.mu.Unlock()
 		return PairingDenied
 	}
+	// F11: the queue being full is capacity, not a user decision about this client — Aborted.
 	if b.queue.Len() >= maxQueueLen {
 		b.mu.Unlock()
-		return PairingDenied
+		return PairingAborted
 	}
 	now := b.now()
 	entry := &pendingEntry{
@@ -326,14 +337,16 @@ func (b *Broker) ExpireOverdue() {
 	}
 }
 
-// Shutdown resolves every currently queued pairing request as denied, unblocking any Request()
-// call still waiting on one. Server.Close calls this before its own wg.Wait() (G32 round-3
-// architecture/security review, finding #1): a queued request's Request() call blocks on
+// Shutdown resolves every currently queued pairing request as aborted (F11), unblocking any
+// Request() call still waiting on one. Server.Close calls this before its own wg.Wait() (G32
+// round-3 architecture/security review, finding #1): a queued request's Request() call blocks on
 // entry.result, a plain Go channel receive with no other case — unlike a connection blocked on an
 // actual network read, closing its net.Conn does nothing to unblock it, so a pairing prompt still
 // sitting unanswered when the app quits would otherwise hang that connection's handleConn
-// goroutine, and so Close's own wg.Wait(), forever. No cooldown is started (unlike an explicit
-// Deny): this is the server going away, not a decision about the client.
+// goroutine, and so Close's own wg.Wait(), forever. No cooldown is started, and the outcome is
+// Aborted, not Denied (F11): this is the server going away, not a decision about the client — the
+// client's terminal, manual-retry-only "denied" state would otherwise leave it disconnected until
+// the user finds and presses retry.
 func (b *Broker) Shutdown() {
 	b.mu.Lock()
 	b.closed = true
@@ -343,7 +356,7 @@ func (b *Broker) Shutdown() {
 	b.mu.Unlock()
 
 	for _, entry := range all {
-		entry.result <- PairingDenied
+		entry.result <- PairingAborted
 	}
 	if len(all) > 0 {
 		b.emitter.Emit(seq, snap)

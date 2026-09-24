@@ -155,6 +155,11 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	case PairingDenied:
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "denied"})
 		return "", "", "", false
+	case PairingAborted:
+		// F11: not a user decision (server shutdown, queue cap) — close without a frame, the row-1
+		// posture, so the client backs off and redials instead of landing in its terminal "denied"
+		// state.
+		return "", "", "", false
 	default: // PairingTimedOut
 		sendHandshake(c, handshakeResponse{Kind: "pairingDenied", Reason: "timeout"})
 		return "", "", "", false
