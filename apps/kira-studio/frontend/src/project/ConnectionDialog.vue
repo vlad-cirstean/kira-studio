@@ -279,11 +279,25 @@ async function onTest(): Promise<void> {
 // P14 D6: the backend decides, this just renders what comes back. requestReveal recurses exactly
 // once, for the confirmation-required -> user confirms -> re-ask-with-confirmed:true path; every
 // other outcome is terminal.
+//
+// P108 Part 12 F4: this dialog stays mounted across a draft swap (openCreateDialog/openEditDialog
+// Object.assign a new draft into the same reactive `dialog` in place — no close/reopen — so the
+// menu-bar New Connection, or closing and opening a different Edit, can replace
+// connectionDialogStore.draft while an OS auth prompt or the confirm dialog above is still up).
+// `target`/`targetEditingId` pin down which draft this reveal was requested for; every await
+// re-checks identity before touching state, so a reveal that outlives its own draft writes (and
+// shows) a secret into a draft the user never asked to reveal, instead of bailing quietly.
 async function requestReveal(id: string, confirmed: boolean): Promise<void> {
+  const target = draft.value;
+  const targetEditingId = connectionDialogStore.editingId;
+  const stillCurrent = (): boolean =>
+    connectionDialogStore.draft === target && connectionDialogStore.editingId === targetEditingId;
+
   const result = await control.connectionsReveal(id, confirmed);
+  if (!stillCurrent()) return;
   switch (result.outcome) {
     case 'revealed':
-      if (draft.value) draft.value.password = result.password;
+      if (target) target.password = result.password;
       revealed.value = true;
       showPassword.value = true;
       return;
@@ -291,18 +305,32 @@ async function requestReveal(id: string, confirmed: boolean): Promise<void> {
       // D11: the user cancelled the OS prompt on purpose — nothing to show for it.
       return;
     case 'confirmation-required': {
-      const name = draft.value?.name || 'this connection';
+      const name = target?.name || 'this connection';
       const ok = await confirmDialogStore.confirmDialog(
         `Show the saved password for "${name}"? It will be displayed in plain text.`,
         { danger: false },
       );
+      if (!stillCurrent()) return;
       if (ok) await requestReveal(id, true);
       return;
     }
     default:
-      connectionDialogStore.error = result.error ?? 'Could not reveal the saved password.';
+      if (stillCurrent()) connectionDialogStore.error = result.error ?? 'Could not reveal the saved password.';
   }
 }
+
+// P108 Part 12 F4: revealed/showPassword are plain refs, set once at setup — a draft swap while
+// this component stays mounted (see requestReveal's own comment above) never re-ran that setup,
+// so a revealed secret from the old draft stayed shown (and un-masked) in the new one. Reset on
+// every genuine draft-identity change (a fresh create or a fresh edit), never on an in-place edit
+// of the current draft's own fields.
+watch(
+  () => connectionDialogStore.draft,
+  () => {
+    revealed.value = !isEdit.value;
+    showPassword.value = false;
+  },
+);
 
 function onReveal(): void {
   const id = connectionDialogStore.editingId;

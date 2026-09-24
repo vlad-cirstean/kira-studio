@@ -3,6 +3,7 @@ import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm, cancelConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // P14: confirm-before-reveal for saved credentials. Follows secrets.spec.ts's own pattern (F10) —
 // mocking ConnectionsService.Reveal's response per scenario, rather than branching on the host OS
@@ -189,6 +190,52 @@ test('OS auth unavailable routes through the in-app confirmation', async ({ rela
   const revealCalls = control.log().filter((e) => e.channel === IPC.connectionsReveal);
   expect(revealCalls).toHaveLength(3);
   expect(revealCalls[2]?.args).toEqual({ id: CONN.id, confirmed: true });
+});
+
+// P108 Part 12 F4: a reveal in flight for the connection being edited must not write (or show)
+// its secret into whatever draft has replaced it by the time the reveal resolves —
+// ConnectionDialog.vue stays mounted across the swap (App.vue's `v-if="connectionDialogStore.open"`
+// never toggles: openCreateDialog Object.assigns a fresh draft into the same store, it doesn't
+// close and reopen the dialog), so nothing but requestReveal's own draft-identity check stands
+// between them. The swap itself is the menu-bar "New Connection" command the finding calls out
+// (IPC.newConnection, a push event — same path a Cmd+N keypress or File-menu click takes), fired
+// straight at the mock's dispatch hook rather than closing the dialog: a close (or a v-if-gated
+// remount of any kind) would reset revealed/showPassword on its own even under the old, unfixed
+// code, and would prove nothing about the identity-check fix this finding is actually about.
+test("a draft swap while a reveal is in flight does not leak the old draft's secret", async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: boot([
+      {
+        channel: IPC.connectionsReveal,
+        args: { id: CONN.id, confirmed: false },
+        response: { password: 'hunter2', error: null, outcome: 'revealed' },
+        hold: true,
+      },
+    ]),
+  });
+
+  await openEdit(page);
+  const passwordField = page.locator('[data-testid="connection-password"]');
+
+  // Press reveal for CONN — the reply is held, so this awaits nothing but the click itself.
+  await page.click('[aria-label="Show password"]');
+  expect(control.log().filter((e) => e.channel === IPC.connectionsReveal)).toHaveLength(1);
+
+  // Swap the draft to a brand-new create-mode one while CONN's reveal is still in flight — same
+  // live dialog instance, no close/reopen. defaultDraft()'s own empty name is the swap's signal:
+  // the dialog never unmounted (still visible throughout), only its draft identity changed.
+  await emitWailsEvent(page, IPC.newConnection, undefined);
+  await expect(page.locator('[data-testid="connection-dialog"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-name"]')).toHaveValue('');
+  await expect(passwordField).toHaveValue('');
+  await expect(passwordField).toHaveAttribute('type', 'password');
+
+  // Now let CONN's held reveal resolve. It must not land in the new, unrelated draft.
+  control.release(IPC.connectionsReveal);
+  await expect(passwordField).toHaveValue('');
+  await expect(passwordField).toHaveAttribute('type', 'password');
 });
 
 test("a reveal error renders in the dialog's existing error slot", async ({ relaunch }) => {
