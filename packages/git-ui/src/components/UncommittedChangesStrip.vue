@@ -128,14 +128,17 @@ const tooltipText = computed(() => {
   <button
     v-if="visible"
     type="button"
-    class="kv-uncommitted-strip"
+    class="kv:shrink-0 kv:flex kv:items-center kv:w-full kv:h-5.5 kv:border-0 kv:border-b kv:border-panel-border kv:bg-panel kv:[font:inherit] kv:text-inherit kv:text-left kv:cursor-pointer kv:hover:bg-hover kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-1"
     data-testid="uncommitted-strip"
     @click="emit('select')"
   >
-    <div class="kv-uncommitted-strip-gutter" :style="{ width: `${gutterWidth}px` }">
+    <div
+      class="kv:shrink-0 kv:h-full kv:flex kv:items-center kv:overflow-visible"
+      :style="{ width: `${gutterWidth}px` }"
+    >
       <svg
         v-if="nodeCx !== undefined"
-        class="kv-uncommitted-strip-node"
+        class="kv:overflow-visible"
         aria-hidden="true"
         :width="gutterWidth"
         height="18"
@@ -147,63 +150,16 @@ const tooltipText = computed(() => {
           :class="laneClassName"
           :stroke-width="GEOMETRY.strokeWidth"
           :stroke-dasharray="dashArray"
-          style="fill: none"
+          class="kv:fill-none"
         />
       </svg>
     </div>
     <span
       v-kui-tooltip="tooltipText"
-      class="kv-uncommitted-strip-label"
+      class="kv:min-w-0 kv:truncate kv:text-muted kv:text-sm"
       data-testid="uncommitted-strip-label"
     >
       {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
     </span>
   </button>
 </template>
-
-<style>
-.kv-uncommitted-strip {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 22px;
-  border: none;
-  border-bottom: 1px solid var(--kv-panel-border);
-  background-color: var(--kv-panel-bg);
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.kv-uncommitted-strip:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-uncommitted-strip:focus-visible {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
-}
-
-.kv-uncommitted-strip-gutter {
-  flex-shrink: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  overflow: visible;
-}
-
-.kv-uncommitted-strip-node {
-  overflow: visible;
-}
-
-.kv-uncommitted-strip-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kv-description-fg);
-  font-size: 0.9em;
-}
-</style>

@@ -22,6 +22,7 @@ import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
 import {
+  cn,
   KuiButton,
   KuiContextMenu,
   KuiSearchInput,
@@ -230,6 +231,26 @@ watch(
 
 function rowKey(row: FileTreeRow): string {
   return row.kind === 'directory' ? `dir:${row.node.path}` : `file:${row.node.path}`;
+}
+
+/** P110 A15: replaces the old `[kuiRowVariants(), 'kv-file-tree-row', {...}]` array binding.
+ *  `kuiRowVariants({ selected })` already renders byte-identically to the file's own retired
+ *  `.kv-row-selected`/hover rules (`kui-bridge.css`'s `--kui-selected-*`/`--kui-hover-bg` map to
+ *  the exact same `--kv-row-selected-*`/`--kv-row-hover-bg` tokens) — no separate selected class
+ *  needed. `cn()` cancels the variant's own `px-kui-3` (6px) with this row's real 2px/8px padding
+ *  (`.kv-file-tree-row`'s own padding shorthand always fully overrode it, unlayered). The focus
+ *  ring is `group-focus-within` (the container below carries `kv:group`) applied only to the one
+ *  row `index === focusedRow` names — reproducing the old
+ *  `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused` compound selector. */
+function rowClass(row: FileTreeRow, index: number): string {
+  const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
+  return cn(
+    kuiRowVariants({ selected }),
+    'kv:py-0.5 kv:px-2',
+    index === focusedRow.value
+      ? 'kv:group-focus-within:outline kv:group-focus-within:outline-1 kv:group-focus-within:outline-focus kv:group-focus-within:-outline-offset-1'
+      : '',
+  );
 }
 
 /** G21 D13: every selection change — a click or an arrow-key move alike — also opens the file,
@@ -451,7 +472,7 @@ function reviewToggleTitle(path: string): string {
 </script>
 
 <template>
-  <div class="kv-file-tree" data-testid="file-tree">
+  <div class="kv:flex kv:flex-col kv:min-h-0 kv:flex-1" data-testid="file-tree">
     <!-- G21 D11 (superseded by G34 D1): this root used to carry `.kv-skin-kira` to scope
          kira-structure.css's colour-free, structural-only tokens (spacing/control-height/
          font-role) to this one component while density.css's own scale governed everywhere else.
@@ -462,11 +483,11 @@ function reviewToggleTitle(path: string): string {
          text, new position) — a comment sitting as the root `<div>`'s own template-level sibling
          defeats Vue's single-root detection for THIS toolchain (Vue 3.5.42 /
          @vitejs/plugin-vue 6.0.8: confirmed empirically, not merely suspected), which silently
-         drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own
-         `class="kv-detail-pane-tree"` (border-top/bottom, and D7's own new max-height/flex rules)
-         never reached this component's root at all before this move. -->
-    <div v-if="parentOptions.length > 1" class="kv-file-tree-parent">
-      <span class="kv-file-tree-parent-label">Diffing against</span>
+         drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own `class` prop
+         on its `<FileTree>` usage (P110 A15: now `kv:flex-auto kv:min-h-0 kv:border-y
+         kv:border-panel-border`) never reached this component's root at all before this move. -->
+    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-1 kv:px-5 kv:pb-4 kv:text-sm">
+      <span>Diffing against</span>
       <KuiSelect
         :model-value="String(parentIndex)"
         :options="parentSelectOptions"
@@ -475,9 +496,9 @@ function reviewToggleTitle(path: string): string {
       />
     </div>
 
-    <div v-if="showToolbar !== false" class="kv-file-tree-toolbar">
+    <div v-if="showToolbar !== false" class="kv:flex kv:gap-2 kv:px-4 kv:pb-2">
       <KuiSearchInput
-        class="kv-file-tree-filter"
+        class="kv:flex-1 kv:min-w-0"
         :model-value="filterInput"
         placeholder="Filter files"
         ariaLabel="Filter files"
@@ -494,7 +515,7 @@ function reviewToggleTitle(path: string): string {
     <div
       v-if="listMode === 'tree'"
       ref="treeEl"
-      class="kv-file-tree-rows"
+      class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none kv:group"
       aria-label="File tree"
       role="tree"
       @keydown="onKeydown"
@@ -503,11 +524,7 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        :class="[
-          kuiRowVariants(),
-          'kv-file-tree-row',
-          { 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile },
-        ]"
+        :class="rowClass(row, index)"
         role="treeitem"
         :aria-level="row.depth + 1"
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
@@ -522,19 +539,19 @@ function reviewToggleTitle(path: string): string {
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="kv-file-tree-review-slot" aria-hidden="true"></span>
+          <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
           <span
-            class="codicon kv-file-tree-chevron"
+            class="codicon kv:text-[12px] kv:w-3"
             :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
             aria-hidden="true"
           ></span>
-          <span class="kv-file-tree-dir-name">{{ row.node.name }}</span>
-          <span class="kv-file-tree-dir-stats">
+          <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
+          <span class="kv:ml-auto kv:text-muted kv:font-ui kv:text-xs kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv-diff-added-fg" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
+            <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv-diff-deleted-fg" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="kv:text-diff-deleted" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
@@ -548,7 +565,7 @@ function reviewToggleTitle(path: string): string {
           <input
             v-if="reviewStates"
             type="checkbox"
-            class="kv-file-tree-review-toggle"
+            class="kv:shrink-0"
             :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
             :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
             v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
@@ -556,11 +573,11 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv-file-tree-icon"
+            class="kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
+          <span class="kv:overflow-hidden kv:text-ellipsis" v-kui-tooltip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
@@ -570,21 +587,24 @@ function reviewToggleTitle(path: string): string {
           </span>
           <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
                directory row already carries this path via its own ancestor rows). -->
-          <span class="kv-file-tree-trailing">
-            <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
+          <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
+            <span
+              v-if="!row.node.change.isBinary"
+              class="kv:font-ui kv:text-xs kv:flex kv:gap-1 kv:shrink-0"
+            >
               <span
-                class="kv-diff-added-fg"
+                class="kv:text-diff-added"
                 v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
-                class="kv-diff-deleted-fg"
+                class="kv:text-diff-deleted"
                 v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
-              class="kv-file-tree-status"
+              class="kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -592,7 +612,7 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv-file-tree-changed-badge"
+            class="kv:shrink-0 kv:text-[0.5em] kv:text-diff-modified"
             v-kui-tooltip="'Changed since you reviewed it'"
             aria-hidden="true"
             >●</span
@@ -600,7 +620,11 @@ function reviewToggleTitle(path: string): string {
         </template>
       </div>
 
-      <KuiButton v-if="capped.hiddenCount > 0" class="kv-file-tree-show-all" @click="capLifted = true">
+      <KuiButton
+        v-if="capped.hiddenCount > 0"
+        class="kv:w-full kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:border-0 kv:border-t kv:border-panel-border kv:p-1 kv:cursor-pointer"
+        @click="capLifted = true"
+      >
         Show all {{ rows.length }} files
       </KuiButton>
 
@@ -617,7 +641,7 @@ function reviewToggleTitle(path: string): string {
     <div
       v-else
       ref="treeEl"
-      class="kv-file-tree-rows"
+      class="kv:flex-1 kv:min-h-0 kv:overflow-auto kv:outline-none kv:group"
       aria-label="File list"
       role="listbox"
       @keydown="onKeydown"
@@ -626,11 +650,7 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        :class="[
-          kuiRowVariants(),
-          'kv-file-tree-row',
-          { 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile },
-        ]"
+        :class="rowClass(row, index)"
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
@@ -643,19 +663,19 @@ function reviewToggleTitle(path: string): string {
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
                rows' checkbox column aligned underneath it. -->
-          <span v-if="reviewStates" class="kv-file-tree-review-slot" aria-hidden="true"></span>
+          <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
           <span
-            class="codicon kv-file-tree-chevron"
+            class="codicon kv:text-[12px] kv:w-3"
             :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
             aria-hidden="true"
           ></span>
-          <span class="kv-file-tree-dir-name">{{ row.node.name }}</span>
-          <span class="kv-file-tree-dir-stats">
+          <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
+          <span class="kv:ml-auto kv:text-muted kv:font-ui kv:text-xs kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv-diff-added-fg" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
+            <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv-diff-deleted-fg" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="kv:text-diff-deleted" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
@@ -669,7 +689,7 @@ function reviewToggleTitle(path: string): string {
           <input
             v-if="reviewStates"
             type="checkbox"
-            class="kv-file-tree-review-toggle"
+            class="kv:shrink-0"
             :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
             :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
             v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
@@ -677,11 +697,11 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv-file-tree-icon"
+            class="kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
+          <span class="kv:overflow-hidden kv:text-ellipsis" v-kui-tooltip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
@@ -691,24 +711,27 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="dirOf(row.node.path)"
-            class="kv-file-tree-file-dir"
+            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted kv:text-xs"
             >{{ dirOf(row.node.path) }}</span
           >
-          <span class="kv-file-tree-trailing">
-            <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
+          <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
+            <span
+              v-if="!row.node.change.isBinary"
+              class="kv:font-ui kv:text-xs kv:flex kv:gap-1 kv:shrink-0"
+            >
               <span
-                class="kv-diff-added-fg"
+                class="kv:text-diff-added"
                 v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
-                class="kv-diff-deleted-fg"
+                class="kv:text-diff-deleted"
                 v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
-              class="kv-file-tree-status"
+              class="kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -716,7 +739,7 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv-file-tree-changed-badge"
+            class="kv:shrink-0 kv:text-[0.5em] kv:text-diff-modified"
             v-kui-tooltip="'Changed since you reviewed it'"
             aria-hidden="true"
             >●</span
@@ -724,7 +747,11 @@ function reviewToggleTitle(path: string): string {
         </template>
       </div>
 
-      <KuiButton v-if="capped.hiddenCount > 0" class="kv-file-tree-show-all" @click="capLifted = true">
+      <KuiButton
+        v-if="capped.hiddenCount > 0"
+        class="kv:w-full kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:border-0 kv:border-t kv:border-panel-border kv:p-1 kv:cursor-pointer"
+        @click="capLifted = true"
+      >
         Show all {{ rows.length }} files
       </KuiButton>
 
@@ -741,225 +768,3 @@ function reviewToggleTitle(path: string): string {
   </div>
 </template>
 
-<style>
-.kv-file-tree {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-}
-
-.kv-file-tree-parent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kv-s-1);
-  padding: 0 var(--kv-s-5) var(--kv-s-4);
-  font-size: 0.9em;
-}
-
-/* G34 D15: the same horizontal inset every other toolbar in the app now uses. */
-.kv-file-tree-toolbar {
-  display: flex;
-  gap: var(--kv-s-2);
-  padding: 0 var(--kv-s-4) var(--kv-s-2);
-}
-
-.kv-file-tree-filter {
-  flex: 1;
-  min-width: 0;
-}
-
-.kv-file-tree-rows {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  outline: none;
-}
-
-/* G21 D11: this row geometry used to be `ReviewView.vue`'s own `.kv-skin-kira` restyle of a
- * plainer base rule here — the graph panel's tree had to stay byte-identical while it still
- * embedded a diff (G12 D14's own guarantee). Items 9/10/12/13 already changed that tree's icons,
- * status glyph, and click behaviour, so there is nothing left for that guarantee to protect: this
- * is now the one geometry every tree renders, the component's only appearance. */
-.kv-file-tree-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  min-height: var(--kv-control-h);
-  padding: var(--kv-s-1) var(--kv-s-4);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.kv-file-tree-row:hover {
-  background-color: var(--kv-row-hover-bg);
-}
-
-.kv-file-tree-row.kv-row-selected {
-  background-color: var(--kv-row-selected-bg);
-  color: var(--kv-row-selected-fg);
-}
-
-.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused {
-  outline: 1px solid var(--kv-focus-border);
-  outline-offset: -1px;
-}
-
-.kv-file-tree-chevron {
-  font-size: 12px;
-  width: 12px;
-}
-
-.kv-file-tree-dir-name {
-  font-family: var(--kv-font-ui);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.kv-file-tree-dir-stats {
-  margin-left: auto;
-  color: var(--kv-description-fg);
-  font-family: var(--kv-font-ui);
-  font-size: 0.85em;
-  display: flex;
-  gap: var(--kv-s-2);
-}
-
-/* G19 D14: the row's primary leading glyph, taking over the leading-icon role the status letter
- * used to occupy. G-UX D3 (item 3): a real seti-ui icon now, rendered as a CSS mask (not inline
- * SVG/`v-html`) so `background-color` keeps driving its colour exactly as it did for the codicon
- * this replaces — `setiFileIcon.ts`'s own doc comment explains the mask choice. 16px matches VS
- * Code's own explorer icon box (G-UX item 6/F7 also flagged the old 14px-in-16px box as slightly
- * oversized; this box is unchanged, only what fills it). */
-.kv-file-tree-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-}
-
-/* G21 D10: item 10's own wording, taken literally — "just a colored letter", not a chip. G19
- * D14's status-chip class (background/border-radius/fixed 1.3em square/0.75em shrink) is
- * deleted outright; `min-width: 1ch` is the one thing kept from it, so the letter still occupies
- * a consistent width against its neighbour without reintroducing a box around it. G-UX D6
- * (item 6): the letter drops from the inherited full body size/weight-700 down to the tree's own
- * secondary scale — the same tier `.kv-file-tree-counts`/`-dir-stats`/`-file-dir` already use —
- * so it reads as metadata, not a heading. G34: the `0.85em` fallback this and
- * `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it and `--kv-t-xs`
- * (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
- * (kira-structure.css is `:root`-scoped, so it always resolves). G-UX (item 8): moved from
- * leading (just after the file icon) to trailing, on the row's right edge — see
- * `.kv-file-tree-trailing`'s own `margin-left: auto`, below. Bug fix (manual testing): the letter
- * now renders after the +N/-N counts, at the very right edge, not before them — the wrapper below
- * pushes the pair as a unit; a binary file with no counts span still lands the letter at the right
- * edge on its own. */
-.kv-file-tree-trailing {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-2);
-  flex-shrink: 0;
-}
-
-.kv-file-tree-status {
-  min-width: 1ch;
-  font-family: var(--kv-mono-font-family);
-  font-size: var(--kv-t-xs);
-  font-weight: 600;
-  line-height: 1;
-  flex-shrink: 0;
-  /* G-UX (item 8): "use stronger colors" — a single 11px letter needs more punch than the
-   * `--kv-diff-*-fg` tokens give it at that size (those are sourced from the ACTIVE VS Code
-   * theme's own `--vscode-gitDecoration-*` colors, tuned for larger surfaces like the diff
-   * gutter, and can read as pale/washed-out this small). A `filter` boosts saturation/contrast on
-   * whichever color the active theme actually supplies, rather than replacing it with a fixed
-   * hex that would stop following the user's theme (and rather than touching the shared
-   * `--kv-diff-*-fg` tokens themselves, which the diff view and change-count numbers still rely
-   * on unchanged). */
-  filter: saturate(1.6) contrast(1.15);
-}
-
-.kv-status-added {
-  color: var(--kv-diff-added-fg);
-}
-.kv-status-modified {
-  color: var(--kv-diff-modified-fg);
-}
-.kv-status-deleted {
-  color: var(--kv-diff-deleted-fg);
-}
-.kv-status-renamed {
-  color: var(--kv-diff-renamed-fg);
-}
-.kv-status-copied {
-  color: var(--kv-diff-copied-fg);
-}
-.kv-status-typechanged {
-  color: var(--kv-diff-typechanged-fg);
-}
-.kv-status-unmerged {
-  color: var(--kv-diff-unmerged-fg);
-}
-
-.kv-file-tree-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* G14 D8: the review sidebar's own dimmed-directory-after-filename (row 5, flat-list mode only —
- * tree mode already nests by directory). GitLens's own file-node anatomy. */
-.kv-file-tree-file-dir {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-xs);
-}
-
-.kv-file-tree-counts {
-  font-family: var(--kv-font-ui);
-  font-size: 0.85em;
-  display: flex;
-  gap: var(--kv-s-2);
-  flex-shrink: 0;
-}
-
-.kv-diff-added-fg {
-  color: var(--kv-diff-added-fg);
-}
-.kv-diff-deleted-fg {
-  color: var(--kv-diff-deleted-fg);
-}
-
-.kv-file-tree-changed-badge {
-  flex-shrink: 0;
-  font-size: 0.5em;
-  color: var(--kv-diff-modified-fg);
-}
-
-.kv-file-tree-review-toggle {
-  flex-shrink: 0;
-}
-
-/* P75 §4.3: a directory row has nothing to mark, but the file rows below it must still line up
-   under one checkbox column — same width as the checkbox itself. */
-.kv-file-tree-review-slot {
-  width: 14px;
-  flex-shrink: 0;
-}
-
-.kv-file-tree-show-all {
-  width: 100%;
-  background: transparent;
-  color: var(--kv-focus-border);
-  border: none;
-  border-top: 1px solid var(--kv-panel-border);
-  padding: var(--kv-s-2);
-  cursor: pointer;
-}
-</style>
