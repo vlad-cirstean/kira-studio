@@ -9,6 +9,16 @@
  * positioned "surface" (`.kui-menu-root` / `.kui-popover`) around this component's own `.kui-menu-
  * list`, which carries no position/background/border/shadow of its own by design — see
  * `theme/controls.css`'s own comment on `.kui-menu-list`.
+ *
+ * P110 A5: controls.css's `.kui-menu-list`/`.kui-menu-item`(+`--disabled`/`--danger`)/`-label`/
+ * `-detail`/`.kui-menu-heading`/`.kui-menu-separator`/`.kui-visually-hidden` replaced by `kv:`
+ * utilities; the item row itself now composes the shared `kuiRowVariants()` (A5) rather than the
+ * retired literal `class="kui-row"`. The icon box is a real `<KuiIconBox>` now (A3), not a raw
+ * `class="kui-icon-box"` span — this was that class's last consumer, so `controls.css`'s own
+ * `.kui-icon-box`/`.kui-icon-box .codicon` rules are deleted in this same commit. Its unconditional
+ * muted colour (menu-specific, not part of `kuiRowVariants`: every row in a menu gets it whether or
+ * not it carries an icon) is a ternary against `item.danger` on the component itself, since danger
+ * is the one state that overrides it.
  */
 import { computed, ref } from 'vue';
 import {
@@ -17,6 +27,8 @@ import {
   flattenItems,
   type MenuSection,
 } from './contextMenuModel.ts';
+import KuiIconBox from './KuiIconBox.vue';
+import { kuiRowVariants } from './rowVariants.ts';
 
 const props = defineProps<{
   sections: readonly MenuSection[];
@@ -116,20 +128,28 @@ defineExpose({
 <template>
   <div
     ref="listEl"
-    class="kui-menu-list"
+    class="kv:flex kv:flex-col kv:gap-px kv:p-kui-2"
     role="menu"
     :aria-label="title ?? label"
     @keydown="onKeydown"
   >
-    <div v-if="title" class="kui-menu-heading" aria-hidden="true">{{ title }}</div>
+    <div
+      v-if="title"
+      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-kui-3 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-[0.06em] kv:truncate"
+      aria-hidden="true"
+    >
+      {{ title }}
+    </div>
     <template v-for="(section, sectionIndex) in sections" :key="sectionIndex">
-      <hr v-if="sectionIndex > 0" class="kui-menu-separator" />
+      <hr
+        v-if="sectionIndex > 0"
+        class="kv:h-px kv:my-kui-2 kv:border-0 kv:bg-kui-border-strong"
+      />
       <div
         v-for="item in section.items"
         :id="itemId(item.id)"
         :key="item.id"
-        class="kui-row kui-menu-item"
-        :class="{ 'kui-menu-item--disabled': item.disabled, 'kui-menu-item--danger': item.danger }"
+        :class="kuiRowVariants({ disabled: item.disabled, danger: item.danger })"
         role="menuitem"
         :aria-disabled="item.disabled"
         :aria-describedby="item.disabled && item.disabledReason ? `${itemId(item.id)}-reason` : undefined"
@@ -141,17 +161,18 @@ defineExpose({
       >
         <!-- G34 D9: the icon box is unconditional (Kira's own shape) so every row's label starts
              at the same x position whether or not that particular item carries an icon. -->
-        <span class="kui-icon-box">
-          <span v-if="item.icon" class="codicon" :class="item.icon" aria-hidden="true"></span>
-        </span>
-        <span class="kui-menu-item-label">
+        <KuiIconBox
+          :icon="item.icon"
+          :class="item.danger ? 'kv:text-kui-danger-fg' : 'kv:text-kui-fg-muted'"
+        />
+        <span class="kv:flex kv:flex-col kv:min-w-0">
           <span>{{ item.label }}</span>
-          <span v-if="item.detail" class="kui-menu-item-detail">{{ item.detail }}</span>
+          <span v-if="item.detail" class="kv:text-kui-xs kv:text-kui-fg-muted">{{ item.detail }}</span>
         </span>
         <span
           v-if="item.disabled && item.disabledReason"
           :id="`${itemId(item.id)}-reason`"
-          class="kui-visually-hidden"
+          class="kv:sr-only"
         >
           {{ item.disabledReason }}
         </span>

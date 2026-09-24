@@ -10,7 +10,13 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import { KuiButton, KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
+import {
+  KuiButton,
+  KuiPopoverPanel,
+  KuiSearchInput,
+  kuiRowVariants,
+  useModalFocus,
+} from '@kira/kira-ui';
 import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
@@ -135,7 +141,7 @@ function pick(ref: string): void {
           <KuiButton
             v-for="candidate in suggested"
             :key="candidate.ref"
-            class="kui-row kv-base-row"
+            :class="[kuiRowVariants(), 'kv-base-row']"
             @click="pick(candidate.ref)"
           >
             <span class="kv-base-row-name">{{ candidate.ref }}</span>
@@ -148,7 +154,7 @@ function pick(ref: string): void {
           <KuiButton
             v-for="row in sections.branches.visible"
             :key="row.refname"
-            class="kui-row kv-base-row"
+            :class="[kuiRowVariants(), 'kv-base-row']"
             @click="pick(row.shortName)"
           >
             <span class="kv-base-row-name">{{ row.shortName }}</span>
@@ -156,7 +162,7 @@ function pick(ref: string): void {
           <KuiButton
             v-for="row in sections.remoteBranches.visible"
             :key="row.refname"
-            class="kui-row kv-base-row"
+            :class="[kuiRowVariants(), 'kv-base-row']"
             icon="codicon-cloud"
             @click="pick(row.shortName)"
           >
@@ -222,8 +228,8 @@ function pick(ref: string): void {
   text-transform: uppercase;
 }
 
-/* G34 D7: geometry now comes from `.kui-row` (composed in the template) — this class keeps only
-   the full-width stretch a vertical list of these needs. */
+/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template) — this
+   class keeps only the full-width stretch a vertical list of these needs. */
 .kv-base-row {
   width: 100%;
 }

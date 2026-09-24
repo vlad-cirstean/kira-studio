@@ -30,6 +30,7 @@ import {
   KuiSearchInput,
   KuiSegmented,
   KuiTextInput,
+  kuiRowVariants,
   type MenuItem,
 } from '@kira/kira-ui';
 import { onClickOutside, useEventListener } from '@vueuse/core';
@@ -638,7 +639,7 @@ watch(visibleBranchNames, (names) => {
               </KuiButton>
             </template>
             <template v-else>
-              <KuiButton class="kui-row kv-branch-row-main" @click="checkoutBranch(row)">
+              <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main']" @click="checkoutBranch(row)">
                 <span
                   class="kv-branch-current-dot"
                   :role="row.isHead ? 'img' : undefined"
@@ -703,7 +704,11 @@ watch(visibleBranchNames, (names) => {
             :data-row-id="`remote:${row.refname}`"
             :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
           >
-            <KuiButton class="kui-row kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
+            <KuiButton
+              :class="[kuiRowVariants(), 'kv-branch-row-main']"
+              icon="codicon-cloud"
+              @click="checkoutRemote(row)"
+            >
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
               <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
@@ -887,10 +892,10 @@ watch(visibleBranchNames, (names) => {
   font-weight: 600;
 }
 
-/* G34 D7: geometry now comes from `.kui-row` (composed in the template, `.kui-button.kui-row`'s
-   own `height: auto` override in kira-ui/theme/controls.css cancels `.kui-button`'s fixed height
-   so `.kui-row`'s `min-height` actually governs) — this class keeps only what's specific to this
-   row inside `.kv-branch-row`'s own flex layout. */
+/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template onto
+   `KuiButton`'s own `min-h-kui-control` base — a min-height needs no override to let this row grow
+   past it) — this class keeps only what's specific to this row inside `.kv-branch-row`'s own flex
+   layout. */
 .kv-branch-row-main {
   flex: 1;
   min-width: 0;

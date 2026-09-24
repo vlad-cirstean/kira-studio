@@ -10,7 +10,7 @@ import type { StashEntry } from '@kira/git-ipc';
  * via `menuSelect` for the caller's own `switch`.
  */
 import type { MenuSection } from '@kira/kira-ui';
-import { KuiButton } from '@kira/kira-ui';
+import { KuiButton, kuiRowVariants } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
@@ -96,7 +96,11 @@ function onMenuSelect(id: string): void {
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
-    <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
+    <KuiButton
+      :class="[kuiRowVariants(), 'kv-branch-row-main']"
+      icon="codicon-archive"
+      @click="select(entry)"
+    >
       <span v-if="rowModel(entry).badge" class="kv-stash-index">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"

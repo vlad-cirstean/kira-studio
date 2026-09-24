@@ -21,7 +21,14 @@
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
 import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { KuiButton, KuiContextMenu, KuiSearchInput, KuiSegmented, KuiSelect } from '@kira/kira-ui';
+import {
+  KuiButton,
+  KuiContextMenu,
+  KuiSearchInput,
+  KuiSegmented,
+  KuiSelect,
+  kuiRowVariants,
+} from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
@@ -496,8 +503,11 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        class="kui-row kv-file-tree-row"
-        :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
+        :class="[
+          kuiRowVariants(),
+          'kv-file-tree-row',
+          { 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile },
+        ]"
         role="treeitem"
         :aria-level="row.depth + 1"
         :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
@@ -616,8 +626,11 @@ function reviewToggleTitle(path: string): string {
         v-for="(row, index) in capped.visible"
         :id="rowId(index)"
         :key="rowKey(row)"
-        class="kui-row kv-file-tree-row"
-        :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
+        :class="[
+          kuiRowVariants(),
+          'kv-file-tree-row',
+          { 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile },
+        ]"
         role="option"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"

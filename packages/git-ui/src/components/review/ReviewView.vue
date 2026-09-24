@@ -45,6 +45,7 @@ import {
   KuiSegmented,
   KuiTextInput,
   KuiTooltip,
+  kuiRowVariants,
 } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
@@ -842,7 +843,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              class="kui-row kv-review-picker-row"
+              :class="[kuiRowVariants(), 'kv-review-picker-row']"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -856,7 +857,7 @@ watch(
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              class="kui-row kv-review-picker-row"
+              :class="[kuiRowVariants(), 'kv-review-picker-row']"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
@@ -1173,8 +1174,8 @@ watch(
   text-transform: uppercase;
 }
 
-/* G34 D7: geometry now comes from `.kui-row` (composed in the template) — this class keeps only
-   the full-width stretch a vertical list of these needs. */
+/* G34 D7: geometry now comes from `kuiRowVariants()` (P110 A5, composed in the template) — this
+   class keeps only the full-width stretch a vertical list of these needs. */
 .kv-review-picker-row {
   width: 100%;
   text-align: left;

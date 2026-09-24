@@ -8,7 +8,7 @@
  * this file's own template, not that one's.
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import { KuiButton, kuiRowVariants } from '@kira/kira-ui';
 import { computed } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowContextMenu from './RowContextMenu.vue';
@@ -111,7 +111,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
-      <KuiButton class="kui-row kv-branch-row-main" @click="checkout(row)">
+      <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main']" @click="checkout(row)">
         <span
           class="codicon codicon-tag"
           :class="{ 'kv-tag-lightweight': !row.annotation }"

@@ -26,6 +26,8 @@ export { default as KuiTextInput } from './KuiTextInput.vue';
 export { default as KuiTooltip } from './KuiTooltip.vue';
 export { useModalFocus } from './modalFocus.ts';
 export type { KuiSegmentedOption, KuiSelectOption } from './optionTypes.ts';
+export type { KuiRowVariants } from './rowVariants.ts';
+export { kuiRowVariants } from './rowVariants.ts';
 export {
   getAnchorElement,
   initTooltips,

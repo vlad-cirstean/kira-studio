@@ -13,7 +13,7 @@
  * element that actually holds focus throughout — not here; this file only reflects
  * `highlightedId` back as `aria-selected` and forwards a click as `select`.
  */
-import { computeFloatPosition, KuiButton } from "@kira/kira-ui";
+import { computeFloatPosition, KuiButton, kuiRowVariants } from "@kira/kira-ui";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { formatRelativeDate } from "./dateFormat.ts";
 import { SEARCH_LISTBOX_ID } from "./searchListboxId.ts";
@@ -81,8 +81,11 @@ onMounted(() => void reposition());
           <div
             :id="option.id"
             role="option"
-            class="kui-row kv-search-option"
-            :class="{ 'kv-search-option--active': option.id === highlightedId }"
+            :class="[
+              kuiRowVariants(),
+              'kv-search-option',
+              { 'kv-search-option--active': option.id === highlightedId },
+            ]"
             :aria-selected="option.id === highlightedId"
             tabindex="-1"
             @click="emit('select', option)"

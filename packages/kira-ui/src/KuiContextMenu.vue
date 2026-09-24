@@ -13,6 +13,18 @@
  * Owns no global singleton — each instance is created and destroyed by its caller, exactly as
  * `RowContextMenu.vue` already did. Submenus are explicitly not included (D3's own non-goal) —
  * nothing in `packages/git-ui`'s own menus needs one.
+ *
+ * P110 A5: controls.css's `.kui-menu-root` replaced by `kv:` utilities on this component's own
+ * positioned surface — the one class exclusively this component's (`.kui-menu-list` is
+ * `KuiMenuList`'s own root, converted there instead). `z-[var(--kui-z-menu,30)]`/
+ * `max-h-[var(--kui-float-max-h,none)]` stay arbitrary values (§1.1 rung 4): both read a raw
+ * `--kui-*` custom property with its own fallback, not a value on any Tailwind scale, and neither
+ * is reused anywhere else in this package's own build (KuiTooltip/KuiPopoverPanel/KuiDialog each
+ * have their own distinct `.kui-tooltip`/`.kui-popover`/`.kui-modal` class, A6). `min-w-45`/
+ * `max-w-80` are the default numeric spacing scale instead (180px/320px = 45/80 × the kept 4px
+ * `--spacing` step, rung 1) — no new token needed for a literal pixel size already on that scale.
+ * `.kui-menu-root-wrap` carries no rule of its own (a pure `onClickOutside` ref anchor) and is
+ * left as-is.
  */
 import { onClickOutside } from '@vueuse/core';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
@@ -82,7 +94,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootEl" class="kui-menu-root-wrap">
-    <div ref="menuEl" class="kui-menu-root" :style="style">
+    <div
+      ref="menuEl"
+      class="kv:fixed kv:z-[var(--kui-z-menu,30)] kv:min-w-45 kv:max-w-80 kv:max-h-[var(--kui-float-max-h,none)] kv:overflow-y-auto kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float"
+      :style="style"
+    >
       <KuiMenuList
         ref="listRef"
         :sections="sections"
