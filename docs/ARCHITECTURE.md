@@ -1198,7 +1198,7 @@ truncation (64 KiB, half HTTP's single-payload cap, since a streamed message is 
 than the one thing a response is), a 100-stored-message-per-entry elision with a true `message_count`
 kept alongside it (D11's own addition: unlike an HTTP response's one body, a streaming call's
 messages have no natural single-payload bound to truncate *to*, so a count cap does the job a byte
-cap did for HTTP), the same 20-per-scope trim, and a global byte budget — **32 MiB, a quarter of
+cap did for HTTP), the same 30-per-scope trim, and a global byte budget — **32 MiB, a quarter of
 HTTP's 128 MiB**, reflecting that this is a newer, narrower-audience protocol inside the same app
 rather than a claim that a gRPC call matters four times less. `Adopt`/`SweepOrphans` and the
 generated `scope_key` are ports of `ResponseHistoryRepo`'s own mechanism, unchanged in shape.
@@ -1949,8 +1949,10 @@ empty state naming exactly that lifetime, the same one P2 D6 already gave the li
 itself, applied here to a strictly larger payload. A rendered request's secrets are masked back to
 `{{name}}` before this even matters: `internal/apivars.ResolveRequest` (above) already returns
 which secret names it substituted and their values in the same call; `bridge/http.go` builds a
-`strings.Replacer` from that pair set and applies it to `Wire.Request` only — never
-`Wire.ResponseHead`, which never carried a request secret to begin with. This is the same posture
+`strings.Replacer` from that pair set and applies it to both `Wire.Request` (a second, defense-in-depth
+pass — the body portion is already masked before D4's truncation cap, P108 F12) and
+`Wire.ResponseHead`, since a response header can echo a secret back (a redirect's own `Location`
+being the clearest case) same as a request one can. This is the same posture
 P7's *Copy as curl* dialog already applies to a generated command (a copyable text surface with
 every secret masked by construction), reused rather than a second reveal gate invented for a third
 surface — the raw pane's own masking note points at *Copy as curl* for anyone who needs the real
