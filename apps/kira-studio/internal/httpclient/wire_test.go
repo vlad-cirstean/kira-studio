@@ -113,7 +113,7 @@ func TestRenderRequest_ExactnessAgainstTheWire(t *testing.T) {
 	body := Body{Mode: string(BodyCode), Code: `{"a":1}`, CodeLanguage: "json"}
 	req, formBoundary := buildTestRequest(t, srv.URL+"/v2/orders?a=1&b=2", "POST", headers, body)
 
-	rendered, _, err := renderRequest(req, body, formBoundary)
+	rendered, _, err := renderRequest(req, body, formBoundary, nil)
 	if err != nil {
 		t.Fatalf("renderRequest: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestRenderRequest_MultipartElision(t *testing.T) {
 	body := Body{Mode: string(BodyFormData), FormData: fields}
 	req, formBoundary := buildTestRequest(t, "http://example.invalid/upload", "POST", nil, body)
 
-	text, elided, err := renderRequest(req, body, formBoundary)
+	text, elided, err := renderRequest(req, body, formBoundary, nil)
 	if err != nil {
 		t.Fatalf("renderRequest: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestRenderRequest_128KiBCap(t *testing.T) {
 	body := Body{Mode: string(BodyRaw), Raw: raw}
 	req, formBoundary := buildTestRequest(t, "http://example.invalid/paste", "POST", nil, body)
 
-	text, elided, err := renderRequest(req, body, formBoundary)
+	text, elided, err := renderRequest(req, body, formBoundary, nil)
 	if err != nil {
 		t.Fatalf("renderRequest: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestRenderRequestBody_FileBodyReadsNoBytes(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	text, elided, err := renderRequestBody(Body{Mode: string(BodyFile), File: filePath}, "", int64(len(content)))
+	text, elided, err := renderRequestBody(Body{Mode: string(BodyFile), File: filePath}, "", int64(len(content)), nil)
 	if err != nil {
 		t.Fatalf("renderRequestBody: %v", err)
 	}
@@ -315,5 +315,51 @@ func TestSend_WireResponseHeadNeverCarriesTheBinaryBody(t *testing.T) {
 	}
 	if !utf8.ValidString(resp.Wire.ResponseHead) {
 		t.Fatal("ResponseHead is not valid text — the binary body leaked into it")
+	}
+}
+
+// TestCapWireText_MasksBeforeTruncating is P108 F12: a secret straddling the 128 KiB cut used to
+// leak its unmasked prefix, because masking (bridge/http.go's maskSecrets) ran on the already-cut
+// text — the replacer's full registered pattern no longer matched what survived the cut. mask now
+// runs inside capWireText itself, before the cut, so the whole secret is gone before truncation
+// ever sees it.
+func TestCapWireText_MasksBeforeTruncating(t *testing.T) {
+	secret := "s3cr3t-token-value-1234567890"
+	half := len(secret) / 2
+	firstHalf := secret[:half]
+	prefixLen := maxWireBodyBytes - half // the cut byte lands exactly at the secret's midpoint
+	s := strings.Repeat("a", prefixLen) + secret + strings.Repeat("b", 4096)
+	mask := strings.NewReplacer(secret, "{{token}}")
+
+	text, truncated := capWireText(s, mask)
+	if !truncated {
+		t.Fatal("truncated = false, want true")
+	}
+	if strings.Contains(text, firstHalf) {
+		t.Fatalf("capWireText leaked %q (half the secret) into the kept prefix — masking must run before truncation, not after", firstHalf)
+	}
+	if strings.Contains(text, secret) {
+		t.Fatal("capWireText left the secret's plaintext in the output despite masking")
+	}
+	if !strings.Contains(text, "{{token}}") {
+		t.Fatalf("capWireText dropped the masked placeholder entirely:\n%s", text)
+	}
+}
+
+// TestCapWireText_CutsOnRuneBoundary is F12's other half: a byte cap can split a multi-byte UTF-8
+// rune (e.g. "é", 2 bytes) if the cut point falls inside it, producing invalid UTF-8 in the kept
+// prefix.
+func TestCapWireText_CutsOnRuneBoundary(t *testing.T) {
+	s := strings.Repeat("a", maxWireBodyBytes-1) + "é" + strings.Repeat("b", 10)
+	text, truncated := capWireText(s, nil)
+	if !truncated {
+		t.Fatal("truncated = false, want true")
+	}
+	marker := strings.Index(text, "\n[…")
+	if marker < 0 {
+		t.Fatalf("no truncation marker found:\n%s", text)
+	}
+	if kept := text[:marker]; !utf8.ValidString(kept) {
+		t.Fatalf("capWireText cut mid-rune, producing invalid UTF-8: %q", kept)
 	}
 }

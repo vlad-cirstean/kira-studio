@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,6 +25,16 @@ type Options struct {
 	// Ephemeral routes this send's cookies to a throwaway jar instead of the shared one — set by
 	// bridge/http.go for an incognito tab (cookies.go). Never surfaced in Settings.
 	Ephemeral bool `json:"ephemeral,omitempty"`
+	// WireMask is P108 F12's fix: bridge/http.go builds this from the secrets stage 2 actually
+	// substituted (apivars.UsedSecret has already been resolved by the time it calls Send) and
+	// passes it in so wire.go's capWireText can mask a body BEFORE truncating it to D4's cap,
+	// never after. Masking only after capping (the old order — mask the whole already-built
+	// WireExchange.Request in bridge/http.go's maskSecrets) can leave an unmasked secret prefix
+	// when the secret straddles the cut: the kept bytes no longer match the full registered
+	// pattern, so the replacer can't find it. httpclient never sees apivars.UsedSecret directly —
+	// only this already-built stdlib Replacer — so this package takes on no dependency on
+	// apivars. Never populated from IPC JSON.
+	WireMask *strings.Replacer `json:"-"`
 }
 
 // resolved is Options with every field decided and clamped. Nothing below this line reads Options.

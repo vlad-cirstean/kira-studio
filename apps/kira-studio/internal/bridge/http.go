@@ -104,12 +104,19 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				return nil, resolveErr
 			}
 
+			// P108 F12: opts is built once, before usedSecrets is known — a per-send copy carries
+			// the replacer wire.go needs to mask a body BEFORE truncating it to D4's cap, not
+			// after (the old order could leave an unmasked secret prefix when a secret straddled
+			// the cut byte). nil (secretReplacer's own "nothing to mask" case) is exactly opts'
+			// existing zero value, so a request using no secret costs nothing extra.
+			sendOpts := opts
+			sendOpts.WireMask = secretReplacer(usedSecrets)
 			resp, sendErr := httpclient.Send(runCtx, httpclient.Request{
 				Method:  args.Method,
 				URL:     url,
 				Headers: headers,
 				Body:    body,
-			}, opts)
+			}, sendOpts)
 			if sendErr != nil {
 				// P10 D14/D15: a failed send's own Timeline (classifySendErr always attaches one,
 				// C2) carries the same resolved hop URLs a successful send's does, and mapHttpError
@@ -305,6 +312,11 @@ func maskSecrets(resp *httpclient.Response, used []apivars.UsedSecret) {
 		return
 	}
 	if resp.Wire != nil {
+		// P108 F12: Send's own Options.WireMask already masked the body portion of Wire.Request
+		// BEFORE wire.go truncated it to D4's cap — this replace is a second pass over the whole
+		// string, catching the request head httputil.DumpRequestOut renders (never capped, so
+		// never at risk of the straddle-the-cut bug WireMask exists for) and cheap idempotent
+		// no-ops over whatever WireMask already replaced in the body.
 		resp.Wire.Request = replacer.Replace(resp.Wire.Request)
 		// F16's own reasoning ("a Location header is a URL too — the most likely place for a
 		// secret-bearing query string to reappear on a redirect") applies identically here:

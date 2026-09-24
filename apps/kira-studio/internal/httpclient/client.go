@@ -338,7 +338,7 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 		ElapsedMs:       int(elapsed.Milliseconds()),
 		FinalURL:        finalURL,
 		Redirects:       tl.redirectHops(),
-		Wire:            buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary),
+		Wire:            buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary, opts.WireMask),
 		Timeline:        timeline,
 		SentCookies:     tl.sentCookies(),
 		ReceivedCookies: tl.receivedCookiesSnapshot(),
@@ -452,12 +452,13 @@ func readResponseBody(resp *http.Response, maxResponseBytes int64) (data []byte,
 // exchange nil rather than propagated.
 func buildWireExchange(
 	reqHead []byte, dumpErr error, httpReq *http.Request, resp *http.Response, body Body, formBoundary string,
+	mask *strings.Replacer,
 ) *WireExchange {
 	if dumpErr != nil {
 		slog.Warn("rendering the outgoing request failed", "scope", "httpclient", "err", dumpErr)
 		return nil
 	}
-	bodyText, elided, bodyErr := renderRequestBody(body, formBoundary, httpReq.ContentLength)
+	bodyText, elided, bodyErr := renderRequestBody(body, formBoundary, httpReq.ContentLength, mask)
 	if bodyErr != nil {
 		slog.Warn("rendering the request body failed", "scope", "httpclient", "err", bodyErr)
 		return nil

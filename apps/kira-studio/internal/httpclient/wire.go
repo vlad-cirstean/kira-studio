@@ -12,6 +12,7 @@ import (
 	"net/http/httputil"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 // maxWireBodyBytes — D4: 128 KiB. Distinct from P8's 256 KiB storage cap and the 10 MiB transfer
@@ -50,11 +51,26 @@ func classifyFidelity(resp *http.Response, httpReq *http.Request) string {
 
 // capWireText applies D4's cap to a free-form buffer (raw/code/urlencoded bodies) — truncated with
 // a visible marker naming exactly how much was cut, never silently.
-func capWireText(s string) (string, bool) {
+//
+// P108 F12: mask runs BEFORE the cap, never after. A secret straddling the cut byte would
+// otherwise leave the kept prefix not matching the replacer's full registered pattern, so masking
+// the already-truncated text (the old call order, in bridge/http.go's maskSecrets) could leave an
+// unmasked secret prefix on the wire pane. mask is nil in every context with no secret to mask
+// (the common case) or that predates F12 (wire_test.go's own direct calls).
+func capWireText(s string, mask *strings.Replacer) (string, bool) {
+	if mask != nil {
+		s = mask.Replace(s)
+	}
 	if len(s) <= maxWireBodyBytes {
 		return s, false
 	}
-	return s[:maxWireBodyBytes] + fmt.Sprintf("\n[… %d more bytes …]", len(s)-maxWireBodyBytes), true
+	// Cut on a rune boundary — a byte cap can otherwise split a multi-byte UTF-8 rune, producing
+	// invalid UTF-8 in the kept prefix.
+	cut := maxWireBodyBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + fmt.Sprintf("\n[… %d more bytes …]", len(s)-cut), true
 }
 
 // binaryMarker is D4's elision marker, shared by a `file` body and a formdata file part — the
@@ -72,7 +88,7 @@ func binaryMarker(n int64, name string) string {
 // httpReq.ContentLength for a `file` body: buildFile's own os.Stat already resolved it once: D4's
 // own "the Content-Length in the head is always the real one" invariant extended to the marker's
 // count, rather than a second, possibly-racing os.Stat here.
-func renderRequestBody(body Body, formBoundary string, fileContentLength int64) (text string, elided bool, err error) {
+func renderRequestBody(body Body, formBoundary string, fileContentLength int64, mask *strings.Replacer) (text string, elided bool, err error) {
 	mode := body.Mode
 	if mode == "" {
 		mode = string(BodyNone)
@@ -81,10 +97,10 @@ func renderRequestBody(body Body, formBoundary string, fileContentLength int64) 
 	case BodyNone:
 		return "", false, nil
 	case BodyRaw:
-		text, truncated := capWireText(body.Raw)
+		text, truncated := capWireText(body.Raw, mask)
 		return text, truncated, nil
 	case BodyCode:
-		text, truncated := capWireText(body.Code)
+		text, truncated := capWireText(body.Code, mask)
 		return text, truncated, nil
 	case BodyURLEncoded:
 		// D4: the *encoded* string buildURLEncoded produced, not a re-derivation — url.QueryEscape's
@@ -93,12 +109,12 @@ func renderRequestBody(body Body, formBoundary string, fileContentLength int64) 
 		if encErr != nil {
 			return "", false, encErr
 		}
-		text, truncated := capWireText(encoded)
+		text, truncated := capWireText(encoded, mask)
 		return text, truncated, nil
 	case BodyFile:
 		return binaryMarker(fileContentLength, filepath.Base(strings.TrimSpace(body.File))), true, nil
 	case BodyFormData:
-		return renderFormDataBody(body.FormData, formBoundary)
+		return renderFormDataBody(body.FormData, formBoundary, mask)
 	}
 	return "", false, nil
 }
@@ -107,7 +123,7 @@ func renderRequestBody(body Body, formBoundary string, fileContentLength int64) 
 // countWriter: the identical boundary and formPartHeader output the real pass writes, so the
 // framing this renders is exactly what went out. Each file part's payload is replaced by its
 // marker (never read); each text part is kept verbatim under D4's cap.
-func renderFormDataBody(fields []FormField, boundary string) (string, bool, error) {
+func renderFormDataBody(fields []FormField, boundary string, mask *strings.Replacer) (string, bool, error) {
 	parts, err := prepareFormParts(fields)
 	if err != nil {
 		return "", false, err
@@ -133,7 +149,7 @@ func renderFormDataBody(fields []FormField, boundary string) (string, bool, erro
 			elided = true
 			continue
 		}
-		text, truncated := capWireText(p.field.Value)
+		text, truncated := capWireText(p.field.Value, mask)
 		if truncated {
 			elided = true
 		}
@@ -151,12 +167,12 @@ func renderFormDataBody(fields []FormField, boundary string) (string, bool, erro
 // per F7, including the transport's own Accept-Encoding, the real Content-Length, Go's header
 // ordering and a Host: override (F14) — plus the body, appended directly onto the dump's own
 // trailing blank line (DumpRequestOut with body=false already ends the head at "\r\n\r\n", F8).
-func renderRequest(httpReq *http.Request, body Body, formBoundary string) (text string, elided bool, err error) {
+func renderRequest(httpReq *http.Request, body Body, formBoundary string, mask *strings.Replacer) (text string, elided bool, err error) {
 	head, dumpErr := httputil.DumpRequestOut(httpReq, false)
 	if dumpErr != nil {
 		return "", false, dumpErr
 	}
-	bodyText, bodyElided, bodyErr := renderRequestBody(body, formBoundary, httpReq.ContentLength)
+	bodyText, bodyElided, bodyErr := renderRequestBody(body, formBoundary, httpReq.ContentLength, mask)
 	if bodyErr != nil {
 		return "", false, bodyErr
 	}
