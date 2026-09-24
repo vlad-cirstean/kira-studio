@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@theme/components/ui/command';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@theme/components/ui/command';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
-import { onClickOutside } from '@vueuse/core';
-import { useTemplateRef } from 'vue';
 import { usePaletteStore } from './state';
 
-// P104 §3: list chrome, filtering and keyboard model now come from ui/command (reka's Listbox) —
-// activeIndex/ArrowUp/ArrowDown/Enter and the hand-rolled `filtered` computed all delete with it.
-// `paletteCommands`' own declaration order is preserved as-is: Command's filter only toggles an
-// item's visibility, it never reorders, so rendering `paletteCommands` straight into the v-for
-// keeps the same ranking the old computed produced.
+// P108 Part 12 F15 (carry-over from Part 10 F10): the hand-rolled backdrop this used to carry
+// aria-hidden="true" on the very element wrapping the live, focused palette — hiding the whole
+// subtree (input, listbox, every item) from assistive tech, with no role="dialog"/aria-modal, no
+// focus trap and no focus restore on close. CommandDialog (packages/theme/src/components/ui/
+// command/CommandDialog.vue), unused until now, is the shadcn-vue primitive built for exactly
+// this — reka-ui's DialogRoot/DialogContent underneath supply all four for free, plus
+// Escape-to-close and click-outside-to-close, replacing the store's own manual onClickOutside and
+// the palette's own Escape handler this file used to carry.
 const paletteStore = usePaletteStore();
-
-// P105 §5.2(b): the backdrop itself has no interactive role — VueUse's onClickOutside on the
-// panel replaces both the backdrop's own click handler and the panel's own @click.stop.
-const panelEl = useTemplateRef<HTMLElement>('panelEl');
-onClickOutside(panelEl, () => paletteStore.closePalette());
 
 function runCommand(id: string): void {
   const command = paletteStore.paletteCommands.find((c) => c.id === id);
@@ -24,55 +26,37 @@ function runCommand(id: string): void {
   command.run();
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  wrapSelectionOnType(e);
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    paletteStore.closePalette();
-  }
+function onOpenChange(open: boolean): void {
+  if (!open) paletteStore.closePalette();
 }
 </script>
 
 <template>
-  <div
-    v-if="paletteStore.open"
-    class="palette-backdrop"
-    data-testid="command-palette-backdrop"
-    aria-hidden="true"
+  <CommandDialog
+    :open="paletteStore.open"
+    title="Command Palette"
+    description="Search for a command to run…"
+    class="w-105 sm:max-w-105"
+    @update:open="onOpenChange"
   >
-    <div ref="panelEl" class="palette p-float" data-testid="command-palette">
-      <Command class="rounded-none! p-0!" @keydown="onKeydown">
-        <CommandInput data-testid="command-palette-input" placeholder="Type a command…" />
-        <CommandList class="max-h-72">
-          <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
-          <CommandItem
-            v-for="command in paletteStore.paletteCommands"
-            :key="command.id"
-            :value="command.id"
-            class="whitespace-nowrap"
-            data-testid="command-palette-item"
-            :data-command-id="command.id"
-            @select="runCommand(command.id)"
-          >
-            {{ command.label }}
-          </CommandItem>
-        </CommandList>
-      </Command>
-    </div>
-  </div>
+    <CommandInput
+      data-testid="command-palette-input"
+      placeholder="Type a command…"
+      @keydown="wrapSelectionOnType"
+    />
+    <CommandList class="max-h-72">
+      <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
+      <CommandItem
+        v-for="command in paletteStore.paletteCommands"
+        :key="command.id"
+        :value="command.id"
+        class="whitespace-nowrap"
+        data-testid="command-palette-item"
+        :data-command-id="command.id"
+        @select="runCommand(command.id)"
+      >
+        {{ command.label }}
+      </CommandItem>
+    </CommandList>
+  </CommandDialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.palette-backdrop {
-  /* P28 D17(c): the dialog rung — the palette is a modal over the whole workbench, and this was
-     a bare 100, the literal DialogFrame used to carry. Same relationship, named. */
-  @apply fixed inset-0 flex items-start justify-center pt-30 bg-black/30;
-  z-index: var(--kira-z-dialog);
-}
-
-.palette {
-  @apply w-105 flex flex-col;
-}
-</style>
