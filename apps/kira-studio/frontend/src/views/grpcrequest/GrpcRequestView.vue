@@ -50,6 +50,17 @@ const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
+// P108 F14: state.ts's own call() reads `method?.serverStreaming ?? false` from findMethod against
+// whatever schema happens to be in schemaRuntime at that instant — a Call issued before the schema
+// (re)load in flight resolves finds no method at all and silently defaults to unary, so a genuinely
+// server-streaming method got called as one-shot instead. Rather than have call() await a load
+// (a user-visible delay on every single Call, not just the rare early one), Call disables until
+// findMethod can actually resolve the tab's own service+method against the current schema.
+const methodResolved = computed(() => {
+  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema ?? null;
+  return !!findMethod(schema, props.tab.state.service, props.tab.state.method);
+});
+
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
 // environment id it reads through while incognito.
 const { railColor, runState, runStateLabel, incognito, toggleIncognito, envId } = useRequestChrome(
@@ -396,7 +407,7 @@ onUnmounted(() => {
               variant="toolbar-primary"
               size="kira"
               data-testid="grpc-call"
-              :disabled="running || !tab.state.service || !tab.state.method"
+              :disabled="running || !tab.state.service || !tab.state.method || !methodResolved"
               @click="onCall"
             >
               <CodiconIcon name="play" :size="13" />
@@ -404,7 +415,7 @@ onUnmounted(() => {
             </Button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
-        <TooltipContent>Call</TooltipContent>
+        <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? 'Waiting on the schema…' : 'Call' }}</TooltipContent>
       </Tooltip>
       <span class="p-push" />
       <span

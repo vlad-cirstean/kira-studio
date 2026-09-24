@@ -292,7 +292,22 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
 
     const schema = schemaRuntime[tabId]?.schema ?? null;
     const method = findMethod(schema, tab.state.service, tab.state.method);
-    const streaming = method?.serverStreaming ?? false;
+    // P108 F14: this used to default `streaming` to false whenever the schema simply wasn't loaded
+    // yet (a Call issued right after mount, or right after switching method, before its own
+    // loadSchema/loadSchemaDebounced round trip resolved) — a genuinely server-streaming method
+    // then went out over the wire as a one-shot unary call, silently wrong rather than merely
+    // delayed. GrpcRequestView.vue's own Call button now disables until findMethod can resolve
+    // too, but Enter/the command palette reach this function directly, so the real guard belongs
+    // here: bail with a clear error instead of guessing.
+    if (!method) {
+      rt.status = 'error';
+      rt.error = {
+        code: 'client',
+        message: 'Method not resolved yet — the schema is still loading.',
+      };
+      return;
+    }
+    const streaming = method.serverStreaming;
 
     const opId = crypto.randomUUID();
     rt.status = 'running';
