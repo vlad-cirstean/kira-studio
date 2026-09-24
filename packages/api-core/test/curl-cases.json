@@ -162,6 +162,26 @@
       "warnings": []
     },
     {
+      "name": "P108 F10: --json @file is a file reference, not literal body text",
+      "command": "curl https://x.test/a --json @body.json",
+      "want": {
+        "method": "POST",
+        "url": "https://x.test/a",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json",
+            "enabled": true,
+            "description": ""
+          },
+          { "name": "Accept", "value": "application/json", "enabled": true, "description": "" }
+        ],
+        "bodyMode": "file",
+        "binaryFile": { "path": "", "name": "body.json", "size": 0 }
+      },
+      "warnings": ["unresolved-file"]
+    },
+    {
       "name": "-F text plus a file field with ;type=",
       "command": "curl https://x.test/upload -F 'note=hello' -F 'file=@/tmp/report.csv;type=text/csv'",
       "want": {

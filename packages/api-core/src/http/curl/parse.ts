@@ -356,9 +356,14 @@ function handle(
       });
       return;
     case 'json':
+      // F10: curl's --json is --data-binary plus these two headers — including --data-binary's
+      // own `@file` file-reference handling (unlike --data-raw, which never treats a leading `@`
+      // as a file). Pushing it under 'data-binary' routes an `@path` value through the same
+      // unresolved-file/file-mode handling `--data-binary` already gets, instead of importing the
+      // literal text `@body.json` as the body with no warning.
       pushHeader(acc, 'Content-Type', 'application/json');
       pushHeader(acc, 'Accept', 'application/json');
-      acc.rawDataPieces.push({ id: 'data-raw', text: v });
+      acc.rawDataPieces.push({ id: 'data-binary', text: v });
       return;
     case 'data':
     case 'data-raw':
