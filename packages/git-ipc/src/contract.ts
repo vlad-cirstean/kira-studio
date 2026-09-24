@@ -810,6 +810,10 @@ export type PullBlocker = 'dirtyNonFastForward';
 export interface PullPreflight {
   readonly strategy: PullStrategy;
   readonly source: PullStrategySource;
+  /** `true` only when `strategy` is `rebase`, `source` is `branchConfig` or `pullConfig`, and the
+   *  key that won the ladder holds `merges`/`m`. `false` otherwise, including every
+   *  `explicit`/`setting`/`default` source. */
+  readonly rebaseMerges: boolean;
   readonly upstream: string | null;
   readonly ahead: number;
   readonly behind: number;
@@ -853,6 +857,9 @@ export interface RemoteOpParams {
   readonly prune: boolean;
   readonly pruneTags: boolean;
   readonly strategy: PullStrategy | undefined;
+  /** `pull` + `strategy: "rebase"` only. `true` runs `git rebase --rebase-merges`; `false`/
+   *  `undefined` runs a plain, linearizing `git rebase`. `undefined` for every other kind. */
+  readonly rebaseMerges: boolean | undefined;
   /** `forcePush` only: the PushPreflight.remoteTip value the confirmation dialog showed the
    *  user, or null when the dialog showed "nothing to overwrite". The server re-reads the
    *  remote-tracking ref immediately before spawning and compares against this value, failing
@@ -1993,9 +2000,8 @@ export type Contract = {
       params: {
         repoId: string;
         branch: string;
-        /** G7 D2: injected by the extension from `kiraSpace.pull.strategy`, exactly as
-         *  `review.resolveBase` injects `baseCandidates`. Absent for every raw socket client —
-         *  the server treats that the same as `"auto"`. */
+        /** Optional; absent resolves this repo's stored `kiraSpace.pull.strategy` server-side;
+         *  an unknown value is refused. */
         strategySetting?: PullStrategy | 'auto';
       };
       result: PullPreflight;

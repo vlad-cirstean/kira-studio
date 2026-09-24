@@ -103,6 +103,10 @@ export type PullBlocker = 'dirtyNonFastForward';
 export interface PullPreflight {
   readonly strategy: PullStrategy;
   readonly source: PullStrategySource;
+  /** `true` only when `strategy` is `rebase`, `source` is `branchConfig` or `pullConfig`, and the
+   *  key that won the ladder holds `merges`/`m`. `false` otherwise, including every
+   *  `explicit`/`setting`/`default` source. */
+  readonly rebaseMerges: boolean;
   readonly upstream: string | null;
   readonly ahead: number;
   readonly behind: number;

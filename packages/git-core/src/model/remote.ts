@@ -52,9 +52,12 @@ export interface RemoteOpRequest {
   readonly prune: boolean;
   /** `fetch`/`pull`'s fetch phase only — off by default even when `prune` is on (D49, OQ2). */
   readonly pruneTags: boolean;
-  /** `pull` only: an explicit override of `resolvePullStrategy`'s ladder for this one
-   *  invocation (`PullStrategySource`'s `"explicit"`). `undefined` lets the ladder decide. */
+  /** `pull` only: the strategy to run — the preflight-resolved one, or the user's explicit
+   *  pick. */
   readonly strategy: PullStrategy | undefined;
+  /** `pull` + `strategy: "rebase"` only. `true` runs `git rebase --rebase-merges`; `false`/
+   *  `undefined` runs a plain, linearizing `git rebase`. `undefined` for every other kind. */
+  readonly rebaseMerges: boolean | undefined;
   /** `forcePush` only: the `PushPreflight.remoteTip` the confirmation dialog showed the user,
    *  `null` when the dialog showed "nothing to overwrite". `RepoService.runRemoteOp` (W14)
    *  re-reads the remote-tracking ref immediately before spawning and compares — a mismatch

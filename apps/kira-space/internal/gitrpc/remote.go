@@ -107,6 +107,9 @@ func (r *Router) handleRemoteRun(ctx context.Context, c *gitsession.Conn, params
 			if !validPullStrategy(p.Strategy) {
 				return "", ipcerr.BadRequest("gitrpc: remote.run: invalid strategy " + p.Strategy)
 			}
+			if p.RebaseMerges && (p.Kind != "pull" || p.Strategy != string(gitpreflight.PullRebase)) {
+				return "", ipcerr.BadRequest("gitrpc: remote.run: rebaseMerges requires kind pull and strategy rebase")
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p RemoteRunParams) (gitsession.RemoteOpResult, error) {

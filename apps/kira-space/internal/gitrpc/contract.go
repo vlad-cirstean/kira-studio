@@ -159,7 +159,10 @@ package gitrpc
 // settings under the old key names against a server that has migrated its stored rows to the new
 // ones -- deliberately rejected by the version gate instead, the same reasoning every
 // version-only bump in this history has already established (G10 D9).
-const ContractVersion = 40
+// P111: 40 -> 41, one new PullPreflight field (rebaseMerges) and one new remote.run param
+// (rebaseMerges) -- the pull executor stops re-deriving --rebase-merges from config and takes it
+// from the preflight the client already ran. No new request, no new event, no SQL migration.
+const ContractVersion = 41
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

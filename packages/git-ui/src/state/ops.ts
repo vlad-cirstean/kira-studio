@@ -1539,6 +1539,7 @@ export class OpsState {
         prune: true,
         pruneTags: false,
         strategy: undefined,
+        rebaseMerges: undefined,
         expectedRemoteTip: undefined,
         plainForce: undefined,
         confirmToken: undefined,
@@ -1566,6 +1567,10 @@ export class OpsState {
    * `pendingPull` (`PullDialog.vue`'s own confirm step, mirroring `pendingCheckout`) — cancelling
    * ends the pull with nothing run; confirming pushes a stash, runs the pull, and pops it back
    * exactly like `runCheckout`'s own inline call above (`#stashAndCarry`'s shared shape).
+   *
+   * P111: `rebaseMerges` travels with the preflight-resolved strategy (`preflight.rebaseMerges`,
+   * the server's own once-computed decision); an explicit override always sends `false` — never
+   * derived here from `strategy === 'rebase'` or from `source`.
    */
   async runPull(remote: string, branch: string, explicitStrategy?: PullStrategy): Promise<void> {
     const repoId = this.#repoId;
@@ -1579,6 +1584,8 @@ export class OpsState {
     const source: PullStrategySource =
       explicitStrategy !== undefined ? 'explicit' : preflight.source;
     this.pullStrategy.value = { strategy, source };
+    // An explicit pick is a plain strategy choice; only the config ladder carries git's own "merges".
+    const rebaseMerges = explicitStrategy === undefined ? preflight.rebaseMerges : false;
 
     if (preflight.blockers.length > 0) {
       const proceed = await this.#confirmPull(preflight);
@@ -1604,6 +1611,7 @@ export class OpsState {
               prune: false,
               pruneTags: false,
               strategy,
+              rebaseMerges,
               expectedRemoteTip: undefined,
               plainForce: undefined,
               confirmToken: undefined,
@@ -1626,6 +1634,7 @@ export class OpsState {
         prune: false,
         pruneTags: false,
         strategy,
+        rebaseMerges,
         expectedRemoteTip: undefined,
         plainForce: undefined,
         confirmToken: undefined,
@@ -1670,6 +1679,7 @@ export class OpsState {
         prune: false,
         pruneTags: false,
         strategy: undefined,
+        rebaseMerges: undefined,
         expectedRemoteTip: undefined,
         plainForce: undefined,
         confirmToken: undefined,
@@ -1714,6 +1724,7 @@ export class OpsState {
         prune: false,
         pruneTags: false,
         strategy: undefined,
+        rebaseMerges: undefined,
         expectedRemoteTip: preflight.remoteTip,
         plainForce: route.plain,
         confirmToken: route.confirmToken,

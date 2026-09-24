@@ -41,11 +41,11 @@ func initStashRpcRepo(t *testing.T) string {
 	return dir
 }
 
-// TestContractVersion_Is40 is P7 item 2's own literal exit-criteria assertion, moved forward again
-// (39 -> 40, P100 Part 3's settings-key rename) in the same commit that bumps the constant.
-func TestContractVersion_Is40(t *testing.T) {
-	if ContractVersion != 40 {
-		t.Fatalf("ContractVersion = %d, want 40", ContractVersion)
+// TestContractVersion_Is41 is P7 item 2's own literal exit-criteria assertion, moved forward again
+// (40 -> 41, P111's pull rebaseMerges field) in the same commit that bumps the constant.
+func TestContractVersion_Is41(t *testing.T) {
+	if ContractVersion != 41 {
+		t.Fatalf("ContractVersion = %d, want 41", ContractVersion)
 	}
 }
 

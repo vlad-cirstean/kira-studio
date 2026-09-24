@@ -28,13 +28,17 @@ func (e *RepoEntry) CancelRemote() bool {
 // alongside RepoID (the same "gitsession owns the flattened decode" precedent OpRequest already
 // established for op.run, D5), since remote.run's own wire params are flat (no nested object).
 type RemoteOpParams struct {
-	Kind              string  `json:"kind"` // "fetch" | "push" | "pull" | "forcePush" | "deleteRemoteBranch"
-	Remote            string  `json:"remote"`
-	Branch            string  `json:"branch,omitempty"`
-	SetUpstream       bool    `json:"setUpstream,omitempty"`
-	Prune             bool    `json:"prune,omitempty"`
-	PruneTags         bool    `json:"pruneTags,omitempty"`
-	Strategy          string  `json:"strategy,omitempty"`
+	Kind        string `json:"kind"` // "fetch" | "push" | "pull" | "forcePush" | "deleteRemoteBranch"
+	Remote      string `json:"remote"`
+	Branch      string `json:"branch,omitempty"`
+	SetUpstream bool   `json:"setUpstream,omitempty"`
+	Prune       bool   `json:"prune,omitempty"`
+	PruneTags   bool   `json:"pruneTags,omitempty"`
+	Strategy    string `json:"strategy,omitempty"`
+	// RebaseMerges (P111): pull + strategy "rebase" only, computed once by remote.pullPreflight
+	// (gitpreflight.ResolveRebaseMerges) and carried through unchanged -- runPullOp no longer
+	// re-derives it from a second git config spawn.
+	RebaseMerges      bool    `json:"rebaseMerges,omitempty"`
 	ExpectedRemoteTip *string `json:"expectedRemoteTip,omitempty"`
 	PlainForce        bool    `json:"plainForce,omitempty"`
 	ConfirmToken      string  `json:"confirmToken,omitempty"`
@@ -563,11 +567,7 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 	case gitpreflight.PullMerge:
 		integrateArgv = gitops.MergeArgs(upstream)
 	case gitpreflight.PullRebase:
-		rebaseMerges, err := e.wantsRebaseMerges(roCtx, params.Branch)
-		if err != nil {
-			return nil, nil, err
-		}
-		integrateArgv = gitops.RebaseArgs(upstream, rebaseMerges)
+		integrateArgv = gitops.RebaseArgs(upstream, params.RebaseMerges)
 	default:
 		integrateArgv = gitops.MergeFFOnlyArgs(upstream)
 	}
@@ -721,54 +721,6 @@ func parsePullConfig(raw []byte, branch string) gitpreflight.PullConfigValues {
 	return cfg
 }
 
-// wantsRebaseMerges is P108 Part 15 F6's own fix, re-tightened by F6 (P108 Part 16 review):
-// PullPreflight's own resolved PullStrategy is a wire value with exactly three members (@kira/
-// git-ipc's own union) — widening it to a fourth so the client could carry "and use
-// --rebase-merges" back to the executor would be a git-ipc contract change (Part 17's own
-// boundary, not yet reviewed). Instead, this re-reads the SAME one config spawn PullPreflight
-// already made (gitops.PullConfigArgs/parsePullConfig), right before the rebase actually runs.
-//
-// P108 Part 16 review, F6: the Part 15 version added --rebase-merges whenever
-// branch.<name>.rebase/pull.rebase said "merges", regardless of what actually decided to rebase at
-// all — a user whose kiraSpace.pull.strategy setting is plain "rebase" (ranked ABOVE config in
-// ResolvePullStrategy's own ladder, and meaning a plain, linearizing rebase in git's own semantics)
-// still got --rebase-merges if their git config happened to also say merges. Fixed by re-running
-// the SAME ladder (ResolvePullStrategy) with this fresh cfg and honoring --rebase-merges only when
-// the ladder's OWN result is genuinely config-derived (SourceBranchConfig/SourcePullConfig) — never
-// when an explicit override or a Kira Space setting is what decided to rebase, even if config
-// separately happens to say "merges" too. A config-read error now surfaces to the caller instead of
-// silently downgrading to a plain, linearizing rebase.
-//
-// Known limitation, not fully resolved within gitpreflight/gitops's own chunk (flagged rather than
-// guessed at, per this fix's own instructions, same as Part 15 F6 originally flagged it): an
-// EXPLICIT strategy override is still indistinguishable, from this re-read alone, from one the
-// config ladder itself would ALSO have produced — if RunRemote's own params.Strategy came from an
-// explicit client override that happens to coincide with what the ladder derives fresh right now
-// (e.g. the override was itself "rebase" and branch.<name>.rebase also says "merges"), this still
-// reports SourceBranchConfig and applies --rebase-merges, even though the override — not config —
-// is what actually chose to rebase. Closing that residual gap needs a git-ipc wire change (carrying
-// the ladder's own resolved PullStrategySource, or a rebaseMerges flag, from preflight through to
-// remote.run's own params) — Part 17's own boundary, out of scope here.
-func (e *RepoEntry) wantsRebaseMerges(ctx context.Context, branch string) (bool, error) {
-	raw, err := e.runAllowingExit(ctx, gitops.PullConfigArgs(branch), 0, 1)
-	if err != nil {
-		return false, err
-	}
-	cfg := parsePullConfig(raw.Stdout, branch)
-	_, source := gitpreflight.ResolvePullStrategy(nil, e.RepoSettings().PullStrategy, cfg)
-	switch source {
-	case gitpreflight.SourceBranchConfig:
-		return gitpreflight.WantsRebaseMerges(cfg.BranchRebase), nil
-	case gitpreflight.SourcePullConfig:
-		return gitpreflight.WantsRebaseMerges(cfg.PullRebase), nil
-	default:
-		// SourceExplicit, SourceSetting or SourceDefault: something OTHER than config chose to
-		// rebase at all (or nothing did) — --rebase-merges is a config-derived-only embellishment,
-		// never applied on that basis.
-		return false, nil
-	}
-}
-
 // PullPreflight is remote.pullPreflight's own orchestration (D18): one config --null --get-regexp
 // spawn feeds the strategy ladder; upstream/ahead/behind come from the branch's own for-each-ref
 // row (the SAME %(upstream)/%(upstream:track) fields refs.list already computes, D10's own
@@ -782,6 +734,7 @@ func (e *RepoEntry) PullPreflight(ctx context.Context, branch, strategySetting s
 	}
 	cfg := parsePullConfig(cfgRaw.Stdout, branch)
 	strategy, source := gitpreflight.ResolvePullStrategy(nil, strategySetting, cfg)
+	rebaseMerges := gitpreflight.ResolveRebaseMerges(strategy, source, cfg)
 
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
@@ -807,6 +760,7 @@ func (e *RepoEntry) PullPreflight(ctx context.Context, branch, strategySetting s
 	dirty := len(gitpreflight.DirtyPaths(statusResult)) > 0
 
 	return gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{
-		Strategy: strategy, Source: source, Upstream: upstream, Ahead: ahead, Behind: behind, Dirty: dirty,
+		Strategy: strategy, Source: source, RebaseMerges: rebaseMerges,
+		Upstream: upstream, Ahead: ahead, Behind: behind, Dirty: dirty,
 	}), nil
 }

@@ -155,7 +155,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // rows to the new ones -- deliberately rejected by the version gate instead, the same reasoning
 // every version-only bump in this history has already established (G10 D9): the mismatch must be
 // a loud, blocking panel, not a settings value that quietly stops round-tripping.
-export const CONTRACT_VERSION = 40;
+// P111: 40 -> 41, one new PullPreflight field (rebaseMerges) and one new remote.run param
+// (rebaseMerges) -- the pull executor stops re-deriving --rebase-merges from config and takes it
+// from the preflight the client already ran. No new request, no new event, no SQL migration.
+export const CONTRACT_VERSION = 41;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

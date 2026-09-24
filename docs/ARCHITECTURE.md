@@ -2692,8 +2692,8 @@ human approval always re-admits.
 
 **Version compatibility is hard lockstep, negotiated in that same handshake.**
 `gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**40** today, since P100 Part 3's `kiraVersion.*` → `kiraSpace.*` wire-key rename bumped it from
-39), asserted equal by tests on both sides, and it is the *sole* compatibility authority — not the
+(**41** today, since P111's pull `rebaseMerges` field bumped it from 40), asserted equal by tests
+on both sides, and it is the *sole* compatibility authority — not the
 app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
 never a degraded mode: this app has no auto-update and the extension installs separately, so "run
 an older method set" has no honest meaning here.
@@ -2839,7 +2839,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**51 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (40 as of this chapter), and the wire types |
+| `gitrpc` | The method table (**51 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (41 as of this chapter), and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |

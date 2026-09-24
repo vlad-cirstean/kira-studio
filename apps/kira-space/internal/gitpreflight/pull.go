@@ -37,12 +37,16 @@ const BlockerDirtyNonFastForward PullBlocker = "dirtyNonFastForward"
 type PullPreflight struct {
 	Strategy PullStrategy       `json:"strategy"`
 	Source   PullStrategySource `json:"source"`
-	Upstream *string            `json:"upstream"`
-	Ahead    int                `json:"ahead"`
-	Behind   int                `json:"behind"`
-	Dirty    bool               `json:"dirty"`
-	Routes   []PullRoute        `json:"routes"`
-	Blockers []PullBlocker      `json:"blockers"`
+	// RebaseMerges is P111's own field: true only when Strategy is rebase, Source is
+	// branchConfig/pullConfig, and the winning config key said "merges"/"m" -- see
+	// ResolveRebaseMerges. Always emitted (D5's result-field rule), false for every other source.
+	RebaseMerges bool          `json:"rebaseMerges"`
+	Upstream     *string       `json:"upstream"`
+	Ahead        int           `json:"ahead"`
+	Behind       int           `json:"behind"`
+	Dirty        bool          `json:"dirty"`
+	Routes       []PullRoute   `json:"routes"`
+	Blockers     []PullBlocker `json:"blockers"`
 }
 
 // PullConfigValues is the strategy ladder's own raw (still git-syntax) values of the three config
@@ -60,9 +64,8 @@ type PullConfigValues struct {
 // MapRebaseValue maps a raw `branch.<name>.rebase`/`pull.rebase` config value onto a PullStrategy:
 // true (and its own synonyms) or interactive/merges -> rebase, false (and its own synonyms) ->
 // merge; anything else (including an unrecognised string, or nil) is not a decision this key
-// makes, ok is false. Exported (P108 Part 15 F6 fix) so gitsession's own executor can re-derive
-// the SAME precedence decision at pull-execution time (wantsRebaseMerges, remote.go) without
-// duplicating this table.
+// makes, ok is false. Exported (P108 Part 15 F6 fix) so ResolveRebaseMerges (below) can reuse the
+// SAME precedence decision without duplicating this table.
 //
 // F6 fix: git itself accepts boolean synonyms case-insensitively — `git_config_bool`'s own
 // accepted spellings are yes/on/1 (true) and no/off/0 (false), alongside true/false themselves —
@@ -89,10 +92,9 @@ func MapRebaseValue(raw *string) (PullStrategy, bool) {
 // rather than a plain rebase (F6): git's own "merges"/"m" shorthand preserves merge commits during
 // the rebase instead of linearizing them away. Kept as its own function, not folded into
 // MapRebaseValue's own return: PullStrategy's wire union stays exactly the three values
-// @kira/git-ipc already declares (widening it to a fourth is a git-ipc contract change, Part 17's
-// own boundary) — gitsession's own executor re-reads this SAME config value a second time, right
-// before the rebase actually runs, and asks this function instead (remote.go's own
-// wantsRebaseMerges).
+// @kira/git-ipc already declares (widening it to a fourth is a git-ipc contract change) — called
+// only from ResolveRebaseMerges (below), which decides once, at preflight time, whether the
+// winning ladder key said "merges" at all.
 func WantsRebaseMerges(raw *string) bool {
 	if raw == nil {
 		return false
@@ -100,6 +102,24 @@ func WantsRebaseMerges(raw *string) bool {
 	switch strings.ToLower(*raw) {
 	case "merges", "m":
 		return true
+	default:
+		return false
+	}
+}
+
+// ResolveRebaseMerges reports whether a ladder result should rebase with --rebase-merges: only
+// when config itself chose to rebase, and the winning key said "merges"/"m". Computed once by
+// remote.pullPreflight (P111) and carried on PullPreflight.rebaseMerges/RemoteOpParams.rebaseMerges
+// through to remote.run, which no longer re-derives it from a second git config spawn.
+func ResolveRebaseMerges(strategy PullStrategy, source PullStrategySource, cfg PullConfigValues) bool {
+	if strategy != PullRebase {
+		return false
+	}
+	switch source {
+	case SourceBranchConfig:
+		return WantsRebaseMerges(cfg.BranchRebase)
+	case SourcePullConfig:
+		return WantsRebaseMerges(cfg.PullRebase)
 	default:
 		return false
 	}
@@ -136,6 +156,7 @@ func ResolvePullStrategy(explicit *PullStrategy, settingStrategy string, cfg Pul
 type ClassifyPullInput struct {
 	Strategy      PullStrategy
 	Source        PullStrategySource
+	RebaseMerges  bool
 	Upstream      *string
 	Ahead, Behind int
 	Dirty         bool
@@ -160,7 +181,7 @@ func ClassifyPull(in ClassifyPullInput) PullPreflight {
 	}
 
 	return PullPreflight{
-		Strategy: in.Strategy, Source: in.Source, Upstream: in.Upstream,
+		Strategy: in.Strategy, Source: in.Source, RebaseMerges: in.RebaseMerges, Upstream: in.Upstream,
 		Ahead: in.Ahead, Behind: in.Behind, Dirty: in.Dirty,
 		Routes: routes, Blockers: blockers,
 	}

@@ -60,6 +60,7 @@ describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing
     const preflight: PullPreflight = {
       strategy: 'merge',
       source: 'default',
+      rebaseMerges: false,
       upstream: 'origin/main',
       ahead: 0,
       behind: 1,
@@ -214,6 +215,7 @@ describe('OpsState — post-checkout pull prompt', () => {
         return {
           strategy: 'merge',
           source: 'default',
+          rebaseMerges: false,
           upstream: 'origin/feature',
           ahead: 0,
           behind: 3,
