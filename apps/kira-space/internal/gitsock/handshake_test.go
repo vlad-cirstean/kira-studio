@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -121,6 +122,29 @@ func TestHandshake_Row1_EmptyClientID_ClosesSilently(t *testing.T) {
 	clientSend(t, client, helloFrame{Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion})
 	if ok := <-done; ok {
 		t.Fatal("want ok=false for an empty client id")
+	}
+}
+
+// TestHandshake_Row1_OversizedClientID_ClosesSilently is F13's regression guard: unlike the label
+// (maxLabelBytes), hello.Client.ID was unclamped and could otherwise reach the git_clients row and
+// the pairing dialog at up to the 8 MiB frame cap.
+func TestHandshake_Row1_OversizedClientID_ClosesSilently(t *testing.T) {
+	t.Parallel()
+	client, server := net.Pipe()
+	defer client.Close()
+	deps := testHandshakeDeps(newFakeTrustStore(), NewBroker(time.Now), time.Now)
+
+	done := make(chan bool, 1)
+	go func() {
+		_, _, _, ok := runHandshake(newConn(server), deps)
+		done <- ok
+	}()
+	clientSend(t, client, helloFrame{
+		Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion,
+		Client: helloClient{ID: strings.Repeat("x", maxClientIDBytes+1)},
+	})
+	if ok := <-done; ok {
+		t.Fatal("want ok=false for a client id over maxClientIDBytes")
 	}
 }
 

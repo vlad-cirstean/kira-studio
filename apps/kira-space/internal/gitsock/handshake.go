@@ -15,6 +15,18 @@ import (
 // or shown in the Connected editors pane.
 const maxLabelBytes = 200
 
+// maxClientIDBytes is F13's clamp on hello.Client.ID — unlike the label, this was unclamped, so a
+// same-user local process could reach the git_clients row and the pairing dialog with an id up to
+// the 8 MiB frame cap.
+const maxClientIDBytes = 256
+
+// handshakeReadTimeout bounds only the first Receive() (F13): with no deadline, a same-user local
+// process that connects and sends nothing, or declares a large body and trickles it in, held a
+// goroutine, an fd and up to maxFrameBytes until Server.Close. Cleared right after that read —
+// nothing else in the handshake reads from the client again except F12's own watcher, which sets
+// and clears its own deadline around its wait.
+const handshakeReadTimeout = 10 * time.Second
+
 // helloFrame/helloClient are SPEC §3.3's C→S wire shape, verbatim.
 type helloFrame struct {
 	Kind            string      `json:"kind"`
@@ -69,12 +81,15 @@ type handshakeDeps struct {
 // means a terminal frame (or nothing, for row 1) has already been sent and the caller closes the
 // connection.
 func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label string, ok bool) {
+	_ = c.nc.SetReadDeadline(time.Now().Add(handshakeReadTimeout))
 	raw, err := c.Receive()
+	_ = c.nc.SetReadDeadline(time.Time{}) // F13: bounds only this first read.
 	if err != nil {
-		return "", "", "", false // row 1: undecodable/EOF — nothing to answer, just close.
+		return "", "", "", false // row 1: undecodable/EOF/timeout — nothing to answer, just close.
 	}
 	var hello helloFrame
-	if err := json.Unmarshal(raw, &hello); err != nil || hello.Kind != "hello" || hello.Client.ID == "" {
+	if err := json.Unmarshal(raw, &hello); err != nil || hello.Kind != "hello" || hello.Client.ID == "" ||
+		len(hello.Client.ID) > maxClientIDBytes {
 		return "", "", "", false // row 1
 	}
 
