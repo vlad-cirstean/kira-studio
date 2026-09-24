@@ -5385,3 +5385,124 @@ Neither is named by any of the 17 findings, neither's file was touched by any co
 and per `CLAUDE.md`'s own exception ("fixing it needs work genuinely outside the phase's own scope —
 a different subsystem, a real design decision"), both are left for their own follow-up phase rather
 than fixed here.
+
+## P108 Part 12 result
+
+Reviewed per `plans/P108-part12-findings.md` (Opus reviewer, no fixing) — chunk A11, "Studio shell,
+project tree, state stores and UI-test harness": `apps/kira-studio/frontend/src/{App.vue,main.ts,
+fonts.ts}`, `{workbench,project,state,theme,shortcuts,terminal,views/terminal}/**`. 18 findings, 2
+High, 4 Medium, 12 Low. One Sonnet fixer landed one commit per finding, F1-F18 in order, none
+dismissed or deferred.
+
+- **F1 `582031f`** (High) — Remote DDL change never reaches another window: `applyRemote` only
+  called `invalidateQueries`, which triggered a refetch that always ran into `schemaQueryOptions`'s
+  own "prefer cached value" guard (P12 round 2 finding #14) — so a genuine remote `onSchemaChanged`
+  push could never move the cache. Window B's console completion, lint and hover stayed on the
+  pre-change DDL for the whole session, and saving from B's Schema dialog overwrote window A's newer
+  document. `applyRemote` now writes the pushed DDL straight into the cache (the push already
+  carries it); the old in-flight-save race protection moves from "always prefer cache" to a
+  per-connection write generation bumped on every direct cache write (`saveDdl` and `applyRemote`,
+  via a shared `commitDdl` helper).
+- **F2 `48be876`** (High) — DB MCP approval queue swap leaves focus on Approve: the dialog stays
+  mounted across a queue advance (request A answered while B is already queued — `pending` swaps
+  A -> B with no null in between), and the focus-Deny watcher only fired on null<->non-null, so
+  focus stayed on Approve for a request the user never reviewed — a second Enter or key repeat could
+  approve B unreviewed. Separately, `onApprove`/`onDeny` read the request id fresh from the store at
+  click time, so a request expiring Go-side and swapping in under the pointer mid-click could land
+  the click on the new request. Fixed by watching `requestId` (not just pending-vs-not), keying the
+  `Dialog` by `requestId` so a swap mid-click destroys/recreates the buttons, binding
+  `onApprove`/`onDeny` to the id rendered in the template, and having `approveQuery`/`denyQuery` rely
+  solely on the approval broker's own broadcast rather than the RPC's own returned snapshot (which
+  could race a second window's concurrent answer).
+- **F3 `bdc0147`** — `initTreeSync`/`initSchemaSync`/`initSchemaColumnsSync` only ever ran from
+  `ProjectTree.vue`'s `onMounted` — a window booted with the project panel hidden or zero connections
+  got none of them for the whole session. Moved all three into `main.ts`'s `bootstrap()`, beside
+  `initApiDataSync()` (P112's own precedent for this exact gap).
+- **F4 `d0974e8`** (plus `395cb85` adding a hold/release rendezvous to the control mock) — credential
+  reveal could write connection A's password into another draft: guarded against a draft swap in
+  flight while a reveal's own async round trip was still outstanding.
+- **F5 `6e47b53`** — mounted console lost cached columns on every reconnect or tree Refresh; re-warms
+  console completion after a schema-columns drop.
+- **F6 `e52cea5`** — `ensureSchemaColumns` memoized a transient failure (a dropped connection, a
+  timeout) as `[]` forever; stopped caching a failed fetch as empty.
+- **F7 `f58a7d5`** — `hydrateOps` subscribed to `onOpUpdate` only after already taking its own
+  `opsRecent` snapshot, so an update landing in that window was lost, leaving a phantom running op;
+  subscribes before the snapshot.
+- **F8 `4858ba6`** — `ensureSchemaColumns` had no generation guard, so a stale in-flight fetch could
+  overwrite a newer one's result; guarded against a mid-flight drop.
+- **F9 `9a6c1ab`** — tree `loadChildren` resolving after a connection's own disconnect wrote a stale
+  entry back into a tree that should already be empty; drops it.
+- **F10 `ffb5fc3`** — a collapse issued while `expand()` was still connecting was undone once
+  `expand()` itself resolved; honors the collapse instead.
+- **F11 `83b4ccd`** — tree load races and an unhandled saved-queries rejection; sequenced the loads,
+  deduped the visibility fetch, and caught the rejection.
+- **F12 `05ec1cd`** — concurrent tab saves had no ordering guarantee against each other (Wails
+  dispatches each bound call on its own goroutine, with nothing serializing two `tabsSave` calls
+  against each other DB-side) — whichever round trip landed last won, not whichever was issued last.
+  `enqueueSave` now chains every save through one persistent promise, coalescing any burst of
+  intervening changes down to the latest snapshot; `flushPendingTabState` awaits the full chain
+  instead of firing its own independent call. New `tabs-save-serialized.spec.ts` pins the behavior.
+- **F13 `c591338`** — boot had no error path (a hydrate rejection left a permanently blank window,
+  visible only as an unhandled rejection in the webview console) and the mode store's debounced write
+  was never flushed before close. Added `BootFailure.vue` (adapted verbatim from `apps/kira-space`'s
+  own P100 Part 2 F2) plus a `bootstrap()` wrapper with Retry; hooked `state/mode.ts`'s write into the
+  same native `onFlushBeforeClose`/`onWindowFlushBeforeClose` handshake `createTabsStore.ts` already
+  uses, rather than a browser `beforeunload` — traced through `internal/shell/closeflush.go` and
+  confirmed `beforeunload` never fires at all on the "closing the last window" path (`Hide()`, not
+  `Close()`).
+- **F14 `c894d2c`** — `hydrateTabs` kept raw, unparsed state when a `dataTabStateSchema` `safeParse`
+  failed on one missing field (every sibling schema already tolerates this via `.default(...)`,
+  `dataTabStateSchema` was the one outlier) — a restored data tab computed `pageIndex * pageSize` as
+  `NaN`. Added `.default(...)` to every field, and `hydrateTabs` now resets to the kind's own
+  `defaultState()` rather than keeping unparsed raw state on a genuine parse failure.
+- **F15 `962ac00`** — CommandPalette hid itself from assistive tech (carry-over from Part 10 F10): its
+  hand-rolled backdrop carried `aria-hidden="true"` on the element wrapping the live, focused palette,
+  with no `role="dialog"`, no focus trap, no focus restore. Rebuilt on `CommandDialog.vue` — a
+  shadcn-vue primitive built for exactly this, fully vendored but entirely unused anywhere in the app
+  until now — which supplies all of that for free via reka-ui, plus Escape-to-close and
+  click-outside-to-close, replacing the store's own manual handlers.
+- **F16 `6d0171b`** — Operations panel re-run mishandled a failed reconnect: Go's
+  `ConnectionsService.Connect` never rejects for a bad connection, it resolves with an error status,
+  so a reconnect that landed on `'error'` still ran the SQL below against a connection never actually
+  connected. Widened `onReconnectAndLoad`'s return to report success/failure and added a new
+  non-reactive `ensureConnectedOnce` for OperationsPanel's one-shot, context-menu-triggered call site
+  (a fresh `useConnectionGate()` call there had no owning effect scope to ever dispose its
+  `computed()`s — a small permanent leak on every Re-run). Cascaded into 6 files via
+  `refreshOrReconnect`'s own parameter-type widening.
+- **F17 `28fffce`** — ConnectionDialog's Test result could show as current after the draft was
+  edited mid-flight: `draft` is mutated in place by v-model, so an identity check alone (the pattern
+  the sibling `requestReveal` already uses) would not catch an in-place field edit during an
+  in-flight Test. Added a `JSON.stringify` content-snapshot check alongside the existing
+  identity/editingId check.
+- **F18 `8617087`** — mask rules went stale in other windows (carry-over, candidate #8): no
+  cross-window broadcast existed for Upsert/Remove/RegenerateKey, unlike `schemaChanged`. Added
+  `ChannelMaskRulesChanged` (Go `internal/bridge/{events,maskrules}.go`, per-connection payload
+  mirroring `schemaChanged`'s shape rather than `customScriptsChanged`'s flat list), a new
+  `onMaskRulesChanged` binding, and `state/maskRules.ts`'s `initMaskRulesSync` (wired into
+  `main.ts`'s boot sequence beside `initSchemaSync`) — writes the pushed rules/counts straight into
+  the query cache, with no `writeGeneration` guard (`schemas.ts`'s own fuller machinery): mask rules
+  take effect immediately, with no local draft to race against an in-flight fetch. `RegenerateKey`'s
+  payload also signals a receiving window to drop its own cached correlation key.
+
+**Nothing dismissed.** All 18 findings matched real, reachable code and were fixed as specified — no
+scope narrowed, no requirement dropped.
+
+**Shared-checkout note.** This branch was open concurrently to at least three other sessions this
+pass (a P112 subagent, a CSS/Tailwind-migration audit, and a "P108 Part 13" fixer), all committing
+directly into this same local working directory/branch. Every commit above was staged with an
+explicit file list (never `git add -A`), and every push landed as a clean fast-forward — no rebase,
+no conflict, and no unrelated file ever appeared in this phase's own commits' diffs (confirmed via
+each commit's own `N files changed` line matching exactly what was staged for it).
+
+**Disclosed, uncorrected discrepancy.** Commits F5-F11 (`6e47b53`, `e52cea5`, `4858ba6`, `9a6c1ab`,
+`ffb5fc3`, `83b4ccd`) are missing the `Co-Authored-By`/`Claude-Session` attribution lines this
+session's own instructions require on every commit — a gap introduced earlier in this same run,
+found only once this phase's closing verification pass re-checked every commit rather than just the
+ones just made. Left uncorrected: fixing it means amending or force-pushing six already-pushed
+commits, which `CLAUDE.md`'s and this session's own git-safety rules forbid without an explicit user
+request to do so. Every commit from F12 onward (`05ec1cd` through `8617087`) carries both lines,
+confirmed present as created.
+
+**P108 (all 20 parts) is now fully complete.** No separate whole-phase `## P108 result` rollup —
+P99 and P100, both multi-part phases, closed the same way with no rollup section, and nothing about
+this phase's own closure changes that precedent.
