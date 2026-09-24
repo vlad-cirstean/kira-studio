@@ -34,7 +34,7 @@ test.describe('branch picker', () => {
     await openPicker(page);
     // branches: main + feature-auth; tags: v1; stashes: one stack entry; worktrees: one; stacks:
     // one stacked branch — in `tabOptions`' own order (Branches, Tags, Stashes, Worktrees, Stacks).
-    await expect(page.locator('.kv-branch-tabs .kui-segmented-badge')).toHaveText([
+    await expect(page.locator('.kv-branch-tabs [data-testid="kui-segmented-badge"]')).toHaveText([
       '2',
       '1',
       '1',
