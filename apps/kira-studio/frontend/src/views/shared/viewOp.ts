@@ -157,6 +157,10 @@ export function applyLoadFailure(
 interface CountRuntime {
   count: { value: number; exact: boolean; stale: boolean } | null;
   countOpId: string | null;
+  // F13 (P108 Part 10): setFilter nulls `count` before a fresh count runs — a count that then
+  // fails used to leave the toolbar blank with no signal it failed or why. Surfaced in the count
+  // chip; cleared by the next count that succeeds.
+  countError: string | null;
 }
 
 // P107 T2-16: the countOpId-stamp/guard/assign skeleton — byte-identical across documents/grid/
@@ -178,7 +182,13 @@ export async function runPagedCount(
     // cleared it) — an answer to the previous request landing now would resurrect a stale total.
     if (rt.countOpId !== opId) return;
     rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-  } catch {
+    rt.countError = null;
+  } catch (err) {
+    // A filter/refresh change since this count started already stamped a newer countOpId (or
+    // cleared it) — same supersede guard as the success path above, so a stale failure can't
+    // overwrite an error (or a clear) that belongs to a newer request.
+    if (rt.countOpId !== opId) return;
     // Leave the previous count (if any) rather than blanking it on a failed refresh.
+    rt.countError = classifyLoadError(err).message;
   }
 }

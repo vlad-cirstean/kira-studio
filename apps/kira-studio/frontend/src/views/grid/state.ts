@@ -41,6 +41,9 @@ interface DataViewRuntime {
   opId: string | null; // the in-flight op, for the stop button (D2)
   count: { value: number; exact: boolean; stale: boolean } | null;
   countOpId: string | null; // guards runCount against a stale response outliving a filter change
+  // F13 (P108 Part 10): surfaced in the count chip when a count fails — setFilter nulls `count`
+  // first, so a failed refresh otherwise leaves the chip blank with no signal anything went wrong.
+  countError: string | null;
   meta: ObjectMeta | null; // from kira:tree:describe (L1) — the projection menu
   lastStrategy: 'keyset' | 'offset';
   nextToken: string | null;
@@ -67,6 +70,7 @@ function defaultRuntime(): DataViewRuntime {
     opId: null,
     count: null,
     countOpId: null,
+    countError: null,
     meta: null,
     lastStrategy: 'offset',
     nextToken: null,
@@ -312,6 +316,7 @@ export const useGridViewStore = defineStore('gridView', () => {
     const rt = ensureRuntime(tabId);
     rt.count = null;
     rt.countOpId = null;
+    rt.countError = null;
     useTabsStore().patchDataTabState(tabId, { filter, pageIndex: 0 });
     await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
   }

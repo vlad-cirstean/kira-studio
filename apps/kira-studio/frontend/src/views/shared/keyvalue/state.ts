@@ -29,6 +29,8 @@ interface KeyValueViewRuntime {
   /** P48 F17/D15: the grid's own countOpId guard (P43 F7/D10), ported here — this view has no
    *  filter to change, but Refresh carries the same late-response race. */
   countOpId: string | null;
+  // F13 (P108 Part 10): surfaced in the count chip when a count fails — same shape as grid's own.
+  countError: string | null;
   rowCount: number;
   hasMore: boolean;
   nextToken: string | null;
@@ -44,6 +46,7 @@ function defaultRuntime(): KeyValueViewRuntime {
     opId: null,
     count: null,
     countOpId: null,
+    countError: null,
     rowCount: 0,
     hasMore: false,
     nextToken: null,

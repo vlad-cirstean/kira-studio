@@ -290,18 +290,30 @@ function onDeleteRow(): void {
           variant="toolbar"
           size="kira-icon"
           data-testid="toolbar-count"
-          :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
+          :style="
+            rt?.countError
+              ? { color: 'var(--kira-error)' }
+              : rt?.count?.stale
+                ? { color: 'var(--kira-warn)' }
+                : undefined
+          "
           aria-label="Count all rows"
           @click="onCount"
         >
           <CodiconIcon name="symbol-number" :size="13" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent data-testid="toolbar-count-tooltip">
         {{
+          // F13 (P108 Part 10): a failed count is no longer silent — setFilter nulls `count`
+          // before a fresh count runs, so a failure right after has no old count to keep showing;
+          // a failed *refresh* of an existing count keeps that count on screen (unchanged) with
+          // the error appended, rather than losing it.
           rt?.count
-            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
-            : 'Count all rows'
+            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}${rt?.countError ? ` — refresh failed: ${rt.countError}` : ''}`
+            : rt?.countError
+              ? `Count failed: ${rt.countError}`
+              : 'Count all rows'
         }}
       </TooltipContent>
     </Tooltip>

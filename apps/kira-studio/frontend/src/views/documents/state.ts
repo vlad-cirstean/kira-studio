@@ -31,6 +31,8 @@ interface DocumentViewRuntime {
    *  since this count started already cleared rt.count/countOpId (setSearch), and an answer to
    *  the previous filter landing now would resurrect a total for the wrong query. */
   countOpId: string | null;
+  // F13 (P108 Part 10): surfaced in the count chip when a count fails — same shape as grid's own.
+  countError: string | null;
   rowCount: number;
   hasMore: boolean;
   nextToken: string | null;
@@ -47,6 +49,7 @@ function defaultRuntime(): DocumentViewRuntime {
     opId: null,
     count: null,
     countOpId: null,
+    countError: null,
     rowCount: 0,
     hasMore: false,
     nextToken: null,
@@ -169,6 +172,7 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     const rt = ensureRuntime(tabId);
     rt.count = null;
     rt.countOpId = null;
+    rt.countError = null;
     useTabsStore().patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
     void load(tabId, undefined, prevIndex);
   }
