@@ -139,7 +139,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 <template>
   <div data-testid="terminal-panel" class="terminal-panel">
     <div ref="rootEl" class="flex h-full flex-col">
-      <div class="p-panel-head h-bar">
+      <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
         <span class="panel-title">Quick commands</span>
         <Tooltip>
           <TooltipTrigger as-child>

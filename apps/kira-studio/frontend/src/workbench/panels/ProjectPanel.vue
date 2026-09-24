@@ -32,7 +32,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
 
 <template>
   <div ref="rootEl" class="flex h-full flex-col">
-    <div class="p-panel-head h-bar">
+    <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
       <span>Connections</span>
       <Tooltip>
         <TooltipTrigger as-child>

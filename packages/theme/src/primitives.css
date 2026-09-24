@@ -645,19 +645,9 @@
   flex-direction: column;
   min-height: 0;
 }
-.p-panel-head {
-  height: var(--kira-control-h-lg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+/* P110 B8: the old panel-head primitive converted to utilities on its 6 consumers -- see
+   flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm
+   text-muted-foreground uppercase tracking-wider. */
 
 /* ---------- LAW: a toolbar is --kira-toolbar-h, holds only h-sm controls ---------- */
 .p-toolbar {
@@ -906,7 +896,7 @@
 /* ---------- definition-view sections (P24 D31) ---------- */
 /* Shared by the five views/definition/*Section.vue components (Columns/Indexes/Constraints/
    Validation/Properties), collapsing five near-identical <style scoped> blocks into one. The
-   section title adopts .p-panel-head's own idiom (uppercase/muted/t-sm/letter-spacing) instead of
+   section title adopts the panel-head utility group's own idiom (uppercase/muted/t-sm/letter-spacing) instead of
    bold text — the design system never uses it anywhere; hierarchy comes from colour, size, case
    and letter-spacing alone. `.def-table td`'s border-right
    is deliberately NOT here: Validation/Properties are plain key-value tables with no column

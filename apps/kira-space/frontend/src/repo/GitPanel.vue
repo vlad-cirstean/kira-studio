@@ -331,7 +331,7 @@ onUnmounted(() => {
 
 <template>
   <div ref="rootEl" class="flex h-full flex-col">
-    <div class="p-panel-head h-bar">
+    <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
       <ToggleGroup

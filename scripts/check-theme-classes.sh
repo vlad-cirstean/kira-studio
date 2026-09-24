@@ -56,6 +56,8 @@ check_class 'bg-input' 'bg-field'
 # the unlayered rule was winning over them (11px ring instead of 12px, an accidental box-shadow
 # from Tailwind's own `ring` utility name colliding with the `.ring` hook class).
 check_class 'p-run-state' 'data-testid="run-state"/"run-state-label" plus plain utilities'
+# P110 B8
+check_class 'p-panel-head' 'flex items-center shrink-0 h-control-lg (or h-bar) gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
