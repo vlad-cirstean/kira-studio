@@ -139,6 +139,12 @@ func main() {
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
+		// F6: gitSock.Close() only reaches gitRegistry.Close() itself when this instance actually
+		// won the listen (Server.Close's own early return otherwise) — a second instance's entries,
+		// watchers, auto-fetch timers and review.db stayed open until process exit. Registry.Close
+		// is idempotent (gitreview.Store.Close too), so calling it again here unconditionally is
+		// always safe, listened or not.
+		gitRegistry.Close()
 		if askpassBroker != nil {
 			if err := askpassBroker.Close(); err != nil {
 				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
