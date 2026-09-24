@@ -104,25 +104,29 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
       <p v-if="dbMcpStore.status.error" class="muted-note" data-testid="db-mcp-error">
         {{ dbMcpStore.status.error }}
       </p>
-      <template v-else-if="dbMcpStore.status.running && dbMcpStore.status.command">
-        <p class="mono command-text" data-testid="db-mcp-command">
-          {{ dbMcpStore.status.command }}
-        </p>
-        <Button
-          variant="dialog"
-          size="kira-lg"
-          class="action-button"
-          :disabled="dbMcpInstalling"
-          data-testid="db-mcp-install-button"
-          @click="onInstallDbMcpClaudeCode"
-        >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
-        </Button>
-        <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
-          {{ dbMcpInstallMessage }}
-        </p>
-      </template>
+      <!-- F9: Regenerate must render whenever the server is running, in both branches below —
+           the expired-token message further down ("regenerate it above") has no remedy otherwise
+           once a command was shown (the common case post-F8: the command shows across ordinary
+           restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
-        <p class="muted-note" data-testid="db-mcp-no-token">
+        <template v-if="dbMcpStore.status.command">
+          <p class="mono command-text" data-testid="db-mcp-command">
+            {{ dbMcpStore.status.command }}
+          </p>
+          <Button
+            variant="dialog"
+            size="kira-lg"
+            class="action-button"
+            :disabled="dbMcpInstalling"
+            data-testid="db-mcp-install-button"
+            @click="onInstallDbMcpClaudeCode"
+          >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
+          </Button>
+          <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
+            {{ dbMcpInstallMessage }}
+          </p>
+        </template>
+        <p v-else class="muted-note" data-testid="db-mcp-no-token">
           This server restarted since it was last enabled; its registration command needs a
           fresh token to show again.
         </p>
