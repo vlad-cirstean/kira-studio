@@ -209,4 +209,43 @@ describe('createHistoryStore reactivity and refresh policy (P18 D1/D2/D3)', () =
     expect(store.runtime['tab-1'].entries).toEqual([{ id: 'e1' }, { id: 'e-new' }]);
     expect(store.runtime['tab-1'].loading).toBe(false);
   });
+
+  // P108 F1: noteRecorded firing twice close together (the reachable repro: gRPC's own
+  // applyGrpcEvent-done and call()-return sites both calling noteGrpcCallRecorded for the same
+  // call, before that duplicate notify was fixed at its own source) used to retry-loop forever —
+  // each load()'s own retry re-bumped the single counter both "a newer load exists" and "marked
+  // stale mid-flight" shared, which made the other in-flight load look superseded in turn, and the
+  // pair kept re-superseding each other indefinitely (109 list calls in 300ms, `loading` stuck
+  // true, `entries` never committed, in the finding's own harness). This drives that exact shape —
+  // two noteRecorded calls a beat apart while the pane is on History, so each is an eager load()
+  // racing the other's in-flight fetch — and asserts convergence rather than the runaway retry.
+  test('9. two noteRecorded calls close together (pane on History) converge instead of retrying forever (F1)', async () => {
+    const results: FakeEntry[][] = [
+      [{ id: 'e1' }],
+      [{ id: 'e1' }, { id: 'e2' }],
+      [{ id: 'e1' }, { id: 'e2' }, { id: 'e3' }],
+    ];
+    let call = 0;
+    const store = makeStore(async () => {
+      const r = results[Math.min(call, results.length - 1)] as FakeEntry[];
+      call++;
+      await new Promise((resolve) => setTimeout(resolve, 5)); // FIFO replies, matching the finding's own harness
+      return r;
+    });
+    store.registerTab('tab-1', 'history');
+
+    store.noteRecorded('tab-1'); // T0: eager load() #1 in flight
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    store.noteRecorded('tab-1'); // T1: eager load() #2 starts while #1 is still in flight
+
+    // Bounds the wait rather than looping forever: the pre-fix code never reached quiescence here.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(store.runtime['tab-1'].loading).toBe(false);
+    expect(store.runtime['tab-1'].stale).toBe(false);
+    expect(store.runtime['tab-1'].entries).not.toBeNull();
+    // Pre-fix: unbounded (109 in the finding's own 300ms harness). A handful of retries converging
+    // is fine; a runaway retry storm is exactly what this bounds out.
+    expect(store.listCallCount()).toBeLessThan(10);
+  });
 });

@@ -78,6 +78,15 @@ interface GrpcRequestViewRuntime {
    *  event outright. Matching against `lastCallId` instead keeps the event subscriber correct
    *  regardless of which side finishes first, since only a *new* call ever changes it. */
   lastCallId: string | null;
+  /** P108 F1: the callId `noteGrpcCallRecorded` has already fired for. For a server-streaming
+   *  call, both the control-plane return (`call`'s own success path) and the terminal streaming
+   *  event (`applyGrpcEvent`'s `done` branch) observe "this call finished" — same race F5 above
+   *  documents, whichever lands first. Both used to call `noteGrpcCallRecorded` unconditionally,
+   *  recording the same call twice and feeding history's own `load()` two overlapping refreshes
+   *  close enough together to retry-loop forever (F1). Guarding on this field records once per
+   *  callId regardless of which side notices completion first — unary (no streaming events) still
+   *  records once, from the return path, same as before. */
+  notifiedCallId: string | null;
   streaming: boolean;
   error: { code: string; message: string } | null;
   result: GrpcCallResultWire | null;
@@ -99,6 +108,7 @@ function defaultRuntime(): GrpcRequestViewRuntime {
     status: 'idle',
     opId: null,
     lastCallId: null,
+    notifiedCallId: null,
     streaming: false,
     error: null,
     result: null,
@@ -183,7 +193,12 @@ function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCa
       rt.status = 'idle';
       rt.result = event.status ?? rt.result;
     }
-    useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
+    // P108 F1: dedupe against call()'s own return-path notify (see `notifiedCallId` doc) —
+    // whichever of the two observes this call's completion first wins.
+    if (rt.notifiedCallId !== event.callId) {
+      rt.notifiedCallId = event.callId;
+      useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
+    }
   }
 }
 
@@ -333,7 +348,12 @@ export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
         rt.trueMessageCount = result.messages.length;
         rt.messageBytes = result.messages.reduce((n, m) => n + m.wireBytes, 0);
       }
-      useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
+      // P108 F1: dedupe against applyGrpcEvent's own terminal-event notify (see `notifiedCallId`
+      // doc) — for a streaming call the terminal event may already have recorded this callId.
+      if (rt.notifiedCallId !== opId) {
+        rt.notifiedCallId = opId;
+        useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
+      }
     } catch (err) {
       if (rt.opId !== opId) return;
       rt.opId = null;

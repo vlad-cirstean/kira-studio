@@ -26,9 +26,22 @@ const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcr
 const grpcRequestViewStore = useGrpcRequestViewStore();
 
 const originalGrpcCall = control.grpcCall;
+const originalGrpcHistoryList = control.grpcHistoryList;
 afterEach(() => {
   control.grpcCall = originalGrpcCall;
+  control.grpcHistoryList = originalGrpcHistoryList;
 });
+
+// P108 F1: counts how many times the gRPC call-history store actually fetches its list — the
+// direct, observable signature of noteGrpcCallRecorded firing. Set to `historyListCalls = 0`
+// (below) and the tab's `responsePane` to 'history' (so noteRecorded's own eager branch fires a
+// real load()) at the top of any test that needs to assert on it.
+let historyListCalls = 0;
+// biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcHistoryList
+(control as any).grpcHistoryList = async () => {
+  historyListCalls++;
+  return [];
+};
 
 // ensureGrpcCallSubscription (state.ts) calls control.onGrpcCall exactly once ever, module-wide
 // (a `subscribedToGrpcCall` flag, never reset) — the first call() in this whole test process to
@@ -80,13 +93,17 @@ function terminalResult(): GrpcCallResultWire {
 
 function setUpStreamingTab(): string {
   const id = openGrpcRequestTab();
-  patchGrpcRequestTabState(id, { service: 'Svc', method: 'Stream' });
+  // responsePane: 'history' so noteGrpcCallRecorded's own eager branch (api/state/history.ts's
+  // noteRecorded) fires a real list() fetch per call — the observable signal the F1 test below
+  // counts via historyListCalls, rather than the lazy `stale` flag a non-History pane would set.
+  patchGrpcRequestTabState(id, { service: 'Svc', method: 'Stream', responsePane: 'history' });
   grpcRequestViewStore.schemaRuntime[id] = {
     status: 'idle',
     schema: streamingSchema(),
     error: null,
     genId: 0,
   };
+  historyListCalls = 0;
   return id;
 }
 
@@ -132,6 +149,13 @@ describe("a server-streaming call's terminal event race (F5)", () => {
     expect(grpcRequestViewStore.runtime[id]?.messages).toHaveLength(2);
     expect(grpcRequestViewStore.runtime[id]?.trueMessageCount).toBe(2);
     expect(grpcRequestViewStore.runtime[id]?.messageBytes).toBe(20);
+
+    // P108 F1: both the control-plane return (above) and this terminal event observed "the call
+    // finished" — each used to call noteGrpcCallRecorded unconditionally, recording this one call
+    // twice and feeding history's own load() two overlapping refreshes close enough together to
+    // retry-loop forever. `notifiedCallId` must have deduped them to exactly one history list
+    // fetch.
+    expect(historyListCalls).toBe(1);
   });
 
   test('the terminal event arriving before the control-plane response still works (the order the code always handled)', async () => {

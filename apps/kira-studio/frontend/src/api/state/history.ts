@@ -39,11 +39,25 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   // same failure P18 S1/S2 root-caused for the read side). Each tab's own monotonic counter: a
   // load only commits its result if nothing newer (another load, or a noteRecorded marking stale)
   // has started since — the same opId-supersession shape the view stores already use elsewhere.
+  //
+  // P108 F1: this used one counter for both signals — "a newer load exists" and "marked stale
+  // while in flight" — and had every retry re-bump it. Two overlapping loads each saw the other's
+  // bump as "I was superseded", retried, and that retry's own bump made the other's in-flight
+  // fetch look superseded too, forever (109 list calls in 300ms in the finding's harness, `loading`
+  // stuck true). `latestSeq` now means only "a newer load() call exists" (a load discards quietly
+  // — the newer load owns the result, no retry). `staleSeq` means only "noteRecorded marked stale
+  // while a load was in flight" (that load retries once to pick it up). A retry bumps `latestSeq`
+  // like any other load, but that no longer causes a loop: the older load it supersedes just
+  // discards, and nothing keeps re-triggering `staleSeq` on its own.
   const latestSeq = new Map<string, number>();
   function bumpSeq(tabId: string): number {
     const next = (latestSeq.get(tabId) ?? 0) + 1;
     latestSeq.set(tabId, next);
     return next;
+  }
+  const staleSeq = new Map<string, number>();
+  function bumpStale(tabId: string): void {
+    staleSeq.set(tabId, (staleSeq.get(tabId) ?? 0) + 1);
   }
 
   function ensure(tabId: string): Runtime {
@@ -68,6 +82,7 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   registerTabRuntimeCleanup((tabId) => {
     delete runtime[tabId];
     latestSeq.delete(tabId);
+    staleSeq.delete(tabId);
   });
 
   function scopeIdsFor(tabId: string): { itemId: string; tabId: string } {
@@ -80,38 +95,50 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
   async function load(tabId: string): Promise<void> {
     const rt = ensure(tabId);
     const mySeq = bumpSeq(tabId);
+    const staleAtStart = staleSeq.get(tabId) ?? 0;
     rt.loading = true;
     rt.error = null;
-    // P21 round 3 functional finding 4: set below only on the "superseded while in flight, so a
-    // retry now owns `loading`" branch — this call's own `finally` must not clear `loading` out
-    // from under that retry.
-    let retried = false;
+    // P21 round 3 functional finding 4 / P108 F1: set below whenever this call's own `finally`
+    // must not clear `loading` out from under someone else still owning it — either a retry this
+    // call itself kicked off, or a newer load() call that started while this one was in flight.
+    let skipLoadingClear = false;
     try {
       const { itemId, tabId: tid } = scopeIdsFor(tabId);
       const entries = await opts.list(itemId, tid);
       if (!opts.findTab(tabId)) return; // the tab closed while this was in flight
-      // Only commit if nothing newer started while this fetch was in flight — otherwise this is
-      // an answer to a question already superseded (a fresher load, or a noteRecorded that this
-      // fetch's own snapshot predates).
-      if (latestSeq.get(tabId) === mySeq) {
+      if (latestSeq.get(tabId) !== mySeq) {
+        // P108 F1: a newer load() call started while this fetch was in flight — that load owns
+        // `loading`/`entries` and (if itself superseded) its own retry chain. This one's answer is
+        // simply stale; discard quietly. Retrying here too was the bug: the retry's own bumpSeq
+        // made the newer load look superseded in turn, and the pair kept re-superseding each other
+        // forever (F1's 300ms/109-call harness).
+        skipLoadingClear = true;
+        return;
+      }
+      // Only commit if no noteRecorded marked this tab stale while the fetch was in flight —
+      // otherwise this answer predates a send/call this fetch's own snapshot doesn't reflect.
+      // `?? 0` matters here: an untouched tab's `staleSeq` entry is `undefined`, and `staleAtStart`
+      // above already normalizes that same read to `0` — comparing this read bare against that
+      // would spuriously mismatch (`undefined !== 0`) and force a retry on every ordinary load.
+      if ((staleSeq.get(tabId) ?? 0) === staleAtStart) {
         rt.entries = entries;
         rt.stale = false;
       } else {
         // F8's own retry-side hole: a load superseded by noteRecorded's `stale = true` branch
-        // (which only bumps the sequence counter — it never itself starts a new load) used to be
-        // silently discarded here, leaving `stale` set with nothing left to ever clear it. The
-        // just-sent response then never appeared in History until the user sent again or deleted/
-        // cleared an entry. Retrying converges: either nothing supersedes the retry and it commits
-        // normally, or it is itself superseded and retries again, until sends/calls stop arriving
-        // faster than a fetch can complete.
-        retried = true;
+        // used to be silently discarded here, leaving `stale` set with nothing left to ever clear
+        // it. The just-sent response then never appeared in History until the user sent again or
+        // deleted/cleared an entry. Retrying converges: `staleSeq` only advances on a genuine new
+        // noteRecorded call, so this bottoms out once sends/calls stop arriving faster than a
+        // fetch can complete — unlike the old shared counter, a retry does not itself re-trigger
+        // this branch.
+        skipLoadingClear = true;
         void load(tabId);
       }
     } catch (err) {
       if (!opts.findTab(tabId)) return;
       rt.error = err instanceof Error ? err.message : String(err);
     } finally {
-      if (opts.findTab(tabId) && !retried) rt.loading = false;
+      if (opts.findTab(tabId) && !skipLoadingClear) rt.loading = false;
     }
   }
 
@@ -136,9 +163,13 @@ export function createHistoryStore<Entry, Snapshot, Extra extends object = Recor
       void load(tabId);
     } else {
       rt.stale = true;
-      // Supersede any in-flight load (F8) — one issued before this send/call completed must not
-      // resolve afterward and clear the `stale` flag this line just set.
-      bumpSeq(tabId);
+      // Mark any in-flight load stale (F8) — one issued before this send/call completed must not
+      // resolve afterward and clear the `stale` flag this line just set. P108 F1: this used to
+      // share `latestSeq` with load()'s own "a newer load exists" signal, which made every retry
+      // this triggered look like a newer load to any other in-flight load too. `staleSeq` is its
+      // own counter now — it only tells an in-flight load "retry once", never "someone else owns
+      // this now".
+      bumpStale(tabId);
     }
   }
 
