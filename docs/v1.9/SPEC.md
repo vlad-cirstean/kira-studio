@@ -4895,3 +4895,191 @@ on; the two incidents above were both caught this way, not by luck.
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
   starts, written by an Opus subagent per `CLAUDE.md`'s own process, never edited afterward.
+
+## P108 Part 11 result
+
+Reviewed per `plans/P108-part11-findings.md` (Opus reviewer, no fixing) — chunk "Studio console and
+editor: `apps/kira-studio/frontend/src/views/{console,stream,documents,definition,browse}/**`,
+`editor/**`". 17 findings, F1-F3 High, F4-F11 Medium, F12-F17 Low. One Sonnet fixer landed one
+commit per finding, F1-F17 in order, none dismissed or deferred.
+
+- **F1 `3da5e02`** — closing a console tab deleted `runtime[tabId]` but left `run()`/`explain()`
+  holding a reference to the now-detached runtime object, so their post-`await` supersession guards
+  kept reading `status: 'running'` forever and the statement (or auto-explain's own `EXPLAIN`) kept
+  running against a connection nothing could see any more. Cancels the in-flight run/auto-explain on
+  tab close.
+- **F2 `72fb26f`** — `isExplainable` (`console/explain.ts`) accepted any `SELECT`/`WITH` statement
+  without checking for an embedded `;` before the trailing one, so a merged multi-statement blob
+  (never produced by Run all's own splitter, but reachable via paste/type) could be sent through
+  `EXPLAIN` as if it were one statement. Guarded on both the TS and Go sides.
+- **F3** — Run statement picked the *next* statement when the caret sat right after a `;` or on a
+  blank line between two statements — that span belongs to the *preceding* statement (where the
+  caret lands after typing `;` or pressing End), not the following one. Fixed via a new
+  `statementAtOffset` (`packages/shared/domain/sql-split.ts`) that treats trailing whitespace up to
+  the next statement's first non-space character as owned by the statement before it;
+  `statementAtCursor` now delegates to it, and `ConsoleView.vue`'s own cached-split caret lookup
+  reuses the same function. **Landed inside a concurrent sibling subagent's commit `a2f8807`**
+  (`refactor(studio): variable rows onto TanStack Query (P112)`) rather than its own — this
+  session's changes were staged (`sql-split.ts`, `ConsoleView.vue`, `sql-split.spec.ts`) when the
+  sibling ran a broad `git commit` against the same shared index between this session's `git add`
+  and `git commit` calls. Confirmed complete and correctly attributed in that commit's diff (own
+  `P108 Part 11 F3` doc comments throughout, `sql-split.spec.ts` covers it) before accepting it as
+  done rather than re-doing the work.
+- **F4 `507c785`** — `scanSqlSpan` (`sql-lex.ts`) had no case for MySQL/ClickHouse `#` line
+  comments, Postgres `E'...'` escape strings, Postgres nested block comments, SQLite/SQL Server
+  `[bracket]` identifiers, or a `$` inside an identifier on Postgres (misread as a dollar-quote open
+  tag) — so Run all/Run statement/Format/Explain-eligibility/hover split a document differently than
+  the dialect actually parses it. Added five options to `SqlLexOptions`
+  (`hashComments`/`slashSlashComments`/`nestedBlockComments`/`bracketIdentifiers`/
+  `postgresEscapeStrings`), threaded through `sqlIdent.ts`'s dialect-keyed option builders.
+- **F5** — Operation history's re-run reopened at the connection's bare default path rather than the
+  original tab's path (unqualified DML could hit a different database/schema's same-named table),
+  fired without `ensureConnectedForRun` (failed instead of reconnecting), and re-split the recorded
+  `;\n`-joined command through the same trailing-line-comment bug F9 independently fixes on the TS
+  side. Fixed by: a new `OpRecord.Path` (Go model + `0027_p108part11_op_log_path.sql` migration +
+  wire type + `ops.ts`'s Zod mirror), `adapterhost.Dispatcher.Execute`/`OpCtx.SetPath` recording it,
+  `OperationsPanel.vue`'s re-run reopening at that path and refusing when it's missing; a new shared
+  `adapters.JoinConsoleStatements` (Go, mirroring F9's `joinFormattedStatements` on the TS side)
+  replacing every adapter's bare `strings.Join(statements, ";\n")` (postgres/sqlite/mysqlfamily/
+  mongo/clickhouse `console.go`); and routing re-run through the same reconnect step Run itself uses.
+  **Landed inside a concurrent sibling subagent's commit `5ea9684`**
+  (`refactor(studio): collections tree onto TanStack Query (P112)`) via the same shared-index race as
+  F3. Confirmed complete: every touched file (`adapterhost/data.go`, `adapterhost/host.go`,
+  `adapters/adapter.go`, `adapters/sqltext.go`+`_test.go`, all 5 adapters' `console.go`,
+  `oplog/wire.go`, `storage/migrations/embed.go`+the new `.sql` file, `storage/model/ops.go`,
+  `storage/repos/ops.go`, `packages/shared/domain/ops.ts`, `OperationsPanel.vue`) carries its own
+  `P108 Part 11 F5` doc comment and traces correctly end to end (verified by reading each diff, not
+  by the sibling's commit message, which never mentions F5 at all).
+- **F6 `b24bb16`** — `ProjectionMenu.vue` always called `setProjection` on unmount, inferring
+  "everything" from `selected.size === fieldNames.length` — `fieldNames` is itself the *already
+  projected* page's own field set, so an untouched close of an active `[a, b]` projection
+  re-derived `selected` as matching it and silently cleared the projection. Extracted the shared
+  `setsEqual`/`nextDocumentProjectionOnClose` helper (`projection.ts`) the component now imports
+  instead of duplicating, fixing the coincidental-equality bug at its root.
+- **F7 `d4af8a1`** — console row/range copy (`ConsoleSlickGrid.vue`, `resultMenu.ts`) keyed
+  TSV/CSV/JSON output by raw column name; a self-join's duplicate column names silently overwrote
+  each other in the copied row object. Added `disambiguateNames` (`clipboardFormats.ts`) and used it
+  at both call sites — scoped to console per the finding's own note that grid's name-keyed column
+  widths stay out of it.
+- **F8 `2b5703b`** — Monaco hover content (`MonacoHost.vue`'s `buildHoverProvider`) rendered
+  database-sourced text (a column comment, a variable value) as Markdown unescaped — a value
+  containing `[`, `_`, backticks, etc. could re-render as a link, emphasis, or break out of its own
+  code fence. Added `escapeMarkdownSyntaxTokens` (VS Code's own convention) for plain-text `lines`
+  entries and `fenceMarkdownValue` (a CommonMark-correct fence, one backtick longer than the longest
+  run inside the value) for the single `value` entry.
+- **F9 `9e03a17`** — `formatConsoleText`'s rejoin (`joinFormattedStatements`, `format.ts`) merged
+  statements through a trailing `--`/`#` line comment: the `;\n` separator's `;` read as part of the
+  comment, and re-splitting merged the two statements into one. Fixed by appending an extra `\n`
+  before the separator whenever a statement's last line contains one; also added the matching Mongo
+  refusal (`unexpected trailing content after statement`) `formatMongoStatement` was missing,
+  matching the Go adapter's own wording.
+- **F10 `828a558`** — a stream column resize (`StreamView.vue`, `KuiColumnResizeHandle.vue`) left
+  `liveResizeWidth` stuck at the live-drag value if the drag was cancelled (Escape, or losing the
+  pointer capture) rather than committed — the column stayed visually at the cancelled width until
+  some unrelated re-render happened to clear it. Added a `cancel` emit to the shared
+  `packages/kira-ui` handle (ignored by `CommitGrid.vue`, the component's other consumer, which
+  never held live-resize preview state to begin with) and a `left-button-only` guard.
+- **F11 `dbeb9da`** — Run/Run all/Explain in the console guarded only on `running`, not on the
+  window between "guard check passes" and `run()`/`explain()` actually starting — a slow
+  `ensureConnectedForRun()` reconnect left that window long enough for a second click to fire a
+  second, overlapping run. Added a `starting` ref covering exactly that await, checked alongside
+  `running` in all three guards and disabled bindings. **This commit also absorbed two files it did
+  not intend to** (`apps/kira-studio/frontend/src/api/state/draftMerge.ts`,
+  `apps/kira-studio/tests/unit/api-draft-merge.spec.ts`) — a concurrent sibling's own new/untracked
+  files staged between this session's `git status` check and its `git commit` call, the same
+  shared-index race as F3/F5 but in the opposite direction (a sibling's work swept into this
+  session's commit rather than the reverse). Verified harmless before moving on:
+  `bun test apps/kira-studio/tests/unit/api-draft-merge.spec.ts` → 4 pass, confirming the swept-in
+  files were the sibling's own complete, working commit, not broken WIP. From F12 onward this
+  session switched to `git commit -m "…" -- <explicit pathspec>` for every commit, which closes this
+  race by construction — no recurrence after F11.
+- **F12 `6f218c1`** — Part 10 F16 capped the regex-search text scanned per cell
+  (`REGEX_SCAN_TEXT_CAP`) in grid/keyvalue search only, deliberately leaving console search
+  (`console/search.ts`, all three branches), documents search (`documents/search.ts`), and the
+  editor find bar (`editor/findRanges.ts`) uncapped — a user regex like `(a+)+$` against one long
+  cell/body/document still blocked the main thread there. Threaded the same cap through all four,
+  reimplemented inline in `findRanges.ts` (a prefix truncation before the exec loop) since it has no
+  `eachMatch` call of its own to pass the parameter through.
+- **F13 `4d466cd`** — `onFormat()` captured `originalText` before awaiting `formatConsoleText()`
+  (which awaits a dynamic `import('sql-formatter')` on first use); a keystroke typed while that
+  import resolved was silently discarded — `setText()` applied the formatted result of the stale
+  `originalText` over whatever was now in the editor. Guards right after the await: if the tab's
+  live text no longer matches `originalText`, discards the stale result and surfaces a note instead
+  of applying it.
+- **F14 `d29b529`** — `stream/state.ts`'s `load()` hand-wrote the same supersede/tab-closed/
+  page-kind-check/`applyLoadFailure` frame `shared/page/load.ts`'s `runPagedLoad` already extracts
+  from documents/grid/keyvalue's own `load()`s (`load.ts`'s own comment had already flagged this as
+  an unadopted candidate, Part 10 F20). Migrated to `runPagedLoad`; behavior unchanged.
+- **F15 `6946de0`** — `applyStreamFilter` cleared `rt.count`/`rt.countOpId` on a filter change but
+  left `rt.countError` standing, so a count failure from before the filter change kept showing under
+  a total the new filter never produced; neither the stream nor document toolbar rendered
+  `countError` at all (only `grid/DataToolbar.vue` did, since Part 10 F13), even though
+  `runPagedCount` — the shared count frame all four views share — has set it on failure since then.
+  Cleared `countError` alongside the other two in `applyStreamFilter`; both toolbars' count buttons
+  now tint and show the failure in their tooltip, mirroring `DataToolbar.vue`.
+- **F16 `6b68cfb`** — Console/Stream/Document's Refresh and Stop buttons carried a dynamic
+  `:disabled` but weren't wrapped in `TooltipDisabledTrigger` (the focusable-span shim every other
+  conditionally-disabled toolbar button already uses, since a disabled native button dispatches no
+  pointer/focus event a `TooltipTrigger` can react to) — their tooltip silently never fired exactly
+  when disabled, the moment an explanation matters most. Wrapped all four. Browse's and Definition's
+  Stop buttons carried a hardcoded `disabled` permanently (Definition's own comment already said
+  so — "this load has no cancellation to offer"); removed both rather than wrapped, after grepping
+  both testids repo-wide and finding no test referenced either.
+- **F17 `482084b`** — the document context menu's Delete item had no disabled/label gating at all,
+  while the row's own Delete button already refuses on `!canDelete` (`caps.canDelete` combined with
+  the connection's `readOnly` flag) — right-clicking the same row offered a Delete that would still
+  fire and fail server-side. Added a `deleteGate` parameter to `rowMenu()` mirroring the `editGate`
+  pattern the same function already uses for Edit; `DocumentView.vue`'s call site passes
+  `{ deletable: canDelete.value, label: deleteTitle.value }`, the exact values its own row button
+  reads.
+
+**Nothing dismissed.** All 17 findings matched real, reachable code and were fixed as specified — no
+scope narrowed, no requirement dropped.
+
+**Shared-checkout git races (three instances, all disclosed above at their own finding):** F3 and F5
+landed inside a concurrent sibling subagent's own commits rather than this session's, and F11's
+commit absorbed two of that sibling's untracked files — all three are the same underlying hazard
+(one shared git index across two subagents working the same checkout at once) in either direction.
+Each was caught immediately (a commit's file list not matching what was staged, or the "3 files
+changed" summary not matching the 1 file intended) and verified rather than assumed: F3/F5 by reading
+the sibling's full diff for the exact files this session's own edits touched and confirming every
+one carries this phase's own doc-comment references and matches the finding's fix; F11 by running
+the swept-in test file and confirming it passes. From F12 onward every commit in this phase used
+`git commit -m "…" -- <explicit pathspec>` rather than a plain `git commit` against whatever the
+index held at that moment — closes the race by construction, since a pathspec-scoped commit builds
+its tree only from the named paths regardless of what else is staged. No recurrence after F11.
+
+**Verification:**
+- `npx biome check .` — clean, whole repo.
+- `bun run typecheck` (whole-repo parallel task: web/unit/tests/api-core targets for both apps plus
+  `packages/git-ipc`/`git-core`/`git-ui`/`kira-ui`/`api-core`) — clean.
+- `bun test apps/kira-studio/tests/unit/` — 748 pass, 3 fail (see "Deferred" below), 11011
+  `expect()` calls across 751 tests in 93 files.
+- `golangci-lint run ./internal/adapters/... ./internal/adapterhost/... ./internal/oplog/...
+  ./internal/storage/...` (every Go package F5 touched; installed per `docs/DEV_ENVIRONMENT.md`'s
+  `scripts/install-golangci-lint.sh`, since the container's preinstalled binary refuses this repo's
+  `go 1.27.1`) — 0 issues.
+- `go test ./internal/adapters/... ./internal/adapterhost/... ./internal/oplog/... ./internal/storage/...`
+  — all packages pass.
+- Every commit's own file list checked against its intended set (`git status --short` before
+  staging, `git status --short`/`git log --oneline` after) before moving on — the race disclosure
+  above was caught this way, not by luck.
+
+**Deferred, out of this phase's scope — 2 pre-existing/concurrent-phase unit test failures, both
+confirmed unrelated to any of this phase's 17 findings or their files:**
+- `grpc-schema-supersession.spec.ts` (2 of its tests) — fails against `views/grpcrequest/state.ts`.
+  `git log` shows that file's own most recent commit is the sibling's still-in-progress `a2f8807`
+  (P112's TanStack Query migration for variable rows), landed mid-session; `git status --short`
+  confirms neither the spec nor the source file was touched by this phase. A different subsystem
+  (gRPC request view, not console/editor) under active edit by a concurrent P112 subagent — fixing
+  it here would mean editing another agent's in-flight migration, not this phase's own scope.
+- `bridge-unwrap.spec.ts` (1 test) — fails against `bridge/control.ts`'s wrap contract (every
+  promise-returning method should surface `{ code: 'E_QUERY' }`, not a raw rejection). `git log`
+  shows that file's own most recent commit is `d84a7c4` (`fix(a11y): add missing aria-label on
+  icon-only Tooltip triggers`), an ancestor of this phase's own plan commit `2483051` — genuinely
+  pre-existing, predating this phase entirely, and unrelated to console/editor.
+
+Neither is named by any of the 17 findings, neither's file was touched by any commit in this phase,
+and per `CLAUDE.md`'s own exception ("fixing it needs work genuinely outside the phase's own scope —
+a different subsystem, a real design decision"), both are left for their own follow-up phase rather
+than fixed here.
