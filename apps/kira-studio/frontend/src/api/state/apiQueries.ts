@@ -64,7 +64,7 @@ export function apiCollectionsTreeQueryOptions() {
 // `null` means "confirmed orphan" (GetRequest threw — the row was deleted, in this window or
 // another); `undefined` (no data) means "not loaded yet". Keeps P108 F4's orphan/not-loaded split
 // exactly, without two parallel maps.
-export function apiSavedRequestQueryOptions(itemId: string) {
+function apiSavedRequestQueryOptions(itemId: string) {
   return {
     queryKey: apiSavedRequestKey(itemId),
     queryFn: async (): Promise<HttpSavedRequest | null> => {
@@ -79,7 +79,7 @@ export function apiSavedRequestQueryOptions(itemId: string) {
 }
 
 /** apiSavedRequestQueryOptions' own gRPC sibling. */
-export function apiSavedGrpcRequestQueryOptions(itemId: string) {
+function apiSavedGrpcRequestQueryOptions(itemId: string) {
   return {
     queryKey: apiSavedGrpcRequestKey(itemId),
     queryFn: async (): Promise<GrpcSavedRequest | null> => {
@@ -101,7 +101,7 @@ export function apiEnvironmentsQueryOptions() {
   };
 }
 
-export function apiVariablesQueryOptions(scope: VariableScope, ownerId: string) {
+function apiVariablesQueryOptions(scope: VariableScope, ownerId: string) {
   return {
     queryKey: apiVariablesKey(scope, ownerId),
     queryFn: (): Promise<ApiVariable[]> => control.variablesList(scope, ownerId),
