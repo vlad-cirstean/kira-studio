@@ -9,13 +9,8 @@ import { pinia } from '../../state/pinia';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
-import {
-  applyLoadFailure,
-  beginOp,
-  createRuntimeStore,
-  runPagedCount,
-  stopOp,
-} from '../shared/viewOp';
+import { runPagedLoad } from '../shared/page/load';
+import { beginOp, createRuntimeStore, runPagedCount, stopOp } from '../shared/viewOp';
 import { drop, setPage } from './page';
 import { useStreamFilterHistoryStore } from './streamFilterHistory';
 
@@ -113,6 +108,10 @@ export const useStreamViewStore = defineStore('streamView', () => {
     delete runtime[tabId];
   });
 
+  // P108 Part 11 F14: adopts shared/page/load.ts's runPagedLoad frame (P107 I2-14), which
+  // documents/grid/keyvalue's own load() already use — this view's supersede/tab-closed/kind-check/
+  // applyLoadFailure tail was the exact same shape load.ts's own F20 note (P108 Part 10) flagged as
+  // a candidate, just never migrated.
   async function load(tabId: string, cursor?: PageCursor): Promise<void> {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return;
@@ -122,39 +121,38 @@ export const useStreamViewStore = defineStore('streamView', () => {
     rt.polled = true;
 
     const filter = currentStreamFilter(tab);
+    const connectionId = tab.connectionId;
 
-    try {
-      const response = await data.read({
-        opId,
-        tabId,
-        connectionId: tab.connectionId,
-        path: tab.path,
-        projection: null,
-        filter,
-        sort: null,
-        pageSize: tab.state.pageSize,
-        cursor: effectiveCursor,
-      });
-      // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
-      // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-      // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
-      if (!runtime[tabId]) return;
-      if (rt.opId !== opId) return;
-      if (response.page.kind !== 'stream') {
-        throw new Error(`unexpected page kind for a stream tab: ${response.page.kind}`);
-      }
-
-      setPage(tabId, response.page);
-      rt.status = 'idle';
-      rt.opId = null;
-      rt.rowCount = response.page.rowCount;
-      rt.hasMore = response.page.position.hasMore;
-      rt.nextToken = response.page.position.nextToken;
-      rt.visibilityTimeoutSeconds = response.page.visibilityTimeoutSeconds;
-      rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
-    } catch (err) {
-      applyLoadFailure(rt, opId, err, tabId);
-    }
+    await runPagedLoad({
+      rt,
+      opId,
+      stillMounted: () => Boolean(runtime[tabId]),
+      read: () =>
+        data.read({
+          opId,
+          tabId,
+          connectionId,
+          path: tab.path,
+          projection: null,
+          filter,
+          sort: null,
+          pageSize: tab.state.pageSize,
+          cursor: effectiveCursor,
+        }),
+      expectKind: 'stream',
+      id: tabId,
+      tabNoun: 'stream tab',
+      apply: (page) => {
+        setPage(tabId, page);
+        rt.status = 'idle';
+        rt.opId = null;
+        rt.rowCount = page.rowCount;
+        rt.hasMore = page.position.hasMore;
+        rt.nextToken = page.position.nextToken;
+        rt.visibilityTimeoutSeconds = page.visibilityTimeoutSeconds;
+        rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
+      },
+    });
   }
 
   async function reload(tabId: string): Promise<void> {
