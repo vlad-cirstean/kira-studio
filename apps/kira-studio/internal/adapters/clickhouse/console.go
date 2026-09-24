@@ -41,11 +41,45 @@ func classifyClickHouseSQL(statement string) adapters.OpClass {
 	fields := strings.Fields(stripped)
 	if len(fields) > 0 && strings.EqualFold(fields[0], "EXPLAIN") {
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
+		// F4: ClickHouse's own EXPLAIN grammar allows an optional kind keyword
+		// (AST/SYNTAX/QUERY TREE/PLAN/PIPELINE/ESTIMATE/TABLE OVERRIDE), and PLAN accepts an
+		// optional `k = v, ...` settings list, both before the actual target statement —
+		// queryplan.StatementsFor composes exactly this shape ("EXPLAIN PLAN json = 1, ... SELECT
+		// ..."). Left unstripped, ExplainAnalyzeTarget/ClassifySQL below see a leading "PLAN"/
+		// "ESTIMATE" token instead of the real target and classify it ClassUnknown, so every
+		// composed explain_query statement failed to classify.
+		rest = stripClickHouseExplainKindAndSettings(rest)
 		if hasAnalyze, target, ok := adapters.ExplainAnalyzeTarget(rest); ok && !hasAnalyze {
 			return adapters.ClassifySQL(target)
 		}
 	}
 	return adapters.ClassifySQL(statement)
+}
+
+// chExplainKindRE matches ClickHouse's optional EXPLAIN kind keyword. ANALYZE is deliberately not
+// here — ExplainAnalyzeTarget already recognizes it, and stripping it here would defeat that check.
+var chExplainKindRE = regexp.MustCompile(`(?i)^(QUERY\s+TREE|TABLE\s+OVERRIDE|AST|SYNTAX|PLAN|PIPELINE|ESTIMATE)\b`)
+
+// chExplainSettingsRE matches PLAN's optional `k = v, k2 = v2, ...` settings list, requiring
+// trailing whitespace before the target statement so it never over-consumes into it.
+var chExplainSettingsRE = regexp.MustCompile(
+	`(?i)^((?:[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:'[^']*'|[^,\s]+)\s*,\s*)*` +
+		`[A-Za-z_][A-Za-z0-9_]*\s*=\s*(?:'[^']*'|[^,\s]+)\s+)`,
+)
+
+// stripClickHouseExplainKindAndSettings strips a leading EXPLAIN kind keyword and its optional
+// settings list (see StatementsFor's own ClickHouse composition), leaving the actual target
+// statement for ExplainAnalyzeTarget/ClassifySQL to classify.
+func stripClickHouseExplainKindAndSettings(rest string) string {
+	kind := chExplainKindRE.FindString(rest)
+	if kind == "" {
+		return rest
+	}
+	rest = strings.TrimSpace(rest[len(kind):])
+	if settings := chExplainSettingsRE.FindString(rest); settings != "" {
+		rest = strings.TrimSpace(rest[len(settings):])
+	}
+	return rest
 }
 
 // leadingCommentRE/rowReturningRE are console.ts's own — D19: the HTTP interface gives no cheap

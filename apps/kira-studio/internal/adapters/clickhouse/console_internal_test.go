@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/queryplan"
 )
 
 func TestClassifyClickHouseSQLReclassifiesBareExplainByTarget(t *testing.T) {
@@ -30,6 +31,56 @@ func TestClassifyClickHouseSQLReclassifiesBareExplainByTarget(t *testing.T) {
 		},
 		{"plain select is unaffected", "SELECT * FROM t", adapters.ClassRead},
 		{"plain delete is unaffected", "DELETE FROM t WHERE id = 1", adapters.ClassWrite},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyClickHouseSQL(tc.statement); got != tc.want {
+				t.Fatalf("classifyClickHouseSQL(%q) = %s, want %s", tc.statement, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestClassifyClickHouseSQLHandlesComposedExplainStatements guards F4: every statement
+// queryplan.StatementsFor("clickhouse", ...) actually composes must classify by its real target,
+// not ClassUnknown, so explain_query and run_query's auto-explain never silently fail to
+// classify. Built from the composer itself (not a hand-copied string) so the two can't drift
+// apart again.
+func TestClassifyClickHouseSQLHandlesComposedExplainStatements(t *testing.T) {
+	targets := []struct {
+		name string
+		sql  string
+		want adapters.OpClass
+	}{
+		{"select target", "SELECT * FROM t", adapters.ClassRead},
+		{"delete target is still a write under EXPLAIN PLAN/ESTIMATE", "DELETE FROM t WHERE id = 1", adapters.ClassWrite},
+	}
+	for _, target := range targets {
+		for _, composed := range queryplan.StatementsFor("clickhouse", target.sql) {
+			t.Run(composed, func(t *testing.T) {
+				if got := classifyClickHouseSQL(composed); got != target.want {
+					t.Fatalf("classifyClickHouseSQL(%q) = %s, want %s", composed, got, target.want)
+				}
+			})
+		}
+	}
+}
+
+// TestClassifyClickHouseSQLOtherExplainKinds covers the EXPLAIN kinds StatementsFor doesn't
+// compose (AST/SYNTAX/QUERY TREE/PIPELINE) so a future composer addition isn't the only thing
+// exercising them.
+func TestClassifyClickHouseSQLOtherExplainKinds(t *testing.T) {
+	cases := []struct {
+		name      string
+		statement string
+		want      adapters.OpClass
+	}{
+		{"explain ast select", "EXPLAIN AST SELECT * FROM t", adapters.ClassRead},
+		{"explain syntax delete", "EXPLAIN SYNTAX DELETE FROM t WHERE id = 1", adapters.ClassWrite},
+		{"explain query tree select", "EXPLAIN QUERY TREE SELECT * FROM t", adapters.ClassRead},
+		{"explain pipeline select", "EXPLAIN PIPELINE SELECT * FROM t", adapters.ClassRead},
+		{"explain estimate select", "EXPLAIN ESTIMATE SELECT * FROM t", adapters.ClassRead},
+		{"explain plan with settings and insert target", "EXPLAIN PLAN json = 1, indexes = 1, description = 1 INSERT INTO t VALUES (1)", adapters.ClassWrite},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
