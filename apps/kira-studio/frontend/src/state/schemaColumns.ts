@@ -143,8 +143,15 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
     const key = rowKey(connectionId, containerPath);
     if (state.byContainer[key] || pendingLoads.has(key)) return;
     pendingLoads.add(key);
+    // P108 Part 12 F8: captured before the await, checked after — dropSchemaColumns bumps this on
+    // every drop (reconnect, explicit Refresh). Without the check, a fetch already in flight when a
+    // drop lands writes its now-stale result straight back into byContainer[key] once it resolves,
+    // undoing the drop with no further fetch to correct it (the guard above then treats that stale
+    // write as "already loaded").
+    const startGeneration = generationFor(connectionId);
     try {
       const result = await control.treeSchemaColumns(connectionId, containerPath);
+      if (generationFor(connectionId) !== startGeneration) return;
       state.byContainer[key] = result.relations;
     } catch {
       // Same discipline as views/grid/state.ts's own loadMeta: a nicety that warms completion, not
