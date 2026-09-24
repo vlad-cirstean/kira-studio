@@ -62,47 +62,26 @@ defineExpose({ refresh: doRefresh });
 </script>
 
 <template>
+  <!-- KuiButton's own icon renders through KuiIconBox internally (no class passthrough to the
+       inner `.codicon` span), so spinning it needs an arbitrary descendant-selector variant here
+       rather than a class placed directly on the icon (§1.1 rung 4). Pre-approved spinner change
+       (§1.4/§6.4): the stepped 1.5s rotation becomes Tailwind's smooth 1s `animate-spin`. -->
   <KuiButton
     :icon="ACTION_ICONS.refresh"
-    variant="icon" class="kv-refresh-button"
-    :class="{ 'kv-refresh-spinning': isRefreshing }"
+    variant="icon"
+    :class="[
+      'kv:relative kv:disabled:cursor-default kv:disabled:opacity-70',
+      { 'kv:[&_.codicon]:animate-spin': isRefreshing },
+    ]"
     :disabled="isBusy"
     v-kui-tooltip="tooltip"
     aria-label="Refresh"
     @click="doRefresh"
   >
-    <span v-if="hasPendingChange" class="kv-refresh-dot" aria-hidden="true"></span>
+    <span
+      v-if="hasPendingChange"
+      class="kv:absolute kv:top-[3px] kv:right-[3px] kv:size-1.5 kv:rounded-full kv:bg-focus"
+      aria-hidden="true"
+    ></span>
   </KuiButton>
 </template>
-
-<style>
-.kv-refresh-button {
-  position: relative;
-}
-
-.kv-refresh-button:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
-.kv-refresh-dot {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--kv-focus-border);
-}
-
-.kv-refresh-spinning .codicon {
-  display: inline-block;
-  animation: kv-refresh-spin 1.5s steps(30) infinite;
-}
-
-@keyframes kv-refresh-spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>

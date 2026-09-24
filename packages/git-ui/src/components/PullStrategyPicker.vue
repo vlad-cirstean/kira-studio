@@ -143,10 +143,10 @@ defineExpose({ run: runDefault });
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-pull-picker">
+  <div ref="rootEl" class="kv:relative kv:inline-flex">
     <KuiButton
       icon="codicon-repo-pull"
-      class="kv-pull-picker-main"
+      class="kv:rounded-tr-none kv:rounded-br-none"
       :disabled="disabled"
       v-kui-tooltip="mainTitle"
       data-testid="pull-button"
@@ -156,7 +156,7 @@ defineExpose({ run: runDefault });
     </KuiButton>
     <KuiButton
       icon="codicon-chevron-down"
-      class="kv-pull-picker-chevron"
+      class="kv:px-0.5 kv:border-l-0 kv:rounded-tl-none kv:rounded-bl-none"
       :disabled="disabled"
       aria-label="Pull strategy options"
       :aria-expanded="isOpen"
@@ -175,28 +175,3 @@ defineExpose({ run: runDefault });
     </KuiPopoverPanel>
   </div>
 </template>
-
-<style>
-/* G19 D3a: the trigger's own look now comes from @kira/kira-ui's KuiButton (matching
-   `AppToolbar.vue`'s own Fetch/Push buttons) — the `.kv-toolbar-button` rule that used to be
-   defined identically in both files is closed at its source, not restyled around. */
-.kv-pull-picker {
-  position: relative;
-  display: inline-flex;
-}
-
-.kv-pull-picker-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.kv-pull-picker-chevron {
-  padding: 0 var(--kv-s-1);
-  border-left: none;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-/* G34 D8: `.kv-pull-picker-panel`/`.kv-pull-picker-item*` are gone — the popover now wraps a
-   `<KuiMenuList>`, the same menu a right-click renders, instead of a hand-rolled one. */
-</style>

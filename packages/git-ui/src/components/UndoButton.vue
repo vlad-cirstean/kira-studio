@@ -30,7 +30,7 @@ async function undo(): Promise<void> {
 </script>
 
 <template>
-  <div v-if="writeCapability && ops.undoSlot.value" class="kv-undo">
+  <div v-if="writeCapability && ops.undoSlot.value" class="kv:flex kv:items-center kv:gap-0.5">
     <KuiButton
       icon="codicon-discard"
       v-kui-tooltip="composeUndoTooltip(ops.undoSlot.value.label)"
@@ -45,30 +45,14 @@ async function undo(): Promise<void> {
          default, the same call the "Show more"/"Show less" toggle gets for the identical reason. -->
     <KuiButton
       v-if="clipboardEnabled"
-      class="kv-undo-sha"
+      class="kv:font-data kv:text-xs kv:text-muted kv:cursor-copy"
       v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
       @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
     >
       {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
     </KuiButton>
-    <span v-else class="kv-undo-sha">{{ ops.undoSlot.value.recoverySha.slice(0, 7) }}</span>
+    <span v-else class="kv:font-data kv:text-xs kv:text-muted kv:cursor-copy">{{
+      ops.undoSlot.value.recoverySha.slice(0, 7)
+    }}</span>
   </div>
 </template>
-
-<style>
-.kv-undo {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-1);
-}
-
-/* G34 D14: `.kv-undo-button` (this component's first KuiButton, the undo affordance itself) is
-   gone — it re-declared `.kui-button`'s own box byte for byte; the default `KuiButton` is now
-   exactly this shape. */
-.kv-undo-sha {
-  font-family: var(--kv-mono-font-family);
-  font-size: 0.85em;
-  color: var(--kv-description-fg);
-  cursor: copy;
-}
-</style>

@@ -58,19 +58,20 @@ function handleCancel(): void {
        mid-load. -->
   <div
     v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
-    class="kv-load-more"
+    class="kv:flex kv:items-center kv:justify-center kv:gap-1 kv:py-1 kv:px-2 kv:shrink-0"
   >
     <KuiButton
-      class="kv-load-more-button"
       :disabled="isLoading"
       v-kui-tooltip="'Alt-click to load everything remaining — this keeps every loaded commit in memory.'"
       @click="handlePress"
     >
       {{ buttonLabel }}
     </KuiButton>
+    <!-- G34: the default `KuiButton` box already matches this shape; Cancel keeps its one genuine
+         distinction, the underline. -->
     <KuiButton
       v-if="isLoading"
-      class="kv-load-more-cancel"
+      class="kv:underline"
       aria-label="Cancel loading"
       @click="handleCancel"
     >
@@ -78,21 +79,3 @@ function handleCancel(): void {
     </KuiButton>
   </div>
 </template>
-
-<style>
-.kv-load-more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kv-s-2);
-  padding: var(--kv-s-2) var(--kv-s-4);
-  flex-shrink: 0;
-}
-
-/* G34: `.kv-load-more-button`/`.kv-load-more-cancel` no longer re-declare a `KuiButton`'s own
-   box (height/padding/border/border-radius) — the default box is this shape now. Cancel keeps
-   its one genuine distinction, the underline. */
-.kv-load-more-cancel {
-  text-decoration: underline;
-}
-</style>

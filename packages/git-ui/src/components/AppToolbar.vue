@@ -289,7 +289,11 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
        allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
-  <div class="kv-toolbar" role="toolbar" aria-label="Kira Space toolbar">
+  <div
+    class="kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:bg-toolbar kv:border-b kv:border-toolbar-border kv:shrink-0"
+    role="toolbar"
+    aria-label="Kira Space toolbar"
+  >
     <BranchPicker
       ref="branchPickerRef"
       :refs="refsState"
@@ -313,18 +317,24 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
     <span
       v-if="stackState.restacking.value"
-      class="kv-toolbar-restacking"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm kv:whitespace-nowrap"
       role="status"
       aria-live="polite"
     >
       <span class="codicon codicon-sync codicon-modifier-spin" aria-hidden="true"></span>
       Restacking…
     </span>
-    <span class="kv-toolbar-separator" aria-hidden="true"></span>
+    <span
+      class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+      aria-hidden="true"
+    ></span>
     <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
 
     <template v-if="write && hasRemote">
-      <span class="kv-toolbar-separator" aria-hidden="true"></span>
+      <span
+        class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+        aria-hidden="true"
+      ></span>
       <KuiButton
         icon="codicon-cloud-download"
         :disabled="fetchDisabled"
@@ -344,10 +354,10 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         :disabled="pushPullDisabled"
       />
 
-      <div class="kv-push-group">
+      <div class="kv:relative kv:inline-flex">
         <KuiButton
           icon="codicon-repo-push"
-          class="kv-push-main"
+          class="kv:rounded-tr-none kv:rounded-br-none"
           :disabled="pushPullDisabled"
           v-kui-tooltip="`Push to ${defaultRemote}`"
           data-testid="push-button"
@@ -357,7 +367,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         </KuiButton>
         <KuiButton
           icon="codicon-chevron-down"
-          class="kv-push-chevron"
+          class="kv:px-0.5 kv:border-l-0 kv:rounded-tl-none kv:rounded-bl-none"
           :disabled="pushPullDisabled"
           aria-label="Push options"
           :aria-expanded="isForcePushMenuOpen"
@@ -382,7 +392,10 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     </template>
 
     <template v-if="write">
-      <span class="kv-toolbar-separator" aria-hidden="true"></span>
+      <span
+        class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
+        aria-hidden="true"
+      ></span>
       <KuiButton
         icon="codicon-inbox"
         :disabled="stashDisabled"
@@ -398,11 +411,15 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
          disabling any of them with a reason (§4.2 layer 3) — this note is the one place that
          explains why, for a user arriving from the VS Code extension who might otherwise wonder
          where Fetch/Pull/Push/Stash/Undo went. -->
-    <span v-if="!write" class="kv-toolbar-readonly-note" data-testid="read-only-note">
+    <span
+      v-if="!write"
+      class="kv:text-muted kv:text-sm kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis"
+      data-testid="read-only-note"
+    >
       Read-only view — use the VS Code extension to make changes
     </span>
 
-    <span class="kv-toolbar-spacer" aria-hidden="true"></span>
+    <span class="kv:flex-1" aria-hidden="true"></span>
 
     <KuiButton
       variant="icon"
@@ -434,9 +451,15 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       @click="emit('open-repo-settings')"
     />
 
-    <div v-if="write && remoteBusy" class="kv-remote-progress" data-testid="remote-progress">
-      <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
-      <span class="kv-remote-progress-label">{{ progressText }}</span>
+    <div
+      v-if="write && remoteBusy"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm"
+      data-testid="remote-progress"
+    >
+      <!-- Pre-approved spinner change (§1.4/§6.4): stepped 1.5s rotation -> Tailwind's smooth 1s
+           `animate-spin`. -->
+      <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
+      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-[260px]">{{ progressText }}</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"
@@ -447,17 +470,17 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       />
     </div>
 
-    <!-- G25 D13: the same shape kv-remote-progress above uses — visible once the dialog that
-         started a prepare run is dismissed (WorktreeDialog.vue's own doc comment: dismissing
-         never cancels the run), which is exactly when this strip becomes the only visible
+    <!-- G25 D13: the same status-strip shape the remote-progress div above uses — visible once the
+         dialog that started a prepare run is dismissed (WorktreeDialog.vue's own doc comment:
+         dismissing never cancels the run), which is exactly when this strip becomes the only visible
          indicator that one is still going. -->
     <div
       v-if="write && opsState.activeWorktreePreparePath.value !== undefined"
-      class="kv-remote-progress"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm"
       data-testid="worktree-prepare-progress"
     >
-      <span class="codicon codicon-loading kv-remote-progress-spin" aria-hidden="true"></span>
-      <span class="kv-remote-progress-label">Preparing worktree…</span>
+      <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
+      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-[260px]">Preparing worktree…</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"
@@ -475,118 +498,3 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
   </div>
 </template>
-
-<style>
-/* G34 D13: Kira's own `.p-toolbar` geometry (`--kv-bar-h`, a token that tracks the user's font
-   size, not the 35px literal this used to be — see this file's own header comment). */
-.kv-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--kv-s-3);
-  height: var(--kv-bar-h);
-  padding: 0 var(--kv-s-4);
-  background-color: var(--kv-toolbar-bg);
-  border-bottom: var(--kv-border-width) solid var(--kv-toolbar-border);
-  flex-shrink: 0;
-}
-
-/* G34 D13: Kira's `.p-toolbar .sep` — a short rail centred in the bar, not a stretched one. */
-.kv-toolbar-separator {
-  width: var(--kv-border-width);
-  height: var(--kv-control-inline-h);
-  align-self: center;
-  margin: 0 var(--kv-s-1);
-  background-color: var(--kv-border-strong);
-  flex-shrink: 0;
-}
-
-/* G26 D6/D8: mirrors the remote/worktree-prepare progress strips' own shape — a plain, low-key
-   status readout, never a second progress bar (a restack's own per-branch granularity is one
-   `stack.progress` event, not a stream worth a bar of its own, per §9's own "not built" note).
-   G34 D13: adopts Kira's `.p-status` proportions. */
-.kv-toolbar-restacking {
-  display: flex;
-  align-items: center;
-  height: var(--kv-control-h-sm);
-  padding: 0 var(--kv-s-3);
-  border-radius: var(--kv-radius-sm);
-  gap: var(--kv-s-2);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-  white-space: nowrap;
-}
-
-.kv-toolbar-spacer {
-  flex: 1;
-}
-
-/* C10 §4.3/§14 OQ2: the read-only note — same muted, small-text treatment as the description-fg
-   text used elsewhere in this toolbar (kv-toolbar-restacking above), never an error/warning color:
-   this is expected, permanent state, not a problem. */
-.kv-toolbar-readonly-note {
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* G19 D3a: the toolbar-button look now comes from @kira/kira-ui's own KuiButton (P110 A3's
-   `kuiButtonVariants` cva, via this host's kui-bridge.css) — the duplicated `.kv-toolbar-button`
-   rule that used to live here *and* in `PullStrategyPicker.vue` is closed at its source, not
-   restyled around. `.kv-push-main`/`.kv-push-chevron` below only add the split-button corner
-   radii KuiButton has no opinion about. */
-.kv-push-group {
-  position: relative;
-  display: inline-flex;
-}
-
-.kv-push-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.kv-push-chevron {
-  padding: 0 var(--kv-s-1);
-  border-left: none;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-/* G34 D8: `.kv-push-menu`/`.kv-push-menu-item` are gone — the popover now wraps a
-   `<KuiMenuList>`, the same menu a right-click renders, instead of a hand-rolled one. */
-
-/* The one in-webview progress affordance for whichever `remote.run` is in flight (P6 judgment
-   call 6's precedent — no `Notifications` port, D54) — a phase label, throttled to ~10/s
-   host-side (OQ10), and the one cancel button every remote op shares, D50's table read forward
-   into "enabled" vs "disabled-with-reason". */
-/* G34 D13: adopts Kira's `.p-status` proportions, same treatment as `.kv-toolbar-restacking`. */
-.kv-remote-progress {
-  display: inline-flex;
-  align-items: center;
-  height: var(--kv-control-h-sm);
-  padding: 0 var(--kv-s-3);
-  border-radius: var(--kv-radius-sm);
-  gap: var(--kv-s-2);
-  color: var(--kv-description-fg);
-  font-size: var(--kv-t-sm);
-}
-
-.kv-remote-progress-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 260px;
-}
-
-.kv-remote-progress-spin {
-  display: inline-block;
-  animation: kv-remote-progress-spin 1.5s steps(30) infinite;
-}
-
-@keyframes kv-remote-progress-spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>
