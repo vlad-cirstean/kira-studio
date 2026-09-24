@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -160,7 +161,19 @@ var descriptorCache = struct {
 	byKey      map[string]*list.Element // Value is *descriptorCacheEntry
 	order      *list.List               // front = least recently used, back = most recently used
 	totalBytes int64
-}{byKey: map[string]*list.Element{}, order: list.New()}
+	// generation is F11's own staleness guard, keyed the same as byKey but never pruned when an
+	// entry is evicted or invalidated — a key's counter only ever goes up. InvalidateCache bumps a
+	// key's counter; resolveSource captures it right before starting a resolution and passes it to
+	// descriptorCachePut, which skips the Put outright when the counter has since moved. Without
+	// this, a resolution already in flight when Reload calls InvalidateCache would finish after the
+	// invalidation and Put the stale descriptors right back.
+	generation map[string]int64
+}{byKey: map[string]*list.Element{}, order: list.New(), generation: map[string]int64{}}
+
+// resolveGroup collapses concurrent resolveSource calls for the same key into one underlying
+// resolution (F11) — without this, two Calls (or a Call racing a Describe) against the same
+// not-yet-cached Source each pay their own reflection round trip or .proto parse.
+var resolveGroup singleflight.Group
 
 type descriptorCacheEntry struct {
 	key   string
@@ -230,11 +243,26 @@ func descriptorCacheGet(key string) (*resolved, bool) {
 	return el.Value.(*descriptorCacheEntry).r, true
 }
 
-func descriptorCachePut(key string, r *resolved) {
+// descriptorCacheGeneration reads key's current invalidation counter (F11) — resolveSource calls
+// this right before starting a resolution and passes the result back to descriptorCachePut, which
+// only stores the result when the counter is still the same.
+func descriptorCacheGeneration(key string) int64 {
+	descriptorCache.mu.Lock()
+	defer descriptorCache.mu.Unlock()
+	return descriptorCache.generation[key]
+}
+
+func descriptorCachePut(key string, gen int64, r *resolved) {
 	size := approxDescriptorBytes(r.files)
 
 	descriptorCache.mu.Lock()
 	defer descriptorCache.mu.Unlock()
+	// F11: key was invalidated (Reload) after this resolution started — the descriptors just
+	// fetched are already stale, so drop them instead of overwriting whatever a later resolution
+	// (or a cache miss) will produce.
+	if descriptorCache.generation[key] != gen {
+		return
+	}
 	if el, ok := descriptorCache.byKey[key]; ok {
 		entry := el.Value.(*descriptorCacheEntry)
 		descriptorCache.totalBytes += size - entry.bytes
@@ -265,22 +293,41 @@ func resolveSource(ctx context.Context, src Source) (*resolved, error) {
 		return r, nil
 	}
 
-	var r *resolved
-	var err error
-	switch src.Mode {
-	case SourceReflection:
-		r, err = resolveReflection(ctx, src)
-	case SourceProto:
-		r, err = resolveProto(ctx, src)
-	default:
-		return nil, BadRequest(fmt.Sprintf("unrecognised descriptor source %q", src.Mode))
-	}
+	// F11: singleflight collapses concurrent resolveSource calls sharing key into the one call
+	// below, so two Calls (or a Call racing a Describe) against the same not-yet-cached Source
+	// only ever pay for one reflection round trip or .proto parse.
+	v, err, _ := resolveGroup.Do(key, func() (any, error) {
+		// Re-check: another goroutine may have already resolved and cached key while this one
+		// waited to become the singleflight leader.
+		if r, ok := descriptorCacheGet(key); ok {
+			return r, nil
+		}
+		// Captured right before resolving starts, so a concurrent InvalidateCache anywhere in the
+		// resolution's lifetime — including one that lands after this call becomes leader but
+		// before it finishes — is visible to descriptorCachePut below.
+		gen := descriptorCacheGeneration(key)
+
+		var r *resolved
+		var err error
+		switch src.Mode {
+		case SourceReflection:
+			r, err = resolveReflection(ctx, src)
+		case SourceProto:
+			r, err = resolveProto(ctx, src)
+		default:
+			return nil, BadRequest(fmt.Sprintf("unrecognised descriptor source %q", src.Mode))
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		descriptorCachePut(key, gen, r)
+		return r, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	descriptorCachePut(key, r)
-	return r, nil
+	return v.(*resolved), nil
 }
 
 // InvalidateCache drops one Source's cached descriptors — the UI's explicit Reload action (D4).
@@ -290,6 +337,9 @@ func InvalidateCache(src Source) {
 	key := cacheKey(src)
 	descriptorCache.mu.Lock()
 	defer descriptorCache.mu.Unlock()
+	// F11: bumped even though the generation map is never pruned — a resolution already in flight
+	// for key captured the pre-bump value and must not Put its (now stale) result.
+	descriptorCache.generation[key]++
 	if el, ok := descriptorCache.byKey[key]; ok {
 		descriptorCache.order.Remove(el)
 		delete(descriptorCache.byKey, key)

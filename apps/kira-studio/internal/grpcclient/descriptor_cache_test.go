@@ -82,7 +82,7 @@ func TestInvalidateCache_ProtoModeEvictsEntryCallWouldUse(t *testing.T) {
 		ProtoPath: "/tmp/service.proto",
 	}
 
-	descriptorCachePut(cacheKey(describeShaped), &resolved{})
+	descriptorCachePut(cacheKey(describeShaped), descriptorCacheGeneration(cacheKey(describeShaped)), &resolved{})
 	if _, ok := descriptorCacheGet(cacheKey(callShaped)); !ok {
 		t.Fatalf("Call's shape should hit the entry Describe populated")
 	}
@@ -132,7 +132,7 @@ func TestDescriptorCache_EvictsLeastRecentlyUsedPastByteBudget(t *testing.T) {
 	for i := 0; i < capacity+5; i++ {
 		key := "synthetic-key-" + strconv.Itoa(i)
 		keys = append(keys, key)
-		descriptorCachePut(key, compiled)
+		descriptorCachePut(key, descriptorCacheGeneration(key), compiled)
 	}
 
 	// Touch the very first surviving key (keys[5], the oldest that wasn't already evicted just by
@@ -142,7 +142,7 @@ func TestDescriptorCache_EvictsLeastRecentlyUsedPastByteBudget(t *testing.T) {
 	if _, ok := descriptorCacheGet(keys[5]); !ok {
 		t.Fatalf("keys[5] (%s) should still be cached before the touch", keys[5])
 	}
-	descriptorCachePut("one-more-key", compiled)
+	descriptorCachePut("one-more-key", descriptorCacheGeneration("one-more-key"), compiled)
 
 	if _, ok := descriptorCacheGet(keys[5]); !ok {
 		t.Errorf("keys[5] was evicted despite being touched (moved to most-recently-used) just before the insert that should have evicted keys[6] instead")
@@ -189,7 +189,7 @@ func TestDescriptorCache_SingleOversizedEntrySurvivesItsOwnPut(t *testing.T) {
 	descriptorCache.totalBytes = 0
 	descriptorCache.mu.Unlock()
 
-	descriptorCachePut("oversized", compiled)
+	descriptorCachePut("oversized", descriptorCacheGeneration("oversized"), compiled)
 
 	if _, ok := descriptorCacheGet("oversized"); !ok {
 		t.Error("the single entry just inserted was evicted by its own Put despite exceeding the budget alone")
