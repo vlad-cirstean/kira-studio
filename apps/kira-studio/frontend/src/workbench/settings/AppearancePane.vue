@@ -112,7 +112,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         </optgroup>
       </NativeSelect>
       <span
-        class="font-preview"
+        class="overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-fg"
         data-testid="font-preview"
         :style="{ fontFamily: draft.appearance.fontFamily }"
         >The quick brown fox jumps over the lazy dog — 0123456789</span
@@ -134,21 +134,53 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
 
     <RowDensityField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
       <FieldDescription>Applies to the tree, the grid and every list.</FieldDescription>
-      <div class="row-preview">
-        <div class="row-preview-row row-preview-head">
-          <span class="row-preview-cell row-preview-gutter" :style="{ height: `${rowPreviewHeight}px` }" />
-          <span class="row-preview-cell" :style="{ height: `${rowPreviewHeight}px` }">id</span>
-          <span class="row-preview-cell row-preview-grow" :style="{ height: `${rowPreviewHeight}px` }">email</span>
+      <!-- P110 B36: every cell below carries the full computed style of the old shared
+           .row-preview-cell/.row-preview-gutter/.row-preview-grow/.row-preview-head rules, resolved
+           per-instance rather than stacking conflicting same-property utilities (§1.3) -- the head
+           row's `.row-preview-head .row-preview-cell` descendant selector outranked the gutter/grow
+           siblings' own color/font-size on specificity alone, and .row-preview-grow's flex-1 always
+           beat .row-preview-cell's own flex-basis by source order. That descendant selector's own
+           `font-family: inherit` is dropped rather than ported: none of these 3 header cells carry
+           font-data (unlike their data-row counterparts below), so they already inherit naturally
+           -- porting `inherit` as a class would just re-state the default. -->
+      <div class="overflow-hidden rounded-kira-sm border border-border">
+        <div class="flex bg-elevated border-b border-border-strong">
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-muted-foreground text-kira-sm bg-elevated"
+            :style="{ height: `${rowPreviewHeight}px` }"
+          />
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-muted-foreground text-kira-sm"
+            :style="{ height: `${rowPreviewHeight}px` }"
+            >id</span
+          >
+          <span
+            class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-muted-foreground text-kira-sm"
+            :style="{ height: `${rowPreviewHeight}px` }"
+            >email</span
+          >
         </div>
-        <div class="row-preview-row" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="row-preview-cell row-preview-gutter">1</span>
-          <span class="row-preview-cell">c1d0-88ae</span>
-          <span class="row-preview-cell row-preview-grow">rowan.brooks@example.com</span>
+        <div class="flex" :style="{ height: `${rowPreviewHeight}px` }">
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-xs bg-elevated font-data"
+            >1</span
+          >
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            >c1d0-88ae</span
+          >
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            >rowan.brooks@example.com</span
+          >
         </div>
-        <div class="row-preview-row" :style="{ height: `${rowPreviewHeight}px` }">
-          <span class="row-preview-cell row-preview-gutter">2</span>
-          <span class="row-preview-cell">7f2b-19cd</span>
-          <span class="row-preview-cell row-preview-grow">amari.osei@example.com</span>
+        <div class="flex border-t border-border" :style="{ height: `${rowPreviewHeight}px` }">
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-9 justify-end text-subtle text-kira-xs bg-elevated font-data"
+            >2</span
+          >
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-none basis-37.5 text-fg text-kira-md font-data"
+            >7f2b-19cd</span
+          >
+          <span class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis px-2 border-r border-border flex-1 text-fg text-kira-md font-data"
+            >amari.osei@example.com</span
+          >
         </div>
       </div>
     </RowDensityField>

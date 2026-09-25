@@ -102,7 +102,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
     </Label>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
-      <p v-if="dbMcpStore.status.error" class="muted-note" data-testid="db-mcp-error">
+      <p v-if="dbMcpStore.status.error" class="text-subtle text-kira-xs" data-testid="db-mcp-error">
         {{ dbMcpStore.status.error }}
       </p>
       <!-- F9: Regenerate must render whenever the server is running, in both branches below —
@@ -111,13 +111,16 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
            restarts now, so this is no longer the rare branch it used to be). -->
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
-          <p class="font-data command-text" data-testid="db-mcp-command">
+          <p
+            class="font-data m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs"
+            data-testid="db-mcp-command"
+          >
             {{ dbMcpStore.status.command }}
           </p>
           <Button
             variant="dialog"
             size="kira-lg"
-            class="action-button"
+            class="self-start"
             :disabled="dbMcpInstalling"
             data-testid="db-mcp-install-button"
             @click="onInstallDbMcpClaudeCode"
@@ -127,14 +130,14 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
             {{ dbMcpInstallMessage }}
           </FieldDescription>
         </template>
-        <p v-else class="muted-note" data-testid="db-mcp-no-token">
+        <p v-else class="text-subtle text-kira-xs" data-testid="db-mcp-no-token">
           This server restarted since it was last enabled; its registration command needs a
           fresh token to show again.
         </p>
         <Button
           variant="dialog"
           size="kira-lg"
-          class="action-button"
+          class="self-start"
           :disabled="dbMcpRegenerating"
           data-testid="db-mcp-regenerate-button"
           @click="onRegenerateDbMcpToken"
@@ -159,7 +162,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
       Deny by default — only connections checked here are visible to an AI client through
       this server.
     </FieldDescription>
-    <p class="muted-note">
+    <p class="text-subtle text-kira-xs">
       A newly exposed connection defaults to read allow, write prompt, DDL deny — this
       migration tightened what an already-exposed connection allowed too. Edit a
       connection's own three modes and description in its MCP tab. Newly exposed
@@ -168,17 +171,17 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
     </p>
     <ul
       v-if="connectionsStore.records.length"
-      class="db-mcp-connections-list"
+      class="flex flex-col m-0 p-0 list-none gap-0.5"
       data-testid="db-mcp-connections-list"
     >
       <li
         v-for="conn in connectionsStore.records"
         :key="conn.id"
-        class="db-mcp-connection-row"
+        class="flex items-center justify-between rounded-kira-sm gap-1.5 py-1 px-1.5 border border-border"
         :data-testid="`db-mcp-connection-row-${conn.id}`"
       >
-        <div class="db-mcp-connection-info">
-          <span class="db-mcp-connection-name">{{ conn.name }}</span>
+        <div class="flex flex-col min-w-0 gap-0.5">
+          <span class="break-words text-fg text-kira-sm">{{ conn.name }}</span>
           <FieldDescription
             >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
             {{ conn.mcpDdlMode }}<template v-if="conn.mcpAutoExplain">
@@ -209,7 +212,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
         </Checkbox>
       </li>
     </ul>
-    <p v-else class="muted-note" data-testid="db-mcp-connections-empty">
+    <p v-else class="text-subtle text-kira-xs" data-testid="db-mcp-connections-empty">
       No connections yet — add one first.
     </p>
   </div>

@@ -145,17 +145,17 @@ async function onAddScript(): Promise<void> {
 
     <div
       v-if="customScriptsStore.records.length"
-      class="custom-script-list"
+      class="flex flex-col max-h-80 overflow-y-auto gap-1.5"
       data-testid="custom-script-list"
     >
       <div
         v-for="script in customScriptsStore.records"
         :key="script.id"
-        class="custom-script-row"
+        class="flex flex-col gap-1 py-1.5 border-b border-border"
         :data-testid="`custom-script-${script.id}`"
       >
-        <div class="script-row-top">
-          <div class="script-name">
+        <div class="flex items-center gap-1.5">
+          <div class="flex flex-col flex-1 min-w-0">
             <Input
               v-model="scriptDrafts[script.id].name"
               placeholder="Name"
@@ -212,7 +212,7 @@ async function onAddScript(): Promise<void> {
             <TooltipContent>Remove this script</TooltipContent>
           </Tooltip>
         </div>
-        <div class="script-command">
+        <div class="flex flex-col w-full">
           <Input
             v-model="scriptDrafts[script.id].command"
             placeholder="Command"
@@ -221,7 +221,7 @@ async function onAddScript(): Promise<void> {
             @blur="onScriptFieldBlur(script)"
           />
         </div>
-        <div class="script-workingdir">
+        <div class="flex flex-col w-full">
           <Input
             v-model="scriptDrafts[script.id].workingDir"
             placeholder="Active repository"
@@ -236,9 +236,9 @@ async function onAddScript(): Promise<void> {
       No scripts yet. Add one to launch it from the tab strip's + button.
     </FieldDescription>
 
-    <div class="custom-script-add">
-      <div class="script-row-top">
-        <div class="script-name">
+    <div class="flex flex-col gap-1">
+      <div class="flex items-center gap-1.5">
+        <div class="flex flex-col flex-1 min-w-0">
           <Input
             v-model="newScriptName"
             placeholder="Name"
@@ -288,7 +288,7 @@ async function onAddScript(): Promise<void> {
           >Add</Button
         >
       </div>
-      <div class="script-command">
+      <div class="flex flex-col w-full">
         <Input
           v-model="newScriptCommand"
           placeholder="Command"
@@ -296,7 +296,7 @@ async function onAddScript(): Promise<void> {
           data-testid="custom-script-add-command"
         />
       </div>
-      <div class="script-workingdir">
+      <div class="flex flex-col w-full">
         <Input
           v-model="newScriptWorkingDir"
           placeholder="Active repository"

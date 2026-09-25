@@ -149,7 +149,7 @@ async function onClearCaches(): Promise<void> {
         disabled
       />
     </Label>
-    <Button variant="dialog" size="kira-lg" class="action-button" data-testid="settings-clear-caches" @click="onClearCaches">
+    <Button variant="dialog" size="kira-lg" class="self-start" data-testid="settings-clear-caches" @click="onClearCaches">
       Clear caches
     </Button>
   </div>

@@ -57,14 +57,14 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
     <template v-if="settingsStore.claudeCode.hooksEnabled">
       <p
         v-if="agentHooksStore.status.error"
-        class="muted-note"
+        class="text-subtle text-kira-xs"
         data-testid="claude-code-hooks-error"
       >
         {{ agentHooksStore.status.error }}
       </p>
       <p
         v-else-if="agentHooksStore.status.running"
-        class="font-data command-text"
+        class="font-data m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs"
         data-testid="claude-code-hooks-path"
       >
         {{ agentHooksStore.status.settingsPath }}

@@ -127,7 +127,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         {{ opLogRetentionError }}
       </FieldError>
     </Label>
-    <p class="muted-note">Takes effect after restart.</p>
+    <p class="text-subtle text-kira-xs">Takes effect after restart.</p>
 
     <Label :class="fieldVariants()">
       <div class="flex items-center justify-between gap-1">
