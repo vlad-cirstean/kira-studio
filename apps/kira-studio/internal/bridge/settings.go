@@ -27,7 +27,7 @@ type SettingsSetArgs struct {
 func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	merged, err := s.Deps.Repos.Settings.Set(args.Patch)
 	if err != nil {
-		return model.Settings{}, ipcerr.Internal(err.Error())
+		return model.Settings{}, ipcerr.InternalErr(err)
 	}
 	if args.Patch.Cache != nil && args.Patch.Cache.L2BudgetMb != nil {
 		s.Deps.Router.PushCacheConfig(merged)

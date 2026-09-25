@@ -26,7 +26,7 @@ type LayoutSetArgs struct {
 func (s *LayoutService) Set(args LayoutSetArgs) (model.Layout, error) {
 	merged, err := s.Deps.Repos.Layout.Set(args.Patch)
 	if err != nil {
-		return model.Layout{}, ipcerr.Internal(err.Error())
+		return model.Layout{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelLayoutChanged, merged)
 	return merged, nil
