@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,21 +29,23 @@ func init() {
 // handed.
 const disconnectTimeout = 10 * time.Second
 
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3): requireClient's own RequireConnected(a.getClient()), Execute's own a.getDefaultDatabase(),
+// Read/Count/Mutate/Execute's own a.getReadOnly() — the same class of data race Part 4's own F3
+// fixed for the SQL engines. Guarded via adapters.Guarded (P113 G1).
+type connState struct {
+	client          *mongodriver.Client
+	defaultDatabase *string
+	readOnly        bool
+}
+
 // Adapter is index.ts's MongoAdapter. D8: one pooled *mongo.Client — the driver's own internal
 // pool handles concurrency, so there is no ConnSet/LRU analog to MariaDB's (client.Database(name)
 // is a cheap synchronous handle-get, not a new connection).
 type Adapter struct {
 	deps adapters.Deps
 
-	// mu guards every field below (F3): Connect/Disconnect write client/defaultDatabase/readOnly
-	// from whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op
-	// reading them (requireClient's own RequireConnected(a.getClient()), Execute's own
-	// a.getDefaultDatabase(), Read/Count/Mutate/Execute's own a.getReadOnly()) — the same class of
-	// data race Part 4's own F3 fixed for the SQL engines.
-	mu              sync.Mutex
-	client          *mongodriver.Client
-	defaultDatabase *string
-	readOnly        bool
+	state adapters.Guarded[connState]
 
 	// tracker replaces a bare inFlight sync.WaitGroup (F4): the old field's own doc comment claimed
 	// it tracked RunWithAbortRace's detached background goroutines, but every RunWithAbortRace call
@@ -60,42 +61,30 @@ type Adapter struct {
 
 // getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
 // takes its result, never a.client directly.
-func (a *Adapter) getClient() *mongodriver.Client {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.client
-}
+func (a *Adapter) getClient() *mongodriver.Client { return a.state.Load().client }
 
 // getDefaultDatabase is Execute's own locked read of a.defaultDatabase (F3).
-func (a *Adapter) getDefaultDatabase() *string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.defaultDatabase
-}
+func (a *Adapter) getDefaultDatabase() *string { return a.state.Load().defaultDatabase }
 
 // getReadOnly is Read/Count/Mutate/Execute's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *mongodriver.Client, defaultDatabase *string, readOnly bool) {
-	a.mu.Lock()
-	a.client = client
-	a.defaultDatabase = defaultDatabase
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = client
+		s.defaultDatabase = defaultDatabase
+		s.readOnly = readOnly
+	})
 }
 
 // clearConnected is Disconnect's own locked write, once client.Disconnect (a real network call, run
 // with no lock held) has returned (F3).
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.client = nil
-	a.defaultDatabase = nil
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = nil
+		s.defaultDatabase = nil
+	})
 }
 
 // queryTokenSeq hands trackerFor a unique identity per registration (F4b/c): mongo has no natural
