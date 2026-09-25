@@ -53,7 +53,10 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text'>(
       ],
       radius: ['kui', 'kui-float'],
       shadow: ['float', 'kui-float'],
-      text: ['kui-icon'],
+      // P110 I2-2: M1 -- `kv:text-kui-xs`/`-sm`/`-base` (kuiRowVariants, KuiTextInput) read as
+      // colour utilities without these, and drop a static `kv:text-kui-fg`/`-selected-fg` colour
+      // on the same element as a false same-group conflict.
+      text: ['kui-icon', 'kui-xs', 'kui-sm', 'kui-base'],
     },
   },
 });

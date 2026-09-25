@@ -21,6 +21,9 @@ const twMerge = extendTailwindMerge({
         'tabbar',
         'statusbar',
         'titlebar-inset',
+        // P110 I2-2: M2 -- max-w-completion-max-w was unregistered, so a static max-w utility
+        // next to it on the same element read as a false conflict.
+        'completion-max-w',
       ],
       radius: ['kira-sm', 'kira', 'kira-lg', 'kira-pill'],
       shadow: ['kira', 'kira-dialog'],
