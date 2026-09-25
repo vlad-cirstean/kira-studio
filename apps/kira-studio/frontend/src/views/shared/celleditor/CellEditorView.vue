@@ -494,7 +494,7 @@ const statusLine = computed(() => {
 
 <template>
   <div
-    class="cell-editor"
+    class="flex flex-col h-full min-h-0"
     data-testid="cell-editor-panel"
     :data-cell-key="cellKey(selectedCell)"
     :data-format="effectiveFormat"
@@ -540,18 +540,28 @@ const statusLine = computed(() => {
         <TooltipContent>{{ formatProblem.message }}</TooltipContent>
       </Tooltip>
 
-      <span class="format-group">
+      <!-- the format select + beautify/reset trio: this panel's own controls, set off from the
+           identity badges with the standard s-4 gutter (mirrors CellEditor.html's inline group) -->
+      <span class="flex items-center shrink-0 gap-1.5 ml-2">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger>
+              <!-- P42 D27: an app-drawn menu trigger, not a native <select> — border/background/
+                   padding/cursor still come from nativeSelectVariants({variant: 'bordered'})
+                   (P110 B24, applied directly as a class function since this is a <button>, not a
+                   NativeSelect component); its appearance:base-select/::picker(select)/option
+                   selectors are select-only and simply don't match a <button>, which is why the
+                   chevron below is drawn explicitly instead of relying on one. Its own
+                   disabled:text-disabled/cursor-default already covers this button too, no local
+                   duplicate needed. -->
               <button
                 type="button"
-                :class="[nativeSelectVariants({ variant: 'bordered' }), 'format-select']"
+                :class="[nativeSelectVariants({ variant: 'bordered' }), 'max-w-40 font-[family-name:var(--kira-font-ui)]']"
                 data-testid="cell-editor-format"
                 :disabled="isNullValue"
                 @click="openFormatMenu"
               >
-                <span class="format-select-label">{{
+                <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{
                   override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
                 }}</span>
                 <CodiconIcon name="chevron-down" :size="12" />
@@ -567,7 +577,7 @@ const statusLine = computed(() => {
              said first — this row's own badge would be the same number shown twice. -->
         <template v-if="!viewerMode">
           <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
-            <span ref="generateAnchorRef" class="generate-anchor">
+            <span ref="generateAnchorRef" class="relative shrink-0">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <TooltipDisabledTrigger>
@@ -588,12 +598,12 @@ const statusLine = computed(() => {
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
             <PopoverContent align="start" class="w-52 gap-0 p-0" data-testid="cell-editor-generate-popover">
-              <div class="generate-menu">
+              <div class="flex flex-col gap-px p-1">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover generate-item"
+                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 bg-transparent text-left font-[family-name:var(--kira-font-ui)]"
                       :data-testid="`cell-editor-generate-${gen.id}`"
                       @click="applyGenerator(gen)"
                     >
@@ -657,10 +667,14 @@ const statusLine = computed(() => {
          inherits this same staging rule instead of needing its own (P24 D14/D15). -->
     <div
       ref="editorBodyEl"
-      class="editor-body"
+      class="editor-body flex-1 min-h-0 flex flex-col"
       :class="{ 'has-translate': showTranslatePane }"
     >
-      <div class="encoded-pane" data-testid="cell-editor-encoded">
+      <!-- The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
+           encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a
+           side-by-side split — this panel is usually too narrow for two columns to read
+           comfortably. `.editor-body`/`.encoded-pane` stay bare markers to anchor this compound. -->
+      <div class="encoded-pane flex-auto min-h-0" data-testid="cell-editor-encoded">
         <MonacoHost
           ref="encodedHostRef"
           :doc="doc"
@@ -676,11 +690,11 @@ const statusLine = computed(() => {
       <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
            above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
-        <div class="translate-head">
+        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2">
           <CodiconIcon name="symbol-string" :size="13" />
           <span>Decoded text</span>
         </div>
-        <div v-if="decodedDoc !== null" class="translate-pane" data-testid="cell-editor-decoded">
+        <div v-if="decodedDoc !== null" class="flex-1 basis-5/12 min-h-0" data-testid="cell-editor-decoded">
           <MonacoHost
             :doc="decodedDoc"
             language="plain"
@@ -691,7 +705,7 @@ const statusLine = computed(() => {
         <Alert
           v-else
           variant="note"
-          class="translate-pane-empty"
+          class="flex-1 basis-5/12 items-center text-subtle"
           data-testid="cell-editor-decoded-empty"
         >
           <AlertDescription>
@@ -703,12 +717,12 @@ const statusLine = computed(() => {
       <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
            field and calendar entirely — this file only decides whether to show it. -->
       <template v-else-if="isTimestampFormat">
-        <div class="translate-head">
+        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2">
           <CodiconIcon name="calendar" :size="13" />
           <span>Date &amp; time</span>
         </div>
         <TimestampPane
-          class="translate-pane"
+          class="flex-1 basis-5/12 min-h-0"
           :doc="doc"
           :format="effectiveFormat"
           :read-only="!isEditable"
@@ -730,68 +744,9 @@ const statusLine = computed(() => {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.cell-editor {
-  @apply flex flex-col h-full min-h-0;
-}
-
-/* the format select + beautify/reset trio: this panel's own controls, set off from the
-   identity badges with the standard s-4 gutter (mirrors CellEditor.html's inline group) */
-.format-group {
-  @apply flex items-center shrink-0 gap-1.5 ml-2;
-}
-
-/* P42 D27: an app-drawn menu trigger, not a native <select> — border/background/padding/cursor
-   still come from nativeSelectVariants({variant: 'bordered'}) (P110 B24, applied directly as a
-   class function since this is a <button>, not a NativeSelect component); its
-   appearance:base-select/::picker(select)/option selectors are select-only and simply don't
-   match a <button>, which is why the chevron below is drawn explicitly instead of relying on
-   one. Its own disabled:text-disabled/cursor-default already covers this button too, no local
-   duplicate needed. */
-.format-select {
-  @apply max-w-40 font-[family-name:var(--kira-font-ui)];
-}
-
-.format-select-label {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.generate-anchor {
-  @apply relative shrink-0;
-}
-
-.generate-menu {
-  @apply flex flex-col gap-px p-1;
-}
-
-.generate-item {
-  @apply w-full border-0 bg-transparent text-left font-[family-name:var(--kira-font-ui)];
-}
-
-.editor-body {
-  @apply flex-1 min-h-0 flex flex-col;
-}
-
-.encoded-pane {
-  @apply flex-auto min-h-0;
-}
-
-/* The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
-   encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a side-by-side
-   split — this panel is usually too narrow for two columns to read comfortably. */
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.editor-body`/`.encoded-pane` stay bare markers to anchor this compound. */
 .editor-body.has-translate .encoded-pane {
   @apply flex-1 basis-7/12 border-b border-border;
-}
-
-.translate-head {
-  @apply flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2;
-}
-
-.translate-pane {
-  @apply flex-1 basis-5/12 min-h-0;
-}
-
-.translate-pane-empty {
-  @apply flex-1 basis-5/12 items-center text-subtle;
 }
 </style>

@@ -34,7 +34,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="doc-row"
+    class="doc-row flex flex-col border-b border-border"
     :class="{
       open: expanded,
       selected,
@@ -44,7 +44,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
     :data-id="view.id"
   >
     <div
-      class="doc-head"
+      class="doc-head flex shrink-0 items-center cursor-pointer gap-1.5 px-2 h-6.5"
       role="option"
       tabindex="0"
       :aria-selected="selected"
@@ -53,14 +53,14 @@ function onHeadKeydown(e: KeyboardEvent): void {
     >
       <button
         type="button"
-        class="expand-toggle"
+        class="flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
         data-testid="document-toggle-expand"
         :aria-label="expanded ? 'Collapse' : 'Expand'"
         @click.stop="$emit('toggle')"
       >
         <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
       </button>
-      <span class="doc-id" data-testid="document-id">{{ view.idLabel }}</span>
+      <span class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)]" data-testid="document-id">{{ view.idLabel }}</span>
       <Badge data-testid="document-field-count">{{ view.fieldCount }} fields</Badge>
       <Badge data-testid="document-byte-badge">{{ view.byteLabel }}</Badge>
       <Tooltip v-if="view.isTruncated">
@@ -77,20 +77,8 @@ function onHeadKeydown(e: KeyboardEvent): void {
 
 <style scoped>
 @reference "@theme/base.css";
-
-/* P48 F11: the nine rules DocumentView.vue and ConsoleResultGrid.vue each declared for this row
-   and its head, one of which had already drifted (`.doc-head`'s own padding, D12 — the document
-   view's `--kira-s-4` is the value kept). Everything about the *expanded body* (its own wrapper
-   class, its v-if gate, `.doc-preview-match`) stays per-caller in the #body slot (F13) — none of
-   it is in this list. */
-.doc-row {
-  @apply flex flex-col border-b border-border;
-}
-
-.doc-head {
-  @apply flex shrink-0 items-center cursor-pointer gap-1.5 px-2 h-6.5;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.doc-row`/`.doc-head` stay bare markers to anchor these compounds. */
 .doc-head:hover {
   @apply bg-hover;
 }
@@ -115,12 +103,4 @@ function onHeadKeydown(e: KeyboardEvent): void {
    (--color-search-match[-current] already @theme-registered, base.css). Deliberately no `text-bg`
    here (unlike KeyValuePane.vue/ConsoleResultGrid.vue's own -current pairing): this row's current-
    match state was never given a text-colour change, only the background -- kept exact. */
-
-.expand-toggle {
-  @apply flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground;
-}
-
-.doc-id {
-  @apply shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)];
-}
 </style>

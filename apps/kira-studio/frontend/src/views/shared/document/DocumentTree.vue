@@ -31,19 +31,29 @@ function onWheel(e: WheelEvent): void {
 // ObjectId(...), or a canonical-EJSON fallback for a type this app's shell has no constructor for)
 // reuses --kira-syntax-function, the same hue CodeMirror already gives a function-call name.
 const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
-  string: 'tok-string',
-  number: 'tok-number',
-  keyword: 'tok-keyword',
-  bson: 'tok-bson',
+  string: 'text-syntax-string',
+  number: 'text-syntax-number',
+  keyword: 'text-syntax-keyword',
+  bson: 'text-syntax-function',
 };
 </script>
 
 <template>
-  <div class="document-tree" data-testid="document-tree" ref="treeRef" @wheel="onWheel">
+  <!-- P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
+       the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
+       accounting (rows.ts) is untouched. -->
+  <div
+    class="overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)] scrollbar-none py-1"
+    data-testid="document-tree"
+    ref="treeRef"
+    @wheel="onWheel"
+  >
+    <!-- A line only as wide as its own content grows the scroller's scrollWidth past the panel — a
+         plain 100% width would clip at the viewport instead of revealing the rest on scroll. -->
     <div
       v-for="line in lines"
       :key="line.node.path"
-      class="tree-line"
+      class="flex items-center whitespace-nowrap w-max min-w-full gap-0.5 pr-2 h-4.5"
       :style="{ paddingLeft: `${line.depth * 16 + 4}px` }"
       data-testid="document-tree-line"
       :data-path="line.node.path"
@@ -52,81 +62,28 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
       <button
         v-if="line.expandable"
         type="button"
-        class="tree-twisty"
+        class="flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground"
         data-testid="document-tree-twisty"
         :aria-label="line.expanded ? 'Collapse' : 'Expand'"
         @click="emit('toggle-path', line.node.path)"
       >
         <CodiconIcon :name="line.expanded ? 'chevron-down' : 'chevron-right'" :size="12" />
       </button>
-      <span v-else class="tree-twisty-spacer"></span>
-      <span v-if="line.node.key !== ''" class="tree-key">{{ line.node.key }}:</span>
+      <span v-else class="shrink-0 w-3.5"></span>
+      <span v-if="line.node.key !== ''" class="shrink-0 text-syntax-property">{{ line.node.key }}:</span>
+      <!-- P43 iter3 D42: no longer clipped — the row's own max-content width lets this grow past
+           the panel instead, reachable by scrolling the tree sideways. -->
       <span
         v-if="line.node.kind === 'scalar'"
-        class="tree-value"
+        class="shrink-0"
         :class="TOKEN_CLASS[line.node.token]"
         data-testid="document-tree-value"
         >{{ line.node.text }}</span
       >
-      <span v-else class="tree-value tree-summary" data-testid="document-tree-summary">{{
+      <span v-else class="shrink-0 text-muted-foreground" data-testid="document-tree-summary">{{
         line.node.summary
       }}</span>
     </div>
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.document-tree {
-  /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
-     the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
-     accounting (rows.ts) is untouched. P110 B37: scrollbar-width: none + the ::-webkit-scrollbar
-     rule become scrollbar-none; padding: var(--kira-s-2) 0 (4px vertical) becomes py-1. */
-  @apply overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)] scrollbar-none py-1;
-}
-
-.tree-line {
-  /* A line only as wide as its own content grows the scroller's scrollWidth past the panel — a
-     plain 100% width would clip at the viewport instead of revealing the rest on scroll. */
-  @apply flex items-center whitespace-nowrap w-max min-w-full gap-0.5 pr-2 h-4.5;
-}
-
-.tree-twisty {
-  @apply flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted-foreground;
-}
-
-.tree-twisty-spacer {
-  @apply shrink-0 w-3.5;
-}
-
-.tree-key {
-  @apply shrink-0 text-syntax-property;
-}
-
-.tree-value {
-  /* P43 iter3 D42: no longer clipped — .tree-line's own max-content width lets this grow past
-     the panel instead, reachable by scrolling .document-tree sideways. */
-  @apply shrink-0;
-}
-
-.tree-summary {
-  @apply text-muted-foreground;
-}
-
-.tok-string {
-  @apply text-syntax-string;
-}
-
-.tok-number {
-  @apply text-syntax-number;
-}
-
-.tok-keyword {
-  @apply text-syntax-keyword;
-}
-
-.tok-bson {
-  @apply text-syntax-function;
-}
-</style>

@@ -14,6 +14,7 @@ import {
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
+import TimestampReading from './TimestampReading.vue';
 import {
   defaultShapeFor,
   describeTimestamp,
@@ -96,36 +97,30 @@ watch(calendarOpen, (open) => {
 </script>
 
 <template>
-  <div class="ts-pane" data-testid="cell-editor-timestamp-pane">
-    <Alert class="ts-readings" variant="note" data-testid="cell-editor-timestamp">
+  <div class="flex flex-col h-full min-h-0" data-testid="cell-editor-timestamp-pane">
+    <Alert class="shrink-0" variant="note" data-testid="cell-editor-timestamp">
       <AlertDescription class="flex items-center gap-1">
         <CodiconIcon name="clock" :size="13" />
         <template v-if="reading">
-          <span
-            class="ts-reading"
-            :class="{ 'text-subtle': zone !== 'local' }"
-            data-testid="cell-editor-timestamp-local"
-            >{{ reading.local }}</span
+          <TimestampReading :subtle="zone !== 'local'" data-testid="cell-editor-timestamp-local"
+            >{{ reading.local }}</TimestampReading
           >
-          <span class="ts-sep">·</span>
-          <span
-            class="ts-reading"
-            :class="{ 'text-subtle': zone !== 'utc' }"
-            data-testid="cell-editor-timestamp-utc"
-            >{{ reading.utc }}</span
+          <span class="opacity-50">·</span>
+          <TimestampReading :subtle="zone !== 'utc'" data-testid="cell-editor-timestamp-utc"
+            >{{ reading.utc }}</TimestampReading
           >
-          <span class="ts-sep">·</span>
-          <span class="ts-reading text-subtle" data-testid="cell-editor-timestamp-relative">{{
+          <span class="opacity-50">·</span>
+          <TimestampReading subtle data-testid="cell-editor-timestamp-relative">{{
             reading.relative
-          }}</span>
+          }}</TimestampReading>
         </template>
-        <span v-else class="ts-reading text-subtle" data-testid="cell-editor-timestamp-unparseable"
-          >Not a recognizable {{ format }} value</span
+        <TimestampReading v-else subtle data-testid="cell-editor-timestamp-unparseable"
+          >Not a recognizable {{ format }} value</TimestampReading
         >
       </AlertDescription>
     </Alert>
 
-    <div class="ts-edit">
+    <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
       <ToggleGroup
         type="single"
         :model-value="zone"
@@ -136,7 +131,7 @@ watch(calendarOpen, (open) => {
           {{ opt.label }}
         </ToggleGroupItem>
       </ToggleGroup>
-      <div class="ts-field">
+      <div class="flex-1 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger class="w-full">
@@ -153,7 +148,7 @@ watch(calendarOpen, (open) => {
         </Tooltip>
       </div>
       <Popover :open="calendarOpen" @update:open="calendarOpen = $event">
-        <span ref="calendarAnchorRef" class="ts-calendar-anchor">
+        <span ref="calendarAnchorRef" class="relative shrink-0">
           <Tooltip>
             <TooltipTrigger as-child>
               <TooltipDisabledTrigger>
@@ -182,34 +177,3 @@ watch(calendarOpen, (open) => {
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.ts-pane {
-  @apply flex flex-col h-full min-h-0;
-}
-
-.ts-readings {
-  @apply shrink-0;
-}
-
-.ts-reading {
-  @apply whitespace-nowrap;
-}
-
-.ts-sep {
-  @apply opacity-50;
-}
-
-.ts-edit {
-  @apply flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2;
-}
-
-.ts-field {
-  @apply flex-1 min-w-0;
-}
-
-.ts-calendar-anchor {
-  @apply relative shrink-0;
-}
-</style>

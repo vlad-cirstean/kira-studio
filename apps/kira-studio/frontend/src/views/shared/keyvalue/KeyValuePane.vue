@@ -719,7 +719,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="keyvalue-pane" data-testid="keyvalue-pane" :class="{ embedded: !tab }">
+  <div class="flex-1 min-h-0 flex flex-col" data-testid="keyvalue-pane">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <template v-if="tab">
       <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
@@ -790,8 +790,13 @@ onUnmounted(() => {
       </div>
     </template>
 
-    <SplitterGroup direction="vertical" class="kv-split">
-    <SplitterPanel class="kv-split-top" :order="1">
+    <!-- P104: the SplitterGroup wrapping the reconnect/main content + CellEditorDock.vue's own dock
+         panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
+         PanelSplitter. -->
+    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
+    <!-- SplitterPanel's own inline style owns flex-grow/basis (it always wins over a class rule) —
+         the badges/strips/table still stack in a column inside it, same as before. -->
+    <SplitterPanel class="flex flex-col min-h-0" :order="1">
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
@@ -801,7 +806,7 @@ onUnmounted(() => {
       </Button>
     </Alert>
     <template v-else>
-      <div v-if="page" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border kv-badges" data-testid="keyvalue-badges">
+      <div v-if="page" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="keyvalue-badges">
         <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
         <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
@@ -819,7 +824,7 @@ onUnmounted(() => {
         <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
       </div>
 
-      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 kv-toolbar" data-testid="keyvalue-toolbar">
+      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" data-testid="keyvalue-toolbar">
         <div class="flex items-center gap-1.5 min-w-0">
           <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
@@ -900,7 +905,7 @@ onUnmounted(() => {
              add-before-delete order), search trails, same as every other view. -->
         <div class="flex items-center gap-1.5 min-w-0">
           <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
-            <div ref="addAnchorRef" class="add-anchor">
+            <div ref="addAnchorRef" class="relative">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <TooltipDisabledTrigger>
@@ -914,8 +919,8 @@ onUnmounted(() => {
               <PopoverAnchor :reference="addAnchorRef ?? undefined" />
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
-              <div class="popover-form">
-                <div class="popover-title text-kira-sm text-muted-foreground">Add key (string value)</div>
+              <div class="flex flex-col gap-1.5 p-1.5">
+                <div class="p-0 text-kira-sm text-muted-foreground">Add key (string value)</div>
                 <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
                 <Input
                   v-model="addValue"
@@ -925,10 +930,10 @@ onUnmounted(() => {
                   @keydown.enter="submitAdd"
                   @keydown.escape="closeAdd"
                 />
-                <div v-if="addError" class="text-kira-xs popover-error" data-testid="keyvalue-add-error">
+                <div v-if="addError" class="text-kira-xs text-error" data-testid="keyvalue-add-error">
                   {{ addError }}
                 </div>
-                <div class="popover-actions">
+                <div class="flex justify-end gap-1">
                   <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
                   <Button
                     variant="dialog-primary"
@@ -943,7 +948,7 @@ onUnmounted(() => {
           </Popover>
 
           <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
-            <div ref="editAnchorRef" class="edit-anchor">
+            <div ref="editAnchorRef" class="relative">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <TooltipDisabledTrigger>
@@ -957,8 +962,8 @@ onUnmounted(() => {
               <PopoverAnchor :reference="editAnchorRef ?? undefined" />
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
-              <div class="popover-form">
-                <div class="popover-title text-kira-sm text-muted-foreground">Edit value</div>
+              <div class="flex flex-col gap-1.5 p-1.5">
+                <div class="p-0 text-kira-sm text-muted-foreground">Edit value</div>
                 <Input
                   v-model="editDraft"
                   class="w-full"
@@ -966,10 +971,10 @@ onUnmounted(() => {
                   @keydown.enter="saveEdit"
                   @keydown.escape="closeEdit"
                 />
-                <div v-if="editError" class="text-kira-xs popover-error" data-testid="keyvalue-edit-error">
+                <div v-if="editError" class="text-kira-xs text-error" data-testid="keyvalue-edit-error">
                   {{ editError }}
                 </div>
-                <div class="popover-actions">
+                <div class="flex justify-end gap-1">
                   <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
                   <Button
                     variant="dialog-primary"
@@ -1076,19 +1081,22 @@ onUnmounted(() => {
         @close="onCloseSearch"
       />
 
-      <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 table-panel">
+      <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 flex-1 min-h-0 border-0 rounded-none">
         <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-gutter"></div>
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-field">
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-10 shrink-0"></div>
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-56 shrink-0">
             <span class="text-fg overflow-hidden text-ellipsis">{{
               page?.redisType === 'string' ? '' : page?.redisType === 'list' ? 'index' : 'field'
             }}</span>
           </div>
-          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap kv-col-value">
+          <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap flex-1 min-w-0">
             <span class="text-fg overflow-hidden text-ellipsis">{{ page?.redisType === 'zset' ? 'score' : 'value' }}</span>
           </div>
         </div>
-        <div class="tbody" data-testid="keyvalue-list">
+        <!-- P49 D5/P104 §3.4: the virtualizer's own scroll container (kv-virtual-scroll below) owns
+             scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches
+             above never needed to scroll either. -->
+        <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
           <Alert v-if="!rt || rt.rowCount === 0" class="empty-state">
             <CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" class="text-subtle" />
             <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ rt ? 'No data' : 'Loading…' }}</AlertTitle>
@@ -1111,18 +1119,20 @@ onUnmounted(() => {
               Show all rows
             </Button>
           </Alert>
+          <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against
+               — this component owns it directly now, VirtualList.vue no longer wraps it. -->
           <div
             v-else
             ref="scrollRef"
-            class="kv-virtual-scroll"
+            class="flex-1 min-h-0 overflow-auto"
             data-testid="virtual-list"
             role="listbox"
             aria-label="Rows"
           >
-            <div class="kv-virtual-inner" :style="{ height: `${totalSize}px` }">
+            <div class="relative w-full" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
                 <div
-                  class="kv-row"
+                  class="kv-row flex cursor-pointer h-row absolute top-0 left-0 w-full"
                   data-testid="keyvalue-row"
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
@@ -1132,11 +1142,11 @@ onUnmounted(() => {
                   @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
-                  <div class="flex items-center justify-end px-2 border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative kv-col-gutter">{{ entry.i + 1 }}</div>
+                  <div class="flex items-center justify-end px-2 border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-field"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate w-56 shrink-0"
                         :class="{
                           'search-match bg-search-match': isSearchMatch(entry.i, 'field'),
                           'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
@@ -1154,7 +1164,7 @@ onUnmounted(() => {
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate kv-col-value"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate flex-1 min-w-0"
                         :class="{
                           'search-match bg-search-match': isSearchMatch(entry.i, 'value'),
                           'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
@@ -1191,96 +1201,20 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.kv-row` stays a bare marker to anchor this hover rule.
 
-.keyvalue-pane {
-  @apply flex-1 min-h-0 flex flex-col;
-}
+   P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
+   `.cell-splitter` (template above) is a bare marker class, kept only because cell-editor.spec.ts
+   polls its box-shadow via getComputedStyle (no rule of its own attaches to the name any more).
 
-/* P104: the SplitterGroup wrapping the reconnect/main content + CellEditorDock.vue's own dock
-   panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
-   PanelSplitter. */
-.kv-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-/* SplitterPanel's own inline style owns flex-grow/basis (it always wins over a class rule) — the
-   badges/strips/table still stack in a column inside it, same as .keyvalue-pane's own layout
-   before. */
-.kv-split-top {
-  @apply flex flex-col min-h-0;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` is now a bare marker class, kept only because cell-editor.spec.ts polls its
-   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
-
-.table-panel {
-  @apply flex-1 min-h-0 border-0 rounded-none;
-}
-
-.tbody {
-  /* P49 D5/P104 §3.4: the virtualizer's own scroll container (.kv-virtual-scroll below) owns
-     scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches above
-     never needed to scroll either. */
-  @apply flex-1 min-h-0 flex flex-col overflow-hidden;
-}
-
-/* P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against — this
-   component owns it directly now, VirtualList.vue no longer wraps it. */
-.kv-virtual-scroll {
-  @apply flex-1 min-h-0 overflow-auto;
-}
-
-.kv-virtual-inner {
-  @apply relative w-full;
-}
-
-.kv-col-gutter {
-  @apply w-10 shrink-0;
-}
-
-.kv-col-field {
-  @apply w-56 shrink-0;
-}
-
-.kv-col-value {
-  @apply flex-1 min-w-0;
-}
-
-.kv-row {
-  @apply flex cursor-pointer h-row absolute top-0 left-0 w-full;
-}
-
+   P110 B34: `.search-match`/`.search-match-current` (template above) carry no rule of their own
+   here any more -- kept as bare marker classes (the shared vocabulary name cellClass.ts/
+   DocumentRow.vue/ConsoleResultGrid.vue also use). The actual tint/text-colour is
+   `bg-search-match[-current] text-bg` alongside on the same element (--color-search-match[-current]
+   already @theme-registered, base.css -- no new utility needed). `.empty-state` (template above)
+   moved to base.css's own @utility empty-state (15-file duplicate). */
 .kv-row:hover {
   @apply bg-hover;
 }
-
-/* P110 B34: `.search-match`/`.search-match-current` carry no rule of their own here any more --
-   kept as bare marker classes (the shared vocabulary name cellClass.ts/DocumentRow.vue/
-   ConsoleResultGrid.vue also use). The actual tint/text-colour is `bg-search-match[-current]
-   text-bg` alongside on the same element (--color-search-match[-current] already @theme-registered,
-   base.css -- no new utility needed). */
-
-.edit-anchor,
-.add-anchor {
-  @apply relative;
-}
-
-.popover-form {
-  @apply flex flex-col gap-1.5 p-1.5;
-}
-
-.popover-title {
-  @apply p-0;
-}
-
-.popover-actions {
-  @apply flex justify-end gap-1;
-}
-
-.popover-error {
-  @apply text-error;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>
