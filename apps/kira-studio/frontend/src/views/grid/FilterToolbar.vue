@@ -128,7 +128,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 <template>
   <!-- LAW 02 / README: one row, two prefixed inputs, one verb — permanent, so Clear rather than
        a close button that would make the grid change height under you. -->
-  <div class="history-anchor">
+  <div class="relative">
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
@@ -158,7 +158,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       />
     </Popover>
   </div>
-  <div class="where-input">
+  <div class="flex-1 min-w-0">
     <AutocompleteField
       v-model="whereText"
       class="w-full"
@@ -175,7 +175,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       @blur="applyWhere"
     />
   </div>
-  <div class="orderby-input">
+  <div class="w-56 shrink-0">
     <AutocompleteField
       v-model="orderByText"
       class="w-full"
@@ -198,24 +198,3 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
     <TooltipContent>Empty both fields and refetch</TooltipContent>
   </Tooltip>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* Height, padding and colour come from the parent toolbar div's utility classes (P110 B28) and
-   InputGroup's own kira variant — only the two fields' own widths live here. P110 B25: each
-   field's width is now a `class="w-full"` prop straight on <AutocompleteField> (template above),
-   not a scoped `:deep(.p-input)` rule reaching across the component boundary (DocumentView.vue's
-   same `.filter-field` precedent). */
-.history-anchor {
-  @apply relative;
-}
-
-.where-input {
-  @apply flex-1 min-w-0;
-}
-
-.orderby-input {
-  @apply w-56 shrink-0;
-}
-</style>

@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
           @dragover.prevent="onDragOver(index)"
           @dragend="onDragEnd"
         >
-          <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
+          <span class="flex items-center shrink-0 text-subtle cursor-grab" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
           <Tooltip v-if="pkNames.has(name)">
             <TooltipTrigger as-child>
               <Checkbox
@@ -156,18 +156,11 @@ onBeforeUnmount(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-/* P110 B34: `.columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` moved to base.css's own
-   `@utility` set, shared byte-for-byte with ProjectionMenu.vue. `.columns-menu-item` stays here
-   (its own gap-1, for the inline drag-handle icon ProjectionMenu.vue's item has none of). */
-.columns-menu-item {
-  @apply cursor-pointer gap-1;
-}
-
+/* P110 B40: `.columns-menu-item`'s own plain rule (cursor-pointer, gap-1) was already duplicated
+   inline in the template -- dropped as redundant. `.drag-handle` folded onto its span the same
+   way. `.columns-menu-item` itself stays a bare marker: tooltips.spec.ts locates by
+   `.columns-menu-item.is-pk`, and this compound variant still needs it. */
 .columns-menu-item.is-dragging {
   @apply opacity-50;
-}
-
-.drag-handle {
-  @apply flex items-center shrink-0 text-subtle cursor-grab;
 }
 </style>

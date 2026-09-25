@@ -130,10 +130,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fk-preview-backdrop" data-testid="fk-preview-backdrop">
-    <div ref="panelEl" class="fk-preview bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
-      <div class="fk-preview-header">
-        <span class="fk-preview-title">{{ tableLabel }}</span>
+  <div class="fixed inset-0 z-[var(--kira-z-popover)]" data-testid="fk-preview-backdrop">
+    <div ref="panelEl" class="fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)] bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
+      <div class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5">
+        <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
         <Badge
           v-if="state.status === 'ready' && state.hasMore"
           variant="info"
@@ -143,30 +143,37 @@ onUnmounted(() => {
         </Badge>
       </div>
 
-      <div class="fk-preview-actions">
+      <div class="flex border-b border-border-strong flex-none gap-1 p-1.5">
         <Button variant="toolbar" size="kira" data-testid="fk-preview-open" @click="onOpenClick">
           <CodiconIcon name="arrow-right" :size="13" />
           Open in new tab
         </Button>
       </div>
 
-      <div class="fk-preview-body">
-        <div v-if="state.status === 'loading'" class="fk-preview-loading">
+      <!-- flex-1 min-h-0 is load-bearing: without it a flex child refuses to shrink below its
+           content height, and the panel overflows its own max-height instead of scrolling here. -->
+      <div class="flex-1 min-h-0 overflow-y-auto p-1.5">
+        <div v-if="state.status === 'loading'" class="flex items-center justify-center h-10 text-muted-foreground">
           <CodiconIcon name="loading" class="animate-spin" :size="14" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">
           <AlertDescription>No matching row in {{ tableLabel }}</AlertDescription>
         </Alert>
-        <table v-else-if="state.status === 'ready'" class="fk-preview-table">
+        <!-- .header-key/.header-key.is-fk: no rule here — this popover is always rendered inside
+             SlickGridHost's own `.slick-grid-host` root (§4.3), so slickTheme.css's own
+             `.slick-grid-host .header-key` rule already applies (the "same header-key style"
+             §4.2 asks for), unscoped CSS reaching into any descendant regardless of which
+             component rendered it. -->
+        <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-sm">
           <tbody>
             <tr v-for="(col, i) in state.columns" :key="col.name">
-              <th :style="{ color: typeClassColor(col.typeClass) }">
+              <th class="text-left font-medium text-muted-foreground whitespace-nowrap align-top py-0.5 pl-0 pr-1" :style="{ color: typeClassColor(col.typeClass) }">
                 {{ col.name }}
                 <span v-if="col.isPrimaryKey" class="header-key">PK</span>
                 <span v-if="col.isTarget" class="header-key is-fk">FK</span>
               </th>
-              <td>
+              <td class="break-words py-0.5">
                 <Badge
                   v-if="state.rows[0]?.values[i]?.isNull"
                   variant="info"
@@ -183,55 +190,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.fk-preview-backdrop {
-  @apply fixed inset-0 z-[var(--kira-z-popover)];
-}
-
-.fk-preview {
-  @apply fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)];
-}
-
-.fk-preview-header {
-  @apply flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5;
-}
-
-.fk-preview-title {
-  @apply font-semibold overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.fk-preview-body {
-  /* Load-bearing: without this a flex child refuses to shrink below its content height, and the
-     panel overflows its own max-height instead of scrolling here. */
-  @apply flex-1 min-h-0 overflow-y-auto p-1.5;
-}
-
-.fk-preview-loading {
-  @apply flex items-center justify-center h-10 text-muted-foreground;
-}
-
-/* P110 B37: .spin/@keyframes fk-preview-spin deleted -- Tailwind's own animate-spin (1s linear
-   infinite, rotate 0->360) is byte-identical, confirmed via compile check. */
-
-.fk-preview-table {
-  @apply w-full border-collapse text-kira-sm;
-}
-.fk-preview-table th {
-  @apply text-left font-medium text-muted-foreground whitespace-nowrap align-top py-0.5 pl-0 pr-1;
-}
-.fk-preview-table td {
-  @apply break-words py-0.5;
-}
-
-/* .header-key/.header-key.is-fk: no rule here — this popover is always rendered inside
-   SlickGridHost's own `.slick-grid-host` root (§4.3), so slickTheme.css's own
-   `.slick-grid-host .header-key` rule already applies (the "same header-key style" §4.2 asks
-   for), unscoped CSS reaching into any descendant regardless of which component rendered it. */
-
-.fk-preview-actions {
-  @apply flex border-b border-border-strong flex-none gap-1 p-1.5;
-}
-</style>

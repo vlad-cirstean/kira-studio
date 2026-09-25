@@ -313,7 +313,7 @@ function onDeleteRow(): void {
     </Tooltip>
 
     <Popover :open="columnsOpen" @update:open="columnsOpen = $event">
-      <div ref="columnsAnchorRef" class="columns-anchor">
+      <div ref="columnsAnchorRef" class="relative">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -437,16 +437,3 @@ function onDeleteRow(): void {
     </Tooltip>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* Sizing/spacing/colour all come from the parent toolbar div's utility classes (P110 B28) and what
-   this hosts (p-iconbtn, Button variant="toolbar", p-seg, InputGroup variant="kira", plus the Badge
-   component) — the pager's own layout/page-jump-input styling lives in PagerControls.vue now; only
-   the columns anchor's positioning is left here. */
-
-.columns-anchor {
-  @apply relative;
-}
-</style>

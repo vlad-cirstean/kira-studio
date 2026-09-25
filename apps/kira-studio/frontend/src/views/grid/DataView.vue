@@ -201,7 +201,7 @@ function onCloseSearch(): void {
 </script>
 
 <template>
-  <div class="data-view">
+  <div class="h-full flex flex-col min-h-0">
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="view-head">
       <span v-if="railColor !== undefined" class="size-1.25 rounded-full shrink-0" :class="!railColor ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'" data-testid="conn-dot" :style="{ '--kira-rail': connColorVar(railColor) }" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
@@ -292,7 +292,7 @@ function onCloseSearch(): void {
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
-            <div ref="previewAnchorRef" class="preview-anchor">
+            <div ref="previewAnchorRef" class="relative">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <TooltipDisabledTrigger>
@@ -369,8 +369,8 @@ function onCloseSearch(): void {
       @close="onCloseSearch"
     />
 
-    <SplitterGroup direction="vertical" class="grid-split">
-      <SplitterPanel class="grid-split-top" :order="1">
+    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
+      <SplitterPanel class="flex flex-col min-h-0" :order="1">
         <div
           v-if="needsReconnect"
           class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
@@ -394,7 +394,7 @@ function onCloseSearch(): void {
             v-if="rt?.status === 'error' && rt.error"
             variant="destructive"
             data-testid="error-strip"
-            class="error-strip"
+            class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]"
           >
             <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.error.message }}</AlertDescription>
@@ -405,7 +405,7 @@ function onCloseSearch(): void {
             v-if="rt?.actionError"
             variant="destructive"
             data-testid="data-action-error"
-            class="error-strip"
+            class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]"
           >
             <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.actionError }}</AlertDescription>
@@ -431,49 +431,17 @@ function onCloseSearch(): void {
               refresh to see them.
             </AlertDescription>
           </Alert>
-          <div class="grid-area">
+          <div class="flex-1 min-h-0 relative">
             <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
           </div>
         </template>
       </SplitterPanel>
+      <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
+           component -- `.cell-splitter` is a bare marker class, kept only because
+           cell-editor.spec.ts polls its box-shadow via getComputedStyle (no rule of its own
+           attaches to the name any more). -->
       <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" />
     </SplitterGroup>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.data-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-.error-strip {
-  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
-}
-
-/* P104: the SplitterGroup wrapping the grid + CellEditorDock.vue's own dock panel — the vertical
-   split (row-resize) that used to be CellEditorDock's own internal PanelSplitter. */
-.grid-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-/* SplitterPanel's own inline style owns flex-grow/basis (it always wins over a class rule) — the
-   alerts + grid-area still stack in a column inside it, same as .data-view's own layout before. */
-.grid-split-top {
-  @apply flex flex-col min-h-0;
-}
-
-.grid-area {
-  @apply flex-1 min-h-0 relative;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` is now a bare marker class, kept only because cell-editor.spec.ts polls its
-   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
-
-.preview-anchor {
-  @apply relative;
-}
-</style>

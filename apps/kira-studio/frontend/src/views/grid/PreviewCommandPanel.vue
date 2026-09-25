@@ -57,8 +57,8 @@ function close(): void {
 
 <template>
   <PopoverContent align="end" class="w-120 gap-0 p-0" data-testid="preview-command-panel">
-    <div class="preview-panel-inner">
-      <div class="preview-panel-header flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
+    <div class="max-h-96 flex flex-col">
+      <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
         <span>Preview SQL</span>
         <Tooltip>
@@ -77,45 +77,20 @@ function close(): void {
           <TooltipContent>Close</TooltipContent>
         </Tooltip>
       </div>
-      <div v-if="isLoading" class="preview-panel-loading text-kira-sm text-muted-foreground">Loading…</div>
+      <div v-if="isLoading" class="p-2 text-kira-sm text-muted-foreground">Loading…</div>
       <div
         v-else-if="errorMessage"
-        class="preview-panel-error text-kira-sm"
+        class="text-error p-2 text-kira-sm"
         data-testid="preview-command-error"
       >
         {{ errorMessage }}
       </div>
-      <div v-else-if="statements.length === 0" class="preview-panel-empty text-kira-sm text-muted-foreground">
+      <div v-else-if="statements.length === 0" class="p-2 text-kira-sm text-muted-foreground">
         No pending changes.
       </div>
-      <div v-else class="preview-panel-body">
+      <div v-else class="h-60">
         <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>
     </div>
   </PopoverContent>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.preview-panel-inner {
-  @apply max-h-96 flex flex-col;
-}
-
-.preview-panel-header {
-  @apply normal-case tracking-normal;
-}
-
-.preview-panel-loading,
-.preview-panel-empty {
-  @apply p-2;
-}
-
-.preview-panel-error {
-  @apply text-error p-2;
-}
-
-.preview-panel-body {
-  @apply h-60;
-}
-</style>
