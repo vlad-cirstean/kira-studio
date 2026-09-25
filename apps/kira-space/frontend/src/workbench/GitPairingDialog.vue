@@ -2,8 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { useIntervalFn } from '@vueuse/core';
-import { computed, nextTick, ref, watch } from 'vue';
+import { usePendingDecision } from '@workbench/util/usePendingDecision';
 import { useGitClientsStore } from '../state/gitClients';
 
 const gitClientsStore = useGitClientsStore();
@@ -11,46 +10,13 @@ const gitClientsStore = useGitClientsStore();
 // G1 D17: a separate, always-mounted dialog at App.vue's root, the same precedent ConfirmDialog
 // sets — a pairing request must be able to appear with nothing else open. Renders nothing while
 // gitClientsStore.pending is null.
-const denyButton = ref<InstanceType<typeof Button> | null>(null);
-const now = ref(Date.now());
-
-// Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
-// unmounted per pairing request), so a plain onMounted only ever fires once, at app boot — a 1s
-// interval started there would tick for the app's entire lifetime even though the dialog itself
-// renders nothing while gitClientsStore.pending is null (DialogFrame's own v-if below). useIntervalFn's
-// own pause()/resume() (immediate: false) is started/stopped instead as pending flips non-null/null.
-const { pause: pauseTick, resume: resumeTick } = useIntervalFn(
-  () => {
-    now.value = Date.now();
-  },
-  1000,
-  { immediate: false },
-);
-
-// This also fixes denyButton's own focus call: run from onMounted, it only ever executed once, at
-// that same app-boot mount — with DialogFrame's v-if false and nothing in the DOM yet, so
-// denyButton.value was always null there and Deny was never actually focused. nextTick here runs
-// it after each pairing request's own DOM update instead, so it sticks for real.
-watch(
-  () => gitClientsStore.pending !== null,
-  (isPending) => {
-    if (isPending) {
-      now.value = Date.now();
-      resumeTick();
-      // D17's "Deny is the default focus" — a trust prompt whose Enter key grants access is the
-      // wrong default.
-      void nextTick(() => denyButton.value?.$el?.focus());
-    } else {
-      pauseTick();
-    }
-  },
-  { immediate: true },
-);
-
-const remainingSeconds = computed(() => {
-  const expires = gitClientsStore.pending?.expiresAtMs;
-  if (expires === undefined) return 0;
-  return Math.max(0, Math.ceil((expires - now.value) / 1000));
+//
+// P113 F5 (fix): was keyed on `pending !== null`, a boolean — the queue advancing from request A
+// straight to request B (no null in between) never re-fired it, so Deny focus and the countdown
+// reset silently stayed on A. usePendingDecision keys on the request id instead.
+const { remainingSeconds } = usePendingDecision({
+  pendingId: () => gitClientsStore.pending?.requestId,
+  expiresAtMs: () => gitClientsStore.pending?.expiresAtMs,
 });
 
 async function onDeny(): Promise<void> {
