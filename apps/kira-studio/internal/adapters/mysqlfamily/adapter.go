@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"regexp"
 	"strconv"
-	"sync"
 
 	"github.com/go-sql-driver/mysql"
 
@@ -14,6 +13,17 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3) — a real data race, not a theoretical one, same class as postgres/adapter.go's own (the
+// running-query bookkeeping below is unrelated, tracker's own lock, P107 T2-3). Guarded together
+// via adapters.Guarded (P113 G1).
+type connState struct {
+	connSet         *ConnSet
+	cfg             *model.ResolvedConnectionConfig
+	primaryDatabase string
+	readOnly        bool
+}
+
 // Adapter is index.ts's MysqlFamilyAdapter — one implementation for both MariaDB and MySQL,
 // parameterized by a Profile (P34 D7/D9) plus a per-engine Caps literal (D10).
 type Adapter struct {
@@ -21,69 +31,38 @@ type Adapter struct {
 	profile Profile
 	caps    adapters.Caps
 
-	// mu guards every field below (F3): Connect/Disconnect write connSet/cfg/primaryDatabase/
-	// readOnly from whatever goroutine adapterhost dispatches them on, concurrently with any
-	// in-flight op reading them (requireEntry's own RequireConnected(a.connSet), Mutate/Execute's own
-	// a.readOnly, Children's own a.primaryDatabase) — a real data race, not a theoretical one, same
-	// class as postgres/adapter.go's own (the running-query bookkeeping below is unrelated, tracker's
-	// own lock, P107 T2-3).
-	mu              sync.Mutex
-	connSet         *ConnSet
-	cfg             *model.ResolvedConnectionConfig
-	primaryDatabase string
-	readOnly        bool
+	state adapters.Guarded[connState]
 
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// getConnSet is every op's own locked read of a.connSet (F3) — requireEntry's RequireConnected call
-// takes its result, never a.connSet directly.
-func (a *Adapter) getConnSet() *ConnSet {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.connSet
-}
+// getConnSet is every op's own locked read of state.connSet (F3) — requireEntry's RequireConnected
+// call takes its result, never state.connSet directly.
+func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().connSet }
 
 // setConnSet is Connect's own locked write of connSet/cfg together (F3) — P13 D1: assigned before
 // anything is opened, not after the probe succeeds.
 func (a *Adapter) setConnSet(connSet *ConnSet, cfg *model.ResolvedConnectionConfig) {
-	a.mu.Lock()
-	a.connSet = connSet
-	a.cfg = cfg
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.connSet = connSet; s.cfg = cfg })
 }
 
 // setConnected is Connect's own locked write of the two fields only a successful probe fills in
 // (F3).
 func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
-	a.mu.Lock()
-	a.primaryDatabase = primaryDatabase
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.primaryDatabase = primaryDatabase; s.readOnly = readOnly })
 }
 
 // clearConnected is Disconnect's own locked write, once CloseAll (a real network call, run with no
-// lock held) has returned (F3).
+// lock held) has returned (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.connSet = nil
-	a.primaryDatabase = ""
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.connSet = nil; s.primaryDatabase = "" })
 }
 
-// getPrimaryDatabase is Children's own locked read of a.primaryDatabase (F3).
-func (a *Adapter) getPrimaryDatabase() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.primaryDatabase
-}
+// getPrimaryDatabase is Children's own locked read of state.primaryDatabase (F3).
+func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().primaryDatabase }
 
-// getReadOnly is Mutate/Execute's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+// getReadOnly is Mutate/Execute's own locked read of state.readOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // New constructs an Adapter for profile/caps — mariadb/adapter.go's and mysql/adapter.go's own
 // init() call this, each with their own Profile and Caps literal (P34 D7).
@@ -428,9 +407,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // killing someone else's does.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	running, ok := a.tracker.PopRunning(opID)
-	a.mu.Lock()
-	cfg := a.cfg
-	a.mu.Unlock()
+	cfg := a.state.Load().cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}
