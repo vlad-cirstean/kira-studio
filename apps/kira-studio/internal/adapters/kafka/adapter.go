@@ -179,12 +179,18 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	}
 }
 
+// resolveTopicTarget is Read/Count/Preview/Mutate's shared single-topic path check (P113 G2). Every
+// call site passes what="read" regardless of its own actual op — a pre-existing quirk kept as-is,
+// out of this finding's scope. RequirePath's exact-length match also newly rejects a topic path
+// with trailing segments past the root, which the old len==0 check silently allowed through: a topic
+// is a tree leaf (Children never reports children for one), so no real caller ever sends a deeper
+// path here.
 func (a *Adapter) resolveTopicTarget(path model.NodePath, what string) (string, error) {
-	if len(path.Segments) == 0 || path.Segments[0].Kind != "topic" {
-		return "", adapters.New(adapters.CodeNotFound,
-			what+" requires a topic path, got: "+model.EncodePath(path.Segments), nil)
+	segs, err := adapters.RequirePath(path, what, adapters.Seg("topic"))
+	if err != nil {
+		return "", err
 	}
-	return path.Segments[0].Name, nil
+	return segs[0].Name, nil
 }
 
 // Read is index.ts's read.

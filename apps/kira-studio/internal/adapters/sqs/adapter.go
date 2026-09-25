@@ -152,11 +152,16 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 	return nil, adapters.Unsupported("sqs", "schemaColumns")
 }
 
+// resolveQueueTarget is Definition/Read/Count/Preview/Mutate's shared single-queue path check
+// (P113 G2). The message text stays hardcoded to "read" regardless of the actual caller, a
+// pre-existing quirk kept as-is. A queue is a tree leaf, so RequirePath's exact-length match (vs.
+// the old check's mere non-emptiness) changes nothing for any real caller.
 func (a *Adapter) resolveQueueTarget(path model.NodePath) (string, error) {
-	if len(path.Segments) == 0 || path.Segments[0].Kind != "queue" {
-		return "", adapters.New(adapters.CodeNotFound, "read requires a queue path, got: "+model.EncodePath(path.Segments), nil)
+	segs, err := adapters.RequirePath(path, "read", adapters.Seg("queue"))
+	if err != nil {
+		return "", err
 	}
-	return path.Segments[0].Name, nil
+	return segs[0].Name, nil
 }
 
 // Definition is index.ts's definition.
