@@ -17,21 +17,28 @@ func init() {
 	})
 }
 
+// connState is db/file/readOnly (F3): Connect/Disconnect wrote them with no lock despite an
+// earlier version of this comment's own claim, racing runOnConn's own reads (a.db == nil,
+// a.db.Conn(ctx)) and Mutate's a.readOnly read — a real data race, same class as
+// postgres/mysqlfamily/clickhouse's own adapter.go. Guarded together via adapters.Guarded (P113
+// G1), separately from runningByOp below (its own mutex, an unrelated concern: op-cancellation
+// bookkeeping, not connection state, and every access to it was already its own atomic
+// lock/unlock, never combined with a connState field in one critical section).
+type connState struct {
+	db       *sql.DB
+	file     string
+	readOnly bool
+}
+
 // Adapter is index.ts's SqliteAdapter — P35 D17/D18: stands alone, no "family" pattern (that
 // exists in mysqlfamily/ because two engines share one wire protocol and one driver, P34 D7).
 // SQLite shares neither with anything.
 type Adapter struct {
 	deps adapters.Deps
 
-	// mu guards db/file/readOnly (F3) in addition to runningByOp below: Connect/Disconnect wrote
-	// them with no lock despite this comment's own earlier claim, racing runOnConn's own reads
-	// (a.db == nil, a.db.Conn(ctx)) and Mutate's a.readOnly read — a real data race, same class as
-	// postgres/mysqlfamily/clickhouse's own adapter.go.
-	mu       sync.Mutex
-	db       *sql.DB
-	file     string
-	readOnly bool
+	state adapters.Guarded[connState]
 
+	mu          sync.Mutex
 	runningByOp map[string]context.CancelFunc
 
 	// inFlight mirrors postgres's and mysqlfamily's own field of the same name: it counts
@@ -45,36 +52,21 @@ type Adapter struct {
 func (a *Adapter) Kind() string        { return "sqlite" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
 
-// getDB is runOnConn's own locked read of a.db (F3).
-func (a *Adapter) getDB() *sql.DB {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.db
-}
+// getDB is runOnConn's own locked read of state.db (F3).
+func (a *Adapter) getDB() *sql.DB { return a.state.Load().db }
 
 // setConnected is Connect's own locked write of db/file/readOnly together (F3).
 func (a *Adapter) setConnected(db *sql.DB, file string, readOnly bool) {
-	a.mu.Lock()
-	a.db = db
-	a.file = file
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.db = db; s.file = file; s.readOnly = readOnly })
 }
 
-// clearConnected is Disconnect's own locked write (F3).
+// clearConnected is Disconnect's own locked write (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.db = nil
-	a.file = ""
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.db = nil; s.file = "" })
 }
 
-// getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+// getReadOnly is Mutate's own locked read of state.readOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // Connect is index.ts's connect.
 func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
