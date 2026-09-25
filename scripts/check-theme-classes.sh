@@ -262,6 +262,16 @@ check_kui_class 'kui-segmented-badge' 'kv: utilities on KuiSegmented.vue'
 check_class 'animate-kira-spin' 'animate-spin'
 check_class_in_attrs 'codicon-modifier-spin' 'kv:inline-block kv:animate-spin' "$GIT_UI_SRC $KIRA_UI_SRC"
 
+# P110 I2-10/11: the "nothing here yet" panel, folded into the shared Empty/EmptyMedia/EmptyTitle/
+# EmptyDescription components (packages/theme/src/components/ui/empty/, a shadcn-vue registry
+# fetch). `empty-state` itself is attribute-scoped: several files carry a legitimate prose comment
+# naming the retired class for history (KeyValuePane.vue, BrowseView.vue,
+# api-ui-consistency.spec.ts, scroll-trace.spec.ts) -- a whole-file check_class would false-positive
+# on those. `-icon`/`-title` have zero such survivors, so a plain check_class is enough for them.
+check_class_in_attrs 'empty-state' 'Empty (packages/theme/src/components/ui/empty)'
+check_class 'empty-state-icon' 'EmptyMedia'
+check_class 'empty-state-title' 'EmptyTitle'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

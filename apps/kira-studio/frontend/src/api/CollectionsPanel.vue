@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -231,15 +231,13 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
-    <div v-else class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 p-4 text-center">
+    <div v-else class="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 p-4 text-center">
       <ImportReportStrip />
-      <Alert class="empty-state" data-testid="collections-empty">
-        <CodiconIcon name="folder-library" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No collections yet</AlertTitle>
-        <span class="text-kira-xs text-subtle leading-normal"
-          >Create one from the <b>+</b> above, or import a Postman collection.</span
-        >
-      </Alert>
+      <Empty data-testid="collections-empty">
+        <EmptyMedia><CodiconIcon name="folder-library" :size="24" /></EmptyMedia>
+        <EmptyTitle>No collections yet</EmptyTitle>
+        <EmptyDescription>Create one from the <b>+</b> above, or import a Postman collection.</EmptyDescription>
+      </Empty>
     </div>
   </div>
 </template>

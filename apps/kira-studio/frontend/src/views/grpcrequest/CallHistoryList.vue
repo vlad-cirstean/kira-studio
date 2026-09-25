@@ -5,9 +5,10 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
   InputGroup,
   InputGroupAddon,
@@ -108,12 +109,10 @@ async function onClear(): Promise<void> {
     <Alert v-if="rt?.error" variant="destructive">
       <AlertDescription>{{ rt.error }}</AlertDescription>
     </Alert>
-    <Alert v-else-if="entries.length === 0" class="empty-state">
-      <CodiconIcon name="history" :size="24" class="empty-state-icon" />
-      <AlertTitle class="empty-state-title">
-        {{ incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet' }}
-      </AlertTitle>
-    </Alert>
+    <Empty v-else-if="entries.length === 0">
+      <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
+      <EmptyTitle>{{ incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet' }}</EmptyTitle>
+    </Empty>
 
     <template v-else>
       <InputGroup>
@@ -127,14 +126,13 @@ async function onClear(): Promise<void> {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <Alert
+      <Empty
         v-if="isFiltered && filteredEntries.length === 0"
-        class="empty-state"
         data-testid="grpc-history-filter-empty"
       >
-        <CodiconIcon name="search" :size="24" class="empty-state-icon" />
-        <AlertTitle class="empty-state-title">No matches</AlertTitle>
-      </Alert>
+        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+        <EmptyTitle>No matches</EmptyTitle>
+      </Empty>
     </template>
 
     <div
@@ -202,7 +200,4 @@ async function onClear(): Promise<void> {
 .history-row.is-viewing {
   @apply bg-hover;
 }
-
-/* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared
-   across ResponsePane/SchemaBrowser/CallHistoryList, `.empty-state` a 15-file duplicate). */
 </style>

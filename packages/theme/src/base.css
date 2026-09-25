@@ -162,37 +162,10 @@
    unlayered `.virtual-row`/`.sticky-row` scoped rule instead -- byte-identical declarations,
    just no longer shared, so no consuming file can ever lose this fight to another unlayered rule. */
 
-/* The "nothing here yet" panel shape -- byte-identical across 15 files (KeyValuePane,
-   RawExchangePane, CookiesPane, ResponseHistoryList, both request kinds' ResponsePane,
-   TimelinePane, SchemaBrowser, CallHistoryList, VariableHistoryMenu, VariablesOverviewPanel,
-   VariableSetView, EnvironmentsView, CollectionsPanel, DynamicValuesDialog). api-ui-consistency.
-   spec.ts polls `.empty-state` by class, so the name stays. */
-@utility empty-state {
-  display: flex;
-  min-height: 0px;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--spacing) * 2);
-  border-style: var(--tw-border-style);
-  border-width: 0px;
-  background-color: transparent;
-  text-align: center;
-}
-
-/* The gRPC empty-state's own icon/title dress-up -- identical across ResponsePane/SchemaBrowser/
-   CallHistoryList (grpcrequest/**). Values real-compile-verified against `text-subtle`/
-   `text-muted-foreground text-kira-md font-normal` (the classes each file's own rule `@apply`ed). */
-@utility empty-state-icon {
-  color: var(--color-subtle);
-}
-@utility empty-state-title {
-  font-size: var(--text-kira-md);
-  color: var(--muted-foreground);
-  --tw-font-weight: var(--font-weight-normal);
-  font-weight: var(--font-weight-normal);
-}
+/* P110 I2-10/11: `.empty-state`/`-icon`/`-title` (the 15-file duplicate above) retired -- every
+   consumer now uses the shared `Empty`/`EmptyMedia`/`EmptyTitle`/`EmptyDescription` components
+   (packages/theme/src/components/ui/empty/, a shadcn-vue registry fetch). Guarded in
+   check-theme-classes.sh so neither name comes back. */
 
 /* A tree row shell -- CollectionRow.vue/project/TreeRow.vue's own `.tree-row` base declarations
    (real-compile-verified equal: `gap-1`==`--kira-s-2`, `pr-2`==`--kira-s-4`, `h-row`==

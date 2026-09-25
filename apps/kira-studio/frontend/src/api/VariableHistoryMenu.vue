@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatRelative } from '@workbench/util/format';
@@ -35,14 +35,13 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 <template>
   <PopoverContent align="start" class="w-72 gap-0 p-0" data-testid="variable-history">
     <div class="flex max-h-80 flex-col overflow-auto p-1">
-      <Alert
+      <Empty
         v-if="variableSetStore.entries.length === 0"
-        class="empty-state"
         data-testid="variable-history-empty"
       >
-        <CodiconIcon name="history" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No previous values</AlertTitle>
-      </Alert>
+        <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
+        <EmptyTitle>No previous values</EmptyTitle>
+      </Empty>
       <div
         v-for="entry in variableSetStore.entries"
         :key="entry.id"

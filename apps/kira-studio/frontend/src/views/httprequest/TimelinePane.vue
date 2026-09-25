@@ -2,8 +2,9 @@
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
@@ -309,18 +310,18 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </div>
     </template>
 
-    <Alert v-else-if="response" class="empty-state" data-testid="http-timeline-empty">
-      <CodiconIcon name="watch" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No timeline for this response</AlertTitle>
-    </Alert>
-    <Alert v-else-if="rt?.status === 'error'" class="empty-state" data-testid="http-timeline-empty">
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">This request failed before any timeline was captured</AlertTitle>
-    </Alert>
-    <Alert v-else class="empty-state">
-      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
-    </Alert>
+    <Empty v-else-if="response" data-testid="http-timeline-empty">
+      <EmptyMedia><CodiconIcon name="watch" :size="24" /></EmptyMedia>
+      <EmptyTitle>No timeline for this response</EmptyTitle>
+    </Empty>
+    <Empty v-else-if="rt?.status === 'error'" data-testid="http-timeline-empty">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This request failed before any timeline was captured</EmptyTitle>
+    </Empty>
+    <Empty v-else>
+      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+      <EmptyTitle>Send a request to see the response</EmptyTitle>
+    </Empty>
   </div>
 </template>
 
@@ -332,6 +333,4 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 .hop-phase[data-present='false'] {
   @apply opacity-60;
 }
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

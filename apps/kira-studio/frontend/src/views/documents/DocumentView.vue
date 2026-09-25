@@ -6,6 +6,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
@@ -984,11 +985,7 @@ onUnmounted(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
          — the part that actually needs a live connection — swaps for the gate. -->
-    <div
-      v-if="needsReconnect"
-      class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
-      data-testid="document-reconnect"
-    >
+    <Empty v-if="needsReconnect" data-testid="document-reconnect">
       <Button
         variant="dialog-primary"
         size="kira-lg"
@@ -997,7 +994,7 @@ onUnmounted(() => {
       >
         Reconnect & load
       </Button>
-    </div>
+    </Empty>
     <template v-else>
     <div v-if="creatingNew" class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated" data-testid="document-new">
       <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />

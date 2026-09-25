@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import {
   InputGroup,
@@ -359,18 +360,17 @@ useEventListener(listEl, 'dragend', onDragEnd);
             <TooltipContent>Delete</TooltipContent>
           </Tooltip>
         </div>
-        <Alert v-if="variablesStore.environments.length === 0" class="empty-state" data-testid="environments-empty">
-          <CodiconIcon name="server-environment" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No environments yet</AlertTitle>
-        </Alert>
-        <Alert
+        <Empty v-if="variablesStore.environments.length === 0" data-testid="environments-empty">
+          <EmptyMedia><CodiconIcon name="server-environment" :size="24" /></EmptyMedia>
+          <EmptyTitle>No environments yet</EmptyTitle>
+        </Empty>
+        <Empty
           v-else-if="isFiltered && displayEnvironments.length === 0"
-          class="empty-state"
           data-testid="environments-filter-empty"
         >
-          <CodiconIcon name="search" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
-        </Alert>
+          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+          <EmptyTitle>No matches</EmptyTitle>
+        </Empty>
     </div>
   </div>
 </template>

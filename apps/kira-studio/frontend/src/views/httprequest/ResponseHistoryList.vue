@@ -5,10 +5,10 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
   InputGroup,
   InputGroupAddon,
@@ -139,10 +139,10 @@ async function onClear(): Promise<void> {
       </Button>
     </div>
 
-    <Alert v-if="entries.length === 0" class="empty-state" data-testid="http-history-empty">
-      <CodiconIcon name="history" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">No past responses yet</AlertTitle>
-      <span class="text-kira-xs text-subtle mt-0.5">
+    <Empty v-if="entries.length === 0" data-testid="http-history-empty">
+      <EmptyMedia><CodiconIcon name="history" :size="24" /></EmptyMedia>
+      <EmptyTitle>No past responses yet</EmptyTitle>
+      <EmptyDescription>
         <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
         <template v-else>
           Sending this request will record one.
@@ -151,8 +151,8 @@ async function onClear(): Promise<void> {
             keep it.
           </template>
         </template>
-      </span>
-    </Alert>
+      </EmptyDescription>
+    </Empty>
 
     <template v-else>
       <InputGroup>
@@ -164,14 +164,13 @@ async function onClear(): Promise<void> {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <Alert
+      <Empty
         v-if="isFiltered && filteredEntries.length === 0"
-        class="empty-state"
         data-testid="http-history-filter-empty"
       >
-        <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
-      </Alert>
+        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+        <EmptyTitle>No matches</EmptyTitle>
+      </Empty>
     </template>
 
     <div
@@ -255,5 +254,4 @@ async function onClear(): Promise<void> {
 .history-row.is-viewing {
   @apply bg-hover;
 }
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

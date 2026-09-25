@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
   InputGroup,
   InputGroupAddon,
@@ -470,10 +471,10 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      <Alert v-else class="empty-state">
-        <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
-      </Alert>
+      <Empty v-else>
+        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+        <EmptyTitle>Send a request to see the response</EmptyTitle>
+      </Empty>
     </div>
     <RawExchangePane
       v-else-if="tab.state.responsePane === 'raw'"
@@ -502,9 +503,9 @@ onUnmounted(() => {
           :range-highlights="bodyHighlights"
         />
       </template>
-      <Alert v-else class="empty-state">
-        <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
+      <Empty v-else>
+        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+        <EmptyTitle>Send a request to see the response</EmptyTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -514,7 +515,7 @@ onUnmounted(() => {
         >
           {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
         </button>
-      </Alert>
+      </Empty>
     </div>
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
@@ -531,5 +532,4 @@ onUnmounted(() => {
 .pane-jump-link:hover {
   @apply text-fg;
 }
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

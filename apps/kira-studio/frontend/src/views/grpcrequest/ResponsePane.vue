@@ -7,9 +7,10 @@ import {
 } from '@shared/domain/grpc';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -465,9 +466,9 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <Alert v-if="messages.length === 0" class="empty-state" variant="default">
-        <CodiconIcon name="arrow-right" :size="24" class="empty-state-icon" />
-        <AlertTitle class="empty-state-title">Call this method to see its response</AlertTitle>
+      <Empty v-if="messages.length === 0">
+        <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+        <EmptyTitle>Call this method to see its response</EmptyTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -477,7 +478,7 @@ onUnmounted(() => {
         >
           {{ historyCount }} past call{{ historyCount === 1 ? '' : 's' }} · View history
         </button>
-      </Alert>
+      </Empty>
     </div>
 
     <!-- D14: docked below the pane it searches (LAW 03), mirroring HTTP's own ResponsePane.vue. -->
@@ -501,6 +502,4 @@ onUnmounted(() => {
   @apply bg-hover;
 }
 
-/* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared
-   across ResponsePane/SchemaBrowser/CallHistoryList, `.empty-state` a 15-file duplicate). */
 </style>

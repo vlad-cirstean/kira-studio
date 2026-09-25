@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import {
   InputGroup,
@@ -244,20 +245,17 @@ function selectMethod(service: string, method: string): void {
           </button>
         </div>
       </template>
-      <Alert
+      <Empty
         v-else-if="isFiltered && rt?.schema && rt.schema.services.length > 0"
-        class="empty-state"
         data-testid="grpc-schema-filter-empty"
       >
-        <CodiconIcon name="search" :size="24" class="empty-state-icon" />
-        <AlertTitle class="empty-state-title">No matches</AlertTitle>
-      </Alert>
-      <Alert v-else-if="rt?.status !== 'loading'" class="empty-state">
-        <CodiconIcon name="symbol-interface" :size="24" class="empty-state-icon" />
-        <AlertTitle class="empty-state-title">
-          Choose a source above to browse this server's services
-        </AlertTitle>
-      </Alert>
+        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+        <EmptyTitle>No matches</EmptyTitle>
+      </Empty>
+      <Empty v-else-if="rt?.status !== 'loading'">
+        <EmptyMedia><CodiconIcon name="symbol-interface" :size="24" /></EmptyMedia>
+        <EmptyTitle>Choose a source above to browse this server's services</EmptyTitle>
+      </Empty>
     </div>
   </div>
 </template>

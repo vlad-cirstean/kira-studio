@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
   InputGroup,
   InputGroupAddon,
@@ -89,15 +89,15 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 
 <template>
   <div v-if="mode === 'request'" class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-request-cookies">
-    <Alert v-if="disableCookieJar" class="empty-state" data-testid="http-cookies-jar-off">
-      <CodiconIcon name="circle-slash" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">
+    <Empty v-if="disableCookieJar" data-testid="http-cookies-jar-off">
+      <EmptyMedia><CodiconIcon name="circle-slash" :size="24" /></EmptyMedia>
+      <EmptyTitle>
         The cookie jar is off for this request
-      </AlertTitle>
+      </EmptyTitle>
       <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
         Edit global defaults…
       </button>
-    </Alert>
+    </Empty>
     <template v-else>
       <div class="flex items-center gap-1">
         <InputGroup>
@@ -152,11 +152,11 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </Tooltip>
         </div>
       </div>
-      <Alert v-else class="empty-state" data-testid="http-cookies-empty">
-        <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No cookies for this request's URL</AlertTitle>
+      <Empty v-else data-testid="http-cookies-empty">
+        <EmptyMedia><CodiconIcon name="symbol-key" :size="24" /></EmptyMedia>
+        <EmptyTitle>No cookies for this request's URL</EmptyTitle>
         <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
-      </Alert>
+      </Empty>
     </template>
   </div>
 
@@ -196,14 +196,14 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
       </template>
-      <Alert v-else class="empty-state" data-testid="http-response-cookies-empty">
-        <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">This response carries no cookies</AlertTitle>
-      </Alert>
+      <Empty v-else data-testid="http-response-cookies-empty">
+        <EmptyMedia><CodiconIcon name="symbol-key" :size="24" /></EmptyMedia>
+        <EmptyTitle>This response carries no cookies</EmptyTitle>
+      </Empty>
     </template>
-    <Alert v-else class="empty-state">
-      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
-    </Alert>
+    <Empty v-else>
+      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+      <EmptyTitle>Send a request to see the response</EmptyTitle>
+    </Empty>
   </div>
 </template>

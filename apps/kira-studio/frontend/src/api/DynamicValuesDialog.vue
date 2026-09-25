@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyText } from '@workbench/util/clipboard';
@@ -97,14 +97,13 @@ function close(): void {
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
-      <Alert
+      <Empty
         v-if="isFiltered && filteredEntries.length === 0"
-        class="empty-state"
         data-testid="dynamic-values-filter-empty"
       >
-        <CodiconIcon name="search" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
-      </Alert>
+        <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+        <EmptyTitle>No matches</EmptyTitle>
+      </Empty>
       <Tooltip v-for="entry in filteredEntries" :key="entry.name">
         <TooltipTrigger as-child>
           <button

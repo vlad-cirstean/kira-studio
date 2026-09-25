@@ -38,9 +38,10 @@ import {
 } from '@shared/protocol/page';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle } from '@theme/components/ui/resizable';
@@ -781,11 +782,11 @@ onUnmounted(() => {
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
          renders its own header, same discipline every other main-tab view follows.
          P104 §3: ReconnectGate inlined (no library counterpart). -->
-    <Alert v-if="needsReconnect" class="empty-state" data-testid="keyvalue-reconnect">
+    <Empty v-if="needsReconnect" data-testid="keyvalue-reconnect">
       <Button variant="dialog-primary" size="kira-lg" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
         Reconnect &amp; load
       </Button>
-    </Alert>
+    </Empty>
     <template v-else>
       <div v-if="page" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="keyvalue-badges">
         <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
@@ -1078,19 +1079,18 @@ onUnmounted(() => {
              scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches
              above never needed to scroll either. -->
         <div class="flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="keyvalue-list">
-          <Alert v-if="!rt || rt.rowCount === 0" class="empty-state">
-            <CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ rt ? 'No data' : 'Loading…' }}</AlertTitle>
-          </Alert>
+          <Empty v-if="!rt || rt.rowCount === 0">
+            <EmptyMedia><CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" /></EmptyMedia>
+            <EmptyTitle>{{ rt ? 'No data' : 'Loading…' }}</EmptyTitle>
+          </Empty>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
-          <Alert
+          <Empty
             v-else-if="displayRows && displayRows.length === 0"
-            class="empty-state"
             data-testid="keyvalue-no-matching-rows"
           >
-            <CodiconIcon name="search" :size="24" class="text-subtle" />
-            <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matching rows</AlertTitle>
+            <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+            <EmptyTitle>No matching rows</EmptyTitle>
             <Button
               variant="toolbar"
               size="kira"
@@ -1099,7 +1099,7 @@ onUnmounted(() => {
             >
               Show all rows
             </Button>
-          </Alert>
+          </Empty>
           <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against
                — this component owns it directly now, VirtualList.vue no longer wraps it. -->
           <div
@@ -1199,8 +1199,9 @@ onUnmounted(() => {
    here any more -- kept as bare marker classes (the shared vocabulary name cellClass.ts/
    DocumentRow.vue/ConsoleResultGrid.vue also use). The actual tint/text-colour is
    `bg-search-match[-current] text-bg` alongside on the same element (--color-search-match[-current]
-   already @theme-registered, base.css -- no new utility needed). `.empty-state` (template above)
-   moved to base.css's own @utility empty-state (15-file duplicate). */
+   already @theme-registered, base.css -- no new utility needed). P110 I2-10/11: the old
+   `.empty-state`/`-icon`/`-title` trio (a 15-file duplicate, once base.css's own @utility bundle)
+   is gone -- the template above now uses the shared `Empty`/`EmptyMedia`/`EmptyTitle` components. */
 .kv-row:hover {
   @apply bg-hover;
 }

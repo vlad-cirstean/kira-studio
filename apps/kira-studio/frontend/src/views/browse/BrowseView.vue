@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { ResizableHandle } from '@theme/components/ui/resizable';
 import {
@@ -406,15 +407,11 @@ onMounted(() => {
            the body — the part that actually needs a live connection — swaps for the gate.
            P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
            just the list — a disconnected connection means neither side has anything live to show. -->
-      <div
-        v-if="needsReconnect"
-        class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
-        data-testid="browse-reconnect"
-      >
+      <Empty v-if="needsReconnect" data-testid="browse-reconnect">
         <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
           Reconnect & load
         </Button>
-      </div>
+      </Empty>
       <SplitterGroup v-else direction="horizontal" class="browse-body">
         <SplitterPanel
           class="list-pane"

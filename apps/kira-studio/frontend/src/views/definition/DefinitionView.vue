@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
@@ -340,15 +341,11 @@ const breadcrumb = computed(() => {
          all) — every other view but the grid's DataView.vue did the same, the one inconsistency
          this fixes. The chrome above always renders; only the body — the part that actually needs
          a live connection — swaps for the gate. -->
-    <div
-      v-if="needsReconnect"
-      class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
-      data-testid="definition-reconnect"
-    >
+    <Empty v-if="needsReconnect" data-testid="definition-reconnect">
       <Button variant="dialog-primary" size="kira-lg" data-testid="definition-reconnect-load" @click="onReconnectAndLoad">
         Reconnect &amp; load
       </Button>
-    </div>
+    </Empty>
     <template v-else>
     <div v-if="pane === 'source'" class="flex-1 min-h-0">
       <MonacoHost

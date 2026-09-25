@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -99,22 +99,20 @@ function editEnvironmentVariables(): void {
       </InputGroup>
 
       <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
-        <Alert
+        <Empty
           v-if="isFiltered && filteredRows.length === 0"
-          class="empty-state"
           data-testid="variables-overview-empty"
         >
-          <CodiconIcon name="search" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No matches</AlertTitle>
-        </Alert>
-        <Alert
+          <EmptyMedia><CodiconIcon name="search" :size="24" /></EmptyMedia>
+          <EmptyTitle>No matches</EmptyTitle>
+        </Empty>
+        <Empty
           v-else-if="rows.length === 0"
-          class="empty-state"
           data-testid="variables-overview-empty"
         >
-          <CodiconIcon name="symbol-variable" :size="24" class="text-subtle" />
-          <AlertTitle class="text-kira-md text-muted-foreground font-normal">No variables in scope</AlertTitle>
-        </Alert>
+          <EmptyMedia><CodiconIcon name="symbol-variable" :size="24" /></EmptyMedia>
+          <EmptyTitle>No variables in scope</EmptyTitle>
+        </Empty>
         <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
              has no use for (handle, secret toggle, history, remove) -- name, value, scope,
              description, in the DOM order below. `description` is the last column specifically

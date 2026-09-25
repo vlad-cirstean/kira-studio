@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
+import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle } from '@theme/components/ui/resizable';
 import {
@@ -352,11 +353,7 @@ function onCloseSearch(): void {
 
     <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
       <SplitterPanel class="flex flex-col min-h-0" :order="1">
-        <div
-          v-if="needsReconnect"
-          class="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 text-subtle"
-          data-testid="reconnect-panel"
-        >
+        <Empty v-if="needsReconnect" data-testid="reconnect-panel">
           <Button
             variant="dialog-primary"
             size="kira-lg"
@@ -365,7 +362,7 @@ function onCloseSearch(): void {
           >
             Reconnect & load
           </Button>
-        </div>
+        </Empty>
         <template v-else>
           <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
                that started it (RunState, above), never a bar across the top of the view — §8.5's

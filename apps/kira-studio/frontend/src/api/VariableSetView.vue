@@ -2,8 +2,9 @@
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import {
   InputGroup,
@@ -509,10 +510,10 @@ function onBulkClose(): void {
       </div>
     </div>
 
-    <Alert v-if="ownersLoaded && !ownerExists" class="empty-state" data-testid="variable-set-orphan">
-      <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">This variable set no longer exists</AlertTitle>
-    </Alert>
+    <Empty v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan">
+      <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>
+      <EmptyTitle>This variable set no longer exists</EmptyTitle>
+    </Empty>
     <BulkVariablesEditor
       v-else-if="bulkMode"
       :tab-id="tab.id"

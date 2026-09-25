@@ -2,8 +2,9 @@
 import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
@@ -271,14 +272,14 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
     </template>
 
     <template v-else-if="emptyLabel">
-      <Alert class="empty-state">
-        <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
-        <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyLabel }}</AlertTitle>
-      </Alert>
+      <Empty>
+        <EmptyMedia><CodiconIcon name="file-binary" :size="24" /></EmptyMedia>
+        <EmptyTitle>{{ emptyLabel }}</EmptyTitle>
+      </Empty>
     </template>
-    <Alert v-else class="empty-state">
-      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md text-muted-foreground font-normal">Send a request to see the response</AlertTitle>
-    </Alert>
+    <Empty v-else>
+      <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
+      <EmptyTitle>Send a request to see the response</EmptyTitle>
+    </Empty>
   </div>
 </template>
