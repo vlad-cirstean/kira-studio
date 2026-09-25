@@ -2605,15 +2605,21 @@ let lastPendingRows = new Set<number>();
 // `pendingFor(tabId)?.edits`/`.deletes` are a reactive Map/Set (pendingChanges.ts's own
 // `pendingState`, a Vue `reactive()`), so both track reactively without a reference-identity trap
 // the way the TabPending object itself would be (created once per tab, mutated in place, never
-// reassigned). The signature is row -> staged *column count* / delete flag, not values:
-// refreshStagedLayer only needs to know *which* cells are staged, never what they hold, so a
-// same-column value edit (no key added/removed) correctly does not re-trigger this.
+// reassigned). The signature must be value-aware, not just row -> staged column count: this same
+// watch also drives the `grid.invalidateRow()`/`grid.render()` call below, which repaints the
+// cell's *text* (via `dataItemColumnValueExtractor`, C8's own comment), not only the
+// `kira-staged` CSS layer. Re-editing an already-staged cell with a new value (same column, so
+// the key count is unchanged) is a Map `.set()` on an existing key — Vue still re-runs this
+// getter, but a count-only signature comes back byte-identical, so `watch()`'s equality check
+// skips the callback and the grid keeps showing the previous staged value forever. Keying on
+// `JSON.stringify(edit.changes)` instead makes any staged-value change, not just a staged-key
+// change, produce a different signature.
 watch(
   () => {
     const p = pendingChangesStore.pendingFor(props.tabId);
     if (!p) return '';
     let sig = '';
-    for (const [row, edit] of p.edits) sig += `e${row}:${Object.keys(edit.changes).length};`;
+    for (const [row, edit] of p.edits) sig += `e${row}:${JSON.stringify(edit.changes)};`;
     for (const row of p.deletes) sig += `d${row};`;
     return sig;
   },
