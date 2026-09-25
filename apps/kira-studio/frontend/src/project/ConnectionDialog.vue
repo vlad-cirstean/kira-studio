@@ -677,8 +677,9 @@ const preconnectText = computed({
           <Tooltip v-for="kind in filteredKinds" :key="kind">
             <TooltipTrigger as-child>
               <label
-                class="kind relative flex flex-col items-start gap-1 py-3 px-2 border border-border rounded-kira bg-bg cursor-pointer text-left text-inherit"
-                :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
+                class="relative flex flex-col items-start gap-1 py-3 px-2 border rounded-kira bg-bg cursor-pointer text-left text-inherit not-data-[off]:hover:bg-hover not-data-[off]:hover:border-border-strong focus-within:border-focus data-[off]:opacity-40 data-[off]:cursor-default"
+                :class="draft.kind === kind ? 'border-focus' : 'border-border'"
+                :data-off="!SUPPORTED_KINDS.has(kind)"
               >
                 <input
                   type="radio"
@@ -1432,42 +1433,11 @@ const preconnectText = computed({
         </div>
       </DialogFooter>
     </DialogContent>
+    <!-- P110 I2-18: the `.kind` hover/selected/focus-within/off compound rules (previously kept as
+         scoped CSS -- see this file's own P110 B35/B37 history) folded into the tile's own classes
+         above: `not-data-[off]:hover:` and `data-[off]:` variants off a `data-off` attribute
+         (compile-verified), `focus-within:border-focus`, and a `draft.kind === kind` ternary for the
+         selected/default border color (kept out of the static class list, alongside the hover/
+         focus-within variants, to avoid a same-group static-vs-conditional fight). -->
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B35: every raw-declaration rule this file had (title-mid, engine-mark, engine-body,
-   field/field-row/field.checkbox and its name-field/port-field/color-field/mask-rule-flag
-   variants, size-input, password-row/-input, p-tab-strip, tab-pane, uri-note, min-version-note,
-   helper-text, field-error, credential-note, preconnect-warning, test-area, test-chip, kind-grid,
-   kind-ic, kind-name, mask-rule-list/-row/-target/-add) moved onto the template elements
-   themselves as Tailwind utilities (audit §3.7's own mapping table) -- each is a one-off, single-
-   file class, so it converts in place rather than becoming a shared `@utility`. `.field > label`'s
-   own two declarations (text-kira-sm text-muted-foreground) now sit directly on every `<Label>`
-   that used to inherit them from that descendant rule.
-
-   `.kind`'s own base declarations (position/padding/border/rounded/bg/flex layout/cursor) moved
-   the same way; `font: inherit`/`text-align: left`/`color: inherit` were dropped rather than
-   ported -- the label has no direct text of its own (only a form control plus two spans that set
-   their own font-size), so all three were no-ops. `.kind` itself stays as a bare marker class:
-   the three rules below are real conditional CSS (a hover exclusion, a compound selected/focus-
-   within selector, an off-state), not mechanically reducible to per-element utility classes on the
-   template without changing which one wins on the shared `background`/`border-color` properties --
-   the SELECTORS stay as scoped, unlayered CSS exactly as before. P110 B37: their own declarations
-   still convert to @apply in place, though (same selectors, same source order, no cascade change --
-   @apply only substitutes the property value's own syntax). */
-.kind:hover:not(.is-off) {
-  @apply bg-hover border-border-strong;
-}
-
-.kind.is-selected,
-.kind:focus-within {
-  @apply border-focus;
-}
-
-.kind.is-off {
-  @apply opacity-40 cursor-default;
-}
-</style>
