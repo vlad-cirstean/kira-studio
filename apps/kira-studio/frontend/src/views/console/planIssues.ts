@@ -80,3 +80,26 @@ export function rawFieldMetrics(
   }
   return out;
 }
+
+/** P113 F10: mysql.ts and mariadb.ts each pushed this identical D15 full-scan/unused-index pair
+ *  onto a table node — same two rules, same messages; every other raw field (mysql.ts's own
+ *  `cost_info` metric expansion included) stays per-engine, since only this fragment matched. */
+export function pushIndexIssues(
+  node: PlanNode,
+  table: { access_type?: string; possible_keys?: string[]; key?: string },
+): void {
+  if (table.access_type === 'ALL') {
+    node.issues.push({
+      severity: 'warn',
+      code: 'full-scan',
+      message: `full table scan on "${node.relation ?? '?'}" — no index was used`,
+    });
+  }
+  if (table.possible_keys && table.possible_keys.length > 0 && !table.key) {
+    node.issues.push({
+      severity: 'warn',
+      code: 'unused-index',
+      message: `"${node.relation ?? '?'}" has an index (${table.possible_keys.join(', ')}) the planner did not choose`,
+    });
+  }
+}

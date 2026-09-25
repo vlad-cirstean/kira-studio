@@ -1,6 +1,7 @@
 import {
   isOverThreshold,
   maxEstimatedRows,
+  pushIndexIssues,
   pushWideScanIssue,
   rawFieldMetrics,
   rollupIssues,
@@ -64,22 +65,8 @@ function tableNode(table: RawTable, scans: ScanEstimate[]): PlanNode {
     children: [],
   };
 
-  // D15: full scan.
-  if (table.access_type === 'ALL') {
-    node.issues.push({
-      severity: 'warn',
-      code: 'full-scan',
-      message: `full table scan on "${node.relation ?? '?'}" — no index was used`,
-    });
-  }
-  // D15: an index existed and was not chosen.
-  if (table.possible_keys && table.possible_keys.length > 0 && !table.key) {
-    node.issues.push({
-      severity: 'warn',
-      code: 'unused-index',
-      message: `"${node.relation ?? '?'}" has an index (${table.possible_keys.join(', ')}) the planner did not choose`,
-    });
-  }
+  // D15: full scan / unused index.
+  pushIndexIssues(node, table);
 
   if (node.estimatedRows !== undefined) scans.push({ node, rows: node.estimatedRows });
   return node;

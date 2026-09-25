@@ -1,6 +1,7 @@
 import {
   isOverThreshold,
   maxEstimatedRows,
+  pushIndexIssues,
   pushWideScanIssue,
   rollupIssues,
   tableLabel,
@@ -86,22 +87,8 @@ function tableNode(table: RawTable, thresholdRows: number, scans: ScanEstimate[]
     children: [],
   };
 
-  // D15: full scan.
-  if (table.access_type === 'ALL') {
-    node.issues.push({
-      severity: 'warn',
-      code: 'full-scan',
-      message: `full table scan on "${node.relation ?? '?'}" — no index was used`,
-    });
-  }
-  // D15: an index existed and was not chosen.
-  if (table.possible_keys && table.possible_keys.length > 0 && !table.key) {
-    node.issues.push({
-      severity: 'warn',
-      code: 'unused-index',
-      message: `"${node.relation ?? '?'}" has an index (${table.possible_keys.join(', ')}) the planner did not choose`,
-    });
-  }
+  // D15: full scan / unused index.
+  pushIndexIssues(node, table);
   // D15: filesort, when the flag sits on the table itself rather than an ordering_operation
   // wrapper (both are real shapes — see D15's own table).
   if (table.using_filesort) {
