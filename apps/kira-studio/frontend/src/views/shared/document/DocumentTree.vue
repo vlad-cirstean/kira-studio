@@ -81,14 +81,9 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 .document-tree {
   /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
      the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
-     accounting (rows.ts) is untouched. */
-  @apply overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)];
-  scrollbar-width: none;
-  padding: var(--kira-s-2) 0;
-}
-
-.document-tree::-webkit-scrollbar {
-  @apply hidden;
+     accounting (rows.ts) is untouched. P110 B37: scrollbar-width: none + the ::-webkit-scrollbar
+     rule become scrollbar-none; padding: var(--kira-s-2) 0 (4px vertical) becomes py-1. */
+  @apply overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)] scrollbar-none py-1;
 }
 
 .tree-line {
@@ -106,8 +101,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 }
 
 .tree-key {
-  @apply shrink-0;
-  color: var(--kira-syntax-property);
+  @apply shrink-0 text-syntax-property;
 }
 
 .tree-value {
@@ -121,18 +115,18 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 }
 
 .tok-string {
-  color: var(--kira-syntax-string);
+  @apply text-syntax-string;
 }
 
 .tok-number {
-  color: var(--kira-syntax-number);
+  @apply text-syntax-number;
 }
 
 .tok-keyword {
-  color: var(--kira-syntax-keyword);
+  @apply text-syntax-keyword;
 }
 
 .tok-bson {
-  color: var(--kira-syntax-function);
+  @apply text-syntax-function;
 }
 </style>

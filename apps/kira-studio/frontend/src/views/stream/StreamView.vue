@@ -1347,16 +1347,18 @@ onUnmounted(() => {
    deleted DataGrid.vue), replacing the inset bar so all four search-capable views agree.
    P110 B34: NOT converted to a template-level `bg-search-match[-current]` utility class like its
    3 siblings (KeyValuePane/DocumentRow/ConsoleResultGrid) -- `.stream-row:hover`/`.stream-row.
-   selected` above tie this rule's own specificity exactly, so today's unlayered same-block source
-   order (this rule wins on overlap) would flip to the *utility losing* to hover/selected if moved
-   out of this unlayered block. Left as its own raw-declaration rule for B37's own pass instead. */
+   selected` above tie this rule's own specificity exactly, so a template-level utility class would
+   drop into Tailwind's (layered) utilities layer, losing to the unlayered scoped hover/selected
+   rules regardless of specificity. P110 B37: `@apply bg-search-match`/`bg-search-match-current`
+   inside this same unlayered scoped rule instead -- @apply inlines the utility's own declarations
+   into this rule's existing cascade position, so source order (this rule still wins on overlap)
+   is unchanged from the raw `background: var(--kira-search-match*)` it replaces. */
 .stream-row.search-match {
-  background: var(--kira-search-match);
+  @apply bg-search-match;
 }
 
 .stream-row.search-match-current {
-  @apply text-bg;
-  background: var(--kira-search-match-current);
+  @apply text-bg bg-search-match-current;
 }
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */

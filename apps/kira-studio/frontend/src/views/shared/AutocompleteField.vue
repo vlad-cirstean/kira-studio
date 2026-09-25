@@ -606,6 +606,8 @@ const fieldAttrs = computed(
 </template>
 
 <style scoped>
+@reference "@theme/base.css";
+
 /* Paint-only and never scrolled by the user directly (see onInputScroll) — sized/positioned to sit
    exactly under the real `<input>` next to it, not the whole `.p-input` box (which may also carry a
    `prefix` span ahead of this wrapper). `kira-font-family` is a monospace stack, so the overlay's
@@ -613,22 +615,19 @@ const fieldAttrs = computed(
    of the two engines is laying out any given glyph — the one property this trick actually depends
    on. */
 .highlight-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  white-space: pre;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  line-height: normal;
-  background: transparent;
   /* The painted text sizes to its own one line of content, not to this inset:0 box — centering it
      here is what lines it up with the native input's own vertically-centered line box
      (`.input-wrap`'s own align-items: center) regardless of the current font-size setting.
      `onInputScroll` pans this element's own `scrollLeft`, so the overflowing (flex, non-shrinking)
      text content is what actually needs the horizontal scroll, not a nested child. */
-  display: flex;
-  align-items: center;
+  @apply absolute inset-0 pointer-events-none overflow-hidden whitespace-pre font-data text-kira-sm bg-transparent flex items-center;
+  /* line-height: normal stays raw, NOT leading-normal (P110 B37 declined despite the accepted B12
+     precedent elsewhere) -- Tailwind's leading-normal resolves to a fixed 1.5, not the CSS keyword
+     `normal`, and this rule's own comment above says line-height is "the one property this trick
+     actually depends on" for lining the overlay up with the real input's own line box; a fixed 1.5
+     is not proven identical to the browser/font's own `normal` metric here. Flagged, not pushed
+     past silently. */
+  line-height: normal;
 }
 
 /* Mirrors MonacoHost.vue's own identical rules — `classFor` (api/state/variableCompletion.ts)
@@ -657,9 +656,9 @@ const fieldAttrs = computed(
    `.highlight-overlay` above stays for every non-grow field, so no single-line field moves by a
    pixel. */
 .autocomplete-field.is-grow .highlight-overlay {
-  display: block;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  /* line-height: inherit has no allowlisted Tailwind equivalent (section 1.2's closed allowlist has
+     no leading-[inherit] entry) -- left raw, everything else moved to @apply. */
+  @apply block whitespace-pre-wrap wrap-anywhere;
   line-height: inherit;
 }
 
@@ -673,9 +672,6 @@ const fieldAttrs = computed(
    elements' first glyphs land on the same pixel; do not add a compensating offset. */
 .input-wrap input.has-overlay,
 .input-wrap textarea.has-overlay {
-  position: relative;
-  z-index: 1;
-  color: transparent;
-  caret-color: var(--kira-fg);
+  @apply relative z-1 text-transparent caret-fg;
 }
 </style>
