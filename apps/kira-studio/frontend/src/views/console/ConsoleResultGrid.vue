@@ -400,7 +400,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="group/row flex border-b border-border w-[var(--total-width)]"
+          class="group/row flex border-b border-border w-(--total-width)"
           data-testid="console-result-kv-row"
           :data-row="rowIndices[vi.index]"
           :class="VIRTUAL_ROW_CLASS"

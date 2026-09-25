@@ -228,7 +228,7 @@ function selectMethod(service: string, method: string): void {
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer w-full justify-between border-0 bg-none text-left font-[inherit]"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer w-full justify-between border-0 bg-none text-left"
             :class="(tab.state.service === svc.name && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"

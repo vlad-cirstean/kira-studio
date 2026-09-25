@@ -257,7 +257,7 @@ const secondText = computed<string>({
                reset to look like the <span> it replaces rather than a bordered control. -->
           <button
             type="button"
-            class="border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
+            class="border-0 bg-none rounded-kira-sm text-kira-sm text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
             data-testid="datetime-picker-month"
             @click="cycleMode"
           >
@@ -291,7 +291,7 @@ const secondText = computed<string>({
             v-for="cell in days"
             :key="`${cell.year}-${cell.month}-${cell.day}`"
             type="button"
-            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border bg-none font-[inherit] h-5.5"
+            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border bg-none h-5.5"
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
@@ -316,7 +316,7 @@ const secondText = computed<string>({
           v-for="(name, i) in MONTH_NAMES"
           :key="name"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none h-5.5"
           data-testid="datetime-picker-month-cell"
           :data-selected="i === viewMonth"
           :class="i === viewMonth ? 'bg-primary text-primary-foreground' : 'text-fg'"
@@ -330,7 +330,7 @@ const secondText = computed<string>({
           v-for="y in yearBlock"
           :key="y"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none h-5.5"
           data-testid="datetime-picker-year-cell"
           :data-selected="y === viewYear"
           :class="y === viewYear ? 'bg-primary text-primary-foreground' : 'text-fg'"

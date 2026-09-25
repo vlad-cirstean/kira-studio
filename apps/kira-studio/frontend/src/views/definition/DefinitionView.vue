@@ -310,7 +310,7 @@ const breadcrumb = computed(() => {
     </ViewToolbar>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
-      <AlertDescription><span class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]">{{ rt.error }}</span></AlertDescription>
+      <AlertDescription><span class="whitespace-pre-wrap font-data">{{ rt.error }}</span></AlertDescription>
     </Alert>
     <Alert
       v-if="pane === 'source' && definition && definition.notes.length > 0"

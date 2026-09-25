@@ -313,8 +313,8 @@ onUnmounted(() => {
         >
           <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
           <span class="font-data text-muted-foreground">{{ row.name }}</span>
-          <span class="font-data [overflow-wrap:anywhere]">{{ row.a ?? '—' }}</span>
-          <span class="font-data [overflow-wrap:anywhere]">{{ row.b ?? '—' }}</span>
+          <span class="font-data wrap-anywhere">{{ row.a ?? '—' }}</span>
+          <span class="font-data wrap-anywhere">{{ row.b ?? '—' }}</span>
         </div>
         <details v-if="unchangedHeaderRows.length > 0" class="group">
           <summary
@@ -330,8 +330,8 @@ onUnmounted(() => {
           >
             <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
             <span class="font-data text-muted-foreground">{{ row.name }}</span>
-            <span class="font-data [overflow-wrap:anywhere]">{{ row.a }}</span>
-            <span class="font-data [overflow-wrap:anywhere]">{{ row.b }}</span>
+            <span class="font-data wrap-anywhere">{{ row.a }}</span>
+            <span class="font-data wrap-anywhere">{{ row.b }}</span>
           </div>
         </details>
       </div>

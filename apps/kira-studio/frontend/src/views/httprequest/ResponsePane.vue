@@ -322,7 +322,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="text-kira-xs text-subtle cursor-pointer border-0 bg-none p-0 font-[inherit] hover:text-fg"
+              class="text-kira-xs text-subtle cursor-pointer border-0 bg-none p-0 hover:text-fg"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
@@ -431,7 +431,7 @@ onUnmounted(() => {
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="text-kira-xs text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 font-[inherit] hover:text-fg"
+          class="text-kira-xs text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 hover:text-fg"
           data-testid="http-redirects"
           @click="viewTimeline"
         >

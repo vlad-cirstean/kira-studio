@@ -435,7 +435,7 @@ onUnmounted(() => {
                  MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
-            <button type="button" class="box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer hover:bg-hover" @click="toggleExpanded(entry.m.seq)">
+            <button type="button" class="box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 text-fg h-5.5 cursor-pointer hover:bg-hover" @click="toggleExpanded(entry.m.seq)">
               <span class="text-kira-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
               <span class="text-kira-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">

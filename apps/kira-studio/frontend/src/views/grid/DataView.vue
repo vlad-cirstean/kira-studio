@@ -373,7 +373,7 @@ function onCloseSearch(): void {
             v-if="rt?.status === 'error' && rt.error"
             variant="destructive"
             data-testid="error-strip"
-            class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]"
+            class="whitespace-pre-wrap font-data"
           >
             <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.error.message }}</AlertDescription>
@@ -384,7 +384,7 @@ function onCloseSearch(): void {
             v-if="rt?.actionError"
             variant="destructive"
             data-testid="data-action-error"
-            class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]"
+            class="whitespace-pre-wrap font-data"
           >
             <CodiconIcon name="warning" :size="16" />
             <AlertDescription>{{ rt.actionError }}</AlertDescription>

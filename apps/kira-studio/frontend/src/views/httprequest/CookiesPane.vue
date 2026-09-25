@@ -134,7 +134,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
             <span class="wrap-anywhere font-data">{{ c.value }}</span>
-            <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">{{ attributeLine(c) }}</span>
+            <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-xs font-data">{{ attributeLine(c) }}</span>
           </div>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -170,7 +170,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
-                <span class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">
+                <span class="text-muted-foreground text-kira-xs font-data">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}
@@ -186,7 +186,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
-                <span class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">
+                <span class="text-muted-foreground text-kira-xs font-data">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}

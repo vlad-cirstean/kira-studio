@@ -594,7 +594,7 @@ const fieldAttrs = computed(
         side="bottom"
         align="start"
         :side-offset="4"
-        class="autocomplete-suggestions bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-x-hidden overflow-y-auto z-[var(--kira-z-autocomplete)] m-0 list-none font-data p-0.5 min-w-50 max-w-completion-max-w max-h-60"
+        class="autocomplete-suggestions bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-x-hidden overflow-y-auto z-(--kira-z-autocomplete) m-0 list-none font-data p-0.5 min-w-50 max-w-completion-max-w max-h-60"
         @mousedown.prevent
       >
         <ComboboxViewport>
@@ -619,7 +619,7 @@ const fieldAttrs = computed(
     <div
       v-if="hoverLines"
       ref="hoverPanelRef"
-      class="var-hover-panel bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed z-[var(--kira-z-autocomplete)] max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
+      class="var-hover-panel bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed z-(--kira-z-autocomplete) max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
       role="tooltip"
       data-testid="autocomplete-hover"
       :style="hoverStyle ?? undefined"
@@ -627,7 +627,7 @@ const fieldAttrs = computed(
       <div
         v-for="(line, i) in hoverLines"
         :key="i"
-        class="hover-line whitespace-pre-wrap [overflow-wrap:anywhere]"
+        class="hover-line whitespace-pre-wrap wrap-anywhere"
         :class="{ 'mt-0.5 text-muted-foreground': i > 0 }"
         >{{ line }}</div
       >

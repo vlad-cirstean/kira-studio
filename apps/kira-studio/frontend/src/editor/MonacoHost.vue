@@ -624,7 +624,7 @@ watch(
   >
     <pre
       v-if="pending"
-      class="m-0 font-[family-name:var(--kira-font-data)] text-[length:var(--kira-font-size)] text-fg bg-bg overflow-auto"
+      class="m-0 font-data text-kira-md text-fg bg-bg overflow-auto"
       :class="singleLine ? 'p-0 whitespace-pre' : 'py-2 px-0 whitespace-pre-wrap'"
       >{{ doc }}</pre
     >

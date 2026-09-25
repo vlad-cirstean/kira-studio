@@ -83,7 +83,7 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:bor
               <TooltipTrigger as-child>
                 <button
                   type="button"
-                  class="border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info hover:text-primary"
+                  class="border-0 bg-none p-0 cursor-pointer underline text-info hover:text-primary"
                   @click="onNavigate(c)"
                 >
                   {{ referencedTableName(c) }}

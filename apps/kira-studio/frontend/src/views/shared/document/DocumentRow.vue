@@ -59,7 +59,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
       >
         <CodiconIcon :name="expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
       </button>
-      <span class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)]" data-testid="document-id">{{ view.idLabel }}</span>
+      <span class="shrink-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-data" data-testid="document-id">{{ view.idLabel }}</span>
       <Badge data-testid="document-field-count">{{ view.fieldCount }} fields</Badge>
       <Badge data-testid="document-byte-badge">{{ view.byteLabel }}</Badge>
       <Tooltip v-if="view.isTruncated">

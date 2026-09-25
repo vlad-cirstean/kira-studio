@@ -571,7 +571,7 @@ const statusLine = computed(() => {
                    duplicate needed. -->
               <button
                 type="button"
-                :class="[nativeSelectVariants({ variant: 'bordered' }), 'max-w-40 font-[family-name:var(--kira-font-ui)]']"
+                :class="[nativeSelectVariants({ variant: 'bordered' }), 'max-w-40 font-ui']"
                 data-testid="cell-editor-format"
                 :disabled="isNullValue"
                 @click="openFormatMenu"
@@ -618,7 +618,7 @@ const statusLine = computed(() => {
                   <TooltipTrigger as-child>
                     <button
                       type="button"
-                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 bg-transparent text-left font-[family-name:var(--kira-font-ui)]"
+                      class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 bg-transparent text-left font-ui"
                       :data-testid="`cell-editor-generate-${gen.id}`"
                       @click="applyGenerator(gen)"
                     >

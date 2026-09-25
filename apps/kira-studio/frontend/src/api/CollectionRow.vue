@@ -177,7 +177,7 @@ function onKeydown(e: KeyboardEvent): void {
       v-if="renaming"
       ref="inputRef"
       v-model="draft"
-      class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 font-[inherit] text-fg bg-field outline-none border-primary"
+      class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 text-fg bg-field outline-none border-primary"
       data-testid="collection-rename-input"
       @click.stop
       @dblclick.stop

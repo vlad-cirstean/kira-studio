@@ -328,7 +328,7 @@ function onDeleteRow(): void {
               <CodiconIcon name="list-selection" :size="13" />
               <span
                 v-if="columnsIndicator"
-                class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-[var(--kira-state-on)]"
+                class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-state-on"
               />
             </Button>
           </TooltipTrigger>

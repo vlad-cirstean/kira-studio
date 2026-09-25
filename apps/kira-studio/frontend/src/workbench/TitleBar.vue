@@ -85,11 +85,11 @@ const keepAwakeTooltip = computed(() => {
         <!-- P22 D6: rendered at the icon's own 16px design size (--kira-icon-box) — the glyph fills
              its box instead of leaving per-glyph advance slack at 13px (F9(a)). Mode-tab-local. -->
         <span
-          class="size-4 flex items-center justify-center shrink-0 leading-[var(--kira-control-inline-h)]"
+          class="size-4 flex items-center justify-center shrink-0 leading-3.5"
           data-testid="mode-tab-icon"
           ><CodiconIcon :name="MODES[mode].icon" :size="16"
         /></span>
-        <span class="mode-label leading-[var(--kira-control-inline-h)]">{{ MODES[mode].label }}</span>
+        <span class="mode-label leading-3.5">{{ MODES[mode].label }}</span>
       </button>
     </div>
 

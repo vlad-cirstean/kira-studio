@@ -43,7 +43,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
        the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
        accounting (rows.ts) is untouched. -->
   <div
-    class="overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)] scrollbar-none py-1"
+    class="overflow-x-auto overflow-y-hidden text-kira-sm font-data scrollbar-none py-1"
     data-testid="document-tree"
     ref="treeRef"
     @wheel="onWheel"

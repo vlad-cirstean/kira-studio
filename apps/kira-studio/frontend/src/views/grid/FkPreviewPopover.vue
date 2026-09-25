@@ -130,7 +130,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[var(--kira-z-popover)]" data-testid="fk-preview-backdrop">
+  <div class="fixed inset-0 z-(--kira-z-popover)" data-testid="fk-preview-backdrop">
     <div ref="panelEl" class="fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)] bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden" data-testid="fk-preview" :style="style">
       <div class="flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5">
         <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{{ tableLabel }}</span>
