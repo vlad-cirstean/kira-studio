@@ -46,7 +46,7 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.8/` today) needs an
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.9/` today) needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -139,8 +139,8 @@ duplicated here; this file only points at them.
   "Known open items"), never a running narrative of what each round found.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
-  per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8 continue one counter (v1.6 topped out at `P70`; v1.8
-  starts at `P71`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
+  per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
+  starts at `P71`, v1.9 at `P96`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
   highest `P` number used across all of them, not just the chapter immediately before it, and
   continue from there — regardless of whether that chapter was shaped as independent misc phases or
   one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
@@ -251,8 +251,8 @@ duplicated here; this file only points at them.
 
 ## CodeGraph
 
-Code navigation in this repo goes through [CodeGraph](https://github.com/colbymchenry/codegraph),
-not repo-map: symbol index, call graphs, blast radius, registered as an MCP server via the
+Code navigation in this repo goes through [CodeGraph](https://github.com/colbymchenry/codegraph):
+symbol index, call graphs, blast radius, registered as an MCP server via the
 committed `.mcp.json` — use the MCP tools, not the `codegraph` CLI.
 
 **Mandatory for discovery, not for applying a known fix — and verified, not assumed.** Real usage
@@ -273,26 +273,22 @@ there is busywork, not signal.
 CLAUDE.md being on disk in a subagent's worktree doesn't make it follow this — every subagent
 prompt doing discovery work (Opus planner, audit agent) must restate the requirement explicitly.
 Before accepting a plan or an audit's findings (this file's own verification rule), the
-orchestrating session confirms real `codegraph_explore`/`codegraph_node` tool calls happened in
+orchestrating session confirms real `codegraph_explore` tool calls happened in
 that subagent's own run — grep its tool-call log, don't take "I used CodeGraph" on prose alone.
 Loading the tool via `ToolSearch` without ever calling it doesn't count. A discovery subagent that
 skipped it despite loading it goes back to redo the lookup, same as any other short-of-the-ask
 result.
 
 **The tools aren't in the default tool list.** Call `ToolSearch` for `"codegraph"` first — it
-loads `codegraph_explore`, `codegraph_node` and the rest by name, then they're callable like any
-other tool. Don't fall back to the CLI just because they're not visible yet; search for them.
+loads `codegraph_explore` by name, then it's callable like any other tool. Don't fall back to the
+CLI just because it's not visible yet; search for it.
 
 - **Automatic** — a `UserPromptSubmit` hook (`codegraph prompt-hook`) fires on every message and
   injects matching symbols as `<codegraph_context>`, no tool call needed. Read it before
   searching files.
 - **Explicit** — `codegraph_explore` answers most code questions in one call: the relevant
   symbols' source plus the call paths between them, including dynamic-dispatch hops grep can't
-  follow. `codegraph_node` reads one symbol's source plus its caller/callee trail.
+  follow.
 
 `.claude/hooks/session-start.sh` installs the `codegraph` binary and builds/syncs the index every
-session — that's build tooling, not how code gets navigated; navigation is the MCP tools above.
-
-The shipped repo-map feature (Settings dialog's Code intelligence tab, `internal/repomap`) was
-removed in v1.9 P97 — CodeGraph above is now the only code-index in this repo, no name collision
-to keep straight.
+session — that's build tooling, not how code gets navigated; navigation is the MCP tool above.
