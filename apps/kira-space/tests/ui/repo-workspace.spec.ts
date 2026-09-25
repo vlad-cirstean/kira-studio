@@ -1,6 +1,6 @@
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
-import { installGitStreamMock } from './support/gitStreamMock';
+import { gitStreamRequests, installGitStreamMock } from './support/gitStreamMock';
 import {
   buildGraphStreamChunk,
   buildMultiBranchChunk,
@@ -483,6 +483,14 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
     // Marking it `active` here (unlike the restored-tab test above, which leaves its tab inactive
     // to exercise ensureWorkspaceShell's own fallback) means it renders as soon as the workspace
     // itself activates, with no tree click needed.
+    //
+    // P114: unlike the first half, boot itself opens the git transport here — main.ts's own
+    // post-hydrate fall-forward mounts this active tab's RepoFileView before app.mount, so before
+    // any click is even possible. The mock must exist before that first page script runs, which
+    // `installGitStreamMock`'s `page.evaluate` (installed after `relaunch()` resolves) is too late
+    // for. Use `relaunch`'s own `gitStream` option (`page.addInitScript`) instead. `'repo.open':
+    // null`, not `undefined` — `addInitScript` JSON-serializes its args, and an `undefined` value
+    // would drop the key and hang `repo.open` forever (see gitStreamMock.ts's own doc comment).
     const REV = 'b'.repeat(40);
     const { window: page } = await relaunch({
       control: [
@@ -516,19 +524,39 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
           ],
         },
       ],
-    });
-    await installGitStreamMock(page, REPO.repoId, {
-      'repo.open': undefined,
-      'blame.line': BLAME_RESULT,
-      'file.read': { kind: 'found', content: 'export const a = 1;\n' },
+      gitStream: {
+        repoId: REPO.repoId,
+        extraResults: {
+          'repo.open': null,
+          'blame.line': BLAME_RESULT,
+          // Two lines, so a click plus ArrowDown below moves to a real second line.
+          'file.read': { kind: 'found', content: 'export const a = 1;\nexport const b = 2;\n' },
+        },
+      },
     });
 
-    // No click needed: main.ts's own post-hydrate fall-forward (no WindowsService/persisted
-    // "last active workspace" here, main.ts's own doc comment) activates this restored workspace
-    // on boot, which flips GitPanel.vue's own panel tab to Files — the repo row itself never
-    // renders in this state, so waiting on it would hang.
+    // Content only renders from state = 'found', which RepoFileView.vue's mount() reaches only
+    // after synchronously evaluating the `blameable` guard (`rev === null`) earlier in the same
+    // function — so this assertion (unlike a bare toBeVisible(), which an empty 'loading' host
+    // would also satisfy) proves the guard actually ran.
     const editor = page.locator('[data-testid="repo-file-editor"]');
-    await expect(editor).toBeVisible();
+    await expect(editor.locator('.view-lines')).toContainText('export const a = 1;');
+    await expect(page.locator('[data-testid="blame-status"]')).toHaveCount(0);
+
+    // Arm the trap the same way the first half does: move the cursor, so a regressed `blameable`
+    // guard (one that dropped `rev === null`) would actually call `blame.line` and show the item,
+    // instead of this half passing vacuously because the cursor never moved.
+    await editor.locator('.view-lines').click();
+    await page.keyboard.press('ArrowDown');
+
+    // Bounded negative window: >3x blameLine.ts's 150ms DEBOUNCE_MS plus the mock's own
+    // setTimeout(0) round trips. A guard regression has no event this test could otherwise wait
+    // on, and toHaveCount(0) alone would pass at t=0, before a regressed controller even fires.
+    await page.waitForTimeout(500);
+
+    const requests = await gitStreamRequests(page);
+    expect(requests).toContain('file.read'); // the mock was live
+    expect(requests).not.toContain('blame.line'); // the guard held
     await expect(page.locator('[data-testid="blame-status"]')).toHaveCount(0);
   }
 });
