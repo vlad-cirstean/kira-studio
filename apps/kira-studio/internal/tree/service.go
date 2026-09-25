@@ -179,6 +179,28 @@ func (s *Service) putIfSinceUnchanged(connectionID, path, kind string, since int
 	_ = s.meta.Put(connectionID, path, kind, encoded)
 }
 
+// cacheAside is Describe/Definition/SchemaColumns's own shared cache-miss path (P113 G7): resolve
+// path, capture Since, run load, marshal-and-store the result if the connection's Since hasn't
+// moved on meanwhile, and return it. Children keeps its own logic — a truncated listing is dropped
+// rather than cached, and Children returns a different result shape than Describe/Definition/
+// SchemaColumns's own (v, source) pairing.
+func cacheAside[T any](s *Service, connectionID, path, kind string, load func(nodePath model.NodePath) (T, error)) (T, error) {
+	var zero T
+	nodePath, err := s.resolvePath(connectionID, path)
+	if err != nil {
+		return zero, err
+	}
+	since := s.sinceEpoch(connectionID)
+	v, err := load(nodePath)
+	if err != nil {
+		return zero, err
+	}
+	if encoded, err := json.Marshal(v); err == nil {
+		s.putIfSinceUnchanged(connectionID, path, kind, since, encoded)
+	}
+	return v, nil
+}
+
 // Children ports tree-service.ts:82-108, including P43 iter2 D22 (a truncated listing is never
 // cached) and P43 iter3 D38 (a truncated refresh drops any older complete row for the same path).
 func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenResult, error) {
@@ -220,17 +242,11 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 			return DescribeResult{Meta: meta, Source: "cache"}, nil
 		}
 	}
-	nodePath, err := s.resolvePath(connectionID, path)
+	meta, err := cacheAside(s, connectionID, path, "describe", func(nodePath model.NodePath) (model.ObjectMeta, error) {
+		return s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
+	})
 	if err != nil {
 		return DescribeResult{}, err
-	}
-	since := s.sinceEpoch(connectionID)
-	meta, err := s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
-	if err != nil {
-		return DescribeResult{}, err
-	}
-	if encoded, err := json.Marshal(meta); err == nil {
-		s.putIfSinceUnchanged(connectionID, path, "describe", since, encoded)
 	}
 	return DescribeResult{Meta: meta, Source: "server"}, nil
 }
@@ -245,17 +261,11 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 			return DefinitionResult{Definition: def, Source: "cache"}, nil
 		}
 	}
-	nodePath, err := s.resolvePath(connectionID, path)
+	definition, err := cacheAside(s, connectionID, path, "definition", func(nodePath model.NodePath) (model.ObjectDefinition, error) {
+		return s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
+	})
 	if err != nil {
 		return DefinitionResult{}, err
-	}
-	since := s.sinceEpoch(connectionID)
-	definition, err := s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
-	if err != nil {
-		return DefinitionResult{}, err
-	}
-	if encoded, err := json.Marshal(definition); err == nil {
-		s.putIfSinceUnchanged(connectionID, path, "definition", since, encoded)
 	}
 	return DefinitionResult{Definition: definition, Source: "server"}, nil
 }
@@ -273,20 +283,18 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 			return SchemaColumnsResult{Relations: rels, Source: "cache"}, nil
 		}
 	}
-	nodePath, err := s.resolvePath(connectionID, path)
+	relations, err := cacheAside(s, connectionID, path, "columns", func(nodePath model.NodePath) ([]model.RelationColumns, error) {
+		relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
+		if err != nil {
+			return nil, err
+		}
+		if relations == nil {
+			relations = []model.RelationColumns{}
+		}
+		return relations, nil
+	})
 	if err != nil {
 		return SchemaColumnsResult{}, err
-	}
-	since := s.sinceEpoch(connectionID)
-	relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
-	if err != nil {
-		return SchemaColumnsResult{}, err
-	}
-	if relations == nil {
-		relations = []model.RelationColumns{}
-	}
-	if encoded, err := json.Marshal(relations); err == nil {
-		s.putIfSinceUnchanged(connectionID, path, "columns", since, encoded)
 	}
 	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
 }
