@@ -35,10 +35,6 @@ type Adapter struct {
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// getConnSet is every op's own locked read of state.ConnSet (F3) — requireClient's
-// RequireConnected call takes its result, never state.ConnSet directly.
-func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().ConnSet }
-
 // setConnSet is Connect's own locked write of ConnSet/Cfg together (F3) — P13 D1: assigned before
 // anything is opened, not after the probe succeeds, so the handle is reachable by Disconnect from
 // the instant connSet.Primary() could have opened a socket, and a probe failure (or a dropped
@@ -58,12 +54,6 @@ func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
 func (a *Adapter) clearConnected() {
 	a.state.Update(func(s *connState) { s.ConnSet = nil; s.PrimaryDatabase = "" })
 }
-
-// getPrimaryDatabase is Children's own locked read of state.PrimaryDatabase (F3).
-func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().PrimaryDatabase }
-
-// getReadOnly is Read/Count/Mutate/Execute's own locked read of state.ReadOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().ReadOnly }
 
 func (a *Adapter) Kind() string        { return "postgres" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
@@ -117,7 +107,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 // their connection, and Drain's own wait is bounded by ctx rather than able to block this call for
 // as long as the longest still-running query.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	return relational.Disconnect(ctx, a.tracker.Snapshot(), a.Cancel, a.tracker.Drain, a.getConnSet(),
+	return relational.Disconnect(ctx, a.tracker.Snapshot(), a.Cancel, a.tracker.Drain, a.state.Load().ConnSet,
 		func(cs *ConnSet, ctx context.Context) { cs.CloseAll(ctx) }, a.clearConnected)
 }
 
@@ -125,7 +115,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 // exactly once — it holds the per-connection lock ConnSet.Acquire's own doc comment describes for
 // as long as the caller keeps conn (P2 R2).
 func (a *Adapter) requireClient(ctx context.Context, database string) (*trackedConn, func(), error) {
-	connSet, err := adapters.RequireConnected(a.getConnSet())
+	connSet, err := adapters.RequireConnected(a.state.Load().ConnSet)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,7 +132,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 			return adapters.TreeChildren{}, err
 		}
 		defer release()
-		nodes, err := listDatabases(ctx, execFor(conn, op, a.trackerFor(op.OpID)), a.getPrimaryDatabase())
+		nodes, err := listDatabases(ctx, execFor(conn, op, a.trackerFor(op.OpID)), a.state.Load().PrimaryDatabase)
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
@@ -307,7 +297,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 		return nil, err
 	}
 	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
-	if err := assertReadOnlyFilterSortSafe(a.getReadOnly(), req.Filter, req.Sort); err != nil {
+	if err := assertReadOnlyFilterSortSafe(a.state.Load().ReadOnly, req.Filter, req.Sort); err != nil {
 		return nil, err
 	}
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
@@ -336,7 +326,7 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 		return adapters.CountResult{}, err
 	}
 	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
-	if err := assertReadOnlyFilterSortSafe(a.getReadOnly(), req.Filter, nil); err != nil {
+	if err := assertReadOnlyFilterSortSafe(a.state.Load().ReadOnly, req.Filter, nil); err != nil {
 		return adapters.CountResult{}, err
 	}
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
@@ -363,7 +353,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	defer release()
-	return mutate(ctx, conn, op, a.trackerFor(op.OpID), a.getReadOnly(), plan)
+	return mutate(ctx, conn, op, a.trackerFor(op.OpID), a.state.Load().ReadOnly, plan)
 }
 
 // Execute is index.ts's execute.
@@ -377,7 +367,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		return nil, err
 	}
 	defer release()
-	return execute(ctx, conn, op, a.trackerFor(op.OpID), a.getReadOnly(), req.Statements)
+	return execute(ctx, conn, op, a.trackerFor(op.OpID), a.state.Load().ReadOnly, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers
