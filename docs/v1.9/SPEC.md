@@ -5569,3 +5569,113 @@ exercised. `cac7093b` is correct app behavior and was not touched.
 
 Touched exactly the plan's own 3 files (`gitStreamMock.ts`, `fixtures.ts`,
 `repo-workspace.spec.ts`) plus this result section, per the plan's own §6 file-ownership list.
+
+## P109 result
+
+Plan: `docs/v1.9/plans/P109-docs-trueup.md`. One sequential implementer, per the plan's own §3 —
+`ARCHITECTURE.md` carries ~75% of the edits and is one file, so no split. 11 commits, in the plan's
+own §3 order, each through the real pre-commit hook (`bun run lint` + `bun run typecheck`), no
+`--no-verify`:
+
+1. `0ab82bf` — `docs(claude): drop dead pointers (v1.8 path, codegraph_node, repo-map)` (§1.1).
+2. `ec47a26` — `docs(dev-env): true up paths, script names, dbmcp port; add shadcn-vue and CodeGraph sections` (§1.2, §2.4).
+3. `3e2eef0` — `docs(architecture): true up Stack table and header` (§1.3, §2.1) — includes the one real `bun run build:studio` bundle-size measurement.
+4. `2ffd69c` — `docs(architecture): true up adapter sections` (§1.4).
+5. `407f8e7` — `docs(architecture): move native code workspace into Git module; drop quick open; storage schema to 0027` (§1.5, §2.3).
+6. `c6276f5` — `docs(architecture): true up caching and UI architecture for Pinia/TanStack Query` (§1.6, §2.2).
+7. `1b764a8` — `docs(architecture): true up process model, git module, DB MCP, security, testing` (§1.7).
+8. `dbd66bb` — `docs(architecture): prune and re-verify known open items` (§1.9, §2.5).
+9. `8b3e045` — `docs: true up READMEs; add docs/v1.9/README.md` (§1.8, §2.6).
+10. `9f684be` — `docs: residual scan fixes (P109)` — one real finding the §4.3 grep surfaced after
+    commit 7 landed (`DEV_ENVIRONMENT.md`'s own DB MCP port note still said "OS-assigned").
+11. This commit — `docs(v1.9): record P109 result`.
+
+**CodeGraph.** Real `codegraph_explore` calls throughout discovery, not just loaded — used to
+verify the C5-C7 native-workspace move's own path fixes, the adapter-contract `nativeKinds`/
+`ChildRoutes` claims, the `WorkbenchHost`/`MainView.vue` dispatch rewrite, and (the deepest one) the
+P72/P79 KeepAlive graph-persistence claim, which real exploration plus a real `playwright` run
+showed was flat wrong in the plan's own assumption that a live `KeepAlive` site still existed
+somewhere to find.
+
+**A1-A8 outcomes, verified with the plan's own §4 scripts against the final tree, not assumed:**
+
+- **A1 (`paths2.py`).** `python3 paths2.py . CLAUDE.md docs/ARCHITECTURE.md docs/DEV_ENVIRONMENT.md
+  README.md apps/*/README.md packages/api-core/README.md scripts/demo-dbs/README.md
+  apps/kira-studio/tests/visual/README.md docs/v1.9/README.md` — 131 hits total (95 in
+  `ARCHITECTURE.md` alone, down from the plan's own recorded 123 at `f20298d1`). Every hit checked
+  by hand against §4.2's intentional list (build outputs, leading-dot paths, deleted-history,
+  third-party, Go symbol references) or against text that explicitly states the thing no longer
+  exists (`packages/api-ui`/`packages/ui-kit`, both named in prose saying they don't exist) or is an
+  illustrative example (an S3 object key, a wire-syntax literal) rather than a repo path. Zero
+  unexplained `MISSING`.
+- **A2 (retired-name grep, §4.3).** Zero survivors outside a past-tense/P104-history clause for
+  every named term; the "must be zero" set (`codegraph_node`, `internal/repomap`, `colorForColumn`,
+  bare `modeState`/`tabsState`/`incognitoState`, `apps/kira-studio/internal/shell`, "ephemeral
+  fallback", "OS-assigned") is genuinely zero across every target doc, confirmed after commit 10's
+  fix.
+- **A3 (script names, §4.4).** `node -e '...'` against the real root `package.json` (unreadable to
+  the planning pass, per its own §6) — zero unexplained misses; the one hit (`docs/DEV_ENVIRONMENT.md`'s
+  own "no `bun run mcp:*` script exists" sentence) is the script-name checker matching a
+  wildcard-glob mention inside a sentence stating that script does *not* exist — a false positive in
+  the checker, not a doc error.
+- **A4 (Known open items).** Every C9 quick-open entry deleted (4 bullets); every surviving entry
+  re-verified against real source (symbols confirmed present/absent, paths requalified); two new
+  items added — Kira Space's missing `e2e-real` tier for git pairing, and the P72/P79 KeepAlive
+  mechanism being fully dead code (a new finding this phase made, not carried over from any prior
+  phase's own notes).
+- **A5 (`CLAUDE.md`).** Diffed against the pre-phase commit: exactly the 7 dead-pointer edits §1.1
+  named, nothing else.
+- **A6 (structural move).** `## Storage` now runs straight from `review.db`'s own paragraphs into
+  the gRPC/S3/SQS/growth-bound/DataGrip content with no C5-C9 heading in between; the moved
+  `### The native code workspace (C5-C7, P67c)` section sits inside `## Git module`, immediately
+  before `### Git graph in the native workspace (C10)`; the Quick open (C9) subsection is gone
+  outright, not moved.
+- **A7 (recount checklist, §4.5).** Every number reverified against a real command, not assumed:
+  bound services 29 (Studio)/10 (Space) via `grep -c application.NewService`; `gitrpc` 56 requests
+  (`grep -cE` over `requestHandlers`) plus 1 stream, `gitstream.go`'s own allowlist 53+1=54 (already
+  correct pre-phase, confirmed not stale); `ContractVersion` 41 on both sides; 47 extension commands
+  (parsed from `package.json`'s own `contributes.commands` array, not a raw grep, which
+  over-counts); 20 `components/ui` sets, 70 `defineStore` calls; 8 Studio settings sections;
+  migration high-water mark 0027, Kira Space 2 migrations; `tests/ui` 283 tests/53 spec files (recounted
+  via a real `playwright --list` run — the plan's own placeholder "252/47" was itself stale, not just
+  the doc); `visual` 6 specs/13 snapshots (also a real `--list` run); `e2e-real` 4 specs/6 tests
+  (already correct pre-phase); `db-fixtures/support` 7 modules; Stack row bundle figures from one
+  real `bun run build:studio` (needed a full `scripts/setup.sh` toolchain install first — GTK/WebKit
+  apt packages, `wails3`, bindings codegen for both apps — none of it pre-installed in this
+  container).
+- **A8.** Every one of the 11 commits above passed the real pre-commit hook; final `git push` went
+  through the real pre-push hook (`go build ./...`, `bun run lint:go`, `bun run lint:dead`) via the
+  normal hook path on the final push, no bypass.
+
+**Flagged to the orchestrator, per the plan's own §5 "Out of scope" (neither acted on here):**
+
+- **`apps/kira-studio/tests/unit/bridge-unwrap.spec.ts` — no longer red.** The plan recorded it
+  failing per P108 Part 11's own "Deferred" note (SPEC L5378-5382, at commit time). Re-run during
+  this phase (3x isolated, plus the full `bun run test:unit` — 1662 pass, 0 fail, across every
+  package) shows it passing cleanly now, along with the sibling `grpc-schema-supersession.spec.ts`
+  cases that same note deferred. Something between P108 Part 11 and now (most likely P112's own
+  TanStack Query migration, named in that same deferred note as the concurrent edit in flight)
+  fixed the underlying contract without a phase ever recording it as a fix. No code was touched
+  here to make this true — it was already true on the tree this phase started from. The
+  orchestrator should decide whether this needs its own confirming note anywhere, but there is no
+  longer a red test to fix.
+- **The P113 SPEC row's stale "after P112" ordering claim.** P113's own row (§ above) still says it
+  runs "last … after P112", but P114 now follows it in the table. This is `SPEC.md` phasing prose,
+  not one of this phase's own named targets (`docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`,
+  READMEs, `CLAUDE.md`) — left for the orchestrator to fix or fold into P113's own eventual
+  implementation.
+
+**New finding this phase made, beyond the plan's own scope, recorded as a Known open item rather
+than fixed (source change, out of a docs-only phase's scope):** the P72/P79 KeepAlive-based graph
+tab persistence is dead code in both apps — neither's shared `MainView.vue` wraps its dynamic
+component in a `KeepAlive` any more, confirmed by grep across every `.vue` file in both apps and
+`packages/workbench`, and by running the real `repo-workspace.spec.ts` case that exercises the
+user-visible behavior (still green — continuity now comes from `TabViewStateStore`
+persist/restore, not a live instance). See `docs/ARCHITECTURE.md`'s Known open items, Kira Space
+block.
+
+**Not done, per the plan's own §5 scope boundary:** the stale source comments it names
+(`connections.go:172`'s `nativeKinds` mention, two `quickOpen.ts` references, the
+`internal/datagrip/jdbc.go` "CLAUDE.md's per-adapter port literals" comment, two more naming deleted
+`IconButton`/`PopoverPanel`, and `RepoGraphView.vue:10`'s stale "(Studio only)") — all source, not
+docs, listed for a later phase to decide on.
