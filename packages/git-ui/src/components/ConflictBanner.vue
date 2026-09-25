@@ -101,7 +101,7 @@ const PATH_DISPLAY_CAP = 20;
         aria-hidden="true"
       ></span>
       <span class="kv:font-semibold">{{ describeInProgress(inProgress) }}</span>
-      <span v-if="inProgress.unmergedCount > 0" class="kv:text-muted kv:text-sm">
+      <span v-if="inProgress.unmergedCount > 0" class="kv:text-muted-foreground kv:text-sm">
         {{ inProgress.unmergedCount }} unresolved {{ inProgress.unmergedCount === 1 ? "file" : "files" }}
       </span>
 
@@ -142,7 +142,7 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-xs kv:text-muted"
+      class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
@@ -152,13 +152,13 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-else-if="inProgress.unmergedCount > 0"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-xs kv:text-muted"
+      class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
       then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
     </p>
-    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-xs kv:text-muted">
+    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground">
       No conflicts remain. Continue to commit this change, or Skip if it is already present.
     </p>
 
@@ -171,7 +171,7 @@ const PATH_DISPLAY_CAP = 20;
       </li>
       <li
         v-if="inProgress.conflictedPaths.length > PATH_DISPLAY_CAP"
-        class="kv:text-muted"
+        class="kv:text-muted-foreground"
       >
         +{{ inProgress.conflictedPaths.length - PATH_DISPLAY_CAP }} more
       </li>

@@ -123,7 +123,7 @@ function pick(ref: string): void {
       @click="toggle"
     >
       <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
-      <span v-if="triggerReason" class="kv:text-muted kv:text-xs">{{ triggerReason }}</span>
+      <span v-if="triggerReason" class="kv:text-muted-foreground kv:text-xs">{{ triggerReason }}</span>
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </KuiButton>
 
@@ -141,7 +141,7 @@ function pick(ref: string): void {
       />
       <div class="kv:overflow-auto kv:min-h-0">
         <section v-if="suggested.length > 0" aria-label="Suggested">
-          <div class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs kv:uppercase">Suggested</div>
+          <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs kv:uppercase">Suggested</div>
           <KuiButton
             v-for="candidate in suggested"
             :key="candidate.ref"
@@ -149,12 +149,12 @@ function pick(ref: string): void {
             @click="pick(candidate.ref)"
           >
             <span class="kv:truncate">{{ candidate.ref }}</span>
-            <span class="kv:ml-auto kv:text-muted kv:text-xs">{{ candidateReason(candidate) }}</span>
+            <span class="kv:ml-auto kv:text-muted-foreground kv:text-xs">{{ candidateReason(candidate) }}</span>
           </KuiButton>
         </section>
 
         <section aria-label="All branches">
-          <div class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs kv:uppercase">All branches</div>
+          <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs kv:uppercase">All branches</div>
           <KuiButton
             v-for="row in sections.branches.visible"
             :key="row.refname"
@@ -174,7 +174,7 @@ function pick(ref: string): void {
           </KuiButton>
           <div
             v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-            class="kv:py-1 kv:px-2 kv:text-muted"
+            class="kv:py-1 kv:px-2 kv:text-muted-foreground"
           >
             No matching branches
           </div>

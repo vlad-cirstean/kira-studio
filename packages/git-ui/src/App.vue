@@ -1811,7 +1811,7 @@ onBeforeUnmount(() => {
       class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
       data-testid="boot-error"
     >
-      <p class="kv:m-0 kv:max-w-120 kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
+      <p class="kv:m-0 kv:max-w-120 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
       <!-- Cancels KuiButton's own default-variant background/text/hover so the retry action here
            keeps this panel's plain panel-bg/app-fg look (this button's own established
            override, unaffected by hovering — same effect the old unlayered `.kv-boot-error
@@ -1944,7 +1944,7 @@ onBeforeUnmount(() => {
               @pointerdown="startDetailResize"
               @keydown="handleDetailHandleKeydown"
             />
-            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted">Select a commit to see its details.</p>
+            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"
@@ -1978,7 +1978,7 @@ onBeforeUnmount(() => {
             data-testid="detail-region"
             aria-label="Commit detail"
           >
-            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted">Select a commit to see its details.</p>
+            <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Select a commit to see its details.</p>
             <WorkingDetailPane
               v-else-if="selectionIsWorking && actions"
               :working-state="workingState"

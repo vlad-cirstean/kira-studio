@@ -104,7 +104,7 @@ function confirmPlain(): void {
     </label>
 
     <details class="kv:mt-2 kv:pt-1 kv:border-t kv:border-panel-border">
-      <summary class="kv:cursor-pointer kv:text-muted">Use plain <code>--force</code> instead</summary>
+      <summary class="kv:cursor-pointer kv:text-muted-foreground">Use plain <code>--force</code> instead</summary>
       <p class="kv:text-diff-deleted kv:my-0.5">
         This skips the lease check entirely — it will overwrite the remote branch even if someone
         else has pushed to it since the lease's own tip was read, with no protection against

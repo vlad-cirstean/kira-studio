@@ -552,7 +552,7 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
           ></span>
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted kv:font-ui kv:text-xs kv:flex kv:gap-1">
+          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-xs kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -676,7 +676,7 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
           ></span>
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted kv:font-ui kv:text-xs kv:flex kv:gap-1">
+          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-xs kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -717,7 +717,7 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="dirOf(row.node.path)"
-            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted kv:text-xs"
+            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted-foreground kv:text-xs"
             >{{ dirOf(row.node.path) }}</span
           >
           <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">

@@ -156,7 +156,7 @@ const tooltipText = computed(() => {
     </div>
     <span
       v-kui-tooltip="tooltipText"
-      class="kv:min-w-0 kv:truncate kv:text-muted kv:text-sm"
+      class="kv:min-w-0 kv:truncate kv:text-muted-foreground kv:text-sm"
       data-testid="uncommitted-strip-label"
     >
       {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}

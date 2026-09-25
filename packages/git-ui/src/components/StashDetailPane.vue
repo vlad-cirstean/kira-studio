@@ -61,7 +61,7 @@ function onOpenFile(index: number, pinned: boolean): void {
     <template v-if="entry">
       <div class="kv:py-2 kv:px-3 kv:border-b kv:border-panel-border">
         <p class="kv:m-0 kv:mb-0.5 kv:font-semibold kv:break-words">{{ entry.message }}</p>
-        <p class="kv:m-0 kv:text-xs kv:text-muted">
+        <p class="kv:m-0 kv:text-xs kv:text-muted-foreground">
           <span v-kui-tooltip="formatAbsoluteDate(entry.timestamp)">{{
             formatRelativeDate(entry.timestamp)
           }}</span>
@@ -87,6 +87,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!stash.error.value" class="kv:m-0 kv:p-3 kv:text-muted">Loading…</p>
+    <p v-else-if="!stash.error.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Loading…</p>
   </div>
 </template>

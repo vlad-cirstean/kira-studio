@@ -260,7 +260,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
       <section class="kv:flex kv:gap-0.25" aria-label="Search options">
         <KuiButton
           icon="codicon-case-sensitive"
-          class="kv:text-muted kv:text-xs"
+          class="kv:text-muted-foreground kv:text-xs"
           :active="search.caseSensitive.value"
           :aria-pressed="search.caseSensitive.value"
           v-kui-tooltip="'Match case'"
@@ -270,7 +270,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-whole-word"
-          class="kv:text-muted kv:text-xs"
+          class="kv:text-muted-foreground kv:text-xs"
           :active="search.wholeWord.value"
           :aria-pressed="search.wholeWord.value"
           v-kui-tooltip="'Match whole word'"
@@ -280,7 +280,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-regex"
-          class="kv:text-muted kv:text-xs"
+          class="kv:text-muted-foreground kv:text-xs"
           :active="search.regex.value"
           :aria-pressed="search.regex.value"
           v-kui-tooltip="'Use regular expression'"
@@ -297,7 +297,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         :options="scopeOptions"
         @update:model-value="onScopeChange"
       />
-      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted kv:text-xs kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
+      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-xs kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"

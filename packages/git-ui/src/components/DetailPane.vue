@@ -93,6 +93,6 @@ function onOpenFile(index: number, pinned: boolean): void {
       />
     </template>
 
-    <p v-else-if="!detailState.error.value" class="kv:m-0 kv:p-3 kv:text-muted">Loading…</p>
+    <p v-else-if="!detailState.error.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Loading…</p>
   </div>
 </template>

@@ -18,11 +18,11 @@ defineProps<{ branchName: string }>();
     data-testid="empty-repository-panel"
   >
     <span
-      class="codicon kv:text-[24px] kv:text-muted"
+      class="codicon kv:text-[24px] kv:text-muted-foreground"
       :class="STATE_ICONS.commit"
       aria-hidden="true"
     ></span>
-    <p class="kv:m-0 kv:max-w-105 kv:text-muted">
+    <p class="kv:m-0 kv:max-w-105 kv:text-muted-foreground">
       This repository has no commits yet. Create the first one on
       <strong>{{ branchName }}</strong> to see it here.
     </p>

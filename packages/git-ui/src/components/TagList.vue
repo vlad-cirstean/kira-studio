@@ -103,7 +103,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
 
 <template>
   <section aria-label="Tags">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">Tags</div>
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">Tags</div>
     <div
       v-for="row in section.visible"
       :key="row.refname"
@@ -118,15 +118,15 @@ async function onRefMenuSelect(id: string): Promise<void> {
           aria-hidden="true"
         ></span>
         <span class="kv:truncate">{{ row.shortName }}</span>
-        <span class="kv:text-xs kv:text-muted">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span class="kv:text-xs kv:text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
         <span
           v-if="row.annotation"
-          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted"
+          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted-foreground"
           v-kui-tooltip="row.annotation.subject"
         >
           {{ row.annotation.subject }}
         </span>
-        <span class="kv:font-data kv:text-xs kv:text-muted">{{ targetCommit(row) }}</span>
+        <span class="kv:font-data kv:text-xs kv:text-muted-foreground">{{ targetCommit(row) }}</span>
       </KuiButton>
       <KuiButton
         variant="icon"
@@ -145,7 +145,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
     >
       Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
     </KuiButton>
-    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">No tags</div>
+    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No tags</div>
 
     <RowContextMenu
       v-if="refMenu"

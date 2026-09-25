@@ -86,12 +86,12 @@ async function removeFromStack(branch: string): Promise<void> {
 
 <template>
   <section aria-label="Stacks">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">
+    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">
       Stacks
     </div>
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="kv:mb-1">
-      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted">
+      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
         <span class="kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <KuiButton
           v-if="writeCapability"
@@ -139,7 +139,7 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </span>
-          <span v-if="row.trackText" class="kv:text-xs kv:text-muted">{{ row.trackText }}</span>
+          <span v-if="row.trackText" class="kv:text-xs kv:text-muted-foreground">{{ row.trackText }}</span>
           <span v-if="row.checkedOutIn" class="kv:text-xs kv:opacity-80" v-kui-tooltip="row.checkedOutIn">
             <span class="codicon codicon-repo" aria-hidden="true"></span>
           </span>
@@ -166,7 +166,7 @@ async function removeFromStack(branch: string): Promise<void> {
     </div>
 
     <div v-if="orphans.visible.length > 0" class="kv:mb-1">
-      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted">
+      <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
         <span class="kv:flex-1 kv:min-w-0 kv:truncate">Needs attention</span>
       </div>
       <div
@@ -203,7 +203,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs"
+      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs"
     >
       No stacked branches
     </div>

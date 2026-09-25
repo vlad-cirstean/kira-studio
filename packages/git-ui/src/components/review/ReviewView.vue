@@ -809,7 +809,7 @@ watch(
 
     <template v-if="bootError">
       <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
-        <p class="kv:m-0 kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
+        <p class="kv:m-0 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
         <KuiButton
           class="kv:self-start kv:py-1 kv:px-3 kv:border-panel-border kv:rounded-sm kv:bg-panel kv:enabled:hover:bg-panel kv:text-row-fg kv:enabled:hover:text-row-fg"
           data-testid="boot-retry"
@@ -821,7 +821,7 @@ watch(
     </template>
 
     <template v-else-if="!review">
-      <p class="kv:p-3 kv:text-muted">Loading…</p>
+      <p class="kv:p-3 kv:text-muted-foreground">Loading…</p>
     </template>
 
     <template v-else-if="noActiveRepo">
@@ -837,7 +837,7 @@ watch(
         data-testid="review-no-branch"
       >
         <h2 class="kv:m-0 kv:text-lg">Review branch changes</h2>
-        <p class="kv:m-0 kv:text-muted">
+        <p class="kv:m-0 kv:text-muted-foreground">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
         <KuiSearchInput
@@ -848,7 +848,7 @@ watch(
         />
         <div class="kv:flex-1 kv:min-h-0 kv:overflow-auto">
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted kv:text-xs kv:uppercase">Branches</div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-xs kv:uppercase">Branches</div>
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
@@ -859,13 +859,13 @@ watch(
             </KuiButton>
             <div
               v-if="branchSections.branches.visible.length === 0"
-              class="kv:text-muted kv:py-0.5 kv:px-1"
+              class="kv:text-muted-foreground kv:py-0.5 kv:px-1"
             >
               No matching branches
             </div>
           </div>
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted kv:text-xs kv:uppercase">Remote branches</div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-xs kv:uppercase">Remote branches</div>
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
@@ -909,7 +909,7 @@ watch(
               >
             </div>
             <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
-              <span class="kv:text-muted kv:shrink-0" aria-hidden="true">↔</span>
+              <span class="kv:text-muted-foreground kv:shrink-0" aria-hidden="true">↔</span>
               <BaseSelector
                 :resolution="review.resolution.value"
                 :refs-state="refsState"
@@ -927,7 +927,7 @@ watch(
         </div>
         <div
           v-if="review.phase.value === 'listing'"
-          class="kv:font-ui kv:text-muted kv:text-xs kv:truncate"
+          class="kv:font-ui kv:text-muted-foreground kv:text-xs kv:truncate"
         >
           {{ comparisonSummaryLabel }}
         </div>
@@ -977,7 +977,7 @@ watch(
       </div>
 
       <div class="kv:flex-1 kv:min-h-0 kv:flex kv:flex-col">
-        <p v-if="review.phase.value === 'resolving'" class="kv:m-0 kv:p-3 kv:text-muted">
+        <p v-if="review.phase.value === 'resolving'" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
           Resolving comparison…
         </p>
 
@@ -987,7 +987,7 @@ watch(
 
         <div
           v-else-if="review.phase.value === 'ask'"
-          class="kv:m-0 kv:p-3 kv:text-muted"
+          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
           data-testid="review-ask"
         >
           <p>Nothing was detected for <strong>{{ review.branch.value }}</strong> — pick a base above. We won't guess.</p>
@@ -995,7 +995,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'unrelated'"
-          class="kv:m-0 kv:p-3 kv:text-muted"
+          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
           data-testid="review-unrelated"
         >
           “{{ review.branch.value }}” and “{{ review.resolution.value?.base }}” share no common
@@ -1004,7 +1004,7 @@ watch(
 
         <p
           v-else-if="review.phase.value === 'empty'"
-          class="kv:m-0 kv:p-3 kv:text-muted"
+          class="kv:m-0 kv:p-3 kv:text-muted-foreground"
           data-testid="review-empty"
         >
           “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.

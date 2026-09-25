@@ -91,6 +91,6 @@ const detail = computed(() => props.state?.detail);
       aria-hidden="true"
     ></span>
     <span class="kv:font-semibold">{{ title }}</span>
-    <span v-if="detail" class="kv:text-muted kv:text-sm">{{ detail }}</span>
+    <span v-if="detail" class="kv:text-muted-foreground kv:text-sm">{{ detail }}</span>
   </div>
 </template>

@@ -155,7 +155,7 @@ function closeDialog(): void {
             base: {{ entry.baseSource }})
           </li>
         </ul>
-        <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted">
+        <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted-foreground">
           These branches will need a force-push afterwards:
           {{ preflight.needsForcePush.join(', ') }}.
         </p>

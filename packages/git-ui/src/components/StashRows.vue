@@ -116,8 +116,8 @@ function onMenuSelect(id: string): void {
       >
       <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
       <span v-if="entry.includedUntracked" class="kv:font-data kv:text-xs kv:opacity-80" v-kui-tooltip="'Includes untracked files'">-u</span>
-      <span class="kv:text-xs kv:text-muted kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
-      <span class="kv:text-xs kv:text-muted kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
+      <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
+      <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </KuiButton>
     <KuiButton
       variant="icon"
@@ -136,7 +136,7 @@ function onMenuSelect(id: string): void {
   >
     Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
   </KuiButton>
-  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted kv:text-xs">{{ emptyMessage }}</div>
+  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">{{ emptyMessage }}</div>
 
   <RowContextMenu
     v-if="stashMenu"

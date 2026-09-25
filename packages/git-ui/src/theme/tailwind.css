@@ -52,7 +52,7 @@
   --color-toolbar: var(--kv-toolbar-bg);
   --color-toolbar-border: var(--kv-toolbar-border);
   --color-focus: var(--kv-focus-border);
-  --color-muted: var(--kv-description-fg);
+  --color-muted-foreground: var(--kv-description-fg);
   --color-error: var(--kv-error-fg);
   --color-overlay: var(--kv-overlay-bg);
   --color-search-match: var(--kv-search-match-bg);

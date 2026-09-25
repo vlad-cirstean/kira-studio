@@ -57,7 +57,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     data-testid="no-repository-panel"
   >
     <span
-      class="codicon kv:text-[32px] kv:text-muted"
+      class="codicon kv:text-[32px] kv:text-muted-foreground"
       :class="STATE_ICONS.repo"
       aria-hidden="true"
     ></span>
@@ -83,12 +83,12 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <template v-else>
       <p
         v-if="refreshError"
-        class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center"
+        class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center"
         data-testid="no-repository-refresh-error"
       >
         Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
       </p>
-      <p v-else class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center">
+      <p v-else class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center">
         Kira Space follows the folders open in this VS Code window. None of them is a Git
         repository — open one with File → Open Folder.
       </p>
@@ -98,7 +98,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     </template>
     <p
       v-if="pickError"
-      class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center"
+      class="kv:max-w-105 kv:m-0 kv:text-muted-foreground kv:text-center"
       data-testid="no-repository-pick-error"
     >
       Couldn't open that repository — {{ pickError }}.

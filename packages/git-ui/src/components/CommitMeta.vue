@@ -337,7 +337,7 @@ const prIcon = computed(() => {
       />
     </div>
 
-    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted kv:text-xs">
+    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-xs">
       <span v-kui-tooltip="formatAbsoluteDate(detail.committer.timestamp)">{{
         formatRelativeDate(detail.committer.timestamp)
       }}</span>
@@ -381,10 +381,10 @@ const prIcon = computed(() => {
     </KuiButton>
 
     <div v-if="expanded" class="kv-meta-expanded kv:flex kv:flex-col kv:gap-1 kv:mt-1">
-      <p class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted">
+      <p class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
         {{ detail.author.name }} &lt;{{ detail.author.email }}&gt;
       </p>
-      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted">
+      <p v-if="committerDiffersFromAuthor" class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
         <span class="kv:text-xs">committer</span>
       </p>
@@ -393,9 +393,9 @@ const prIcon = computed(() => {
         class="kv-meta-trailers kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
       >
         <template v-for="(row, index) in trailerRows" :key="index">
-          <dt class="kv:text-muted">{{ row.token }}</dt>
+          <dt class="kv:text-muted-foreground">{{ row.token }}</dt>
           <dd v-if="row.name !== undefined" class="kv:m-0">
-            {{ row.name }} <span class="kv:text-muted">&lt;{{ row.email }}&gt;</span>
+            {{ row.name }} <span class="kv:text-muted-foreground">&lt;{{ row.email }}&gt;</span>
           </dd>
           <dd v-else class="kv:m-0">{{ row.raw }}</dd>
         </template>
@@ -405,15 +405,15 @@ const prIcon = computed(() => {
         class="kv:m-0 kv:grid kv:grid-cols-[max-content_1fr] kv:gap-y-0.5 kv:gap-x-2 kv:text-sm"
       >
         <template v-if="detail.decoration.length > 0">
-          <dt class="kv:text-muted">Refs</dt>
+          <dt class="kv:text-muted-foreground">Refs</dt>
           <dd ref="decorationEl" class="kv-meta-refs kv:m-0 kv:flex kv:flex-wrap kv:gap-0.5"></dd>
         </template>
         <template v-if="signatureText">
-          <dt class="kv:text-muted">Signature</dt>
+          <dt class="kv:text-muted-foreground">Signature</dt>
           <dd class="kv:m-0">{{ signatureText }}</dd>
         </template>
         <template v-if="prDetail">
-          <dt class="kv:text-muted">Pull request</dt>
+          <dt class="kv:text-muted-foreground">Pull request</dt>
           <dd v-if="prDetail.kind === 'prs'" class="kv:m-0 kv:flex kv:flex-col kv:gap-0.5">
             <div
               v-for="pr in prDetail.prs"
@@ -439,7 +439,7 @@ const prIcon = computed(() => {
             </div>
           </dd>
           <dd v-else-if="prDetail.kind === 'none'" class="kv:m-0">No pull request</dd>
-          <dd v-else class="kv:m-0 kv:text-muted" data-testid="pr-unavailable">
+          <dd v-else class="kv:m-0 kv:text-muted-foreground" data-testid="pr-unavailable">
             {{ prDetail.reason }}
           </dd>
         </template>

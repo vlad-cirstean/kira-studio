@@ -317,7 +317,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     />
     <span
       v-if="stackState.restacking.value"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm kv:whitespace-nowrap"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap"
       role="status"
       aria-live="polite"
     >
@@ -415,7 +415,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
          where Fetch/Pull/Push/Stash/Undo went. -->
     <span
       v-if="!write"
-      class="kv:text-muted kv:text-sm kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis"
+      class="kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis"
       data-testid="read-only-note"
     >
       Read-only view — use the VS Code extension to make changes
@@ -455,7 +455,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
 
     <div
       v-if="write && remoteBusy"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm"
       data-testid="remote-progress"
     >
       <!-- Pre-approved spinner change (§1.4/§6.4): stepped 1.5s rotation -> Tailwind's smooth 1s
@@ -478,7 +478,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
          indicator that one is still going. -->
     <div
       v-if="write && opsState.activeWorktreePreparePath.value !== undefined"
-      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted kv:text-sm"
+      class="kv:inline-flex kv:items-center kv:h-control-sm kv:px-1.5 kv:rounded-sm kv:gap-1 kv:text-muted-foreground kv:text-sm"
       data-testid="worktree-prepare-progress"
     >
       <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>

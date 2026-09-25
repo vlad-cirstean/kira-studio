@@ -91,7 +91,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section aria-label="Global stash">
-    <div class="kv:flex kv:items-center kv:justify-between kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted kv:uppercase kv:tracking-wider">
+    <div class="kv:flex kv:items-center kv:justify-between kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">
       <span>Global stash</span>
       <KuiButton
         v-if="writeCapability"

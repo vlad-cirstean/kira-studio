@@ -103,7 +103,7 @@ function onToggleReviewed(path: string): void {
           ariaLabel="What to compare"
           @update:model-value="(value) => reviewFiles.setDiffMode(value as ReviewDiffMode)"
         />
-        <span v-if="deltaStatusText" class="kv:ml-auto kv:text-muted kv:text-sm">{{ deltaStatusText }}</span>
+        <span v-if="deltaStatusText" class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ deltaStatusText }}</span>
       </div>
       <p v-if="reviewFiles.diffError.value" class="kv:m-0 kv:p-3 kv:text-error">
         Couldn't open that file in the editor — {{ reviewFiles.diffError.value }}
@@ -130,7 +130,7 @@ function onToggleReviewed(path: string): void {
         @open-file="onOpenFileIndex"
         @toggle-reviewed="onToggleReviewed"
       />
-      <p v-if="reviewFiles.loading.value && files.length === 0" class="kv:m-0 kv:p-3 kv:text-muted">
+      <p v-if="reviewFiles.loading.value && files.length === 0" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
         Loading…
       </p>
     </template>

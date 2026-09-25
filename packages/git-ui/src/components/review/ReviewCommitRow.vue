@@ -239,7 +239,7 @@ function onOpenFile(index: number, pinned: boolean): void {
            below it. GitLens's own commit-node anatomy. -->
       <span class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
         <span class="kv:truncate">{{ commit.subject }}</span>
-        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted kv:text-xs kv:whitespace-nowrap kv:overflow-hidden">
+        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-xs kv:whitespace-nowrap kv:overflow-hidden">
           <span class="kv:overflow-hidden kv:text-ellipsis">{{ commit.author.name }}</span>
           <span class="kv:shrink-0" aria-hidden="true">·</span>
           <span class="kv:overflow-hidden kv:text-ellipsis">{{ dateText }}</span>
@@ -300,7 +300,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         @open-file="onOpenFile"
         @update:parent-index="expansion.detail.setParentIndex($event)"
       />
-      <p v-else class="kv:m-0 kv:p-2 kv:text-muted">Loading…</p>
+      <p v-else class="kv:m-0 kv:p-2 kv:text-muted-foreground">Loading…</p>
     </div>
 
     <RowContextMenu

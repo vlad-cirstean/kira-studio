@@ -70,7 +70,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
 <template>
   <div class="kv:flex kv:flex-col kv:min-h-0 kv:h-full">
     <div class="kv:flex kv:items-center kv:gap-1 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0 kv:font-ui">
-      <span class="kv:text-muted kv:text-sm" data-testid="review-comments-count">{{
+      <span class="kv:text-muted-foreground kv:text-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
       <KuiButton
@@ -131,7 +131,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
             @keydown.enter="emit('select-comment', group.path)"
           >
             <div class="kv:flex kv:items-center kv:gap-1">
-              <span class="kv:font-data kv:text-muted kv:text-sm">{{ lineLabel(c.range) }}</span>
+              <span class="kv:font-data kv:text-muted-foreground kv:text-sm">{{ lineLabel(c.range) }}</span>
               <span
                 v-if="anchorTitle(c)"
                 class="codicon codicon-warning kv:text-diff-modified"
@@ -153,13 +153,13 @@ function anchorTitle(c: ReviewComment): string | undefined {
         </div>
       </div>
 
-      <p v-else-if="!reviewComments.loading.value" class="kv:m-0 kv:p-3 kv:text-muted">
+      <p v-else-if="!reviewComments.loading.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
       </p>
 
       <p
         v-if="reviewComments.loading.value && groups.length === 0"
-        class="kv:m-0 kv:p-3 kv:text-muted"
+        class="kv:m-0 kv:p-3 kv:text-muted-foreground"
       >
         Loading…
       </p>

@@ -95,7 +95,7 @@ function confirm(): void {
           <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
         </li>
       </ul>
-      <p v-if="preflight.leavingTruncated" class="kv:text-muted kv:italic">and more…</p>
+      <p v-if="preflight.leavingTruncated" class="kv:text-muted-foreground kv:italic">and more…</p>
     </template>
     <p v-else>
       This moves to a different line of history: {{ preflight.leaving }} commit{{
@@ -105,7 +105,7 @@ function confirm(): void {
     </p>
 
     <fieldset class="kv:my-2 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm">
-      <legend class="kv:px-0.5 kv:text-muted">Mode</legend>
+      <legend class="kv:px-0.5 kv:text-muted-foreground">Mode</legend>
       <label class="kv:flex kv:gap-1 kv:items-start kv:py-1">
         <input
           type="radio"
@@ -156,7 +156,7 @@ function confirm(): void {
       <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
         <li v-for="path in destroys" :key="path"><code>{{ path }}</code></li>
       </ul>
-      <p class="kv:text-muted kv:italic">
+      <p class="kv:text-muted-foreground kv:italic">
         Untracked and ignored files are <strong>not</strong> affected.
       </p>
 
