@@ -214,7 +214,7 @@ onUnmounted(() => {
           <div class="flex flex-1 min-h-0 flex-col" :class="{ collapsed: !collectionsExpanded }">
             <button
               type="button"
-              class="panel-category-head"
+              class="flex shrink-0 items-center gap-1 px-1.5 h-control text-kira-sm uppercase tracking-wider border-0 bg-transparent text-muted-foreground cursor-pointer hover:text-fg"
               data-testid="collections-category-toggle"
               @click="collectionsExpanded = !collectionsExpanded"
             >
@@ -239,23 +239,13 @@ onUnmounted(() => {
         <EmptyDescription>Create one from the <b>+</b> above, or import a Postman collection.</EmptyDescription>
       </Empty>
     </div>
+    <!-- P110 I2-18: `.panel-category-head`'s `all: unset` + @apply folded directly onto the button
+         above -- `border-0 bg-transparent cursor-pointer` replaces what `all: unset` reset that
+         Preflight's own button normalization doesn't (Preflight zeroes font/margin/padding and sets
+         `appearance: button`, not border/background/cursor). No new primitive (F12): still reuses
+         the definition-section-title idiom (uppercase/muted/t-sm/letter-spacing) the views/
+         definition/*Section.vue components share -- promote to a real component only if a second
+         panel wants this exact category shape (P18's own "promote when a second consumer appears"
+         rule). -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* No new primitive (F12): reuses the definition-section-title idiom (uppercase/muted/t-sm/
-   letter-spacing) the views/definition/*Section.vue components share — promote to a real
-   component only if a second panel wants this exact category shape (P18's own "promote when a
-   second consumer appears" rule). `all: unset` has no Tailwind utility equivalent (a full
-   property reset) and this file's only other @apply-only rules moved to the template (P110
-   B38d) -- this is the sole rule left needing a real scoped-CSS selector. */
-.panel-category-head {
-  all: unset;
-  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted-foreground uppercase tracking-wider h-control text-kira-sm;
-}
-.panel-category-head:hover {
-  @apply text-fg;
-}
-</style>

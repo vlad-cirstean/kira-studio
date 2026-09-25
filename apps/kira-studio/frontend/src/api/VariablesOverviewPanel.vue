@@ -174,7 +174,7 @@ function editEnvironmentVariables(): void {
         <button
           v-if="canEdit"
           type="button"
-          class="overview-link"
+          class="inline-flex items-center gap-1 text-info text-kira-sm border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
@@ -184,7 +184,7 @@ function editEnvironmentVariables(): void {
         <button
           v-if="canEdit"
           type="button"
-          class="overview-link"
+          class="inline-flex items-center gap-1 text-info text-kira-sm border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"
@@ -200,20 +200,10 @@ function editEnvironmentVariables(): void {
         </button>
       </div>
     </div>
+    <!-- P110 I2-18: `.overview-link`'s `all: unset` + @apply folded directly onto both footer
+         buttons above -- `border-0 bg-transparent cursor-pointer` replaces what `all: unset` reset
+         that Preflight's own button normalization doesn't (Preflight zeroes font/margin/padding and
+         sets `appearance: button`, not border/background/cursor). `disabled:` variants replace the
+         old `:disabled` compound selector. -->
   </PopoverContent>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* `all: unset` has no Tailwind utility equivalent (a full property reset) -- this file's only
-   other @apply-only rules moved to the template (P110 B38d); .overview-link (2 template sites,
-   both footer buttons) is the sole rule left needing a real scoped-CSS selector. */
-.overview-link {
-  all: unset;
-  @apply inline-flex cursor-pointer items-center gap-1 text-info text-kira-sm;
-}
-.overview-link:disabled {
-  @apply cursor-default text-subtle opacity-60;
-}
-</style>
