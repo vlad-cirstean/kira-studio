@@ -5507,3 +5507,65 @@ confirmed present as created.
 **P108 (all 20 parts) is now fully complete.** No separate whole-phase `## P108 result` rollup —
 P99 and P100, both multi-part phases, closed the same way with no rollup section, and nothing about
 this phase's own closure changes that precedent.
+
+## P114 result
+
+Landed as 2 plan commits (`docs/v1.9/plans/P114-status-bar-blame-test-fix.md`), against this SPEC
+row. One Opus planning pass, one sequential Sonnet implementer, no review stage — a small,
+already-fully-designed phase per the plan's own §4.
+
+The row's own reported symptom (a 60s timeout on `[data-testid="status-bar"]`, "the app never
+finishes launching") did not reproduce anywhere in the plan's investigation or in this
+implementation pass. The actual, deterministic failure was
+`repo-workspace.spec.ts:531`'s `expect(editor).toBeVisible()` on
+`[data-testid="repo-file-editor"]`, timing out at 5s with "the transport was disposed" showing in
+its place. Root cause (plan §2): the P76 test's revision-pinned half seeds an active, restored
+repo-file tab, whose boot itself opens the git transport (`main.ts`'s post-hydrate fall-forward
+mounts it before `app.mount`, before any click is possible) — but the half's own git-stream mock
+was installed via `page.evaluate` after `relaunch()` had already resolved, too late for that boot
+path. Since `cac7093b` ("react to the git transport's own stream closing (F3)"), the unmocked,
+closed transport now correctly rejects `file.read` instead of hanging, so `RepoFileView` never
+reaches `state: 'found'` and the editor container never renders. Before `cac7093b` this half passed
+vacuously, off a forever-loading empty host that satisfied `toBeVisible()` regardless, and it never
+moved the cursor either, so `blame.line` — the guard the half exists to prove — was never actually
+exercised. `cac7093b` is correct app behavior and was not touched.
+
+- **P114-1 `bf010890` — pre-navigation git stream mock install and request log.**
+  `gitStreamMock.ts`'s browser-side body hoisted into a shared `installInBrowser`, plus a new
+  `installGitStreamMockOnInit` (`page.addInitScript`) for a launch whose boot itself opens the git
+  transport — the existing `installGitStreamMock` (`page.evaluate`) stays the per-spec default for
+  every other caller. `installInBrowser` also logs every method seen in a `t: 'req'` frame to
+  `window.__kiraGitRequests`, read back via new `gitStreamRequests()`. `fixtures.ts`'s
+  `RelaunchOptions` gains an optional `gitStream` field wired into `installMocks`, before
+  `relaunch()`'s one navigation. All 12 existing `installGitStreamMock` callers compiled and passed
+  unchanged; full `ui` project at this commit: 19 passed, the P76 test still failing as expected
+  until P114-2.
+- **P114-2 `6f8f9654` — install the P76 revision-pinned half's git mock before boot.** Switched the
+  half to `relaunch`'s new `gitStream` option (`'repo.open': null`, not `undefined` —
+  `addInitScript` JSON-serializes its args, and `undefined` would silently drop the key and hang
+  `repo.open` forever). Replaced the vacuous `toBeVisible()` with an assertion that file content
+  actually renders (`'export const a = 1;'` in `.view-lines`), which only happens from
+  `state: 'found'`, reached only after `RepoFileView.vue`'s `mount()` has already evaluated the
+  `blameable` guard synchronously — so this proves the guard ran, not just that some container
+  exists. Then mirrors the first half's arming action (a click plus `ArrowDown`, moving to the
+  file's now-two-line content) and a bounded ~500ms wait (>3x `blameLine.ts`'s 150ms
+  `DEBOUNCE_MS`), then asserts `file.read` was requested, `blame.line` was not, and
+  `blame-status` still reads count 0.
+
+**Verification, all run for real:**
+1. Isolated: `--repeat-each=3` in one invocation, 3/3 clean, plus 3 further separate standalone
+   invocations, all clean.
+2. Full `playwright test --config=apps/kira-space/playwright.config.ts --project=ui`: 20 passed, 0
+   failed, 0 flaky (both before P114-2, with the P76 test as the sole expected failure, and after).
+3. Mutation check (plan §0 acceptance 3), scratch-only, reverted immediately after: at
+   `RepoFileView.vue:204`, dropped `&& rev === null` from the `blameable` guard, rebuilt, reran the
+   P76 test 3x. All 3 runs **failed** at `expect(requests).not.toContain('blame.line')`, with the
+   request log reading `["file.read","repo.open","blame.line","blame.line"]` — the exact sequence
+   the plan's own prototype found. Confirms the revision-pinned half is no longer vacuous. Guard
+   reverted (`git diff --stat` on `RepoFileView.vue` clean before the fix-verification reruns
+   above), and the full `ui` project reran green (20/20) after reverting.
+4. `bun run lint` and `bun run typecheck` (covering `typecheck:space-tests`) both pass, via the
+   pre-commit hook on both commits — no `--no-verify` on either.
+
+Touched exactly the plan's own 3 files (`gitStreamMock.ts`, `fixtures.ts`,
+`repo-workspace.spec.ts`) plus this result section, per the plan's own §6 file-ownership list.
