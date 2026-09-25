@@ -504,7 +504,7 @@ function onBulkClose(): void {
         <span
           class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
           :class="{
-            'animate-kira-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
+            'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
             'border-error': runState.status === 'error',
           }"
         />

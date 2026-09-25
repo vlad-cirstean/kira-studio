@@ -114,21 +114,6 @@
 
   --shadow-kira: var(--kira-shadow);
   --shadow-kira-dialog: var(--kira-shadow-dialog);
-
-  /* v1.9 tailwind-declines deep dive: names primitives.css's own `@keyframes p-spin` as a real
-     `animate-kira-spin` utility, replacing a dozen `animate-[spin_0.7s_linear_infinite]` arbitrary
-     values with the app's existing spinner speed (0.7s) instead of falling back to Tailwind's
-     default `animate-spin` (1s), which would be a real timing change with no real benefit.
-     P110 B6: the keyframes themselves move here from primitives.css (renamed p-spin -> kira-spin,
-     Tailwind v4 supports @keyframes inside @theme), so primitives.css loses its last @theme-adjacent
-     rule. */
-  --animate-kira-spin: kira-spin 0.7s linear infinite;
-
-  @keyframes kira-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
 }
 
 /* P110 B6: recurring multi-declaration patterns, promoted to @utility ahead of the scoped-block

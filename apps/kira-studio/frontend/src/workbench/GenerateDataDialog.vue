@@ -503,7 +503,7 @@ function onSequenceStartChange(index: number, start: number): void {
               <span class="inline-flex items-center gap-1 font-data text-kira-xs text-info">
                 <span class="min-w-[7ch] text-right">—</span>
                 <span
-                  class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-kira-spin"
+                  class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-spin"
                 />
               </span>
             </TooltipTrigger>

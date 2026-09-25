@@ -321,7 +321,9 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       role="status"
       aria-live="polite"
     >
-      <span class="codicon codicon-sync codicon-modifier-spin" aria-hidden="true"></span>
+      <!-- Pre-approved spinner change (P110 I2-35, §1.4/§3.11.1): codicon's own stepped 1.5s
+           spin -> Tailwind's smooth 1s `animate-spin`, the same change already made just below. -->
+      <span class="codicon codicon-sync kv:inline-block kv:animate-spin" aria-hidden="true"></span>
       Restacking…
     </span>
     <span

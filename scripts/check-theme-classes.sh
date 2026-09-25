@@ -255,6 +255,13 @@ check_kui_class 'kui-segmented' 'kv: utilities on KuiSegmented.vue'
 check_kui_class 'kui-segmented-button' 'kuiSegmentedButtonVariants() (packages/kira-ui/src/KuiSegmented.vue)'
 check_kui_class 'kui-segmented-badge' 'kv: utilities on KuiSegmented.vue'
 
+# P110 I2-35: one spinner speed, Tailwind's own default `animate-spin` (1s) -- retires the app's
+# own 0.7s `--animate-kira-spin` token and codicon's own 1.5s stepped `codicon-modifier-spin`.
+# Attribute-scoped for the codicon check: codicon.css's own header comment names the class as
+# prose (see that file's own top-of-file doc comment).
+check_class 'animate-kira-spin' 'animate-spin'
+check_class_in_attrs 'codicon-modifier-spin' 'kv:inline-block kv:animate-spin' "$GIT_UI_SRC $KIRA_UI_SRC"
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else
