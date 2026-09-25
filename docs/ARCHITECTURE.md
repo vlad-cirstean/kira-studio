@@ -3872,10 +3872,9 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   existed. `TestFixture_ClickHouse`/`Kafka`/`MariaDB`/`MySQL`/`Redis`/`SQS` all diff against the
   committed JSON: a new `caps.keyTypes` field, and every fixture connection row logs "unrecognised
   MCP {read,write,DDL} mode ... mode=\"\"" since the stored rows predate those columns and read back
-  empty. Predates this chapter entirely — not caused by M1/M2/M3 — and this suite is explicitly
-  on-demand/CI-only (`CLAUDE.md`'s P25 section), so it doesn't gate a phase's own fast checks.
-  Closing it needs running the suite's own regeneration path (extend, per `CLAUDE.md`'s own P25/P26
-  guidance) against a current schema.
+  empty. This suite is explicitly on-demand/CI-only (`CLAUDE.md`'s real-container two-suite rule),
+  so it doesn't gate a phase's own fast checks. Closing it needs running the suite's own
+  regeneration path (extend, per `CLAUDE.md`'s own P25/P26 guidance) against a current schema.
 
 - **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
   definition** (M7 round 2, finding #1). A view that itself renames a masked column
@@ -3911,13 +3910,24 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Response bodies, gRPC response messages and jar cookies reach `kira.sqlite` history unmasked**
   (F16, P108 Part 8). `bridge/http.go`'s `maskSecrets` masks headers, redirect/final URLs and the
-  rendered `Wire` exchange, but never `resp.Body`; `bridge/grpc.go`'s `maskGrpcResult` never masks
-  `Messages[].JSON`; the jar-cookie bridge (`http.go`'s `Cookies`) returns `JarCookies` unmasked.
+  rendered `Wire` exchange, but never `resp.Body` — `internal/httpclient/options.go`'s own
+  `WireMask`/`wire.go`'s `capWireText` (P108 F12) mask the *request* body's wire text earlier, before
+  truncation, but that is a different pass over a different field, and the response body stays
+  untouched by either; `bridge/grpc.go`'s `maskGrpcResult` never masks `Messages[].JSON`; the
+  jar-cookie bridge (`http.go`'s `Cookies`) returns `JarCookies` unmasked.
   Accepted by design (P8 OQ-6, P11) — a request secret is masked because it's substituted from a
   known name/value pair; a response body is opaque server output with no such pairing to mask
   against. A server that echoes a secret back in its response body, a gRPC reply message, or a
   `Set-Cookie` therefore stores that secret in plaintext in history. Closing this needs the same
   substituted-secret value set applied as a body/message/cookie scan, not just a header/URL one.
+
+- **`internal/dbmcp/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (M7 finding
+  #7 gave it `ReadHeaderTimeout`/`IdleTimeout` plus the cross-origin wrapper). Deliberate: the
+  Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
+  would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
+  a slow header (`ReadHeaderTimeout`, now bounded) is. Loopback-only binding plus the cross-origin
+  wrapper narrow who can reach the server further still, but a client that opens a connection and
+  simply never finishes its response body can still tie one up indefinitely.
 
 - **The SQL splitter has no notion of a compound statement body** (F4, P108 Part 11). A SQLite
   `CREATE TRIGGER … BEGIN …; …; END`, a MySQL stored procedure body, or a Postgres `BEGIN ATOMIC …
@@ -3931,21 +3941,22 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   this phase did close.
 
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
-  install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
-  `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
-  `shell.DefaultBounds` see a real work area for a window opened well after `Run()` (Dock-reopen
-  minting a fresh window, "New Window" with nothing to cascade from). But every window opened at
-  startup is still built before `app.Run()` even runs (main.go's own top comment), and on macOS the
+  install opens** (round-2 review finding 4). Repo-root `internal/shell/openwindow.go`'s
+  `OpenWindow` now resolves `app.Screen.GetPrimary()` fresh per call rather than once before
+  `app.Run()`, which lets `DefaultBounds` (`internal/shell/window.go`) see a real work area for a
+  window opened well after `Run()` (Dock-reopen minting a fresh window, "New Window" with nothing to
+  cascade from). But every window opened at startup is still built before `app.Run()` even runs
+  (`main.go`'s own top comment), and on macOS the
   screen cache isn't populated until `ApplicationDidFinishLaunching` fires, strictly after `Run()`
   is called. So a genuinely first-ever launch still gets the unclamped 1280×800 default until the
   window is resized once. Fixing this needs deferring startup window creation until after that
   event fires — a materially larger structural change than this fix.
 
-**As of P100, every item from here through "No debounce on the quick-open palette's keystroke
-handler" below (including the Correctness: and Performance: subsections) describes Kira Space, not
-Kira Studio** — the native code workspace and git module both moved there in full, unchanged, so
-each limitation moved with the code it describes. The items after it are Kira Studio's own (or, for
-the workflow-coverage item, repo-wide).
+**As of P100, every item from here through the comment-reload fan-out item below (including the
+Correctness: and Performance: subsections) describes Kira Space, not Kira Studio** — the native code
+workspace and git module both moved there in full, unchanged, so each limitation moved with the code
+it describes. The items after it are Kira Studio's own (or, for the workflow-coverage item,
+repo-wide).
 
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
@@ -3975,17 +3986,6 @@ the workflow-coverage item, repo-wide).
   posture C5's project tree already takes for its own listing.
 - **C7's search cannot match a pattern spanning multiple lines.** The scanner hands the matcher one
   line at a time (`^`/`$` anchor per line, D5); a `--multiline`-equivalent search is out of scope.
-- **C9's quick open (⌘P) has no recency ranking and no MRU.** SPEC's row names recency as a ranking
-  need; the `scoreFn` seam is one term wide when a later phase wants it (C9 D2 rule 3), but building
-  it now needs a persisted per-repo history this phase does not add.
-- **C9's quick open matches only the same tree listing C5's project tree already holds** — it does
-  not re-enumerate. A file created since the tree's last refresh is not quick-openable until one
-  (workspace open, or the panel's own Refresh) happens — the same snapshot-freshness posture the
-  tree itself already has, above, not a new staleness this phase introduces.
-- **C9's quick open matches only the first 50,000 candidate files** (`QUICK_OPEN_MAX_CANDIDATES`) in
-  a repository past that size, and says so (a dim footer row) rather than searching the rest —
-  D3's measured knee (34.78 ms worst-case query at 50k, 144.06 ms at 200k, on this app's own
-  hardware) between "sub-frame" and "perceptible."
 - **The native graph and the VS Code extension hold independent `gitsession.Conn`s over the same
   repository** (C10 §8). Correct by design — each connection's own hold/refcount is exactly what
   lets `repo.close` release only that connection's share (`internal/gitrpc/handlers.go`) — but it
@@ -3993,13 +3993,6 @@ the workflow-coverage item, repo-wide).
   Harmless (each connection's own hold is independently refcounted and released) and bounded, but
   real.
 
-- **`internal/dbmcp/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (M7 finding
-  #7 gave it `ReadHeaderTimeout`/`IdleTimeout` plus the cross-origin wrapper). Deliberate: the
-  Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
-  would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
-  a slow header (`ReadHeaderTimeout`, now bounded) is. Loopback-only binding plus the cross-origin
-  wrapper narrow who can reach the server further still, but a client that opens a connection and
-  simply never finishes its response body can still tie one up indefinitely.
 - **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
   repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
   `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,
@@ -4011,9 +4004,32 @@ the workflow-coverage item, repo-wide).
   `OpRequest` kinds have no such kind, `packages/git-ipc`'s contract has none, and `packages/git-ui`
   has no `MergeDialog`/`RebaseDialog`. Merge and rebase are reachable only as `remote.run`'s own pull
   strategies (`ff-only`/`merge`/`rebase`) and inside `stack.restack`'s own branch-by-branch rebase.
-  Building a standalone version needs a new `OpRequest` kind, a new `opSpec` with an undo policy, a
-  new preflight, a new dialog and a `ContractVersion` bump — out of scope until a phase actually
-  asks for it.
+  P111 (`ContractVersion` 41) only added a `rebaseMerges` flag onto that existing pull path — still
+  no standalone operation. Building one needs a new `OpRequest` kind, a new `opSpec` with an undo
+  policy, a new preflight, a new dialog and a further `ContractVersion` bump — out of scope until a
+  phase actually asks for it.
+- **Kira Space has no full-stack (`e2e-real`) tier, so git pairing has no real-socket test** (found
+  v1.9 P109). `git-pairing-real.spec.ts` was deleted at P100 rather than ported (Testing, above):
+  nothing drives pairing, token reuse or revocation against a real `-tags server` Kira Space binary
+  and a real `git.sock`. Go unit tests cover `gitsock` in-process only. Closing it needs a Kira Space
+  `e2e-real` project (fixtures, a `playwright.config.ts` project, the spec).
+- **The graph tab's P72/P79 KeepAlive-based persistence is dead code — real, unflagged before now**
+  (found v1.9 P109, verified against a real `repo-workspace.spec.ts` run). Neither app's
+  `packages/workbench/src/components/MainView.vue` wraps its `<component :is>` in a `KeepAlive` any
+  more (confirmed by grep across every `.vue` file in both apps and the shared workbench package);
+  `RepoGraphView.vue`'s own `onActivated`/`onDeactivated` hooks, and `graphVisibility.ts`'s
+  `GRAPH_VISIBLE_KEY`/`MountHandle.setVisible` (P79's background-pause optimization) they drive, need
+  a `KeepAlive` ancestor to fire at all and consequently never do. The graph tab still fully unmounts
+  and remounts on every tab switch; the continuity users observe comes entirely from
+  `TabViewStateStore` persisting/restoring view state through the tab's own `state.viewState` (see
+  "The native code workspace" above), not from an in-memory instance surviving in the background.
+  Source comments in both files still describe the old KeepAlive design as current. No functional
+  bug (the test that exercises the user-visible behavior passes), but the background-pause
+  optimization is silently inert, and any future change assuming a live KeepAlive ancestor exists
+  would be building on a false premise. Closing this needs either restoring a real `KeepAlive`
+  wrapper (recovering the pause optimization) or deleting the now-dead `setVisible`/`onActivated`/
+  `onDeactivated` machinery and its source comments — a source change, out of this phase's own
+  docs-only scope.
 
 Correctness:
 - **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
@@ -4028,29 +4044,36 @@ Correctness:
   looks identical to "all comments were deleted."
 
 Performance:
-- **`repo/state/fileTree.ts`'s tree-filter computed has per-row reactive dependency tracking**
-  costing 3-3.5x at the 200,000-file cap (C13-6's `markRaw` covered the tree structure but not the
-  `status`/`expanded` reactive lookups inside the filter).
+- **`repo/state/fileTree.ts`'s `useFileTreeStore` (Pinia now, same file) tree-filter computed has
+  per-row reactive dependency tracking** costing 3-3.5x at the 200,000-file cap (C13-6's `markRaw`
+  covered the tree structure but not the `status`/`expanded` reactive lookups inside the filter,
+  still true post-Pinia: `state.status`/`state.expanded` stay reactive fields the filter reads per
+  row).
 - **One comment mutation with N open review diff tabs on the same branch triggers N+1 redundant
   `review.comment.list` re-anchoring passes** (a server-side cost) — C13-12 fixed the diff-reload
   fan-out (C14-2 fixed a regression in that same split) but not the comment-reload fan-out.
-- **No debounce on the quick-open palette's keystroke handler** (the project tree got a 150ms
-  debounce in C13-6, quick-open did not) — low severity, 20-35ms per keystroke measured even at the
-  file-count cap.
 
 - **Kira Studio's own `LinkService`/`link.openExternal` bind has no live caller** (found during
-  P100 Part 4's docs sweep). `packages/git-ui`'s commit-body link opening was the only consumer;
-  it moved to Kira Space with the rest of the git module, and `frontend/src/bridge/index.ts`'s
-  `linkOpenExternal` wrapper is still exported with nothing calling it. Harmless — it is still a
-  well-formed, tested bound method, just unreachable from any UI — and removing the bind (Go
-  service, its `main.go` registration, the frontend wrapper) is left for a future pass rather than
-  attempted here, out of this phase's own icon/docs/audit scope.
-- **`.github/workflows/pr.yml` has no Kira Space coverage at all** (found during P100 Part 4's docs
-  sweep). Its `checks` job runs `bun run build:studio` (Kira Studio's frontend only — `build:space` is a
-  separate script it never calls), `go build ./...` (covers Kira Space's Go, since it is one
-  module) and `verify:packaging` (Kira Studio's own bundle only); there is no `build:vscode` or
-  `test:webview` step anywhere in CI. `typecheck`/`lint` already cover Kira Space, since those are
-  whole-repo scripts. Not fixed here: `docs/DEV_ENVIRONMENT.md`'s own section explains this session
+  P100 Part 4's docs sweep, still true). `packages/git-ui`'s commit-body link opening was the only
+  consumer; it moved to Kira Space with the rest of the git module. The `linkOpenExternal` wrapper
+  itself moved on to shared `packages/workbench/src/bridge/createCoreControl.ts` and is very much
+  live — just for Kira Space (`repo/git/hostHandlers.ts:433`, binding its own
+  `apps/kira-space/internal/bridge/link.go`), not Kira Studio. Kira Studio's own copy of the bind
+  (Go service, `main.go` registration) is still what has nothing calling it. Harmless — it is still a
+  well-formed, tested bound method, just unreachable from Kira Studio's own UI — and removing that
+  one app's now-unused bind is left for a future pass rather than attempted here, out of this phase's
+  own icon/docs/audit scope.
+- **`.github/workflows/pr.yml` still has no Kira Space coverage in what's actually live, and a
+  staged fix for part of it sits unapplied.** As shipped, its `checks`/`container-tests` jobs run
+  `bun run build:studio` (Kira Studio's frontend only), `go build ./...` (covers Kira Space's Go,
+  since it is one module) and `verify:packaging` (Kira Studio's own bundle only); there is no
+  `build:vscode`, `test:webview` or `test:ui:space` step anywhere in CI. `typecheck`/`lint` already
+  cover Kira Space, since those are whole-repo scripts.
+  `docs/pending-changes/.github__workflows__pr.yml.patch` (P108 Part 2 F3/F4) stages `bun run
+  build:space` beside every `build:studio` step in both jobs and retargets the darwin `go test` list
+  onto `apps/kira-space/internal/gitclient` — still unapplied. Even once it is,
+  `build:vscode`/`test:webview`/`test:ui:space` remain absent from CI; that gap needs its own
+  follow-up. Not fixed here: `docs/DEV_ENVIRONMENT.md`'s own section explains this session
   cannot push a `.github/workflows/*.yml` change directly (an OAuth scope limit) and requires
   staging one under `docs/pending-changes/` for a session that can; that staging step is real,
   separate work this phase's own icon/docs/audit scope does not cover.
