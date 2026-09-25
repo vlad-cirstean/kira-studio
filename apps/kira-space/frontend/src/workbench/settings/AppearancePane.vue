@@ -1,15 +1,9 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import DateFormatField from '@workbench/settings/fields/DateFormatField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
@@ -67,24 +61,15 @@ const inlineBlameId = useId();
           repository file viewer.</FieldDescription
         >
       </Field>
-      <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-          class="ml-auto"
-            data-testid="settings-reset-appearance-inlineBlame"
-            :disabled="isAtDefault('appearance', 'inlineBlame')"
-            aria-label="Reset to default"
-            @click="resetLeaf('appearance', 'inlineBlame')"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        class="ml-auto"
+        data-testid="settings-reset-appearance-inlineBlame"
+        :disabled-trigger="isAtDefault('appearance', 'inlineBlame')"
+        :disabled="isAtDefault('appearance', 'inlineBlame')"
+        @click="resetLeaf('appearance', 'inlineBlame')"
+      />
     </FieldGroup>
 
     <DateFormatField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />

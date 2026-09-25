@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
 import { computed, useId } from 'vue';
@@ -61,23 +54,14 @@ const expensiveQueryRowsId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="opLogRetentionDaysId" class="text-kira-sm">Operation log retention (days)</Label>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'opLogRetentionDays') }">
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="settings-reset-advanced-opLogRetentionDays"
-                :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
-                aria-label="Reset to default"
-                @click="resetLeaf('advanced', 'opLogRetentionDays')"
-              >
-                <CodiconIcon name="discard" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-advanced-opLogRetentionDays"
+          :disabled-trigger="isAtDefault('advanced', 'opLogRetentionDays')"
+          :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
+          @click="resetLeaf('advanced', 'opLogRetentionDays')"
+        />
       </div>
       <NumberStepperInput
         :id="opLogRetentionDaysId"
@@ -97,23 +81,14 @@ const expensiveQueryRowsId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="expensiveQueryRowsId" class="text-kira-sm">Expensive query threshold (rows)</Label>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'expensiveQueryRows') }">
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="settings-reset-advanced-expensiveQueryRows"
-                :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
-                aria-label="Reset to default"
-                @click="resetLeaf('advanced', 'expensiveQueryRows')"
-              >
-                <CodiconIcon name="discard" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-advanced-expensiveQueryRows"
+          :disabled-trigger="isAtDefault('advanced', 'expensiveQueryRows')"
+          :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
+          @click="resetLeaf('advanced', 'expensiveQueryRows')"
+        />
       </div>
       <NumberStepperInput
         :id="expensiveQueryRowsId"

@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
@@ -36,23 +29,14 @@ const defaultPageSizeId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="defaultPageSizeId" class="text-kira-sm">Default page size</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('data', 'defaultPageSize') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-data-defaultPageSize"
-              :disabled="isAtDefault('data', 'defaultPageSize')"
-              aria-label="Reset to default"
-              @click="resetLeaf('data', 'defaultPageSize')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-data-defaultPageSize"
+          :disabled-trigger="isAtDefault('data', 'defaultPageSize')"
+          :disabled="isAtDefault('data', 'defaultPageSize')"
+          @click="resetLeaf('data', 'defaultPageSize')"
+        />
       </div>
       <NativeSelect
         :id="defaultPageSizeId"

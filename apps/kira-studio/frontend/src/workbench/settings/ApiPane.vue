@@ -1,16 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, useId } from 'vue';
 import {
@@ -94,23 +88,14 @@ const disableCookieJarId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'httpVersion') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-api-httpVersion"
-              :disabled="isAtDefault('api', 'httpVersion')"
-              aria-label="Reset to default"
-              @click="resetLeaf('api', 'httpVersion')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-api-httpVersion"
+          :disabled-trigger="isAtDefault('api', 'httpVersion')"
+          :disabled="isAtDefault('api', 'httpVersion')"
+          @click="resetLeaf('api', 'httpVersion')"
+        />
       </div>
       <NativeSelect
         :id="httpVersionId"
@@ -127,23 +112,14 @@ const disableCookieJarId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'requestTimeoutMs') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-api-requestTimeoutMs"
-              :disabled="isAtDefault('api', 'requestTimeoutMs')"
-              aria-label="Reset to default"
-              @click="resetLeaf('api', 'requestTimeoutMs')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-api-requestTimeoutMs"
+          :disabled-trigger="isAtDefault('api', 'requestTimeoutMs')"
+          :disabled="isAtDefault('api', 'requestTimeoutMs')"
+          @click="resetLeaf('api', 'requestTimeoutMs')"
+        />
       </div>
       <NumberStepperInput
         :id="requestTimeoutMsId"
@@ -166,23 +142,14 @@ const disableCookieJarId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'maxResponseMb') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-api-maxResponseMb"
-              :disabled="isAtDefault('api', 'maxResponseMb')"
-              aria-label="Reset to default"
-              @click="resetLeaf('api', 'maxResponseMb')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-api-maxResponseMb"
+          :disabled-trigger="isAtDefault('api', 'maxResponseMb')"
+          :disabled="isAtDefault('api', 'maxResponseMb')"
+          @click="resetLeaf('api', 'maxResponseMb')"
+        />
       </div>
       <NumberStepperInput
         :id="maxResponseMbId"
@@ -215,24 +182,15 @@ const disableCookieJarId = useId();
         </Checkbox>
         <Label :for="sslVerifyId" class="text-kira-sm">Verify SSL certificates</Label>
       </Field>
-      <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'sslVerify') }">
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-          class="ml-auto"
-            data-testid="settings-reset-api-sslVerify"
-            :disabled="isAtDefault('api', 'sslVerify')"
-            aria-label="Reset to default"
-            @click="resetLeaf('api', 'sslVerify')"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        class="ml-auto"
+        data-testid="settings-reset-api-sslVerify"
+        :disabled-trigger="isAtDefault('api', 'sslVerify')"
+        :disabled="isAtDefault('api', 'sslVerify')"
+        @click="resetLeaf('api', 'sslVerify')"
+      />
     </FieldGroup>
     <FieldError v-if="!draft.api.sslVerify" data-testid="settings-api-sslVerify-warning">
       Turning certificate verification off lets any server present any certificate.
@@ -254,46 +212,28 @@ const disableCookieJarId = useId();
         </Checkbox>
         <Label :for="followRedirectsId" class="text-kira-sm">Follow redirects</Label>
       </Field>
-      <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'followRedirects') }">
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-          class="ml-auto"
-            data-testid="settings-reset-api-followRedirects"
-            :disabled="isAtDefault('api', 'followRedirects')"
-            aria-label="Reset to default"
-            @click="resetLeaf('api', 'followRedirects')"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        class="ml-auto"
+        data-testid="settings-reset-api-followRedirects"
+        :disabled-trigger="isAtDefault('api', 'followRedirects')"
+        :disabled="isAtDefault('api', 'followRedirects')"
+        @click="resetLeaf('api', 'followRedirects')"
+      />
     </FieldGroup>
 
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'maxRedirects') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-api-maxRedirects"
-              :disabled="isAtDefault('api', 'maxRedirects')"
-              aria-label="Reset to default"
-              @click="resetLeaf('api', 'maxRedirects')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-api-maxRedirects"
+          :disabled-trigger="isAtDefault('api', 'maxRedirects')"
+          :disabled="isAtDefault('api', 'maxRedirects')"
+          @click="resetLeaf('api', 'maxRedirects')"
+        />
       </div>
       <NumberStepperInput
         :id="maxRedirectsId"
@@ -333,24 +273,15 @@ const disableCookieJarId = useId();
           the same host.</FieldDescription
         >
       </Field>
-      <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'disableCookieJar') }">
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-          class="ml-auto"
-            data-testid="settings-reset-api-disableCookieJar"
-            :disabled="isAtDefault('api', 'disableCookieJar')"
-            aria-label="Reset to default"
-            @click="resetLeaf('api', 'disableCookieJar')"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        class="ml-auto"
+        data-testid="settings-reset-api-disableCookieJar"
+        :disabled-trigger="isAtDefault('api', 'disableCookieJar')"
+        :disabled="isAtDefault('api', 'disableCookieJar')"
+        @click="resetLeaf('api', 'disableCookieJar')"
+      />
     </FieldGroup>
   </div>
 </template>
