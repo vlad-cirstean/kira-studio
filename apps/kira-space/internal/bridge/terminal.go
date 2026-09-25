@@ -100,7 +100,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 		if errors.Is(err, terminal.ErrDuplicateSession) {
 			return TerminalOpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
 		}
-		return TerminalOpenResult{}, ipcerr.Internal(err.Error())
+		return TerminalOpenResult{}, ipcerr.InternalErr(err)
 	}
 
 	return TerminalOpenResult{Shell: sess.Shell()}, nil

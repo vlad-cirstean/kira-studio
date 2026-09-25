@@ -28,7 +28,7 @@ type SettingsSetArgs struct {
 func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	merged, err := s.Deps.Repos.Settings.Set(args.Patch)
 	if err != nil {
-		return model.Settings{}, ipcerr.Internal(err.Error())
+		return model.Settings{}, ipcerr.InternalErr(err)
 	}
 	if args.Patch.Advanced != nil && args.Patch.Advanced.GitLogLevel != nil {
 		logging.SetLevel(*args.Patch.Advanced.GitLogLevel)

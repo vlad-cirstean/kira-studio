@@ -116,7 +116,7 @@ const repoHeadsConcurrency = 4
 func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeadsArgs) ([]CodeRepoHead, error) {
 	repos, err := s.Deps.Repos.CodeRepos.List()
 	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
+		return nil, ipcerr.InternalErr(err)
 	}
 	if len(args.IDs) > 0 {
 		want := make(map[string]bool, len(args.IDs))
@@ -177,7 +177,7 @@ type CodeRepoWorktreeLink struct {
 func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRepoWorktreeLink, error) {
 	repos, err := s.Deps.Repos.CodeRepos.List()
 	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
+		return nil, ipcerr.InternalErr(err)
 	}
 
 	status := s.Discovery.Status(ctx, s.gitPathSetting())
@@ -280,7 +280,7 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 
 	existing, err := s.Deps.Repos.CodeRepos.List()
 	if err != nil {
-		return model.CodeRepo{}, ipcerr.Internal(err.Error())
+		return model.CodeRepo{}, ipcerr.InternalErr(err)
 	}
 	for _, r := range existing {
 		if r.RepoID == summary.RepoID {
@@ -316,7 +316,7 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 		return ipcerr.BadRequest("id is required")
 	}
 	if err := s.Deps.Repos.CodeRepos.Remove(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	s.Registry.Close(args.ID)
 	return nil
@@ -398,7 +398,7 @@ func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceR
 		if errors.Is(err, codeworkspace.ErrSessionClosed) {
 			return codeworkspace.DiffContent{}, ipcerr.New("E_WORKSPACE_CLOSED", "codeworkspace: workspace was closed")
 		}
-		return codeworkspace.DiffContent{}, ipcerr.Internal(err.Error())
+		return codeworkspace.DiffContent{}, ipcerr.InternalErr(err)
 	}
 	return content, nil
 }
