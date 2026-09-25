@@ -128,14 +128,14 @@ defineExpose({
 <template>
   <div
     ref="listEl"
-    class="kv:flex kv:flex-col kv:gap-px kv:p-kui-2"
+    class="kv:flex kv:flex-col kv:gap-px kv:p-1"
     role="menu"
     :aria-label="title ?? label"
     @keydown="onKeydown"
   >
     <div
       v-if="title"
-      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-kui-3 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-wider kv:truncate"
+      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-1.5 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-wider kv:truncate"
       aria-hidden="true"
     >
       {{ title }}
@@ -143,7 +143,7 @@ defineExpose({
     <template v-for="(section, sectionIndex) in sections" :key="sectionIndex">
       <hr
         v-if="sectionIndex > 0"
-        class="kv:h-px kv:my-kui-2 kv:border-0 kv:bg-kui-border-strong"
+        class="kv:h-px kv:my-1 kv:border-0 kv:bg-kui-border-strong"
       />
       <div
         v-for="item in section.items"

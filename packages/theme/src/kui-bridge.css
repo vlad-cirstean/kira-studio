@@ -15,6 +15,9 @@
  * `--kui-icon-size`, `--kui-font-*`, `--kui-space-5`/`-6`, `--kui-shadow-float`) — the contract
  * this file's own header promises ("real and satisfiable from both hosts") was not actually true
  * from G21 through G34 (this file was missing all three G21 additions); it is again now.
+ *
+ * P110 I2-29: `--kui-space-1..6` retired — every `kv:*-kui-1..6` site now uses the default
+ * Tailwind spacing scale directly, so nothing bridges this name any more.
  */
 :root {
   --kui-fg: var(--kira-fg);
@@ -42,12 +45,6 @@
   --kui-font-size: var(--kira-t-md);
   --kui-font-size-sm: var(--kira-t-sm);
   --kui-font-size-xs: var(--kira-t-xs);
-  --kui-space-1: var(--kira-s-1);
-  --kui-space-2: var(--kira-s-2);
-  --kui-space-3: var(--kira-s-3);
-  --kui-space-4: var(--kira-s-4);
-  --kui-space-5: var(--kira-s-5);
-  --kui-space-6: var(--kira-s-6);
   --kui-shadow-float: var(--kira-shadow-dialog);
   /* G20 D6: mapped from this app's own real `--kira-z-*` ladder — inert today, same as every
      other token above (nothing in this app consumes a `packages/kira-ui` floating surface yet).

@@ -23,7 +23,7 @@ import { cva } from 'class-variance-authority';
 import type { KuiSegmentedOption } from './optionTypes.ts';
 
 const kuiSegmentedButtonVariants = cva(
-  'kv:flex kv:items-center kv:justify-center kv:gap-kui-1 kv:px-kui-3 kv:border-0 kv:bg-transparent kv:text-kui-sm kv:cursor-pointer kv:whitespace-nowrap',
+  'kv:flex kv:items-center kv:justify-center kv:gap-0.5 kv:px-1.5 kv:border-0 kv:bg-transparent kv:text-kui-sm kv:cursor-pointer kv:whitespace-nowrap',
   {
     variants: {
       active: {

@@ -16,7 +16,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
  * here.)
  */
 export const kuiRowVariants = cva(
-  'kv:flex kv:items-center kv:gap-kui-2 kv:min-h-kui-control kv:px-kui-3 kv:rounded-kui kv:text-kui-fg kv:text-kui-base kv:cursor-pointer kv:whitespace-nowrap kv:hover:bg-kui-hover kv:focus-visible:bg-kui-hover kv:focus-visible:outline-none',
+  'kv:flex kv:items-center kv:gap-1 kv:min-h-kui-control kv:px-1.5 kv:rounded-kui kv:text-kui-fg kv:text-kui-base kv:cursor-pointer kv:whitespace-nowrap kv:hover:bg-kui-hover kv:focus-visible:bg-kui-hover kv:focus-visible:outline-none',
   {
     variants: {
       selected: {

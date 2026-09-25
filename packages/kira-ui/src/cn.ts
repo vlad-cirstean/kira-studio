@@ -40,13 +40,8 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text' |
         'row-compact',
         'row-comfortable',
         'tree-indent',
-        // This package's own theme/tailwind-theme.css (A2).
-        'kui-1',
-        'kui-2',
-        'kui-3',
-        'kui-4',
-        'kui-5',
-        'kui-6',
+        // This package's own theme/tailwind-theme.css (A2). P110 I2-29: `kui-1..6` dropped --
+        // retired in favour of the default spacing scale (same values, real Tailwind steps).
         'kui-control',
         'kui-control-sm',
         'kui-icon-box',

@@ -32,7 +32,7 @@ function onChange(event: Event): void {
   <span :class="cn('kv:relative kv:inline-flex kv:items-center', props.class)">
     <select
       :id="props.id"
-      class="kv:h-kui-control kv:py-0 kv:pr-kui-6 kv:pl-kui-4 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:appearance-none kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
+      class="kv:h-kui-control kv:py-0 kv:pr-4 kv:pl-2 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:appearance-none kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
       :value="props.modelValue"
       :aria-label="props.ariaLabel"
       @change="onChange"
@@ -42,7 +42,7 @@ function onChange(event: Event): void {
       </option>
     </select>
     <span
-      class="codicon codicon-chevron-down kv:absolute kv:right-kui-1 kv:pointer-events-none kv:text-kui-icon kv:opacity-70"
+      class="codicon codicon-chevron-down kv:absolute kv:right-0.5 kv:pointer-events-none kv:text-kui-icon kv:opacity-70"
       aria-hidden="true"
     ></span>
   </span>

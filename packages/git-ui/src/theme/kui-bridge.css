@@ -10,10 +10,11 @@
  * and becomes `--kv-control-h`, a token that grows with the user's VS Code font-size setting the
  * same way every control inside it already does. `--kui-radius` moves from 0 (square) to Kira's
  * 4px interactive tier; floating surfaces (menus/popovers/dialogs) get their own 6px panel tier,
- * `--kui-radius-float`, since Kira draws those two tiers differently. F13 (see the G34 plan): the
- * spacing reindex means `--kui-space-5` now means 12px, not 16px — the two gutter declarations in
- * `controls.css` that actually need a fixed 16px clearance for a glyph pin themselves to
- * `--kui-space-6` explicitly, so this reindex costs nothing there.
+ * `--kui-radius-float`, since Kira draws those two tiers differently.
+ *
+ * P110 I2-29: `--kui-space-1..6` retired — every `kv:*-kui-1..6` site now uses the default
+ * Tailwind spacing scale directly (its own steps already equal these values 1:1), so nothing
+ * bridges this name any more.
  */
 :root {
   --kui-fg: var(--kv-app-fg);
@@ -41,12 +42,6 @@
   --kui-font-size: var(--kv-t-md);
   --kui-font-size-sm: var(--kv-t-sm);
   --kui-font-size-xs: var(--kv-t-xs);
-  --kui-space-1: var(--kv-s-1);
-  --kui-space-2: var(--kv-s-2);
-  --kui-space-3: var(--kv-s-3);
-  --kui-space-4: var(--kv-s-4);
-  --kui-space-5: var(--kv-s-5);
-  --kui-space-6: var(--kv-s-6);
   --kui-shadow-float: var(--kv-shadow-dialog) var(--kv-widget-shadow);
   /* G20 D6: `packages/git-ui` had no `--kv-z-*` ladder to bridge from (ad hoc 10/20/30 literals
      throughout) — this phase is the one that establishes the values, not merely re-maps them.

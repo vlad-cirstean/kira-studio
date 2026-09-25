@@ -50,12 +50,6 @@
 
   --shadow-kui-float: var(--kui-shadow-float, 0 8px 28px rgba(0, 0, 0, 0.45));
 
-  --spacing-kui-1: var(--kui-space-1, 2px);
-  --spacing-kui-2: var(--kui-space-2, 4px);
-  --spacing-kui-3: var(--kui-space-3, 6px);
-  --spacing-kui-4: var(--kui-space-4, 8px);
-  --spacing-kui-5: var(--kui-space-5, 12px);
-  --spacing-kui-6: var(--kui-space-6, 16px);
   --spacing-kui-control: var(--kui-control-h, 22px);
   --spacing-kui-control-sm: var(--kui-control-h-sm, 14px);
   --spacing-kui-icon-box: var(--kui-icon-box, 16px);

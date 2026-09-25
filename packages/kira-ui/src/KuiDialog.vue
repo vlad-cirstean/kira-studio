@@ -70,7 +70,7 @@ onClickOutside(rootEl, close);
     >
       <div
         ref="rootEl"
-        class="kv:flex kv:flex-col kv:max-h-[85vh] kv:p-kui-5 kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float"
+        class="kv:flex kv:flex-col kv:max-h-[85vh] kv:p-3 kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
@@ -80,7 +80,7 @@ onClickOutside(rootEl, close);
       >
         <h2
           :id="titleId"
-          class="kv:shrink-0 kv:m-0 kv:mb-kui-4 kv:text-lg"
+          class="kv:shrink-0 kv:m-0 kv:mb-2 kv:text-lg"
         >
           <slot name="title">{{ title }}</slot>
         </h2>
@@ -89,7 +89,7 @@ onClickOutside(rootEl, close);
         </div>
         <div
           v-if="$slots.actions"
-          class="kv:flex kv:shrink-0 kv:justify-end kv:gap-kui-2 kv:mt-kui-5"
+          class="kv:flex kv:shrink-0 kv:justify-end kv:gap-1 kv:mt-3"
         >
           <slot name="actions" />
         </div>
