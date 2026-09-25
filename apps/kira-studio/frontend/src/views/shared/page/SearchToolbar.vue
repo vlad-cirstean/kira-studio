@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
+import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
@@ -281,26 +282,11 @@ onUnmounted(() => {
          only models "exactly one option selected") — the same three codicons VS Code's own
          find widget uses for this. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <TooltipIconButton
-        icon="case-sensitive"
-        label="Match case"
-        :class="{ 'bg-field text-fg': matchCase }"
-        :data-testid="`${testidPrefix}search-match-case`"
-        @click="matchCase = !matchCase"
-      />
-      <TooltipIconButton
-        icon="whole-word"
-        label="Whole word"
-        :class="{ 'bg-field text-fg': wholeWord }"
-        :data-testid="`${testidPrefix}search-whole-word`"
-        @click="wholeWord = !wholeWord"
-      />
-      <TooltipIconButton
-        icon="regex"
-        label="Regular expression"
-        :class="{ 'bg-field text-fg': regex }"
-        :data-testid="`${testidPrefix}search-regex`"
-        @click="regex = !regex"
+      <SearchOptionToggles
+        v-model:match-case="matchCase"
+        v-model:whole-word="wholeWord"
+        v-model:regex="regex"
+        :testid-prefix="`${testidPrefix}search-`"
       />
     </div>
 

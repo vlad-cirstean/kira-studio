@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
 import { unrefElement, useEventListener } from '@vueuse/core';
+import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
@@ -156,26 +157,11 @@ useEventListener(
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
          options in the data views. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <TooltipIconButton
-        icon="case-sensitive"
-        label="Match case"
-        :class="{ 'bg-field text-fg': matchCase }"
-        data-testid="http-find-match-case"
-        @click="matchCase = !matchCase"
-      />
-      <TooltipIconButton
-        icon="whole-word"
-        label="Whole word"
-        :class="{ 'bg-field text-fg': wholeWord }"
-        data-testid="http-find-whole-word"
-        @click="wholeWord = !wholeWord"
-      />
-      <TooltipIconButton
-        icon="regex"
-        label="Regular expression"
-        :class="{ 'bg-field text-fg': regex }"
-        data-testid="http-find-regex"
-        @click="regex = !regex"
+      <SearchOptionToggles
+        v-model:match-case="matchCase"
+        v-model:whole-word="wholeWord"
+        v-model:regex="regex"
+        testid-prefix="http-find-"
       />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">

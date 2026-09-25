@@ -6,6 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
+import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, useTemplateRef } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
@@ -118,26 +119,15 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
            codicons SearchToolbar.vue's own find widget uses, so the two surfaces read as one
            vocabulary (D13). -->
       <div class="flex">
-        <TooltipIconButton
-          icon="case-sensitive"
-          label="Match case"
-          :class="{ 'bg-field text-fg': options.caseSensitive }"
-          data-testid="repo-search-case"
-          @click="onToggleOption('caseSensitive')"
-        />
-        <TooltipIconButton
-          icon="whole-word"
-          label="Whole word"
-          :class="{ 'bg-field text-fg': options.wholeWord }"
-          data-testid="repo-search-whole-word"
-          @click="onToggleOption('wholeWord')"
-        />
-        <TooltipIconButton
-          icon="regex"
-          label="Regular expression"
-          :class="{ 'bg-field text-fg': options.regex }"
-          data-testid="repo-search-regex"
-          @click="onToggleOption('regex')"
+        <SearchOptionToggles
+          :match-case="options.caseSensitive"
+          :whole-word="options.wholeWord"
+          :regex="options.regex"
+          testid-prefix="repo-search-"
+          match-case-test-id="repo-search-case"
+          @update:match-case="onToggleOption('caseSensitive')"
+          @update:whole-word="onToggleOption('wholeWord')"
+          @update:regex="onToggleOption('regex')"
         />
       </div>
       <TooltipIconButton
