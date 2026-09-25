@@ -191,15 +191,13 @@ func (r *ConnectionsRepo) Get(connID string) (*model.ConnectionSummary, error) {
 	return c, nil
 }
 
-// Insert computes the next sort_order inside the same transaction as the insert (unlike
-// connections.ts's two separate statements — under this app's SetMaxOpenConns(1) a transaction
-// costs nothing and removes the race outright), then returns the row via Get.
-func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
-	optionsJSON, err := json.Marshal(f.Options)
-	if err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
-	}
-
+// insertTx runs the begin/next-sort-order/commit/Get-after frame Insert/InsertWithSecret/
+// InsertDuplicateWithSecret all three share (P113 G11) — insert receives the open tx and the
+// freshly computed next sort_order, and does only the one INSERT statement that actually differs
+// between the three (column list, whether password is bound directly or copied via subquery,
+// InsertDuplicateWithSecret's forced mcp_enabled literal). connID is the row insert is expected to
+// have written, read back via Get once the transaction commits.
+func (r *ConnectionsRepo) insertTx(connID string, insert func(tx *sql.Tx, sortOrder int) error) (model.ConnectionSummary, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
@@ -210,14 +208,8 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
 	}
-	if _, err := tx.Exec(`
-		INSERT INTO connections (
-			id, `+connectionColumns+`, created_at, updated_at, sort_order
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder)...,
-	); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
+	if err := insert(tx, sortOrder); err != nil {
+		return model.ConnectionSummary{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
@@ -231,6 +223,12 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", connID)
 	}
 	return *created, nil
+}
+
+// Insert is InsertWithSecret with no password — kept for ipcfixture/harness.go's own test-support
+// caller, which never needs one.
+func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
+	return r.InsertWithSecret(connID, f, createdAt, nil)
 }
 
 func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, updatedAt string) (model.ConnectionSummary, error) {
@@ -272,38 +270,18 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
 	}
-
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	var sortOrder int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
-	}
-	if _, err := tx.Exec(`
-		INSERT INTO connections (
-			id, `+connectionColumns+`, created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc)...,
-	); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
-	}
-
-	created, err := r.Get(connID)
-	if err != nil {
-		return model.ConnectionSummary{}, err
-	}
-	if created == nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", connID)
-	}
-	return *created, nil
+	return r.insertTx(connID, func(tx *sql.Tx, sortOrder int) error {
+		if _, err := tx.Exec(`
+			INSERT INTO connections (
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+			append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc)...,
+		); err != nil {
+			return fmt.Errorf("repos/connections: insert %s: %w", connID, err)
+		}
+		return nil
+	})
 }
 
 // InsertDuplicateWithSecret is InsertWithSecret's own twin for connections.Service.Duplicate,
@@ -333,43 +311,23 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: encode options: %w", err)
 	}
-
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	var sortOrder int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
-	}
-	if _, err := tx.Exec(`
-		INSERT INTO connections (
-			id, `+connectionColumns+`, created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			(SELECT password FROM connections WHERE id = ?))
-	`,
-		toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec,
-		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-		createdAt, createdAt, sortOrder, fromConnectionID,
-	); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: commit: %w", err)
-	}
-
-	created, err := r.Get(toConnectionID)
-	if err != nil {
-		return model.ConnectionSummary{}, err
-	}
-	if created == nil {
-		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", toConnectionID)
-	}
-	return *created, nil
+	return r.insertTx(toConnectionID, func(tx *sql.Tx, sortOrder int) error {
+		if _, err := tx.Exec(`
+			INSERT INTO connections (
+				id, `+connectionColumns+`, created_at, updated_at, sort_order, password
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+				(SELECT password FROM connections WHERE id = ?))
+		`,
+			toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
+			boolToInt(f.AutoExplain), f.ThrottlePerSec,
+			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+			createdAt, createdAt, sortOrder, fromConnectionID,
+		); err != nil {
+			return fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
+		}
+		return nil
+	})
 }
 
 // SetMcpEnabled flips mcp_enabled alone — Duplicate's own fix (finding #4, M7): the new row is
