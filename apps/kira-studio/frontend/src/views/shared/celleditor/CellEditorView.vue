@@ -679,16 +679,15 @@ const statusLine = computed(() => {
          else bubble. Both are on the wrapping div, so they cover the translate pane too — TimestampPane
          lives inside here (not in its own strip, as the native picker used to) precisely so it
          inherits this same staging rule instead of needing its own (P24 D14/D15). -->
-    <div
-      ref="editorBodyEl"
-      class="editor-body flex-1 min-h-0 flex flex-col"
-      :class="{ 'has-translate': showTranslatePane }"
-    >
+    <div ref="editorBodyEl" class="flex-1 min-h-0 flex flex-col">
       <!-- The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
            encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a
            side-by-side split — this panel is usually too narrow for two columns to read
-           comfortably. `.editor-body`/`.encoded-pane` stay bare markers to anchor this compound. -->
-      <div class="encoded-pane flex-auto min-h-0" data-testid="cell-editor-encoded">
+           comfortably. -->
+      <div
+        :class="showTranslatePane ? 'flex-1 basis-7/12 border-b border-border min-h-0' : 'flex-auto min-h-0'"
+        data-testid="cell-editor-encoded"
+      >
         <MonacoHost
           ref="encodedHostRef"
           :doc="doc"
@@ -753,14 +752,6 @@ const statusLine = computed(() => {
       :targets="findTargets"
       @close="closeFind"
     />
+    <!-- P110 I2-18: `.editor-body.has-translate .encoded-pane` moved to the ternary above. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.editor-body`/`.encoded-pane` stay bare markers to anchor this compound. */
-.editor-body.has-translate .encoded-pane {
-  @apply flex-1 basis-7/12 border-b border-border;
-}
-</style>

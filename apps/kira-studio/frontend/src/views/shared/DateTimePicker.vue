@@ -257,7 +257,7 @@ const secondText = computed<string>({
                reset to look like the <span> it replaces rather than a bordered control. -->
           <button
             type="button"
-            class="dtp-month-label border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1"
+            class="border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
             data-testid="datetime-picker-month"
             @click="cycleMode"
           >
@@ -291,13 +291,17 @@ const secondText = computed<string>({
             v-for="cell in days"
             :key="`${cell.year}-${cell.month}-${cell.day}`"
             type="button"
-            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border bg-none font-[inherit] h-5.5"
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
             :class="[
-              { 'is-selected': cell.isSelected, 'is-today': cell.isToday },
-              cell.inMonth ? 'text-fg' : 'text-subtle',
+              cell.isSelected
+                ? 'bg-primary text-primary-foreground'
+                : cell.inMonth
+                  ? 'text-fg'
+                  : 'text-subtle',
+              cell.isToday ? 'border-border-strong' : 'border-transparent',
             ]"
             @click="pickDay(cell)"
           >
@@ -312,10 +316,10 @@ const secondText = computed<string>({
           v-for="(name, i) in MONTH_NAMES"
           :key="name"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
           data-testid="datetime-picker-month-cell"
           :data-selected="i === viewMonth"
-          :class="{ 'is-selected': i === viewMonth }"
+          :class="i === viewMonth ? 'bg-primary text-primary-foreground' : 'text-fg'"
           @click="pickMonth(i)"
         >
           {{ name.slice(0, 3) }}
@@ -326,10 +330,10 @@ const secondText = computed<string>({
           v-for="y in yearBlock"
           :key="y"
           type="button"
-          class="flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+          class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
           data-testid="datetime-picker-year-cell"
           :data-selected="y === viewYear"
-          :class="{ 'is-selected': y === viewYear }"
+          :class="y === viewYear ? 'bg-primary text-primary-foreground' : 'text-fg'"
           @click="pickYear(y)"
         >
           {{ y }}
@@ -372,24 +376,8 @@ const secondText = computed<string>({
         <TooltipContent>Now</TooltipContent>
       </Tooltip>
     </div>
+    <!-- P110 I2-18: `.dtp-month-label`/`.dtp-day` compound rules moved to conditional classes above.
+         bg-primary/text-primary-foreground, never bg-accent: shadcn-bridge.css maps --color-accent to
+         --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.dtp-month-label`/`.dtp-day` stay bare markers to anchor these compounds. */
-.dtp-month-label:hover {
-  @apply bg-hover;
-}
-
-.dtp-day.is-today {
-  @apply border-border-strong;
-}
-
-/* bg-primary/text-primary-foreground, never bg-accent: shadcn-bridge.css maps --color-accent to
-   --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input. */
-.dtp-day.is-selected {
-  @apply bg-primary text-primary-foreground;
-}
-</style>

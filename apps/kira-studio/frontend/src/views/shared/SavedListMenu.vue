@@ -79,8 +79,8 @@ defineSlots<{
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="pin-button flex shrink-0 cursor-pointer border-0 bg-transparent p-0 text-subtle"
-                :class="{ pinned: isPinned(entry) }"
+                class="flex shrink-0 cursor-pointer border-0 bg-transparent p-0"
+                :class="isPinned(entry) ? 'text-warn' : 'text-subtle'"
                 @click.stop="emit('togglePin', entry)"
               >
                 <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
@@ -124,24 +124,16 @@ defineSlots<{
       </template>
 
       <slot name="footer" />
+      <!-- P110 I2-18: `.pin-button.pinned` moved to a ternary above.
+           flex-1/overflow-hidden/text-ellipsis/whitespace-nowrap used to live here as a single
+           :slotted(.entry-name) rule, but reka-ui's TooltipTrigger `as-child` clones the slotted
+           vnode (every caller wraps its entry-name span in a Tooltip, for the full-text-on-hover
+           P31 D27/F27 behavior) without carrying Vue's slotted-content scope-id marker, so the rule
+           silently never matched — the row's flex children packed left instead of stretching, and
+           its geometric center (what a real click/tap lands on) fell on the trailing action buttons
+           instead of the row's own content (console.spec.ts's saved-query-apply scenario caught
+           it). Each caller applies these Tailwind classes directly on its own entry-name span
+           instead. -->
     </div>
   </PopoverContent>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.pin-button` stays a bare marker to anchor this compound. */
-.pin-button.pinned {
-  @apply text-warn;
-}
-
-/* flex-1/overflow-hidden/text-ellipsis/whitespace-nowrap used to live here as a single
-   :slotted(.entry-name) rule, but reka-ui's TooltipTrigger `as-child` clones the slotted vnode
-   (every caller wraps its entry-name span in a Tooltip, for the full-text-on-hover P31 D27/F27
-   behavior) without carrying Vue's slotted-content scope-id marker, so the rule silently never
-   matched — the row's flex children packed left instead of stretching, and its geometric center
-   (what a real click/tap lands on) fell on the trailing action buttons instead of the row's own
-   content (console.spec.ts's saved-query-apply scenario caught it). Each caller now applies these
-   Tailwind classes directly on its own entry-name span instead. */
-</style>

@@ -63,14 +63,14 @@ async function onDismissHooksPrompt(): Promise<void> {
   <TerminalHostView :tab="tab" :deps="deps">
     <div
       v-if="showHooksPrompt"
-      class="claude-code-hooks-prompt flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5"
+      class="flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5"
       data-testid="claude-code-hooks-prompt"
     >
-      <span v-if="hooksJustEnabled">
+      <span v-if="hooksJustEnabled" class="flex-1">
         Session reporting is on. It applies to the next Claude Code tab you open.
       </span>
       <template v-else>
-        <span>
+        <span class="flex-1">
           Kira Studio can show what this session is doing — a running-session count and a tab dot
           when it needs your attention.
         </span>
@@ -92,15 +92,7 @@ async function onDismissHooksPrompt(): Promise<void> {
           >Not now</Button
         >
       </template>
+      <!-- P110 I2-18: the descendant `span` rule moved directly onto each span above. -->
     </div>
   </TerminalHostView>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: `.claude-code-hooks-prompt` stays a bare marker to anchor this descendant selector;
-   its own plain rule moved onto the template as Tailwind utilities. */
-.claude-code-hooks-prompt span {
-  @apply flex-1;
-}
-</style>
