@@ -608,8 +608,19 @@ filter_history(id, connection_id, path, where_text, order_by_json, used_at)
                                                        -- 20/path, 4,000/connection, 4 KiB/row (P23)
 metadata_cache(connection_id, path, kind, payload_json, fetched_at, etag)
 op_log(id, connection_id, tab_id, started_at, duration_ms, kind, status, rows,
-       command, error, stored_bytes, command_truncated)  -- rotated, capped (P23: stored_bytes/
-                                                       -- command_truncated added by migration 15)
+       command, error, stored_bytes, command_truncated, path)
+                                                       -- rotated, capped (P23: stored_bytes/
+                                                       -- command_truncated added by migration 15);
+                                                       -- path (TEXT, migration 0027, P108 Part 11
+                                                       -- F5) is the console database/schema an
+                                                       -- op actually ran against, NULL for every
+                                                       -- non-console-execute op kind and for every
+                                                       -- pre-existing row
+custom_scripts(id, name, command, working_dir, color, sort_order, created_at, updated_at)
+                                                       -- P85, migration 0024; the tab strip's "+"
+                                                       -- dropdown launchable scripts, one row per
+                                                       -- script, user-curated (create/delete, no
+                                                       -- cap)
 ui_layout(key, value)                                   -- panel sizes, visibility (app-wide)
 windows(key, order, bounds_json)                        -- one row per workbench (P8)
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
@@ -681,9 +692,11 @@ sequence (`apps/kira-space/internal/storage/migrations/`) — see the Git module
 `mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
 added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
 (`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
-`tabs.workspace_id` (above). Current high-water mark is **0026** (`0024_p85_custom_scripts.sql`,
-`0025_p97_drop_repo_map.sql`, `0026_p100_drop_git_tables.sql` — the last one is this phase's own,
-above).
+`tabs.workspace_id` (above). Current high-water mark is **0027** (`0024_p85_custom_scripts.sql`
+created `custom_scripts`; `0025_p97_drop_repo_map.sql`; `0026_p100_drop_git_tables.sql`;
+`0027_p108part11_op_log_path.sql` added `op_log.path TEXT`, the console path an op actually ran
+against, F5). Kira Space's own `kira.db` runs its own two-migration sequence
+(`apps/kira-space/internal/storage/migrations/`): `0001_init.sql`, `0002_p100_tabs_layout.sql`.
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -886,296 +899,6 @@ and `review_comment`, the flat file/line AI-comment list, anchored by both a com
 path's blob oid at that commit. Sessions are purged after 14 days idle — returning after that
 window starts clean, by design rather than as an error case.
 
-### The native code workspace (C5-C9)
-
-**As of P100, this whole subsection describes Kira Space, not Kira Studio.** C5-C9 built the
-native code/git workspace (repo import, tab isolation, project tree, Monaco viewer, diff tabs,
-search, markdown reading) inside what was then Kira Studio's own Wails window, as one `AppMode`
-beside `studio`/`api` (P67b, below). P100 extracted the whole feature — Go's
-`internal/codeworkspace` and its own `internal/pathsafe` dependents, plus the frontend's
-`views/repo/*`/`repo/*` trees — into Kira Space, a separate standalone app with no `studio`/`api`
-sibling modules of its own (Kira Space's `WorkbenchShell.vue`: "this app has exactly one module").
-The port kept the identical relative paths (`views/repo/RepoFileView.vue` is the same path under
-`apps/kira-space/frontend/src` it was under `apps/kira-studio/frontend/src`), so every claim below
-about *what* this feature does and *how* it is built stays accurate; only the *hosting app* changed
-— read every unqualified "this app"/"the app" below as Kira Space, not Kira Studio. Kira Studio
-itself has none of this any more — no repo import, no project tree, no diff tabs, no code search —
-confirmed by the phase-closing audit's own grep, below.
-
-**Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
-throughout.** Import a git repository and click it to open it as its own independent workspace: its
-own tab set, never interleaved with another open repo's or with studio/api's shared strip (as it
-was through P100 — see the note above for what changed since). **P67b:**
-the repo list itself lives in `repo/GitPanel.vue` — the Git module's own left panel — not in
-`ProjectPanel.vue` (Studio's, when this ran inside Kira Studio), which C5 originally placed it in;
-see "Git module (v1.3)" below for the nav-level reason (a repository is an instance inside the Git
-module, not a sibling of it).
-
-- **Tab isolation is a new orthogonal *workspace* dimension, not a new `AppMode`.** Two open
-  repositories share the exact same two tab kinds (`repo-graph`, `repo-file`), which a mode-per-kind
-  mapping (`TAB_KIND_MODE`) structurally cannot express — so `TabRecord` gained one nullable field,
-  `workspaceId`, and one derivation, `workspaceKeyOf(tab) = tab.workspaceId ?? TAB_KIND_MODE[tab.kind]`,
-  replaces the mode filter everywhere a tab set is read (`state/mode.ts`). `null` is every tab that
-  existed before this phase, so studio/api behave byte-identically — the only thing that changed
-  under them is that the record they are filtered by is now computed by a function with a `??` in
-  it, not a plain lookup.
-- **The preview slot is a cohort per workspace** (`tabsState.previewIdsByWorkspace`, in-memory
-  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into a
-  shared, replaceable preview tab (rendered in italics); a double-click, or a second single-click
-  reuse, promotes it to a permanent tab (`promoteTab`). A permanent open never evicts the preview
-  cohort; an ordinary (non-cohort) preview open evicts every id currently in it and splices the new
-  tab into the first evicted tab's own array position, rather than mutating a closed tab's record
-  in place, so the one existing close path (`closeTab`, which frees page stores/runtime) still
-  runs. **P74 §5.2** widened this from a single id to a set: `openTab`'s `previewCohort` flag lets a
-  bulk opener ("Open all changes") join several tabs into one replaceable batch instead of each
-  evicting the last — the first file of a batch evicts (no flag), every file after it joins
-  (flag set).
-- **The pin is a property of the tab *kind*, not a per-tab flag.** `repo-graph` is the only pinned
-  kind (`TabKindDef.pinned`) — permanently first (`tabsForWorkspace`'s own stable partition, pinned
-  tabs first in array order, then the rest), unclosable, un-reorderable, un-duplicable. This phase
-  (C5) built the mechanism behind an honest placeholder view for that slot
-  (`views/repo/RepoGraphView.vue`, no stubbed handler, no `TODO`); **C10 replaced the
-  `TAB_VIEWS['repo-graph']` mapping** (`workbench/tabViews.ts`) with the real `packages/git-ui`
-  mount (`RepoGraphTabView`).
-- **The file list is `codeworkspace.EnumerateAll`** (`internal/codeworkspace/enumerate.go`) — the
-  same `git ls-files -z --cached --others --exclude-standard` argv the search scanner also uses (§C7,
-  below), unfiltered by extension (D6). Capped at 200,000 paths (an honest IPC-payload limit, not a
-  UI virtualization one — the tree view already virtualizes the rendered rows on `@tanstack/
-  vue-virtual`, P104's own replacement for the deleted hand-rolled tree-host component).
-  **Refresh is on workspace open and an explicit Refresh action only — nothing live**: there is no
-  worktree watcher of any kind, so a change made outside the app is picked up only on the next open
-  or an explicit Refresh.
-- **Read-only, enforced in three places**, each independently: the bound service
-  (`internal/bridge/codeworkspace.go`, `CodeWorkspaceService`) has no write method at all, and
-  every git invocation inside `internal/codeworkspace` builds its `gitclient.Spec` with
-  `ReadOnly: true`; every Monaco instance sets `readOnly: true` and `domReadOnly: true`, so neither
-  the keyboard nor a paste can mutate a model; no tab kind here defines a `badge`, a dirty flag, a
-  save action or a commit action — `definition`'s own existing no-badge shape is the precedent, not
-  a new convention.
-- **Path safety** (`ValidateRelPath`, `internal/pathsafe` since C8): every path crossing the bound
-  service is repository-relative, rejected outright for an absolute path or a `..` segment, then
-  resolved with `filepath.EvalSymlinks` and required to stay under the session's own root — a
-  repository can contain a symlink pointing anywhere on the machine, so resolving before the
-  containment check (not after joining alone) is what actually prevents this read-only viewer from
-  being used to read `~/.ssh/id_rsa`. `internal/codeworkspace/paths.go` keeps the name as a
-  two-line delegate (`internal/pathsafe`'s own doc comment covers why: a leaf package, so a
-  consumer that only needs this one containment check — `codeworkspace/search.go`'s repository-wide
-  scanner is the other one — never has to pull in `catfile`/`porcelain` or the whole `Session` type
-  for it).
-- **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
-  for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
-  `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
-  **P67c widened this from 19 registered languages to all 84 Monaco ships** —
-  `views/repo/monacoEntry.ts` imports upstream's own `languages/definitions/register.all.js` bundle
-  instead of 19 individual `register.js` imports (measured: ~12 KB raw / ~3 KB gzip added to the
-  chunk — each grammar body still stays behind its own lazy `loader: () => import(...)`, so nothing
-  extra loads eagerly), and `views/repo/language.ts`'s extension table was rebuilt against every
-  `register.js`'s own `extensions` list rather than memory. **`.json`/`.jsonc` no longer reuse the
-  JavaScript grammar** — that Monarch has one generic `string` rule, so a `package.json`'s keys and
-  values painted the same color; `.json`/`.jsonc` now register against Monaco's own worker-free
-  tokenizer (`languages/features/json/tokenization.js`, a real `TokensProvider` whose only
-  dependency is the bundled jsonc-parser scanner — no `jsonMode`, no `workerManager`, no
-  `json.worker`), which tells `string.key.json` apart from `string.value.json`. **A TypeScript/
-  JavaScript decorator (`@Component`) no longer paints red** — 0.56.0's shared JS/TS Monarch
-  tokenizer has no rule for `@` at all (not in `common`, not in the `symbols` regex), so it fell
-  through to `defaultToken: "invalid"`; `views/repo/monarch/decorators.ts`'s `withDecorators()`
-  shallow-clones that shared tokenizer object (mutating in place would edit a module-level export
-  both languages reference) and prepends one rule emitting an `annotation` token, the same scope
-  Java's own grammar already uses for `@Override`. `.vue`/`.svelte` still color as plain HTML (no
-  Monaco grammar exists for either, so a `<script>` block colors as HTML text, not TypeScript —
-  Known open items, below) and `toml` still colors via the `ini` grammar (no TOML grammar ships).
-  Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`) — never a language-
-  service worker, which is what actually disables IntelliSense/diagnostics rather than merely
-  hiding its UI.
-- **P67c also re-themed the menu/suggest/list/find/peek widgets and fixed the overflow container's
-  own missing palette.** `editor/monaco.ts#overflowWidgetsContainer()` (the shared `document.body`
-  node every `MonacoHost.vue` reparents its hover/suggest/parameter-hint widgets into) now also
-  carries the `monaco-editor` class — Monaco scopes every `--vscode-*` custom property it defines to
-  `.monaco-editor, .monaco-diff-editor, .monaco-component` (`standaloneThemeService.js`), so a plain
-  `document.body` child carried none of them at all, matching upstream's own convention for the
-  multi-diff editor's own overflow node. `editor/monacoTheme.ts#defineKiraTheme` grew from ~16
-  `colors` keys to ~46 — `menu.*`, the rest of `editorSuggestWidget.*`, `list.*`, `dropdown.*`,
-  `input.*`, `widget.border`/`.shadow`, `scrollbarSlider.*`, `peekView*`, `editor.findMatch*` and
-  `textLink.*` — so the context menu and the rest of these widgets stop falling back to `vs-dark`'s
-  own hardcoded literals. `editor/monaco.ts#normalizeColor` gained an `rgba()`-to-`#RRGGBBAA`
-  branch for this: `editor.defineTheme`'s `colors` values go through `Color.fromHex`, which accepts
-  only hex forms and returns *red*, not an error, on anything else, and a translucent token
-  (`--kira-scrollbar`, `--kira-search-match`) normalizes to `rgba(...)` before this branch existed.
-**Diff tabs (C6): a worktree-vs-HEAD diff tab — still entirely read-only.**
-
-- **Model URIs are built with `Uri.from`, not string interpolation** (`views/repo/monaco.ts`,
-  `kira-repo://<repoId>/<path>`) — the editor opener has to recover `(repoId, path)` from a `Uri`
-  the other direction, and a path containing a space, `#`, `?` or `%` does not survive a plain
-  template-literal round trip; `Uri.from` escapes correctly and `uri.authority`/`uri.path` give the
-  decoded values back.
-- **The diff tab** (`repo-diff`, `views/repo/RepoDiffView.vue`) reads a path's HEAD-vs-worktree
-  content (`internal/codeworkspace/diff.go`'s `ReadDiff`) — the worktree side through the existing
-  `ReadFile` classification, the HEAD side through the session's own lazily-built `catfile.Session`
-  at the identical 8 MiB gate, so the two sides can never disagree about what's too large. No status
-  field on the wire: the two sides already say what happened (HEAD missing means added, worktree
-  missing means deleted). Mounted with `mod.editor.createDiffEditor`, `readOnly`/`domReadOnly`
-  (blocking the keyboard and paste, same as the file viewer) plus **`renderMarginRevertIcon: false`
-  and `renderGutterMenu: false`** — not cosmetic: both surface revert/apply affordances that would
-  otherwise let a user trigger a write from a widget built for the extension's own read-write use,
-  the second enforcement layer beyond `readOnly` itself. `hideUnchangedRegions.enabled` and
-  `renderSideBySide` are both on; `diffAlgorithm` is left at its pinned default (never
-  `'advanced-wasm'`/`'advanced-external'`, which resolve an external computer this bundle doesn't
-  ship). The tab carries no session state (`repoDiffTabStateSchema` is `{}`, like `repo-graph`) — a
-  restored diff tab re-reads both sides and opens at Monaco's own first change, which is where a
-  diff is read from anyway. "Open changes" (the tree's own context menu, gated on the same status
-  glyph the tree already colors from) opens it as a permanent tab, never the preview slot.
-- **The diff editor is `editor.worker`'s first real consumer.** C5 shipped the chunk and confirmed
-  it exists in `dist/assets`, but a read-only file viewer never asks `IEditorWorkerService` for
-  anything; the diff editor computes its diff there. Measured chunk delta (`bun run build:studio`): the
-  diff contribution was already inside `register.all.js` (C5's own bundle), so the Monaco chunk size
-  is unchanged by this phase — confirmed, not just assumed, against a real build.
-- **A reveal (a search result) now applies to a tab whose editor
-  is already mounted and active, not only on mount** (C7 D12, `views/repo/reveal.ts`) — the case
-  the paragraph above left implicit. `RepoFileView.vue` still applies its own persisted
-  `state.revealLine` on mount, but `openRepoFileTab`'s reveal option now also calls
-  `requestReveal`, which moves the cursor immediately (`setSelection` +
-  `revealRangeInCenterIfOutsideViewport`) when that tab's editor is already live, and stores the
-  request for the next mount to consume otherwise. Before this, a match inside the file already
-  open and active moved nothing at all.
-
-**Search (C7): Go-native, repository-wide and in-file, still entirely read-only.**
-
-- **No search library — RE2 (stdlib `regexp`) plus `git ls-files` plus a bounded worker pool
-  already written twice in this repo *is* the library answer.** A text search is four parts:
-  pattern matching (RE2 — linear time, so a user-typed pattern can never hang the app), ignore
-  semantics (`codeworkspace.EnumerateAll`, the same `git ls-files -z --cached --others
-  --exclude-standard` the project tree already uses — D2), concurrency (a channel-fed bounded worker
-  pool), and a scanner (`internal/codeworkspace/search.go`, hand-rolled because this is where the
-  app's own rules actually live: binary/size/long-line gates, UTF-16 columns, preview windowing). An
-  indexed engine (`sourcegraph/zoekt`, `google/codesearch`) was declined for building and serving a
-  *second* index this chapter doesn't need, when the whole point is grepping the worktree as it is
-  right now.
-- **Enumeration is unchanged and unwidened — the same `codeworkspace.EnumerateAll` the project tree
-  already calls.** `.git` internals are never reported (git's own rule), and a repository that
-  commits its dependencies (a vendored `vendor/` tree) gets them searched, because they're part of
-  what that repository is — a hardcoded skip list would be wrong in both directions, hiding a
-  deliberately-committed tree and missing everything it doesn't happen to name.
-- **Three skip rules, cheapest first, and the skip count is always reported, never silent**
-  (`FilesSkipped` in the status line): a path failing `pathsafe.ValidateRelPath` (the same
-  containment check every other read in this chapter goes through — a search touches every file in
-  the worktree, unlike the tree, which only reads what's clicked, so a committed symlink pointing
-  at `~/.ssh/id_rsa` is a real risk here, not a theoretical one); a NUL byte in the first 8 KiB (the
-  identical rule `ReadFile` uses) or a file over `MaxReadBytes` reused verbatim (a match in a file
-  the viewer can't open is a result nobody can click); a NUL found only later, checked once per
-  matching line rather than once per line scanned, which drops the whole file including matches
-  already collected for it.
-- **A match's column is computed by `utf16Units`, extracted out of `LineIndex.Position`
-  (`internal/codeworkspace/textpos.go`, C7 S1)** — the scanner has one line in hand, not a whole
-  file, so it cannot call `LineIndex` directly, but it must use the identical UTF-16 rules or a
-  result click could land the cursor a column off on any line with a non-ASCII rune. This is
-  `LineIndex`'s sole surviving consumer since P97 removed the native code-navigation feature that
-  originally motivated it.
-- **Results stream over a new coalescing push channel, `kira:code:search`** — `ChannelGrpcCall`'s
-  own D8 shape restated (flush on 60 ms/an accumulated match count/the terminal event, which always
-  fires even on cancel), `EmitTo`'d to the one window that asked. One search in flight per
-  workspace (`Session.BeginSearch`/`CancelSearch`): starting a new one cancels whatever that
-  workspace's previous search was running, and `Session.Close` cancels it too — not a queue, since
-  the UI has exactly one query box per workspace.
-- **The results surface is the repo panel's own left-panel Files/Search switch, not a new tab
-  kind** — a user clicks several results in turn, and an opened file takes over the main area, so a
-  results-in-a-tab design would lose the list behind the first click with no way back but the tab
-  strip. Costs no new tab-kind vocabulary at all.
-- **In-file search is Monaco's own find widget** (`features/register.all.js` already ships it) —
-  `RepoFileView.vue`/`RepoDiffView.vue` each just register the existing `view.find` command onto
-  it; the diff editor runs it against `getModifiedEditor()` specifically, since
-  `IStandaloneDiffEditor` itself has no `getAction` and the worktree pane is the one whose content
-  matches the file on disk.
-
-**Markdown reading view (P67c): a Source/Reading toggle on a markdown file, opt-in and per tab.**
-
-- **Only a true `markdown` file grows the toggle** (`views/repo/language.ts`'s `monacoLanguageFor`
-  returning `'markdown'` — `.md`/`.markdown`/`.mdown`/… but never `.mdx`, which colors as its own
-  Monaco language). Every other file type is byte-identical to before this phase — no wrapper
-  element, no toolbar.
-- **Opens on Source, like every other file type** — a reading view is opt-in, not a default flip
-  for markdown specifically. The choice persists per tab via `repoFileTabStateSchema`'s
-  `markdownReading` field (`.default(false)`, following `revealLine`'s own discipline so a tab saved
-  before this field existed still restores).
-- **The Monaco container uses `v-show`, never `v-if`, on toggle** — `v-if` would dispose and
-  recreate the editor widget, losing scroll position/selection/find state on every round trip;
-  `automaticLayout: true` re-measures off a `ResizeObserver`, which does fire when `v-show` restores
-  the container's size, so the toggle needs no `editor.layout()` call of its own (one is still made,
-  belt-and-braces, on the transition back to Source).
-- **`markdown-it` (MIT, pinned 15.0.2, npm), dynamically imported** (`views/repo/markdownReading.ts`)
-  — never in the boot bundle, and never even fetched by a session that opens no markdown file.
-  Chosen over `marked` specifically for its default `html: false`, which **escapes** raw HTML in the
-  source rather than passing it through — this view renders a file straight off disk inside the
-  app's own privileged WKWebView, so that default removes the need for a second dependency (a
-  DOMPurify-style sanitizer) entirely. `linkify: true`/`typographer: false`/`breaks: false` round out
-  the options object; do not flip `html` to `true`.
-- **Every anchor click in the reading pane is neutered.** There is no back button in this webview —
-  an accidental navigation would strand the user with no way home short of a restart. The click
-  handler calls `preventDefault()` unconditionally; a same-page `#anchor` link still scrolls to its
-  heading (`markdownReading.ts`'s own `heading_open` renderer override assigns each heading a
-  GitHub-style slug id, numbered on collision), anything else is left inert with its target
-  surfaced through the link's own `title` attribute (a `link_open` renderer override) instead of
-  ever being followed. **Opening an external link is explicitly out of scope** — `internal/bridge/
-  update.go`'s `OpenReleasePage()` is nullary specifically because `OpenURL` (`pkg/application`)
-  validates nothing at all, and a markdown file's own link is exactly as untrusted as any other
-  renderer-supplied string; reversing that needs its own vetted bridge method (a scheme allow-list
-  at minimum), not a sub-feature of a reading view. That method now exists (`bridge/link.go`,
-  "Renderer security surface" below) — the reading pane still deliberately does not use it, and
-  every anchor click here stays `preventDefault()`ed.
-- **No syntax highlighting inside a fenced code block** — `markdown-it`'s `highlight` hook plus
-  Monaco's `editor.colorize()` would do it, but `colorize` is async per block and this is a reading
-  view, not a second editor; a fenced block renders as themed monospace instead.
-
-**Quick open (C9): ⌘P, fuzzy file finder, renderer-side matching over C5's own tree listing.**
-
-- **No new enumeration — reads `repo/state/fileTree.ts`'s already-loaded `paths` array**
-  (`repoTreePaths`, a five-line accessor beside `repoTreeTruncated`/`repoTreeError`). That array is
-  already `codeworkspace.ListFiles` → `codeworkspace.EnumerateAll`'s own output, so quick open
-  inherits the project tree's exact snapshot rather than a second, independently-stale one:
-  refreshed on workspace open and on the tree's own Refresh action, never live. A lower-layer read
-  was declined on one ground: a new Go binding would re-run `git ls-files` for bytes the renderer
-  already holds.
-- **Matching is `fuzzysort` (MIT, 4.0.2, zero transitive dependencies), a direct dependency,
-  entirely in the renderer — no Go call, no IPC per keystroke.** Every substring filter already in
-  this app (`CommandPalette.vue`, the tree's own name filter) was declined as not fuzzy at all;
-  Monaco's own internal `base/common/fuzzyScorer.js` was declined too — reachable, MIT,
-  the literal VS Code algorithm, but shipping no typings for that module under this repo's `strict`
-  config, and only the string scorer, not VS Code's item-level basename-vs-path ranking on top of
-  it. Measured against this repository's own 2,176-path listing (`fuzzysort@4.0.2`,
-  `keys:['name','path']`, 20 iterations after 3 warm-ups): a 1.2 ms snapshot build and a 2.15 ms
-  worst-case (1-character) query — client-side wins outright at this and larger realistic scales,
-  and a Go round trip would add per-keystroke IPC serialization to beat 2 ms of local work.
-- **A per-repo `fuzzysort` snapshot over both `name` and `path`, cached on the tree's own `paths`
-  array reference** — `refreshRepoTree` assigns a fresh array on every reload, so reference equality
-  is an exact, versioning-free invalidation signal. Built lazily on first ⌘P for that repo, dropped
-  in `dropQuickOpen` beside `dropRepoTree`'s own call site (`state/coderepos.ts`'s `removeCodeRepo`).
-- **Ranking: `Math.max(nameScore, pathScore × 0.8) − depth × a small constant`.** A basename hit
-  outranks the same characters merely scattered across a path (typing `repotabs` should surface
-  `state/repoTabs.ts` over a deep file that only contains those letters across directory names) but
-  a path-only match still surfaces (`state/repo` still finds files under `state/repo/`); the depth
-  term is small enough against `fuzzysort`'s 0..1 scale to break only a near-tie, never promote a
-  worse match. No recency term — deferred whole (Known open items, below), the seam being exactly
-  one more term in this expression when a later phase adds a persisted per-repo MRU.
-- **Two caps, both surfaced, never silent**: `QUICK_OPEN_MAX_RESULTS` (50) bounds both `fuzzysort`'s
-  own sort work and what a keyboard-driven list can navigate; `QUICK_OPEN_MAX_CANDIDATES` (50,000)
-  slices the matched-against list for a repository past D3's measured knee (worst-case query time
-  34.78 ms at 50k candidates, 144.06 ms at 200k) — a dim footer row says so, the same posture the
-  tree's own `MaxListedFiles` truncation already takes.
-- **`repo/QuickOpen.vue` is a new component, not an extension of `CommandPalette.vue`.** The two
-  share only chrome (a `p-float` backdrop, an input, a keyboard-driven list, mirrored CSS classes
-  rather than a shared base component) — matching, ranking, scope, and row shape (two-part,
-  basename plus a dim, start-ellipsised parent directory) all differ. Matched characters are bolded
-  via `fuzzysort.highlight`'s callback form, rendered as literal spans — never `v-html`, so a path
-  containing `<` cannot inject markup.
-- **⌘P is gated on the active workspace itself (`repoIdOfWorkspace(workspaceState.active)`), not on
-  a mounted component** — reachable with the project panel collapsed, unlike `repo.search`'s
-  `registerCommand` shape (which is meaningless without that panel, since it switches its segmented
-  control). Opening also loads the tree itself (`ensureRepoTreeLoaded`) rather than assuming the
-  panel already has, so a fresh window with the panel collapsed still populates the list.
-- **Opening reuses C7's own convention**: `openRepoFileTab(repoId, path, { preview })`, no `reveal`
-  (a file has no line to reveal). Enter and a single click preview; ⇧Enter and a double-click open a
-  permanent tab — ⇧Enter is quick open's own addition, since a keyboard palette has no double-click
-  to mirror the tree/search views' own promotion gesture.
-
 **Why a content snapshot and not just a commit sha.** The trivial case — nothing rewritten since
 the last review — is `git merge-base --is-ancestor <lastReviewedSha> HEAD`; when that succeeds an
 ordinary `git diff` is exact and cheap, and the stored blob is never read at all. The case this
@@ -1250,7 +973,8 @@ cap did not, and the column that can hold arbitrary user text had no ceiling at 
 |---|---|---|
 | `schema_version` | nothing | one row |
 | `settings`, `ui_layout` | nothing | closed key set; every writer is a hand-listed leaf |
-| `connections`, `connection_ddl`, `connection_tree_filters`, `saved_queries` | user action | user action; all cascade on connection delete |
+| `connections`, `connection_ddl`, `connection_tree_filters`, `saved_queries`, `connection_mask_rules` | user action | user action; all cascade on connection delete |
+| `custom_scripts` | user action | user action; one row per script, created and deleted one at a time |
 | `api_collections`, `api_items`, `api_environments`, `api_variables` | user action / import | user action; import capped at 64 MiB upstream |
 | `tabs` | open tabs | rewritten per window per save; cascades on window close |
 | `windows` | live windows | one row per live window (+1 for session restore) |
@@ -3031,10 +2755,248 @@ The filename carries no version: the version lives inside the manifest, where `c
 Taskfile.yml`'s copy-and-fail-loudly block, and `build:vsix`'s own dependency edge into it, were
 both removed at P100 Part 3, since the extension it used to bundle is Kira Space's now.
 
+### The native code workspace (C5-C7, P67c)
+
+C5-C7 built the native code/git workspace (repo import, tab isolation, project tree, Monaco viewer,
+diff tabs, search) inside what was then Kira Studio's own Wails window, as one `AppMode` beside
+`studio`/`api` (P67b, below); P67c added markdown reading on top. P100 extracted the whole feature —
+Go's `internal/codeworkspace` (now `apps/kira-space/internal/codeworkspace`; its path-containment
+check stayed repo-root `internal/pathsafe`, never moved into it), plus the frontend's
+`views/repo/*`/`repo/*` trees — into Kira Space, a separate standalone app with no `studio`/`api`
+sibling modules of its own (Kira Space's `WorkbenchShell.vue`: "this app has exactly one module").
+The port kept the identical relative paths (`views/repo/RepoFileView.vue` is the same path under
+`apps/kira-space/frontend/src` it was under `apps/kira-studio/frontend/src`), so every claim below
+about *what* this feature does and *how* it is built stays accurate; only the *hosting app* changed.
+Kira Studio itself has none of this any more — no repo import, no project tree, no diff tabs, no
+code search — confirmed by the phase-closing audit's own grep, below. Every `views/repo/*`/`repo/*`
+path below is relative to `apps/kira-space/frontend/src`; every bare `internal/codeworkspace/*` path
+is under `apps/kira-space/`.
+
+**Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
+throughout.** Import a git repository and click it to open it as its own independent workspace: its
+own tab set, never interleaved with another open repo's or with studio/api's shared strip (unchanged
+since P100). **P67b:** the repo list itself lives in `repo/GitPanel.vue` — the Git module's own left
+panel — not in `ProjectPanel.vue` (Studio's, when this ran inside Kira Studio), which C5 originally
+placed it in; a repository is an instance inside the Git module, not a sibling of it.
+
+- **Tab isolation is a new orthogonal *workspace* dimension, not a new `AppMode`.** Two open
+  repositories share the exact same two tab kinds (`repo-graph`, `repo-file`), which a mode-per-kind
+  mapping (`TAB_KIND_MODE`) structurally cannot express — so `TabRecord` gained one nullable field,
+  `workspaceId`, and one derivation, `workspaceKeyOf(tab) = tab.workspaceId ?? TAB_KIND_MODE[tab.kind]`,
+  replaces the mode filter everywhere a tab set is read (`state/mode.ts`). `null` is every tab that
+  existed before this phase, so studio/api behave byte-identically — the only thing that changed
+  under them is that the record they are filtered by is now computed by a function with a `??` in
+  it, not a plain lookup.
+- **The preview slot is a cohort per workspace** (`tabsState.previewIdsByWorkspace`, in-memory
+  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into a
+  shared, replaceable preview tab (rendered in italics); a double-click, or a second single-click
+  reuse, promotes it to a permanent tab (`promoteTab`). A permanent open never evicts the preview
+  cohort; an ordinary (non-cohort) preview open evicts every id currently in it and splices the new
+  tab into the first evicted tab's own array position, rather than mutating a closed tab's record
+  in place, so the one existing close path (`closeTab`, which frees page stores/runtime) still
+  runs. **P74 §5.2** widened this from a single id to a set: `openTab`'s `previewCohort` flag lets a
+  bulk opener ("Open all changes") join several tabs into one replaceable batch instead of each
+  evicting the last — the first file of a batch evicts (no flag), every file after it joins
+  (flag set).
+- **The pin is a property of the tab *kind*, not a per-tab flag.** `repo-graph` is the only pinned
+  kind (`TabKindDef.pinned`) — permanently first (`tabsForWorkspace`'s own stable partition, pinned
+  tabs first in array order, then the rest), unclosable, un-reorderable, un-duplicable. This phase
+  (C5) built the mechanism behind an honest placeholder view for that slot
+  (`views/repo/RepoGraphView.vue`, no stubbed handler, no `TODO`); **C10 replaced the
+  `TAB_VIEWS['repo-graph']` mapping** (`workbench/tabViews.ts`) with the real `packages/git-ui`
+  mount (`RepoGraphTabView`).
+- **The file list is `codeworkspace.EnumerateAll`** (`internal/codeworkspace/enumerate.go`) — the
+  same `git ls-files -z --cached --others --exclude-standard` argv the search scanner also uses (§C7,
+  below), unfiltered by extension (D6). Capped at 200,000 paths (an honest IPC-payload limit, not a
+  UI virtualization one — the tree view already virtualizes the rendered rows on `@tanstack/
+  vue-virtual`, P104's own replacement for the deleted hand-rolled tree-host component).
+  **Refresh is on workspace open and an explicit Refresh action only — nothing live**: there is no
+  worktree watcher of any kind, so a change made outside the app is picked up only on the next open
+  or an explicit Refresh.
+- **Read-only, enforced in three places**, each independently: the bound service
+  (`internal/bridge/codeworkspace.go`, `CodeWorkspaceService`) has no write method at all, and
+  every git invocation inside `internal/codeworkspace` builds its `gitclient.Spec` with
+  `ReadOnly: true`; every Monaco instance sets `readOnly: true` and `domReadOnly: true`, so neither
+  the keyboard nor a paste can mutate a model; no tab kind here defines a `badge`, a dirty flag, a
+  save action or a commit action — `definition`'s own existing no-badge shape is the precedent, not
+  a new convention.
+- **Path safety** (`ValidateRelPath`, repo-root `internal/pathsafe` since C8): every path crossing the bound
+  service is repository-relative, rejected outright for an absolute path or a `..` segment, then
+  resolved with `filepath.EvalSymlinks` and required to stay under the session's own root — a
+  repository can contain a symlink pointing anywhere on the machine, so resolving before the
+  containment check (not after joining alone) is what actually prevents this read-only viewer from
+  being used to read `~/.ssh/id_rsa`. `internal/codeworkspace/paths.go` keeps the name as a
+  two-line delegate (`internal/pathsafe`'s own doc comment covers why: a leaf package, so a
+  consumer that only needs this one containment check — `codeworkspace/search.go`'s repository-wide
+  scanner is the other one — never has to pull in `catfile`/`porcelain` or the whole `Session` type
+  for it).
+- **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
+  for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
+  `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
+  **P67c widened this from 19 registered languages to all 81 Monaco ships** —
+  `packages/workbench/src/editor/monacoEntry.ts` imports upstream's own `languages/definitions/register.all.js` bundle
+  instead of 19 individual `register.js` imports (measured: ~12 KB raw / ~3 KB gzip added to the
+  chunk — each grammar body still stays behind its own lazy `loader: () => import(...)`, so nothing
+  extra loads eagerly), and `views/repo/language.ts`'s extension table was rebuilt against every
+  `register.js`'s own `extensions` list rather than memory. **`.json`/`.jsonc` no longer reuse the
+  JavaScript grammar** — that Monarch has one generic `string` rule, so a `package.json`'s keys and
+  values painted the same color; `.json`/`.jsonc` now register against Monaco's own worker-free
+  tokenizer (`languages/features/json/tokenization.js`, a real `TokensProvider` whose only
+  dependency is the bundled jsonc-parser scanner — no `jsonMode`, no `workerManager`, no
+  `json.worker`), which tells `string.key.json` apart from `string.value.json`. **A TypeScript/
+  JavaScript decorator (`@Component`) no longer paints red** — 0.56.0's shared JS/TS Monarch
+  tokenizer has no rule for `@` at all (not in `common`, not in the `symbols` regex), so it fell
+  through to `defaultToken: "invalid"`; `packages/workbench/src/editor/monarch/decorators.ts`'s `withDecorators()`
+  shallow-clones that shared tokenizer object (mutating in place would edit a module-level export
+  both languages reference) and prepends one rule emitting an `annotation` token, the same scope
+  Java's own grammar already uses for `@Override`. `.vue`/`.svelte` still color as plain HTML (no
+  Monaco grammar exists for either, so a `<script>` block colors as HTML text, not TypeScript —
+  Known open items, below) and `toml` still colors via the `ini` grammar (no TOML grammar ships).
+  Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`) — never a language-
+  service worker, which is what actually disables IntelliSense/diagnostics rather than merely
+  hiding its UI.
+- **P67c also re-themed the menu/suggest/list/find/peek widgets and fixed the overflow container's
+  own missing palette.** `packages/workbench/src/editor/monaco.ts#overflowWidgetsContainer()` (the shared `document.body`
+  node every `MonacoHost.vue` reparents its hover/suggest/parameter-hint widgets into) now also
+  carries the `monaco-editor` class — Monaco scopes every `--vscode-*` custom property it defines to
+  `.monaco-editor, .monaco-diff-editor, .monaco-component` (`standaloneThemeService.js`), so a plain
+  `document.body` child carried none of them at all, matching upstream's own convention for the
+  multi-diff editor's own overflow node. `packages/workbench/src/editor/monacoTheme.ts#defineKiraTheme` grew from ~16
+  `colors` keys to ~46 — `menu.*`, the rest of `editorSuggestWidget.*`, `list.*`, `dropdown.*`,
+  `input.*`, `widget.border`/`.shadow`, `scrollbarSlider.*`, `peekView*`, `editor.findMatch*` and
+  `textLink.*` — so the context menu and the rest of these widgets stop falling back to `vs-dark`'s
+  own hardcoded literals. `packages/workbench/src/editor/monaco.ts#normalizeColor` gained an `rgba()`-to-`#RRGGBBAA`
+  branch for this: `editor.defineTheme`'s `colors` values go through `Color.fromHex`, which accepts
+  only hex forms and returns *red*, not an error, on anything else, and a translucent token
+  (`--kira-scrollbar`, `--kira-search-match`) normalizes to `rgba(...)` before this branch existed.
+**Diff tabs (C6): a worktree-vs-HEAD diff tab — still entirely read-only.**
+
+- **Model URIs are built with `Uri.from`, not string interpolation** (`views/repo/monaco.ts`,
+  `kira-repo://<repoId>/<path>`) — the editor opener has to recover `(repoId, path)` from a `Uri`
+  the other direction, and a path containing a space, `#`, `?` or `%` does not survive a plain
+  template-literal round trip; `Uri.from` escapes correctly and `uri.authority`/`uri.path` give the
+  decoded values back.
+- **The diff tab** (`repo-diff`, `views/repo/RepoDiffView.vue`) reads a path's HEAD-vs-worktree
+  content (`internal/codeworkspace/diff.go`'s `ReadDiff`) — the worktree side through the existing
+  `ReadFile` classification, the HEAD side through the session's own lazily-built `catfile.Session`
+  at the identical 8 MiB gate, so the two sides can never disagree about what's too large. No status
+  field on the wire: the two sides already say what happened (HEAD missing means added, worktree
+  missing means deleted). Mounted with `mod.editor.createDiffEditor`, `readOnly`/`domReadOnly`
+  (blocking the keyboard and paste, same as the file viewer) plus **`renderMarginRevertIcon: false`
+  and `renderGutterMenu: false`** — not cosmetic: both surface revert/apply affordances that would
+  otherwise let a user trigger a write from a widget built for the extension's own read-write use,
+  the second enforcement layer beyond `readOnly` itself. `hideUnchangedRegions.enabled` and
+  `renderSideBySide` are both on; `diffAlgorithm` is left at its pinned default (never
+  `'advanced-wasm'`/`'advanced-external'`, which resolve an external computer this bundle doesn't
+  ship). The tab carries no session state (`repoDiffTabStateSchema` is `{}`, like `repo-graph`) — a
+  restored diff tab re-reads both sides and opens at Monaco's own first change, which is where a
+  diff is read from anyway. "Open changes" (the tree's own context menu, gated on the same status
+  glyph the tree already colors from) opens it as a permanent tab, never the preview slot.
+- **The diff editor is `editor.worker`'s first real consumer.** C5 shipped the chunk and confirmed
+  it exists in `dist/assets`, but a read-only file viewer never asks `IEditorWorkerService` for
+  anything; the diff editor computes its diff there. Measured chunk delta (`bun run build:studio`): the
+  diff contribution was already inside `register.all.js` (C5's own bundle), so the Monaco chunk size
+  is unchanged by this phase — confirmed, not just assumed, against a real build.
+- **A reveal (a search result) now applies to a tab whose editor
+  is already mounted and active, not only on mount** (C7 D12, `views/repo/reveal.ts`) — the case
+  the paragraph above left implicit. `RepoFileView.vue` still applies its own persisted
+  `state.revealLine` on mount, but `openRepoFileTab`'s reveal option now also calls
+  `requestReveal`, which moves the cursor immediately (`setSelection` +
+  `revealRangeInCenterIfOutsideViewport`) when that tab's editor is already live, and stores the
+  request for the next mount to consume otherwise. Before this, a match inside the file already
+  open and active moved nothing at all.
+
+**Search (C7): Go-native, repository-wide and in-file, still entirely read-only.**
+
+- **No search library — RE2 (stdlib `regexp`) plus `git ls-files` plus a bounded worker pool
+  already written twice in this repo *is* the library answer.** A text search is four parts:
+  pattern matching (RE2 — linear time, so a user-typed pattern can never hang the app), ignore
+  semantics (`codeworkspace.EnumerateAll`, the same `git ls-files -z --cached --others
+  --exclude-standard` the project tree already uses — D2), concurrency (a channel-fed bounded worker
+  pool), and a scanner (`internal/codeworkspace/search.go`, hand-rolled because this is where the
+  app's own rules actually live: binary/size/long-line gates, UTF-16 columns, preview windowing). An
+  indexed engine (`sourcegraph/zoekt`, `google/codesearch`) was declined for building and serving a
+  *second* index this chapter doesn't need, when the whole point is grepping the worktree as it is
+  right now.
+- **Enumeration is unchanged and unwidened — the same `codeworkspace.EnumerateAll` the project tree
+  already calls.** `.git` internals are never reported (git's own rule), and a repository that
+  commits its dependencies (a vendored `vendor/` tree) gets them searched, because they're part of
+  what that repository is — a hardcoded skip list would be wrong in both directions, hiding a
+  deliberately-committed tree and missing everything it doesn't happen to name.
+- **Three skip rules, cheapest first, and the skip count is always reported, never silent**
+  (`FilesSkipped` in the status line): a path failing `pathsafe.ValidateRelPath` (the same
+  containment check every other read in this chapter goes through — a search touches every file in
+  the worktree, unlike the tree, which only reads what's clicked, so a committed symlink pointing
+  at `~/.ssh/id_rsa` is a real risk here, not a theoretical one); a NUL byte in the first 8 KiB (the
+  identical rule `ReadFile` uses) or a file over `MaxReadBytes` reused verbatim (a match in a file
+  the viewer can't open is a result nobody can click); a NUL found only later, checked once per
+  matching line rather than once per line scanned, which drops the whole file including matches
+  already collected for it.
+- **A match's column is computed by `utf16Units`, extracted out of `LineIndex.Position`
+  (`internal/codeworkspace/textpos.go`, C7 S1)** — the scanner has one line in hand, not a whole
+  file, so it cannot call `LineIndex` directly, but it must use the identical UTF-16 rules or a
+  result click could land the cursor a column off on any line with a non-ASCII rune. This is
+  `LineIndex`'s sole surviving consumer since P97 removed the native code-navigation feature that
+  originally motivated it.
+- **Results stream over a new coalescing push channel, `kira:code:search`** — `ChannelGrpcCall`'s
+  own D8 shape restated (flush on 60 ms/an accumulated match count/the terminal event, which always
+  fires even on cancel), `EmitTo`'d to the one window that asked. One search in flight per
+  workspace (`Session.BeginSearch`/`CancelSearch`): starting a new one cancels whatever that
+  workspace's previous search was running, and `Session.Close` cancels it too — not a queue, since
+  the UI has exactly one query box per workspace.
+- **The results surface is the repo panel's own left-panel Files/Search switch, not a new tab
+  kind** — a user clicks several results in turn, and an opened file takes over the main area, so a
+  results-in-a-tab design would lose the list behind the first click with no way back but the tab
+  strip. Costs no new tab-kind vocabulary at all.
+- **In-file search is Monaco's own find widget** (`features/register.all.js` already ships it) —
+  `RepoFileView.vue`/`RepoDiffView.vue` each just register the existing `view.find` command onto
+  it; the diff editor runs it against `getModifiedEditor()` specifically, since
+  `IStandaloneDiffEditor` itself has no `getAction` and the worktree pane is the one whose content
+  matches the file on disk.
+
+**Markdown reading view (P67c): a Source/Reading toggle on a markdown file, opt-in and per tab.**
+
+- **Only a true `markdown` file grows the toggle** (`views/repo/language.ts`'s `monacoLanguageFor`
+  returning `'markdown'` — `.md`/`.markdown`/`.mdown`/… but never `.mdx`, which colors as its own
+  Monaco language). Every other file type is byte-identical to before this phase — no wrapper
+  element, no toolbar.
+- **Opens on Source, like every other file type** — a reading view is opt-in, not a default flip
+  for markdown specifically. The choice persists per tab via `repoFileTabStateSchema`'s
+  `markdownReading` field (`.default(false)`, following `revealLine`'s own discipline so a tab saved
+  before this field existed still restores).
+- **The Monaco container uses `v-show`, never `v-if`, on toggle** — `v-if` would dispose and
+  recreate the editor widget, losing scroll position/selection/find state on every round trip;
+  `automaticLayout: true` re-measures off a `ResizeObserver`, which does fire when `v-show` restores
+  the container's size, so the toggle needs no `editor.layout()` call of its own (one is still made,
+  belt-and-braces, on the transition back to Source).
+- **`markdown-it` (MIT, pinned 15.0.2, npm), dynamically imported** (`views/repo/markdownReading.ts`)
+  — never in the boot bundle, and never even fetched by a session that opens no markdown file.
+  Chosen over `marked` specifically for its default `html: false`, which **escapes** raw HTML in the
+  source rather than passing it through — this view renders a file straight off disk inside the
+  app's own privileged WKWebView, so that default removes the need for a second dependency (a
+  DOMPurify-style sanitizer) entirely. `linkify: true`/`typographer: false`/`breaks: false` round out
+  the options object; do not flip `html` to `true`.
+- **Every anchor click in the reading pane is neutered.** There is no back button in this webview —
+  an accidental navigation would strand the user with no way home short of a restart. The click
+  handler calls `preventDefault()` unconditionally; a same-page `#anchor` link still scrolls to its
+  heading (`markdownReading.ts`'s own `heading_open` renderer override assigns each heading a
+  GitHub-style slug id, numbered on collision), anything else is left inert with its target
+  surfaced through the link's own `title` attribute (a `link_open` renderer override) instead of
+  ever being followed. **Opening an external link is explicitly out of scope** — `internal/bridge/
+  update.go`'s `OpenReleasePage()` is nullary specifically because `OpenURL` (`pkg/application`)
+  validates nothing at all, and a markdown file's own link is exactly as untrusted as any other
+  renderer-supplied string; reversing that needs its own vetted bridge method (a scheme allow-list
+  at minimum), not a sub-feature of a reading view. That method now exists (`bridge/link.go`,
+  "Renderer security surface" below) — the reading pane still deliberately does not use it, and
+  every anchor click here stays `preventDefault()`ed.
+- **No syntax highlighting inside a fenced code block** — `markdown-it`'s `highlight` hook plus
+  Monaco's `editor.colorize()` would do it, but `colorize` is async per block and this is a reading
+  view, not a second editor; a fenced block renders as themed monospace instead.
+
 ### Git graph in the native workspace (C10)
 
 **As of P100, this section describes Kira Space, not Kira Studio** — C10 built on the native code
-workspace (C5-C9, above), which the same phase moved out of Kira Studio in full. (One pre-existing,
+workspace (C5-C7, above), which the same phase moved out of Kira Studio in full. (One pre-existing,
 phase-unrelated naming drift: a few paragraphs below call the host component `RepoPanel.vue`; the
 file living under `apps/kira-space/frontend/src/repo/` today is `GitPanel.vue` — predates P100, out
 of this phase's own scope to chase further.)
