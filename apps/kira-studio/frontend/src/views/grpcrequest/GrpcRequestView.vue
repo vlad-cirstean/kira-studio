@@ -561,15 +561,12 @@ onUnmounted(() => {
         <ResponsePane :tab="tab" />
       </SplitterPanel>
     </SplitterGroup>
+    <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
+         Tailwind utilities. `.grpc-target-field` and `.request-pane` stay bare markers:
+         api-ui-consistency.spec.ts selects both directly (no rule of their own attaches to either
+         name any more). `.request-splitter` is the same kind of bare marker (P110 B32) —
+         grpc-request.spec.ts polls its box-shadow via getComputedStyle.
+         P110 I2-17: this file's own <style> block was comment-only (dead, still triggering an
+         @reference/Tailwind compile) -- deleted, comment moved here. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.grpc-target-field` and `.request-pane` stay bare markers: api-ui-consistency.spec.ts
-   selects both directly (no rule of their own attaches to either name any more).
-   `.request-splitter` is the same kind of bare marker (P110 B32) — grpc-request.spec.ts polls its
-   box-shadow via getComputedStyle. */
-</style>

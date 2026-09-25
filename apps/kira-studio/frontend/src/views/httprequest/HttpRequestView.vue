@@ -822,13 +822,12 @@ onUnmounted(() => {
         <ResponsePane :tab="tab" />
       </SplitterPanel>
     </SplitterGroup>
+    <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
+         Tailwind utilities. `.url-field` and `.request-pane` stay bare markers —
+         api-ui-consistency.spec.ts selects both directly. `.request-splitter` (ResizableHandle
+         below) already carried no rule of its own (P110 B32) — http-request.spec.ts/
+         grpc-request.spec.ts poll its box-shadow instead.
+         P110 I2-17: this file's own <style> block was comment-only (dead, still triggering an
+         @reference/Tailwind compile) -- deleted, comment moved here. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.url-field` and `.request-pane` stay bare markers — api-ui-consistency.spec.ts
-   selects both directly. `.request-splitter` (ResizableHandle below) already carried no rule of
-   its own (P110 B32) — http-request.spec.ts/grpc-request.spec.ts poll its box-shadow instead. */
-</style>
