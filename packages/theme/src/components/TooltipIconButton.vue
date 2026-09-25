@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import type { ButtonVariants } from '@theme/components/ui/button';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { computed, useTemplateRef } from 'vue';
 
 // P113 F2: 152 call sites across 52 files repeated this exact
 // Tooltip > TooltipTrigger as-child > [TooltipDisabledTrigger] > Button > CodiconIcon shape, 13-16
@@ -33,17 +34,27 @@ withDefaults(
     size: 'kira-icon',
   },
 );
+
+// fix: a handful of call sites (TimestampPane.vue's calendar trigger, FilterToolbar.vue's history
+// trigger, StreamView.vue's ×3, DocumentView.vue's ×2) put `ref="x"` on this component expecting
+// `x.value.$el` to be the real button DOM node — the pre-extraction inline Button carried that ref
+// directly. This component's own root is `Tooltip`, which renders a second, teleported
+// `TooltipContent` sibling alongside the trigger, so the built-in `$el` a single-root component
+// gets for free does not reliably resolve to the button here. Re-exposed explicitly off the real
+// template ref instead of relying on that built-in.
+const buttonRef = useTemplateRef<{ $el: HTMLElement }>('buttonRef');
+defineExpose({ $el: computed(() => buttonRef.value?.$el) });
 </script>
 
 <template>
   <Tooltip>
     <TooltipTrigger as-child>
       <TooltipDisabledTrigger v-if="disabledTrigger">
-        <Button :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
+        <Button ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
           <CodiconIcon :name="icon" :size="iconSize" />
         </Button>
       </TooltipDisabledTrigger>
-      <Button v-else :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
+      <Button v-else ref="buttonRef" :variant="variant" :size="size" :aria-label="ariaLabel ?? label" v-bind="$attrs">
         <CodiconIcon :name="icon" :size="iconSize" />
       </Button>
     </TooltipTrigger>
