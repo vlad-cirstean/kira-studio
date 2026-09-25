@@ -1,8 +1,7 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
@@ -282,51 +281,27 @@ onUnmounted(() => {
          only models "exactly one option selected") — the same three codicons VS Code's own
          find widget uses for this. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': matchCase }"
-            aria-label="Match case"
-            :data-testid="`${testidPrefix}search-match-case`"
-            @click="matchCase = !matchCase"
-          >
-            <CodiconIcon name="case-sensitive" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Match case</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': wholeWord }"
-            aria-label="Whole word"
-            :data-testid="`${testidPrefix}search-whole-word`"
-            @click="wholeWord = !wholeWord"
-          >
-            <CodiconIcon name="whole-word" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Whole word</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': regex }"
-            aria-label="Regular expression"
-            :data-testid="`${testidPrefix}search-regex`"
-            @click="regex = !regex"
-          >
-            <CodiconIcon name="regex" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Regular expression</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="case-sensitive"
+        label="Match case"
+        :class="{ 'bg-field text-fg': matchCase }"
+        :data-testid="`${testidPrefix}search-match-case`"
+        @click="matchCase = !matchCase"
+      />
+      <TooltipIconButton
+        icon="whole-word"
+        label="Whole word"
+        :class="{ 'bg-field text-fg': wholeWord }"
+        :data-testid="`${testidPrefix}search-whole-word`"
+        @click="wholeWord = !wholeWord"
+      />
+      <TooltipIconButton
+        icon="regex"
+        label="Regular expression"
+        :class="{ 'bg-field text-fg': regex }"
+        :data-testid="`${testidPrefix}search-regex`"
+        @click="regex = !regex"
+      />
     </div>
 
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
@@ -335,23 +310,14 @@ onUnmounted(() => {
          group, flanked by .sep on both sides, since case/word/regex say *how to match* and this
          (with prev/next) says *what to do with the matches*. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg is-active': filtering }"
-            aria-label="Show only matching rows"
-            :data-testid="`${testidPrefix}search-filter-rows`"
-            @click="toggleFilter"
-          >
-            <CodiconIcon name="filter" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{
-          filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
-        }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="filter"
+        :label="filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'"
+        aria-label="Show only matching rows"
+        :class="{ 'bg-field text-fg is-active': filtering }"
+        :data-testid="`${testidPrefix}search-filter-rows`"
+        @click="toggleFilter"
+      />
     </div>
 
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
@@ -388,22 +354,18 @@ onUnmounted(() => {
         </template>
         <template v-else>0 of 0</template>
       </span>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Previous match" :data-testid="`${testidPrefix}search-prev`" @click="goPrev">
-            <CodiconIcon name="chevron-up" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Previous match</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Next match" :data-testid="`${testidPrefix}search-next`" @click="goNext">
-            <CodiconIcon name="chevron-down" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Next match</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="chevron-up"
+        label="Previous match"
+        :data-testid="`${testidPrefix}search-prev`"
+        @click="goPrev"
+      />
+      <TooltipIconButton
+        icon="chevron-down"
+        label="Next match"
+        :data-testid="`${testidPrefix}search-next`"
+        @click="goNext"
+      />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <span class="text-kira-xs text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
@@ -419,13 +381,12 @@ onUnmounted(() => {
         search matches stored values, not displayed ones
       </span>
     </template>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" class="ml-auto" aria-label="Close" :data-testid="`${testidPrefix}search-close`" @click="close">
-          <CodiconIcon name="close" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Close</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="close"
+      label="Close"
+      class="ml-auto"
+      :data-testid="`${testidPrefix}search-close`"
+      @click="close"
+    />
   </ViewToolbar>
 </template>

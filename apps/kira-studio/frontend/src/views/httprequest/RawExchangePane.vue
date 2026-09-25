@@ -2,10 +2,9 @@
 import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -242,14 +241,12 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
               {{ section.caption }}
             </span>
             <span class="ml-auto" />
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button variant="toolbar" size="kira-icon" :aria-label="section.copyLabel" :data-testid="section.copyTestid" @click="section.onCopy">
-                  <CodiconIcon name="copy" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{{ section.copyLabel }}</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              icon="copy"
+              :label="section.copyLabel"
+              :data-testid="section.copyTestid"
+              @click="section.onCopy"
+            />
           </div>
           <Alert v-if="section.noteBefore" variant="note" :data-testid="section.noteBeforeTestid">
             <AlertDescription>{{ section.noteBefore }}</AlertDescription>

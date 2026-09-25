@@ -38,6 +38,7 @@ import {
 } from '@shared/protocol/page';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -46,12 +47,7 @@ import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -739,32 +735,21 @@ onUnmounted(() => {
       <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(connColor) }" />
       <ViewToolbar border="none">
         <div class="flex items-center gap-1.5 min-w-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="keyvalue-refresh" @click="onRefresh">
-                <CodiconIcon name="refresh" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Refresh</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  :class="{ 'is-live': !!running }"
-                  aria-label="Stop"
-                  data-testid="keyvalue-stop"
-                  :disabled="!running"
-                  @click="onStop"
-                >
-                  <CodiconIcon name="debug-stop" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Stop</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="refresh"
+            label="Refresh"
+            data-testid="keyvalue-refresh"
+            @click="onRefresh"
+          />
+          <TooltipIconButton
+            icon="debug-stop"
+            label="Stop"
+            disabled-trigger
+            :class="{ 'is-live': !!running }"
+            data-testid="keyvalue-stop"
+            :disabled="!running"
+            @click="onStop"
+          />
         </div>
         <span class="ml-auto" />
         <RunState :state="runState" />
@@ -812,41 +797,25 @@ onUnmounted(() => {
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
                same call StreamView.vue's isBatch makes for SQS. The status text stays: it's the
                only place the Count button's result (below) ever gets shown, for every engine. -->
-          <Tooltip v-if="!isSingleObjectPage">
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Previous page"
-                  data-testid="keyvalue-prev"
-                  :disabled="prevDisabled"
-                  @click="keyValueViewStore.goPrev(viewKey)"
-                >
-                  <CodiconIcon name="arrow-left" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Previous page</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            v-if="!isSingleObjectPage"
+            icon="arrow-left"
+            label="Previous page"
+            disabled-trigger
+            data-testid="keyvalue-prev"
+            :disabled="prevDisabled"
+            @click="keyValueViewStore.goPrev(viewKey)"
+          />
           <span class="font-data text-kira-sm text-muted-foreground" data-testid="keyvalue-status">{{ statusLine }}</span>
-          <Tooltip v-if="!isSingleObjectPage">
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Next page"
-                  data-testid="keyvalue-next"
-                  :disabled="!rt?.hasMore"
-                  @click="keyValueViewStore.goNext(viewKey)"
-                >
-                  <CodiconIcon name="arrow-right" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Next page</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            v-if="!isSingleObjectPage"
+            icon="arrow-right"
+            label="Next page"
+            disabled-trigger
+            data-testid="keyvalue-next"
+            :disabled="!rt?.hasMore"
+            @click="keyValueViewStore.goNext(viewKey)"
+          />
         </div>
 
         <template v-if="!isSingleObjectPage">
@@ -871,14 +840,12 @@ onUnmounted(() => {
         <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
              (a key has no schema), so this group is count alone, same slot as SQL/Document. -->
         <div class="flex items-center gap-1.5 min-w-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Exact count" data-testid="keyvalue-count" @click="keyValueViewStore.runCount(viewKey)">
-                <CodiconIcon name="symbol-number" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Exact count</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="symbol-number"
+            label="Exact count"
+            data-testid="keyvalue-count"
+            @click="keyValueViewStore.runCount(viewKey)"
+          />
         </div>
 
         <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
@@ -888,16 +855,15 @@ onUnmounted(() => {
         <div class="flex items-center gap-1.5 min-w-0">
           <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
             <div ref="addAnchorRef" class="relative">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <TooltipDisabledTrigger>
-                    <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
-                      <CodiconIcon name="add" :size="13" />
-                    </Button>
-                  </TooltipDisabledTrigger>
-                </TooltipTrigger>
-                <TooltipContent>{{ addTitle }}</TooltipContent>
-              </Tooltip>
+              <TooltipIconButton
+                icon="add"
+                :label="addTitle"
+                aria-label="Add"
+                disabled-trigger
+                :disabled="!canInsert"
+                data-testid="keyvalue-add"
+                @click="openAdd"
+              />
               <PopoverAnchor :reference="addAnchorRef ?? undefined" />
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
@@ -931,16 +897,15 @@ onUnmounted(() => {
 
           <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
             <div ref="editAnchorRef" class="relative">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <TooltipDisabledTrigger>
-                    <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
-                      <CodiconIcon name="edit" :size="13" />
-                    </Button>
-                  </TooltipDisabledTrigger>
-                </TooltipTrigger>
-                <TooltipContent>{{ editTitle }}</TooltipContent>
-              </Tooltip>
+              <TooltipIconButton
+                icon="edit"
+                :label="editTitle"
+                aria-label="Edit"
+                disabled-trigger
+                :disabled="editDisabled"
+                data-testid="keyvalue-edit"
+                @click="openEdit"
+              />
               <PopoverAnchor :reference="editAnchorRef ?? undefined" />
             </div>
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-edit-popover">
@@ -970,41 +935,32 @@ onUnmounted(() => {
             </PopoverContent>
           </Popover>
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
-                  <CodiconIcon name="trash" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>{{ deleteTitle }}</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="trash"
+            :label="deleteTitle"
+            aria-label="Delete"
+            disabled-trigger
+            :disabled="!canDelete"
+            data-testid="keyvalue-delete"
+            @click="onDeleteKey"
+          />
 
-          <Tooltip v-if="canDownload">
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Download" data-testid="keyvalue-download" @click="onDownload">
-                <CodiconIcon name="cloud-download" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ downloadTitle }}</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            v-if="canDownload"
+            icon="cloud-download"
+            :label="downloadTitle"
+            aria-label="Download"
+            data-testid="keyvalue-download"
+            @click="onDownload"
+          />
 
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
-                aria-label="Search this page"
-                data-testid="keyvalue-search"
-                @click="onToggleSearch"
-              >
-                <CodiconIcon name="search" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Search this page</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="search"
+            label="Search this page"
+            :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
+            data-testid="keyvalue-search"
+            @click="onToggleSearch"
+          />
         </div>
       </ViewToolbar>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
@@ -143,20 +143,13 @@ function onClearFile(index: number): void {
           </TooltipTrigger>
           <TooltipContent>{{ row.path }}</TooltipContent>
         </Tooltip>
-        <Tooltip v-if="row.fileName">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Clear file"
-              data-testid="http-formdata-clear-file"
-              @click="onClearFile(index)"
-            >
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Clear file</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="row.fileName"
+          icon="close"
+          label="Clear file"
+          data-testid="http-formdata-clear-file"
+          @click="onClearFile(index)"
+        />
         <div class="flex-1 min-w-0">
           <Input
             :model-value="row.contentType"

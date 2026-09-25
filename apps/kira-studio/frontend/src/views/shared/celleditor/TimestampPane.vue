@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
@@ -149,24 +144,15 @@ watch(calendarOpen, (open) => {
       </div>
       <Popover :open="calendarOpen" @update:open="calendarOpen = $event">
         <span ref="calendarAnchorRef" class="relative shrink-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  ref="calendarTriggerEl"
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Pick a date and time"
-                  :disabled="readOnly"
-                  data-testid="cell-editor-timestamp-calendar"
-                  @click="calendarOpen = !calendarOpen"
-                >
-                  <CodiconIcon name="calendar" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Pick a date and time</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="calendar"
+            label="Pick a date and time"
+            disabled-trigger
+            ref="calendarTriggerEl"
+            :disabled="readOnly"
+            data-testid="cell-editor-timestamp-calendar"
+            @click="calendarOpen = !calendarOpen"
+          />
           <PopoverAnchor :reference="calendarAnchorRef ?? undefined" />
         </span>
         <PopoverContent align="start" class="w-56 gap-0 p-0" data-testid="cell-editor-timestamp-calendar-popover">

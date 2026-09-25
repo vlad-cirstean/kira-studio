@@ -1,13 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
@@ -71,40 +64,22 @@ function onJump(e: Event): void {
 
 <template>
   <div class="group gap-0.5" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="First page"
-            :data-testid="`${testidPrefix}pager-first`"
-            :disabled="pageIndex === 0"
-            @click="emit('first')"
-          >
-            <CodiconIcon name="chevron-left" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>First page</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Previous page"
-            :data-testid="`${testidPrefix}pager-prev`"
-            :disabled="pageIndex === 0"
-            @click="emit('prev')"
-          >
-            <CodiconIcon name="arrow-left" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Previous page</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="chevron-left"
+      label="First page"
+      disabled-trigger
+      :data-testid="`${testidPrefix}pager-first`"
+      :disabled="pageIndex === 0"
+      @click="emit('first')"
+    />
+    <TooltipIconButton
+      icon="arrow-left"
+      label="Previous page"
+      disabled-trigger
+      :data-testid="`${testidPrefix}pager-prev`"
+      :disabled="pageIndex === 0"
+      @click="emit('prev')"
+    />
     <span class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground">
       page
       <div class="w-12">
@@ -127,39 +102,22 @@ function onJump(e: Event): void {
       </div>
       <template v-if="pageCount"> of {{ pageCount }}</template>
     </span>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Next page"
-            :data-testid="`${testidPrefix}pager-next`"
-            :disabled="!hasMore"
-            @click="emit('next')"
-          >
-            <CodiconIcon name="arrow-right" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Next page</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Last page"
-            :data-testid="`${testidPrefix}pager-last`"
-            :disabled="!pageCount"
-            @click="emit('last')"
-          >
-            <CodiconIcon name="chevron-right" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ pageCount ? 'Last page' : lastTooltip }}</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="arrow-right"
+      label="Next page"
+      disabled-trigger
+      :data-testid="`${testidPrefix}pager-next`"
+      :disabled="!hasMore"
+      @click="emit('next')"
+    />
+    <TooltipIconButton
+      icon="chevron-right"
+      :label="pageCount ? 'Last page' : lastTooltip"
+      aria-label="Last page"
+      disabled-trigger
+      :data-testid="`${testidPrefix}pager-last`"
+      :disabled="!pageCount"
+      @click="emit('last')"
+    />
   </div>
 </template>

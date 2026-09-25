@@ -2,17 +2,12 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
-import { Button } from '@theme/components/ui/button';
 import { nativeSelectVariants } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -593,23 +588,14 @@ const statusLine = computed(() => {
         <template v-if="!viewerMode">
           <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
             <span ref="generateAnchorRef" class="relative shrink-0">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <TooltipDisabledTrigger>
-                    <Button
-                      variant="toolbar"
-                      size="kira-icon"
-                      aria-label="Generate a value"
-                      :disabled="!isEditable"
-                      data-testid="cell-editor-generate"
-                      @click="generatePanelOpen = !generatePanelOpen"
-                    >
-                      <CodiconIcon name="sparkle" :size="13" />
-                    </Button>
-                  </TooltipDisabledTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Generate a value</TooltipContent>
-              </Tooltip>
+              <TooltipIconButton
+                icon="sparkle"
+                label="Generate a value"
+                disabled-trigger
+                :disabled="!isEditable"
+                data-testid="cell-editor-generate"
+                @click="generatePanelOpen = !generatePanelOpen"
+              />
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
             <PopoverContent align="start" class="w-52 gap-0 p-0" data-testid="cell-editor-generate-popover">
@@ -648,29 +634,19 @@ const statusLine = computed(() => {
           <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
         </Badge>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': findOpen }"
-              aria-label="Find in value"
-              data-testid="cell-editor-search-toggle"
-              @click="toggleFind"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Find in value</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" aria-label="Close" data-testid="cell-editor-close" @click="closePanel">
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Close</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="search"
+          label="Find in value"
+          :class="{ 'bg-field text-fg': findOpen }"
+          data-testid="cell-editor-search-toggle"
+          @click="toggleFind"
+        />
+        <TooltipIconButton
+          icon="close"
+          label="Close"
+          data-testid="cell-editor-close"
+          @click="closePanel"
+        />
       </span>
     </ViewToolbar>
 

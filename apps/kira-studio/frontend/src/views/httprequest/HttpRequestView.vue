@@ -15,6 +15,7 @@ import {
 } from '@kira/api-core';
 import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import {
@@ -26,12 +27,7 @@ import {
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
@@ -557,24 +553,21 @@ onUnmounted(() => {
     />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="http-request-refresh" @click="onSend">
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="http-request-stop" @click="onStop">
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          data-testid="http-request-refresh"
+          @click="onSend"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'is-live': running }"
+          :disabled="!running"
+          data-testid="http-request-stop"
+          @click="onStop"
+        />
       </div>
       <MethodSelect
         :model-value="tab.state.method"
@@ -632,39 +625,30 @@ onUnmounted(() => {
            prospective rule (§3.1): switching this on stops future writes, it never deletes rows
            already saved before it was flipped. -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" aria-label="Copy as curl" data-testid="http-copy-as-curl" @click="onCopyAsCurl">
-              <CodiconIcon name="terminal" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Copy as curl…</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button variant="toolbar" size="kira-icon" :disabled="!canEditRaw" aria-label="Edit as raw HTTP" data-testid="http-edit-raw" @click="onEditRaw">
-                <CodiconIcon name="code" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ editRawTooltip }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': incognito }"
-              aria-label="Incognito"
-              data-testid="http-incognito-toggle"
-              @click="toggleIncognito"
-            >
-              <CodiconIcon name="eye-closed" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on' }}</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="terminal"
+          label="Copy as curl…"
+          aria-label="Copy as curl"
+          data-testid="http-copy-as-curl"
+          @click="onCopyAsCurl"
+        />
+        <TooltipIconButton
+          icon="code"
+          :label="editRawTooltip"
+          aria-label="Edit as raw HTTP"
+          disabled-trigger
+          :disabled="!canEditRaw"
+          data-testid="http-edit-raw"
+          @click="onEditRaw"
+        />
+        <TooltipIconButton
+          icon="eye-closed"
+          :label="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
+          aria-label="Incognito"
+          :class="{ 'bg-field text-fg': incognito }"
+          data-testid="http-incognito-toggle"
+          @click="toggleIncognito"
+        />
       </div>
     </ViewToolbar>
 
@@ -679,68 +663,40 @@ onUnmounted(() => {
           {{ opt.label }}
         </ToggleGroupItem>
       </ToggleGroup>
-      <Tooltip v-if="showFieldFilterToggle">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': fieldFilterOpen }"
-            aria-label="Filter"
-            data-testid="http-field-filter-toggle"
-            @click="toggleFieldFilter"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Filter</TooltipContent>
-      </Tooltip>
-      <Tooltip v-if="showFieldFilterToggle">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
-            aria-label="Descriptions"
-            data-testid="http-field-descriptions-toggle"
-            @click="toggleFieldDescriptions"
-          >
-            <CodiconIcon name="note" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions' }}</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': requestFindOpen }"
-            aria-label="Find in request"
-            data-testid="http-request-find-toggle"
-            @click="toggleRequestFind"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Find in the request body</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="showFieldFilterToggle"
+        icon="search"
+        label="Filter"
+        :class="{ 'bg-field text-fg': fieldFilterOpen }"
+        data-testid="http-field-filter-toggle"
+        @click="toggleFieldFilter"
+      />
+      <TooltipIconButton
+        v-if="showFieldFilterToggle"
+        icon="note"
+        :label="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
+        aria-label="Descriptions"
+        :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
+        data-testid="http-field-descriptions-toggle"
+        @click="toggleFieldDescriptions"
+      />
+      <TooltipIconButton
+        icon="search"
+        label="Find in the request body"
+        aria-label="Find in request"
+        :class="{ 'bg-field text-fg': requestFindOpen }"
+        data-testid="http-request-find-toggle"
+        @click="toggleRequestFind"
+      />
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
         <div ref="overviewAnchorRef" class="relative flex">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'bg-field text-fg': overviewOpen }"
-                aria-label="Variables"
-                data-testid="http-variables-overview-toggle"
-                @click="overviewOpen = !overviewOpen"
-              >
-                <CodiconIcon name="variable-group" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Variables</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="variable-group"
+            label="Variables"
+            :class="{ 'bg-field text-fg': overviewOpen }"
+            data-testid="http-variables-overview-toggle"
+            @click="overviewOpen = !overviewOpen"
+          />
           <PopoverAnchor :reference="overviewAnchorRef ?? undefined" />
         </div>
         <VariablesOverviewPanel
