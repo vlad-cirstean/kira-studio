@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { FieldDescription, FieldError, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -11,7 +11,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
@@ -49,13 +49,18 @@ const expensiveQueryRowsError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError);
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const opLogRetentionDaysId = useId();
+const expensiveQueryRowsId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Operation log retention (days)</span>
+        <Label :for="opLogRetentionDaysId" class="text-kira-sm">Operation log retention (days)</Label>
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'opLogRetentionDays') }">
@@ -75,6 +80,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="opLogRetentionDaysId"
         :min="OP_LOG_RETENTION_DAYS_RANGE.min"
         :max="OP_LOG_RETENTION_DAYS_RANGE.max"
         :aria-invalid="!!opLogRetentionError || undefined"
@@ -85,12 +91,12 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
       <FieldError v-if="opLogRetentionError" data-testid="settings-oplog-retention-error">
         {{ opLogRetentionError }}
       </FieldError>
-    </Label>
+    </Field>
     <p class="text-subtle text-kira-xs">Takes effect after restart.</p>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Expensive query threshold (rows)</span>
+        <Label :for="expensiveQueryRowsId" class="text-kira-sm">Expensive query threshold (rows)</Label>
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'expensiveQueryRows') }">
@@ -110,6 +116,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="expensiveQueryRowsId"
         :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
         :max="EXPENSIVE_QUERY_ROWS_RANGE.max"
         :aria-invalid="!!expensiveQueryRowsError || undefined"
@@ -128,7 +135,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         expensive by the console's Explain button and by auto-explain. Not comparable
         across engines' own cost figures — see the plan panel's own note.</FieldDescription
       >
-    </Label>
+    </Field>
 
     <GitLogLevelField :advanced="draft.advanced" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
       <FieldDescription>Verbosity of kira-space's own diagnostic log, for every repository.</FieldDescription>

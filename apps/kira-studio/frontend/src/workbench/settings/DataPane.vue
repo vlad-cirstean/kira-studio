@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { fieldVariants } from '@theme/components/ui/field';
+import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import {
@@ -10,6 +10,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -24,13 +25,17 @@ function onDefaultPageSizeChange(rawValue: unknown): void {
   if (!pageSize) return;
   props.draft.data.defaultPageSize = pageSize;
 }
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const defaultPageSizeId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Default page size</span>
+        <Label :for="defaultPageSizeId" class="text-kira-sm">Default page size</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('data', 'defaultPageSize') }">
@@ -50,6 +55,7 @@ function onDefaultPageSizeChange(rawValue: unknown): void {
         </Tooltip>
       </div>
       <NativeSelect
+        :id="defaultPageSizeId"
         variant="bordered"
         size="kira-lg"
         data-testid="settings-default-page-size"
@@ -58,6 +64,6 @@ function onDefaultPageSizeChange(rawValue: unknown): void {
       >
         <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
       </NativeSelect>
-    </Label>
+    </Field>
   </div>
 </template>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldGroup, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldGroup } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
 import {
@@ -91,13 +91,23 @@ function onEditGlobalDefaults(): void {
 // P110 B40: `.inherit`'s own shared class string, repeated 7 times in this file's template --
 // the DEF_TH/DEF_TD const idiom views/definition/*.vue already uses.
 const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-xs';
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const httpVersionId = useId();
+const requestTimeoutMsId = useId();
+const maxResponseMbId = useId();
+const sslVerifyId = useId();
+const followRedirectsId = useId();
+const maxRedirectsId = useId();
+const disableCookieJarId = useId();
 </script>
 
 <template>
   <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>HTTP version</span>
+        <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.httpVersion === null"
@@ -110,6 +120,7 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         </Label>
       </div>
       <NativeSelect
+        :id="httpVersionId"
         variant="bordered"
         size="kira-lg"
         data-testid="http-settings-httpVersion"
@@ -120,11 +131,11 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </NativeSelect>
       <FieldDescription>Global: HTTP/{{ global.httpVersion }}</FieldDescription>
-    </Label>
+    </Field>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Request timeout (ms)</span>
+        <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
@@ -137,6 +148,7 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         </Label>
       </div>
       <Input
+        :id="requestTimeoutMsId"
         type="number"
         :min="REQUEST_TIMEOUT_MS_RANGE.min"
         :max="REQUEST_TIMEOUT_MS_RANGE.max"
@@ -148,11 +160,11 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
       <FieldDescription>
         Global: {{ global.requestTimeoutMs === 0 ? 'no timeout' : `${global.requestTimeoutMs} ms` }}
       </FieldDescription>
-    </Label>
+    </Field>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Max response size (MB)</span>
+        <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxResponseMb === null"
@@ -165,6 +177,7 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         </Label>
       </div>
       <Input
+        :id="maxResponseMbId"
         type="number"
         :min="MAX_RESPONSE_MB_RANGE.min"
         :max="MAX_RESPONSE_MB_RANGE.max"
@@ -176,11 +189,12 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
       <FieldDescription>
         Global: {{ global.maxResponseMb === 0 ? 'unlimited' : `${global.maxResponseMb} MB` }}
       </FieldDescription>
-    </Label>
+    </Field>
 
     <FieldGroup class="items-center">
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="sslVerifyId"
           :model-value="settings.sslVerify ?? global.sslVerify"
           :disabled="settings.sslVerify === null"
           data-testid="http-settings-sslVerify"
@@ -188,8 +202,8 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Verify SSL certificates</span>
-      </Label>
+        <Label :for="sslVerifyId" class="text-kira-sm">Verify SSL certificates</Label>
+      </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.sslVerify === null"
@@ -204,8 +218,9 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
     <FieldDescription>Global: {{ global.sslVerify ? 'on' : 'off' }}</FieldDescription>
 
     <FieldGroup class="items-center">
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="followRedirectsId"
           :model-value="settings.followRedirects ?? global.followRedirects"
           :disabled="settings.followRedirects === null"
           data-testid="http-settings-followRedirects"
@@ -213,8 +228,8 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Follow redirects</span>
-      </Label>
+        <Label :for="followRedirectsId" class="text-kira-sm">Follow redirects</Label>
+      </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.followRedirects === null"
@@ -228,9 +243,9 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
     </FieldGroup>
     <FieldDescription>Global: {{ global.followRedirects ? 'on' : 'off' }}</FieldDescription>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Max redirects</span>
+        <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxRedirects === null"
@@ -243,6 +258,7 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         </Label>
       </div>
       <Input
+        :id="maxRedirectsId"
         type="number"
         :min="MAX_REDIRECTS_RANGE.min"
         :max="MAX_REDIRECTS_RANGE.max"
@@ -255,11 +271,12 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         Follow redirects is off — this has no effect.
       </FieldDescription>
       <FieldDescription v-else>Global: {{ global.maxRedirects }}</FieldDescription>
-    </Label>
+    </Field>
 
     <FieldGroup class="items-center">
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="disableCookieJarId"
           :model-value="settings.disableCookieJar ?? global.disableCookieJar"
           :disabled="settings.disableCookieJar === null"
           data-testid="http-settings-disableCookieJar"
@@ -267,8 +284,8 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Disable cookie jar</span>
-      </Label>
+        <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
+      </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.disableCookieJar === null"

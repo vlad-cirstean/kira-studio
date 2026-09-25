@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldError, FieldGroup, FieldLegend, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import {
@@ -15,7 +15,7 @@ import DateFormatField from '@workbench/settings/fields/DateFormatField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../../fonts';
 import type { SettingsPaneProps } from './types';
 
@@ -54,14 +54,20 @@ function onInlineBlameChange(checked: boolean): void {
 }
 
 const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+const fontFamilyId = useId();
+const rowColoringId = useId();
+const inlineBlameId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">Typography</FieldLegend>
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Data font</span>
+        <Label :for="fontFamilyId" class="text-kira-sm">Data font</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontFamily') }">
@@ -81,6 +87,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         </Tooltip>
       </div>
       <NativeSelect
+        :id="fontFamilyId"
         variant="bordered"
         size="kira-lg"
         data-testid="settings-font-family"
@@ -123,7 +130,7 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         ><template v-else> — text falls back to the browser's default.</template>
       </FieldError>
       <FieldDescription v-else>Grid cells, editors, anything that came out of a database.</FieldDescription>
-    </Label>
+    </Field>
 
     <FontSizeField
       :appearance="draft.appearance"
@@ -193,8 +200,9 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
     </WordWrapField>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="rowColoringId"
           class="size-3.5"
           :model-value="draft.appearance.rowColoring"
           data-testid="settings-row-coloring"
@@ -202,12 +210,12 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Row colouring</span>
+        <Label :for="rowColoringId" class="text-kira-sm">Row colouring</Label>
         <FieldDescription
           >Colour grid values by their column's data type. Off renders every row in the
           plain text colour.</FieldDescription
         >
-      </Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowColoring') }">
@@ -229,8 +237,9 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
     </FieldGroup>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="inlineBlameId"
           class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
           data-testid="settings-inline-blame"
@@ -238,12 +247,12 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Inline blame</span>
+        <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
         <FieldDescription
           >Show who last changed the current line, at the end of that line, in the
           repository file viewer.</FieldDescription
         >
-      </Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">

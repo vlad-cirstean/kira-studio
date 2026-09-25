@@ -3,9 +3,10 @@ import type { AppearanceSettings } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldGroup, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useId } from 'vue';
 
 // I2-18: the word-wrap checkbox row (checkbox, reset button) was byte-identical between
 // kira-studio's and kira-space's own AppearancePane.vue; the helper text differs per app (each
@@ -19,12 +20,17 @@ const props = defineProps<{
 function onWordWrapChange(checked: boolean): void {
   props.appearance.wordWrap = checked;
 }
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+const wordWrapId = useId();
 </script>
 
 <template>
   <FieldGroup>
-    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+    <Field orientation="horizontal">
       <Checkbox
+        :id="wordWrapId"
         class="size-3.5"
         :model-value="appearance.wordWrap"
         data-testid="settings-word-wrap"
@@ -32,9 +38,9 @@ function onWordWrapChange(checked: boolean): void {
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <span>Word wrap</span>
+      <Label :for="wordWrapId" class="text-kira-sm">Word wrap</Label>
       <slot />
-    </Label>
+    </Field>
     <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">

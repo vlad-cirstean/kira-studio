@@ -331,6 +331,13 @@ check_class 'step-btn' 'data-testid="number-step-up"/"number-step-down" (package
 check_class_in_attrs 'text-prompt-title' 'dropped -- was already orphaned (I2-8)' "$WORKBENCH_SRC/prompt/TextPromptDialog.vue"
 check_class_in_attrs 'row' 'the sibling utility string already carries all real styling' "$FRONTEND_SRC/api/MethodSelect.vue $FRONTEND_SRC/api/EnvironmentSelect.vue"
 
+# P110 I2-26: GitPane.vue's (kira-space) two <h3> section headers carried `section-subhead`, dead
+# with zero CSS backing it anywhere in the tree (confirmed by grep before removal) -- the current,
+# already-recorded visual baseline is plain unstyled <h3>, not FieldLegend's uppercase/subtle
+# treatment every other pane's own section header uses, so removing the dead hook (not swapping in
+# FieldLegend) was the zero-diff fix. Guarded so it never comes back.
+check_class 'section-subhead' 'dropped -- had zero CSS backing (see settings-git-visual-linux.png, a plain <h3> baseline)'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

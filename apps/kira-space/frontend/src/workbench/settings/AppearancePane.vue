@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldGroup, FieldLegend, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -14,6 +14,7 @@ import DateFormatField from '@workbench/settings/fields/DateFormatField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
+import { useId } from 'vue';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -25,6 +26,10 @@ const props = defineProps<SettingsPaneProps>();
 function onInlineBlameChange(checked: boolean): void {
   props.draft.appearance.inlineBlame = checked;
 }
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+const inlineBlameId = useId();
 </script>
 
 <template>
@@ -46,8 +51,9 @@ function onInlineBlameChange(checked: boolean): void {
     </WordWrapField>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="inlineBlameId"
           class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
           data-testid="settings-inline-blame"
@@ -55,12 +61,12 @@ function onInlineBlameChange(checked: boolean): void {
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Inline blame</span>
+        <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
         <FieldDescription
           >Show who last changed the current line, at the end of that line, in the
           repository file viewer.</FieldDescription
         >
-      </Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">

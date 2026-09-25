@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldError, FieldGroup, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import {
@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import {
   type ApiSettings,
   HTTP_VERSIONS,
@@ -77,13 +77,23 @@ const maxRedirectsError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('api.maxRedirects', maxRedirectsError);
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const httpVersionId = useId();
+const requestTimeoutMsId = useId();
+const maxResponseMbId = useId();
+const sslVerifyId = useId();
+const followRedirectsId = useId();
+const maxRedirectsId = useId();
+const disableCookieJarId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>HTTP version</span>
+        <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'httpVersion') }">
@@ -103,6 +113,7 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         </Tooltip>
       </div>
       <NativeSelect
+        :id="httpVersionId"
         variant="bordered"
         size="kira-lg"
         data-testid="settings-api-httpVersion"
@@ -111,11 +122,11 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </NativeSelect>
-    </Label>
+    </Field>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Request timeout (ms)</span>
+        <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'requestTimeoutMs') }">
@@ -135,6 +146,7 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="requestTimeoutMsId"
         :min="REQUEST_TIMEOUT_MS_RANGE.min"
         :max="REQUEST_TIMEOUT_MS_RANGE.max"
         :aria-invalid="!!requestTimeoutMsError || undefined"
@@ -149,11 +161,11 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         {{ requestTimeoutMsError }}
       </FieldError>
       <FieldDescription v-else>0 = no timeout.</FieldDescription>
-    </Label>
+    </Field>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Max response size (MB)</span>
+        <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'maxResponseMb') }">
@@ -173,6 +185,7 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="maxResponseMbId"
         :min="MAX_RESPONSE_MB_RANGE.min"
         :max="MAX_RESPONSE_MB_RANGE.max"
         :aria-invalid="!!maxResponseMbError || undefined"
@@ -187,11 +200,12 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         {{ maxResponseMbError }}
       </FieldError>
       <FieldDescription v-else>0 = unlimited. A larger body is truncated, not refused.</FieldDescription>
-    </Label>
+    </Field>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="sslVerifyId"
           class="size-3.5"
           :model-value="draft.api.sslVerify"
           data-testid="settings-api-sslVerify"
@@ -199,8 +213,8 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Verify SSL certificates</span>
-      </Label>
+        <Label :for="sslVerifyId" class="text-kira-sm">Verify SSL certificates</Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'sslVerify') }">
@@ -228,8 +242,9 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     </FieldError>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="followRedirectsId"
           class="size-3.5"
           :model-value="draft.api.followRedirects"
           data-testid="settings-api-followRedirects"
@@ -237,8 +252,8 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Follow redirects</span>
-      </Label>
+        <Label :for="followRedirectsId" class="text-kira-sm">Follow redirects</Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'followRedirects') }">
@@ -259,9 +274,9 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
       </Tooltip>
     </FieldGroup>
 
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Max redirects</span>
+        <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'maxRedirects') }">
@@ -281,6 +296,7 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="maxRedirectsId"
         :min="MAX_REDIRECTS_RANGE.min"
         :max="MAX_REDIRECTS_RANGE.max"
         :disabled="!draft.api.followRedirects"
@@ -298,11 +314,12 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
       <FieldDescription v-else-if="!draft.api.followRedirects">
         Follow redirects is off — this has no effect.
       </FieldDescription>
-    </Label>
+    </Field>
 
     <FieldGroup>
-      <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+      <Field orientation="horizontal">
         <Checkbox
+          :id="disableCookieJarId"
           class="size-3.5"
           :model-value="draft.api.disableCookieJar"
           data-testid="settings-api-disableCookieJar"
@@ -310,12 +327,12 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <span>Disable cookie jar</span>
+        <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
         <FieldDescription
           >Off keeps a session cookie a server sets and replays it on later requests to
           the same host.</FieldDescription
         >
-      </Label>
+      </Field>
       <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('api', 'disableCookieJar') }">

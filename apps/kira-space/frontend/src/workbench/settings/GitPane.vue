@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { FieldDescription, FieldError, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import {
   defaultSettings,
   FETCH_AUTO_INTERVAL_MINUTES_RANGE,
@@ -78,18 +78,25 @@ const graphFontSizeError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('git.graphFontSize', graphFontSizeError);
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const protectedBranchesId = useId();
+const fetchAutoIntervalMinutesId = useId();
+const gitPathId = useId();
+const graphFontSizeId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <h3 class="section-subhead">Git remote operations</h3>
+    <h3>Git remote operations</h3>
     <p class="text-subtle text-kira-xs">
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Protected branch patterns (one per line)</span>
+        <Label :for="protectedBranchesId" class="text-kira-sm">Protected branch patterns (one per line)</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'protectedBranches') }">
@@ -109,6 +116,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <Textarea
+        :id="protectedBranchesId"
         v-model="protectedBranchesText"
         class="font-data"
         rows="4"
@@ -119,10 +127,10 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         >Force-pushing or deleting a matching remote branch requires typing its name to
         confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</FieldDescription
       >
-    </Label>
-    <Label :class="fieldVariants()">
+    </Field>
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Auto-fetch interval (minutes)</span>
+        <Label :for="fetchAutoIntervalMinutesId" class="text-kira-sm">Auto-fetch interval (minutes)</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'fetchAutoIntervalMinutes') }">
@@ -142,6 +150,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="fetchAutoIntervalMinutesId"
         :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
         :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
         :aria-invalid="!!fetchAutoIntervalError || undefined"
@@ -160,10 +169,10 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         needs one simply fails silently and disables the timer until the next explicit
         fetch.</FieldDescription
       >
-    </Label>
-    <Label :class="fieldVariants()">
+    </Field>
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Git executable path</span>
+        <Label :for="gitPathId" class="text-kira-sm">Git executable path</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'gitPath') }">
@@ -183,6 +192,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <Input
+        :id="gitPathId"
         type="text"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         data-testid="settings-git-path"
@@ -192,11 +202,11 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
         time, never cached, so a change here takes effect on the next one.</FieldDescription
       >
-    </Label>
-    <h3 class="section-subhead">Graph</h3>
-    <Label :class="fieldVariants()">
+    </Field>
+    <h3>Graph</h3>
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Font size</span>
+        <Label :for="graphFontSizeId" class="text-kira-sm">Font size</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'graphFontSize') }">
@@ -216,6 +226,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="graphFontSizeId"
         :min="FONT_SIZE_RANGE.min"
         :max="FONT_SIZE_RANGE.max"
         :aria-invalid="!!graphFontSizeError || undefined"
@@ -227,6 +238,6 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         {{ graphFontSizeError }}
       </FieldError>
       <FieldDescription v-else>0 = match the app font size.</FieldDescription>
-    </Label>
+    </Field>
   </div>
 </template>

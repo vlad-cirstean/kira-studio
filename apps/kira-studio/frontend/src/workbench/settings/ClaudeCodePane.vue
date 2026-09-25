@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
+import { useId } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useKeepAwakeStore } from '../../state/keepAwake';
 import { useSettingsStore } from '../../state/settings';
@@ -28,6 +29,11 @@ const { busy: claudeCodeHooksToggling, run: onToggleAgentHooksEnabled } = useBus
 const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = useBusyAction(
   (enabled: boolean) => keepAwakeStore.setKeepAwakeAgentAware(enabled),
 );
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+const hooksEnabledId = useId();
+const keepAwakeAgentAwareId = useId();
 </script>
 
 <template>
@@ -36,8 +42,9 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
          this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
          hook listener in one call, so it belongs on the action side of the draft/Save
          line, never mixed with it. -->
-    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+    <Field orientation="horizontal">
       <Checkbox
+        :id="hooksEnabledId"
         class="size-3.5"
         :model-value="settingsStore.claudeCode.hooksEnabled"
         :disabled="claudeCodeHooksToggling"
@@ -46,13 +53,13 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <span>Report session activity to Kira Studio</span>
+      <Label :for="hooksEnabledId" class="text-kira-sm">Report session activity to Kira Studio</Label>
       <FieldDescription
         >A Claude Code tab launches with a `--settings` flag pointing at a file this app
         owns — no project file is written. Turning this off affects only the next launch;
         a session already running simply stops reporting.</FieldDescription
       >
-    </Label>
+    </Field>
 
     <template v-if="settingsStore.claudeCode.hooksEnabled">
       <p
@@ -74,8 +81,9 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
     <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
          enough to hold the assertion, and this leaf's own instant-action posture mirrors
          the hooks toggle just above. -->
-    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+    <Field orientation="horizontal">
       <Checkbox
+        :id="keepAwakeAgentAwareId"
         class="size-3.5"
         :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
         :disabled="keepAwakeAgentAwareToggling"
@@ -84,12 +92,12 @@ const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = 
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <span>Keep this Mac awake while a Claude Code session is running</span>
+      <Label :for="keepAwakeAgentAwareId" class="text-kira-sm">Keep this Mac awake while a Claude Code session is running</Label>
       <FieldDescription
         >Prevents idle sleep, and system sleep on AC power, for as long as at least one
         Claude Code tab is live. Independent of the title bar's own keep-awake button —
         either one is enough to keep the machine awake.</FieldDescription
       >
-    </Label>
+    </Field>
   </div>
 </template>

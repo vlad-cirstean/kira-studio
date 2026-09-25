@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { FieldError, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { formatBytes } from '@workbench/util/format';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';
 import { CACHE_L2_BUDGET_MB_RANGE } from '../../state/settingsDomain';
@@ -55,13 +55,19 @@ const cacheSizeLabel = computed(() => {
 async function onClearCaches(): Promise<void> {
   await data.clearCaches();
 }
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+const cacheBudgetMbId = useId();
+const currentUsageId = useId();
+const hitRateId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Label :class="fieldVariants()">
+    <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
-        <span>Result page cache budget (MB)</span>
+        <Label :for="cacheBudgetMbId" class="text-kira-sm">Result page cache budget (MB)</Label>
         <Tooltip>
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('cache', 'l2BudgetMb') }">
@@ -81,6 +87,7 @@ async function onClearCaches(): Promise<void> {
         </Tooltip>
       </div>
       <NumberStepperInput
+        :id="cacheBudgetMbId"
         :min="CACHE_L2_BUDGET_MB_RANGE.min"
         :max="CACHE_L2_BUDGET_MB_RANGE.max"
         :aria-invalid="!!cacheBudgetError || undefined"
@@ -91,25 +98,27 @@ async function onClearCaches(): Promise<void> {
       <FieldError v-if="cacheBudgetError" data-testid="settings-cache-budget-error">
         {{ cacheBudgetError }}
       </FieldError>
-    </Label>
-    <Label :class="fieldVariants()">
-      <span class="text-muted-foreground">Current usage</span>
+    </Field>
+    <Field class="items-center">
+      <Label :for="currentUsageId" class="text-kira-sm text-muted-foreground">Current usage</Label>
       <Input
+        :id="currentUsageId"
         type="text"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         :model-value="cacheSizeLabel"
         disabled
       />
-    </Label>
-    <Label :class="fieldVariants()">
-      <span class="text-muted-foreground">Hit rate</span>
+    </Field>
+    <Field class="items-center">
+      <Label :for="hitRateId" class="text-kira-sm text-muted-foreground">Hit rate</Label>
       <Input
+        :id="hitRateId"
         type="text"
         class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
         :model-value="hitRateLabel"
         disabled
       />
-    </Label>
+    </Field>
     <Button variant="dialog" size="kira-lg" class="self-start" data-testid="settings-clear-caches" @click="onClearCaches">
       Clear caches
     </Button>

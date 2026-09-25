@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { FieldDescription, FieldLegend, fieldVariants } from '@theme/components/ui/field';
+import { Field, FieldDescription, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
@@ -73,6 +73,10 @@ async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promi
 function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
   return conn.mcpDescription.split('\n', 1)[0] ?? '';
 }
+
+// P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
+const dbMcpEnabledId = useId();
 </script>
 
 <template>
@@ -83,8 +87,9 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
          one call, so it belongs on the action side of the draft/Save line, never mixed with
          it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
          "enabling is never a silent action"). -->
-    <Label data-slot="field" :class="fieldVariants({ orientation: 'horizontal' })">
+    <Field orientation="horizontal">
       <Checkbox
+        :id="dbMcpEnabledId"
         class="size-3.5"
         :model-value="settingsStore.dbMcp.serverEnabled"
         :disabled="dbMcpToggling"
@@ -93,13 +98,13 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <span>Enable the database MCP server</span>
+      <Label :for="dbMcpEnabledId" class="text-kira-sm">Enable the database MCP server</Label>
       <FieldDescription
         >Lets an AI client list, browse and query the connections exposed below, through
         the same path this app's own SQL console uses. Starts and stops with this
         toggle.</FieldDescription
       >
-    </Label>
+    </Field>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
       <p v-if="dbMcpStore.status.error" class="text-subtle text-kira-xs" data-testid="db-mcp-error">
