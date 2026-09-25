@@ -17,8 +17,8 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 //
 // P22 D1: the control-role layer (--kira-control-h/-lg/-sm) is a pure alias over the existing
 // --kira-h-* scale — every control keeps today's rendered height. The one deliberate exception is
-// .p-view-head, which moves onto --kira-viewhead-h (= --kira-bar-h) to close the split fb7476e's
-// bar-height family left between it and the now-taller .p-toolbar (F2(c)).
+// .p-view-head, which moves onto the --kira-bar-h band to close the split fb7476e's bar-height
+// family left between it and the now-taller .p-toolbar (F2(c)).
 
 const CONNECTION_ID = 'conn-control-sizing';
 const FIXTURE = orderItemsFixture(CONNECTION_ID);

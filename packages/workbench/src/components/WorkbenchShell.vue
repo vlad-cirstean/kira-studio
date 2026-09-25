@@ -107,7 +107,7 @@ watch([() => props.opsHeight, vGroupHeight], ([height, h]) => {
 // external, px contract this component receives, so no measurement is needed.
 const opsMarginPx = computed(() => {
   if (!hasDock.value || !props.opsVisible) return 0;
-  return (props.opsHeight ?? 0) + 2; // +2: the SplitterResizeHandle's own gap-0.5 track (--kira-gap).
+  return (props.opsHeight ?? 0) + 2; // +2: the SplitterResizeHandle's own gap-0.5 track (2px).
 });
 
 function onProjectResize(size: number): void {
@@ -125,7 +125,7 @@ function onOpsResize(percent: number): void {
 
 <template>
   <!-- flex-1 (was dropped converting the old grid's `flex: 1` to Tailwind classes, collapsing the
-       whole shell to content height) and gap-0.5 (the old grid's row-gap: var(--kira-gap), between
+       whole shell to content height) and gap-0.5 (the old grid's row-gap, 2px, between
        the content row and the status bar) both reproduce byte-identical geometry to the pre-P104
        CSS grid — found via a tree.spec.ts virtualization-boundary regression the grid version never
        had; SplitterGroup's own default alignment otherwise leaves this 2px unaccounted for. -->
@@ -211,8 +211,8 @@ function onOpsResize(percent: number): void {
 
     <!-- The old grid template stays four rows (main/splitops/ops/status) whether or not ops is
          open when hasDock (Risk §11's own "structural, not a zero-height row" point) — even a
-         collapsed splitops/ops row still consumes its own row-gap. mt-1 (4px = two more
-         --kira-gap) reproduces that reserved space exactly; gap-0.5 above already accounts for
+         collapsed splitops/ops row still consumes its own row-gap. mt-1 (4px = two more 2px
+         row-gaps) reproduces that reserved space exactly; gap-0.5 above already accounts for
          one. Kira Space (no #dock slot) never adds it, matching its own two-row grid exactly. -->
     <div class="shrink-0 h-statusbar" :class="{ 'mt-1': hasDock }" data-testid="status-bar">
       <slot name="status" />
