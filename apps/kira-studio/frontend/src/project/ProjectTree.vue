@@ -188,8 +188,8 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
 </script>
 
 <template>
-  <div class="project-tree">
-    <div ref="treeBodyEl" class="tree-body" data-testid="tree-background">
+  <div class="h-full flex flex-col min-h-0">
+    <div ref="treeBodyEl" class="flex-1 min-h-0" data-testid="tree-background">
       <div
         ref="scrollEl"
         class="virtual-list h-full overflow-auto"
@@ -241,20 +241,3 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </Alert>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.project-tree {
-  @apply h-full flex flex-col min-h-0;
-}
-
-.tree-body {
-  @apply flex-1 min-h-0;
-}
-
-/* Positioned relative to the zero-height .virtual-list-sticky (itself position: sticky), which is
-   what makes each row's `top` (stickyBand.ts's own output) land correctly without this component
-   needing to know anything about the scrollport (P28 D2). P110 B34: `.sticky-row`/`.virtual-row`
-   moved to base.css's own `@utility` pair (shared duplicates). */
-</style>

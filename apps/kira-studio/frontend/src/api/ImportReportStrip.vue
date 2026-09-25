@@ -39,9 +39,9 @@ function plural(n: number, noun: string): string {
 <template>
   <Alert v-if="report" :variant="tone" data-testid="import-report">
     <AlertDescription class="flex items-start gap-1.5">
-      <div class="report">
+      <div class="flex min-w-0 flex-col gap-0.5">
         <div data-testid="import-report-summary">{{ summary }}</div>
-        <ul v-if="report.warnings.length > 0" class="warnings">
+        <ul v-if="report.warnings.length > 0" class="m-0 flex flex-col gap-0.5 pl-2">
           <li v-for="warning in report.warnings" :key="warning.kind" :data-kind="warning.kind">
             {{ warning.detail }}
           </li>
@@ -68,7 +68,7 @@ function plural(n: number, noun: string): string {
        export without ever having imported). -->
   <Alert v-if="collectionsStore.exportWarning" variant="warn" data-testid="export-warning">
     <AlertDescription class="flex items-start gap-1.5">
-      <div class="report">{{ collectionsStore.exportWarning }}</div>
+      <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.exportWarning }}</div>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -92,7 +92,7 @@ function plural(n: number, noun: string): string {
        VariableSetView.vue/BulkVariablesEditor.vue already use for their own store-level errors. -->
   <Alert v-if="collectionsStore.error" variant="destructive" data-testid="collections-error">
     <AlertDescription class="flex items-start gap-1.5">
-      <div class="report">{{ collectionsStore.error }}</div>
+      <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.error }}</div>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -121,15 +121,3 @@ function plural(n: number, noun: string): string {
     <AlertDescription>{{ collectionsStore.treeLoadError }}</AlertDescription>
   </Alert>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.report {
-  @apply flex min-w-0 flex-col gap-0.5;
-}
-
-.warnings {
-  @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-</style>

@@ -73,7 +73,7 @@ onMounted(() => {
     <div ref="bodyEl" class="flex flex-col gap-2 p-3">
       <Textarea
         v-model="text"
-        class="font-data curl-textarea"
+        class="font-data curl-textarea min-h-32"
         rows="6"
         placeholder="curl -X POST https://api.example.com/orders -H 'Content-Type: application/json' -d '{&quot;id&quot;: 1}'"
         data-testid="import-curl-textarea"
@@ -88,7 +88,7 @@ onMounted(() => {
              established — shown live, before Import is pressed, rather than as a post-hoc report. -->
         <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="import-curl-warnings">
           <AlertDescription>
-            <ul class="warnings">
+            <ul class="m-0 flex flex-col gap-0.5 pl-2">
               <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
                 {{ warning.detail }}
               </li>
@@ -116,15 +116,3 @@ onMounted(() => {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.curl-textarea {
-  @apply min-h-32;
-}
-
-.warnings {
-  @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-</style>

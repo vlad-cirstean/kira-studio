@@ -92,7 +92,7 @@ function close(): void {
     <div class="flex flex-col gap-2 p-3">
       <div class="text-kira-sm text-muted-foreground" data-testid="edit-raw-hint">{{ hint }}</div>
 
-      <div class="raw-editor">
+      <div class="h-80 overflow-hidden rounded-kira border border-border">
         <MonacoHost
           :doc="text"
           language="plain"
@@ -115,7 +115,7 @@ function close(): void {
         </Alert>
         <Alert v-if="preview.warnings.length > 0" variant="warn" data-testid="edit-raw-warnings">
           <AlertDescription>
-            <ul class="warnings">
+            <ul class="m-0 flex flex-col gap-0.5 pl-2">
               <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
                 {{ warning.detail }}
               </li>
@@ -143,15 +143,3 @@ function close(): void {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.raw-editor {
-  @apply h-80 overflow-hidden rounded-kira border border-border;
-}
-
-.warnings {
-  @apply m-0 flex flex-col gap-0.5 pl-2;
-}
-</style>
