@@ -1,5 +1,5 @@
 #!/bin/sh
-# P110 B5: guards every legacy/retired class name this CSS-to-Tailwind migration renames or
+# P110 B5/C1: guards every legacy/retired class name this CSS-to-Tailwind migration renames or
 # deletes from ever coming back. Each check greps for one retired name, anchored the same way
 # check-tokens.sh anchors --kira-* references: the name must be preceded by whitespace, a quote,
 # a backtick, a brace or a colon (i.e. a real class-name token, possibly with a variant chain like
@@ -60,6 +60,34 @@ check_class_in_attrs() {
     grep -v "^${THEME_SRC}/components/ui/" || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired class '$name' still used in a class attribute -- replace with '$replacement':" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+
+# check_kui_class <retired-name> <replacement>
+# P110 C1: A3-A8 retired every `controls.css` selector in favour of `kv:` utilities/cva variants
+# directly on the owning `Kui*` component (A8 deleted `controls.css` itself). Scoped to GU/KU
+# (`kui-*` names only ever lived there) and, like check_class_in_attrs, to real `class="..."` /
+# `:class="..."` attribute values only -- not check_class's broader scan. Two reasons, both real
+# survivors verified by grep, not assumed:
+#   1. A3-A8's own commits document the retired selectors inline as `class="kui-x"`-shaped prose in
+#      JSDoc comments (KuiIconBox.vue, KuiMenuList.vue, KuiButton.vue, rowVariants.ts, ...) -- a
+#      whole-file scan would fail on that documentation, not a regression. Comment lines (a `*`
+#      continuation or `//`) are excluded.
+#   2. Several retired names collide with real, ongoing non-class identifiers: `kui-icon-box` is
+#      also a real `cn.ts` spacing-scale token name, `kui-tooltip`/`kui-segmented-badge` are also a
+#      real directive name/`TOOLTIP_ID`/`data-testid`. None of those are `class="..."` attribute
+#      values, so the attribute scope leaves them alone.
+check_kui_class() {
+  name="$1"
+  replacement="$2"
+  hits=$(grep -rnP --include='*.vue' --include='*.ts' \
+    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+    grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: retired kui-* class '$name' still used -- replace with '$replacement':" >&2
     echo "$hits" >&2
     STATUS=1
   fi
@@ -190,6 +218,42 @@ check_class 'def-empty' 'text-muted-foreground m-0'
 check_class 'def-table' 'w-full border-collapse text-kira-md (plus a local `.definition-table` hook where a scoped column-divider override needs one)'
 check_class 'def-head-row' 'per-th px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap (plus border-r border-border except the last column)'
 check_class 'def-row' 'border-b border-border hover:bg-hover'
+
+# P110 A3: KuiButton/KuiIconBox onto cva variants + kv: utilities.
+check_kui_class 'kui-button' 'kuiButtonVariants({ variant, active }) (packages/kira-ui/src/KuiButton.vue)'
+check_kui_class 'kui-button-count' 'the count span'"'"'s own kv: utilities on KuiButton.vue'
+check_kui_class 'kui-icon-box' 'KuiIconBox (packages/kira-ui/src/KuiIconBox.vue)'
+# P110 A4: KuiTextInput/KuiSearchInput/KuiSelect onto kv: utilities.
+check_kui_class 'kui-search-input' 'kv: utilities on KuiSearchInput.vue'
+check_kui_class 'kui-search-input-icon' 'kv: utilities on KuiSearchInput.vue'
+check_kui_class 'kui-search-input-field' 'kv: utilities on KuiSearchInput.vue'
+check_kui_class 'kui-search-input-clear' 'kv: utilities on KuiSearchInput.vue'
+check_kui_class 'kui-select' 'kv: utilities on KuiSelect.vue'
+check_kui_class 'kui-select-field' 'kv: utilities on KuiSelect.vue'
+check_kui_class 'kui-select-chevron' 'kv: utilities on KuiSelect.vue'
+# P110 A5: KuiMenuList/KuiContextMenu onto cva, exported kuiRowVariants.
+check_kui_class 'kui-row' 'kuiRowVariants() (packages/kira-ui/src/rowVariants.ts)'
+check_kui_class 'kui-menu-list' 'kv: utilities on KuiMenuList.vue'
+check_kui_class 'kui-menu-item' 'kuiRowVariants() (packages/kira-ui/src/rowVariants.ts)'
+check_kui_class 'kui-menu-item-label' 'kv: utilities on KuiMenuList.vue'
+check_kui_class 'kui-menu-item-detail' 'kv: utilities on KuiMenuList.vue'
+check_kui_class 'kui-menu-heading' 'kv: utilities on KuiMenuList.vue'
+check_kui_class 'kui-menu-separator' 'kv: utilities on KuiMenuList.vue'
+check_kui_class 'kui-menu-root' 'kv: utilities on KuiContextMenu.vue'
+check_kui_class 'kui-visually-hidden' 'kv: utilities on KuiMenuList.vue'
+# P110 A6: KuiTooltip/KuiPopoverPanel/KuiDialog onto kv: utilities.
+check_kui_class 'kui-tooltip' 'kv: utilities on KuiTooltip.vue'
+check_kui_class 'kui-popover-backdrop' 'kv: utilities on KuiPopoverPanel.vue'
+check_kui_class 'kui-popover' 'kv: utilities on KuiPopoverPanel.vue'
+check_kui_class 'kui-modal-backdrop' 'kv: utilities on KuiDialog.vue'
+check_kui_class 'kui-modal' 'kv: utilities on KuiDialog.vue'
+check_kui_class 'kui-modal-title' 'kv: utilities on KuiDialog.vue'
+check_kui_class 'kui-modal-body' 'kv: utilities on KuiDialog.vue'
+check_kui_class 'kui-modal-actions' 'kv: utilities on KuiDialog.vue'
+# P110 A7: KuiSegmented onto cva/kv: utilities.
+check_kui_class 'kui-segmented' 'kv: utilities on KuiSegmented.vue'
+check_kui_class 'kui-segmented-button' 'kuiSegmentedButtonVariants() (packages/kira-ui/src/KuiSegmented.vue)'
+check_kui_class 'kui-segmented-badge' 'kv: utilities on KuiSegmented.vue'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

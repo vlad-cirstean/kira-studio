@@ -5,9 +5,12 @@
 # toolchain) — its one known blind spot is a var() carrying a fallback (var(--x, red)), which is
 # legitimate and is skipped by construction (the pattern below only matches a var() whose closing
 # paren directly follows the property name). That blind spot is exactly right for the --kui- pass
-# below: every --kui-* reference in packages/kira-ui/src/theme/controls.css carries a fallback on
-# purpose (a host that has not loaded a bridge must still render something), so this guard leaves
-# that file alone and only catches a bridge-less *consumer* reference.
+# below: every --kui-* reference across packages/kira-ui/src and packages/git-ui/src carries a
+# fallback on purpose (a host that has not loaded a bridge must still render something), so this
+# guard only catches a bridge-less *consumer* reference, never a definition site. P110 A8 deleted
+# packages/kira-ui/src/theme/controls.css entirely (kira-ui ships no component CSS of its own any
+# more); git-ui's own theme/kui-bridge.css is the sole --kui-* definition file left, referenced
+# below.
 #
 # G34 D16: this is the guard that would have caught G34's own F5 (packages/git-ui/src/App.vue
 # referencing five --kv-* tokens outside the ancestor that used to define them) — there was no
