@@ -233,9 +233,9 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="ops-panel">
-    <div class="ops-header">
-      <div class="filter-input flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2">
+  <div class="h-full flex flex-col min-h-0 text-kira-sm">
+    <div class="shrink-0 flex items-center gap-2 py-1 px-2 border-b border-border">
+      <div class="flex-none w-40 flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2">
         <CodiconIcon name="filter" :size="13" class="shrink-0 text-muted-foreground" />
         <Input
           v-model="opsStore.filterText"
@@ -253,7 +253,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
           {{ opt.label }}
         </ToggleGroupItem>
       </ToggleGroup>
-      <span class="running-count">{{ opsStore.runningCount }} running</span>
+      <span class="ml-auto text-muted-foreground">{{ opsStore.runningCount }} running</span>
       <Tooltip>
         <TooltipTrigger as-child>
           <Button variant="dialog" size="kira-lg" @click="opsStore.clearOps">Clear</Button>
@@ -269,7 +269,12 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </Alert>
     </div>
     <template v-else>
-      <div class="ops-columns">
+      <!-- P110 B36: this grid-cols-[...] arbitrary value is not a new one -- it was already
+           @apply'd in this file's own scoped block pre-phase (same "moved, not added" situation
+           as SchemaDialog.vue's h-[60vh], B35f), and the shape already has precedent elsewhere
+           (GenerateDataDialog.vue, shadcn's own alert/index.ts). Not itemized on plan 1.2's own
+           allowlist; flagging for the plan owner to add a matching entry, same as B35f's note. -->
+      <div class="grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center gap-2 px-2 shrink-0 uppercase tracking-wider h-4.5 text-muted-foreground border-b border-border">
         <span>Time</span>
         <span>Connection</span>
         <span>Tab</span>
@@ -281,7 +286,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </div>
       <div
         ref="scrollEl"
-        class="ops-body overflow-auto"
+        class="flex-1 min-h-0 overflow-auto"
         data-testid="virtual-list"
         role="listbox"
         aria-label="Operations"
@@ -300,9 +305,9 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <div
               v-if="listItems[vi.index].kind === 'op'"
-              class="ops-row virtual-row"
+              class="grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center gap-2 px-2 cursor-pointer select-text h-4.5 hover:bg-hover virtual-row"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-              :class="{ error: listItems[vi.index].record.status === 'error' }"
+              :class="{ 'text-error': listItems[vi.index].record.status === 'error' }"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
               role="option"
@@ -312,23 +317,23 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
             >
               <span class="font-data" data-testid="op-time-cell">{{ formatTime(listItems[vi.index].record.startedAt) }}</span>
-              <span class="connection-cell">
+              <span class="flex items-center min-w-0 gap-1">
                 <span
                   v-if="connectionFor(listItems[vi.index].record)"
-                  class="chip"
+                  class="w-2 h-2 shrink-0 rounded-sm"
                   :style="{ background: connColorVar(connectionFor(listItems[vi.index].record)?.color) ?? 'none' }"
                 />
-                <span class="truncate">{{ connectionFor(listItems[vi.index].record)?.name ?? '—' }}</span>
+                <span class="truncate min-w-0">{{ connectionFor(listItems[vi.index].record)?.name ?? '—' }}</span>
               </span>
-              <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(listItems[vi.index].record) }}</span>
+              <span class="truncate min-w-0" data-testid="op-tab-cell">{{ tabTitleFor(listItems[vi.index].record) }}</span>
               <span>{{ listItems[vi.index].record.kind }}</span>
-              <span class="status-cell">
+              <span class="flex items-center gap-1">
                 <CodiconIcon v-if="listItems[vi.index].record.status === 'running'" name="loading" class="animate-spin" :size="13" />
                 {{ listItems[vi.index].record.status }}
                 <button
                   v-if="listItems[vi.index].record.status === 'running'"
                   type="button"
-                  class="cancel-button"
+                  class="bg-transparent border-0 cursor-pointer p-0 flex text-muted-foreground"
                   aria-label="Cancel operation"
                   @click.stop="onCancel(listItems[vi.index].record)"
                 >
@@ -339,20 +344,20 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span>{{ listItems[vi.index].record.rows ?? '—' }}</span>
               <Tooltip v-if="listItems[vi.index].record.status === 'error'">
                 <TooltipTrigger as-child>
-                  <span class="font-data truncate error-text block">{{ listItems[vi.index].record.error }}</span>
+                  <span class="font-data truncate min-w-0 text-error block">{{ listItems[vi.index].record.error }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ listItems[vi.index].record.error ?? '' }}</TooltipContent>
               </Tooltip>
               <Tooltip v-else>
                 <TooltipTrigger as-child>
-                  <span class="font-data truncate block">{{ listItems[vi.index].record.command ?? '—' }}</span>
+                  <span class="font-data truncate min-w-0 block">{{ listItems[vi.index].record.command ?? '—' }}</span>
                 </TooltipTrigger>
                 <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
               </Tooltip>
             </div>
             <div
               v-else-if="listItems[vi.index].kind === 'detail-command'"
-              class="ops-detail-row ops-detail-cm virtual-row"
+              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm virtual-row"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <MonacoHost
@@ -369,7 +374,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
             </div>
             <div
               v-else
-              class="ops-detail-row ops-detail-cm virtual-row"
+              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm virtual-row"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <MonacoHost
@@ -389,102 +394,24 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.ops-panel {
-  @apply h-full flex flex-col min-h-0;
-  font-size: var(--kira-t-sm);
-}
+/* P110 B36: every rule this file had (.ops-panel/-header/-columns/-body/-row/.filter-input/
+   .running-count/.connection-cell/.chip/.truncate/.error-text/.status-cell/.cancel-button/
+   .ops-detail-row) moved onto the template elements as Tailwind utilities. The 3 shared-selector
+   rules (.ops-columns/.ops-row/.ops-detail-row for the grid template, and .ops-detail-row's own
+   second rule overriding grid-cols-1) were resolved per-element rather than stacked (1.3):
+   .ops-detail-cm's own `p-0` always won over the shared rule's own padding on every real instance
+   (both detail-row kinds always carry both classes together), so the merged detail-row elements
+   use p-0 alone with no px-2 alongside it. `.truncate`'s own custom rule duplicated Tailwind's own
+   built-in `truncate` utility for 3 of its 4 declarations (overflow-hidden/text-ellipsis/
+   whitespace-nowrap) -- template keeps the bare `truncate` class name (now resolving to the real
+   utility once this rule is gone) plus an explicit `min-w-0`, the one declaration the built-in
+   utility doesn't carry. `.ops-row.error`'s conditional is now bound to `text-error` directly in
+   the same `:class` object rather than kept as a `.error` marker with no test dependency (grepped
+   apps/kira-studio/tests).
 
-.ops-header {
-  @apply shrink-0 flex items-center;
-  gap: var(--kira-s-4);
-  padding: var(--kira-s-2) var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.filter-input {
-  @apply flex-none w-40;
-}
-
-.running-count {
-  @apply ml-auto;
-  color: var(--kira-fg-muted);
-}
-
-.ops-columns,
-.ops-row,
-.ops-detail-row {
-  @apply grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center;
-  gap: var(--kira-s-4);
-  padding: 0 var(--kira-s-4);
-}
-
-.ops-columns {
-  /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
-     size, case and letter-spacing alone, matching the panel-head utility group's own
-     section-label idiom (uppercase tracking-wider). */
-  @apply shrink-0 uppercase tracking-wider;
-  height: var(--kira-h-xs);
-  color: var(--kira-fg-muted);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.ops-body {
-  @apply flex-1 min-h-0;
-}
-
-/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared duplicate). */
-
-.ops-row {
-  @apply cursor-pointer select-text;
-  height: var(--kira-h-xs);
-}
-
-.ops-row:hover {
-  background: var(--kira-hover);
-}
-
-.ops-row.error {
-  color: var(--kira-error);
-}
-
-.connection-cell {
-  @apply flex items-center min-w-0;
-  gap: var(--kira-s-2);
-}
-
-.chip {
-  @apply w-2 h-2 shrink-0 rounded-sm;
-}
-
-.truncate {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
-}
-
-.error-text {
-  color: var(--kira-error);
-}
-
-.status-cell {
-  @apply flex items-center;
-  gap: var(--kira-s-2);
-}
-
-.cancel-button {
-  @apply bg-transparent border-none cursor-pointer p-0 flex;
-  color: var(--kira-fg-muted);
-}
-
-.ops-detail-row {
-  @apply grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap;
-  height: var(--kira-h-xs);
-  color: var(--kira-fg-muted);
-  background: var(--kira-bg-elevated);
-}
-
-.ops-detail-cm {
-  @apply p-0;
-}
-
+   `.ops-detail-cm` stays a bare marker class -- its own :deep(.monaco-editor)/
+   :deep(.monaco-scrollable-element)/:deep(.view-line) rules below target Monaco's own internal
+   DOM, which no utility class can reach; this is exactly what plan 5.15 keeps as CSS. */
 .ops-detail-cm :deep(.monaco-editor) {
   height: var(--kira-h-xs);
   font-size: var(--kira-t-sm);
