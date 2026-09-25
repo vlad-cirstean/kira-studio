@@ -265,13 +265,13 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
-                  <span class="hop-phase" :data-testid="`http-timeline-phase-${seg.key}`" data-present="false">
+                  <span class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="false">
                     {{ seg.label }} —
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>{{ phaseTooltip(hop, seg.key) }}</TooltipContent>
               </Tooltip>
-              <span v-else class="hop-phase" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
+              <span v-else class="data-[present=false]:opacity-60" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
                 {{ seg.label }} {{ formatMs(hop[seg.key]!.durationMs) }}
               </span>
             </template>
@@ -322,15 +322,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       <EmptyMedia><CodiconIcon name="arrow-right" :size="24" /></EmptyMedia>
       <EmptyTitle>Send a request to see the response</EmptyTitle>
     </Empty>
+    <!-- P110 I2-17: `.hop-phase[data-present='false']` moved onto the span's own
+         `data-[present=false]:opacity-60` (compile-verified) -- no test locates by `.hop-phase`. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.hop-phase` stays a bare marker to anchor this attribute-conditional rule. */
-.hop-phase[data-present='false'] {
-  @apply opacity-60;
-}
-</style>

@@ -283,6 +283,7 @@ onUnmounted(() => {
     <!-- P18 D14 (P15 D1's gRPC sibling): the status row, the pane switcher and every strip render
          from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
          opened tab used to show no Messages/Metadata/History switcher at all. -->
+    <!-- `.response-status-row` stays a bare marker: api-ui-consistency.spec.ts locates it directly. -->
     <div class="response-status-row h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
@@ -434,7 +435,7 @@ onUnmounted(() => {
                  MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
-            <button type="button" class="message-header box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer" @click="toggleExpanded(entry.m.seq)">
+            <button type="button" class="box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer hover:bg-hover" @click="toggleExpanded(entry.m.seq)">
               <span class="text-kira-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
               <span class="text-kira-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
@@ -488,18 +489,7 @@ onUnmounted(() => {
       :targets="findTargets"
       @close="closeFind"
     />
+    <!-- P110 I2-17: `.message-header:hover` moved onto the button's own `hover:bg-hover` -- no
+         test locates by that class, so the marker drops. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.response-status-row` stays a bare marker: api-ui-consistency.spec.ts locates it
-   directly (no rule of its own attaches to the name any more). `.message-header` stays a marker
-   to anchor this hover rule. */
-.message-header:hover {
-  @apply bg-hover;
-}
-
-</style>

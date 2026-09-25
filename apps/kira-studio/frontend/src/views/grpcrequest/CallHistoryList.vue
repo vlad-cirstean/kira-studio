@@ -144,8 +144,8 @@ async function onClear(): Promise<void> {
       <div
         v-for="entry in filteredEntries"
         :key="entry.id"
-        class="history-row flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1"
-        :class="{ 'is-viewing': entry.id === viewingId }"
+        class="flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1"
+        :class="entry.id === viewingId ? 'bg-hover' : 'hover:bg-hover'"
         data-testid="grpc-history-row"
         role="option"
         tabindex="0"
@@ -188,16 +188,8 @@ async function onClear(): Promise<void> {
       Only the last {{ GRPC_HISTORY_PER_SCOPE_LIMIT }} are kept — older calls are removed
       automatically.
     </div>
+    <!-- P110 I2-17: `.history-row:hover`/`.history-row.is-viewing` (same background either way)
+         folded into one ternary -- no test locates by either class (checked; grpc-history-row is
+         the real testid), so both markers drop cleanly. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.history-row` stays a bare marker to anchor this hover/is-viewing compound. */
-.history-row:hover,
-.history-row.is-viewing {
-  @apply bg-hover;
-}
-</style>

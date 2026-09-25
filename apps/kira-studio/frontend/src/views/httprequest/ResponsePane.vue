@@ -322,7 +322,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="text-kira-xs text-subtle pane-jump-link cursor-pointer border-0 bg-none p-0 font-[inherit]"
+              class="text-kira-xs text-subtle cursor-pointer border-0 bg-none p-0 font-[inherit] hover:text-fg"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
@@ -431,7 +431,7 @@ onUnmounted(() => {
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="text-kira-xs text-subtle pane-jump-link block w-full text-left cursor-pointer border-0 bg-none p-0 font-[inherit]"
+          class="text-kira-xs text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 font-[inherit] hover:text-fg"
           data-testid="http-redirects"
           @click="viewTimeline"
         >
@@ -519,17 +519,9 @@ onUnmounted(() => {
     </div>
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
+    <!-- `.response-status-row`/`.response-body` stay bare markers (test locators).
+         P110 I2-17: `.pane-jump-link:hover` moved onto each button's own `hover:text-fg` (a plain
+         button reset rather than AppButton's own chrome, so the status row's look is unchanged) --
+         no test locates by that class, so the marker drops. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.response-status-row`/`.response-body` stay bare markers (test locators); D11: http-
-   elapsed and http-redirects, still the same dim text they always were, clickable — `.pane-jump-
-   link` stays a bare marker to anchor this hover rule (a plain button reset rather than AppButton's
-   own chrome, so the status row's look is unchanged). */
-.pane-jump-link:hover {
-  @apply text-fg;
-}
-</style>
