@@ -47,8 +47,5 @@ func (s *UpdateService) Status(ctx context.Context) (UpdateStatus, error) {
 // when none has ever validated — never a renderer-supplied URL (appupdate.Checker.ReleaseURL is
 // nullary; the renderer never sends or receives a URL at all).
 func (s *UpdateService) OpenReleasePage() error {
-	if err := s.Browser.OpenURL(s.Checker.ReleaseURL()); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Browser.OpenURL(s.Checker.ReleaseURL()))
 }

@@ -33,11 +33,7 @@ func (s *OpsService) Recent(args OpsRecentArgs) ([]model.OpRecord, error) {
 	if args.Limit <= 0 {
 		return nil, ipcerr.BadRequest("limit must be positive")
 	}
-	recs, err := s.Deps.Repos.Ops.Recent(args.Limit)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return recs, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Ops.Recent(args.Limit))
 }
 
 type OpsCancelArgs struct {

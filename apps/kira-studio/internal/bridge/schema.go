@@ -20,11 +20,7 @@ func (s *SchemaService) Get(args SchemaGetArgs) (model.ConnectionDDL, error) {
 	if args.ConnectionID == "" {
 		return model.ConnectionDDL{}, ipcerr.BadRequest("connectionId is required")
 	}
-	ddl, err := s.Deps.Repos.Schema.Get(args.ConnectionID)
-	if err != nil {
-		return model.ConnectionDDL{}, ipcerr.Internal(err.Error())
-	}
-	return ddl, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Schema.Get(args.ConnectionID))
 }
 
 type SchemaSetArgs struct {

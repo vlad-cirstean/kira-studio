@@ -17,11 +17,7 @@ type VariablesService struct{ Deps appcore.Deps }
 // ---- environments (D3) ----
 
 func (s *VariablesService) ListEnvironments() ([]model.Environment, error) {
-	envs, err := s.Deps.Repos.Variables.ListEnvironments()
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return envs, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Variables.ListEnvironments())
 }
 
 type VariablesCreateEnvironmentArgs struct {
@@ -142,11 +138,7 @@ func (s *VariablesService) List(args VariablesScopeArgs) ([]model.Variable, erro
 	if args.OwnerID == "" {
 		return nil, ipcerr.BadRequest("ownerId is required")
 	}
-	list, err := s.Deps.Repos.Variables.List(args.Scope, args.OwnerID)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Variables.List(args.Scope, args.OwnerID))
 }
 
 // VariablesUpsertArgs's ID is "" for a create (D19). Value is a three-state pointer — nil = leave
@@ -249,11 +241,7 @@ func (s *VariablesService) History(args VariablesHistoryArgs) ([]model.VariableH
 	if args.VariableID == "" {
 		return nil, ipcerr.BadRequest("variableId is required")
 	}
-	list, err := s.Deps.Repos.Variables.History(args.VariableID)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Variables.History(args.VariableID))
 }
 
 // ---- the gated reveal (D8/D9) ----

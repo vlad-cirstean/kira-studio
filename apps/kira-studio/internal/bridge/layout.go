@@ -11,11 +11,7 @@ type LayoutService struct {
 }
 
 func (s *LayoutService) GetAll() (model.Layout, error) {
-	layout, err := s.Deps.Repos.Layout.GetAll()
-	if err != nil {
-		return model.Layout{}, ipcerr.Internal(err.Error())
-	}
-	return layout, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Layout.GetAll())
 }
 
 type LayoutSetArgs struct {

@@ -59,10 +59,7 @@ func (s *WindowsService) SetMode(args WindowsSetModeArgs) error {
 	if args.WindowKey == "" {
 		return ipcerr.BadRequest("windowKey is required")
 	}
-	if err := s.Deps.Repos.Windows.SetMode(args.WindowKey, args.Mode); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.Windows.SetMode(args.WindowKey, args.Mode))
 }
 
 // OpenNew is the title bar's "New window" button (P92 item 3) — the same action as the ⇧⌘N menu
