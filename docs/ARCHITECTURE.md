@@ -46,7 +46,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | DB tests | Testcontainers, driven from Go (`testcontainers-go`) | Real-container adapter coverage is Go (`apps/kira-studio/internal/adapters/testsupport/`, `bun run test:go`), not Bun — `packages/db-fixtures/` no longer holds per-engine specs (P58f D1); it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from, Bun driving only that `e2e-real` seeding; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
-| Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard — P67: a left-click on an outbound-FK cell's nav button now opens a read-only preview popover first (`views/grid/FkPreviewPopover.vue`, positioned via `theme/floatingPosition.ts`'s own point-anchored route, ContextMenu.vue's, not `PopoverPanel.vue`'s, since the nav button is imperative DOM with no Vue parent to render a sibling into; fetched with one tab-free, attribution-only `data.read`, `views/grid/fkPreview.ts`), whose own two actions are `Open in new tab` (P7's unchanged `navigateForeignKey` jump, one click further in) and `Edit this record` (`editReferencedRow`, `views/grid/menu.ts` — opens a new, pre-filtered tab on the referenced table and lands the caret on its first non-key column in edit mode via a pending-focus handshake, `views/grid/focusRequest.ts`, ported from `views/repo/reveal.ts`'s own pattern; routes into that ordinary data tab because it already *is* the edit surface — no second editor exists); a multi-candidate click still opens the same right-click ContextMenu, each item now opening the preview for its own edge rather than navigating directly. The PK-side "Referenced by" button/submenu is untouched — it names tables, plural, with no single record to preview); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. the grid no longer uses `@tanstack/vue-virtual` (P30 §3.6 C7) — SlickGrid's own native virtualization replaced it here; the dependency itself is still used elsewhere (`views/shared/keyvalue/KeyValuePane.vue`, `views/grpcrequest/ResponsePane.vue`) |
+| Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard — P67: a left-click on an outbound-FK cell's nav button now opens a read-only preview popover first (`views/grid/FkPreviewPopover.vue`, positioned via `packages/workbench/src/util/floatingPosition.ts`'s own point-anchored route, ContextMenu.vue's, not shadcn `ui/popover`'s (Studio's own popover primitive since P104 deleted `PopoverPanel.vue`; `packages/kira-ui`'s own `KuiPopoverPanel` is the git-side equivalent), since the nav button is imperative DOM with no Vue parent to render a sibling into; fetched with one tab-free, attribution-only `data.read`, `views/grid/fkPreview.ts`), whose own two actions are `Open in new tab` (P7's unchanged `navigateForeignKey` jump, one click further in) and `Edit this record` (`editReferencedRow`, `views/grid/menu.ts` — opens a new, pre-filtered tab on the referenced table and lands the caret on its first non-key column in edit mode via a pending-focus handshake, `views/grid/focusRequest.ts`, ported from `views/repo/reveal.ts`'s own pattern; routes into that ordinary data tab because it already *is* the edit surface — no second editor exists); a multi-candidate click still opens the same right-click ContextMenu, each item now opening the preview for its own edge rather than navigating directly. The PK-side "Referenced by" button/submenu is untouched — it names tables, plural, with no single record to preview); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. the grid no longer uses `@tanstack/vue-virtual` (P30 §3.6 C7) — SlickGrid's own native virtualization replaced it here; the dependency itself is still used elsewhere, in every other list view, through the two shared wrappers `packages/workbench/src/util/virtualRows.ts`/`treeVirtualRows.ts` |
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | Moved to Kira Space in its entirety as of v1.9 P100 — this is no longer part of Kira Studio's own stack. See "Git module" below for the current, Kira-Space-scoped description |
@@ -2191,38 +2191,38 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
 options, registering **29** bound services under `apps/kira-studio/internal/bridge/`
-(`grep -c application.NewService apps/kira-studio/main.go`) — not the twenty-two this paragraph
-used to enumerate by name; several later phases each added their own service (M1's `DbMcpService`,
-`AgentHooksService`, `KeepAwakeService`, P83's `TerminalService`, P85's `CustomScriptsService`,
-P66's `UpdateService`/`LinkService`, and `MaskRulesService`) without folding back into this count —
-pre-existing staleness this phase found but did not fully re-audit, out of P100's own scope.
-Thirteen of the original twenty-two are Studio's and the shell's — `AppService`, `SettingsService`,
-`LayoutService`, `TabsService`, `WindowsService` (P8: a page's own boot-time window registration,
-see Process model's multi-window subsection below), `ConnectionsService`, `TreeService`,
-`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService`
-(P18: the per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL
-language service described below). Seven are the Api module's — `HttpService` (P2: `Send`, the
-outbound HTTP path — see the op-log paragraph below and Stack, above), `GrpcService` (P11),
-`CollectionsService` and `VariablesService` (P4/P5), `ResponseHistoryService` (P8),
-`GrpcHistoryService` (P11), and `DataGripService` (P25's connection import). **One used to be the
-git module's — `GitClientsService`, gone as of P100.** It was the *Connected editors* pane's whole
-surface (list, revoke, install the bundled `.vsix`), and the only bound service the headless git
-module had, since everything else it did crossed its own socket rather than the bindings; that
-whole surface, and the service itself, moved to Kira Space along with the rest of the module (see
-Git module, above) — Kira Studio's `main.go` binds no git-related service of any kind any more,
-confirmed by the grep above and the phase-closing audit's own service-list check, below.
-`LifecycleService` was the twenty-second of the original count, still bound today.
+(`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
+(`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
+own boot-time window registration, see Process model's multi-window subsection below —
+`LifecycleService`); ten Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
+`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` —
+P18: the per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL language
+service described below — `CustomScriptsService`, P85's launchable-scripts feature); seven the Api
+module's (`HttpService` — P2: `Send`, the outbound HTTP path, see the op-log paragraph below and
+Stack, above — `GrpcService` (P11), `CollectionsService` and `VariablesService` (P4/P5),
+`ResponseHistoryService` (P8), `GrpcHistoryService` (P11), `DataGripService`, P25's connection
+import); one Database MCP's (`DbMcpService`, M1); and three the terminal/agent surface's
+(`AgentHooksService`, `KeepAwakeService`, `TerminalService`, P83). `UpdateService`/`LinkService`
+(P66) round it out. **One used to be the git module's — `GitClientsService`, gone as of P100.** It
+was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
+the only bound service the headless git module had, since everything else it did crossed its own
+socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
+along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
+git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
+own service-list check, below. Kira Space's own `main.go` binds a separate **10**
+(`grep -c application.NewService apps/kira-space/main.go`) for its own module.
 `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
 no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
-services: `internal/storage/` (repos plus forward-only SQL migrations), `internal/tree/service.go`
-(the children/describe/definition cache-aside), `internal/preconnect/` (the pre-connect script
-supervisor, a real process-supervisor state machine), `internal/secrets/` (the keychain, see
-Storage), `internal/adapterhost/` (the router, session and data-plane server described above),
-`internal/adapters/` (every engine's own package, see Adapter contract), `internal/oplog/` (the
-op-log event type and its two topics, relocated here from the deleted `internal/enginehost` — P58f
-D9), and `internal/metrics/`.
+services: `apps/kira-studio/internal/storage/` (repos plus forward-only SQL migrations),
+`apps/kira-studio/internal/tree/service.go` (the children/describe/definition cache-aside),
+`apps/kira-studio/internal/preconnect/` (the pre-connect script supervisor, a real
+process-supervisor state machine), `apps/kira-studio/internal/secrets/` (the keychain, see
+Storage), `apps/kira-studio/internal/adapterhost/` (the router, session and data-plane server
+described above), `apps/kira-studio/internal/adapters/` (every engine's own package, see Adapter
+contract), `apps/kira-studio/internal/oplog/` (the op-log event type and its two topics, relocated
+here from the deleted `internal/enginehost` — P58f D9), and `apps/kira-studio/internal/metrics/`.
 
 **Multi-window: per window, or app-wide (P8).** The app has always had exactly one window in
 practice — no code path led to a second one in either the Electron or the Wails shell — but
@@ -2250,9 +2250,12 @@ where it does:
   explicit *Show password* press, which just succeeds without a prompt while a grant is live.
 
 **The window key travels as `?window=<key>` on the frontend URL**, not through an async runtime
-call: the shell mints a UUID per window (`internal/storage/model.WindowRecord`) and builds
-`WebviewWindowOptions{URL: "/?window=" + key, Name: key}`, so `frontend/src/state/window.ts` can
-read it **synchronously**, at module load, with `new URLSearchParams(location.search).get('window')`
+call: the shell mints a UUID per window (`internal/shell/openwindow.go`'s `WindowRecord`, a plain
+alias of repo-root `internal/appstorage.WindowRecord` — Kira Studio's own
+`internal/storage/model.WindowRecord` stays its own type only because it carries an extra `Mode`
+field the shared one doesn't) and builds `WebviewWindowOptions{URL: "/?window=" + key, Name: key}`,
+so `packages/workbench/src/util/window.ts` can read it **synchronously**, at module load, with
+`new URLSearchParams(location.search).get('window')`
 — before `hydrateTabs()` (or anything else window-scoped) ever runs. Absent or unrecognised falls
 back to the key `"main"`, which is what `tests/ui`'s static file server and `tests/e2e-real`'s plain
 Chromium tab both see with no `?window=` of their own, and what a `-tags server` build's own lack of
@@ -2271,7 +2274,8 @@ tabs included, exactly as a single-window session always has.
 **Menu commands go to the focused window; state changes still broadcast to every window.** Wails'
 own event transport fans every `app.Event.Emit` out to all windows — correct for a connection-state
 change or a settings update, wrong for a menu command, which Electron always sent to
-`BrowserWindow.getFocusedWindow()` only. `appcore.Emitter` has three delivery shapes over the same
+`BrowserWindow.getFocusedWindow()` only. Repo-root `internal/appevent.Emitter` (`appcore.Emitter` is
+a plain alias of it, P103 Part 3) has three delivery shapes over the same
 `DispatchWailsEvent` primitive: `Emit` (broadcast — the seven state-change channels, and the quit
 handshake's own flush-before-close signal, which every window must answer), `EmitTo(windowKey, …)`
 (exactly one window by key — the per-window close-flush handshake), and `EmitFocused` (exactly the
@@ -2357,8 +2361,8 @@ is unaffected — LAW 14 governs it, not this feature.
   is nullary; Go decides the URL (`Checker.ReleaseURL()`, validated by `safeReleaseURL` — https,
   `github.com`, this repository's own `/releases/` path, or the constant `/releases` page
   otherwise) and opens it through `internal/shell`'s `NewDeferredBrowser` seam, the same
-  deferred-adapter shape `NewDeferredDialogs` already uses. `internal/shell` stays the only package
-  importing `pkg/application` (unchanged). This matters because Wails' `BrowserManager.OpenURL`
+  deferred-adapter shape `NewDeferredDialogs` already uses. Only `internal/shell`, each app's own
+  `internal/appshell`, and each app's own `main.go` import `pkg/application`. This matters because Wails' `BrowserManager.OpenURL`
   validates nothing itself and macOS `open` will act on any scheme it recognises — `safeReleaseURL`
   is the only check that ever runs before a URL reaches it.
 
@@ -2554,18 +2558,18 @@ GitServer (internal/gitsock)
   its own label, so a second window reads "Undo reset of `main` (window: repo-review)" rather than
   an anonymous or misattributed action.
 - **Credential prompts go to whichever connection owns the in-flight remote op; pairing prompts
-  always stay in Kira Studio.** The split is deliberate and the two questions are genuinely
+  always stay in Kira Space.** The split is deliberate and the two questions are genuinely
   different: "what is the password for this one push" is about an action the user just took in
   *that* window, while "should this window ever talk to me at all" is a trust decision belonging to
   the trust authority. `internal/gitaskpass` brokers the first over its own private socket behind a
   `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — an external, paired VS
-  Code extension window for its own op, or (as of P67e) Kira Studio's own native window for the
+  Code extension window for its own op, or (as of P67e) Kira Space's own native window for the
   native stream's own op, since that stream now has real writes to prompt for. If that connection
   dies mid-prompt the broker fails the credential request non-zero rather than hanging, and the
   120-second wait (`gitaskpass.DefaultTimeout`) is bounded regardless — a git process blocked
   forever on a prompt nobody will answer is the failure this design exists to make impossible.
-  **The native window's own answer path** (`frontend/src/state/gitCredential.ts` +
-  `workbench/GitCredentialDialog.vue`) is a FIFO queue feeding one always-mounted dialog, the same
+  **The native window's own answer path** (`apps/kira-space/frontend/src/state/gitCredential.ts` +
+  `apps/kira-space/frontend/src/workbench/GitCredentialDialog.vue`) is a FIFO queue feeding one always-mounted dialog, the same
   precedent `GitPairingDialog.vue` sets — a prompt started in one repo tab must stay answerable
   after switching away, and one repository's own remote-op slot means at most one prompt per
   workspace, but two open workspaces can each prompt at once. No client-side timeout: the broker's
@@ -2578,7 +2582,7 @@ GitServer (internal/gitsock)
 **Settings ownership follows the same shared/private line, and it is a correctness question rather
 than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` are **server-owned**
 — two windows disagreeing about a protected-branch list is a safety bug — and edited in Kira
-Studio's own Settings dialog (*Git* section), read fresh on every push pre-flight and every
+Space's own Settings dialog (*Git* section), read fresh on every push pre-flight and every
 auto-fetch tick, never cached. Every per-viewer display setting (graph page size and scope, stash
 visibility, and similar) is **per repository**, stored server-side in `git_repo_settings` (Storage,
 above) and edited from a dialog opened in the graph view itself. Neither category lives in VS
@@ -2592,8 +2596,9 @@ code into a shared file where a per-module one would do. `startupfail` is not a 
 — it is repo-root shared infrastructure (P100 Part 1 hoisted it, above), reused by both apps' boot
 sequences; it is listed in the table below only because Kira Space's own boot depends on it, not
 because it belongs to this module.
-`internal/layering_test.go`'s `TestDomainPackagesDoNotImportBridge` covers them exactly as it
-covers the Studio and Api domain packages — no `internal/git*` package imports `internal/bridge`,
+`apps/kira-space/internal/layering_test.go`'s `TestDomainPackagesDoNotImportBridge` covers them
+exactly as Kira Studio's own copy covers the Studio and Api domain packages — no `internal/git*`
+package imports `internal/bridge`,
 none imports or is imported by an adapter package.
 
 | Package | Owns |
@@ -2608,7 +2613,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**51 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (41 as of this chapter), and the wire types |
+| `gitrpc` | The method table (**56 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (**41**, P111), and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
@@ -2617,7 +2622,7 @@ none imports or is imported by an adapter package.
 | `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
 | `startupfail` (repo-root, shared — not a git package, see above) | Native, pre-window failure alerts for every boot step (below) |
 | `rpcstream` (repo-root, shared) | The correlated-RPC-with-credits protocol (above) — module-agnostic by design, hoisted out of `apps/kira-studio/internal/bridge` at P100 so both apps import it |
-| `bridge/gitclients.go` | `GitClientsService`, the bound Wails service behind the *Connected editors* pane |
+| `apps/kira-space/internal/bridge/gitclients.go` | `GitClientsService`, the bound Wails service behind the *Connected editors* pane |
 
 **One deliberate exception to argv-only spawning, and exactly one.** Every other spawn in this
 codebase hands a fixed argv straight to `os/exec` with no shell involved. `gitprepare` runs the
@@ -3030,10 +3035,7 @@ placed it in; a repository is an instance inside the Git module, not a sibling o
 ### Git graph in the native workspace (C10)
 
 **As of P100, this section describes Kira Space, not Kira Studio** — C10 built on the native code
-workspace (C5-C7, above), which the same phase moved out of Kira Studio in full. (One pre-existing,
-phase-unrelated naming drift: a few paragraphs below call the host component `RepoPanel.vue`; the
-file living under `apps/kira-space/frontend/src/repo/` today is `GitPanel.vue` — predates P100, out
-of this phase's own scope to chase further.)
+workspace (C5-C7, above), which the same phase moved out of Kira Studio in full.
 
 The pinned first tab of every repo workspace (`views/repo/RepoGraphView.vue`, reserved empty by C5)
 mounts `packages/git-ui`'s own graph — the identical Vue components the VS Code extension runs,
@@ -3043,13 +3045,13 @@ beside the five existing ones, a `write` capability threaded through the same ha
 that already thread `openWorktreeWindow`/`runPrepareScript`), so the VS Code extension's own
 behaviour (`capabilities.write: true`) is unchanged.
 
-**A second, in-process Wails stream, not the socket.** `internal/bridge/gitstream.go`'s
+**A second, in-process Wails stream, not the socket.** `apps/kira-space/internal/bridge/gitstream.go`'s
 `ServeGitStream` mirrors `ServeEngineStream` over the identical `gitrpc.Router` `internal/gitsock`
 already serves — one handler table, two transports, exactly the precedent `internal/gitsock` and
-`internal/bridge` already were named as peers of (`internal/layering_test.go`'s own comment). No
+`internal/bridge` already were named as peers of (`apps/kira-space/internal/layering_test.go`'s own comment). No
 handshake, no pairing token, no `git_clients` row: the peer is this process's own webview, not an
 external client the trust store exists to gate, and a pairing prompt for "should this window ever
-talk to me" has no question behind it when the asker is Kira Studio's own renderer. Reusing
+talk to me" has no question behind it when the asker is Kira Space's own renderer. Reusing
 `git.sock` itself was rejected outright — `gitsock.Server.Start`'s own flock means a *second*
 window would get no listener at all, the opposite of what an in-process, per-process stream needs.
 On the TypeScript side, `packages/git-ipc/src/streamChannel.ts` is `socketChannel.ts`'s sibling: the
@@ -3057,21 +3059,25 @@ same blob-frame body shape (`blobFrame.ts`, shared by both), but no length prefi
 no drain loop — a Wails stream is message-framed already, so the machinery that exists solely to
 turn a byte stream back into frames is simply absent.
 
-**The mount is kept alive across a tab switch (P72).** `MainView.vue` wraps the view in a `KeepAlive`
-with an explicit `include` (`KEEP_ALIVE_VIEWS = ['RepoGraphView']`, never a blanket `KeepAlive`), so
-switching away and back keeps the computed lane layout, scroll position, loaded rows and session
-alive instead of tearing down git-ui's whole nested app — P72's fix for the graph fully reloading on
-every focus. `RepoGraphView.vue`'s `defineOptions({ name: 'RepoGraphView' })` is what makes `include`
-match at all. A backgrounded, `KeepAlive`'d graph must not keep paying for work nobody can see:
-`graphVisibility.ts` provides a per-mount `GRAPH_VISIBLE_KEY` that `CommitGrid.vue` reads, deferring
-a generation-bump rebuild (layout-worker output plus a SlickGrid column/row rebuild) until the grid
-is visible again — provided only at `main.ts`'s own `mount()`, so the VS Code host and this
-package's own tests are unaffected. This shape produced a regression worth naming, since it is
-exactly the kind of thing a future change re-opens: the same host resize used to be handled twice
-(synchronously by the `detailOpen` watcher, asynchronously by `ResizeObserver`), and the second pass
-could tear down and recreate row DOM mid-measurement. Fixed by a `lastRebuiltHostWidth` dedup plus
-keying the `KeepAlive` skip off the real `graphVisible` signal instead of inferring
-backgrounded-ness from a 0×0 read (`eab3047e`).
+**A tab switch fully unmounts and remounts the graph; continuity comes from persisted view state,
+not a live KeepAlive.** P72 originally wrapped the pre-P100 host's tab view in a `KeepAlive` with an
+explicit `include`; the P100/C5 port to Kira Space's own shared `MainView.vue` never carried that
+wrapper forward — `packages/workbench/src/components/MainView.vue`'s `<component :is>` has no
+`KeepAlive` ancestor at all, in either app, confirmed by grep and by a real run of
+`repo-workspace.spec.ts`'s own "survive a tab switch and back" case (still green). What actually
+survives: `RepoGraphView.vue` constructs a `TabViewStateStore` (`repo/git/viewStateStore.ts`) per
+mount, and git-ui's own `unmount()`/`mount()` read and write through it against the pinned graph
+tab's own persisted `state.viewState` (S13/S14) — the computed lane layout, scroll position and
+loaded rows are serialized out on unmount and rebuilt from that serialized state on the next mount,
+the same round trip a real relaunch already exercises, not an in-memory instance surviving in the
+background. `graphVisibility.ts`'s `GRAPH_VISIBLE_KEY`/`MountHandle.setVisible` (P79's own
+background-pause optimization, keyed off a KeepAlive `onDeactivated`/`onActivated` pair) is
+consequently unreachable in Kira Space today — no caller (VS Code's own webview host never called it
+either, by design) ever invokes it, since there is no "mounted but backgrounded" state left for it to
+pause; `RepoGraphView.vue`'s own `onDeactivated`/`onActivated` hooks need a `KeepAlive` ancestor to
+fire at all, and none exists. This is a real behavior change from source comments still describing
+the old KeepAlive design, not merely a doc drift — flagged as a finding, not fixed here (source
+change, out of this phase's own docs-only scope).
 
 Also worth noting here: PR ancestry is now rebuilt with a **base cutoff** (`state/pr.ts`'s
 `rebuildAncestry`) — each PR's `baseRef` is resolved locally through
@@ -3164,21 +3170,25 @@ lifecycle, and disposed only when the workspace closes.
 
 **Theme.** `git-ui`'s whole colour layer is `--kv-X: var(--vscode-X, <VS Code Dark literal>)`; with
 no `--vscode-*` defined at all it would render VS Code Dark inside a light Kira window regardless of
-the host's own theme. `theme/vscode-bridge.css` defines those names from Kira's own `--kira-*`
-tokens (several of which are themselves already a direct port of the identical VS Code workbench
-colour id), additive and with zero changes to `git-ui`'s own token layer.
+the host's own theme. `packages/theme/src/vscode-bridge.css` defines those names from Kira's own
+`--kira-*` tokens (several of which are themselves already a direct port of the identical VS Code
+workbench colour id), additive and with zero changes to `git-ui`'s own token layer.
 
 **Checkboxes (P67c).** The 14 raw `<input type="checkbox">` elements across 9 dialogs
 (RepoSettingsDialog, StashDialog, TagDialog, BranchDialog, RevertDialog, WorktreeDialog,
 CherryPickDialog, ForcePushDialog, ResetDialog) had no checkbox CSS anywhere in this package —
-each drew the platform's own native widget. `theme/app-shell.css` (the package's one
-document-level stylesheet) gained one rule scoped to `.kv-mount-root input[type="checkbox"]`, in
-`--kv-*`/`--vscode-*` vocabulary (never `--kira-*` — this package also renders inside the VS Code
-extension host), visually matching the host app's own checkbox styling as of P67c (`.p-check`,
-since deleted and replaced by `components/ui/checkbox` at P104 — this package is explicitly out of
-that phase's scope, §1.7, so its own literal values below were never updated to track the swap):
-14px box, 3px radius, `appearance: none`, the already-imported codicon font's own `\eab2` glyph as
-a `::after` pseudo-element for the check mark. No markup change across the 9 dialogs.
+each drew the platform's own native widget. `packages/git-ui/src/theme/app-shell.css` gained one
+rule scoped to `.kv-mount-root input[type="checkbox"]`, in `--kv-*`/`--vscode-*` vocabulary (never
+`--kira-*` — this package also renders inside the VS Code extension host), visually matching the
+host app's own checkbox styling as of P67c (`.p-check`, since deleted and replaced by
+`components/ui/checkbox` at P104): 14px box, 3px radius, `appearance: none`, the already-imported
+codicon font's own `\eab2` glyph as a `::after` pseudo-element for the check mark, its own literal
+values kept rather than tracking Studio's post-P104 swap, since a pseudo-element-driven check mark
+has no shadcn/Tailwind utility equivalent to move onto. **P110 A19 did reach this file** despite
+that: the document-level height-chain/gutter reset (`.kv-mount-root`'s own height/width/overflow)
+converted onto `kv:` Tailwind utility classes applied in `main.ts`'s own `mount()` instead — only
+this checkbox rule stays real CSS, and `.kv-mount-root` survives in this file purely as the
+checkbox rule's own scoping selector now, no longer for sizing.
 
 ### Code review, ported natively (C11)
 
@@ -3191,18 +3201,21 @@ adding the one surface with no portable half: comment threads and review-marking
 Monaco, which have no VS Code equivalent to reuse (that host paints them with its own Comments API
 and native diff editor, neither of which exists here).
 
-**Where the panel lives: a third left-panel segment, not a tab.** `RepoPanel.vue`'s Files/Search
-switch (C7) gains Review as a third `SegmentedControl` option. The alternative — a `repo-review`
-tab kind mirroring `repo-graph` — was rejected because the review workflow is *pick a file → read
-its diff → mark it → pick the next*: splitting the file list into one tab and the diff into another
-costs two tab switches per file and hides the diff being reviewed. The extension's own package.json
-already drew this line the same way (the graph in a `panel` container, the review view in an
-`activitybar` one) — the graph is content, the review view is a navigator driving diffs in the
-editor, and `ReviewView.vue` is built for sidebar width with no viewState it needs to persist
-per-mount (it takes `NullViewStateStore`), corroborating the call. Since `RepoPanel.vue` is one
-persistent component instance across every repo workspace (`WorkbenchShell.vue`'s
-`<component :is="activeModePanel" />` carries no per-repo key, unlike a tab), the mount is tracked
-per `repoId` (`reviewActivatedRepoIds`, `RepoPanel.vue`) rather than with one boolean: switching
+**Where the panel lives: a third left-panel segment, not a tab.** `GitPanel.vue`'s top-level
+Repos/Files/Review switch (a `ui/toggle-group` `ToggleGroup`/`ToggleGroupItem` — the `SegmentedControl`
+primitive it used before P104 deleted it) gained Review as its third option; Files itself still
+carries its own nested Files/Search switch (C7), the same control one level down. The alternative
+— a `repo-review` tab kind mirroring `repo-graph` — was rejected because the review workflow is
+*pick a file → read its diff → mark it → pick the next*: splitting the file list into one tab and
+the diff into another costs two tab switches per file and hides the diff being reviewed. The
+extension's own package.json already drew this line the same way (the graph in a `panel` container,
+the review view in an `activitybar` one) — the graph is content, the review view is a navigator
+driving diffs in the editor, and `ReviewView.vue` is built for sidebar width with no viewState it
+needs to persist per-mount (it takes `NullViewStateStore`), corroborating the call. `GitPanel.vue`
+is one persistent component instance across every repo workspace — Kira Space's own
+`WorkbenchShell.vue` mounts it directly (`<GitPanel />`), with no per-mode dynamic dispatch to carry
+a per-repo key the way Kira Studio's own `activeModePanel` mechanism would — so the mount is tracked
+per `repoId` (`reviewActivatedRepoIds`, `GitPanel.vue`) rather than with one boolean: switching
 Files ⟷ Review ⟷ Search within the *same* repo never tears the mount down (`v-show`), while
 switching to a *different* repo workspace remounts it — safely, because that remount is exactly
 what the session-resume path below exists for.
@@ -3221,7 +3234,7 @@ name that says "write" whose writes land in Kira's own storage, never the user's
 
 **"Open in graph" from a review row is a real host-answered request, not a webview escape hatch
 (P75).** It used to be a `command:` URI — a VS Code webview mechanism with no handler in Kira
-Studio's Wails webview at all. It is now `graph.revealCommit` (`{repoId, sha} -> {revealed}`),
+Space's Wails webview at all. It is now `graph.revealCommit` (`{repoId, sha} -> {revealed}`),
 answered locally by both hosts (`repo/git/hostHandlers.ts` here, `proxyHandlers.ts`'s
 `revealCommitInGraph` in the extension) and never reaching the Go server — the same class as
 `review.open`, so it needs no `gitstream.go` allowlist entry. The status-bar blame item's click
@@ -3302,14 +3315,17 @@ status-bar widget; `views/repo/blameAnnotation.ts` calls the identical method ov
 wire. P62 itself bumped neither `ContractVersion` nor `gitstream.go`'s allowlist — the only Go
 touched by this phase at all is `internal/storage/{model,repos}/settings.go`, for the unrelated
 reason below. (Both moved later, for unrelated reasons: `ContractVersion` was 39 as of this chapter
-— 40 as of P100, above — and the allowlist gained `pr.browserUrl`, P74 §3.3.)
+— 40 as of P100, **41 as of P111** — and the allowlist gained `pr.browserUrl`, P74 §3.3; see
+Transport, above.)
 
 **Where it surfaces — the status bar shipped too, just not the way this paragraph used to expect.**
 The annotation renders as injected text at the end of the cursor's line in
 `views/repo/RepoFileView.vue` — the one native surface whose displayed bytes and `blame.line`'s
 answer are the same document by construction (the diff tabs compare historical revisions
 `blame.line` structurally can't answer for). The status bar was the extension's own surface for
-this, and `workbench/StatusBar.vue`'s own LAW 14 reserves its left readout for "where is the caret,"
+this, and `apps/kira-space/frontend/src/workbench/StatusBar.vue` (wrapping the shared
+`packages/workbench/src/components/StatusBar.vue`)'s own LAW 14 reserves its left readout for
+"where is the caret,"
 never a fact about the line under it — P62 declined the status bar for that reason, porting it
 literally would have meant breaking LAW 14 or wiring a per-view caret readout first. P76 shipped it
 anyway, a third way this paragraph didn't anticipate: a **sibling** left-side item, not the caret
@@ -3339,7 +3355,7 @@ this is, from the reader's vantage, an ordinary file.
 **Two surfaces, one setting.** `RepoFileView.vue` creates the controller whenever `blameable`,
 regardless of `appearance.inlineBlame` — the setting attaches or detaches only the inline renderer,
 resolved even when it's off, so the status bar still has a fact to show. The status-bar item
-publishes through `state/blameStatus.ts`, an owner-token store mirroring `cacheStats.ts`/
+publishes through `apps/kira-space/frontend/src/state/blameStatus.ts`, an owner-token store mirroring `cacheStats.ts`/
 `appMetrics.ts` so `workbench/` never imports `views/repo/`. `blameable` gained a revision guard:
 `gitRepoId !== undefined && rev === null` — P74's revision-pinned `repo-file` tabs read through
 `file.read`, never the worktree, and `blame.line` only ever blames the working tree, so a pinned tab
@@ -3380,11 +3396,11 @@ one.
 `internal/dbmcp` is an MCP protocol server (`go-sdk/mcp`, loopback-only Streamable HTTP, `mcpauth`
 bearer token) fronting the app's own database connections, this app's only embedded MCP server since
 v1.9 P97 removed the repo-map one it originally sat beside. `DefaultPort` **8766** only — a conflict
-refuses to start rather than silently falling back to an OS-assigned ephemeral port (`http.go`,
+refuses to start rather than silently falling back to a different, kernel-assigned port (`http.go`,
 P108 Part 7 F11): every existing registration names 8766, and a fallback would leave it pointing at
 whatever else is now listening there, with the live bearer token going to it on the next connection
 attempt. One token file, `mcp-db-token.json`, no slug, because one instance exists per app process
-per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`).
+per `KIRA_HOME` (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`).
 Lifecycle is `bridge.DbMcpService` — the
 server is constructed and started when the Settings toggle turns on (or already is, at boot) and
 stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `main.go`
@@ -3394,7 +3410,7 @@ a restart.
 ### The six tools
 
 `list_connections`, `list_children`, `describe_table`, `describe_schema`, `run_query`,
-`explain_query` (`server.go:202-225`). Metadata routes through the existing `internal/adapters`
+`explain_query` (`server.go`'s `buildMCPServer`, which registers all six via `mcp.AddTool`). Metadata routes through the existing `internal/adapters`
 layer, and `run_query` through the same adapter query path the console uses
 (`adapterhost.Router.Execute`, exported for this at `ee98b26d`) — no second metadata or query path
 exists. `list_children` replaces the fixed-name `list_databases`/`list_schemas` pair
@@ -3429,7 +3445,10 @@ stop being stripped as a real comment (`16ea4f89`).
 (`Broker`, `pairing.go`) — `ApprovalTimeout`/`maxPendingApprovals` reuse that broker's own bounds
 (`pairingTimeout`, its own queue cap): a client disconnect stops the wait via `ctx`, with no
 external expiry ticker. The UI is `workbench/DbMcpApprovalDialog.vue`, an always-mounted modal at
-`App.vue`'s root beside `GitPairingDialog.vue`. `Reason` is `"permission"` or `"heavy"`, and at most
+`App.vue`'s root beside Studio's other always-mounted dialogs (`ConnectionDialog`,
+`DataGripImportDialog`, `ApiDialogs`, `ConfirmDialog`, …) — the shared
+`packages/workbench/src/components/ConfirmDialog.vue` itself cites this component's own
+teleport-ordering precedent in its own comment. `Reason` is `"permission"` or `"heavy"`, and at most
 one prompt is raised per call when both apply — the stricter reason (permission) wins the label,
 with the plan evidence riding along.
 
@@ -3478,15 +3497,16 @@ type-cast error routinely embeds the literal it failed on (`1ad96285`).
 
 ### The UI surfaces
 
-`workbench/SettingsDialog.vue`'s `sections` array has **ten** entries, and **`'Database MCP'` is
-its own section** — the app's only embedded-MCP-server settings pane since P97 removed the repo-map
-one. That section holds the enable toggle, the registration command and Install button, the
-token-expiry line, and a read-only **Exposed connections** glance (per-row read/write/DDL modes,
-auto-explain, and M5's masked-column count) with **no second editor**.
+`state/settings.ts`'s `sections` array has **eight** entries (Appearance, Data, Cache, Api, Scripts,
+Claude Code, Database MCP, Advanced), and **`'Database MCP'` is its own section** — the app's only
+embedded-MCP-server settings pane since P97 removed the repo-map one. That section holds the enable
+toggle, the registration command and Install button, the token-expiry line, and a read-only
+**Exposed connections** glance (per-row read/write/DDL modes, auto-explain, and M5's masked-column
+count) with **no second editor**.
 `project/ConnectionDialog.vue`'s `DetailTab` is now **five** values — `'General' | 'Advanced' |
 'Pre-connect' | 'MCP' | 'Privacy'` — with all permission and description editing in **MCP** and all
 mask-rule editing in **Privacy**. The grid's own two surfaces are the header menu's `Mark column as
-PII` submenu (`views/grid/menu.ts:619`) and the toolbar preview toggle
+PII` submenu (`views/grid/menu.ts`'s `headerMenu`) and the toolbar preview toggle
 (`views/grid/DataToolbar.vue`'s `toolbar-mask-preview`).
 
 ## Renderer security surface
@@ -3498,7 +3518,7 @@ nothing to turn off, since the thing was never on. A smaller number have **no an
 Wails exposes no equivalent, and the guarantee is genuinely weaker than it was. Those are listed as
 losses below rather than papered over.
 
-`apps/kira-studio/internal/shell/security.go` is the one module owning what remains. `Harden()` returns the
+Repo-root `internal/shell/security.go` is the one module owning what remains. `Harden()` returns the
 posture, and `window.go`'s `Options` is its single caller. It does four things: deny every
 permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` false, leave
 `EnableFileDrop` false, and leave `OpenInspectorOnStartup` false.
@@ -3519,10 +3539,12 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 
 **As of P100, the next paragraph describes Kira Space's renderer, not Kira Studio's** —
 `packages/git-ui` moved there in full, and `apps/kira-studio/frontend` no longer depends on it at
-all. Kira Studio's own `LinkService`/`link.go` (below) is still bound (`main.go`), but with no
-git-ui commit-body link left to open, it currently has no live caller in Kira Studio's own
-frontend — a known, harmless leftover from the extraction, not a bug; removing the now-unused bind
-is left for a future pass rather than done here, out of this phase's own icon/docs/audit scope.
+all. Kira Studio's own `LinkService`/`link.go` is still bound (`main.go`), but with no git-ui
+commit-body link left to open, it still has no live caller in Kira Studio's own frontend (Known
+open items, below). The `linkOpenExternal` wrapper this paragraph used to describe moved to the
+shared `packages/workbench/src/bridge/createCoreControl.ts` — Kira Space is its real, live caller
+now (`repo/git/hostHandlers.ts:433`), binding its own `apps/kira-space/internal/bridge/link.go`
+rather than reaching back into Kira Studio's copy.
 
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
@@ -3562,25 +3584,30 @@ sandbox — and its result, whichever way it goes, does not change this disposit
 Wails half on their own). Re-check after any Wails version bump; P19's posture means this repo keeps
 moving through betas.
 
-**Autofill** is unchanged and still a renderer-side control: `autocomplete="off"` on every
-`TextField.vue`-backed input, since zero `<form>` elements means the engine has no form owner to
-attach autofill heuristics to, and the attribute is the actual per-input opt-out.
+**Autofill** is unchanged and still a renderer-side control: zero `<form>` elements means the engine
+has no form owner to attach autofill heuristics to regardless, and the one free-text input that
+actually sets the attribute — `views/shared/AutocompleteField.vue` (`TextField.vue`'s own
+replacement, P104) — still opts out explicitly (`autocomplete: 'off'`) rather than relying on that.
 
 **The clipboard allowlist is an allowlist, not a deny-all, because a deny-all breaks the app.**
-Denying clipboard reads throws at `clipboard.ts`'s `copyText` (38 call sites) and the grid's own
-paste path. This reasoning still governs the `Permissions` map even though that map is inert on
-macOS — it is the correct value, and the value that actually applies on Linux.
+Denying clipboard reads throws at `packages/workbench/src/util/clipboard.ts`'s `copyText` (23 files
+import it, plus the grid's own paste path). This reasoning still governs the `Permissions` map even
+though that map is inert on macOS — it is the correct value, and the value that actually applies on
+Linux.
 
 **Deliberately left alone, each a decision rather than an oversight:**
 - **Hardware acceleration** stays on. The grid's scroll budget (see Invariants, above, and
   `docs/PERF.md` §1) depends on GPU compositing.
-- **`window.confirm()`** still gates six destructive actions (deleting a key, an S3 object, a
-  message, a document, a connection). Replacing them with the app's own confirmation UI is a UI
-  change for a future phase.
+- **`window.confirm()` is gone.** `packages/workbench/src/state/confirmDialog.ts` ("Replaces
+  `window.confirm()` for every destructive action") plus `ConfirmDialog.vue` now gate every
+  destructive action (deleting a key, an S3 object, a message, a document, a connection) through
+  the app's own in-page confirm store instead.
 
-**What actually holds this**, so a revert is never silent: `apps/kira-studio/internal/shell/security_test.go`
-and `menutemplate_test.go` (the posture value and the packaged-vs-dev menu template — the successors
-to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose subjects moved to Go). No
+**What actually holds this**, so a revert is never silent: repo-root `internal/shell/security_test.go`
+(the posture value) and `menu_test.go` (`TestBuildMenuAcceleratorsAllParse`, against the shared
+`menutemplate.go` vocabulary — each app's own real menu content is `internal/appshell/menu.go` now,
+P103 Part 3) — the successors to the deleted `tests/unit/security.spec.ts`/`menu.spec.ts`, whose
+subjects moved to Go. No
 Wails analogue of the old `tests/e2e/hardening.spec.ts` exists, and none was written: with the table
 above reduced to "no subject" for most rows, nothing is left for such a spec to assert that
 the Go test does not already cover. The macOS-only behaviours — WebKit's clipboard gesture
@@ -3589,9 +3616,9 @@ repo's CI runs.
 
 ## Testing
 
-Four suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`; plus the Go suite
-in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not
-a suite of its own (see below). `ipc/` is the odd one out among the first four — it is two suites in
+Five suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`, `visual/`; plus the
+Go suite in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture
+corpus, not a suite of its own (see below). `ipc/` is the odd one out among the first four — it is two suites in
 one directory, a Go backend half and a Playwright frontend half per adapter, sharing one fixture
 module by design (P50, below).
 
@@ -3631,8 +3658,8 @@ genuinely complex or deeply-nested logic — parsers, cursor/pagination boundary
 eviction, crypto, concurrency state machines. Most CRUD-, wrapper- and constructor-shaped tests were
 deleted as low-value rather than ported. The **Go suite was pruned against the same bar** in the
 same pass. Two specs were deleted because their subject moved rather than disappeared:
-`security.spec.ts` and `menu.spec.ts` are now `apps/kira-studio/internal/shell/security_test.go` and
-`menutemplate_test.go`. A shared runtime stub (`tests/unit/support/wailsRuntime.ts`) registers a fake
+`security.spec.ts` and `menu.spec.ts` are now repo-root `internal/shell/security_test.go` and
+`menu_test.go` (above). A shared runtime stub (`packages/workbench/src/testing/unit/wailsRuntime.ts`) registers a fake
 `/wails/runtime.js` and is imported for its side effect by every spec needing one, rather than
 each spec declaring its own — Bun's module registry is shared across every spec file in one test
 run, so whichever spec's stub loads first wins for the whole run.
@@ -3644,8 +3671,8 @@ TypeScript spec is a live oracle to diff a Go port against"*) expired, since tha
 `src/engine/adapters/` directly. What survives, because Go and `apps/kira-studio/tests/e2e-real/`
 both still read it: `fixtures/*.{sql,ts}` (read by
 `apps/kira-studio/internal/adapters/testsupport/{postgres,mariadb,mysql,sqlite,clickhouse}.go`
-by absolute path) and six `support/*.ts` modules (`connectionConfig`, `docker`, `postgres`,
-`mariadb`, `sqlite`, `kafka`) that `apps/kira-studio/tests/e2e-real/support/*.ts` re-exports for
+by absolute path) and seven `support/*.ts` modules (`common`, `connectionConfig`, `docker`,
+`postgres`, `mariadb`, `sqlite`, `kafka`) that `apps/kira-studio/tests/e2e-real/support/*.ts` re-exports for
 container seeding.
 `packages/db-fixtures/kafka.spec.ts`, the one file in this directory that could never run under Bun at all (the
 old TypeScript driver's compiled binding loaded under no Bun ABI), had already moved to
@@ -3730,9 +3757,11 @@ were deleted outright with no analogue: no `webPreferences`, fuse or Chromium-pe
 concept is left to assert, and no `process.uptime()` equivalent — cold start is now a manual procedure
 (`docs/PERF.md` §3).
 
-**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: 252 tests across
-47 spec files, split across the `ui` and `ui-timing` projects (v1.4 P6 recount — `docs/PERF.md` §5
-records this tier's own measured wall-clock cost, 5m4s) driving the **real built `apps/kira-studio/
+**`tests/ui/`** (`bun run test:ui:studio`) is its replacement for everything that ported: **283**
+tests across **53** spec files, split across the `ui` and `ui-timing` projects (v1.9 P109 recount,
+`npx playwright test --list --project=ui --project=ui-timing` from `apps/kira-studio` — v1.4 P6's
+own recount is now historical; `docs/PERF.md` §5 records that earlier tier's own measured
+wall-clock cost, 5m4s) driving the **real built `apps/kira-studio/
 frontend/dist` bundle** — real Vue, real
 `bridge/{control,port}.ts` — over a static HTTP file server, in **real WebKit**, the same engine a
 packaged build actually embeds (WKWebView on macOS, WebKitGTK on Linux). There is no native app
@@ -3768,9 +3797,11 @@ session** instead: a MariaDB and a Kafka connection both open, the page reloads,
 serve a real read afterward, since no child is left to kill and the property worth proving now
 is that native adapters coexist cleanly within one process across a reload.
 
-**`tests/visual/`** (`bun run test:visual:studio`, v1.4 P6) is a bounded pixel-diff tier — five specs, one
-canonical at-rest screenshot each (the workbench shell, the data grid, the SQL console, the
-connection dialog, the Schema (DDL) editor), reusing `tests/ui/`'s own fixtures/mocked wire planes.
+**`tests/visual/`** (`bun run test:visual:studio`, v1.4 P6) is a bounded pixel-diff tier — **six**
+specs, **13** snapshots total: one canonical at-rest screenshot each for five of them (the workbench
+shell, the data grid, the SQL console, the connection dialog, the Schema (DDL) editor), plus
+`settings.spec.ts` (P110 I2-1b) alone contributing 8, one per Settings pane (Appearance, Data,
+Cache, Api, Scripts, Claude Code, Database MCP, Advanced) — reusing `tests/ui/`'s own fixtures/mocked wire planes.
 Its own project (not folded into `ui`) mirrors why `ui-timing` is its own project too — a different
 measurement contract earns a different one. Baselines are captured/updated only from the `ui` CI
 job's own `ubuntu-latest` environment, never a local macOS run (WKWebView vs. WebKitGTK glyph
@@ -3814,9 +3845,12 @@ was ported from — drift in either fails on the same bytes. `internal/mask/pari
 `tests/unit/mask-parity.spec.ts` do the same for masking, both reading 66 shared fixture pairs under
 `tests/fixtures/mask/`.
 
-**Parallelism.** `playwright.config.ts` runs five projects (v1.4 P27 added `ui-timing`, v1.4 P6
-added `visual`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real` and `visual`, every one but
-`ui-timing` `fullyParallel`. `ui` being fully parallel is a real change from the old `e2e` project's
+**Parallelism.** `apps/kira-studio/playwright.config.ts` runs five projects (v1.4 P27 added
+`ui-timing`, v1.4 P6 added `visual`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real` and `visual`,
+every one but `ui-timing` `fullyParallel`. Kira Space has its own two-project
+`apps/kira-space/playwright.config.ts` (`ui`, `visual`) and the extension has its own
+`apps/kira-space-vscode/playwright.config.ts` (`webview-layout`, `webview-interaction`) — neither
+carries a `ui-timing`/`e2e-real` equivalent of its own. `ui` being fully parallel is a real change from the old `e2e` project's
 `workers: 1`, and it is earned rather than inherited: that serialisation existed because concurrent
 Electron apps contend over wall-clock/RSS budgets and Docker containers, and this tier has neither —
 the same reasoning that already made `ipc-frontend` (and `visual`, which carries no timing
@@ -3924,7 +3958,7 @@ the workflow-coverage item, repo-wide).
   library-reuse-first rule declines.
 - **`vscode-bridge.css`'s `:root`-scoped `--vscode-*` tokens tie with Monaco's own
   `.monaco-editor, .monaco-diff-editor, .monaco-component` scope on specificity** (P67c §3.3).
-  `theme/vscode-bridge.css` declares ~35 `--vscode-*` names at bare `:root` (0,1,0 specificity) so
+  `packages/theme/src/vscode-bridge.css` declares ~35 `--vscode-*` names at bare `:root` (0,1,0 specificity) so
   `packages/git-ui` renders in Kira's palette; that is the same specificity as Monaco's own
   `standaloneThemeService.js`-generated rule, so only document order decides a tie, and Monaco's
   stylesheet (created and appended to `document.head` at runtime) currently wins. Benign today:
@@ -3985,7 +4019,7 @@ Correctness:
 - **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
   is never cleared when consumed via the live-event path** (`review.target`, for an already-mounted
   review view) — only the cold-mount path (`takePendingReviewTarget`) ever drains it. Checked
-  against C14-4's own `RepoPanel.vue` `:key="repoId"` fix: NOT made moot by it — if anything, that
+  against C14-4's own `GitPanel.vue` `:key="repoId"` fix: NOT made moot by it — if anything, that
   fix makes a later cold remount of the same repo (switch away, switch back) more reachable than
   before, which is exactly when a leftover stale entry could now be replayed. Also never cleared on
   workspace close. A stale target can theoretically be re-applied on a later cold remount.
