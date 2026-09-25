@@ -142,7 +142,7 @@ func (s *AgentHooksService) SetEnabled(args AgentHooksSetEnabledArgs) (AgentHook
 		ClaudeCode: &model.ClaudeCodePatch{HooksEnabled: &args.Enabled},
 	})
 	if err != nil {
-		return AgentHooksStatus{}, ipcerr.Internal(err.Error())
+		return AgentHooksStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 

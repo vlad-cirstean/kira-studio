@@ -76,7 +76,7 @@ func (s *FilesService) ChooseSave(args FilesChooseSaveArgs) (FilesChooseSaveResu
 		Filename:  filepath.Base(args.DefaultName),
 	})
 	if err != nil {
-		return FilesChooseSaveResult{}, ipcerr.Internal(err.Error())
+		return FilesChooseSaveResult{}, ipcerr.InternalErr(err)
 	}
 	if path == "" {
 		return FilesChooseSaveResult{Canceled: true}, nil
@@ -93,7 +93,7 @@ func (s *FilesService) ChooseOpen(args FilesChooseOpenArgs) (FilesChooseOpenResu
 
 	path, err := s.Dialogs.OpenFile(req)
 	if err != nil {
-		return FilesChooseOpenResult{}, ipcerr.Internal(err.Error())
+		return FilesChooseOpenResult{}, ipcerr.InternalErr(err)
 	}
 	if path == "" {
 		return FilesChooseOpenResult{Canceled: true}, nil

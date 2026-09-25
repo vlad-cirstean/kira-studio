@@ -266,7 +266,7 @@ func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error)
 		DbMcp: &model.DbMcpPatch{ServerEnabled: &args.Enabled},
 	})
 	if err != nil {
-		return DbMcpStatus{}, ipcerr.Internal(err.Error())
+		return DbMcpStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 

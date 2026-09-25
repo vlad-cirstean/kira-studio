@@ -541,5 +541,5 @@ func mapGrpcError(err error) error {
 		}
 		return e
 	}
-	return ipcerr.Internal(err.Error())
+	return ipcerr.InternalErr(err)
 }

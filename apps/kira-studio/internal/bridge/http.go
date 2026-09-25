@@ -79,7 +79,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	// inherits the global.
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {
-		return httpclient.Response{}, ipcerr.Internal(err.Error())
+		return httpclient.Response{}, ipcerr.InternalErr(err)
 	}
 	opts := resolveSendOptions(settings.Api, args.Options, args.Incognito)
 
@@ -411,5 +411,5 @@ func mapHttpError(err error) error {
 		}
 		return e
 	}
-	return ipcerr.Internal(err.Error())
+	return ipcerr.InternalErr(err)
 }
