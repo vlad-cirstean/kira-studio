@@ -31,16 +31,6 @@ type Adapter struct {
 	state adapters.Guarded[connState]
 }
 
-// getSet is every op's own locked read of state.set (F3) — requireSet's RequireConnected call
-// takes its result, never state.set directly.
-func (a *Adapter) getSet() *dbConnectionSet { return a.state.Load().set }
-
-// getDefaultDbIndex is Execute's own locked read of state.defaultDbIndex (F3).
-func (a *Adapter) getDefaultDbIndex() int { return a.state.Load().defaultDbIndex }
-
-// getReadOnly is Mutate/Execute's own locked read of state.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
-
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(set *dbConnectionSet, defaultDbIndex int, readOnly bool) {
 	a.state.Update(func(s *connState) {
@@ -95,7 +85,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	if set := a.getSet(); set != nil {
+	if set := a.state.Load().set; set != nil {
 		set.closeAll()
 	}
 	a.clearConnected()
@@ -103,7 +93,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 }
 
 func (a *Adapter) requireSet() (*dbConnectionSet, error) {
-	return adapters.RequireConnected(a.getSet())
+	return adapters.RequireConnected(a.state.Load().set)
 }
 
 // Children is index.ts's children.
@@ -248,7 +238,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutateDB(ctx, conn, op, a.getReadOnly(), plan)
+	return mutateDB(ctx, conn, op, a.state.Load().readOnly, plan)
 }
 
 // Execute is index.ts's execute.
@@ -257,7 +247,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	dbIndex := a.getDefaultDbIndex()
+	dbIndex := a.state.Load().defaultDbIndex
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		idx, err := dbIndexFromName(req.Path.Segments[0].Name)
 		if err != nil {
@@ -265,7 +255,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		}
 		dbIndex = idx
 	}
-	return execute(ctx, set, dbIndex, a.getReadOnly(), op, req.Statements)
+	return execute(ctx, set, dbIndex, a.state.Load().readOnly, op, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.
