@@ -29,7 +29,7 @@ On a Linux sandbox: never commit a change to `.github/workflows/*` directly. Ins
   `docs/pending-changes/.github__workflows__release.yml.patch`), containing a normal `git
   diff`-style patch plus a one-line note of why.
 - **Adding a whole new workflow file**: write it complete and ready-to-use under
-  `docs/pending-workflows/` (see that directory's own `README.md`).
+  `docs/pending-workflows/` (create the directory if it doesn't exist).
 
 Commit and push either like anything else (neither path is under `.github/workflows/`, so neither
 trips the scope check). The user applies it to the real workflow file from an environment with
@@ -165,12 +165,12 @@ historical prose.
   — a separate native window/process from `bun run dev:studio`'s Kira Studio, on its own Vite dev-server
   port (9246, beside Kira Studio's 9245) so both can run at once without colliding.
 - **The perf probes are opt-in and assert nothing.**
-  `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-studio/internal/gitsock/ -v`
+  `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-space/internal/gitsock/ -v`
   prints one `key=value` line per probe. No threshold assertion, deliberately: this container's
   numbers and a real Mac's aren't comparable, so a hard bound would be flaky in exactly the way
   it's meant to guard against. Record numbers in the commit message and, when they
   answer a stated budget, in `docs/PERF.md`.
-- **The FSEvents watcher is `darwin && cgo`** (`internal/gitclient/watcher_fsevents_darwin.go`), so
+- **The FSEvents watcher is `darwin && cgo`** (`apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go`), so
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.
 - **The extension's own suites need neither VS Code nor `xvfb`.** `bun run test:webview` builds the
@@ -182,8 +182,8 @@ historical prose.
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
 - **A fresh worktree fails `bun run typecheck`/the pre-commit hook on a git-only change**, even
-  after `bun install` — `typecheck:web`/`typecheck:space-web`/`typecheck:tests`/
-  `typecheck:space-tests`/`typecheck:unit`/`typecheck:space-unit` all resolve one of the two apps'
+  after `bun install` — `typecheck:web:studio`/`typecheck:space-web`/`typecheck:tests:studio`/
+  `typecheck:space-tests`/`typecheck:unit:studio`/`typecheck:space-unit` all resolve one of the two apps'
   frontends' Wails-generated `@bindings/*` modules, which need `scripts/setup.sh`'s full Go+`wails3`
   install and codegen (below) **for both apps**, unrelated to `packages/git-*`. For a change confined
   to `packages/git-core`/`git-ipc`/`git-ui`, verify with `bun run typecheck:git` (or the five
@@ -251,7 +251,7 @@ historical prose.
   from the task's real flags once. `scripts/setup.sh` now calls the task **unconditionally on every
   run**; a CLI/toolchain-identity stamp only decides whether Task's own checksum cache gets wiped
   first, so a plain `bun run setup` always spends the task's own up-to-date check (~0.2s when
-  nothing changed, ~7s on a real source change) rather than skipping it. `apps/kira-studio/frontend/bindings/**` are real Vite import
+  nothing changed, ~7s on a real source change) rather than skipping it. Each app's `frontend/bindings/**` are real Vite import
   targets, so a missing one fails the build with an unresolvable import rather than a stale-bindings
   surprise; regenerate whenever a bridge service's method set changes, and before any frontend
   build. **`-names` is load-bearing, not cosmetic**: without it, every generated call site emits
@@ -310,7 +310,7 @@ anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification).
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
-See `CLAUDE.md`'s `docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
+See `docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
 the pass split. Here: the container quirk that blocked two prior attempts, and the pre-commit/
 pre-push design.
 
@@ -345,7 +345,8 @@ pre-push design.
   minute p99 gets routed around with `--no-verify`, which `CLAUDE.md` forbids as a way of finishing.
   `knip` is a whole-graph analysis; gating it per commit punishes a normal, legible multi-commit
   refactor (deleting a consumer in one commit, adding its replacement in the next). Both instead run
-  in the new `.githooks/pre-push` hook (`bun run lint:go`, `bun run lint:dead`, ~30s warm) — push is
+  in the `.githooks/pre-push` hook (`go build ./...`, `bun run lint:go`, `bun run lint:dead`, ~30s
+  warm) — push is
   when work leaves the machine, the same boundary CI defends — and in CI's `checks` job.
 
 ## A pre-P97 dev box still has orphaned repo-map files on disk
@@ -370,11 +371,38 @@ This server exists only inside the app process: `apps/kira-studio/cmd/` holds on
 - Its token is `${KIRA_HOME}/mcp-db-token.json` — no repo slug, one per `KIRA_HOME`
   (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`, via `mcpauth.PathNamed`) — and it carries a 7-day
   expiry since M1 (`mcpauth.TTL`).
-- Its port is `DefaultPort` **8766** (`internal/dbmcp/server.go`), with an ephemeral fallback on
-  conflict (`net.Listen` retried on `127.0.0.1:0`) — read the actually-bound port off the process's
-  own startup output, not off this example.
+- Its port is always `DefaultPort` **8766** (`internal/dbmcp/server.go`). A conflict on that port
+  fails the enable outright with a message saying another process is using it — `bindHTTP` never
+  falls back to an OS-assigned port (`docs/ARCHITECTURE.md`'s DB MCP section).
 - Its endpoint is `http://127.0.0.1:<port>/mcp`, an ordinary `go-sdk/mcp` Streamable HTTP server
   (`internal/dbmcp/http.go`'s `bindHTTP`) — a JSON-RPC 2.0 `tools/call` POST with an `Authorization:
   Bearer <token>` header reaches it the same way any MCP Streamable HTTP client would; the SDK's own
   client package is the reference for the exact request shape (`Content-Type`/`Accept` framing) if
   driving it with a raw `curl` rather than a real MCP client.
+
+## shadcn-vue — adding a component set in this environment
+
+`shadcn-vue add` cannot run here: this repo has no `components.json`/CLI wiring. Pull from the
+registry directly:
+
+1. `curl -sS "https://shadcn-vue.com/r/styles/reka-nova/<name>.json" -o /tmp/<name>.json`.
+2. For each `files[]` entry, strip the `styles/reka-nova/ui/` prefix and write it under
+   `packages/theme/src/components/ui/<name>/`.
+3. Rewrite `@/lib/utils` to `@theme/lib/utils`, and any `@/…` sibling import to
+   `@theme/components/ui/…`.
+4. Pull `registryDependencies` recursively the same way; check `dependencies` against the root
+   `package.json` before adding anything (and against `CLAUDE.md`'s open-source-only rule).
+5. Run `bun run format` over the new files.
+
+P110 iter2 used this for `empty` and for `resizable`'s `ResizablePanel`/`ResizablePanelGroup`.
+
+## CodeGraph — the code index in this environment
+
+`CLAUDE.md` says how to navigate with CodeGraph; this is the setup. `.claude/hooks/session-start.sh`
+(a `SessionStart` hook in `.claude/settings.json`) runs only when `CLAUDE_CODE_REMOTE=true`: it
+installs `@colbymchenry/codegraph` globally via `npm` if missing, then `codegraph sync .` (or
+`codegraph init .` on first run) and prints `codegraph status .`. The index lives in
+`.codegraph/` (gitignored). `.mcp.json` registers `codegraph serve --mcp`; its one tool is
+`codegraph_explore`, deferred until `ToolSearch` loads it. A `UserPromptSubmit` hook
+(`codegraph prompt-hook`) injects matching symbols into every prompt. Outside a remote session
+none of this runs — install and `codegraph init .` by hand.
