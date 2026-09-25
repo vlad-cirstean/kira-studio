@@ -11,9 +11,10 @@ import {
   type HttpRequestTabState,
   httpRequestTabStateSchema,
 } from '@shared/domain/http';
-import { type TerminalTabState, tabTitle, terminalTabStateSchema } from '@shared/domain/tabs';
+import { tabTitle } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { useTreeStore } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
@@ -59,7 +60,6 @@ import {
   type StudioTabKind,
   streamTabStateSchema,
   type TabRecord,
-  type TerminalTabRecord,
   type VariableSetTabRecord,
   type VariableSetTabState,
   variableSetTabStateSchema,
@@ -90,13 +90,6 @@ const KIND_ICON: Record<string, string> = {
 
 function railColor(tab: TabRecord): ConnectionColor | undefined {
   return useConnectionsStore().connectionRecord(tab.connectionId)?.color;
-}
-
-// P83 §7.2: a filesystem basename (state.cwd is an absolute path, not an encoded NodePath — this
-// is not pathTail).
-function basename(path: string): string {
-  const slash = path.lastIndexOf('/');
-  return slash === -1 ? path : path.slice(slash + 1);
 }
 
 // P71 §5.2: both request kinds' own tab context-menu entry — `setIncognito`'s own listener
@@ -343,31 +336,10 @@ export const TAB_KINDS: TabKindRegistry<
   // included Kira Space's kinds too.
   // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm. P85
   // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
-  terminal: {
-    mode: STUDIO_TAB_KIND_MODE.terminal,
-    title: (tab) => {
-      const s = (tab as TerminalTabRecord).state;
-      return s.label || basename(s.cwd) || 'Terminal';
-    },
-    // 'terminal-bash', not 'terminal': the 'console' kind (a SQL console) already owns that glyph.
-    // The launch kind shows in the title and the rail colour, not a second icon vocabulary.
-    icon: () => 'terminal-bash',
-    railColor: (tab) => (tab as TerminalTabRecord).state.color,
-    defaultState: (): TerminalTabState => ({
-      cwd: '',
-      codeRepoId: '',
-      command: '',
-      label: '',
-      color: 'none',
-      launchKind: 'shell',
-    }),
-    // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
-    // second session with the same launch — which needs no special case (§7.2/P85 §5.2).
-    duplicateState: (tab: TerminalTabRecord): TerminalTabState => ({ ...tab.state }),
-    // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so
-    // a non-terminal tab id is a registry miss here, not a branch.
-    dropResources: (tabId) => useTerminalsStore().closeTerminalSession(tabId),
-    menuExtras: () => [],
-    parseState: parseStateWith(terminalTabStateSchema),
-  },
+  // P113 F6: the descriptor itself moved to workbench's own terminalTabKind, shared with
+  // kira-space's identical copy — only the mode constant and dropResources' own store differ.
+  terminal: terminalTabKind<'terminal', TabRecord, TabIcon, ConnectionColor, MenuItem>(
+    STUDIO_TAB_KIND_MODE.terminal,
+    (tabId) => useTerminalsStore().closeTerminalSession(tabId),
+  ),
 };

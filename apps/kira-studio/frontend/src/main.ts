@@ -1,11 +1,11 @@
 import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
 import { pageChunks } from '@shared/protocol/page';
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { initApiDataSync } from './api/state/apiQueries';
-import BootFailure from './BootFailure.vue';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { useTreeStore } from './project/state/tree';
@@ -373,24 +373,7 @@ async function mountShell(): Promise<void> {
 }
 
 // P108 Part 12 F13: mountShell's own hydrates (modeStore.hydrateMode's windowsEnsure call and every
-// entry in the Promise.all above) can reject — a DB error, or a busy DB. Left uncaught, that
-// rejection skipped app.mount entirely: a permanently blank window, logged only as an unhandled
-// rejection in the webview console. Same fix as apps/kira-space's own main.ts (P100 Part 2 F2):
-// catch it and mount BootFailure instead, with a Retry that re-runs the whole sequence.
-async function bootstrap(): Promise<void> {
-  try {
-    await mountShell();
-  } catch (err) {
-    console.error('bootstrap: failed to hydrate/mount the shell', err);
-    const failureApp = createApp(BootFailure, {
-      message: err instanceof Error ? err.message : String(err),
-      onRetry: () => {
-        failureApp.unmount();
-        void bootstrap();
-      },
-    });
-    failureApp.mount('#app');
-  }
-}
-
-void bootstrap();
+// entry in the Promise.all above) can reject — a DB error, or a busy DB. P113 F6: the catch-and-
+// retry wrapper itself moved to workbench/bootstrapShell.ts, shared with apps/kira-space's own
+// identical copy (P100 Part 2 F2).
+void bootstrapShell(mountShell, 'Kira Studio');

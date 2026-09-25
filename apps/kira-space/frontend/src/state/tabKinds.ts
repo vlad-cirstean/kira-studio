@@ -1,6 +1,6 @@
 import type { PaletteColor } from '@shared/domain/color';
-import { type TerminalTabState, terminalTabStateSchema } from '@shared/domain/tabs';
 import type { MenuItem } from '@workbench/state/contextMenu';
+import { terminalTabKind } from '@workbench/tabs/terminalTabKind';
 import { parseStateWith, type TabKindRegistry } from '@workbench/tabs/types';
 import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { useCodeReposStore } from './coderepos';
@@ -25,7 +25,6 @@ import {
   SPACE_TAB_KIND_MODE,
   type SpaceTabKind,
   type TabRecord,
-  type TerminalTabRecord,
 } from './tabDomain';
 import { useTerminalsStore } from './terminals';
 
@@ -43,12 +42,6 @@ import { useTerminalsStore } from './terminals';
 /** A codicon name, or a file path whose icon comes from the shared seti set
  *  (`repo/fileIcon.ts`) — the same rule the repo file tree and the diff tree already use. */
 type TabIcon = string | { readonly filePath: string };
-
-// A filesystem basename (state.cwd is an absolute path, not an encoded NodePath).
-function basename(path: string): string {
-  const slash = path.lastIndexOf('/');
-  return slash === -1 ? path : path.slice(slash + 1);
-}
 
 function noDrop(): void {
   // repo-graph has no page store of its own — nothing to free.
@@ -157,32 +150,11 @@ export const TAB_KINDS: TabKindRegistry<SpaceTabKind, TabRecord, TabIcon, Palett
       parseState: parseStateWith(repoMultiDiffTabStateSchema),
     },
     // An embedded shell at one worktree's directory, rendered with @xterm/xterm. A launch's own
-    // label (a script's name, or 'Claude Code') wins over the cwd's basename.
-    terminal: {
-      mode: SPACE_TAB_KIND_MODE.terminal,
-      title: (tab) => {
-        const s = (tab as TerminalTabRecord).state;
-        return s.label || basename(s.cwd) || 'Terminal';
-      },
-      // 'terminal-bash': the launch kind shows in the title and the rail colour, not a second icon
-      // vocabulary.
-      icon: () => 'terminal-bash',
-      railColor: (tab) => (tab as TerminalTabRecord).state.color,
-      defaultState: (): TerminalTabState => ({
-        cwd: '',
-        codeRepoId: '',
-        command: '',
-        label: '',
-        color: 'none',
-        launchKind: 'shell',
-      }),
-      // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a second
-      // session with the same launch — which needs no special case.
-      duplicateState: (tab: TerminalTabRecord): TerminalTabState => ({ ...tab.state }),
-      // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so a
-      // non-terminal tab id is a registry miss here, not a branch.
-      dropResources: (tabId) => useTerminalsStore().closeTerminalSession(tabId),
-      menuExtras: () => [],
-      parseState: parseStateWith(terminalTabStateSchema),
-    },
+    // label (a script's name, or 'Claude Code') wins over the cwd's basename. P113 F6: the
+    // descriptor itself moved to workbench's own terminalTabKind, shared with kira-studio's
+    // identical copy — only the mode constant and dropResources' own store differ per app.
+    terminal: terminalTabKind<'terminal', TabRecord, TabIcon, PaletteColor, MenuItem>(
+      SPACE_TAB_KIND_MODE.terminal,
+      (tabId) => useTerminalsStore().closeTerminalSession(tabId),
+    ),
   };

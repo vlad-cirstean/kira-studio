@@ -1,8 +1,8 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
-import BootFailure from './BootFailure.vue';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
 import { useLayoutStore } from './state/layout';
@@ -78,23 +78,6 @@ async function mountShell(): Promise<void> {
 
 // F2: mountShell's own essential hydrates (layout/settings/codeRepos/tabs) can still reject — a DB
 // error, or a busy DB past the 5s _busy_timeout (F7's second-instance case makes this plausible).
-// Left uncaught, that rejection skipped app.mount entirely: a permanently blank window, logged only
-// as an unhandled rejection in the webview console. bootstrap() catches it and mounts BootFailure
-// instead, with a Retry that re-runs the whole sequence.
-async function bootstrap(): Promise<void> {
-  try {
-    await mountShell();
-  } catch (err) {
-    console.error('bootstrap: failed to hydrate/mount the shell', err);
-    const failureApp = createApp(BootFailure, {
-      message: err instanceof Error ? err.message : String(err),
-      onRetry: () => {
-        failureApp.unmount();
-        void bootstrap();
-      },
-    });
-    failureApp.mount('#app');
-  }
-}
-
-void bootstrap();
+// P113 F6: the catch-and-retry wrapper itself moved to workbench/bootstrapShell.ts, shared with
+// kira-studio's own identical copy.
+void bootstrapShell(mountShell, 'Kira Space');
