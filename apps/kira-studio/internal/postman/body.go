@@ -129,8 +129,12 @@ func rawLanguage(raw json.RawMessage) string {
 	return language
 }
 
-func importURLEncoded(raw json.RawMessage) []model.SavedField {
-	out := []model.SavedField{}
+// importKeyValueRows decodes a Postman key/value array — the shared row shape a url-encoded body
+// row and a header row both use (name/value/disabled/description) — into SavedHeader values (P113
+// G13). SavedHeader and SavedField have identical fields, so a caller wanting SavedField converts
+// each row with a plain Go struct conversion.
+func importKeyValueRows(raw json.RawMessage) []model.SavedHeader {
+	out := []model.SavedHeader{}
 	for _, entry := range decodeArray(raw) {
 		row := decodeObject(entry)
 		if row == nil {
@@ -140,7 +144,16 @@ func importURLEncoded(raw json.RawMessage) []model.SavedField {
 		value, _ := decodeScalarString(row["value"])
 		disabled, _ := decodeBool(row["disabled"])
 		description := decodeDescription(row["description"])
-		out = append(out, model.SavedField{Name: key, Value: value, Enabled: !disabled, Description: description})
+		out = append(out, model.SavedHeader{Name: key, Value: value, Enabled: !disabled, Description: description})
+	}
+	return out
+}
+
+func importURLEncoded(raw json.RawMessage) []model.SavedField {
+	rows := importKeyValueRows(raw)
+	out := make([]model.SavedField, len(rows))
+	for i, row := range rows {
+		out[i] = model.SavedField(row)
 	}
 	return out
 }

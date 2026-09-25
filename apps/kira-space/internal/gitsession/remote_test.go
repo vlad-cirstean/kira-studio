@@ -16,14 +16,14 @@ import (
 func TestRemoteOpSlot_SecondClaimIsRefused(t *testing.T) {
 	t.Parallel()
 	var s opSlot
-	if !s.claim("fetch", func() {}) {
+	if !s.claim("fetch", func() {}, false) {
 		t.Fatal("first claim should succeed")
 	}
-	if s.claim("push", func() {}) {
+	if s.claim("push", func() {}, false) {
 		t.Fatal("a second claim while the slot is occupied should be refused")
 	}
 	s.release()
-	if !s.claim("push", func() {}) {
+	if !s.claim("push", func() {}, false) {
 		t.Fatal("a claim after release should succeed")
 	}
 }
@@ -40,7 +40,7 @@ func TestRemoteOpSlot_CancelOnNonKillablePhaseReportsFalseAndNeverCancels(t *tes
 	t.Parallel()
 	var s opSlot
 	cancelled := false
-	s.claim("push", func() { cancelled = true })
+	s.claim("push", func() { cancelled = true }, false)
 	// killable defaults to false on claim (push's own default — never killable, D19).
 	if s.tryCancel() {
 		t.Fatal("cancelling a non-killable phase must report false")
@@ -54,7 +54,7 @@ func TestRemoteOpSlot_CancelOnKillablePhaseCancelsAndReportsTrue(t *testing.T) {
 	t.Parallel()
 	var s opSlot
 	cancelled := false
-	s.claim("fetch", func() { cancelled = true })
+	s.claim("fetch", func() { cancelled = true }, false)
 	s.setKillable(true)
 	if !s.tryCancel() {
 		t.Fatal("cancelling a killable phase must report true")
@@ -68,7 +68,7 @@ func TestRemoteOpSlot_ForceCancelIgnoresKillable(t *testing.T) {
 	t.Parallel()
 	var s opSlot
 	cancelled := false
-	s.claim("push", func() { cancelled = true })
+	s.claim("push", func() { cancelled = true }, false)
 	s.forceCancel()
 	if !cancelled {
 		t.Fatal("forceCancel (teardown's own) must cancel regardless of killable")

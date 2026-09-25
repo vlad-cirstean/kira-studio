@@ -676,7 +676,7 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 //  7. Release the slot (deferred) and return.
 func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (RestackResult, error) {
 	opCtx, cancel := context.WithCancel(ctx)
-	if !e.restack.claimAlways("restack", cancel) {
+	if !e.restack.claim("restack", cancel, true) {
 		cancel()
 		return e.restackResultNoSpawn(ctx, &OpError{
 			Kind: "OperationInProgress", Message: "another restack is already running on this repository",

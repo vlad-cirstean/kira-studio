@@ -457,7 +457,7 @@ type WorktreePrepareDeps struct {
 
 func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha256 string, deps WorktreePrepareDeps) (WorktreePrepareResult, error) {
 	opCtx, cancel := context.WithCancel(ctx)
-	if !e.prepare.claimAlways("prepare", cancel) {
+	if !e.prepare.claim("prepare", cancel, true) {
 		cancel()
 		return noSpawnPrepareResult("AlreadyRunning", "A prepare script is already running for this repository.")
 	}

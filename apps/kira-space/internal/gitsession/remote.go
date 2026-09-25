@@ -286,7 +286,7 @@ func (e *RepoEntry) remoteResultNoSpawn(ctx context.Context, opErr *RemoteOpErro
 //  9. release the slot (deferred, so it holds across every early return) and return.
 func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpParams, deps RemoteDeps) (RemoteOpResult, error) {
 	opCtx, cancel := context.WithCancel(ctx)
-	if !e.remoteOp.claim(params.Kind, cancel) {
+	if !e.remoteOp.claim(params.Kind, cancel, false) {
 		cancel()
 		return e.remoteResultNoSpawn(ctx, &RemoteOpError{
 			Kind: "OperationInProgress", Message: "another remote operation is already running on this repository",

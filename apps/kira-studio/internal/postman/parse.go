@@ -349,20 +349,10 @@ func importHeaders(raw json.RawMessage) []model.SavedHeader {
 		}
 		return out
 	}
-	for _, entry := range decodeArray(raw) {
-		row := decodeObject(entry)
-		if row == nil {
-			continue
-		}
-		name, _ := decodeScalarString(row["key"])
-		// `value` is required by the schema and routinely absent in real files (D10's own
-		// example) — a valueless header row imports as an empty value, not a dropped row.
-		value, _ := decodeScalarString(row["value"])
-		disabled, _ := decodeBool(row["disabled"])
-		// P22b D6: the same decodeDescription() Variable import already uses — a header's own
-		// `description` is oneOf [string, Description-object], never round-tripped verbatim.
-		description := decodeDescription(row["description"])
-		out = append(out, model.SavedHeader{Name: name, Value: value, Enabled: !disabled, Description: description})
-	}
-	return out
+	// `value` is required by the schema and routinely absent in real files (D10's own example) —
+	// importKeyValueRows' decodeScalarString already imports a valueless row as an empty value,
+	// not a dropped row. P22b D6: its decodeDescription() call is the same one Variable import
+	// uses — a header's own `description` is oneOf [string, Description-object], never
+	// round-tripped verbatim.
+	return append(out, importKeyValueRows(raw)...)
 }

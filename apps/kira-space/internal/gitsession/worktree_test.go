@@ -16,14 +16,14 @@ import (
 func TestPrepareOpSlot_SecondClaimIsRefused(t *testing.T) {
 	t.Parallel()
 	var s opSlot
-	if !s.claimAlways("prepare", func() {}) {
+	if !s.claim("prepare", func() {}, true) {
 		t.Fatal("first claim should succeed")
 	}
-	if s.claimAlways("prepare", func() {}) {
+	if s.claim("prepare", func() {}, true) {
 		t.Fatal("a second claim while the slot is occupied should be refused")
 	}
 	s.release()
-	if !s.claimAlways("prepare", func() {}) {
+	if !s.claim("prepare", func() {}, true) {
 		t.Fatal("a claim after release should succeed")
 	}
 }
@@ -40,7 +40,7 @@ func TestPrepareOpSlot_CancelCancelsAndReportsTrue(t *testing.T) {
 	t.Parallel()
 	var s opSlot
 	cancelled := false
-	s.claimAlways("prepare", func() { cancelled = true })
+	s.claim("prepare", func() { cancelled = true }, true)
 	if !s.tryCancel() {
 		t.Fatal("cancelling an active slot must report true")
 	}
@@ -53,7 +53,7 @@ func TestPrepareOpSlot_ForceCancel(t *testing.T) {
 	t.Parallel()
 	var s opSlot
 	cancelled := false
-	s.claimAlways("prepare", func() { cancelled = true })
+	s.claim("prepare", func() { cancelled = true }, true)
 	s.forceCancel()
 	if !cancelled {
 		t.Fatal("forceCancel must cancel")
@@ -389,7 +389,7 @@ func TestRunPrepare_AlreadyRunning(t *testing.T) {
 	entry := newWorktreeTestEntry(t, dir, script)
 	fake := &fakePrepareRunner{}
 
-	if !entry.prepare.claimAlways("prepare", func() {}) {
+	if !entry.prepare.claim("prepare", func() {}, true) {
 		t.Fatal("test setup: claim should succeed")
 	}
 	defer entry.prepare.release()

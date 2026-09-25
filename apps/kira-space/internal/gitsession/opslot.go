@@ -19,28 +19,18 @@ type opSlot struct {
 	cancel   context.CancelFunc
 }
 
-// claim reserves the slot not-yet-killable — remote.run's own path (D19): a later
-// setKillable(true) call makes it cancellable once the current phase allows it.
-func (s *opSlot) claim(kind string, cancel context.CancelFunc) bool {
+// claim reserves the slot (P113 G13). killable is remote.run's own false — a later setKillable(true)
+// call makes it cancellable once the current phase allows it (D19: a half-delivered push has phases
+// whose outcome is unknowable) — or restack.run/worktree.prepare's own true: neither has such a
+// phase, so both are cancellable from the moment they claim, and neither ever calls setKillable
+// itself.
+func (s *opSlot) claim(kind string, cancel context.CancelFunc, killable bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.kind != "" {
 		return false
 	}
-	s.kind, s.killable, s.cancel = kind, false, cancel
-	return true
-}
-
-// claimAlways reserves the slot already killable — restack.run and worktree.prepare's own path:
-// no phase of either is unknowable the way a half-delivered push is, so both are cancellable from
-// the moment they claim.
-func (s *opSlot) claimAlways(kind string, cancel context.CancelFunc) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.kind != "" {
-		return false
-	}
-	s.kind, s.killable, s.cancel = kind, true, cancel
+	s.kind, s.killable, s.cancel = kind, killable, cancel
 	return true
 }
 

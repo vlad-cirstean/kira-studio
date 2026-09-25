@@ -328,7 +328,7 @@ func TestConcurrent_RemoteOpSlotAdmitsExactlyOne(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				_, cancel := context.WithCancel(context.Background())
-				if slot.claim(kind, cancel) {
+				if slot.claim(kind, cancel, false) {
 					atomic.AddInt32(&winners, 1)
 				} else {
 					cancel()

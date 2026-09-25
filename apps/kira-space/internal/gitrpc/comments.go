@@ -30,6 +30,21 @@ func validObjectID(field, value string) error {
 	return nil
 }
 
+// validReviewScope validates the branch+at pair review.comment.list and review.comment.export both
+// take (P113 G13): branch is always required, at is optional — "" means "current branch tip", not
+// "no scope" — and only shape-checked when given.
+func validReviewScope(branch, at string) error {
+	if err := validRefArg("branch", branch); err != nil {
+		return err
+	}
+	if at != "" {
+		if err := validObjectID("at", at); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // normalizeCommentBody is D15's own body rule: \r\n and \r normalise to \n, then the whole body is
 // trimmed — a whitespace-only body trims to "" and is refused as empty, never stored as a
 // whitespace note.
@@ -80,13 +95,8 @@ func (r *Router) handleReviewCommentList(ctx context.Context, c *gitsession.Conn
 			if err := requireNonEmpty("review.comment.list", "repoId", p.RepoID); err != nil {
 				return "", err
 			}
-			if err := validRefArg("branch", p.Branch); err != nil {
+			if err := validReviewScope(p.Branch, p.At); err != nil {
 				return "", err
-			}
-			if p.At != "" {
-				if err := validObjectID("at", p.At); err != nil {
-					return "", err
-				}
 			}
 			return p.RepoID, nil
 		},
@@ -162,13 +172,8 @@ func (r *Router) handleReviewCommentExport(ctx context.Context, c *gitsession.Co
 			if err := requireNonEmpty("review.comment.export", "repoId", p.RepoID); err != nil {
 				return "", err
 			}
-			if err := validRefArg("branch", p.Branch); err != nil {
+			if err := validReviewScope(p.Branch, p.At); err != nil {
 				return "", err
-			}
-			if p.At != "" {
-				if err := validObjectID("at", p.At); err != nil {
-					return "", err
-				}
 			}
 			return p.RepoID, nil
 		},
