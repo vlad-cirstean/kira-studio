@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
@@ -126,70 +125,40 @@ onUnmounted(() => {
   <div ref="rootEl" class="flex h-full flex-col">
     <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
       <span>Collections</span>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto"
-            :class="{ 'bg-field text-fg': showSearch }"
-            aria-label="Search"
-            data-testid="toggle-search"
-            @click="toggleSearch"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="New request"
-            data-testid="new-request"
-            @click="openApiRequestTab"
-          >
-            <CodiconIcon name="add" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>New request</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="New collection"
-            data-testid="new-collection"
-            @click="onNewCollection"
-          >
-            <CodiconIcon name="new-folder" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>New collection</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="search"
+        :label="showSearch ? 'Hide search' : 'Search'"
+        aria-label="Search"
+        class="ml-auto"
+        :class="{ 'bg-field text-fg': showSearch }"
+        data-testid="toggle-search"
+        @click="toggleSearch"
+      />
+      <TooltipIconButton
+        icon="add"
+        label="New request"
+        data-testid="new-request"
+        @click="openApiRequestTab"
+      />
+      <TooltipIconButton
+        icon="new-folder"
+        label="New collection"
+        data-testid="new-collection"
+        @click="onNewCollection"
+      />
       <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
            and to the command palette entry it already had. D11's spinner-on-the-action reasoning
            went with the button; collectionsState.busy still gates re-entry inside
            importCollection() itself, so a second import cannot start while one is running. -->
       <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Environments"
-            data-testid="api-environments"
-            @click="onEnvironments"
-          >
-            <CodiconIcon name="server-environment" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Environments…</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="server-environment"
+        label="Environments…"
+        aria-label="Environments"
+        data-testid="api-environments"
+        @click="onEnvironments"
+      />
     </div>
     <template v-if="!empty">
       <InputGroup v-if="showSearch" data-testid="collections-search-group">

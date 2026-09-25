@@ -2,8 +2,8 @@
 import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -344,53 +344,33 @@ onUnmounted(() => {
         <ToggleGroupItem value="files" data-testid="git-panel-tab-files">Files</ToggleGroupItem>
         <ToggleGroupItem value="review" data-testid="git-panel-tab-review">Review</ToggleGroupItem>
       </ToggleGroup>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto"
-            :data-active="showSearch"
-            :aria-label="showSearch ? 'Hide search' : 'Search'"
-            data-testid="toggle-search"
-            @click="toggleSearch"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="search"
+        :label="showSearch ? 'Hide search' : 'Search'"
+        class="ml-auto"
+        :data-active="showSearch"
+        data-testid="toggle-search"
+        @click="toggleSearch"
+      />
       <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
-      <Tooltip v-if="tab === 'repos'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Import repository"
-            data-testid="import-repo"
-            @click="onImport"
-          >
-            <CodiconIcon name="repo" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Import repository…</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab === 'repos'"
+        icon="repo"
+        label="Import repository…"
+        aria-label="Import repository"
+        data-testid="import-repo"
+        @click="onImport"
+      />
       <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
            refresh has nothing to do with a search result list. -->
-      <Tooltip v-if="tab === 'files' && view === 'files'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Refresh"
-            data-testid="repo-refresh"
-            @click="onRefresh"
-          >
-            <CodiconIcon name="refresh" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Refresh file tree</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab === 'files' && view === 'files'"
+        icon="refresh"
+        label="Refresh file tree"
+        aria-label="Refresh"
+        data-testid="repo-refresh"
+        @click="onRefresh"
+      />
     </div>
     <template v-if="!panelEmpty">
       <div v-if="panelSearchable && showSearch" class="shrink-0 border-b border-border px-1.5 py-1">

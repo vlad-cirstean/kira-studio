@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
@@ -117,66 +118,35 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
            codicons SearchToolbar.vue's own find widget uses, so the two surfaces read as one
            vocabulary (D13). -->
       <div class="flex">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': options.caseSensitive }"
-              data-testid="repo-search-case"
-              aria-label="Match case"
-              @click="onToggleOption('caseSensitive')"
-            >
-              <CodiconIcon name="case-sensitive" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Match case</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': options.wholeWord }"
-              data-testid="repo-search-whole-word"
-              aria-label="Whole word"
-              @click="onToggleOption('wholeWord')"
-            >
-              <CodiconIcon name="whole-word" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Whole word</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': options.regex }"
-              data-testid="repo-search-regex"
-              aria-label="Regular expression"
-              @click="onToggleOption('regex')"
-            >
-              <CodiconIcon name="regex" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Regular expression</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="case-sensitive"
+          label="Match case"
+          :class="{ 'bg-field text-fg': options.caseSensitive }"
+          data-testid="repo-search-case"
+          @click="onToggleOption('caseSensitive')"
+        />
+        <TooltipIconButton
+          icon="whole-word"
+          label="Whole word"
+          :class="{ 'bg-field text-fg': options.wholeWord }"
+          data-testid="repo-search-whole-word"
+          @click="onToggleOption('wholeWord')"
+        />
+        <TooltipIconButton
+          icon="regex"
+          label="Regular expression"
+          :class="{ 'bg-field text-fg': options.regex }"
+          data-testid="repo-search-regex"
+          @click="onToggleOption('regex')"
+        />
       </div>
-      <Tooltip v-if="running">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            data-testid="repo-search-stop"
-            aria-label="Stop"
-            @click="repoSearchStore.cancelRepoSearch(repoId)"
-          >
-            <CodiconIcon name="debug-stop" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Stop</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="running"
+        icon="debug-stop"
+        label="Stop"
+        data-testid="repo-search-stop"
+        @click="repoSearchStore.cancelRepoSearch(repoId)"
+      />
       <Tooltip v-else>
         <TooltipTrigger as-child>
           <Button

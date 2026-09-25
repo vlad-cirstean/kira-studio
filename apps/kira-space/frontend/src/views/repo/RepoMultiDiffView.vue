@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
 // editor's counterpart. A scrolling column of per-file sections; each section's own diff editor
@@ -128,20 +128,12 @@ onUnmounted(() => {
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
     <div v-for="section in sections" :key="section.path" class="flex flex-none flex-col border-b border-border">
       <div class="flex flex-none items-center gap-1 py-1 px-1.5">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="repo-multi-diff-toggle"
-              :aria-label="section.expanded ? 'Collapse' : 'Expand'"
-              @click="toggle(section)"
-            >
-              <CodiconIcon :name="section.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ section.expanded ? 'Collapse' : 'Expand' }}</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
+          :label="section.expanded ? 'Collapse' : 'Expand'"
+          data-testid="repo-multi-diff-toggle"
+          @click="toggle(section)"
+        />
         <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap" :title="section.path">{{ basename(section.path) }}</span>
         <span class="path-dir flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm" :title="section.path">{{ section.path }}</span>
         <Button

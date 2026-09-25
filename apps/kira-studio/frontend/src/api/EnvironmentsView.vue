@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
@@ -332,34 +333,18 @@ useEventListener(listEl, 'dragend', onDragEnd);
           >
             Edit variables…
           </Button>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Duplicate"
-                data-testid="environment-duplicate"
-                @click="onDuplicate(env.id)"
-              >
-                <CodiconIcon name="copy" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Duplicate</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Delete"
-                data-testid="environment-remove"
-                @click="onDelete(env.id, env.name)"
-              >
-                <CodiconIcon name="trash" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="copy"
+            label="Duplicate"
+            data-testid="environment-duplicate"
+            @click="onDuplicate(env.id)"
+          />
+          <TooltipIconButton
+            icon="trash"
+            label="Delete"
+            data-testid="environment-remove"
+            @click="onDelete(env.id, env.name)"
+          />
         </div>
         <Empty v-if="variablesStore.environments.length === 0" data-testid="environments-empty">
           <EmptyMedia><CodiconIcon name="server-environment" :size="24" /></EmptyMedia>

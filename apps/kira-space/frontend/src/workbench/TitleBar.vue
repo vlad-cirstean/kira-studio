@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { useLayoutStore } from '../state/layout';
 import { useSettingsStore } from '../state/settings';
@@ -18,38 +16,25 @@ const layoutStore = useLayoutStore();
 <template>
   <TitleBarBase>
     <div class="flex items-center gap-0.5 ml-auto wails-no-drag">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="title"
-            size="title"
-            :aria-pressed="layoutStore.panel.project.visible"
-            data-testid="toggle-project-panel"
-            aria-label="Repositories"
-            @click="layoutStore.toggleProjectPanel"
-          >
-            <CodiconIcon
-              :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
-              :size="15"
-            />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Repositories</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="title"
-            size="title"
-            data-testid="open-settings"
-            aria-label="Settings"
-            @click="settingsStore.settingsOpen = true"
-          >
-            <CodiconIcon name="settings-gear" :size="15" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Settings</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        :icon="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
+        label="Repositories"
+        :icon-size="15"
+        variant="title"
+        size="title"
+        :aria-pressed="layoutStore.panel.project.visible"
+        data-testid="toggle-project-panel"
+        @click="layoutStore.toggleProjectPanel"
+      />
+      <TooltipIconButton
+        icon="settings-gear"
+        label="Settings"
+        :icon-size="15"
+        variant="title"
+        size="title"
+        data-testid="open-settings"
+        @click="settingsStore.settingsOpen = true"
+      />
     </div>
 
     <template #settings>

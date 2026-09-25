@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -47,21 +45,13 @@ function plural(n: number, noun: string): string {
           </li>
         </ul>
       </div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto shrink-0"
-            aria-label="Dismiss"
-            data-testid="import-report-dismiss"
-            @click="collectionsStore.dismissReport"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Dismiss</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Dismiss"
+        class="ml-auto shrink-0"
+        data-testid="import-report-dismiss"
+        @click="collectionsStore.dismissReport"
+      />
     </AlertDescription>
   </Alert>
   <!-- P5 D16: the export path's own strip, independent of the import one above (a session can
@@ -69,21 +59,13 @@ function plural(n: number, noun: string): string {
   <Alert v-if="collectionsStore.exportWarning" variant="warn" data-testid="export-warning">
     <AlertDescription class="flex items-start gap-1.5">
       <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.exportWarning }}</div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto shrink-0"
-            aria-label="Dismiss"
-            data-testid="export-warning-dismiss"
-            @click="collectionsStore.dismissExportWarning"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Dismiss</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Dismiss"
+        class="ml-auto shrink-0"
+        data-testid="export-warning-dismiss"
+        @click="collectionsStore.dismissExportWarning"
+      />
     </AlertDescription>
   </Alert>
   <!-- P108 F10: every tree mutation (create/rename/delete/duplicate/save/import/export) used to
@@ -93,21 +75,13 @@ function plural(n: number, noun: string): string {
   <Alert v-if="collectionsStore.error" variant="destructive" data-testid="collections-error">
     <AlertDescription class="flex items-start gap-1.5">
       <div class="flex min-w-0 flex-col gap-0.5">{{ collectionsStore.error }}</div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto shrink-0"
-            aria-label="Dismiss"
-            data-testid="collections-error-dismiss"
-            @click="collectionsStore.dismissError"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Dismiss</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Dismiss"
+        class="ml-auto shrink-0"
+        data-testid="collections-error-dismiss"
+        @click="collectionsStore.dismissError"
+      />
     </AlertDescription>
   </Alert>
   <!-- P112 §4.3: a failed tree List used to reject into a void'd promise with nothing shown — this

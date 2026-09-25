@@ -15,6 +15,7 @@ import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -902,19 +903,11 @@ const preconnectText = computed({
                         @update:model-value="(v) => onPasswordInput(String(v))"
                       />
                     </div>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          variant="toolbar"
-                          size="kira-icon"
-                          :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                          @click="onEyeClick"
-                        >
-                          <CodiconIcon :name="showPassword ? 'eye-closed' : 'eye'" :size="13" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ showPassword ? 'Hide password' : 'Show password' }}</TooltipContent>
-                    </Tooltip>
+                    <TooltipIconButton
+                      :icon="showPassword ? 'eye-closed' : 'eye'"
+                      :label="showPassword ? 'Hide password' : 'Show password'"
+                      @click="onEyeClick"
+                    />
                   </div>
                 </div>
               </div>
@@ -1196,20 +1189,14 @@ const preconnectText = computed({
                   </Checkbox>
                   <span>Correlate</span>
                 </Label>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      variant="danger"
-                      size="kira-icon"
-                      aria-label="Remove this rule"
-                      data-testid="mask-rule-remove"
-                      @click="onRemoveMaskRule(rule.id)"
-                    >
-                      <CodiconIcon name="trash" :size="13" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Not PII — remove this rule</TooltipContent>
-                </Tooltip>
+                <TooltipIconButton
+                  icon="trash"
+                  label="Not PII — remove this rule"
+                  aria-label="Remove this rule"
+                  variant="danger"
+                  data-testid="mask-rule-remove"
+                  @click="onRemoveMaskRule(rule.id)"
+                />
               </div>
             </div>
             <p v-else class="text-subtle text-kira-xs leading-normal w-full">No masking rules yet on this connection.</p>

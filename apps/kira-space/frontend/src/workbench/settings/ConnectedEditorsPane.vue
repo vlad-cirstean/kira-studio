@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription } from '@theme/components/ui/field';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
 import { useBusyAction } from '@workbench/util/useBusyAction';
@@ -121,20 +120,14 @@ const vsixOutcomeMessage = computed(() => {
             <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
           </span>
         </div>
-        <Tooltip v-if="!client.revokedAt">
-          <TooltipTrigger as-child>
-            <Button
-              variant="danger"
-              size="kira-icon"
-              :data-testid="`git-client-revoke-${client.id}`"
-              aria-label="Revoke"
-              @click="onRevokeGitClient(client.id, client.label)"
-            >
-              <CodiconIcon name="trash" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Revoke</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="!client.revokedAt"
+          icon="trash"
+          label="Revoke"
+          variant="danger"
+          :data-testid="`git-client-revoke-${client.id}`"
+          @click="onRevokeGitClient(client.id, client.label)"
+        />
       </li>
     </ul>
   </div>
