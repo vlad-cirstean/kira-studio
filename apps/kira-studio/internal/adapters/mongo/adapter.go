@@ -29,9 +29,10 @@ func init() {
 const disconnectTimeout = 10 * time.Second
 
 // connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
-// (F3): requireClient's own RequireConnected(a.getClient()), Execute's own a.getDefaultDatabase(),
-// Read/Count/Mutate/Execute's own a.getReadOnly() — the same class of data race Part 4's own F3
-// fixed for the SQL engines. Guarded via adapters.Guarded (P113 G1).
+// (F3): requireClient's own RequireConnected(a.state.Load().client), Execute's own
+// a.state.Load().defaultDatabase, Read/Count/Mutate/Execute's own a.state.Load().readOnly — the
+// same class of data race Part 4's own F3 fixed for the SQL engines. Guarded via adapters.Guarded
+// (P113 G1).
 type connState struct {
 	client          *mongodriver.Client
 	defaultDatabase *string
@@ -57,16 +58,6 @@ type Adapter struct {
 	// additionally gives Disconnect a real opID Snapshot to killOp/Cancel before it Drains.
 	tracker adapters.QueryTracker[uint64]
 }
-
-// getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
-// takes its result, never a.client directly.
-func (a *Adapter) getClient() *mongodriver.Client { return a.state.Load().client }
-
-// getDefaultDatabase is Execute's own locked read of a.defaultDatabase (F3).
-func (a *Adapter) getDefaultDatabase() *string { return a.state.Load().defaultDatabase }
-
-// getReadOnly is Read/Count/Mutate/Execute's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *mongodriver.Client, defaultDatabase *string, readOnly bool) {
@@ -150,7 +141,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	}
 	a.tracker.Drain(ctx)
 
-	if client := a.getClient(); client != nil {
+	if client := a.state.Load().client; client != nil {
 		disconnectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), disconnectTimeout)
 		_ = client.Disconnect(disconnectCtx)
 		cancel()
@@ -160,7 +151,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 }
 
 func (a *Adapter) requireClient() (*mongodriver.Client, error) {
-	return adapters.RequireConnected(a.getClient())
+	return adapters.RequireConnected(a.state.Load().client)
 }
 
 func (a *Adapter) dbFor(name string) (*mongodriver.Database, error) {
@@ -335,12 +326,12 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutateDB(ctx, db, op, a.getReadOnly(), plan, a.trackerFor(op.OpID))
+	return mutateDB(ctx, db, op, a.state.Load().readOnly, plan, a.trackerFor(op.OpID))
 }
 
 // Execute is index.ts's execute.
 func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *adapters.OpCtx) ([]page.Page, error) {
-	dbName := a.getDefaultDatabase()
+	dbName := a.state.Load().defaultDatabase
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		name := req.Path.Segments[0].Name
 		dbName = &name
@@ -352,7 +343,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	return execute(ctx, db, a.getReadOnly(), op, req.Statements, a.trackerFor(op.OpID))
+	return execute(ctx, db, a.state.Load().readOnly, op, req.Statements, a.trackerFor(op.OpID))
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false, so no UI ever offers
@@ -381,7 +372,7 @@ type currentOpEntry struct {
 // ops and needs no special privilege — the common case is an ordinary connection with plain
 // readWrite on its own database, not an admin one.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
-	client := a.getClient()
+	client := a.state.Load().client
 	if client == nil {
 		return false, nil
 	}
