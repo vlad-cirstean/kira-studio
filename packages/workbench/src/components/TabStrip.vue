@@ -241,7 +241,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
             <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
             <span
               v-else
-              class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground"
+              class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
               :style="icon.fileStyle"
               aria-hidden="true"
             />
@@ -295,7 +295,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
           <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
           <span
             v-else
-            class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground"
+            class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
             :style="icon.fileStyle"
             aria-hidden="true"
           />
@@ -346,17 +346,15 @@ useEventListener(stripRef, 'dragend', onDragEnd);
 @reference "@theme/base.css";
 
 /* P110 B36: only what a static utility class genuinely can't express stays here. Everything else
-   (layout/spacing/colour) moved onto the template as inline utility classes — see this file's own
-   git history for the byte-for-byte mapping. What's left, and why:
+   (layout/spacing/colour, including .tab-file-icon's own mask-size/mask-repeat/mask-position —
+   Tailwind's own mask-contain/mask-no-repeat/mask-center, confirmed via compile check to emit both
+   the -webkit- prefixed and unprefixed forms) moved onto the template as inline utility classes —
+   see this file's own git history for the byte-for-byte mapping. What's left, and why:
    - `.tab-chip:hover:not(.is-active)` / `.tab-close:hover` / the hover half of the close button's
      opacity toggle: real `:hover` on one element driving another (or itself) — no static class can
      stand in for a live pointer state.
    - `.tab-chip.is-attention::after`: a generated pseudo-element (dot badge) — nothing in the DOM to
      hang a utility class on.
-   - `.tab-file-icon`'s `mask-*`/`-webkit-mask-*`: no Tailwind utility covers `mask-position`/
-     `mask-repeat`/`mask-size` in this version (confirmed via compile check) — RepoSearchRow.vue and
-     RepoTreeRow.vue carry the identical six-declaration block for the same seti-icon masking, same
-     conclusion there.
    `.tab-chip`/`.is-active`/`.is-attention`/`.tab-close`/`.tab-file-icon`/`.tab-title` stay as bare
    marker classes to anchor the selectors below; `.is-active`/`.tab-file-icon`/`.tab-title`/
    `.tab-close` are also real test dependencies (slick-grid.spec.ts, budgets.spec.ts,
@@ -384,16 +382,5 @@ useEventListener(stripRef, 'dragend', onDragEnd);
 }
 .tab-close:hover {
   background: var(--kira-hover);
-}
-
-/* RepoTreeRow.vue's own .node-icon, ported for the identical `{ filePath }` marker — a repo-file
-   tab's own seti icon, not a codicon glyph. */
-.tab-file-icon {
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
 }
 </style>
