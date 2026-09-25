@@ -17,6 +17,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -645,7 +646,7 @@ onUnmounted(() => {
          === false"` made an absent can-refresh mean "always disabled" -- Refresh below has no
          disabled binding at all now, since this view always passes the literal `true` ViewChrome
          used to receive. -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -664,10 +665,10 @@ onUnmounted(() => {
       >
       <Badge>collection</Badge>
       <span class="ml-auto flex items-center gap-1"></span>
-    </div>
+    </ViewToolbar>
 
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -874,14 +875,14 @@ onUnmounted(() => {
         </TooltipTrigger>
       </Tooltip>
       <div class="flex items-center gap-1.5 min-w-0"></div>
-    </div>
+    </ViewToolbar>
     <!-- The Mongo dialect of the filter row: one filter box, permanent, never closed — plus a
          SORT box beside it (read.ts's structured-sort-only rule, see ./sortDocument.ts's
          sortSpecToText/parseSortText), FilterToolbar.vue's ORDER BY box narrowed to the one form
          Mongo can actually execute and reworded to Mongo's own sort-document syntax rather than SQL's.
          History button and Clear button match FilterToolbar.vue's own layout exactly — this row
          used to have neither. -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <div class="relative">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -959,7 +960,7 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Empty both fields and refetch</TooltipContent>
       </Tooltip>
-    </div>
+    </ViewToolbar>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="document-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>

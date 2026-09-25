@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -273,7 +274,7 @@ onUnmounted(() => {
 <template>
   <template v-if="state === 'loading' || state === 'found'">
     <div v-if="isMarkdown" class="flex flex-col h-full w-full">
-      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+      <ViewToolbar border="none">
         <ToggleGroup
           type="single"
           :model-value="view"
@@ -289,7 +290,7 @@ onUnmounted(() => {
             {{ opt.label }}
           </ToggleGroupItem>
         </ToggleGroup>
-      </div>
+      </ViewToolbar>
       <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
            toggle, only hidden, so scroll position/selection/find state survive a round trip.
            flex-1/min-h-0 (not h-full/w-full, the standalone-mount branch below) since this is

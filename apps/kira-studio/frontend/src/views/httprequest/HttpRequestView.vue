@@ -36,6 +36,7 @@ import { connColorVar } from '@theme/connColor';
 import { methodTextClass } from '@theme/methodColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -494,7 +495,7 @@ onUnmounted(() => {
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="http-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="view-head">
+    <ViewToolbar data-testid="view-head">
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -549,13 +550,13 @@ onUnmounted(() => {
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
       </span>
-    </div>
+    </ViewToolbar>
     <div
       class="h-0.5 shrink-0 bg-(--kira-rail)"
       data-testid="toolbar-rail"
       :style="{ '--kira-rail': connColorVar(railColor) }"
     />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -666,9 +667,9 @@ onUnmounted(() => {
           <TooltipContent>{{ incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on' }}</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </ViewToolbar>
 
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <ToggleGroup
         type="single"
         :model-value="tab.state.requestPane"
@@ -752,7 +753,7 @@ onUnmounted(() => {
         />
       </Popover>
       <EnvironmentSelect :tab-id="tab.id" />
-    </div>
+    </ViewToolbar>
 
     <!-- P28 D11: above the request panel it searches, not floating over it — LAW 03, the same
          placement rule the response pane's own bar and the data views' SearchToolbar follow. -->

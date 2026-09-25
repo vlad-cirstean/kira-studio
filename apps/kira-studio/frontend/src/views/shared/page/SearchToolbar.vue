@@ -3,7 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useDebounceFn, useEventListener } from '@vueuse/core';
+import { unrefElement, useDebounceFn, useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
@@ -227,8 +228,12 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 // P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
-const rootEl = useTemplateRef<HTMLElement>('rootEl');
-useEventListener(rootEl, 'keydown', onKeydown);
+const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
+useEventListener(
+  computed(() => unrefElement(rootEl)),
+  'keydown',
+  onKeydown,
+);
 
 onMounted(() => {
   // This component is mounted fresh each time its host toolbar opens (both from the toolbar
@@ -251,9 +256,9 @@ onUnmounted(() => {
 <template>
   <!-- LAW 03 / README: docks at the bottom of the result it searches (never floating over it),
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
-  <div
+  <ViewToolbar
     ref="rootEl"
-    class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border bg-elevated"
+    class="bg-elevated"
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <span
@@ -422,5 +427,5 @@ onUnmounted(() => {
       </TooltipTrigger>
       <TooltipContent>Close</TooltipContent>
     </Tooltip>
-  </div>
+  </ViewToolbar>
 </template>

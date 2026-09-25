@@ -18,6 +18,7 @@ import {
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -281,7 +282,7 @@ onUnmounted(() => {
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -333,9 +334,9 @@ onUnmounted(() => {
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : unresolved ? 'Checking whether this request is still saved…' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
       </span>
-    </div>
+    </ViewToolbar>
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -437,9 +438,9 @@ onUnmounted(() => {
           <TooltipContent>{{ incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on' }}</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </ViewToolbar>
 
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <ToggleGroup type="single" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
         <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>
@@ -509,7 +510,7 @@ onUnmounted(() => {
         />
       </Popover>
       <EnvironmentSelect :tab-id="tab.id" />
-    </div>
+    </ViewToolbar>
 
     <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
       <SplitterPanel

@@ -22,6 +22,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
@@ -643,7 +644,7 @@ const statusLine = computed(() => {
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="console-view" :data-path="tab.path">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -660,10 +661,10 @@ const statusLine = computed(() => {
         targetTail?.name ?? tab.path ?? 'Console'
       }}</span>
       <span class="ml-auto flex items-center gap-1"></span>
-    </div>
+    </ViewToolbar>
 
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <div class="flex items-center gap-1.5 min-w-0">
         <!-- The console's search_path/schema control and the "writes go to production" chip from
              Console.html both need tracked data this app does not have yet (no per-console
@@ -854,7 +855,7 @@ const statusLine = computed(() => {
         </TooltipTrigger>
       </Tooltip>
       <div class="flex items-center gap-1.5 min-w-0"></div>
-    </div>
+    </ViewToolbar>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="console-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>

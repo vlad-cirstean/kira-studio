@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 // native title tooltip (unreadable for multi-line/long messages, and unreachable on touch).
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { autoUpdate, computeFloatPosition } from '@workbench/util/floatingPosition';
 import { nextTick, onUnmounted, ref, watch } from 'vue';
@@ -99,10 +100,10 @@ onUnmounted(() => {
         <!-- Footer is the same 28px band used everywhere a toolbar sits at the edge of a
              floating surface, with the border moved to the top since this one closes
              the popover instead of opening it. -->
-        <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-t border-border">
+        <ViewToolbar border="top">
           <Button variant="toolbar" size="kira" class="ml-auto" @click="copyText(props.message)">Copy</Button>
           <Button variant="toolbar" size="kira" @click="close">Close</Button>
-        </div>
+        </ViewToolbar>
       </div>
     </Teleport>
   </span>

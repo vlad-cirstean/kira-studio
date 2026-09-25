@@ -16,6 +16,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -221,7 +222,7 @@ const breadcrumb = computed(() => {
     <!-- P104 §3: ViewChrome/ViewHeader inlined (no library counterpart) — Tailwind utilities over
          components/ui parts, the same view-head/toolbar chrome utility set every other view uses
          (P110 B28). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -239,9 +240,9 @@ const breadcrumb = computed(() => {
         read-only — {{ originPhrase }}
       </Badge>
       <span class="ml-auto flex items-center gap-1" />
-    </div>
+    </ViewToolbar>
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -306,7 +307,7 @@ const breadcrumb = computed(() => {
           <TooltipContent>Open query console here</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </ViewToolbar>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
       <AlertDescription><span class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]">{{ rt.error }}</span></AlertDescription>

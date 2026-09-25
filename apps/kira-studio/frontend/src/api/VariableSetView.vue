@@ -16,6 +16,7 @@ import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -461,7 +462,7 @@ function onBulkClose(): void {
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="variables-dialog" :data-scope="scope">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -473,13 +474,13 @@ function onBulkClose(): void {
       </span>
       <span class="text-kira-md text-fg truncate" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
       <span class="ml-auto flex items-center gap-1" />
-    </div>
+    </ViewToolbar>
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
          #toolbar-2 row this view used to build both controls into on its own — the search box
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <InputGroup v-if="!bulkMode">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" />
@@ -508,7 +509,7 @@ function onBulkClose(): void {
           <TooltipContent>Edit as .env text</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </ViewToolbar>
 
     <Empty v-if="ownersLoaded && !ownerExists" data-testid="variable-set-orphan">
       <EmptyMedia><CodiconIcon name="warning" :size="24" /></EmptyMedia>

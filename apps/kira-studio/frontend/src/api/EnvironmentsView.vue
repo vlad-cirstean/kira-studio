@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
@@ -222,7 +223,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="environments-dialog">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -232,9 +233,9 @@ useEventListener(listEl, 'dragend', onDragEnd);
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="server-environment" :size="13" /></span>
       <span class="text-kira-md text-fg truncate" data-testid="environments-target">Environments</span>
       <span class="ml-auto flex items-center gap-1" />
-    </div>
+    </ViewToolbar>
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <InputGroup v-if="variablesStore.environments.length > 0">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" />
@@ -251,7 +252,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
           New environment
         </Button>
       </div>
-    </div>
+    </ViewToolbar>
 
     <Alert v-if="variablesStore.error" variant="destructive" data-testid="environments-error">
       <AlertDescription class="flex items-start gap-1.5">

@@ -3,7 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useEventListener } from '@vueuse/core';
+import { unrefElement, useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
@@ -128,13 +129,17 @@ onMounted(() => {
 });
 
 // P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
-const rootEl = useTemplateRef<HTMLElement>('rootEl');
-useEventListener(rootEl, 'keydown', onKeydown);
+const rootEl = useTemplateRef<InstanceType<typeof ViewToolbar>>('rootEl');
+useEventListener(
+  computed(() => unrefElement(rootEl)),
+  'keydown',
+  onKeydown,
+);
 </script>
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
-  <div ref="rootEl" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border bg-elevated" data-testid="http-find-bar">
+  <ViewToolbar ref="rootEl" class="bg-elevated" data-testid="http-find-bar">
     <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground">
       <CodiconIcon name="search" :size="13" />
     </span>
@@ -225,5 +230,5 @@ useEventListener(rootEl, 'keydown', onKeydown);
       </TooltipTrigger>
       <TooltipContent>Close</TooltipContent>
     </Tooltip>
-  </div>
+  </ViewToolbar>
 </template>

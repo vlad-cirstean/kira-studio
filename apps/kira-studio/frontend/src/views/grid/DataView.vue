@@ -15,6 +15,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -197,7 +198,7 @@ function onCloseSearch(): void {
 
 <template>
   <div class="h-full flex flex-col min-h-0">
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="view-head">
+    <ViewToolbar data-testid="view-head">
       <span v-if="railColor !== undefined" class="size-1.25 rounded-full shrink-0" :class="!railColor ? 'bg-none border border-disabled' : 'bg-(--kira-rail)'" data-testid="conn-dot" :style="{ '--kira-rail': connColorVar(railColor) }" />
       <span v-if="connRecord?.kind" class="size-4 flex items-center justify-center shrink-0"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
       <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
@@ -217,14 +218,14 @@ function onCloseSearch(): void {
       <span class="ml-auto flex items-center gap-1">
         <Badge v-if="primaryKeyLabel" variant="info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</Badge>
       </span>
-    </div>
+    </ViewToolbar>
 
     <div
       class="h-0.5 shrink-0 bg-(--kira-rail)"
       data-testid="toolbar-rail"
       :style="{ '--kira-rail': connColorVar(railColor) }"
     />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="data-toolbar">
+    <ViewToolbar data-testid="data-toolbar">
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -332,10 +333,10 @@ function onCloseSearch(): void {
           </Tooltip>
         </template>
       </div>
-    </div>
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" data-testid="filter-toolbar">
+    </ViewToolbar>
+    <ViewToolbar border="none" data-testid="filter-toolbar">
       <FilterToolbar :tab="tab" />
-    </div>
+    </ViewToolbar>
 
     <!-- Below the filter row, not floating over the grid it searches — the "docks at the bottom
          of the result" placement from Toolbars.html overlapped the last visible row, which read as

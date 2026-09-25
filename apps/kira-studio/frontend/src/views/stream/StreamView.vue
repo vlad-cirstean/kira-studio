@@ -22,6 +22,7 @@ import {
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -631,7 +632,7 @@ onUnmounted(() => {
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
          made an absent can-refresh mean "always disabled" -- Refresh below carries the same
          `:disabled="isBatch"` this view's `can-refresh="!isBatch"` used to compute. -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -656,10 +657,10 @@ onUnmounted(() => {
           visibility {{ page.visibilityTimeoutSeconds }}s
         </Badge>
       </span>
-    </div>
+    </ViewToolbar>
 
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" :class="{ 'border-b border-border': isKafka }">
+    <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -853,9 +854,9 @@ onUnmounted(() => {
         </TooltipTrigger>
       </Tooltip>
       <div class="flex items-center gap-1.5 min-w-0"></div>
-    </div>
+    </ViewToolbar>
 
-    <div v-if="isKafka" class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar v-if="isKafka" border="none">
         <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
@@ -1024,7 +1025,7 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>Empty every field and refetch</TooltipContent>
         </Tooltip>
-    </div>
+    </ViewToolbar>
 
     <!-- The one destructive truth of this view, stated once at the top. -->
     <Alert v-if="isBatch" variant="warn" data-testid="stream-poll-warning">

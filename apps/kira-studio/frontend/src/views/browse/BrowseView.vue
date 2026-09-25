@@ -16,6 +16,7 @@ import {
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
@@ -284,7 +285,7 @@ onMounted(() => {
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span
         v-if="railColor !== undefined"
         class="size-1.25 rounded-full shrink-0"
@@ -302,10 +303,10 @@ onMounted(() => {
         >{{ targetName }}</span
       >
       <span class="ml-auto flex items-center gap-1"></span>
-    </div>
+    </ViewToolbar>
 
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+    <ViewToolbar border="none">
       <div class="flex items-center gap-1.5 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -355,7 +356,7 @@ onMounted(() => {
         </TooltipTrigger>
       </Tooltip>
       <div class="flex items-center gap-1.5 min-w-0"></div>
-    </div>
+    </ViewToolbar>
 
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
           <div
@@ -426,7 +427,7 @@ onMounted(() => {
                ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
                toolbar utility band (the same 26px in-view band every other toolbar already is)
                rather than inventing a header. -->
-          <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="browse-list-head">
+          <ViewToolbar data-testid="browse-list-head">
             <Tooltip>
               <TooltipTrigger as-child>
                 <TooltipDisabledTrigger>
@@ -463,7 +464,7 @@ onMounted(() => {
               </template>
             </span>
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
-          </div>
+          </ViewToolbar>
           <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
             <div v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground">Loading…</div>
             <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground" data-testid="browse-empty">

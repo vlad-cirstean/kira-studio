@@ -54,6 +54,7 @@ import {
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -717,7 +718,7 @@ onUnmounted(() => {
   <div class="flex-1 min-h-0 flex flex-col" data-testid="keyvalue-pane">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <template v-if="tab">
-      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+      <ViewToolbar>
         <span
           v-if="connColor !== undefined"
           class="size-1.25 rounded-full shrink-0"
@@ -735,9 +736,9 @@ onUnmounted(() => {
           >{{ targetTail?.name ?? tab.path }}</span
         >
         <span class="ml-auto flex items-center gap-1" />
-      </div>
+      </ViewToolbar>
       <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(connColor) }" />
-      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
+      <ViewToolbar border="none">
         <div class="flex items-center gap-1.5 min-w-0">
           <Tooltip>
             <TooltipTrigger as-child>
@@ -769,7 +770,7 @@ onUnmounted(() => {
         <span class="ml-auto" />
         <RunState :state="runState" />
         <div class="flex items-center gap-1.5 min-w-0" />
-      </div>
+      </ViewToolbar>
     </template>
 
     <!-- P104: the SplitterGroup wrapping the reconnect/main content + CellEditorDock.vue's own dock
@@ -788,7 +789,7 @@ onUnmounted(() => {
       </Button>
     </Empty>
     <template v-else>
-      <div v-if="page" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="keyvalue-badges">
+      <ViewToolbar v-if="page" data-testid="keyvalue-badges">
         <Badge data-testid="keyvalue-type">{{ page.redisType }}</Badge>
         <!-- TTL is a Redis-only concept (always null for an S3 object — read.ts never computes
              it) — showing "no expiry" for every object would be a permanently-meaningless chip,
@@ -804,9 +805,9 @@ onUnmounted(() => {
         </template>
         <Badge data-testid="keyvalue-memory">{{ memoryText(page.memoryBytes) }}</Badge>
         <Badge v-if="connRecord">{{ connRecord.readOnly ? 'read-only' : 'read-write' }}</Badge>
-      </div>
+      </ViewToolbar>
 
-      <div class="h-bar shrink-0 flex items-center gap-1.5 px-2" data-testid="keyvalue-toolbar">
+      <ViewToolbar border="none" data-testid="keyvalue-toolbar">
         <div class="flex items-center gap-1.5 min-w-0">
           <!-- Prev/Next are meaningless for a single-object page (readObject's own doc comment:
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
@@ -1006,7 +1007,7 @@ onUnmounted(() => {
             <TooltipContent>Search this page</TooltipContent>
           </Tooltip>
         </div>
-      </div>
+      </ViewToolbar>
 
       <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="keyvalue-error">
         <AlertDescription>{{ rt.error.message }}</AlertDescription>

@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
+import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
@@ -524,7 +525,7 @@ const statusLine = computed(() => {
          ViewHeader inlined (P104 §3: layout container, no library counterpart) — the row number
          rides along in the target text itself (cell-editor-target's toContainText assertions
          don't care about styling). -->
-    <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <ViewToolbar>
       <span class="size-4 flex items-center justify-center shrink-0">
         <CodiconIcon name="symbol-string" :size="13" />
       </span>
@@ -671,7 +672,7 @@ const statusLine = computed(() => {
           <TooltipContent>Close</TooltipContent>
         </Tooltip>
       </span>
-    </div>
+    </ViewToolbar>
 
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
          (onEditorKeydown) stages without needing to move focus away; neither is on MonacoHost
