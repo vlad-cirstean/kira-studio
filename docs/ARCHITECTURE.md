@@ -111,7 +111,7 @@ footprint. The budget numbers (and what's measured) live in
   surface, below) is unchanged, and the renderer never calls `window.open` or its own equivalent.
   P66's update-availability check is a Go-side request for exactly this reason: `internal/
   appupdate` fetches GitHub's release metadata itself, and the status-bar banner's click opens the
-  OS browser through `internal/shell`'s own seam (`NewDeferredBrowser`) — the renderer calls a
+  OS browser through repo-root `internal/shell`'s own seam (`NewDeferredBrowser`) — the renderer calls a
   nullary `OpenReleasePage()` and neither sends nor receives a URL (UI architecture, below).
 
 ## Adapter contract
@@ -129,7 +129,11 @@ tab instead, SPEC.md §8.18) — UI reads *only* `Caps`, never a `connection.kin
 decide what to show. `registry.go`'s `loaders` map is `registry.ts`'s successor: a plain constructor
 table, each adapter package registering its own constructor from its own `init()`, not a
 lazy-`import()` map — Go links every adapter into the binary regardless of whether a connection kind
-is ever used, so no per-engine baseline-memory story is left to preserve (P58a OQ-6).
+is ever used, so no per-engine baseline-memory story is left to preserve (P58a OQ-6). The
+migration-era `nativeKinds` map this section used to cite per engine is gone too — every kind
+routes through the same `loaders` registry now, so there is nothing left to flag as native versus
+not; only a stale comment survives it
+(`apps/kira-studio/internal/storage/repos/connections.go:172`).
 
 ### Per-database mapping
 
@@ -183,18 +187,17 @@ Full read/write SQL adapters — keyset pagination on the primary key (falling b
 `LIMIT/OFFSET`), `pg_cancel_backend`/`KILL QUERY` cancellation on a side connection.
 
 **PostgreSQL is Go-native as of P58a M5** (`apps/kira-studio/internal/adapters/postgres/`, `pgx/v5`) —
-`nativeKinds["postgres"]` is `true`, so a Postgres connection is served in-process by
-`adapterhost.Router`, never by the Node engine child. The Go port keeps the design facts
-above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the tracked backend
-pid) exactly; only which process runs the adapter and how its query context is
+a Postgres connection is served in-process by `adapterhost.Router` through the `loaders` registry
+above; no Node engine child exists any more to route around (deleted P58f). The Go port keeps the
+design facts above (keyset-on-PK pagination, `pg_cancel_backend` on a side connection using the
+tracked backend pid) exactly; only which process runs the adapter and how its query context is
 handled changed — a caller-side op cancellation must never be the same `context.Context` passed to `pgx`'s
 own `Query`/`Exec`, since pgx (unlike Node's `pg`) honours context cancellation by racing its own
 cancel request against the adapter's explicit `pg_cancel_backend` call
-(`internal/adapters/postgres/query.go`'s `runWithAbortRace`).
+(`apps/kira-studio/internal/adapters/abort.go`'s `adapters.RunWithAbortRace`).
 
 **MariaDB and MySQL are Go-native as of P58b M6.2**
-(`apps/kira-studio/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`) —
-`nativeKinds["mariadb"]` and `nativeKinds["mysql"]` are both `true`. The shared-core/thin-profile
+(`apps/kira-studio/internal/adapters/mysqlfamily/`, `github.com/go-sql-driver/mysql`). The shared-core/thin-profile
 split carries over unchanged from the Node design: `mysqlfamily/` holds one `Adapter`
 implementation; `mariadb/`/`mysql/` each hold only their own `Profile` (server label,
 `ApplyEngineOptions`). Same abort pattern as Postgres but for the opposite reason: where pgx
@@ -214,8 +217,8 @@ when `caching_sha2_password` needs one and TLS is off, with no option to refuse 
 ### SQLite (P35; Go-native as of P58b M6.3)
 
 **SQLite is Go-native as of P58b M6.3** (`apps/kira-studio/internal/adapters/sqlite/`, `modernc.org/sqlite`,
-pure Go and cgo-free — the same driver that also backs the app's own storage, see Storage below) —
-`nativeKinds["sqlite"]` is `true`. `caps.cancel` flips from the Node adapter's honest `false` to
+pure Go and cgo-free — the same driver that also backs the app's own storage, see Storage below).
+`caps.cancel` flips from the Node adapter's honest `false` to
 an equally honest `true`: `node:sqlite` (a Node builtin, no native module, no build step, requiring
 Bun 1.4+/Node 22.5+) had no `sqlite3_interrupt` and its whole API was synchronous, so a running
 statement blocked the event loop and an abort could never be delivered while one ran. The Go port's
@@ -242,8 +245,8 @@ narrow, documented capability trade, not a silent gap.
 ### ClickHouse (P36; Go-native as of P58b M6.4)
 
 **ClickHouse is Go-native as of P58b M6.4** (`apps/kira-studio/internal/adapters/clickhouse/`, plain
-`net/http`) — `nativeKinds["clickhouse"]` is `true`, the last of the five SQL-family kinds P58b set
-out to migrate. Unlike every other adapter in this phase, the Go port carries **no driver
+`net/http`) — the last of the five SQL-family kinds P58b set out to migrate to Go. Unlike every
+other adapter in this phase, the Go port carries **no driver
 dependency at all**: no `@clickhouse/client` equivalent, no vendored client library — a hand-rolled
 HTTP client that POSTs the statement text and reads ClickHouse's own
 `JSONCompactStringsEachRowWithNamesAndTypes` wire format line by line (names row, types row, then
@@ -272,10 +275,10 @@ server keeps executing a query after the original socket closes.
 ### Kafka (Go-native as of P58e M9.3)
 
 **Go-native as of P58e M9.3** (`apps/kira-studio/internal/adapters/kafka/`, `github.com/twmb/franz-go` +
-`franz-go/pkg/kadm`) — `nativeKinds["kafka"]` is `true`, the **tenth and last** of ten kinds, and the
-flip that records checkpoint C2 (the parent P58 plan's zero-traffic proof: a full manual pass across
-all ten kinds, plus cancel/settings-save/cache-clear, left `adapterhost.Router.ChildRoutes()` at
-zero — the Node engine child is spawned, idle, and answers no connection traffic at all). franz-go
+`franz-go/pkg/kadm`) — the **tenth and last** of ten kinds to go Go-native, and the flip that
+records checkpoint C2 (the parent P58 plan's zero-traffic proof: a full manual pass across all ten
+kinds, plus cancel/settings-save/cache-clear, left the Node engine child's own connection-count
+metric at zero — spawned, idle, answering no connection traffic at all). franz-go
 replaces the old TypeScript driver's ABI-specific compiled binding (built against V8's C++ API — the
 one engine Bun could never load at any ABI) with a pure-Go client: no compiled binding, no ABI, no
 rebuild step, no packaged-bundle native-module gap (`docs/PACKAGING.md` §6).
@@ -303,7 +306,7 @@ re-rendered in P58f M10 (D6): it used to show the old `node-rdkafka` binding's
 `producer.produce('<topic>', null, Buffer.from(...), '<key>')` call signature, which after M10 would
 have been the last reference in the repo to an API that no longer exists in a user-visible string;
 it now reads `ProduceSync <topic> key=<key>` (`key=<none>` when the key is null), matching the real
-`kgo.ProduceSync` call the adapter makes (`produce.go`'s `previewProduce`).
+`kgo.ProduceSync` call the adapter makes (`produce.go`'s `preview`).
 
 Cancellation has no server-side kill at all — Kafka's protocol has none, the same shape as SQS and
 S3 — so the op's own `context.Context` on every `kadm`/`kgo` call is the entire mechanism, with one
@@ -316,7 +319,7 @@ per-message delete or update exists at the protocol level, only retention/compac
 ### SQS (Go-native as of P58d M8.2)
 
 **Go-native as of P58d M8.2** (`apps/kira-studio/internal/adapters/sqs/`, `aws-sdk-go-v2/service/sqs`) —
-`nativeKinds["sqs"]` is `true`, the eighth of ten kinds P58 migrates. `caps.pagination = 'batch'` —
+the eighth of ten kinds P58 migrates to Go. `caps.pagination = 'batch'` —
 every poll is an independent, non-resumable `ReceiveMessage` call with no addressable position;
 the stream view never auto-loads, only an explicit Poll button. `canDelete` is a real per-item
 removal via the message's receipt handle (kept adapter-local, in-memory, never round-tripped over
@@ -347,7 +350,7 @@ at first use — a gain, since the Test button reports it sooner.
 ### S3 (Go-native as of P58d M8.3)
 
 **Go-native as of P58d M8.3** (`apps/kira-studio/internal/adapters/s3/`, `aws-sdk-go-v2/service/s3`) —
-`nativeKinds["s3"]` is `true`, reaching **nine of ten** native kinds — Kafka went native next, in
+reaching **nine of ten** native kinds — Kafka went native next, in
 P58e, reaching ten of ten (see the Kafka section above).
 The only engine with `caps.fileTransfer` — items are whole files, streamed to/from a local path via
 a native OS dialog (`downloadObject`), not a value the mutation-preview model can show inline.
@@ -382,8 +385,7 @@ carry `rabbitmq`/`exchange`; there is no successor section here.
 ### MongoDB / Redis (P9/P41; Go-native as of P58c M7.3/M7.4)
 
 **Both are Go-native as of P58c** (`apps/kira-studio/internal/adapters/mongo/` and `.../redis/`) —
-`nativeKinds["mongodb"]` and `nativeKinds["redis"]` are both `true`, the sixth and seventh of ten
-kinds P58 migrates. MongoDB: document-shaped, `_id` keyset pagination falling back to
+the sixth and seventh of ten kinds P58 migrates to Go. MongoDB: document-shaped, `_id` keyset pagination falling back to
 `skip`/`limit`, cancellation via `$currentOp` + `killOp` on the *same* client the adapter already
 holds (never a side connection — `$currentOp`'s default `allUsers: false` only matches the polling
 connection's own authenticated user). Redis: key/value-shaped, `SCAN`-cursor pagination (never
