@@ -78,14 +78,8 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func (a *Adapter) getClient() *awssqs.Client { return a.state.Load().client }
-
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
-
-func (a *Adapter) getReceiptHandles() *receiptHandles { return a.state.Load().receiptHandles }
-
 func (a *Adapter) requireClient() (*awssqs.Client, error) {
-	return adapters.RequireConnected(a.getClient())
+	return adapters.RequireConnected(a.state.Load().client)
 }
 
 // cacheQueueURL is a no-op once Disconnect has nilled queueURLs (F3): an op already past
@@ -195,7 +189,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	return pollQueue(ctx, client, url, req, op, a.getReceiptHandles())
+	return pollQueue(ctx, client, url, req, op, a.state.Load().receiptHandles)
 }
 
 // Count is index.ts's count.
@@ -238,7 +232,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutateQueue(ctx, client, url, name, a.getReadOnly(), plan, a.getReceiptHandles(), op)
+	return mutateQueue(ctx, client, url, name, a.state.Load().readOnly, plan, a.state.Load().receiptHandles, op)
 }
 
 // Execute is index.ts's execute — caps.SQL is false; never reached.
