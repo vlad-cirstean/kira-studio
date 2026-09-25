@@ -168,24 +168,24 @@ const connectionName = computed(
 
       <div class="overflow-auto">
     <div class="flex flex-col gap-2 p-3">
-      <span class="help">
+      <span class="help leading-normal text-kira-xs text-subtle">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
       </span>
 
-      <section class="filter-section">
-        <div class="section-head">
-          <span class="section-title">Object types</span>
-          <span class="section-links">
-            <button type="button" class="link-btn" @click="allKinds">All</button>
-            <button type="button" class="link-btn" @click="noneKinds">None</button>
+      <section class="flex flex-col gap-1">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-kira-sm text-fg">Object types</span>
+          <span class="flex gap-1">
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="allKinds">All</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="noneKinds">None</button>
           </span>
         </div>
-        <div class="kind-list" data-testid="filter-kind-list">
+        <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
           <Label
             v-for="row in kinds"
             :key="row.kind"
-            class="kind-row"
+            class="flex items-center cursor-default gap-1 h-6.5"
             :data-testid="`filter-kind-row-${row.kind}`"
             :data-state="row.hidden ? 'off' : 'on'"
           >
@@ -196,22 +196,22 @@ const connectionName = computed(
             >
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
-            <span class="kind-label">{{ row.label }}</span>
-            <span class="kind-count">{{ row.count }}</span>
+            <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm">{{ row.label }}</span>
+            <span class="text-kira-xs text-subtle">{{ row.count }}</span>
           </Label>
-          <span v-if="kinds.length === 0" class="empty-note">Nothing cached yet.</span>
+          <span v-if="kinds.length === 0" class="text-kira-xs text-subtle p-1">Nothing cached yet.</span>
         </div>
       </section>
 
-      <section class="filter-section">
-        <div class="section-head">
-          <span class="section-title">Objects</span>
-          <span class="section-links">
-            <button type="button" class="link-btn" @click="allObjects">All</button>
-            <button type="button" class="link-btn" @click="noneObjects">None</button>
+      <section class="flex flex-col gap-1">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-kira-sm text-fg">Objects</span>
+          <span class="flex gap-1">
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="allObjects">All</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="noneObjects">None</button>
           </span>
         </div>
-        <div class="name-filter-wrap">
+        <div class="w-full">
           <Input
             v-model="nameFilter"
             class="name-filter h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -219,11 +219,11 @@ const connectionName = computed(
             data-testid="filter-name-input"
           />
         </div>
-        <div class="object-list" data-testid="filter-object-list">
+        <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-object-list">
           <div
             v-for="row in objects.rows"
             :key="row.path"
-            class="object-row"
+            class="flex items-center cursor-default gap-1 h-6.5"
             data-testid="filter-object-row"
             :data-path="row.path"
             :data-state="row.state"
@@ -232,16 +232,16 @@ const connectionName = computed(
             <button
               v-if="row.hasChildren"
               type="button"
-              class="twisty-btn"
+              class="twisty-btn flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer text-muted-foreground"
               :aria-label="expandedPaths.has(row.path) ? 'Collapse' : 'Expand'"
               @click="onToggleExpand(row.path)"
             >
               <CodiconIcon :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'" :size="12" />
             </button>
-            <span v-else class="twisty-spacer" />
+            <span v-else class="w-4 shrink-0" />
             <Tooltip :disabled="!row.disabledReason">
               <TooltipTrigger as-child>
-                <Label class="object-checkbox-label">
+                <Label class="object-checkbox-label flex items-center flex-1 min-w-0 cursor-pointer gap-1">
                   <Checkbox
                     :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
                     :disabled="row.disabled"
@@ -252,21 +252,21 @@ const connectionName = computed(
                       <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="10" />
                     </template>
                   </Checkbox>
-                  <span class="object-name">{{ row.name }}</span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm">{{ row.name }}</span>
                 </Label>
               </TooltipTrigger>
               <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
             </Tooltip>
-            <span v-if="row.hasChildren" class="object-count">{{ row.childCount }}</span>
+            <span v-if="row.hasChildren" class="text-kira-xs text-subtle">{{ row.childCount }}</span>
           </div>
-          <span v-if="objects.rows.length === 0" class="empty-note">Nothing cached yet.</span>
-          <span v-if="objects.truncated" class="empty-note truncated-note" data-testid="filter-object-truncated">
+          <span v-if="objects.rows.length === 0" class="text-kira-xs text-subtle p-1">Nothing cached yet.</span>
+          <span v-if="objects.truncated" class="text-kira-xs text-subtle p-1 italic" data-testid="filter-object-truncated">
             Showing the first 500 rows — type to narrow.
           </span>
         </div>
       </section>
 
-      <Alert variant="note" class="preview-strip" data-testid="filters-preview">
+      <Alert variant="note" class="self-stretch rounded-kira-sm border border-border" data-testid="filters-preview">
         <AlertDescription class="flex items-start gap-1.5">
           <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
           <span>
@@ -275,14 +275,14 @@ const connectionName = computed(
         </AlertDescription>
       </Alert>
 
-      <span class="help cached-note">
+      <span class="help cached-note leading-normal text-kira-xs text-subtle self-start">
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
     </div>
       </div>
 
       <DialogFooter class="border-t border-border bg-transparent">
-        <span class="help">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span class="help leading-normal text-kira-xs text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>
@@ -291,108 +291,3 @@ const connectionName = computed(
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.help {
-  @apply leading-normal;
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-}
-
-.filter-section {
-  @apply flex flex-col;
-  gap: var(--kira-s-2);
-}
-
-.section-head {
-  @apply flex items-center justify-between;
-}
-
-.section-title {
-  @apply font-semibold;
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg);
-}
-
-.section-links {
-  @apply flex;
-  gap: var(--kira-s-2);
-}
-
-.link-btn {
-  @apply bg-none border-none p-0 cursor-pointer;
-  font-size: var(--kira-t-xs);
-  color: var(--kira-accent);
-}
-
-.link-btn:hover {
-  @apply underline;
-}
-
-.kind-list,
-.object-list {
-  @apply flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm;
-  border: var(--kira-border-width) solid var(--kira-border);
-  padding: var(--kira-s-2);
-}
-
-.kind-row,
-.object-row {
-  @apply flex items-center cursor-default;
-  gap: var(--kira-s-2);
-  height: var(--kira-h-md);
-}
-
-.kind-label,
-.object-name {
-  @apply flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
-  font-size: var(--kira-t-sm);
-}
-
-.kind-count,
-.object-count {
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-}
-
-.object-checkbox-label {
-  @apply flex items-center flex-1 min-w-0 cursor-pointer;
-  gap: var(--kira-s-2);
-}
-
-.twisty-btn {
-  @apply flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer;
-  color: var(--kira-fg-muted);
-}
-
-.twisty-spacer {
-  @apply w-4 shrink-0;
-}
-
-.empty-note {
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-  padding: var(--kira-s-2);
-}
-
-.truncated-note {
-  @apply italic;
-}
-
-.name-filter-wrap {
-  @apply w-full;
-}
-
-/* the live-consequence strip is boxed rather than full-bleed, since it sits inside the
-   dialog body rather than spanning a whole view */
-.preview-strip {
-  @apply self-stretch rounded-kira-sm;
-  border: var(--kira-border-width) solid var(--kira-border);
-}
-
-.cached-note {
-  @apply self-start;
-}
-</style>
