@@ -1155,6 +1155,19 @@ byte budget of any kind**, a deliberate consequence of an earlier decision (`doc
 pages is real, uncapped renderer memory; `docs/v1.1/plans/P5-ram-usage.md` §8 OQ-2 hands the actual
 follow-up (surfacing this figure next to the status bar's own cache size, not eviction) to P7.
 
+**Renderer server-state cache (TanStack Query, P99/P112).** Above the three Go tiers, the renderer
+caches bridge-fetched server state in one `QueryClient` per window
+(`packages/workbench/src/state/queryClient.ts`). The API client's collections tree, saved
+HTTP/gRPC requests, variables, environments and active environment are query entries
+(`apps/kira-studio/frontend/src/api/state/apiQueries.ts`) with `staleTime: Infinity`: never
+refetched on a timer, only invalidated. Go broadcasts `kira:api:dataChanged` on every API-data
+mutation (`bridge/apidata.go`'s `emitApiData`), carrying a batch of `{kind, ...scope}` changes;
+the boot-time listener maps each to `queryClient.invalidateQueries`, so every window refetches
+exactly the scopes that changed. `draftMerge.ts` keeps an unsaved edit in the active window from
+being clobbered by that refetch. Other `useQuery` consumers (the Database MCP pane, the
+connection dialog, grid mask-rule/preview state, the console) use the same client with their
+own keys. See Process model's multi-window paragraph for the cross-window contract.
+
 ## UI architecture
 
 Distilled facts about how the workbench is put together — not a restatement of `docs/v1/SPEC.md`
@@ -1178,42 +1191,48 @@ of the same identity.
 second top-level mode alongside Studio (**Api** — named Http through P1-P11, renamed by P12 D2
 once a second protocol, gRPC, joined it; still empty as of P1 — no request builder, no
 collections, nothing protocol-specific had landed yet), and the seam is deliberately the smallest
-thing that works: `TAB_KIND_MODE` (`packages/shared/domain/tabs.ts`) is a total, hand-maintained
-map from `TabKind` to `AppMode`, so no `mode` column, migration or Go change exists — a
+thing that works: `STUDIO_TAB_KIND_MODE` (`state/tabDomain.ts`, P103 Part 2 — split per-app from
+the old shared `TAB_KIND_MODE`; Kira Space's own is `SPACE_TAB_KIND_MODE`) is a total,
+hand-maintained map from `TabKind` to `AppMode`, so no `mode` column, migration or Go change exists — a
 tab's mode is derived, never stored, the same shape the "page kind, never database type" rule
-above already uses. `state/mode.ts`'s `modeState` is a plain selection (`setMode`); `activateTab`/
+above already uses. `state/mode.ts`'s `useModeStore` is a plain selection (`setMode`); `activateTab`/
 `closeTab`/`closeOthers`/`closeToTheRight`/`closeAll`/`stepTab` are all scoped to the current
 workspace's own slice of the one shared `tabs` array. Switching mode touches no `TabRecord`,
 schedules no save, issues no IPC — the two modes cannot drift, cannot double-persist into each
 other, and (per-window `tabs.window_key` scoping, unaffected) cannot leak tabs across a window.
 
-**C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" above) —
-`TAB_KIND_MODE`'s value type is `TabScope = AppMode | 'repo'` now, a repo tab's real workspace
-comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and `tabsState.activeIdByWorkspace`/
-`previewIdsByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
+**C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" in the Git
+module section) — `packages/shared/domain/tabs.ts`'s `TabScope = AppMode | 'repo'` is each
+per-app map's value type now, a repo tab's real workspace
+comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and the tabs store's
+`activeIdByWorkspace`/`previewIdsByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
 studio/api: `workspaceId` is `null` for both, so `workspaceKeyOf` falls straight back to
 `TAB_KIND_MODE[kind]` and every one of these six functions is byte-identical for them.
 
-**As of P100, this `'repo'` scope has no live consumer inside Kira Studio itself.** `packages/shared/
-domain/tabs.ts` stays a genuinely cross-app package — Kira Space's own `apps/kira-space/frontend/src/
-state/tabs.ts` imports the identical `@shared/domain/tabs` module and is the scope's real user now,
-mapping its own `repo-graph`/`repo-file`/`repo-diff`/`repo-multi-diff` kinds onto it exactly as
-described above. Kira Studio's own `state/tabKinds.ts` keeps all four as guard entries
-(`unreachableTabKind(...)`), never a real mapping, and `packages/shared/domain/mode.ts`'s `AppMode`
-itself dropped `'git'` outright (now `'studio' | 'api' | 'terminal'`) — the type union needs `'repo'`
-as a sentinel distinct from `AppMode` only because the shared package still serves the app that
-actually uses it.
+**As of P100, this `'repo'` scope has no live consumer inside Kira Studio itself; as of P103 Part 2,
+Kira Studio no longer even carries a guard stub for it.** `packages/shared/domain/tabs.ts` stays a
+genuinely cross-app package, but now keeps only what both apps' vocabularies really share — the tab
+record envelope, `TabScope`, and the one kind both apps have (`terminal`) — while each app declares
+its own kind union and per-kind schemas in its own `state/tabDomain.ts`. Kira Space's own
+`state/tabDomain.ts` declares `SpaceTabKind` (`repo-graph`/`repo-file`/`repo-diff`/
+`repo-multi-diff`/`terminal`) and is the `'repo'` scope's real, and only, consumer. Kira Studio's own
+`StudioTabKind` (`state/tabDomain.ts`) is a clean 12-kind union with no repo entries at all — the
+old `unreachableTabKind(...)`/`NeverRenderedTabView` guard stubs this paragraph used to describe are
+deleted outright, not kept as dead branches, since the type union itself no longer includes those
+kinds to guard against. `packages/shared/domain/mode.ts`'s `AppMode` itself dropped `'git'` outright
+(now `'studio' | 'api' | 'terminal'`) — `TabScope` still adds `'repo'` as a sentinel distinct from
+`AppMode` only because the shared package still serves the app that actually uses it.
 
 **Incognito request tabs are a property of the tab system, not a subsystem (P71).** The flag is
-per-tab and in-memory only (`state/tabIncognito.ts`'s `incognitoState.ids`), exactly like
-`tabsState.hydrated`/`previewIdsByWorkspace` above — no schema change, and a restored session has
-nothing to restore, since an incognito tab was never saved. It lives in its own module rather than
-as a field on `tabsState`, purely to avoid a cycle: `tabKinds.ts` needs to read it for the
+per-tab and in-memory only (`state/tabIncognito.ts`'s `useTabIncognitoStore`, `isIncognito`/
+`setIncognito`), exactly like the tabs store's `hydrated`/`previewIdsByWorkspace` above — no schema
+change, and a restored session has nothing to restore, since an incognito tab was never saved. It
+lives in its own store rather than as a field on the tabs store, purely to avoid a cycle: `tabKinds.ts` needs to read it for the
 context-menu entry, and `tabs.ts` already imports `tabKinds.ts`. The design is **suppress, don't
 mirror** — one flag consulted at each write site, not a parallel non-persisted store — and the
 module's own header states the standing rule that binds later phases: any new bridge write reachable
 from a request tab must consult `isIncognito` first. Turning it **on** flushes the tab's existing row
-immediately (a registered listener, so the dependency direction stays one-way); turning it **off**
+immediately (`registerIncognitoSetListener`, so the dependency direction stays one-way); turning it **off**
 also saves (P79 review fix — only the on-transition used to). Closing a tab drops the flag through
 the same `registerTabRuntimeCleanup` path every other per-tab runtime uses. The Go half is two
 `Incognito bool` fields (`HttpSendArgs`, `GrpcCallArgs`) threaded into `adapterhost.OpSpec`, guarding
@@ -1260,11 +1279,16 @@ had.
 `state/tabKinds.ts`'s `TAB_KINDS` (component-free) supplies each `TabKind`'s title/icon/rail
 colour/default-and-duplicate state/page-store cleanup/context-menu extras;
 `workbench/tabViews.ts`'s `TAB_VIEWS` (statically imported, so the bundle's two dynamic chunks
-above are unaffected) supplies the view component. `MainView.vue` is one
-`<component :is="TAB_VIEWS[activeTab.kind]">` plus a mode-registry (`workbench/modes.ts`) fallback
-when the mode has no active tab, replacing what used to be a nine-branch `v-if`/`v-else-if` chain;
-`TabStrip.vue` reads the same `TAB_KINDS` registry for its icon/title/rail/context-menu instead of
-branching on `tab.kind` itself, and no longer imports `project/state/tree` at all. Adding a tab
+above are unaffected) supplies the view component. **`MainView.vue`/`TabStrip.vue` are now shared**
+(`packages/workbench/src/components/`, P103 Part 2 §5.4): `MainView.vue` resolves
+`host.views[activeTab.kind]` through the provided `useWorkbenchHost()`
+(`packages/workbench/src/host.ts`) rather than importing either app's `TAB_VIEWS` at module scope,
+with an `#empty` slot fallback for "no active tab" — each app passes its own fallback component
+(Kira Studio: the active mode's `start` component from `workbench/modes.ts`'s `MODES`, still Studio's
+own registry; Kira Space: `GitStart.vue`) — replacing what used to be a nine-branch `v-if`/
+`v-else-if` chain. `TabStrip.vue` reads the same `TAB_KINDS` registry for its icon/title/rail/
+context-menu instead of branching on `tab.kind` itself, and no longer imports `project/state/tree` at
+all. Adding a tab
 kind means one registry entry each in `state/tabKinds.ts` and `workbench/tabViews.ts`, not editing
 a dispatch chain in three files — `'http-request'` (P2) is the first kind to actually exercise
 that promise, and the first Api-mode kind at all: `TAB_KIND_MODE['http-request']` is `'api'`,
@@ -1304,7 +1328,7 @@ tab saved with a field missing restored with that property `undefined` rather th
 stale enum value restored as-is. Merge-only is the load-bearing property: a successful parse can
 only *add* a missing field's default, never drop or reset one, so it is safe to land
 underneath a state-widening phase (P3's own body-mode schema, six new fields) rather than needing
-its own migration story. `tabsSave` still writes `tabsState.tabs` straight back, so a parse also
+its own migration story. `tabsSave` still writes the tabs store's `tabs` straight back, so a parse also
 drops any key no schema recognizes — deliberate, not lossy in a way that matters, since a garbage
 key had no reader to begin with.
 
@@ -1332,21 +1356,23 @@ resolved (P12 D17) — this is an audit, not a restructuring.**
 
 | Coupling | Verdict |
 |---|---|
-| `internal/bridge` is one Go package holding both modules' services | Accepted. Already one file per service, and the six Api files import nothing from the thirteen Studio ones — splitting the package would rewrite every bound method's FQN (`mockRuntime.ts`'s `BRIDGE_PKG` plus 106 `FQN_SUFFIX_BY_IPC_KEY` entries) for no compile-time boundary Go's own `internal/` visibility rule doesn't already give |
+| `internal/bridge` is one Go package holding both modules' services | Accepted. Already one file per service, and the six Api files import nothing from the thirteen Studio ones — splitting the package would rewrite every bound method's FQN (`apps/kira-studio/tests/ui/support/mockRuntime.ts`'s own `BRIDGE_PKG` plus its 136 `FQN_SUFFIX_BY_IPC_KEY` entries) for no compile-time boundary Go's own `internal/` visibility rule doesn't already give |
 | `appcore.Deps` carries Studio's `Connections`/`Tree`/`Router` into Api services, and Api's `ApiVars` into Studio's (`ConnectionsService`) | Accepted, documented. One struct embedded by value into nineteen bound services; a standalone Api app needs only `Deps{DB, Repos, ApiVars, Events}` from it |
 | `internal/storage/{model,repos}` carries both modules' tables and imports `httpclient`/`postman` (`model.ResponseHistorySnapshot` embeds `httpclient.Response` by value; `repos.CollectionsRepo` speaks `postman.Tree`/`postman.Item`) | **The real blocker, named.** Splitting it is a five-constructor, every-repo-test change for zero behaviour delta — worth doing only once a second host genuinely exists. The shape, so it need not be rediscovered: `model/{collections,variables,grpc,responsehistory}.go` and `repos/{collections,variables,response_history,grpc_history}.go` move to an `internal/apistore` package; `repos.Repos` keeps its four Api fields as an embedded `*apistore.Repos`; `postman` imports `apistore` instead of `model`, and `model` stops importing `httpclient` |
 | `adapterhost.Host.RunOp` is the Api module's op scheduler | Accepted **by design**, not neglect — one op log beats a second dead ring on every request tab or a second `useRunState`/ops store, and both `bridge/http.go` and `bridge/grpc.go` pass `ConnectionID: nil` into the same scheduler every DB adapter uses |
-| `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`http/VariablesDialog.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
+| `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`api/VariableSetView.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
 
 **Go-side layering (P21 round 1): no domain package imports `internal/bridge`.** The frontend has
 `biome.json`'s `noRestrictedImports` enforcing its own module graph; the Go side has the equivalent
-rule but no linter behind it, so `internal/ipcerr` (the one error type every bound method returns,
-shaped for `bridge/rpc.ts`'s own `unwrap()`) used to live at `internal/bridge/ipcerr` — an import
-path asserting a dependency on the IPC transport layer from three packages *below* it
-(`connections`, `secrets`, `tree`). It moved to `internal/ipcerr`, a sibling of `internal/bridge`
-rather than a child of it; `apps/kira-studio/internal/layering_test.go`'s
+rule but no linter behind it, so repo-root `internal/ipcerr` (the one error type every bound method
+returns, shaped for `bridge/rpc.ts`'s own `unwrap()`) used to live at `internal/bridge/ipcerr` — an
+import path asserting a dependency on the IPC transport layer from three packages *below* it
+(`connections`, `secrets`, `tree`). It moved to repo-root `internal/ipcerr`, a sibling of
+`internal/bridge` rather than a child of it; `apps/kira-studio/internal/layering_test.go`'s
 `TestDomainPackagesDoNotImportBridge` runs `go list -deps` against the named domain packages so a
 future import back into `internal/bridge/...` fails a test rather than drifting in unnoticed.
+Kira Space carries its own `apps/kira-space/internal/layering_test.go` for the same rule against its
+own domain packages, both built on a shared helper, repo-root `internal/layeringtest`.
 
 **Three duplications P11 (and earlier phases) wrote down as P12's to unpick are unpicked; a fourth,
 proposed, is declined with a reason.**
@@ -1380,23 +1406,21 @@ proposed, is declined with a reason.**
 
 **An App.vue that used to know eleven of the module's own component/store imports now knows one.**
 `api/ApiDialogs.vue` mounts the module's six dialogs, each still gated by its own store's `open`
-flag exactly as before — a template-only wrapper, not a behaviour change, and the artefact a future
-`packages/api-ui` (still not built — see below) would extend rather than replace.
+flag exactly as before — a template-only wrapper, not a behaviour change.
 
-**`packages/api-ui` does not exist, and the reason is a measurement, not neglect.** At P12, the
-module mounted 43 hand-rolled-primitive imports across eleven distinct Vue components, plus
-`CodiconIcon`, `editor/CodeMirrorHost.vue` (since replaced by `editor/MonacoHost.vue`, P60a/P60b),
-`editor/theme`, `beautify`/`format`/`clipboard`, and `views/shared/viewOp.ts` — extracting a UI
-package first needs `packages/ui-kit` (`theme/**` plus `primitives.css`/`tokens.css`/`base.css`
-plus those three utility modules), which **90 of the renderer's 287 source files imported at
-P12** (both figures have grown by two chapters since, but the argument stands regardless of the
-exact current counts). Moving `theme/**` out from under the phase that styles the
-Api module against it next would be exactly backwards. This phase instead makes the
-remaining couplings small and lint-fenced (`api/tabs.ts`, `bridge/apiControl.ts`, and `biome.json`'s
-own six rules) so that a later `packages/ui-kit` extraction turns `packages/api-ui` into a move
-rather than an untangling — three injected ports (an `ApiBridge`, a tab port, the three app-wide
-singletons `confirmDialog`/`contextMenu`/`settings`), two of which this phase already isolated as
-files.
+**`packages/api-ui` still does not exist, but the P12-era shared-UI extraction it was waiting on
+has since happened, just not as a standalone Api package.** At P12, the module mounted 43
+hand-rolled-primitive imports across eleven distinct Vue components, plus `CodiconIcon`,
+`editor/CodeMirrorHost.vue` (deleted at P60b, replaced by `editor/MonacoHost.vue`) and
+`editor/theme` (also gone — Monaco's own theme lives in `packages/workbench/src/editor/
+monacoTheme.ts` now). P98/P104/P110 extracted the shared UI these hand-rolled primitives needed
+into three real packages instead of the one `packages/ui-kit` this paragraph used to propose:
+`packages/theme` (shadcn-vue `components/ui/*`, Tailwind tokens, `CodiconIcon`), `packages/workbench`
+(the shell components, Pinia store factories, the editor bootstrap, test harnesses — see the Stack
+table's frontend-library-baseline row) and `packages/kira-ui` (the git-side `Kui*` primitives). The
+Api module's own UI (`ApiDialogs.vue`, the request/response views, `api/state/`) stays inside
+`apps/kira-studio/frontend/src/api/` because only Kira Studio hosts an Api module at all — there is
+no second app to extract a shared `packages/api-ui` for.
 
 **An HTTP request body is one of five modes; there is no GraphQL mode.** `packages/shared/domain/
 http.ts`'s `httpBodyModeSchema` — `'none' | 'raw' | 'code' | 'urlencoded' | 'formdata' | 'file'` —
@@ -1752,13 +1776,14 @@ this response was kept in history"* and *"this response's body was binary and wa
 bytes"*. A restored tab does **not** auto-load its latest entry — it shows the ordinary empty state
 with one added line, *"N past responses · View history"* — the same "never imply an exchange
 happened when it did not" reasoning as the banner. The history runtime (`views/httprequest/
-history.ts`) is a `createRuntimeStore`, same shape as the response runtime beside it and never
-persisted for the identical reason (P2 D6): only the pane *choice* persists, a pointer at a
-response no more than the response itself does. Refresh is eager only while the History pane is
-the one showing (a send elsewhere just flags the list stale) and one unconditional fetch happens on
-every mount regardless of pane or live response — the same "fetch once, uncaught" shape
-`collectionsList`/`variablesListEnvironments` already use — which is what lets a restored tab say
-"N past responses" before the user ever opens the pane.
+history.ts`'s `useHttpHistoryStore`, a Pinia store built over `api/state/history.ts`'s
+`createHistoryStore` factory) is never persisted for the identical reason (P2 D6): only the pane
+*choice* persists, a pointer at a response no more than the response itself does. Refresh is eager
+only while the History pane is the one showing (a send elsewhere just flags the list stale) and one
+unconditional fetch happens on every mount regardless of pane or live response — unlike
+`collectionsList`/`variablesListEnvironments`, which are TanStack Query entries now
+(`api/state/apiQueries.ts`, cached and invalidated rather than fetched once per mount) — which is
+what lets a restored tab say "N past responses" before the user ever opens the pane.
 
 **Comparing two entries reaches for Monaco's diff editor for the one thing it's actually built for
 — the body — and a plain keyed comparison for headers, not the same algorithm twice (P8; moved
@@ -1784,9 +1809,11 @@ direction is never a surprise; a binary body on either side withholds only the b
 summary and headers levels still shown and the reason stated inline.
 
 **Session restore never auto-reconnects.** On relaunch, previous tabs reopen but their connections
-do not. A restored tab renders a centred **Reconnect & load** button (`ReconnectGate`) and
-nothing else until pressed — the same gate every view kind uses for this state, including
-Browse tabs.
+do not. A restored tab renders a centred **Reconnect & load** button and nothing else until
+pressed — the `ReconnectGate` component itself was inlined at P104 (deleted, no library
+counterpart) onto `components/ui/empty`'s `Empty`, driven by the shared `useConnectionGate`
+composable's `needsReconnect`/`onReconnectAndLoad` (`views/shared/useConnectionGate.ts`) — the same
+gate every view kind uses for this state, including Browse tabs.
 
 **The write model is staged for SQL tables, immediate everywhere else.** PostgreSQL/MariaDB/
 MySQL/SQLite table writes (add row, delete row, cell edit) accumulate in a per-tab pending-change
@@ -1900,8 +1927,9 @@ split above, so a Save still broadcasts to every window.
 **Reverting a setting is per-leaf, not all-or-nothing.** P28 replaced the dialog's single
 *Revert to Defaults* footer button (which staged every section back to
 `model.DefaultSettings()` at once, discarding every other customization along with the one the
-user actually wanted to undo) with a small `IconButton icon="discard"` beside each of the nine
-editable leaves, disabled once the draft already equals that leaf's own default. Two generic
+user actually wanted to undo) with a small `<Button variant="toolbar" size="kira-icon">` carrying a
+`CodiconIcon name="discard"` (the `IconButton` primitive it used before P104 deleted it) beside each
+of the nine editable leaves, disabled once the draft already equals that leaf's own default. Two generic
 `isAtDefault`/`resetLeaf` helpers drive all nine — the same discipline `diffSection` already
 applies to the Save-time patch — so a future leaf needs no dedicated handler. A reset still only
 stages the default into the draft; Save commits it, unchanged from P17.
@@ -1946,17 +1974,23 @@ reconnect needed), and cleared in `Disconnect`.
 
 **Row coloring is a per-column text colour, not a row background.** P9's `appearance.rowColoring`
 setting (default on) paints no background, stripe, parity rule or hash — it derives a
-text colour from each column's own `typeClass`, decided by exactly one function
-(`DataGrid.vue`'s `colorForColumn`). Turning the setting off removes colour wholesale; with it on,
-string-typed cells get no distinct colour of their own, unlike every other type class.
+text colour from each column's own `typeClass`, decided by one shared function,
+`categoryForTypeClass`, called from both `views/grid/SlickGridHost.vue` and
+`views/console/ConsoleSlickGrid.vue` (`DataGrid.vue` itself was deleted at P22 Pass B, above) to
+emit a `tc-*` class the theme colours (`views/shared/slick/slickTheme.css`). Turning the setting
+off removes colour wholesale; with it on, string-typed cells get no distinct colour of their own,
+unlike every other type class.
 
 **The renderer runs Vue in VDOM mode, deliberately, not by default.** Vapor mode (Vue's
 compiled, no-virtual-DOM rendering) was evaluated against this tree in P6
 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) and declined — not because it is new, but because this
 app's hot paths already sit outside the VDOM's per-binding diffing model via the
-no-reactivity-on-row-data invariant above (`:66-67`), so no rendering cost is left for Vapor
-to remove; partial adoption would also ship both runtimes for one component, and the one global
-`v-tooltip` directive is an `ObjectDirective`, an interface Vapor's custom directives don't accept.
+no-reactivity-on-row-data invariant (see Invariants, above), so no rendering cost is left for Vapor
+to remove; partial adoption would also ship both runtimes for one component. P6's own second
+objection — the one global `v-tooltip` directive being an `ObjectDirective`, an interface Vapor's
+custom directives don't accept — no longer applies as stated: P104 deleted that directive for the
+real shadcn `Tooltip`/`TooltipTrigger`/`TooltipContent` trio, which carries no custom directive at
+all. The "both runtimes for one component" objection stands regardless.
 A future Vue 3.6 upgrade keeps VDOM mode — see the plan's §6 for the conditions under which this
 should be re-evaluated.
 
@@ -2787,8 +2821,8 @@ placed it in; a repository is an instance inside the Git module, not a sibling o
   existed before this phase, so studio/api behave byte-identically — the only thing that changed
   under them is that the record they are filtered by is now computed by a function with a `??` in
   it, not a plain lookup.
-- **The preview slot is a cohort per workspace** (`tabsState.previewIdsByWorkspace`, in-memory
-  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into a
+- **The preview slot is a cohort per workspace** (the tabs store's `previewIdsByWorkspace`,
+  in-memory only, like its `hydrated`) — VS Code's own convention: a single click opens a file into a
   shared, replaceable preview tab (rendered in italics); a double-click, or a second single-click
   reuse, promotes it to a permanent tab (`promoteTab`). A permanent open never evicts the preview
   cohort; an ordinary (non-cohort) preview open evicts every id currently in it and splices the new
