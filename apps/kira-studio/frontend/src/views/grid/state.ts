@@ -19,7 +19,13 @@ import {
 import { runPagedLoad } from '../shared/page/load';
 import { createPageNavigation } from '../shared/page/navigation';
 import type { Selection } from '../shared/slick/selection';
-import { beginOp, createRuntimeStore, runPagedCount } from '../shared/viewOp';
+import {
+  beginOp,
+  createRuntimeStore,
+  defaultPagedRuntime,
+  type PagedViewRuntime,
+  runPagedCount,
+} from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
 import { getPage, setPage } from './page';
 import { usePendingChangesStore } from './pendingChanges';
@@ -29,28 +35,11 @@ import { usePendingChangesStore } from './pendingChanges';
 // `import type { Selection } from './state'` site is unchanged.
 export type { Selection };
 
-interface DataViewRuntime {
-  status: 'idle' | 'loading' | 'error' | 'cancelled';
-  error: { code: string; message: string } | null;
-  /** P43 F5/D7: the last *action* (commit) that failed, verbatim from the server. Distinct from
-   *  `error`, which describes a failed page *load* — the page on screen is still valid when a
-   *  commit is refused, so the view keeps rendering it and shows this above it instead. Cleared by
-   *  the next successful action, a load, or a discard (DataToolbar.vue's own onDiscard — resolving
-   *  the very staged change the error was about). */
-  actionError: string | null;
-  opId: string | null; // the in-flight op, for the stop button (D2)
-  count: { value: number; exact: boolean; stale: boolean } | null;
-  countOpId: string | null; // guards runCount against a stale response outliving a filter change
-  // F13 (P108 Part 10): surfaced in the count chip when a count fails — setFilter nulls `count`
-  // first, so a failed refresh otherwise leaves the chip blank with no signal anything went wrong.
-  countError: string | null;
+interface DataViewRuntime extends PagedViewRuntime {
   meta: ObjectMeta | null; // from kira:tree:describe (L1) — the projection menu
   lastStrategy: 'keyset' | 'offset';
-  nextToken: string | null;
   prevToken: string | null;
-  hasMore: boolean;
   selection: Selection | null;
-  searchOpen: boolean;
   /** M5 §6.2: this tab's own masking preview toggle — per-tab, session-only, never persisted (a
    *  masked view must not silently outlive the session and leave a user reading buckets as real
    *  numbers tomorrow). A preview convenience, not a security boundary (§6.1) — the MCP path is
@@ -64,20 +53,11 @@ interface DataViewRuntime {
 
 function defaultRuntime(): DataViewRuntime {
   return {
-    status: 'idle',
-    error: null,
-    actionError: null,
-    opId: null,
-    count: null,
-    countOpId: null,
-    countError: null,
+    ...defaultPagedRuntime(),
     meta: null,
     lastStrategy: 'offset',
-    nextToken: null,
     prevToken: null,
-    hasMore: false,
     selection: null,
-    searchOpen: false,
     maskPreview: false,
     pageStale: false,
   };

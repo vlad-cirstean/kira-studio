@@ -154,6 +154,70 @@ export function applyLoadFailure(
   rt.error = { code: failure.code, message: failure.message };
 }
 
+// P113 F4: the fields every paged view's own `*ViewRuntime` interface and `defaultRuntime()`
+// repeated verbatim — documents/state.ts, keyvalue/state.ts, grid/state.ts, stream/state.ts. Each
+// view's own interface `extends PagedViewRuntime` and adds only what genuinely differs: grid has
+// no `rowCount` (it reads the page store directly instead), stream has no `prevToken` (Kafka/SQS
+// browsing is forward-only, D10/D12) — neither field belongs in the shared base, so it stays out
+// rather than being forced onto a runtime that never used it.
+export interface PagedViewRuntime {
+  status: 'idle' | 'loading' | 'error' | 'cancelled';
+  error: { code: string; message: string } | null;
+  actionError: string | null;
+  opId: string | null;
+  count: { value: number; exact: boolean; stale: boolean } | null;
+  countOpId: string | null;
+  countError: string | null;
+  hasMore: boolean;
+  nextToken: string | null;
+  searchOpen: boolean;
+}
+
+export function defaultPagedRuntime(): PagedViewRuntime {
+  return {
+    status: 'idle',
+    error: null,
+    actionError: null,
+    opId: null,
+    count: null,
+    countOpId: null,
+    countError: null,
+    hasMore: false,
+    nextToken: null,
+    searchOpen: false,
+  };
+}
+
+interface ApplyPagePositionRuntime {
+  status: PagedViewRuntime['status'];
+  opId: string | null;
+  rowCount: number;
+  hasMore: boolean;
+  nextToken: string | null;
+  prevToken: string | null;
+}
+
+// documents/state.ts's and keyvalue/state.ts's own `load()` apply callback opened with this exact
+// six-line block (only `setPage`/`rt` differ, which stay with each caller). grid/state.ts's and
+// stream/state.ts's own apply blocks interleave the identical status/opId/hasMore/nextToken
+// assignments with genuinely per-view lines (pending-changes clearing, `lastStrategy`, `polled`'s
+// own reset) and don't track both `rowCount` and `prevToken` on their runtime — left as their own
+// hand-written blocks rather than forced through this helper for two fields neither one needs.
+export function applyPagePosition(
+  rt: ApplyPagePositionRuntime,
+  page: {
+    rowCount: number;
+    position: { hasMore: boolean; nextToken: string | null; prevToken: string | null };
+  },
+): void {
+  rt.status = 'idle';
+  rt.opId = null;
+  rt.rowCount = page.rowCount;
+  rt.hasMore = page.position.hasMore;
+  rt.nextToken = page.position.nextToken;
+  rt.prevToken = page.position.prevToken;
+}
+
 interface CountRuntime {
   count: { value: number; exact: boolean; stale: boolean } | null;
   countOpId: string | null;

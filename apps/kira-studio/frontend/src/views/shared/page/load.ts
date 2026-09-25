@@ -10,11 +10,10 @@ import { applyLoadFailure } from '../viewOp';
 // `loadMeta` call happen there too, in the same place they always have, after the kind check the
 // frame already ran).
 //
-// F20 (P108 Part 10): stream/state.ts's own load() has this exact same shape (opId supersede,
-// stillMounted, kind check, applyLoadFailure tail) but is not one of this frame's callers — it's a
-// candidate for adopting `runPagedLoad`, not a current user of it. navigation.ts's own reason for
-// excluding stream from `createPageNavigation` (token-only cursor, no `pageIndex`) is unrelated:
-// that applies to page navigation, not to this load frame.
+// F20 (P108 Part 10) adopted this frame into stream/state.ts's own load() too (P108 Part 11 F14) —
+// every paged view now goes through it. navigation.ts's own reason for excluding stream from
+// `createPageNavigation` (token-only cursor, no `pageIndex`) is unrelated: that applies to page
+// navigation, not to this load frame.
 
 interface LoadFrameRuntime {
   status: string;

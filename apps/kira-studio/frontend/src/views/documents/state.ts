@@ -9,7 +9,14 @@ import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
 import { runPagedLoad } from '../shared/page/load';
 import { createPageNavigation } from '../shared/page/navigation';
-import { beginOp, createRuntimeStore, runPagedCount } from '../shared/viewOp';
+import {
+  applyPagePosition,
+  beginOp,
+  createRuntimeStore,
+  defaultPagedRuntime,
+  type PagedViewRuntime,
+  runPagedCount,
+} from '../shared/viewOp';
 import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
@@ -18,43 +25,19 @@ import { setPage } from './page';
 // state, narrowed to a single row index since a document has no columns to select within — this
 // view mounts no cell editor dock to publish into at all) are the only view-local runtime this
 // adds.
-interface DocumentViewRuntime {
-  status: 'idle' | 'loading' | 'error' | 'cancelled';
-  error: { code: string; message: string } | null;
-  /** P43 F6/D7: the last *action* (insert/edit/delete) that failed, verbatim from the server —
-   *  sibling to `error` (a failed *load*), never a reuse of it. Cleared by the next successful
-   *  action or load. */
-  actionError: string | null;
-  opId: string | null;
-  count: { value: number; exact: boolean; stale: boolean } | null;
-  /** P48 F17/D15: the grid's own countOpId guard (P43 F7/D10), ported here — a filter change
-   *  since this count started already cleared rt.count/countOpId (setSearch), and an answer to
-   *  the previous filter landing now would resurrect a total for the wrong query. */
-  countOpId: string | null;
-  // F13 (P108 Part 10): surfaced in the count chip when a count fails — same shape as grid's own.
-  countError: string | null;
+interface DocumentViewRuntime extends PagedViewRuntime {
   rowCount: number;
-  hasMore: boolean;
-  nextToken: string | null;
   prevToken: string | null;
-  searchOpen: boolean;
+  /** P43 F3/D4: highlight-only local UI state, narrowed to a single row index since a document has
+   *  no columns to select within — this view mounts no cell editor dock to publish into at all. */
   selectedRow: number | null;
 }
 
 function defaultRuntime(): DocumentViewRuntime {
   return {
-    status: 'idle',
-    error: null,
-    actionError: null,
-    opId: null,
-    count: null,
-    countOpId: null,
-    countError: null,
+    ...defaultPagedRuntime(),
     rowCount: 0,
-    hasMore: false,
-    nextToken: null,
     prevToken: null,
-    searchOpen: false,
     selectedRow: null,
   };
 }
@@ -112,12 +95,7 @@ export const useDocumentViewStore = defineStore('documentView', () => {
       tabNoun: 'document tab',
       apply: (page) => {
         setPage(tabId, page);
-        rt.status = 'idle';
-        rt.opId = null;
-        rt.rowCount = page.rowCount;
-        rt.hasMore = page.position.hasMore;
-        rt.nextToken = page.position.nextToken;
-        rt.prevToken = page.position.prevToken;
+        applyPagePosition(rt, page);
       },
       onFailure: (superseded) => {
         if (!superseded && revertPageIndexOnFailure !== undefined) {

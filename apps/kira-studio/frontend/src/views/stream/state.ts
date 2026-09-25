@@ -10,7 +10,14 @@ import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { runPagedLoad } from '../shared/page/load';
-import { beginOp, createRuntimeStore, runPagedCount, stopOp } from '../shared/viewOp';
+import {
+  beginOp,
+  createRuntimeStore,
+  defaultPagedRuntime,
+  type PagedViewRuntime,
+  runPagedCount,
+  stopOp,
+} from '../shared/viewOp';
 import { drop, setPage } from './page';
 import { useStreamFilterHistoryStore } from './streamFilterHistory';
 
@@ -27,27 +34,10 @@ function isBatchPagination(connectionId: string): boolean {
 // at all) plus `polled`: runtime-only (never persisted) tracking of whether this tab has loaded
 // at least once, so SQS's view (caps.pagination === 'batch') can show a "click Poll" placeholder
 // until the user explicitly asks for a page (D10/D12 — never auto-loaded).
-interface StreamViewRuntime {
-  status: 'idle' | 'loading' | 'error' | 'cancelled';
-  error: { code: string; message: string } | null;
-  /** P43 F6/D7: the last *action* (SQS delete) that failed, verbatim from the server — sibling to
-   *  `error` (a failed *load*), never a reuse of it. Cleared by the next successful action or
-   *  load. */
-  actionError: string | null;
-  opId: string | null;
-  count: { value: number; exact: boolean; stale: boolean } | null;
-  /** P48 F17/D15: the grid's own countOpId guard (P43 F7/D10), ported here — this view has no
-   *  filter to change, but Refresh carries the same late-response race. */
-  countOpId: string | null;
-  // F13 (P108 Part 10): surfaced in the count chip when a count fails — same shape as grid's own.
-  countError: string | null;
+interface StreamViewRuntime extends PagedViewRuntime {
   rowCount: number;
-  hasMore: boolean;
-  nextToken: string | null;
   visibilityTimeoutSeconds: number | null;
   polled: boolean;
-  /** Mirrors grid/state.ts's own field — a runtime UI flag, never session state (item 5). */
-  searchOpen: boolean;
   /** The row last clicked, for the cell-editor preview (item 6) and — for SQS — Delete message's
    *  target; `null` once the page reloads out from under it (see stream/page.ts's pageVersion). */
   selectedRow: number | null;
@@ -55,19 +45,10 @@ interface StreamViewRuntime {
 
 function defaultRuntime(): StreamViewRuntime {
   return {
-    status: 'idle',
-    error: null,
-    actionError: null,
-    opId: null,
-    count: null,
-    countOpId: null,
-    countError: null,
+    ...defaultPagedRuntime(),
     rowCount: 0,
-    hasMore: false,
-    nextToken: null,
     visibilityTimeoutSeconds: null,
     polled: false,
-    searchOpen: false,
     selectedRow: null,
   };
 }
