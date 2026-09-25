@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru/v2"
+
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
@@ -24,139 +26,81 @@ type detailCacheKey struct {
 // entries (plain LRU by entry count — a CommitDetail is small and roughly fixed-size, unlike a
 // patch), and dropped **whole** on refsChanged (D7): one field of the cached value (decoration,
 // %D) is a fact about refs, not about the commit, and there is no per-entry way to know which
-// entries a given ref move actually touched.
+// entries a given ref move actually touched. Backed by golang-lru (P113 G9, library-first over a
+// hand-rolled slice-based LRU) — its Cache[K, V] is safe for concurrent use on its own, so no
+// wrapper mutex is needed here.
 type detailCache struct {
-	mu    sync.Mutex
-	order []detailCacheKey // least-recently-used first
-	byKey map[detailCacheKey]porcelain.CommitDetail
+	c *lru.Cache[detailCacheKey, porcelain.CommitDetail]
 }
 
 func newDetailCache() *detailCache {
-	return &detailCache{byKey: make(map[detailCacheKey]porcelain.CommitDetail)}
+	c, _ := lru.New[detailCacheKey, porcelain.CommitDetail](detailCacheCap) // only errs on size <= 0
+	return &detailCache{c: c}
 }
 
 func (c *detailCache) get(sha string, parentIndex int) (porcelain.CommitDetail, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	key := detailCacheKey{sha, parentIndex}
-	v, ok := c.byKey[key]
-	if !ok {
-		return porcelain.CommitDetail{}, false
-	}
-	c.touchLocked(key)
-	return v, true
+	return c.c.Get(detailCacheKey{sha, parentIndex})
 }
 
 func (c *detailCache) set(sha string, parentIndex int, v porcelain.CommitDetail) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	key := detailCacheKey{sha, parentIndex}
-	if _, exists := c.byKey[key]; exists {
-		c.removeFromOrderLocked(key)
-	}
-	c.byKey[key] = v
-	c.order = append(c.order, key)
-	for len(c.order) > detailCacheCap {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.byKey, oldest)
-	}
+	c.c.Add(detailCacheKey{sha, parentIndex}, v)
 }
 
 // dropAll evicts every entry — called on refsChanged, before the fan-out (entry.go's note),
 // mirroring G3 D13's ordering rule for marking a Walk stale.
 func (c *detailCache) dropAll() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.order = nil
-	c.byKey = make(map[detailCacheKey]porcelain.CommitDetail)
+	c.c.Purge()
 }
 
-func (c *detailCache) touchLocked(key detailCacheKey) {
-	c.removeFromOrderLocked(key)
-	c.order = append(c.order, key)
-}
-
-func (c *detailCache) removeFromOrderLocked(key detailCacheKey) {
-	for i, k := range c.order {
-		if k == key {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-			return
-		}
-	}
-}
-
-// refsCache is refs.list's own single-value cache (D10) — a repository has one ref list, not
-// many, so no LRU is needed here, unlike detailCache/diffCache. Dropped whole on refsChanged,
-// before the fan-out (entry.go's note), the same ordering G4 D7 established for the detail cache.
-// Pre-flight and the write executor never read it (D10/F16): a decision that precedes a write
-// always takes a fresh snapshot.
-type refsCache struct {
+// valueCache is refsCache/stackCache's own shared shape (P113 G9): one repository, one cached
+// value — refs.list and stack.list each have exactly one answer per repository, never many, so no
+// LRU is needed here, unlike detailCache/diffCache. Dropped whole on refsChanged, before the
+// fan-out (entry.go's note), the same ordering G4 D7 established for the detail cache. Pre-flight
+// and the write executor never read either (D10/F16): a decision that precedes a write always
+// takes a fresh snapshot.
+type valueCache[T any] struct {
 	mu    sync.Mutex
-	value RefsResult
+	value T
 	valid bool
 }
 
-func newRefsCache() *refsCache { return &refsCache{} }
+func newValueCache[T any]() *valueCache[T] { return &valueCache[T]{} }
 
-func (c *refsCache) get() (RefsResult, bool) {
+func (c *valueCache[T]) get() (T, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.valid {
-		return RefsResult{}, false
+		var zero T
+		return zero, false
 	}
 	return c.value, true
 }
 
-func (c *refsCache) set(v RefsResult) {
+func (c *valueCache[T]) set(v T) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.value = v
 	c.valid = true
 }
 
-func (c *refsCache) drop() {
+func (c *valueCache[T]) drop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.value = RefsResult{}
+	var zero T
+	c.value = zero
 	c.valid = false
 }
 
-// stackCache is stack.list's own single-value cache (G26 D3/D16) — the same "one repository, one
-// value" shape refsCache already established, dropped whole on refsChanged and by
-// invalidateAfterWrite (RunRestack and stackSet both go through the latter). Pre-flight
-// (RestackPreflight) never reads it — the same "a decision that precedes a write always takes a
-// fresh snapshot" rule D10/F16 already state for refsCache.
-type stackCache struct {
-	mu    sync.Mutex
-	value gitpreflight.StackListResult
-	valid bool
-}
+// refsCache is refs.list's own single-value cache (D10) — see valueCache's own doc comment.
+type refsCache = valueCache[RefsResult]
 
-func newStackCache() *stackCache { return &stackCache{} }
+func newRefsCache() *refsCache { return newValueCache[RefsResult]() }
 
-func (c *stackCache) get() (gitpreflight.StackListResult, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.valid {
-		return gitpreflight.StackListResult{}, false
-	}
-	return c.value, true
-}
+// stackCache is stack.list's own single-value cache (G26 D3/D16) — see valueCache's own doc
+// comment.
+type stackCache = valueCache[gitpreflight.StackListResult]
 
-func (c *stackCache) set(v gitpreflight.StackListResult) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.value = v
-	c.valid = true
-}
-
-func (c *stackCache) drop() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.value = gitpreflight.StackListResult{}
-	c.valid = false
-}
+func newStackCache() *stackCache { return newValueCache[gitpreflight.StackListResult]() }
 
 // mergeBaseCacheCap mirrors detailCacheCap — a merge-base result is small and roughly fixed-size,
 // the same shape reasoning that constant already documents.
@@ -181,66 +125,29 @@ type mergeBaseCacheValue struct {
 // own dropAll already documents for refs/%D decoration — a ref moving can change what its own
 // merge-base with another ref resolves to, and there is no per-entry way to know which cached
 // pairs a given ref move actually touched: dropped **whole** on refsChanged, capped at
-// mergeBaseCacheCap entries (plain LRU by entry count).
+// mergeBaseCacheCap entries (plain LRU by entry count). Backed by golang-lru, same as detailCache
+// (P113 G9).
 type mergeBaseCache struct {
-	mu    sync.Mutex
-	order []mergeBaseCacheKey
-	byKey map[mergeBaseCacheKey]mergeBaseCacheValue
+	c *lru.Cache[mergeBaseCacheKey, mergeBaseCacheValue]
 }
 
 func newMergeBaseCache() *mergeBaseCache {
-	return &mergeBaseCache{byKey: make(map[mergeBaseCacheKey]mergeBaseCacheValue)}
+	c, _ := lru.New[mergeBaseCacheKey, mergeBaseCacheValue](mergeBaseCacheCap) // only errs on size <= 0
+	return &mergeBaseCache{c: c}
 }
 
 func (c *mergeBaseCache) get(base, branch string) (mergeBaseCacheValue, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	key := mergeBaseCacheKey{base, branch}
-	v, ok := c.byKey[key]
-	if !ok {
-		return mergeBaseCacheValue{}, false
-	}
-	c.touchLocked(key)
-	return v, true
+	return c.c.Get(mergeBaseCacheKey{base, branch})
 }
 
 func (c *mergeBaseCache) set(base, branch string, v mergeBaseCacheValue) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	key := mergeBaseCacheKey{base, branch}
-	if _, exists := c.byKey[key]; exists {
-		c.removeFromOrderLocked(key)
-	}
-	c.byKey[key] = v
-	c.order = append(c.order, key)
-	for len(c.order) > mergeBaseCacheCap {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.byKey, oldest)
-	}
+	c.c.Add(mergeBaseCacheKey{base, branch}, v)
 }
 
 // dropAll evicts every entry — called on refsChanged and by invalidateAfterWrite, mirroring
 // detailCache/refsCache/stackCache's own ordering (entry.go's note, before the fan-out).
 func (c *mergeBaseCache) dropAll() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.order = nil
-	c.byKey = make(map[mergeBaseCacheKey]mergeBaseCacheValue)
-}
-
-func (c *mergeBaseCache) touchLocked(key mergeBaseCacheKey) {
-	c.removeFromOrderLocked(key)
-	c.order = append(c.order, key)
-}
-
-func (c *mergeBaseCache) removeFromOrderLocked(key mergeBaseCacheKey) {
-	for i, k := range c.order {
-		if k == key {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-			return
-		}
-	}
+	c.c.Purge()
 }
 
 type diffCacheKey struct {
