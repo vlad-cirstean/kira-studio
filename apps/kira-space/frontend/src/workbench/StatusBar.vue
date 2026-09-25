@@ -38,43 +38,26 @@ function onRevealBlameCommit(): void {
           <TooltipDisabledTrigger>
             <button
               type="button"
-              class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover blame"
+              class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg cursor-pointer border-0 bg-none hover:bg-hover disabled:cursor-default"
               data-testid="blame-status"
               :disabled="!blameStatusStore.reveal"
               @click="onRevealBlameCommit"
             >
               <CodiconIcon name="git-commit" :size="13" />
-              <span class="blame-text">{{ blameText }}</span>
+              <span class="max-w-80 overflow-hidden text-ellipsis whitespace-nowrap">{{ blameText }}</span>
             </button>
           </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
     </template>
+    <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
+         truncation, folded onto the button/span above -- Preflight already sets `font: inherit` on
+         every <button>, so `text-kira-sm` was redundant with what the button already inherits and
+         was dropped; `text-fg` and `disabled:cursor-default` stay explicit (a plain <button> resets
+         color to black otherwise). Measured getComputedStyle(button) on `[data-testid="blame-
+         status"]` before/after: fontSize 12px -> 12px, fontFamily unchanged, color rgb(204, 204,
+         204) -> rgb(204, 204, 204) (text-fg). max-w-80 (320px): ~48ch in the body's system-ui font
+         at the 12px default, the nearest default step. -->
   </StatusBarBase>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* .blame is a <button> so keyboard focus/Enter/Space come free; its own template class list
-   (P110 B29) already supplies the UA chrome reset. No accent color — a blame readout is
-   informational, not something needing attention. */
-.blame {
-  /* P110 B37: font: inherit has no Tailwind utility equivalent (a font shorthand reset) -- stays
-     raw, load-bearing (a real <button> with its own visible text). color: var(--kira-fg) ->
-     text-fg. */
-  font: inherit;
-  @apply text-fg;
-}
-.blame:disabled {
-  @apply cursor-default;
-}
-/* v1.9 tailwind-declines deep dive: this truncates with an ellipsis rather than reserving exact
-   character width, unlike a monospace digit field -- a fixed cap serves the same purpose. 48ch in
-   the body's system-ui font at the 12px default is roughly 48 * 6.6px =~ 317px; max-w-80 (320px)
-   is the nearest default step. */
-.blame-text {
-  @apply max-w-80 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-</style>

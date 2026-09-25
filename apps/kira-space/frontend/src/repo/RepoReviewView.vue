@@ -63,7 +63,7 @@ onUnmounted(() => {
   <div
     v-if="!errorMessage"
     ref="container"
-    class="repo-review-host"
+    class="h-full w-full"
     data-testid="repo-review-host"
   />
   <!-- error-note here never had a backing rule in this file's own scoped block (unlike
@@ -73,11 +73,3 @@ onUnmounted(() => {
     <AlertDescription>{{ errorMessage }}</AlertDescription>
   </Alert>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-review-host {
-  @apply h-full w-full;
-}
-</style>

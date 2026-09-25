@@ -416,8 +416,8 @@ onUnmounted(() => {
           <div class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
-                class="repo-row h-row flex items-center gap-1 px-1.5 cursor-default select-none"
-                :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
+                class="h-row flex items-center gap-1 px-1.5 cursor-default select-none"
+                :class="[isActive(repo.id) ? 'bg-select' : 'hover:bg-hover', { active: isActive(repo.id) }]"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
                 role="option"
@@ -436,7 +436,12 @@ onUnmounted(() => {
                   testid="repo-row-expand"
                   @toggle="worktreesStore.toggleRepoWorktrees(repo.id)"
                 />
-                <CodiconIcon name="source-control" :size="16" class="repo-icon shrink-0 text-muted-foreground" />
+                <CodiconIcon
+                  name="source-control"
+                  :size="16"
+                  class="shrink-0"
+                  :class="isOpen(repo.id) ? 'text-fg' : 'text-muted-foreground'"
+                />
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ repo.name }}</span>
@@ -482,12 +487,12 @@ onUnmounted(() => {
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
-                  class="worktree-row h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground pr-1.5 pl-6"
-                  :class="{
-                    current: wt.isCurrent,
-                    open: isOpen(worktreeRecordId(wt.path)),
-                    active: isActive(worktreeRecordId(wt.path)),
-                  }"
+                  class="h-row flex items-center gap-1 cursor-default select-none text-kira-sm pr-1.5 pl-6"
+                  :class="[
+                    isActive(worktreeRecordId(wt.path)) ? 'bg-select' : 'hover:bg-hover',
+                    wt.isCurrent || isOpen(worktreeRecordId(wt.path)) ? 'text-fg' : 'text-muted-foreground',
+                    { active: isActive(worktreeRecordId(wt.path)) },
+                  ]"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
                   role="option"
@@ -534,18 +539,18 @@ onUnmounted(() => {
                 <!-- Same indent as the worktree row above -- pl-6/pr-1.5. -->
                 <div
                   v-if="worktreesStore.worktreesError(repo.id)"
-                  class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6 error"
+                  class="text-kira-sm text-error pr-1.5 pl-6"
                   data-testid="repo-worktree-error"
                 >
                   {{ worktreesStore.worktreesError(repo.id) }}
                 </div>
                 <div
                   v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
-                  class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6"
+                  class="text-kira-sm text-subtle pr-1.5 pl-6"
                 >
                   Loading…
                 </div>
-                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6">
+                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="text-kira-sm text-subtle pr-1.5 pl-6">
                   No worktrees
                 </div>
               </section>
@@ -640,55 +645,15 @@ onUnmounted(() => {
     @submit="submitPrompt"
     @cancel="cancelPrompt"
   />
+  <!-- P110 I2-19: `.repo-row`/`.worktree-row`'s own hover/active/open/current rules folded into
+       `:class` ternaries above -- pre-phase cascade order (both `:hover` and the state class at
+       equal 0,2,0 specificity) meant the later-declared rule won on a tie: `.active`/`.bg-select`
+       beats `:hover`/`bg-hover` on background; `.current`/`.open` both drove the same `text-fg`
+       override on color, so `wt.isCurrent || isOpen(...)` merges them with no real precedence
+       question (same value either way). `.repo-icon`'s open-state color is now a ternary directly
+       on the icon. `.repo-row`/`.worktree-row`/`.repo-icon`/`.worktree-note`/`.open`/`.current`/
+       `.error` were marker-only (no test dependency); `active` stays a real conditional class
+       (repo-workspace.spec.ts:153/629 assert `toHaveClass(/active/)` on both rows) alongside its
+       own `bg-select` utility. `.repo-head`/`.worktree-badge` stay real classes too
+       (repo-workspace.spec.ts locates them by class). -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every other rule this file had moved onto the template as Tailwind utilities (base
-   declarations included -- scoped CSS is unlayered, so it always wins over a layered utility on
-   the same element regardless of class order, per this plan's own §1 rule). What's left are the
-   rules that genuinely interact with a sibling rule for the same property and must keep their
-   relative source-order:
-   - `.repo-row:hover`/`.repo-row.active` and `.worktree-row:hover`/`.worktree-row.active`: real
-     `:hover` vs. a state class, both driving `background`.
-   - `.repo-row.open .repo-icon`/`.worktree-row.current`/`.worktree-row.open`: `.repo-icon`/
-     `.worktree-row` own base `text-muted-foreground` moved to the template; these stay to
-     override it (unlayered beats layered unconditionally, so no class-order risk).
-   - `.worktree-note.error`: same reasoning, overriding the base `.worktree-note` text color moved
-     to the template.
-   `.repo-row`/`.repo-icon`/`.worktree-row`/`.worktree-note`/`.repo-head`/`.worktree-badge` stay as
-   bare marker classes: the first four anchor the selectors below, `.repo-head`/`.worktree-badge`
-   are also real test dependencies (repo-workspace.spec.ts). */
-.repo-row:hover {
-  @apply bg-hover;
-}
-.repo-row.active {
-  @apply bg-select;
-}
-
-.repo-row.open .repo-icon {
-  @apply text-fg;
-}
-
-.worktree-row:hover {
-  @apply bg-hover;
-}
-.worktree-row.current {
-  @apply text-fg;
-}
-/* P84 §6.1/§8.6: this app's own open/active workspace state, once the nested row is where a
-   worktree's marking has to live — reusing --kira-fg/--kira-select exactly as .repo-row does.
-   Distinct from .current (this git session's own worktree, a fact about the repository, not this
-   app's workspaces). */
-.worktree-row.open {
-  @apply text-fg;
-}
-.worktree-row.active {
-  @apply bg-select;
-}
-
-.worktree-note.error {
-  @apply text-error;
-}
-</style>
