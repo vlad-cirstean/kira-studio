@@ -39,11 +39,11 @@ func (s *WindowsService) Ensure(args WindowsEnsureArgs) (WindowsEnsureResult, er
 		return WindowsEnsureResult{}, ipcerr.BadRequest("windowKey is required")
 	}
 	if err := s.Deps.Repos.Windows.EnsureExists(args.WindowKey); err != nil {
-		return WindowsEnsureResult{}, ipcerr.Internal(err.Error())
+		return WindowsEnsureResult{}, ipcerr.InternalErr(err)
 	}
 	mode, err := s.Deps.Repos.Windows.GetMode(args.WindowKey)
 	if err != nil {
-		return WindowsEnsureResult{}, ipcerr.Internal(err.Error())
+		return WindowsEnsureResult{}, ipcerr.InternalErr(err)
 	}
 	return WindowsEnsureResult{Mode: mode}, nil
 }

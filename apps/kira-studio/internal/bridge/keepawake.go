@@ -88,7 +88,7 @@ func (s *KeepAwakeService) SetAgentAware(args KeepAwakeSetAgentAwareArgs) (KeepA
 		ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &args.Enabled},
 	})
 	if err != nil {
-		return KeepAwakeStatus{}, ipcerr.Internal(err.Error())
+		return KeepAwakeStatus{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 

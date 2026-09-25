@@ -37,7 +37,7 @@ func (s *SchemaService) Set(args SchemaSetArgs) (model.ConnectionDDL, error) {
 	}
 	ddl, err := s.Deps.Repos.Schema.Set(args.ConnectionID, args.DDL)
 	if err != nil {
-		return model.ConnectionDDL{}, ipcerr.Internal(err.Error())
+		return model.ConnectionDDL{}, ipcerr.InternalErr(err)
 	}
 	s.Deps.Events.Emit(ChannelSchemaChanged, ddl)
 	return ddl, nil

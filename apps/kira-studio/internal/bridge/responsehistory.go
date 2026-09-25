@@ -72,7 +72,7 @@ func (s *ResponseHistoryService) Adopt(args ResponseHistoryAdoptArgs) (ResponseH
 	}
 	n, err := s.Deps.Repos.ResponseHistory.Adopt(args.TabID, args.ItemID)
 	if err != nil {
-		return ResponseHistoryAdoptResult{}, ipcerr.Internal(err.Error())
+		return ResponseHistoryAdoptResult{}, ipcerr.InternalErr(err)
 	}
 	return ResponseHistoryAdoptResult{Adopted: n}, nil
 }

@@ -85,7 +85,7 @@ func (s *MaskRulesService) Remove(args MaskRulesRemoveArgs) error {
 	// broadcast then, since nothing actually changed.
 	existing, err := s.Deps.Repos.MaskRules.Get(args.ID)
 	if err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	if err := s.Deps.MaskRules.Remove(args.ID); err != nil {
 		return ipcerr.BadRequest(err.Error())

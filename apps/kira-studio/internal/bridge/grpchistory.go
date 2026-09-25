@@ -60,7 +60,7 @@ func (s *GrpcHistoryService) Adopt(args GrpcHistoryAdoptArgs) (GrpcHistoryAdoptR
 	}
 	n, err := s.Deps.Repos.GrpcHistory.Adopt(args.TabID, args.ItemID)
 	if err != nil {
-		return GrpcHistoryAdoptResult{}, ipcerr.Internal(err.Error())
+		return GrpcHistoryAdoptResult{}, ipcerr.InternalErr(err)
 	}
 	return GrpcHistoryAdoptResult{Adopted: n}, nil
 }
