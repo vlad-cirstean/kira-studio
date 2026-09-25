@@ -12,7 +12,7 @@ const DEF_TH =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
 const DEF_TH_LAST =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
+const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:border-r-0';
 </script>
 
 <template>
@@ -21,7 +21,7 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Indexes</span>
       <Badge>{{ indexes.length }}</Badge>
     </header>
-    <table class="w-full border-collapse text-kira-md definition-table">
+    <table class="w-full border-collapse text-kira-md">
       <thead>
         <tr>
           <th :class="DEF_TH">Name</th>
@@ -43,17 +43,6 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
       </tbody>
     </table>
   </section>
+  <!-- P110 I2-16: `.definition-table td`/`td:last-child` folded into DEF_TD (matches
+       ColumnsSection.vue's own comment). -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* Only these two aren't in the shared cell utility list above — see ColumnsSection.vue's own
-   comment on why. */
-.definition-table td {
-  @apply border-r border-border;
-}
-.definition-table td:last-child {
-  @apply border-r-0;
-}
-</style>

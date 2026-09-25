@@ -19,7 +19,7 @@ const DEF_TH =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
 const DEF_TH_LAST =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
+const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:border-r-0';
 
 const props = defineProps<{
   columns: ColumnMeta[];
@@ -48,7 +48,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Columns</span>
       <Badge>{{ columns.length }}</Badge>
     </header>
-    <table class="w-full border-collapse text-kira-md definition-table">
+    <table class="w-full border-collapse text-kira-md">
       <thead>
         <tr>
           <th :class="DEF_TH" class="text-muted-foreground w-4"></th>
@@ -77,8 +77,8 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           </td>
           <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
           <td :class="DEF_TD" class="w-6">
-            <span v-if="keyLabel(col) === 'PK'" class="header-key text-warn text-kira-xs">PK</span>
-            <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk text-warn text-kira-xs">FK</span>
+            <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-xs">PK</span>
+            <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-xs">FK</span>
           </td>
           <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
@@ -98,26 +98,10 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
       </tbody>
     </table>
   </section>
+  <!-- P110 I2-16: `.definition-table td`/`td:last-child` folded into DEF_TD (`border-r border-border
+       last:border-r-0`, `last:` compiles to `:last-child` — every DEF_TD <td> is a direct <tr> child).
+       `.header-key`/`.is-fk` dropped from this file: checked slick-grid.spec.ts/clickhouse.frontend.
+       spec.ts (the only 2 test files referencing either name) — both assertions are scoped to the
+       SlickGrid column header (columns.ts/SlickGridHost.vue), never to this table, so no test
+       dependency exists here. PK/FK now a plain ternary (text-warn/text-info) on the <span> itself. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every other rule this file had (`.def-col-*`/`.type-info`/`.header-key`'s own base)
-   moved onto the template as Tailwind utilities. `.header-key` stays a bare marker — a real test
-   dependency (slick-grid.spec.ts, clickhouse.frontend.spec.ts). Only these two — the vertical
-   column dividers — aren't in the shared cell utility list above: Validation/Properties are plain
-   key-value tables that don't want them. `.definition-table` (kept as a marker on the <table>) and
-   `.header-key.is-fk` stay scoped: the first is a descendant selector matching every td by
-   structural position, not a named class; the second needs both classes present simultaneously. */
-.definition-table td {
-  @apply border-r border-border;
-}
-.definition-table td:last-child {
-  @apply border-r-0;
-}
-
-.header-key.is-fk {
-  @apply text-info;
-}
-</style>

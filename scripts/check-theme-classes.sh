@@ -215,7 +215,7 @@ check_class 'def-section' 'flex flex-col gap-1.5'
 check_class 'def-section-head' 'flex items-center gap-1.5'
 check_class 'def-section-title' 'text-kira-sm text-muted-foreground uppercase tracking-wider'
 check_class 'def-empty' 'text-muted-foreground m-0'
-check_class 'def-table' 'w-full border-collapse text-kira-md (plus a local `.definition-table` hook where a scoped column-divider override needs one)'
+check_class 'def-table' 'w-full border-collapse text-kira-md'
 check_class 'def-head-row' 'per-th px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap (plus border-r border-border except the last column)'
 check_class 'def-row' 'border-b border-border hover:bg-hover'
 
@@ -309,6 +309,11 @@ check_class_in_attrs 'spin' 'animate-spin plus data-testid="tree-row-spinner"'
 # leaves them alone.
 check_class_in_attrs 'virtual-row' 'VIRTUAL_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
 check_class_in_attrs 'sticky-row' 'STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
+
+# P110 I2-16: the definition-table `<table>` marker, only ever used to anchor its own scoped
+# `.definition-table td`/`td:last-child` column-divider rule, now folded into each file's own
+# DEF_TD constant (`border-r border-border last:border-r-0`) -- the marker class itself is dead.
+check_class_in_attrs 'definition-table' 'border-r border-border last:border-r-0 on DEF_TD'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

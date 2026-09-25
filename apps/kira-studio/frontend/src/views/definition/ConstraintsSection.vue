@@ -46,7 +46,7 @@ const DEF_TH =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong border-r border-border text-muted-foreground text-kira-sm whitespace-nowrap';
 const DEF_TH_LAST =
   'text-left px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap';
-const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
+const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:border-r-0';
 </script>
 
 <template>
@@ -55,7 +55,7 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Constraints</span>
       <Badge>{{ constraints.length }}</Badge>
     </header>
-    <table class="w-full border-collapse text-kira-md definition-table">
+    <table class="w-full border-collapse text-kira-md">
       <thead>
         <tr>
           <th :class="DEF_TH">Name</th>
@@ -73,15 +73,19 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
         >
           <td :class="DEF_TD" class="def-con-name">{{ c.name }}</td>
           <td :class="DEF_TD" class="def-con-type">
-            <span v-if="KEY_LABEL[c.type] === 'PK'" class="header-key text-warn text-kira-xs">PK</span>
-            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="header-key is-fk text-warn text-kira-xs">FK</span>
+            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-xs">PK</span>
+            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-xs">FK</span>
             <Badge v-else>{{ TYPE_LABEL[c.type] }}</Badge>
           </td>
           <td :class="DEF_TD" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground font-data">{{ c.detail }}</td>
           <td :class="DEF_TD" class="def-con-table">
             <Tooltip v-if="c.referencedPath">
               <TooltipTrigger as-child>
-                <button type="button" class="ref-link border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info" @click="onNavigate(c)">
+                <button
+                  type="button"
+                  class="border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info hover:text-primary"
+                  @click="onNavigate(c)"
+                >
                   {{ referencedTableName(c) }}
                 </button>
               </TooltipTrigger>
@@ -92,29 +96,9 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
       </tbody>
     </table>
   </section>
+  <!-- P110 I2-16: `.definition-table td`/`td:last-child` folded into DEF_TD (matches
+       ColumnsSection.vue's own comment). `.header-key`/`.is-fk` dropped -- no test dependency on
+       this file's own table (see ColumnsSection.vue's comment for the check). `.ref-link:hover`
+       became `hover:text-primary` on the <button> itself (P104 §7.2: text-primary is the real
+       brand accent, not text-accent). -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: `.def-con-detail`/`.ref-link`'s own base rules moved onto the template. Only these two
-   aren't in the shared cell utility list above — see ColumnsSection.vue's own comment on why.
-   `.header-key.is-fk`/`.ref-link:hover` stay scoped (compound/pseudo variants), anchored by their
-   class kept as a bare marker on the template. */
-.definition-table td {
-  @apply border-r border-border;
-}
-.definition-table td:last-child {
-  @apply border-r-0;
-}
-
-.header-key.is-fk {
-  @apply text-info;
-}
-
-/* P104 §7.2: text-primary, not text-accent — shadcn-bridge.css maps --color-accent to
-   --kira-hover (grey); --primary is the real brand accent. */
-.ref-link:hover {
-  @apply text-primary;
-}
-</style>
