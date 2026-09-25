@@ -499,6 +499,17 @@ const currentMatchRow = computed(() => {
   return s && s.index >= 0 ? (s.matches[s.index] ?? null) : null;
 });
 
+// P110 I2-17: `.stream-row:hover`/`.selected`/`.search-match[-current]` folded into one priority
+// lookup, matching the pre-phase source-order winner exactly (all 4 rules shared identical
+// specificity -- 2 classes/class+pseudo each -- so the last one in source order won whenever more
+// than one applied): current beats match beats selected beats hover.
+function streamRowClass(i: number): string {
+  if (currentMatchRow.value === i) return 'bg-search-match-current text-bg';
+  if (matchSet.value.has(i)) return 'bg-search-match';
+  if (rt.value?.selectedRow === i) return 'bg-hover';
+  return 'hover:bg-hover';
+}
+
 // P49 F7/D5: rowIndices is the *filtered* array when the filter toggle is on, so a match's page-row
 // number has to be looked up by position rather than assumed to equal it — same as
 // KeyValueView.vue's/ConsoleResultGrid.vue's own goToMatch, now that this view's rows are
@@ -925,7 +936,7 @@ onUnmounted(() => {
                 <Label
                   v-for="p in partitionOptions"
                   :key="p"
-                  class="partition-option flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1"
+                  class="partition-option flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1 hover:bg-hover"
                   :data-testid="`stream-filter-partition-option-${p}`"
                 >
                   <Checkbox
@@ -1058,24 +1069,24 @@ onUnmounted(() => {
     </Empty>
     <template v-else>
     <!-- Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
-         unscoped `position: absolute; inset: 0` rule) — without it inset:0 has no positioned
-         ancestor anywhere up to <body>, so the placeholder expands to cover the whole app window
-         instead of just this row list, intercepting pointer events app-wide (the tree sidebar
-         included) whenever a stream view shows an empty state. Same fix SlickGridHost.vue already
-         applies to its own `.slick-grid-host` for the identical shared class. `.list-body`/
-         `.no-rows` stay bare markers -- `.no-rows` is polled directly by interaction.spec.ts/
-         sqs.frontend.spec.ts/kafka.frontend.spec.ts. -->
-    <div class="list-body relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
+         unscoped `position: absolute; inset: 0` rule) — the `relative` utility already on this div
+         gives inset:0 a positioned ancestor, so the placeholder stays scoped to this row list
+         instead of covering the whole app window (intercepting pointer events app-wide, the tree
+         sidebar included) whenever a stream view shows an empty state. Same fix SlickGridHost.vue
+         already applies to its own `.slick-grid-host` for the identical shared class. `.no-rows`
+         stays a bare marker -- polled directly by interaction.spec.ts/sqs.frontend.spec.ts/
+         kafka.frontend.spec.ts. -->
+    <div class="relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
       <Alert
         v-if="isBatch && !rt?.polled"
-        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="arrow-swap" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">Click Poll to fetch messages</AlertTitle>
       </Alert>
       <Alert
         v-else-if="!rt || rt.rowCount === 0"
-        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
       >
         <CodiconIcon name="inbox" :size="24" class="text-subtle" />
         <AlertTitle v-if="rt" class="text-kira-md font-normal text-muted-foreground">No messages</AlertTitle>
@@ -1084,7 +1095,7 @@ onUnmounted(() => {
            from "no messages loaded". -->
       <Alert
         v-else-if="displayRows && displayRows.length === 0"
-        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        class="no-rows h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
         data-testid="stream-no-matching-rows"
       >
         <CodiconIcon name="search" :size="24" class="text-subtle" />
@@ -1177,18 +1188,11 @@ onUnmounted(() => {
               <div
                 v-for="vi in virtualItems"
                 :key="String(vi.key)"
-                class="stream-row flex border-b border-border cursor-pointer h-row"
+                class="flex border-b border-border cursor-pointer h-row"
                 data-testid="stream-row"
                 :data-row-index="rowIndices[vi.index]"
                 :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-                :class="[
-                  VIRTUAL_ROW_CLASS,
-                  {
-                    selected: rt?.selectedRow === rowIndices[vi.index],
-                    'search-match': matchSet.has(rowIndices[vi.index]),
-                    'search-match-current': currentMatchRow === rowIndices[vi.index],
-                  },
-                ]"
+                :class="[VIRTUAL_ROW_CLASS, streamRowClass(rowIndices[vi.index])]"
               >
                 <div
                   class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
@@ -1276,56 +1280,19 @@ onUnmounted(() => {
     <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
     </SplitterGroup>
+    <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
+         component -- `.cell-splitter` above is a bare marker class, kept only because
+         cell-editor.spec.ts polls its box-shadow via getComputedStyle.
+         P110 I2-17: `.stream-row:hover`/`.selected`/`.search-match[-current]` folded into
+         streamRowClass()'s own priority lookup (script setup) -- current beats match beats
+         selected beats hover, matching the pre-phase source-order winner exactly (all 4 rules
+         shared identical specificity). `.list-body .no-rows { h-full }` folded onto each `.no-rows`
+         element directly; `.list-body` itself dropped (its only other job, `position: relative` for
+         `.no-rows`'s own inset:0 rule, was already a plain Tailwind utility on the same div).
+         `.no-rows` stays a bare marker -- polled directly by interaction.spec.ts/
+         sqs.frontend.spec.ts/kafka.frontend.spec.ts. `.partition-option:hover` -> `hover:bg-hover`
+         directly on the Label -- `.partition-option` itself stays (kafka.frontend.spec.ts).
+         P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+         virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities (`.path`, unused anywhere in the template, dropped entirely as dead weight).
-   `.stream-row` stays a bare marker to anchor `:hover`/`.selected`/`.search-match[-current]`.
-   `.list-body`/`.no-rows` stay bare markers to anchor the descendant rule below -- `.no-rows` is
-   also polled directly by interaction.spec.ts/sqs.frontend.spec.ts/kafka.frontend.spec.ts.
-   `.partition-option` stays a bare marker to anchor `:hover` -- also polled directly by
-   kafka.frontend.spec.ts.
-
-   P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` (template above) is a bare marker class, kept only because cell-editor.spec.ts
-   polls its box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
-.stream-row:hover {
-  @apply bg-hover;
-}
-
-.stream-row.selected {
-  @apply bg-hover;
-}
-
-/* P31 D21: adopts the same color-mix tint / solid-current pair as KeyValueView.vue (and the
-   deleted DataGrid.vue), replacing the inset bar so all four search-capable views agree.
-   P110 B34: NOT converted to a template-level `bg-search-match[-current]` utility class like its
-   3 siblings (KeyValuePane/DocumentRow/ConsoleResultGrid) -- `.stream-row:hover`/`.stream-row.
-   selected` above tie this rule's own specificity exactly, so a template-level utility class would
-   drop into Tailwind's (layered) utilities layer, losing to the unlayered scoped hover/selected
-   rules regardless of specificity. P110 B37: `@apply bg-search-match`/`bg-search-match-current`
-   inside this same unlayered scoped rule instead -- @apply inlines the utility's own declarations
-   into this rule's existing cascade position, so source order (this rule still wins on overlap)
-   is unchanged from the raw `background: var(--kira-search-match*)` it replaces. */
-.stream-row.search-match {
-  @apply bg-search-match;
-}
-
-.stream-row.search-match-current {
-  @apply text-bg bg-search-match-current;
-}
-
-.list-body .no-rows {
-  @apply h-full;
-}
-
-.partition-option:hover {
-  @apply bg-hover;
-}
-
-/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
-   virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. */
-</style>

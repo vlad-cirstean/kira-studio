@@ -1113,7 +1113,7 @@ onUnmounted(() => {
             <div class="relative w-full" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
                 <div
-                  class="kv-row flex cursor-pointer h-row absolute top-0 left-0 w-full"
+                  class="flex cursor-pointer h-row absolute top-0 left-0 w-full hover:bg-hover"
                   data-testid="keyvalue-row"
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
@@ -1183,26 +1183,14 @@ onUnmounted(() => {
     <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="viewKey" />
     </SplitterGroup>
+    <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
+         component -- `.cell-splitter` above is a bare marker class, kept only because
+         cell-editor.spec.ts polls its box-shadow via getComputedStyle.
+         P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own here --
+         kept as bare marker classes (the shared vocabulary name cellClass.ts/DocumentRow.vue/
+         ConsoleResultGrid.vue also use). The actual tint/text-colour is
+         `bg-search-match[-current] text-bg` alongside on the same element.
+         P110 I2-17: `.kv-row:hover` moved onto the row's own `hover:bg-hover` -- no test locates
+         by `.kv-row` (checked). -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.kv-row` stays a bare marker to anchor this hover rule.
-
-   P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` (template above) is a bare marker class, kept only because cell-editor.spec.ts
-   polls its box-shadow via getComputedStyle (no rule of its own attaches to the name any more).
-
-   P110 B34: `.search-match`/`.search-match-current` (template above) carry no rule of their own
-   here any more -- kept as bare marker classes (the shared vocabulary name cellClass.ts/
-   DocumentRow.vue/ConsoleResultGrid.vue also use). The actual tint/text-colour is
-   `bg-search-match[-current] text-bg` alongside on the same element (--color-search-match[-current]
-   already @theme-registered, base.css -- no new utility needed). P110 I2-10/11: the old
-   `.empty-state`/`-icon`/`-title` trio (a 15-file duplicate, once base.css's own @utility bundle)
-   is gone -- the template above now uses the shared `Empty`/`EmptyMedia`/`EmptyTitle` components. */
-.kv-row:hover {
-  @apply bg-hover;
-}
-</style>
