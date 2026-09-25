@@ -24,6 +24,7 @@ import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
 import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
+import { openAllChangesAnnounced } from '../openAllChangesAnnounced.ts';
 import RowContextMenu from '../RowContextMenu.vue';
 import { buildReviewRowMenu } from '../rowMenuModel.ts';
 
@@ -137,23 +138,10 @@ function onMenuSelect(id: string): void {
 async function openAllChanges(): Promise<void> {
   // G-UX D5: stopPropagation() here is now redundant with (and removed in favour of) onRowClick's
   // own .kv-review-row-actions guard above -- one rule for the whole action cluster.
-  try {
-    const { opened, failed, mode } = await props.actions.openAllChanges({
-      sha: props.sha,
-      parentIndex: props.expansion?.detail.parentIndex.value,
-    });
-    props.actions.announce(
-      failed === 0
-        ? mode === 'multiDiff'
-          ? `Opened all ${opened} changed files`
-          : `Opened ${opened} files`
-        : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
-    );
-  } catch (err) {
-    props.actions.announce(
-      `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
+  await openAllChangesAnnounced(props.actions, {
+    sha: props.sha,
+    parentIndex: props.expansion?.detail.parentIndex.value,
+  });
 }
 
 // G14 D8 row action 3 / D10, replaced P75 §2.3: was a `command:kiraSpace.openCommitInGraph`

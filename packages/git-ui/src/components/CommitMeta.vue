@@ -26,6 +26,7 @@ import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
+import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
 import { buildRefBadges } from './refBadges.ts';
 
 const props = defineProps<{
@@ -255,23 +256,7 @@ function copySha(): void {
 async function openAllChanges(): Promise<void> {
   const detail = props.detail;
   if (!detail) return;
-  try {
-    const { opened, failed, mode } = await props.actions.openAllChanges({
-      sha: detail.sha,
-      parentIndex: detail.parentIndex,
-    });
-    props.actions.announce(
-      failed === 0
-        ? mode === 'multiDiff'
-          ? `Opened all ${opened} changed files`
-          : `Opened ${opened} files`
-        : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
-    );
-  } catch (err) {
-    props.actions.announce(
-      `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
+  await openAllChangesAnnounced(props.actions, { sha: detail.sha, parentIndex: detail.parentIndex });
 }
 
 /** P74 §3.3: the "Pull request" row's own external-open action, and (§4.3) the facts-row icon's
