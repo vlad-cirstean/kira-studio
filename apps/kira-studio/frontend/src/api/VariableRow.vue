@@ -270,8 +270,10 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
    secret row's reveal button (inside the value cell) shifted its neighbours. Named, fixed-fraction
    columns: handle, name, value, description, secret toggle, history, remove. */
 .variable-row {
-  grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  @apply grid items-center gap-1 px-1.5 py-1;
+  /* P110 B37: grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
+     allowlist gap as VariableSetView.vue's own header-row and VariablesOverviewPanel.vue's
+     overview-row -- a pre-existing value relocated, not a new one. */
+  @apply grid items-center gap-1 px-1.5 py-1 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto];
 }
 
 .variable-row.is-dragging {

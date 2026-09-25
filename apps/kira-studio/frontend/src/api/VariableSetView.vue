@@ -695,8 +695,10 @@ function onBulkClose(): void {
    description, secret, history, remove) so the labels sit above their columns; the four
    non-labelled cells are blank placeholders for the columns that carry no header text. */
 .header-row {
-  grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  @apply grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm;
+  /* P110 B37: grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
+     allowlist gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue)
+     below -- a pre-existing value relocated, not a new one. */
+  @apply grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto];
 }
 
 /* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */

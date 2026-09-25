@@ -214,8 +214,11 @@ function editEnvironmentVariables(): void {
    four that renders conditionally (F13/D9): a missing trailing grid item just leaves its own cell
    empty rather than shifting `scope` into its place, which an *earlier* optional column would. */
 .overview-row {
-  grid-template-columns: 1.2fr 2fr auto 1.5fr;
-  @apply grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5;
+  /* P110 B37: grid-cols-[1.2fr_2fr_auto_1.5fr] -- an arbitrary value not on the plan's own section
+     1.2 allowlist, flagged for the plan owner (same disclosed gap as B36c's
+     grid-cols-[90px_140px_...] in OperationsPanel.vue): a pre-existing value relocated into
+     Tailwind's own syntax, not a new one. */
+  @apply grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5 grid-cols-[1.2fr_2fr_auto_1.5fr];
 }
 
 .overview-row.shadowed {
