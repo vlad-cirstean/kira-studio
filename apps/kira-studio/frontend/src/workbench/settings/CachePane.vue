@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Field, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { formatBytes } from '@workbench/util/format';
 import { computed, useId } from 'vue';
@@ -68,23 +62,14 @@ const hitRateId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="cacheBudgetMbId" class="text-kira-sm">Result page cache budget (MB)</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('cache', 'l2BudgetMb') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-cache-l2BudgetMb"
-              :disabled="isAtDefault('cache', 'l2BudgetMb')"
-              aria-label="Reset to default"
-              @click="resetLeaf('cache', 'l2BudgetMb')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-cache-l2BudgetMb"
+          :disabled-trigger="isAtDefault('cache', 'l2BudgetMb')"
+          :disabled="isAtDefault('cache', 'l2BudgetMb')"
+          @click="resetLeaf('cache', 'l2BudgetMb')"
+        />
       </div>
       <NumberStepperInput
         :id="cacheBudgetMbId"
