@@ -80,7 +80,7 @@ test('Cancel and Escape both discard the draft', async ({ relaunch }) => {
 
   // The draft did not survive either close — reopening shows the stored (default) value again.
   await openSettings(page);
-  await expect(densityButton(page, 'comfortable')).toHaveClass(/active/);
+  await expect(densityButton(page, 'comfortable')).toHaveAttribute('aria-pressed', 'true');
   await densityButton(page, 'compact').click();
   await page.click('[data-testid="settings-cancel"]');
 });
@@ -101,7 +101,7 @@ test('a per-setting reset stages only that leaf', async ({ relaunch }) => {
 
   // Only the reset leaf moved — its sibling checkbox, still bound to the un-reset draft, stays
   // exactly where the fixture put it.
-  await expect(densityButton(page, 'comfortable')).toHaveClass(/active/);
+  await expect(densityButton(page, 'comfortable')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-testid="settings-word-wrap"]')).not.toBeChecked();
   expect(settingsSetCalls(control)).toHaveLength(0);
 
@@ -126,7 +126,7 @@ test('a leaf reset button is disabled once the draft matches the default', async
 
   await reset.click();
   await expect(reset).toBeDisabled();
-  await expect(densityButton(page, 'comfortable')).toHaveClass(/active/);
+  await expect(densityButton(page, 'comfortable')).toHaveAttribute('aria-pressed', 'true');
 });
 
 // P12 round 1 finding #9: patchSettings used to apply the patch to settingsState (and re-render

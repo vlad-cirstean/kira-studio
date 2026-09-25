@@ -92,7 +92,9 @@ test('the title bar has a New window button, rightmost of the action row, that c
 
 // P87 §10.3: the titlebar keep-awake toggle — renders (mockRuntime.ts's own default keepAwakeStatus
 // has supported: true), one click issues exactly one KeepAwakeService.SetManual carrying
-// {enabled: true}, and the button gains .is-on/aria-pressed="true".
+// {enabled: true}, and the button gains aria-pressed="true". P110 B13 replaced the old `.is-on`
+// class with `:aria-pressed` (an intentional accessibility fix, per that commit's own message) --
+// this file's `.is-on` assertions are dropped as stale, aria-pressed alone is the toggle signal now.
 test('the keep-awake button toggles on click, calling KeepAwakeService.SetManual once with {enabled: true}', async ({
   relaunch,
 }) => {
@@ -106,7 +108,6 @@ test('the keep-awake button toggles on click, calling KeepAwakeService.SetManual
   });
   const button = window.locator('[data-testid="toggle-keep-awake"]');
   await expect(button).toBeVisible();
-  await expect(button).not.toHaveClass(/is-on/);
   await expect(button).toHaveAttribute('aria-pressed', 'false');
 
   const setManualCalls = () => control.log().filter((e) => e.channel === IPC.keepAwakeSetManual);
@@ -115,7 +116,6 @@ test('the keep-awake button toggles on click, calling KeepAwakeService.SetManual
   await expect.poll(() => setManualCalls().length).toBe(1);
   expect(setManualCalls()[0]?.args).toEqual({ enabled: true });
 
-  await expect(button).toHaveClass(/is-on/);
   await expect(button).toHaveAttribute('aria-pressed', 'true');
 });
 
@@ -127,10 +127,9 @@ test('the keep-awake button turns on from a ChannelKeepAwake broadcast with no c
   const { window } = await relaunch();
   const button = window.locator('[data-testid="toggle-keep-awake"]');
   await expect(button).toBeVisible();
-  await expect(button).not.toHaveClass(/is-on/);
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
 
   await emitWailsEvent(window, IPC.keepAwake, { manual: true, supported: true, error: '' });
 
-  await expect(button).toHaveClass(/is-on/);
   await expect(button).toHaveAttribute('aria-pressed', 'true');
 });
