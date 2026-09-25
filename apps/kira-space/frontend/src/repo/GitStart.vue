@@ -24,8 +24,8 @@ async function onImport(): Promise<void> {
 </script>
 
 <template>
-  <div class="start" data-testid="git-start">
-    <div class="start-inner">
+  <div class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="git-start">
+    <div class="w-105 max-w-full">
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="source-control" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">No repository open</AlertTitle>
@@ -34,25 +34,9 @@ async function onImport(): Promise<void> {
             <CodiconIcon name="repo" :size="13" />
             Import repository…
           </Button>
-          <span v-if="importError" class="text-kira-xs error-note">{{ importError }}</span>
+          <span v-if="importError" class="text-kira-xs text-error">{{ importError }}</span>
         </AlertAction>
       </Alert>
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.start {
-  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-4;
-}
-
-.start-inner {
-  @apply w-105 max-w-full;
-}
-
-.error-note {
-  @apply text-error;
-}
-</style>

@@ -410,12 +410,12 @@ onUnmounted(() => {
         </InputGroup>
       </div>
       <div class="min-h-0 flex-1">
-        <div class="git-panel-body">
-        <section v-if="tab === 'repos'" class="repo-section" data-testid="repo-section">
-          <div class="repo-list" role="listbox" aria-label="Repositories">
+        <div class="h-full flex flex-col min-h-0">
+        <section v-if="tab === 'repos'" class="flex-1 min-h-0 overflow-y-auto" data-testid="repo-section">
+          <div class="flex flex-col" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
-                class="repo-row"
+                class="repo-row h-row flex items-center gap-1 px-1.5 cursor-default select-none"
                 :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
@@ -427,9 +427,10 @@ onUnmounted(() => {
                 @keydown.space.prevent="onRowClick(repo.id)"
                 @contextmenu.prevent="onRepoContextMenu($event, repo)"
               >
+                <!-- RepoTreeRow.vue's .twisty, ported. -->
                 <button
                   type="button"
-                  class="repo-twisty"
+                  class="flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5"
                   tabindex="-1"
                   :aria-label="worktreesStore.isWorktreesExpanded(repo.id) ? 'Collapse worktrees' : 'Expand worktrees'"
                   :aria-expanded="worktreesStore.isWorktreesExpanded(repo.id)"
@@ -441,16 +442,21 @@ onUnmounted(() => {
                     :size="13"
                   />
                 </button>
-                <CodiconIcon name="source-control" :size="16" class="repo-icon" />
+                <CodiconIcon name="source-control" :size="16" class="repo-icon shrink-0 text-muted-foreground" />
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <span class="repo-name">{{ repo.name }}</span>
+                    <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ repo.name }}</span>
                   </TooltipTrigger>
                   <TooltipContent>{{ repo.root }}</TooltipContent>
                 </Tooltip>
+                <!-- P83 plan §12.4: a repo row's checked-out branch. The name span's own flex-1
+                     above keeps it yielding first, so this is what survives on a narrow panel. Same
+                     size/colour
+                     pair as `.worktree-badge` below, so a collapsed row's branch and its expanded
+                     children's read as the same class of information. -->
                 <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
                   <TooltipTrigger as-child>
-                    <span class="repo-head">
+                    <span class="repo-head flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle">
                       {{ repoHeadsStore.repoHeadLabel(repo.id) }}
                     </span>
                   </TooltipTrigger>
@@ -461,7 +467,7 @@ onUnmounted(() => {
                     <CodiconIcon
                       name="terminal-bash"
                       :size="12"
-                      class="worktree-badge-icon"
+                      class="shrink-0 text-subtle"
                       data-testid="repo-terminal-indicator"
                     />
                   </TooltipTrigger>
@@ -472,14 +478,17 @@ onUnmounted(() => {
               </div>
               <section
                 v-if="worktreesStore.isWorktreesExpanded(repo.id)"
-                class="worktree-list"
+                class="flex flex-col"
                 data-testid="repo-worktrees"
                 aria-label="Worktrees"
               >
+                <!-- Indent to the repo name's own left edge: the row's padding, plus the twisty and
+                     its gap. pl-6 (24px) is --kira-s-3 (6px) + the twisty's own 14px + --kira-s-2
+                     (4px); pr-1.5 is --kira-s-3 alone, the row's own right padding. -->
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
-                  class="worktree-row"
+                  class="worktree-row h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground pr-1.5 pl-6"
                   :class="{
                     current: wt.isCurrent,
                     open: isOpen(worktreeRecordId(wt.path)),
@@ -495,16 +504,16 @@ onUnmounted(() => {
                   @keydown.space.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
-                  <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
+                  <CodiconIcon name="git-branch" :size="14" class="shrink-0" />
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <span class="worktree-label">{{ worktreeLabel(wt) }}</span>
+                      <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ worktreeLabel(wt) }}</span>
                     </TooltipTrigger>
                     <TooltipContent>{{ wt.path }}</TooltipContent>
                   </Tooltip>
                   <Tooltip v-if="wt.isMain">
                     <TooltipTrigger as-child>
-                      <span class="worktree-badge">main</span>
+                      <span class="worktree-badge shrink-0 text-kira-sm text-subtle">main</span>
                     </TooltipTrigger>
                     <TooltipContent>Main worktree</TooltipContent>
                   </Tooltip>
@@ -513,7 +522,7 @@ onUnmounted(() => {
                       <CodiconIcon
                         name="terminal-bash"
                         :size="12"
-                        class="worktree-badge-icon"
+                        class="shrink-0 text-subtle"
                         data-testid="repo-terminal-indicator"
                       />
                     </TooltipTrigger>
@@ -523,25 +532,26 @@ onUnmounted(() => {
                   </Tooltip>
                   <Tooltip v-if="wt.locked">
                     <TooltipTrigger as-child>
-                      <CodiconIcon name="lock" :size="12" class="worktree-badge-icon" />
+                      <CodiconIcon name="lock" :size="12" class="shrink-0 text-subtle" />
                     </TooltipTrigger>
                     <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
                   </Tooltip>
                 </div>
+                <!-- Same indent as the worktree row above -- pl-6/pr-1.5. -->
                 <div
                   v-if="worktreesStore.worktreesError(repo.id)"
-                  class="worktree-note error"
+                  class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6 error"
                   data-testid="repo-worktree-error"
                 >
                   {{ worktreesStore.worktreesError(repo.id) }}
                 </div>
                 <div
                   v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
-                  class="worktree-note"
+                  class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6"
                 >
                   Loading…
                 </div>
-                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note">
+                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note text-kira-sm text-subtle pr-1.5 pl-6">
                   No worktrees
                 </div>
               </section>
@@ -551,7 +561,7 @@ onUnmounted(() => {
         <template v-else>
           <template v-if="repoId">
             <template v-if="tab === 'files'">
-              <div class="view-strip">
+              <div class="shrink-0 px-1.5 border-b border-border flex items-center h-row">
                 <ToggleGroup
                   type="single"
                   :model-value="view"
@@ -591,9 +601,9 @@ onUnmounted(() => {
                      sets would mean it never gets the chance to. Its own `rows` computed is empty
                      until the load resolves, then updates reactively — no separate loading
                      placeholder needed for a first open this fast. -->
-                <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.fileSearch" />
+                <RepoFileTree class="flex-1 min-h-0" :repo-id="repoId" :search="local.fileSearch" />
               </template>
-              <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
+              <RepoSearchView v-else-if="view === 'search'" class="flex-1 min-h-0" :repo-id="repoId" />
             </template>
             <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown,
                  never destroyed, by a Files<->Review or Search<->Review switch within this same
@@ -602,7 +612,7 @@ onUnmounted(() => {
               v-if="reviewActivatedRepoIds.has(repoId)"
               v-show="tab === 'review'"
               :key="repoId"
-              class="repo-tree"
+              class="flex-1 min-h-0"
               :repo-id="repoId"
             />
           </template>
@@ -641,69 +651,32 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.git-panel-body {
-  @apply h-full flex flex-col min-h-0;
-}
-
-/* P84 §8.6: the Repositories tab owns the whole panel height now — nothing stacks below the list
-   any more, so P82 §9's has-workspace 50% cap and this section's own border are both gone. */
-.repo-section {
-  @apply flex-1 min-h-0 overflow-y-auto;
-}
-
-/* P84 §8.2: the Files/Search/Review picker, moved out of the header into a strip above the Files
-   tab's own body. */
-.view-strip {
-  @apply shrink-0 px-1.5 border-b border-border flex items-center h-row;
-}
-
-.repo-list {
-  @apply flex flex-col;
-}
-
-.repo-row {
-  @apply h-row flex items-center gap-1 px-1.5 cursor-default select-none;
-}
-
+/* P110 B40: every other rule this file had moved onto the template as Tailwind utilities (base
+   declarations included -- scoped CSS is unlayered, so it always wins over a layered utility on
+   the same element regardless of class order, per this plan's own §1 rule). What's left are the
+   rules that genuinely interact with a sibling rule for the same property and must keep their
+   relative source-order:
+   - `.repo-row:hover`/`.repo-row.active` and `.worktree-row:hover`/`.worktree-row.active`: real
+     `:hover` vs. a state class, both driving `background`.
+   - `.repo-row.open .repo-icon`/`.worktree-row.current`/`.worktree-row.open`: `.repo-icon`/
+     `.worktree-row` own base `text-muted-foreground` moved to the template; these stay to
+     override it (unlayered beats layered unconditionally, so no class-order risk).
+   - `.worktree-note.error`: same reasoning, overriding the base `.worktree-note` text color moved
+     to the template.
+   `.repo-row`/`.repo-icon`/`.worktree-row`/`.worktree-note`/`.repo-head`/`.worktree-badge` stay as
+   bare marker classes: the first four anchor the selectors below, `.repo-head`/`.worktree-badge`
+   are also real test dependencies (repo-workspace.spec.ts). */
 .repo-row:hover {
   @apply bg-hover;
 }
-
 .repo-row.active {
   @apply bg-select;
 }
 
-/* Imported, not open: muted icon. Open (active or not): full-brightness, the same distinction the
-   title bar's own repo tabs used to carry (§4.4's row-state table). */
-.repo-icon {
-  @apply shrink-0 text-muted-foreground;
-}
 .repo-row.open .repo-icon {
   @apply text-fg;
 }
 
-.repo-name {
-  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-/* P83 plan §12.4: a repo row's checked-out branch. `.repo-name` keeps `flex: 1`, so it yields
-   first and this is what survives on a narrow panel. Same size/colour pair as `.worktree-badge`
-   below, so a collapsed row's branch and its expanded children's read as the same class of
-   information. */
-.repo-head {
-  @apply flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle;
-}
-
-.repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5;
-}
-
-.worktree-row {
-  /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap.
-     pl-6 (24px) is --kira-s-3 (6px) + the twisty's own 14px + --kira-s-2 (4px); pr-1.5 is
-     --kira-s-3 alone, the row's own right padding. */
-  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground pr-1.5 pl-6;
-}
 .worktree-row:hover {
   @apply bg-hover;
 }
@@ -721,31 +694,7 @@ onUnmounted(() => {
   @apply bg-select;
 }
 
-.worktree-icon {
-  @apply shrink-0;
-}
-
-.worktree-label {
-  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.worktree-badge {
-  @apply shrink-0 text-kira-sm text-subtle;
-}
-
-.worktree-badge-icon {
-  @apply shrink-0 text-subtle;
-}
-
-.worktree-note {
-  /* Same indent as .worktree-row above -- pl-6/pr-1.5. */
-  @apply text-kira-sm text-subtle pr-1.5 pl-6;
-}
 .worktree-note.error {
   @apply text-error;
-}
-
-.repo-tree {
-  @apply flex-1 min-h-0;
 }
 </style>

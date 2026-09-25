@@ -101,9 +101,9 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 </script>
 
 <template>
-  <div class="repo-search-view">
-    <div ref="toolbarEl" class="repo-search-toolbar">
-      <div class="repo-search-input">
+  <div class="h-full flex flex-col min-h-0">
+    <div ref="toolbarEl" class="flex items-center gap-1 py-1 px-2">
+      <div class="flex-1 min-w-0">
         <Input
           :model-value="query"
           placeholder="Search"
@@ -116,7 +116,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
       <!-- Case/Word/Regex: three independent toggles, not a single-value picker — the same three
            codicons SearchToolbar.vue's own find widget uses, so the two surfaces read as one
            vocabulary (D13). -->
-      <div class="group">
+      <div class="flex">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -202,14 +202,14 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     <Alert
       v-else-if="statusLine"
       variant="note"
-      class="repo-search-status"
+      class="mt-0 mx-2 mb-1"
       data-testid="repo-search-status"
     >
       <AlertDescription>{{ statusLine }}</AlertDescription>
     </Alert>
     <div
       ref="scrollEl"
-      class="repo-search-list overflow-auto"
+      class="flex-1 min-h-0 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
       aria-label="Search results"
@@ -231,33 +231,3 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-search-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-.repo-search-toolbar {
-  @apply flex items-center gap-1 py-1 px-2;
-}
-
-.repo-search-input {
-  @apply flex-1 min-w-0;
-}
-
-.group {
-  @apply flex;
-}
-
-.repo-search-status {
-  @apply mt-0 mx-2 mb-1;
-}
-
-.repo-search-list {
-  @apply flex-1 min-h-0;
-}
-
-/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
-</style>

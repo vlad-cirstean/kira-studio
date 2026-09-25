@@ -89,7 +89,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
 </script>
 
 <template>
-  <div ref="treeBodyEl" class="repo-tree-body" data-testid="tree-background">
+  <div ref="treeBodyEl" class="h-full" data-testid="tree-background">
     <div
       ref="scrollEl"
       class="virtual-list h-full overflow-auto"
@@ -131,15 +131,3 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-tree-body {
-  @apply h-full;
-}
-
-/* P110 B34: `.sticky-row`/`.virtual-row` moved to base.css's own `@utility` pair (shared
-   duplicates across CollectionsTree/ProjectTree/RepoFileTree and 9 virtualized-row files
-   respectively). */
-</style>
