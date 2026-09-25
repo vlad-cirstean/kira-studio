@@ -20,11 +20,7 @@ func (s *TabsService) List(args TabsListArgs) ([]model.TabRecord, error) {
 	if err := s.checkWindow(args.WindowKey); err != nil {
 		return nil, err
 	}
-	tabs, err := s.Deps.Repos.Tabs.List(args.WindowKey)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return tabs, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Tabs.List(args.WindowKey))
 }
 
 type TabsSaveArgs struct {

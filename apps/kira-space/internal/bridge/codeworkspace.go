@@ -86,11 +86,7 @@ func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codewor
 // order — the panel's own list, oldest-imported-first until a user reorders it, matching
 // ConnectionsRepo's own convention).
 func (s *CodeWorkspaceService) ListRepos() ([]model.CodeRepo, error) {
-	repos, err := s.Deps.Repos.CodeRepos.List()
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return repos, nil
+	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.List())
 }
 
 // CodeRepoHeadsArgs optionally scopes RepoHeads to specific rows — an empty/omitted IDs answers
@@ -299,11 +295,7 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 		RepoID:    summary.RepoID,
 		CreatedAt: kiratime.NowISO(),
 	}
-	created, err := s.Deps.Repos.CodeRepos.Create(rec)
-	if err != nil {
-		return model.CodeRepo{}, ipcerr.Internal(err.Error())
-	}
-	return created, nil
+	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Create(rec))
 }
 
 func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.CodeRepo, error) {
@@ -313,11 +305,7 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 	if args.Name == "" {
 		return model.CodeRepo{}, ipcerr.BadRequest("name is required")
 	}
-	rec, err := s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name)
-	if err != nil {
-		return model.CodeRepo{}, ipcerr.Internal(err.Error())
-	}
-	return rec, nil
+	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name))
 }
 
 // RemoveRepo drops the row, its tab rows (CodeReposRepo.Remove's own transaction, §3.1) and stops
@@ -342,11 +330,7 @@ func (s *CodeWorkspaceService) ListFiles(ctx context.Context, args CodeWorkspace
 	if err != nil {
 		return codeworkspace.FileListing{}, err
 	}
-	listing, err := codeworkspace.ListFiles(ctx, sess)
-	if err != nil {
-		return codeworkspace.FileListing{}, ipcerr.Internal(err.Error())
-	}
-	return listing, nil
+	return ipcerr.InternalResult(codeworkspace.ListFiles(ctx, sess))
 }
 
 // ReadFile validates args.Path against the session's own root (§11) before ever touching disk —
@@ -368,11 +352,7 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 	if err != nil {
 		return codeworkspace.FileContent{}, ipcerr.New("E_INVALID", err.Error())
 	}
-	content, err := codeworkspace.ReadFile(absPath, args.Path)
-	if err != nil {
-		return codeworkspace.FileContent{}, ipcerr.Internal(err.Error())
-	}
-	return content, nil
+	return ipcerr.InternalResult(codeworkspace.ReadFile(absPath, args.Path))
 }
 
 // OpenWorkspace opens args.ID's own session (§2/§12) — the registry entry CloseWorkspace pairs

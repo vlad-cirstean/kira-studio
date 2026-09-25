@@ -48,10 +48,7 @@ func (s *GitHubService) OpenPullRequestURL(args GitHubOpenPullRequestURLArgs) er
 		!pullRequestPath.MatchString(u.Path) {
 		return ipcerr.BadRequest("bridge: OpenPullRequestURL: not a GitHub pull request URL")
 	}
-	if err := s.Browser.OpenURL(args.URL); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Browser.OpenURL(args.URL))
 }
 
 // knownGhHosts is the GHES-aware half of the host check above: every host s.Deps.GitRegistry's

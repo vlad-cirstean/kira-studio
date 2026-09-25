@@ -16,11 +16,7 @@ type SettingsService struct {
 }
 
 func (s *SettingsService) GetAll() (model.Settings, error) {
-	settings, err := s.Deps.Repos.Settings.GetAll()
-	if err != nil {
-		return model.Settings{}, ipcerr.Internal(err.Error())
-	}
-	return settings, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Settings.GetAll())
 }
 
 type SettingsSetArgs struct {

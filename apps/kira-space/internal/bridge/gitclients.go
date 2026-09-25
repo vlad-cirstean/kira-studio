@@ -45,11 +45,7 @@ type GitClientsService struct {
 }
 
 func (s *GitClientsService) List() ([]model.GitClient, error) {
-	clients, err := s.Deps.Repos.GitClients.List()
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return clients, nil
+	return ipcerr.InternalResult(s.Deps.Repos.GitClients.List())
 }
 
 // GitClientsIDArgs is shared by every method below that needs nothing but a client or request id.
@@ -61,10 +57,7 @@ func (s *GitClientsService) Revoke(args GitClientsIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Sock.Revoke(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Sock.Revoke(args.ID))
 }
 
 // GitPairingRequest is gitsock.PairingRequest's wire projection — an absolute deadline (epoch
