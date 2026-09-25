@@ -150,16 +150,11 @@ onBeforeUnmount(() => {
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
+    <!-- P110 B40: `.columns-menu-item`'s own plain rule (cursor-pointer, gap-1) was already
+         duplicated inline in the template -- dropped as redundant. `.drag-handle` folded onto its
+         span the same way. `.columns-menu-item` itself stays a bare marker: tooltips.spec.ts
+         locates by `.columns-menu-item.is-pk`, and this compound variant still needs it.
+         P110 I2-16: `.columns-menu-item.is-dragging` moved onto a plain ternary (`opacity-50`) --
+         no test dependency on `is-dragging` itself (checked; only `is-pk` is real). -->
   </PopoverContent>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: `.columns-menu-item`'s own plain rule (cursor-pointer, gap-1) was already duplicated
-   inline in the template -- dropped as redundant. `.drag-handle` folded onto its span the same
-   way. `.columns-menu-item` itself stays a bare marker: tooltips.spec.ts locates by
-   `.columns-menu-item.is-pk`, and this compound variant still needs it.
-   P110 I2-16: `.columns-menu-item.is-dragging` moved onto a plain ternary (`opacity-50`) -- no
-   test dependency on `is-dragging` itself (checked; only `is-pk` is real). */
-</style>
