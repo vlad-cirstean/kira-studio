@@ -38,19 +38,6 @@ type Adapter struct {
 	state adapters.Guarded[connState]
 }
 
-// getClient is Read/Mutate's own locked read of a.client (F3).
-func (a *Adapter) getClient() *kgo.Client { return a.state.Load().client }
-
-// getAdmin is every op's own locked read of a.admin (F3) — requireAdmin's RequireConnected call
-// takes its result, never a.admin directly.
-func (a *Adapter) getAdmin() *kadm.Client { return a.state.Load().admin }
-
-// getOpts is Read's own locked read of a.opts (F3).
-func (a *Adapter) getOpts() []kgo.Opt { return a.state.Load().opts }
-
-// getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
-
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *kgo.Client, admin *kadm.Client, opts []kgo.Opt, readOnly bool) {
 	a.state.Update(func(s *connState) {
@@ -98,7 +85,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 }
 
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	if client := a.getClient(); client != nil {
+	if client := a.state.Load().client; client != nil {
 		client.Close()
 	}
 	a.clearConnected()
@@ -106,7 +93,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 }
 
 func (a *Adapter) requireAdmin() (*kadm.Client, error) {
-	return adapters.RequireConnected(a.getAdmin())
+	return adapters.RequireConnected(a.state.Load().admin)
 }
 
 // Children is index.ts's children. Root is topics ∪ consumer groups (catalog.go's listRoot); a
@@ -199,7 +186,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	opts := a.getOpts()
+	opts := a.state.Load().opts
 	topic, err := a.resolveTopicTarget(req.Path, "read")
 	if err != nil {
 		return nil, err
@@ -231,7 +218,7 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
 
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
-	client, err := adapters.RequireConnected(a.getClient())
+	client, err := adapters.RequireConnected(a.state.Load().client)
 	if err != nil {
 		return model.MutationResult{}, err
 	}
@@ -239,7 +226,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return produce(ctx, client, topic, a.getReadOnly(), plan, op)
+	return produce(ctx, client, topic, a.state.Load().readOnly, plan, op)
 }
 
 // Execute is index.ts's execute — caps.SQL is false (P10's D13); never reached.
