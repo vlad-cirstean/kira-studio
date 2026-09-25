@@ -137,7 +137,9 @@ export async function expandRow(page: Page, path: string): Promise<Locator> {
   const row = await findRow(page, path);
   await expect(row).toBeVisible();
   await row.locator('[data-testid="tree-twisty"]').click();
-  await expect(row.locator('[data-testid="tree-twisty"] .spin')).toHaveCount(0, {
+  await expect(
+    row.locator('[data-testid="tree-twisty"] [data-testid="tree-row-spinner"]'),
+  ).toHaveCount(0, {
     timeout: 15_000,
   });
   return row;

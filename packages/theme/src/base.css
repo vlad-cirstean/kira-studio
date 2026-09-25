@@ -167,24 +167,14 @@
    (packages/theme/src/components/ui/empty/, a shadcn-vue registry fetch). Guarded in
    check-theme-classes.sh so neither name comes back. */
 
-/* A tree row shell -- CollectionRow.vue/project/TreeRow.vue's own `.tree-row` base declarations
-   (real-compile-verified equal: `gap-1`==`--kira-s-2`, `pr-2`==`--kira-s-4`, `h-row`==
-   `--kira-row-height`, `text-kira-md`==`--kira-t-md`, TreeRow.vue's own raw form vs. CollectionRow
-   .vue's Tailwind-native one). Its own `:hover`/`.selected` background rules stay per-file (a
-   single declaration each, no property overlap with this shell, nothing gained by sharing them). */
-@utility tree-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: default;
-  gap: var(--spacing);
-  white-space: nowrap;
-  -webkit-user-select: none;
-  user-select: none;
-  padding-right: calc(var(--spacing) * 2);
-  font-size: var(--text-kira-md);
-  height: var(--spacing-row);
-}
+/* P110 I2-14: `tree-row` (this file's own `@utility tree-row`) retired -- TreeRow.vue/
+   CollectionRow.vue/RepoTreeRow.vue/RepoSearchRow.vue now bind the equivalent literal utility
+   string (`relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none
+   cursor-default`, RepoSearchRow.vue's own two roots minus `relative`, each keeping its own
+   distinct leading padding) directly via `cn()`, folding in a `stateClass` computed for the
+   hover/selected/sticky ternary that used to live in each file's own `<style scoped>` block
+   (selected beats hover pre-phase on specificity -- the ternary reproduces that exactly). Every
+   consumer's `<style scoped>` block for this is gone. */
 
 /* P110 I2-13: `twisty` (this file's own `@utility twisty`) retired in favour of the shared
    TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) -- TreeRow.vue/

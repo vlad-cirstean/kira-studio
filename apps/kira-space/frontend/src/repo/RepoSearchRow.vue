@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed } from 'vue';
+import { computed, type HTMLAttributes } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoSearchRowVm } from './state/search';
 
 // C7 §7.3: one flat row component for both shapes the store's own row fold produces — a file
 // header (path, match count, collapse chevron) or a match (line:column, highlighted preview) —
 // mirroring RepoTreeRow.vue's own markup/class conventions so the two panels read as one system.
-const props = defineProps<{ row: RepoSearchRowVm; selected: boolean }>();
+const props = defineProps<{
+  row: RepoSearchRowVm;
+  selected: boolean;
+  class?: HTMLAttributes['class'];
+}>();
+
+// P110 I2-14: no sticky branch -- this row is never rendered inside a sticky layer, unlike
+// TreeRow.vue/CollectionRow.vue/RepoTreeRow.vue, which all take a `sticky` prop.
+const stateClass = computed(() => (props.selected ? 'bg-select' : 'hover:bg-hover'));
+
 const emit = defineEmits<{
   select: [row: RepoSearchRowVm];
   toggleCollapse: [row: RepoSearchRowVm];
@@ -66,8 +76,13 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     v-if="row.kind === 'file'"
-    class="flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-1 pr-2 repo-search-row"
-    :class="{ selected }"
+    :class="
+      cn(
+        'flex items-center gap-1 pl-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
+        stateClass,
+        props.class,
+      )
+    "
     data-testid="repo-search-file-row"
     :data-path="row.path"
     role="option"
@@ -109,8 +124,13 @@ function onKeydown(e: KeyboardEvent): void {
   </div>
   <div
     v-else
-    class="flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-6 pr-2 font-data repo-search-row"
-    :class="{ selected }"
+    :class="
+      cn(
+        'flex items-center gap-1 pl-6 pr-2 font-data h-row text-kira-md whitespace-nowrap select-none cursor-default',
+        stateClass,
+        props.class,
+      )
+    "
     data-testid="repo-search-match-row"
     :data-path="row.path"
     :data-line="row.line"
@@ -128,22 +148,7 @@ function onKeydown(e: KeyboardEvent): void {
       >{{ previewParts.after }}</span
     >
   </div>
+  <!-- P110 I2-14: hover/selected ternary (stateClass, above) moved onto both root bindings --
+       see packages/theme/src/base.css's own pointer comment for the retired `@utility tree-row`.
+       P110 I2-13: the twisty moved to TreeTwisty.vue. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B37: only the live :hover state plus its cascade order against the JS-toggled .selected
-   class stays here -- both scoped rules share equal specificity, so source order (selected after
-   hover) is what makes a selected row's own background win over hover; moving .selected onto a
-   plain utility class would drop below the scoped :hover rule's specificity instead (scoped styles
-   add an attribute selector) and invert that. Everything else moved onto the template as inline
-   utility classes. */
-.repo-search-row:hover {
-  @apply bg-hover;
-}
-
-.repo-search-row.selected {
-  @apply bg-select;
-}
-</style>

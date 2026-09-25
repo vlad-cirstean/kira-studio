@@ -171,7 +171,11 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
   await (await findRow(page, '')).locator('[data-testid="tree-twisty"]').click();
   await tabLocator(page, tab3Id).click({ button: 'right' });
   await page.click('[data-testid="menu-item-reveal-in-project-panel"]');
-  await expect(await findRow(page, ORDER_ITEMS_PATH)).toHaveClass(/selected/, { timeout: 10_000 });
+  // P110 I2-14: `.tree-row`'s literal `selected` class is gone -- `cn()` now folds selected into
+  // `bg-select` via a `stateClass` computed, so `aria-selected` is the stable selected-state check.
+  await expect(await findRow(page, ORDER_ITEMS_PATH)).toHaveAttribute('aria-selected', 'true', {
+    timeout: 10_000,
+  });
 
   // Close others: only tab 3 (the one right-clicked) survives.
   await tabLocator(page, tab3Id).click({ button: 'right' });

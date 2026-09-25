@@ -4,9 +4,10 @@ import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import { methodTextClass } from '@theme/methodColor';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, type HTMLAttributes, nextTick, ref, watch } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
 // P4 D13: the same 8 + depth × 14 px indent, roving tabindex and twisty as project/TreeRow.vue,
@@ -18,8 +19,19 @@ import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 // It is a separate file for a hard reason as well as a soft one: `http/**` may not import
 // `project/**` (biome.json), so reuse was never on the table.
 const props = withDefaults(
-  defineProps<{ row: CollectionRowVm; selected: boolean; sticky?: boolean }>(),
+  defineProps<{
+    row: CollectionRowVm;
+    selected: boolean;
+    sticky?: boolean;
+    class?: HTMLAttributes['class'];
+  }>(),
   { sticky: false },
+);
+
+// P110 I2-14: same ternary as TreeRow.vue's own stateClass -- selected beats hover pre-phase on
+// specificity, so this reproduces that exactly.
+const stateClass = computed(() =>
+  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
 );
 
 const emit = defineEmits<{
@@ -112,8 +124,13 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="tree-row"
-    :class="{ selected }"
+    :class="
+      cn(
+        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
+        stateClass,
+        props.class,
+      )
+    "
     :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
     :data-testid="sticky ? 'collection-sticky-row' : 'collection-row'"
     :data-kind="row.kind"
@@ -180,28 +197,8 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ row.url || row.name }}</TooltipContent>
     </Tooltip>
+    <!-- P110 I2-14: `.tree-row`'s hover/selected ternary moved onto the root binding (stateClass,
+         above) -- see packages/theme/src/base.css's own pointer comment for the retired
+         `@utility tree-row`. P110 I2-13: the twisty moved to TreeTwisty.vue. -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
-   (real-compile-verified equal to TreeRow.vue's own raw form). Its `:hover`/`.selected` stay here
-   -- one declaration each, no property overlap with the shell. P110 B38: kept as scoped CSS rather
-   than moved to the template (unlike this file's other, plain @apply-only rules) -- `:hover` and
-   `.selected` interact (equal specificity, source order decides which background wins on a
-   selected+hovered row), and reproducing that as conditional template classes risks a real
-   rendering change for zero benefit; both already compile via @apply. */
-.tree-row:hover {
-  @apply bg-hover;
-}
-
-.tree-row.selected {
-  @apply bg-select;
-}
-
-/* P110 I2-13: `.twisty` (base.css's own `@utility twisty`) retired in favour of the shared
-   TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) --
-   mutations.spec.ts/fake-data.spec.ts/tree.spec.ts now select `[data-testid="tree-twisty"]`. */
-</style>

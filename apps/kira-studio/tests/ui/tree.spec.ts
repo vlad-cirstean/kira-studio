@@ -504,7 +504,9 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   async function expandNext(row: Locator): Promise<Locator> {
     await row.scrollIntoViewIfNeeded();
     await row.locator('[data-testid="tree-twisty"]').click();
-    await expect(row.locator('[data-testid="tree-twisty"] .spin')).toHaveCount(0, {
+    await expect(
+      row.locator('[data-testid="tree-twisty"] [data-testid="tree-row-spinner"]'),
+    ).toHaveCount(0, {
       timeout: 15_000,
     });
     return row.locator('xpath=following-sibling::*[1]');
@@ -543,7 +545,9 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // the viewport, and the browser refuses to open a gap under the last row.
   const conn2Sequences = await findFollowingGroup(conn2App, 'Sequences');
   await conn2Sequences.locator('[data-testid="tree-twisty"]').click();
-  await expect(conn2Sequences.locator('[data-testid="tree-twisty"] .spin')).toHaveCount(0, {
+  await expect(
+    conn2Sequences.locator('[data-testid="tree-twisty"] [data-testid="tree-row-spinner"]'),
+  ).toHaveCount(0, {
     timeout: 15_000,
   });
 

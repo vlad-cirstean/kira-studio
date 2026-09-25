@@ -3,8 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed } from 'vue';
+import { computed, type HTMLAttributes } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import EngineIcon from '../theme/EngineIcon.vue';
 import { columnTypeIcon, nodeIcon } from '../theme/icons';
@@ -15,9 +16,22 @@ import { type TreeRowVm, useTreeStore } from './state/tree';
 // different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
 // (so the tree keeps its single roving tab stop). Every emit, every child element, the colour
 // rail and the twisty behave identically either way — a pinned row is a real row, not a decoration.
-const props = withDefaults(defineProps<{ row: TreeRowVm; selected: boolean; sticky?: boolean }>(), {
-  sticky: false,
-});
+const props = withDefaults(
+  defineProps<{
+    row: TreeRowVm;
+    selected: boolean;
+    sticky?: boolean;
+    class?: HTMLAttributes['class'];
+  }>(),
+  { sticky: false },
+);
+
+// P110 I2-14: selected beats hover pre-phase on specificity (equal-specificity scoped rules,
+// `.selected` after `:hover` in source order) -- this ternary reproduces that exactly: a selected
+// row never falls through to the hover/sticky branches at all.
+const stateClass = computed(() =>
+  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
+);
 const emit = defineEmits<{
   select: [row: TreeRowVm];
   toggle: [row: TreeRowVm];
@@ -109,8 +123,13 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="tree-row"
-    :class="{ selected }"
+    :class="
+      cn(
+        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
+        stateClass,
+        props.class,
+      )
+    "
     :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
     :data-testid="sticky ? 'tree-sticky-row' : 'tree-row'"
     :data-path="row.path"
@@ -139,7 +158,13 @@ function onKeydown(e: KeyboardEvent): void {
          own explicit aria-label by hand (no more directive mirroring it in automatically), so
          dropping it here would leave this button nameless. -->
     <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick">
-      <CodiconIcon v-if="row.loading" name="loading" class="spin animate-spin" :size="13" />
+      <CodiconIcon
+        v-if="row.loading"
+        name="loading"
+        class="animate-spin"
+        data-testid="tree-row-spinner"
+        :size="13"
+      />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </TreeTwisty>
 
@@ -189,46 +214,12 @@ function onKeydown(e: KeyboardEvent): void {
       <TooltipContent>{{ row.statusDetail }}</TooltipContent>
     </Tooltip>
     <span v-else-if="row.detail" class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-muted-foreground text-kira-sm">{{ row.detail }}</span>
+    <!-- P110 I2-14: `.tree-row`'s hover/selected ternary moved onto the root binding (stateClass,
+         above) -- see packages/theme/src/base.css's own pointer comment for the retired
+         `@utility tree-row`. P110 I2-13: the twisty moved to TreeTwisty.vue; the loading-spinner
+         override above is this file's own slot content. P110 B35: `.status-dot`/`.label` stay
+         bare marker classes (data-status assertions, font-roles.spec.ts's `.label` check);
+         `.spin` became `data-testid="tree-row-spinner"` (tree.spec.ts/support/tree.ts's own
+         `[data-testid="tree-twisty"] [data-testid="tree-row-spinner"]` locator). -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
-   (real-compile/token-verified equal to CollectionRow.vue's own Tailwind-native form). Its
-   `:hover`/`.selected` stay here -- one declaration each, no property overlap with the shell.
-   P110 B37: their own raw background: var(--kira-hover/select) become @apply bg-hover/bg-select
-   in place (same selectors, same cascade position). */
-.tree-row:hover {
-  @apply bg-hover;
-}
-
-.tree-row.selected {
-  @apply bg-select;
-}
-
-/* P110 I2-13: `.twisty` (base.css's own `@utility twisty`) retired in favour of the shared
-   TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) -- CollectionRow.vue/
-   RepoTreeRow.vue/GitPanel.vue's own repo-row expand take it too. The loading-spinner override
-   below is this file's own slot content, the one real difference from the other 4 consumers'
-   plain chevron. */
-
-/* P110 B35: `.spin`/`.status-dot`/`.label` stay bare marker classes -- tree.spec.ts's own
-   `[data-testid="tree-twisty"] .spin` locator, and slick-grid.spec.ts/connections.spec.ts/
-   tree.spec.ts/etc.'s own
-   `.status-dot` `data-status` assertions (60+ sites), plus font-roles.spec.ts's `.label` font
-   check. Every declaration all three used to carry now sits directly on the element as Tailwind
-   utilities instead (including `.spin`'s own `@apply animate-spin`, now just `animate-spin`
-   alongside the marker). `.status-dot[data-status='...']` became `data-[status=...]:` variants on
-   the same element -- the standard Tailwind data-attribute variant, already used throughout this
-   app's shadcn components (DropdownMenuItem.vue, DialogScrollContent.vue, etc.).
-
-   The `connecting` state's hand-rolled `tree-row-pulse` keyframes (1s ease-in-out, opacity
-   1 to 0.35) are dropped for Tailwind's own `animate-pulse` (2s cubic-bezier, opacity 1 to 0.5) --
-   pre-approved (plan 1.4: "TreeRow pulse becomes animate-pulse"), so this is a disclosed, not a
-   silent, visual change: a connecting row's dot now pulses slower and shallower.
-
-   `.node-icon`/`.badges`/`.detail`/`.error-text` had no test dependency, so those class names
-   dropped entirely once their declarations moved onto the elements. */
-</style>

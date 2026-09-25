@@ -290,6 +290,16 @@ check_class_in_attrs 'columns-menu-footer' 'px-1.5 pb-1.5'
 # that excludes trailing identifier/hyphen characters already keeps it out.
 check_class_in_attrs 'twisty' 'TreeTwisty (packages/workbench/src/components/TreeTwisty.vue)'
 
+# P110 I2-14: the shared tree-row shell, folded into each consumer's own `cn()`-built root class
+# (a `stateClass` computed replacing the hover/selected `<style scoped>` block). Both names are
+# heavy, ordinary prose throughout this codebase's own comments ("tree-row refresh", "the twisty
+# always expands/collapses", TreeRow.vue's own `spin ->` migration comments) -- attribute-scoped
+# so none of that false-positives. `data-testid="tree-row"`/`data-testid="tree-row-spinner"` are
+# real, ongoing test-id values, never `class`/`:class` attribute values, so the attribute scope
+# leaves them alone.
+check_class_in_attrs 'tree-row' 'the shared literal utility string via cn() (see base.css)'
+check_class_in_attrs 'spin' 'animate-spin plus data-testid="tree-row-spinner"'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

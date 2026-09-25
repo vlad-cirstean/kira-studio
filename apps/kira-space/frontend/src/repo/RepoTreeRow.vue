@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { cn } from '@theme/lib/utils';
 import TreeTwisty from '@workbench/components/TreeTwisty.vue';
-import { computed } from 'vue';
+import { computed, type HTMLAttributes } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoTreeRowVm } from './state/fileTree';
 
 const props = withDefaults(
-  defineProps<{ row: RepoTreeRowVm; selected: boolean; sticky?: boolean }>(),
-  {
-    sticky: false,
-  },
+  defineProps<{
+    row: RepoTreeRowVm;
+    selected: boolean;
+    sticky?: boolean;
+    class?: HTMLAttributes['class'];
+  }>(),
+  { sticky: false },
+);
+
+// P110 I2-14: same ternary as TreeRow.vue's own stateClass -- selected beats hover pre-phase on
+// specificity, so this reproduces that exactly.
+const stateClass = computed(() =>
+  props.selected ? 'bg-select' : props.sticky ? 'bg-bg hover:bg-hover' : 'hover:bg-hover',
 );
 const emit = defineEmits<{
   select: [row: RepoTreeRowVm];
@@ -80,8 +90,13 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="flex items-center relative cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pr-2 repo-tree-row"
-    :class="{ selected }"
+    :class="
+      cn(
+        'relative flex items-center gap-1 pr-2 h-row text-kira-md whitespace-nowrap select-none cursor-default',
+        stateClass,
+        props.class,
+      )
+    "
     :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
     :data-testid="sticky ? 'repo-tree-sticky-row' : 'repo-tree-row'"
     :data-path="row.path"
@@ -118,27 +133,11 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ row.name }}</TooltipContent>
     </Tooltip>
+    <!-- P110 I2-14: hover/selected ternary moved onto the root binding (stateClass, above) --
+         .node-icon's own mask-size/mask-repeat/mask-position (+ -webkit- prefixed) became
+         Tailwind's own mask-contain/mask-no-repeat/mask-center (confirmed via compile check to
+         emit both prefixed and unprefixed forms); the three data-status attribute-selector rules
+         became labelStatusClass, a computed bound directly onto the label span (data-status
+         itself stays on the row, for tests/other styling hooks). -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B37: only the live :hover state plus its cascade order against the JS-toggled .selected
-   class stays here -- both scoped rules share equal specificity, so source order (selected after
-   hover) is what makes a selected row's own background win over hover; moving .selected onto a
-   plain utility class would drop below the scoped :hover rule's specificity instead (scoped styles
-   add an attribute selector) and invert that. Everything else moved onto the template as inline
-   utility classes -- .node-icon's own mask-size/mask-repeat/mask-position (+ -webkit- prefixed)
-   became Tailwind's own mask-contain/mask-no-repeat/mask-center (confirmed via compile check to
-   emit both prefixed and unprefixed forms); the three data-status attribute-selector rules became
-   labelStatusClass, a computed bound directly onto the label span (data-status itself stays on the
-   row, for tests/other styling hooks). */
-.repo-tree-row:hover {
-  @apply bg-hover;
-}
-
-.repo-tree-row.selected {
-  @apply bg-select;
-}
-</style>

@@ -1483,7 +1483,9 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   const connRow = connectionRow(page, 'Interaction DB');
   await expect(connRow).toHaveCount(1);
   await connRow.click();
-  await expect(connRow).toHaveClass(/selected/);
+  // P110 I2-14: `.tree-row`'s literal `selected` class is gone -- `cn()` now folds selected into
+  // `bg-select` via a `stateClass` computed, so `aria-selected` is the stable selected-state check.
+  await expect(connRow).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press(COPY_KEY);
   expect(await clipboardText(page)).toBe('Interaction DB');
 
