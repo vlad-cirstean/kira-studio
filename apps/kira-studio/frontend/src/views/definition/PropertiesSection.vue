@@ -28,23 +28,11 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
     <table v-else class="w-full border-collapse text-kira-md">
       <tbody>
         <tr v-for="row in section.rows" :key="row.name" class="border-b border-border hover:bg-hover" data-testid="definition-row">
-          <td :class="DEF_TD" class="def-prop-name font-data">{{ row.name }}</td>
+          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">{{ row.name }}</td>
           <td :class="DEF_TD" class="def-prop-value font-data">{{ row.value }}</td>
-          <td :class="DEF_TD" class="def-prop-detail">{{ row.detail ?? '' }}</td>
+          <td :class="DEF_TD" class="text-subtle text-kira-sm">{{ row.detail ?? '' }}</td>
         </tr>
       </tbody>
     </table>
   </section>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.def-prop-name {
-  @apply whitespace-nowrap text-muted-foreground;
-}
-
-.def-prop-detail {
-  @apply text-subtle text-kira-sm;
-}
-</style>

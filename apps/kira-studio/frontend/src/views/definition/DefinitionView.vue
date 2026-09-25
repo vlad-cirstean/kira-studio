@@ -216,7 +216,7 @@ const breadcrumb = computed(() => {
 
 <template>
   <div
-    class="definition-view"
+    class="h-full flex flex-col min-h-0"
     data-testid="definition-view"
     :data-path="tab.path"
     :data-origin="definition?.origin ?? ''"
@@ -327,7 +327,7 @@ const breadcrumb = computed(() => {
     </div>
 
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
-      <AlertDescription><span class="err-message">{{ rt.error }}</span></AlertDescription>
+      <AlertDescription><span class="whitespace-pre-wrap font-[family-name:var(--kira-font-data)]">{{ rt.error }}</span></AlertDescription>
     </Alert>
     <Alert
       v-if="pane === 'source' && definition && definition.notes.length > 0"
@@ -336,7 +336,7 @@ const breadcrumb = computed(() => {
     >
       <AlertDescription class="flex items-start gap-1.5">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="info" :size="13" /></span>
-        <ul class="notes-list">
+        <ul class="m-0 pl-3">
           <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
         </ul>
       </AlertDescription>
@@ -369,7 +369,7 @@ const breadcrumb = computed(() => {
       </Button>
     </div>
     <template v-else>
-    <div v-if="pane === 'source'" class="editor-body">
+    <div v-if="pane === 'source'" class="flex-1 min-h-0">
       <MonacoHost
         ref="docHostRef"
         :doc="document"
@@ -385,7 +385,7 @@ const breadcrumb = computed(() => {
          as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
          above) instead of meta's own raw ones — filtering lives here, once, not in each
          section. -->
-    <div v-else-if="definition" class="structure-body">
+    <div v-else-if="definition" class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3">
       <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
       <template v-if="meta">
         <ColumnsSection
@@ -417,27 +417,3 @@ const breadcrumb = computed(() => {
     </template>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.definition-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-.err-message {
-  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
-}
-
-.notes-list {
-  @apply m-0 pl-3;
-}
-
-.editor-body {
-  @apply flex-1 min-h-0;
-}
-
-.structure-body {
-  @apply flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3;
-}
-</style>

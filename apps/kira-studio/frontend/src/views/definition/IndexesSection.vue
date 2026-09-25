@@ -38,7 +38,7 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
             <Badge v-else-if="idx.unique">unique</Badge>
           </td>
           <td :class="DEF_TD" class="def-idx-method font-data">{{ idx.method ?? '' }}</td>
-          <td :class="DEF_TD" class="def-idx-columns font-data">({{ idx.columns.join(', ') }})</td>
+          <td :class="DEF_TD" class="text-muted-foreground font-data">({{ idx.columns.join(', ') }})</td>
         </tr>
       </tbody>
     </table>
@@ -55,9 +55,5 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
 }
 .definition-table td:last-child {
   @apply border-r-0;
-}
-
-.def-idx-columns {
-  @apply text-muted-foreground;
 }
 </style>

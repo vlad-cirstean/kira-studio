@@ -51,13 +51,13 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
     <table class="w-full border-collapse text-kira-md definition-table">
       <thead>
         <tr>
-          <th :class="DEF_TH" class="def-col-icon"></th>
+          <th :class="DEF_TH" class="text-muted-foreground w-4"></th>
           <th :class="DEF_TH" class="def-col-name">Name</th>
-          <th :class="DEF_TH" class="def-col-key">Key</th>
-          <th :class="DEF_TH" class="def-col-type">Type</th>
-          <th :class="DEF_TH" class="def-col-null">Null?</th>
-          <th :class="DEF_TH" class="def-col-default">Default</th>
-          <th :class="DEF_TH_LAST" class="def-col-comment">Comment</th>
+          <th :class="DEF_TH" class="w-6">Key</th>
+          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground">Type</th>
+          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground w-20">Null?</th>
+          <th :class="DEF_TH" class="whitespace-nowrap text-muted-foreground">Default</th>
+          <th :class="DEF_TH_LAST" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60">Comment</th>
         </tr>
       </thead>
       <tbody>
@@ -68,7 +68,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           data-testid="definition-row"
           @contextmenu="onContextMenu($event, col)"
         >
-          <td :class="DEF_TD" class="def-col-icon">
+          <td :class="DEF_TD" class="text-muted-foreground w-4">
             <CodiconIcon
               :name="columnTypeIcon(col.dataType)"
               :size="13"
@@ -76,24 +76,24 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
             />
           </td>
           <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
-          <td :class="DEF_TD" class="def-col-key">
-            <span v-if="keyLabel(col) === 'PK'" class="header-key">PK</span>
-            <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk">FK</span>
+          <td :class="DEF_TD" class="w-6">
+            <span v-if="keyLabel(col) === 'PK'" class="header-key text-warn text-kira-xs">PK</span>
+            <span v-else-if="keyLabel(col) === 'FK'" class="header-key is-fk text-warn text-kira-xs">FK</span>
           </td>
-          <td :class="DEF_TD" class="def-col-type font-data">
+          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
             <Tooltip v-if="typeDescription(col.dataType)">
               <TooltipTrigger as-child>
-                <span class="type-info" :aria-label="typeDescription(col.dataType) ?? ''">
+                <span class="align-middle cursor-help text-subtle ml-0.5" :aria-label="typeDescription(col.dataType) ?? ''">
                   <CodiconIcon name="info" :size="13" />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
             </Tooltip>
           </td>
-          <td :class="DEF_TD" class="def-col-null font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
-          <td :class="DEF_TD" class="def-col-default font-data">{{ col.defaultExpr ?? '' }}</td>
-          <td :class="DEF_TD" class="def-col-comment">{{ col.comment ?? '' }}</td>
+          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground w-20 font-data">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
+          <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">{{ col.defaultExpr ?? '' }}</td>
+          <td :class="DEF_TD" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60">{{ col.comment ?? '' }}</td>
         </tr>
       </tbody>
     </table>
@@ -103,8 +103,13 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* Only these two — the vertical column dividers — aren't in the shared cell utility list above:
-   Validation/Properties are plain key-value tables that don't want them. */
+/* P110 B40: every other rule this file had (`.def-col-*`/`.type-info`/`.header-key`'s own base)
+   moved onto the template as Tailwind utilities. `.header-key` stays a bare marker — a real test
+   dependency (slick-grid.spec.ts, clickhouse.frontend.spec.ts). Only these two — the vertical
+   column dividers — aren't in the shared cell utility list above: Validation/Properties are plain
+   key-value tables that don't want them. `.definition-table` (kept as a marker on the <table>) and
+   `.header-key.is-fk` stay scoped: the first is a descendant selector matching every td by
+   structural position, not a named class; the second needs both classes present simultaneously. */
 .definition-table td {
   @apply border-r border-border;
 }
@@ -112,38 +117,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   @apply border-r-0;
 }
 
-.def-col-icon {
-  @apply text-muted-foreground w-4;
-}
-
-.def-col-key {
-  @apply w-6;
-}
-
-.header-key {
-  @apply text-warn text-kira-xs;
-}
 .header-key.is-fk {
   @apply text-info;
-}
-
-.def-col-type {
-  @apply whitespace-nowrap text-muted-foreground;
-}
-
-.type-info {
-  @apply align-middle cursor-help text-subtle ml-0.5;
-}
-
-.def-col-null {
-  @apply whitespace-nowrap text-muted-foreground w-20;
-}
-
-.def-col-default {
-  @apply whitespace-nowrap text-muted-foreground;
-}
-
-.def-col-comment {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground max-w-60;
 }
 </style>

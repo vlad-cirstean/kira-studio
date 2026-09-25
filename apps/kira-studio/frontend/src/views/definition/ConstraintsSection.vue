@@ -73,15 +73,15 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
         >
           <td :class="DEF_TD" class="def-con-name">{{ c.name }}</td>
           <td :class="DEF_TD" class="def-con-type">
-            <span v-if="KEY_LABEL[c.type] === 'PK'" class="header-key">PK</span>
-            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="header-key is-fk">FK</span>
+            <span v-if="KEY_LABEL[c.type] === 'PK'" class="header-key text-warn text-kira-xs">PK</span>
+            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="header-key is-fk text-warn text-kira-xs">FK</span>
             <Badge v-else>{{ TYPE_LABEL[c.type] }}</Badge>
           </td>
-          <td :class="DEF_TD" class="def-con-detail font-data">{{ c.detail }}</td>
+          <td :class="DEF_TD" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground font-data">{{ c.detail }}</td>
           <td :class="DEF_TD" class="def-con-table">
             <Tooltip v-if="c.referencedPath">
               <TooltipTrigger as-child>
-                <button type="button" class="ref-link" @click="onNavigate(c)">
+                <button type="button" class="ref-link border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info" @click="onNavigate(c)">
                   {{ referencedTableName(c) }}
                 </button>
               </TooltipTrigger>
@@ -97,8 +97,10 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
 <style scoped>
 @reference "@theme/base.css";
 
-/* Only these two aren't in the shared cell utility list above — see ColumnsSection.vue's own
-   comment on why. */
+/* P110 B40: `.def-con-detail`/`.ref-link`'s own base rules moved onto the template. Only these two
+   aren't in the shared cell utility list above — see ColumnsSection.vue's own comment on why.
+   `.header-key.is-fk`/`.ref-link:hover` stay scoped (compound/pseudo variants), anchored by their
+   class kept as a bare marker on the template. */
 .definition-table td {
   @apply border-r border-border;
 }
@@ -106,20 +108,10 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
   @apply border-r-0;
 }
 
-.header-key {
-  @apply text-warn text-kira-xs;
-}
 .header-key.is-fk {
   @apply text-info;
 }
 
-.def-con-detail {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground;
-}
-
-.ref-link {
-  @apply border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info;
-}
 /* P104 §7.2: text-primary, not text-accent — shadcn-bridge.css maps --color-accent to
    --kira-hover (grey); --primary is the real brand accent. */
 .ref-link:hover {

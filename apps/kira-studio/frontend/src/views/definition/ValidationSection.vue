@@ -48,23 +48,11 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg';
           <td :class="DEF_TD" class="def-val-required">
             <Badge v-if="f.required">required</Badge>
           </td>
-          <td :class="DEF_TD" class="def-val-desc">{{ f.description ?? '' }}</td>
+          <td :class="DEF_TD" class="text-muted-foreground">{{ f.description ?? '' }}</td>
         </tr>
       </tbody>
     </table>
 
-    <pre v-else-if="showRaw" class="def-raw font-data">{{ documentSchema?.validator }}</pre>
+    <pre v-else-if="showRaw" class="m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2 font-data">{{ documentSchema?.validator }}</pre>
   </section>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.def-val-desc {
-  @apply text-muted-foreground;
-}
-
-.def-raw {
-  @apply m-0 whitespace-pre-wrap rounded-kira-sm bg-field text-fg p-2;
-}
-</style>
