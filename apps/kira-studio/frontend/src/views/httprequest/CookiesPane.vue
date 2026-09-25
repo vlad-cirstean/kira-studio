@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
@@ -9,7 +10,6 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
 import { useCookiesStore } from './cookies';
@@ -136,20 +136,13 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
             <span class="wrap-anywhere font-data">{{ c.value }}</span>
             <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-xs font-data">{{ attributeLine(c) }}</span>
           </div>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Remove cookie"
-                :data-testid="`http-cookies-remove-${c.name}`"
-                @click="onRemove(c.name)"
-              >
-                <CodiconIcon name="close" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Remove</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="close"
+            label="Remove"
+            aria-label="Remove cookie"
+            :data-testid="`http-cookies-remove-${c.name}`"
+            @click="onRemove(c.name)"
+          />
         </div>
       </div>
       <Empty v-else data-testid="http-cookies-empty">

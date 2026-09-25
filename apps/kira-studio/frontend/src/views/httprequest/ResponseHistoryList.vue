@@ -5,6 +5,7 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
@@ -219,20 +220,12 @@ async function onClear(): Promise<void> {
             <span class="text-kira-xs text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
             <span v-if="entry.environment" class="text-kira-xs text-subtle">{{ entry.environment }}</span>
             <span class="ml-auto" />
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Delete"
-                  data-testid="http-history-delete"
-                  @click.stop="onDelete(entry.id)"
-                >
-                  <CodiconIcon name="trash" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              icon="trash"
+              label="Delete"
+              data-testid="http-history-delete"
+              @click.stop="onDelete(entry.id)"
+            />
           </div>
           <div v-if="showUrl(i)" class="text-kira-xs text-subtle overflow-hidden text-ellipsis whitespace-nowrap">{{ entry.url }}</div>
         </div>

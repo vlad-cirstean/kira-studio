@@ -7,6 +7,7 @@ import {
 } from '@shared/domain/grpc';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -306,21 +307,14 @@ onUnmounted(() => {
       <span v-else class="ml-auto" />
       <!-- P22b D14: HTTP's own ResponsePane.vue idiom — only the Messages pane has a document to
            search (Metadata is a plain key-value list, History is a row list). -->
-      <Tooltip v-if="tab.state.responsePane === 'messages'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': findOpen }"
-            aria-label="Find in message"
-            data-testid="grpc-find-toggle"
-            @click="toggleFind"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Find in message</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab.state.responsePane === 'messages'"
+        icon="search"
+        label="Find in message"
+        :class="{ 'bg-field text-fg': findOpen }"
+        data-testid="grpc-find-toggle"
+        @click="toggleFind"
+      />
       <ToggleGroup
         type="single"
         :model-value="tab.state.responsePane"

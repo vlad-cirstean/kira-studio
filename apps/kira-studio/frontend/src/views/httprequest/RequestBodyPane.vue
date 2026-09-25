@@ -8,9 +8,8 @@ import {
   userContentTypeHeader,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -180,14 +179,13 @@ const caption = computed(() =>
         </option>
       </NativeSelect>
       <span class="ml-auto" />
-      <Tooltip v-if="tab.state.bodyMode === 'code' && beautifyFormat">
-        <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Beautify" data-testid="http-body-beautify" @click="onBeautifyBody">
-            <CodiconIcon name="expand-all" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Beautify</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab.state.bodyMode === 'code' && beautifyFormat"
+        icon="expand-all"
+        label="Beautify"
+        data-testid="http-body-beautify"
+        @click="onBeautifyBody"
+      />
     </div>
 
     <div v-if="caption" class="text-kira-xs text-subtle px-1.5 pt-0 pb-1" data-testid="http-body-content-type-caption">

@@ -2,18 +2,14 @@
 import { definitionText } from '@shared/domain/definition';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -244,16 +240,14 @@ const breadcrumb = computed(() => {
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button variant="toolbar" size="kira-icon" :disabled="loading" aria-label="Refresh" data-testid="definition-refresh" @click="onRefresh">
-                <CodiconIcon name="refresh" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          disabled-trigger
+          :disabled="loading"
+          data-testid="definition-refresh"
+          @click="onRefresh"
+        />
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <div class="flex items-center gap-1.5 min-w-0">
@@ -265,21 +259,14 @@ const breadcrumb = computed(() => {
       </div>
       <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
            all — a find-in-document bar for Source, a plain substring filter for Structure. -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :data-active="searchOpen"
-            aria-label="Search"
-            data-testid="definition-search-toggle"
-            @click="toggleSearch"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints' }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="search"
+        :label="pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints'"
+        aria-label="Search"
+        :data-active="searchOpen"
+        data-testid="definition-search-toggle"
+        @click="toggleSearch"
+      />
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 min-w-0">

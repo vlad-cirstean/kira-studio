@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -348,21 +349,14 @@ onUnmounted(() => {
       <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
            find affordance — Headers has its own separate filter (D12), and History/Timeline are
            lists, not one searchable document. -->
-      <Tooltip v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': findOpen }"
-            aria-label="Find in response"
-            data-testid="http-find-toggle"
-            @click="toggleFind"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Find in response</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
+        icon="search"
+        label="Find in response"
+        :class="{ 'bg-field text-fg': findOpen }"
+        data-testid="http-find-toggle"
+        @click="toggleFind"
+      />
       <ToggleGroup
         type="single"
         :model-value="tab.state.responsePane"

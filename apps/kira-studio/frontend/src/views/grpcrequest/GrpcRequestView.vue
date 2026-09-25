@@ -2,6 +2,7 @@
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
@@ -9,12 +10,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -337,24 +333,21 @@ onUnmounted(() => {
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="grpc-request-refresh" @click="onCall">
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="grpc-request-stop" @click="onStop">
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          data-testid="grpc-request-refresh"
+          @click="onCall"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'is-live': running }"
+          :disabled="!running"
+          data-testid="grpc-request-stop"
+          @click="onStop"
+        />
       </div>
       <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
            no-op (F14) -- AutocompleteField sets inheritAttrs: false, so a call-site style lands on
@@ -421,21 +414,14 @@ onUnmounted(() => {
       <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
            icon-only action group, so this is its own toolbar-end group. -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': incognito }"
-              aria-label="Incognito"
-              data-testid="grpc-incognito-toggle"
-              @click="toggleIncognito"
-            >
-              <CodiconIcon name="eye-closed" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on' }}</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="eye-closed"
+          :label="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
+          aria-label="Incognito"
+          :class="{ 'bg-field text-fg': incognito }"
+          data-testid="grpc-incognito-toggle"
+          @click="toggleIncognito"
+        />
       </div>
     </ViewToolbar>
 
@@ -443,61 +429,39 @@ onUnmounted(() => {
       <ToggleGroup type="single" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
         <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>
-      <Tooltip v-if="tab.state.requestPane === 'message'">
-        <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Beautify" data-testid="grpc-beautify" @click="onBeautify">
-            <CodiconIcon name="expand-all" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Beautify</TooltipContent>
-      </Tooltip>
-      <Tooltip v-if="tab.state.requestPane === 'metadata'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': fieldFilterOpen }"
-            aria-label="Filter"
-            data-testid="grpc-field-filter-toggle"
-            @click="toggleFieldFilter"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Filter</TooltipContent>
-      </Tooltip>
-      <Tooltip v-if="tab.state.requestPane === 'metadata'">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
-            aria-label="Descriptions"
-            data-testid="grpc-field-descriptions-toggle"
-            @click="toggleFieldDescriptions"
-          >
-            <CodiconIcon name="note" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions' }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="tab.state.requestPane === 'message'"
+        icon="expand-all"
+        label="Beautify"
+        data-testid="grpc-beautify"
+        @click="onBeautify"
+      />
+      <TooltipIconButton
+        v-if="tab.state.requestPane === 'metadata'"
+        icon="search"
+        label="Filter"
+        :class="{ 'bg-field text-fg': fieldFilterOpen }"
+        data-testid="grpc-field-filter-toggle"
+        @click="toggleFieldFilter"
+      />
+      <TooltipIconButton
+        v-if="tab.state.requestPane === 'metadata'"
+        icon="note"
+        :label="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
+        aria-label="Descriptions"
+        :class="{ 'bg-field text-fg': tab.state.fieldDescriptions }"
+        data-testid="grpc-field-descriptions-toggle"
+        @click="toggleFieldDescriptions"
+      />
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
         <div ref="overviewAnchorRef" class="relative flex">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'bg-field text-fg': overviewOpen }"
-                aria-label="Variables"
-                data-testid="grpc-variables-overview-toggle"
-                @click="overviewOpen = !overviewOpen"
-              >
-                <CodiconIcon name="variable-group" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Variables</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="variable-group"
+            label="Variables"
+            :class="{ 'bg-field text-fg': overviewOpen }"
+            data-testid="grpc-variables-overview-toggle"
+            @click="overviewOpen = !overviewOpen"
+          />
           <PopoverAnchor :reference="overviewAnchorRef ?? undefined" />
         </div>
         <VariablesOverviewPanel

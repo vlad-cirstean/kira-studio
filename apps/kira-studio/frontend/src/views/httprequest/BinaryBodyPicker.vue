@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
@@ -46,20 +46,12 @@ function onClearFile(): void {
         </TooltipTrigger>
         <TooltipContent>{{ tab.state.binaryFile.path }}</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Clear"
-            data-testid="http-binary-clear-file"
-            @click="onClearFile"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Clear</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Clear"
+        data-testid="http-binary-clear-file"
+        @click="onClearFile"
+      />
     </template>
   </div>
 </template>
