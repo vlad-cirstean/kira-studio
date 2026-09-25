@@ -181,17 +181,20 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
 }
 
-func requireRelationPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 2 || segments[0].Kind != "database" || !relationKinds[segments[1].Kind] {
-		return model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got: "+model.EncodePath(segments), nil)
+// requireRelationPath is Describe/Definition/Read/Count's shared database/table path check (P113
+// G2) — the object segment accepts relationKinds's own set (table/view/matview), same as Children's
+// own leaf check above.
+func requireRelationPath(path model.NodePath, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
+	segs, err := adapters.RequirePath(path, opName, adapters.Seg("database"), adapters.Seg("table", "table", "view", "matview"))
+	if err != nil {
+		return model.PathSegment{}, model.PathSegment{}, err
 	}
-	return segments[0], segments[1], nil
+	return segs[0], segs[1], nil
 }
 
 // Describe is index.ts's describe.
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
-	databaseSegment, objectSegment, err := requireRelationPath(path.Segments, "describe")
+	databaseSegment, objectSegment, err := requireRelationPath(path, "describe")
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
@@ -233,10 +236,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 // together with its columns, in one round trip (well, two — relevantTables plus one schema-wide
 // system.columns query — still orders of magnitude cheaper than a listColumnsRaw call per table).
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
-	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got: "+model.EncodePath(path.Segments), nil)
+	segs, err := adapters.RequirePath(path, "schemaColumns", adapters.Seg("database"))
+	if err != nil {
+		return nil, err
 	}
-	databaseSegment := path.Segments[0]
+	databaseSegment := segs[0]
 	handle, err := a.requireHandle()
 	if err != nil {
 		return nil, err
@@ -248,7 +252,7 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	databaseSegment, objectSegment, err := requireRelationPath(path.Segments, "definition")
+	databaseSegment, objectSegment, err := requireRelationPath(path, "definition")
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
@@ -262,7 +266,7 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	databaseSegment, objectSegment, err := requireRelationPath(req.Path.Segments, "read")
+	databaseSegment, objectSegment, err := requireRelationPath(req.Path, "read")
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +292,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 // Count is index.ts's count — no getReadTarget call (D19/scenario 30): count() needs only the
 // qualified name, not the columns/engine/keys catalog round trips read() genuinely uses.
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	databaseSegment, objectSegment, err := requireRelationPath(req.Path.Segments, "count")
+	databaseSegment, objectSegment, err := requireRelationPath(req.Path, "count")
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
