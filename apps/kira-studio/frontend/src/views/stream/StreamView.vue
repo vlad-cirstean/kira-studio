@@ -614,12 +614,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
+  <div class="h-full flex flex-col min-h-0" data-testid="stream-view" :data-path="tab.path">
     <!-- P104: SplitterGroup wraps the inlined header+toolbar chrome + CellEditorDock, since the
          resize handle must sit as reka's own direct child alongside the panel it resizes
          (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
-    <SplitterGroup direction="vertical" class="stream-split">
-    <SplitterPanel class="stream-split-top" :order="1">
+    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
+    <SplitterPanel class="flex flex-col min-h-0" :order="1">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
          Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
@@ -778,7 +778,7 @@ onUnmounted(() => {
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
       <div class="flex items-center gap-1.5 min-w-0">
-        <div class="add-message-anchor">
+        <div class="relative">
           <Tooltip v-if="canInsert">
             <TooltipTrigger as-child>
               <Button
@@ -867,7 +867,7 @@ onUnmounted(() => {
         <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
-        <div class="history-anchor">
+        <div class="relative">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -889,7 +889,7 @@ onUnmounted(() => {
             @close="filterHistoryOpen = false"
           />
         </div>
-        <div class="filter-field">
+        <div class="w-40 shrink-0">
           <div
             class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-field px-2"
           >
@@ -909,7 +909,7 @@ onUnmounted(() => {
             />
           </div>
         </div>
-        <div class="partition-anchor">
+        <div class="relative">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -929,20 +929,22 @@ onUnmounted(() => {
           <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
             <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
             <PopoverContent align="start" class="w-52 p-0" data-testid="stream-partition-menu">
-              <div class="partition-menu">
-                <div v-if="partitionOptionsLoading" class="text-kira-sm text-muted-foreground partition-menu-empty">
+              <!-- Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-
+                   PopoverPanel shape. -->
+              <div class="flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1">
+                <div v-if="partitionOptionsLoading" class="text-kira-sm text-muted-foreground p-1">
                   Loading…
                 </div>
                 <div
                   v-else-if="partitionOptions.length === 0"
-                  class="text-kira-sm text-muted-foreground partition-menu-empty"
+                  class="text-kira-sm text-muted-foreground p-1"
                 >
                   No partitions
                 </div>
                 <Label
                   v-for="p in partitionOptions"
                   :key="p"
-                  class="partition-option"
+                  class="partition-option flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1"
                   :data-testid="`stream-filter-partition-option-${p}`"
                 >
                   <Checkbox
@@ -958,8 +960,11 @@ onUnmounted(() => {
             </PopoverContent>
           </Popover>
         </div>
-        <div class="timestamp-filter-field">
-          <div class="ts-input-row">
+        <!-- P31 D12/D13: the "since" field's own wrapper — not the offset field's shrink-0 w-40
+             (that fixed 160px width and 100%-wide input are sized for a single bare TextField;
+             this one also carries a calendar trigger beside the input and an error line below it). -->
+        <div class="flex flex-col gap-0.5 shrink-0">
+          <div class="flex items-center gap-0.5">
             <Tooltip :disabled="!timestampError">
               <TooltipTrigger as-child>
                 <div
@@ -984,7 +989,7 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ timestampError }}</TooltipContent>
             </Tooltip>
-            <span class="ts-calendar-anchor">
+            <span class="relative shrink-0">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <Button
@@ -1014,7 +1019,7 @@ onUnmounted(() => {
           </div>
           <span
             v-if="timestampError"
-            class="filter-field-error"
+            class="whitespace-nowrap text-error text-kira-xs"
             data-testid="stream-filter-timestamp-error"
             >{{ timestampError }}</span
           >
@@ -1075,7 +1080,15 @@ onUnmounted(() => {
       </Button>
     </div>
     <template v-else>
-    <div class="list-body" data-testid="stream-list">
+    <!-- Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
+         unscoped `position: absolute; inset: 0` rule) — without it inset:0 has no positioned
+         ancestor anywhere up to <body>, so the placeholder expands to cover the whole app window
+         instead of just this row list, intercepting pointer events app-wide (the tree sidebar
+         included) whenever a stream view shows an empty state. Same fix SlickGridHost.vue already
+         applies to its own `.slick-grid-host` for the identical shared class. `.list-body`/
+         `.no-rows` stay bare markers -- `.no-rows` is polled directly by interaction.spec.ts/
+         sqs.frontend.spec.ts/kafka.frontend.spec.ts. -->
+    <div class="list-body relative flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="stream-list">
       <Alert
         v-if="isBatch && !rt?.polled"
         class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
@@ -1116,7 +1129,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('key')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">key</span>
               <KuiColumnResizeHandle
-                class="resize-handle"
+                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
                 draggable="false"
                 data-testid="stream-column-resize-key"
                 label="Resize key column"
@@ -1131,7 +1144,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('timestamp')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">timestamp</span>
               <KuiColumnResizeHandle
-                class="resize-handle"
+                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
                 label="Resize timestamp column"
@@ -1146,7 +1159,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('headers')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">headers</span>
               <KuiColumnResizeHandle
-                class="resize-handle"
+                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
                 label="Resize headers column"
@@ -1161,7 +1174,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap relative" :style="{ width: `${widthFor('attrs')}px` }">
               <span class="text-fg overflow-hidden text-ellipsis">attrs</span>
               <KuiColumnResizeHandle
-                class="resize-handle"
+                class="absolute top-0 right-0 w-1 h-full cursor-col-resize z-1"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
                 label="Resize attrs column"
@@ -1177,7 +1190,7 @@ onUnmounted(() => {
           </div>
           <div
             ref="scrollEl"
-            class="tbody-scroll"
+            class="flex-1 min-h-0 overflow-auto"
             data-testid="virtual-list"
             role="listbox"
             aria-label="Stream rows"
@@ -1187,7 +1200,7 @@ onUnmounted(() => {
               <div
                 v-for="vi in virtualItems"
                 :key="String(vi.key)"
-                class="stream-row virtual-row"
+                class="stream-row flex border-b border-border cursor-pointer h-row virtual-row"
                 data-testid="stream-row"
                 :data-row-index="rowIndices[vi.index]"
                 :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
@@ -1257,7 +1270,7 @@ onUnmounted(() => {
                   {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
                 <div
-                  class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate msg-body flex-1"
+                  class="flex items-center px-2 border-r border-b border-border font-data truncate flex-1 text-muted-foreground text-kira-sm"
                   data-testid="stream-body"
                   role="option"
                   tabindex="0"
@@ -1288,53 +1301,17 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities (`.path`, unused anywhere in the template, dropped entirely as dead weight).
+   `.stream-row` stays a bare marker to anchor `:hover`/`.selected`/`.search-match[-current]`.
+   `.list-body`/`.no-rows` stay bare markers to anchor the descendant rule below -- `.no-rows` is
+   also polled directly by interaction.spec.ts/sqs.frontend.spec.ts/kafka.frontend.spec.ts.
+   `.partition-option` stays a bare marker to anchor `:hover` -- also polled directly by
+   kafka.frontend.spec.ts.
 
-.stream-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-/* P104: the SplitterGroup wrapping the inlined header+toolbar chrome + CellEditorDock.vue's own
-   dock panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
-   PanelSplitter. */
-.stream-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.stream-split-top {
-  @apply flex flex-col min-h-0;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` is now a bare marker class, kept only because cell-editor.spec.ts polls its
-   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
-
-/* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */
-.path {
-  @apply text-subtle;
-}
-
-/* Wraps the "Add message" trigger button and its Popover — P104 §3: reka's PopoverAnchor takes
-   the trigger's real DOM node via an explicit `:reference`, so this wrapper no longer does the
-   positioning work Task #64's PopoverPanel needed; kept only as the trigger's layout box. */
-.add-message-anchor {
-  @apply relative;
-}
-
-/* tabular body shared shape (P16's thead/th/td law, P110 B29's utility strings) — the flex row
-   container and the scrolling wrapper around it are local glue, same as the source design's own
-   (unshared) .tbody/.tr rules. */
-.tbody-scroll {
-  @apply flex-1 min-h-0 overflow-auto;
-}
-
-/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
-
-.stream-row {
-  /* P49 F7/D5: previously unset (sized off whatever text a cell happened to hold) — now fixed,
-     matching the density-driven rowHeight computed VirtualList's offset math needs. */
-  @apply flex border-b border-border cursor-pointer h-row;
-}
-
+   P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
+   `.cell-splitter` (template above) is a bare marker class, kept only because cell-editor.spec.ts
+   polls its box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
 .stream-row:hover {
   @apply bg-hover;
 }
@@ -1361,79 +1338,11 @@ onUnmounted(() => {
   @apply text-bg bg-search-match-current;
 }
 
-/* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
-.msg-body {
-  @apply text-muted-foreground text-kira-sm font-data;
-}
-
-.list-body {
-  /* Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
-     unscoped `position: absolute; inset: 0` rule) — without it inset:0 has no positioned ancestor
-     anywhere up to <body>, so the placeholder expands to cover the whole app window instead of
-     just this row list, intercepting pointer events app-wide (the tree sidebar included) whenever
-     a stream view shows an empty state. Same fix SlickGridHost.vue already applies to its own
-     `.slick-grid-host` for the identical shared class. */
-  @apply relative flex-1 min-h-0 flex flex-col overflow-hidden;
-}
-
 .list-body .no-rows {
   @apply h-full;
 }
 
-.history-anchor,
-.partition-anchor {
-  @apply relative;
-}
-
-.filter-field {
-  @apply w-40 shrink-0;
-}
-
-/* P31 D12/D13: the "since" field's own wrapper — not `.filter-field` (that class's fixed 160px
-   width and 100%-wide input are sized for a single bare TextField; this one also carries a
-   calendar trigger beside the input and an error line below it). */
-.timestamp-filter-field {
-  @apply flex flex-col gap-0.5 shrink-0;
-}
-
-.ts-input-row {
-  @apply flex items-center gap-0.5;
-}
-
-.ts-calendar-anchor {
-  @apply relative shrink-0;
-}
-
-.filter-field-error {
-  @apply whitespace-nowrap text-error text-kira-xs;
-}
-
-/* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */
-.partition-menu {
-  @apply flex flex-col max-h-60 overflow-y-auto gap-0.5 p-1;
-}
-
-.partition-menu-empty {
-  @apply p-1;
-}
-
-.partition-option {
-  @apply flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1;
-}
-
 .partition-option:hover {
   @apply bg-hover;
-}
-
-/* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors the
-   deleted DataGrid.vue's own `.header-cell`/`.resize-handle` pair — SlickGrid resizes its own
-   columns natively now, so this hand-rolled pattern survives only here) — each header cell's own
-   template class list (P110 B29) carries `relative` directly as its positioning context now,
-   rather than a shared scoped rule. Unlike the deleted DataGrid.vue's `.header-cell` (no overflow
-   rule of its own), the header cell's own `overflow-hidden` utility means `right: 0` (rather than
-   DataGrid's `right: -2px`) keeps the whole 4px handle inside its own box instead of half-clipped
-   by that overflow. */
-.resize-handle {
-  @apply absolute top-0 right-0 w-1 h-full cursor-col-resize z-1;
 }
 </style>

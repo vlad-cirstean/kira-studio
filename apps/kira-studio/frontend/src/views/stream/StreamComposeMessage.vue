@@ -57,8 +57,8 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <div class="compose-inner">
-    <div class="compose-header flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
+  <div class="flex flex-col">
+    <div class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal">
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
       <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
       <Tooltip>
@@ -77,8 +77,8 @@ async function submit(): Promise<void> {
       </Tooltip>
     </div>
 
-    <div class="compose-body">
-      <Label v-if="isKafka" class="field">
+    <div class="flex flex-col gap-1.5 p-2">
+      <Label v-if="isKafka" class="flex flex-col gap-0.5 text-kira-sm">
         <span class="text-kira-sm text-muted-foreground">Key (optional)</span>
         <Input
           :model-value="key"
@@ -89,7 +89,7 @@ async function submit(): Promise<void> {
         />
       </Label>
 
-      <Label class="field">
+      <Label class="flex flex-col gap-0.5 text-kira-sm">
         <span class="text-kira-sm text-muted-foreground">Body</span>
         <Textarea
           v-model="body"
@@ -101,7 +101,7 @@ async function submit(): Promise<void> {
         />
       </Label>
 
-      <Label class="field">
+      <Label class="flex flex-col gap-0.5 text-kira-sm">
         <span class="text-kira-sm text-muted-foreground">Headers (optional JSON object)</span>
         <Textarea
           v-model="headers"
@@ -113,12 +113,12 @@ async function submit(): Promise<void> {
         />
       </Label>
 
-      <span v-if="error" class="text-kira-sm error-text" data-testid="stream-add-message-error">{{
+      <span v-if="error" class="text-kira-sm text-error" data-testid="stream-add-message-error">{{
         error
       }}</span>
     </div>
 
-    <div class="compose-actions">
+    <div class="flex justify-end gap-1.5 border-t border-border py-1.5 px-2">
       <Button variant="dialog" size="kira-lg" @click="emit('close')">Cancel</Button>
       <Button
         variant="dialog-primary"
@@ -133,37 +133,3 @@ async function submit(): Promise<void> {
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.compose-inner {
-  @apply flex flex-col;
-}
-
-.compose-header {
-  @apply normal-case tracking-normal;
-}
-
-.compose-body {
-  @apply flex flex-col gap-1.5 p-2;
-}
-
-.field {
-  /* P110 B12: text-kira-sm inlined -- was the shared workbench.css `.field` rule's own
-     contribution (this scoped block already redeclares `gap` at its own, tighter value), now
-     deleted along with the rest of the shared field vocabulary. */
-  @apply flex flex-col gap-0.5 text-kira-sm;
-}
-
-.field-inline {
-  @apply flex-row items-center gap-1;
-}
-
-.error-text {
-  @apply text-error;
-}
-
-.compose-actions {
-  @apply flex justify-end gap-1.5 border-t border-border py-1.5 px-2;
-}
-</style>

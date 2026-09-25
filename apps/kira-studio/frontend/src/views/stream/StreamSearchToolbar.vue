@@ -100,9 +100,9 @@ onUnmounted(() => {
 
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
-  <div ref="rootEl" class="stream-search-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="stream-search-toolbar">
+  <div ref="rootEl" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border bg-elevated" data-testid="stream-search-toolbar">
     <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="search" :size="13" /></span>
-    <div class="search-input">
+    <div class="w-52 shrink-0">
       <Input
         ref="searchInput"
         :model-value="query"
@@ -112,7 +112,7 @@ onUnmounted(() => {
         @update:model-value="(v) => (query = String(v))"
       />
     </div>
-    <span class="text-kira-sm text-muted-foreground search-count" data-testid="stream-search-count">
+    <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="stream-search-count">
       <template v-if="entry && entry.matches.length > 0">
         <b class="font-data">{{ entry.index + 1 }}</b> of <b class="font-data">{{ entry.matches.length }}</b>
       </template>
@@ -181,18 +181,3 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.stream-search-toolbar {
-  @apply bg-elevated;
-}
-
-.search-input {
-  @apply w-52 shrink-0;
-}
-
-.search-count {
-  @apply whitespace-nowrap;
-}
-</style>
