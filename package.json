@@ -48,6 +48,8 @@
     "test:ui:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=ui",
     "test:visual:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual",
     "test:visual:update:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual --update-snapshots",
+    "test:visual:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=visual",
+    "test:visual:update:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=visual --update-snapshots",
     "test:webview": "bun run build:vscode && playwright test --config=apps/kira-space-vscode/playwright.config.ts",
     "test:ipc:fe:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=ipc-frontend",
     "test:unit": "bun test apps/kira-studio/tests/unit apps/kira-space/tests/unit packages/api-core/test packages/git-core/src packages/git-ipc/src apps/kira-space-vscode/src packages/git-ui/src packages/kira-ui/src",
