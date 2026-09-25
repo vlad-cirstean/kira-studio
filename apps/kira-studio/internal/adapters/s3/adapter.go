@@ -2,7 +2,6 @@ package s3
 
 import (
 	"context"
-	"sync"
 
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
@@ -17,17 +16,9 @@ func init() {
 	})
 }
 
-// Adapter is index.ts's S3Adapter. Mirrors redis's adapter closely: bucket ~ redis's database,
-// prefix ~ redis's namespace, object ~ redis's key — a lazy, '/'-delimited key space. Only the
-// bucket itself is a project-tree row; prefix/object stay reachable exclusively through the
-// Browse tab, which calls the same Children this struct has always exposed.
-type Adapter struct {
-	deps adapters.Deps
-
-	// mu guards every field below (F3): Connect/Disconnect write client/scopedBucket/readOnly from
-	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
-	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
-	mu     sync.Mutex
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3), guarded together via adapters.Guarded (P113 G1).
+type connState struct {
 	client *awss3.Client
 	// scopedBucket (options.bucket) — set, this scopes the whole tree to one bucket, for
 	// credentials that can only ever see that one bucket.
@@ -35,43 +26,41 @@ type Adapter struct {
 	readOnly     bool
 }
 
+// Adapter is index.ts's S3Adapter. Mirrors redis's adapter closely: bucket ~ redis's database,
+// prefix ~ redis's namespace, object ~ redis's key — a lazy, '/'-delimited key space. Only the
+// bucket itself is a project-tree row; prefix/object stay reachable exclusively through the
+// Browse tab, which calls the same Children this struct has always exposed.
+type Adapter struct {
+	deps adapters.Deps
+
+	state adapters.Guarded[connState]
+}
+
 // getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
 // takes its result, never a.client directly.
-func (a *Adapter) getClient() *awss3.Client {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.client
-}
+func (a *Adapter) getClient() *awss3.Client { return a.state.Load().client }
 
 // getScopedBucket is Children's own locked read of a.scopedBucket (F3).
-func (a *Adapter) getScopedBucket() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.scopedBucket
-}
+func (a *Adapter) getScopedBucket() string { return a.state.Load().scopedBucket }
 
 // getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *awss3.Client, scopedBucket string, readOnly bool) {
-	a.mu.Lock()
-	a.client = client
-	a.scopedBucket = scopedBucket
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = client
+		s.scopedBucket = scopedBucket
+		s.readOnly = readOnly
+	})
 }
 
 // clearConnected is Disconnect's own locked write (F3).
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.client = nil
-	a.scopedBucket = ""
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = nil
+		s.scopedBucket = ""
+	})
 }
 
 func (a *Adapter) Kind() string        { return "s3" }
