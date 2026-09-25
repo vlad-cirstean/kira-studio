@@ -411,10 +411,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 
    `.ops-detail-cm` stays a bare marker class -- its own :deep(.monaco-editor)/
    :deep(.monaco-scrollable-element)/:deep(.view-line) rules below target Monaco's own internal
-   DOM, which no utility class can reach; this is exactly what plan 5.15 keeps as CSS. */
+   DOM; plan 5.15 keeps the SELECTORS as CSS (no template to put a class on), but their
+   declarations still convert to @apply where they map to a real utility (P110 B37). */
 .ops-detail-cm :deep(.monaco-editor) {
-  height: var(--kira-h-xs);
-  font-size: var(--kira-t-sm);
+  @apply h-4.5 text-kira-sm;
 }
 
 /* The detail row is a single fixed-height (20px) line — VirtualList (P2 §0 note 14) has no
@@ -424,11 +424,11 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
    already turns wordWrap off and the gutter off; this only adds the left/right breathing room
    `.cm-line`'s own padding used to give each row. */
 .ops-detail-cm :deep(.monaco-scrollable-element) {
-  overflow-x: auto;
-  overflow-y: hidden;
+  @apply overflow-x-auto overflow-y-hidden;
 }
 
 .ops-detail-cm :deep(.view-line) {
-  padding: 0 var(--kira-s-4);
+  /* P110 B37: padding: 0 var(--kira-s-4) (8px sides) -> px-2. */
+  @apply px-2;
 }
 </style>

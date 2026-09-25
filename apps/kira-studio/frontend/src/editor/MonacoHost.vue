@@ -648,10 +648,13 @@ watch(
 
 /* wrapper CSS only, past this point -- the rules below target Monaco's own DOM (:deep(.monaco-editor),
    :global(.monaco-hover), :global(.suggest-widget)) or classes injected into Monaco's tokenizer
-   output (:deep(.kira-ed-*)), left as plain CSS rather than risk touching Monaco's own selectors. */
+   output (:deep(.kira-ed-*)). Per the plan's own section 5.15/audit section 6: the SELECTORS stay
+   literal CSS (no template to put a class on), but the declarations inside still convert to @apply
+   where they map to a real utility -- @apply just inlines the utility's own declarations in place,
+   it does not require a template class attribute. P110 B37. */
 .monaco-host--single-line,
 .monaco-host--single-line :deep(.monaco-editor) {
-  height: auto;
+  @apply h-auto;
 }
 
 /* §4.1: app-owned `{{variable}}`/find-bar classes — byte-identical values to `theme.ts:176-251`,
@@ -684,23 +687,19 @@ watch(
    shared `document.body`-level container, so they are never a DOM descendant of `.monaco-host` to
    scope a selector against. */
 :global(.monaco-hover) {
-  z-index: var(--kira-z-tooltip);
+  @apply z-(--kira-z-tooltip);
 }
 
 :global(.monaco-hover .hover-contents pre) {
-  background-color: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  padding: 4px 6px;
+  /* P110 B37: padding: 4px 6px -> py-1 px-1.5 (audit's own literal-px note). */
+  @apply bg-field border border-border rounded-kira-sm py-1 px-1.5;
 }
 
 :global(.monaco-hover .hover-contents p) {
-  font-family: var(--kira-font-ui);
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-muted);
+  @apply font-ui text-kira-xs text-muted-foreground;
 }
 
 :global(.suggest-widget) {
-  z-index: var(--kira-z-tooltip);
+  @apply z-(--kira-z-tooltip);
 }
 </style>
