@@ -30,7 +30,7 @@
     "build:test:space": "cd apps/kira-space/frontend && bun run build:test",
     "build:vscode": "bun run scripts/build-vscode.ts",
     "package:vscode": "bun run scripts/package-vscode.ts",
-    "lint": "biome check . && sh scripts/check-tokens.sh && sh scripts/check-theme-classes.sh",
+    "lint": "biome check . && sh scripts/check-tokens.sh && sh scripts/check-theme-classes.sh && bun scripts/check-class-conflicts.ts",
     "lint:go": "sh scripts/install-golangci-lint.sh && \"$(go env GOPATH)/bin/golangci-lint\" run",
     "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
