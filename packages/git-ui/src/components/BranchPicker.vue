@@ -51,6 +51,8 @@ import {
   type PickerModel,
   type PickerTab,
 } from './pickerModel.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
+import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import {
   formatTrack,
@@ -60,6 +62,7 @@ import {
   remoteCheckoutTarget,
 } from './refListModel.ts';
 import { buildReadOnlyRefMenu, buildRefMenu, remoteNamesFrom } from './rowMenuModel.ts';
+import ShowMoreButton from './ShowMoreButton.vue';
 import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import { childOf, parentOf } from './stackListModel.ts';
@@ -627,7 +630,7 @@ watch(visibleBranchNames, (names) => {
       >
         <template v-if="activeTab === 'branches'">
         <section aria-label="Branches">
-          <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">Branches</div>
+          <RefSectionHeader label="Branches" />
           <div
             v-for="row in model.branchesLocal.visible"
             :key="row.refname"
@@ -682,15 +685,10 @@ watch(visibleBranchNames, (names) => {
                 </span>
                 <span v-if="formatTrack(row.track)" class="kv:text-xs kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </KuiButton>
-              <KuiButton
-                variant="icon"
-                v-kui-tooltip="'More actions'"
-                aria-label="More actions"
+              <RowActionsButton
                 @click="openRefMenuFromButton(row, $event)"
                 @contextmenu="openRefMenu(row, $event)"
-              >
-                <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-              </KuiButton>
+              />
             </template>
           </div>
           <div
@@ -701,19 +699,12 @@ watch(visibleBranchNames, (names) => {
             <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
             <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
           </div>
-          <KuiButton
-            v-if="model.branchesLocal.hiddenCount > 0"
-            class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-            @click="showMore('branchesLocal')"
-          >
-            Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesLocal.hiddenCount) }} more
-            ({{ model.branchesLocal.hiddenCount }} remaining)
-          </KuiButton>
+          <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
           <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
-          <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">Remote branches</div>
+          <RefSectionHeader label="Remote branches" />
           <div
             v-for="row in model.branchesRemote.visible"
             :key="row.refname"
@@ -729,24 +720,12 @@ watch(visibleBranchNames, (names) => {
               <span class="kv:truncate">{{ row.shortName }}</span>
               <span class="kv:text-xs kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
-            <KuiButton
-              variant="icon"
-              v-kui-tooltip="'More actions'"
-              aria-label="More actions"
+            <RowActionsButton
               @click="openRefMenuFromButton(row, $event)"
               @contextmenu="openRefMenu(row, $event)"
-            >
-              <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-            </KuiButton>
+            />
           </div>
-          <KuiButton
-            v-if="model.branchesRemote.hiddenCount > 0"
-            class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-            @click="showMore('branchesRemote')"
-          >
-            Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesRemote.hiddenCount) }} more
-            ({{ model.branchesRemote.hiddenCount }} remaining)
-          </KuiButton>
+          <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
           <div v-if="model.branchesRemote.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">
             No remote branches
           </div>

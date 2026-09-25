@@ -15,9 +15,10 @@ import { computed, ref } from 'vue';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
+import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildReadOnlyStashMenu } from './rowMenuModel.ts';
+import ShowMoreButton from './ShowMoreButton.vue';
 
 export interface StashRowModel {
   /** `data-row-id`/roving-tabindex key — `stash:<sha>` or `global:<sha>`, distinguishing the two
@@ -119,23 +120,12 @@ function onMenuSelect(id: string): void {
       <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
       <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </KuiButton>
-    <KuiButton
-      variant="icon"
-      v-kui-tooltip="'More actions'"
-      aria-label="More actions"
+    <RowActionsButton
       @click="openMenuFromButton(entry, $event)"
       @contextmenu="openMenu(entry, $event)"
-    >
-      <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-    </KuiButton>
+    />
   </div>
-  <KuiButton
-    v-if="section.hiddenCount > 0"
-    class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-    @click="showMore"
-  >
-    Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
-  </KuiButton>
+  <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
   <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">{{ emptyMessage }}</div>
 
   <RowContextMenu

@@ -19,6 +19,7 @@ import { KuiButton } from '@kira/kira-ui';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
 import { buildGlobalStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
 import { globalRowModel } from './stashListModel.ts';
@@ -91,8 +92,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section aria-label="Global stash">
-    <div class="kv:flex kv:items-center kv:justify-between kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">
-      <span>Global stash</span>
+    <RefSectionHeader label="Global stash">
       <KuiButton
         v-if="writeCapability"
         variant="icon"
@@ -101,7 +101,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
         aria-label="Save to global stash…"
         @click="emit('saveGlobalStash')"
       />
-    </div>
+    </RefSectionHeader>
     <StashRows
       :section="section"
       :stash="stash"

@@ -11,9 +11,12 @@ import type { InProgressOperation, RefRow } from '@kira/git-ipc';
 import { KuiButton, kuiRowVariants } from '@kira/kira-ui';
 import { computed } from 'vue';
 import type { OpsState } from '../state/ops.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
+import RowActionsButton from './RowActionsButton.vue';
 import RowContextMenu from './RowContextMenu.vue';
-import { REF_LIST_SECTION_CAP, type RefListSection } from './refListModel.ts';
+import type { RefListSection } from './refListModel.ts';
 import { buildReadOnlyRefMenu, buildRefMenu } from './rowMenuModel.ts';
+import ShowMoreButton from './ShowMoreButton.vue';
 import { useRowMenu } from './useRowMenu.ts';
 
 const props = defineProps<{
@@ -103,7 +106,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
 
 <template>
   <section aria-label="Tags">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">Tags</div>
+    <RefSectionHeader label="Tags" />
     <div
       v-for="row in section.visible"
       :key="row.refname"
@@ -128,23 +131,12 @@ async function onRefMenuSelect(id: string): Promise<void> {
         </span>
         <span class="kv:font-data kv:text-xs kv:text-muted-foreground">{{ targetCommit(row) }}</span>
       </KuiButton>
-      <KuiButton
-        variant="icon"
-        v-kui-tooltip="'More actions'"
-        aria-label="More actions"
+      <RowActionsButton
         @click="openRefMenuFromButton(row, $event)"
         @contextmenu="openRefMenu(row, $event)"
-      >
-        <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-      </KuiButton>
+      />
     </div>
-    <KuiButton
-      v-if="section.hiddenCount > 0"
-      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-      @click="showMore"
-    >
-      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
-    </KuiButton>
+    <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No tags</div>
 
     <RowContextMenu

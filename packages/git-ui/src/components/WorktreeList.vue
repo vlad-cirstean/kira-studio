@@ -22,7 +22,8 @@ import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 import { type PickerList, worktreeLabel } from './pickerModel.ts';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
+import ShowMoreButton from './ShowMoreButton.vue';
 
 const props = defineProps<{
   section: PickerList<WorktreeEntry>;
@@ -118,8 +119,7 @@ async function confirmRemove(): Promise<void> {
 
 <template>
   <section aria-label="Worktrees">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">
-      Worktrees
+    <RefSectionHeader label="Worktrees">
       <KuiButton
         v-if="writeCapability"
         class="kv:ml-auto"
@@ -127,7 +127,7 @@ async function confirmRemove(): Promise<void> {
       >
         Create Worktree…
       </KuiButton>
-    </div>
+    </RefSectionHeader>
     <div
       v-for="entry in section.visible"
       :key="entry.path"
@@ -175,13 +175,7 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-trash" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <KuiButton
-      v-if="section.hiddenCount > 0"
-      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-      @click="showMore"
-    >
-      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
-    </KuiButton>
+    <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No worktrees</div>
 
     <KuiDialog

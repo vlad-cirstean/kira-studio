@@ -24,6 +24,7 @@ import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
 import { buildStashMenu } from './rowMenuModel.ts';
 import StashRows, { type StashRowModel } from './StashRows.vue';
 import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
@@ -111,7 +112,7 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 
 <template>
   <section class="kv-branch-section" aria-label="Stashes">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">Stashes</div>
+    <RefSectionHeader label="Stashes" />
     <StashRows
       :section="section"
       :stash="stash"

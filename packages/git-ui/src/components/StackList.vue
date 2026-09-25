@@ -19,7 +19,8 @@ import { KuiButton } from '@kira/kira-ui';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
+import RefSectionHeader from './RefSectionHeader.vue';
+import ShowMoreButton from './ShowMoreButton.vue';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
@@ -86,9 +87,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
 <template>
   <section aria-label="Stacks">
-    <div class="kv:flex kv:items-center kv:h-control-sm kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground kv:uppercase kv:tracking-wider">
-      Stacks
-    </div>
+    <RefSectionHeader label="Stacks" />
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="kv:mb-1">
       <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
@@ -192,14 +191,7 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <KuiButton
-      v-if="stacks.hiddenCount > 0 || orphans.hiddenCount > 0"
-      class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
-      @click="showMore"
-    >
-      Show {{ Math.min(REF_LIST_SECTION_CAP, stacks.hiddenCount + orphans.hiddenCount) }} more
-      ({{ stacks.hiddenCount + orphans.hiddenCount }} remaining)
-    </KuiButton>
+    <ShowMoreButton :hidden-count="stacks.hiddenCount + orphans.hiddenCount" @click="showMore" />
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
