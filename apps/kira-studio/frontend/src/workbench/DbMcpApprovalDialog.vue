@@ -100,6 +100,11 @@ async function onDeny(requestId: string): Promise<void> {
 async function onApprove(requestId: string): Promise<void> {
   await dbMcpStore.approveQuery(requestId);
 }
+
+// P110 B39: `.detail`'s own class string, used 5 times in the template below (the plan's own 4+
+// threshold for de-duplication) -- a `const` here rather than a local child component, since every
+// site is a plain `<p>` with no props or behaviour of its own.
+const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
 </script>
 
 <template>
@@ -130,20 +135,23 @@ async function onApprove(requestId: string): Promise<void> {
       </DialogHeader>
 
       <div class="overflow-auto">
-        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="message">
+        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="whitespace-pre-wrap mb-1 pt-2 px-3">
           {{ heavyLede }}
         </p>
-        <p v-else class="message">
+        <p v-else class="whitespace-pre-wrap mb-1 pt-2 px-3">
           <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
           ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
           MCP server.
         </p>
-        <pre class="font-data statement" data-testid="db-mcp-approval-statement">{{
+        <pre
+          class="font-data max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm mx-3 mb-1 py-1 px-1.5 bg-field border border-border"
+          data-testid="db-mcp-approval-statement"
+        >{{
           dbMcpStore.approval.pending.statement
         }}</pre>
 
-        <div v-if="dbMcpStore.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
-          <p class="detail" data-testid="db-mcp-approval-plan-rows">
+        <div v-if="dbMcpStore.approval.pending.plan" class="mb-1" data-testid="db-mcp-approval-plan">
+          <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-plan-rows">
             <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
               Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
               read — threshold {{ dbMcpStore.approval.pending.plan.thresholdRows.toLocaleString() }}.
@@ -153,18 +161,18 @@ async function onApprove(requestId: string): Promise<void> {
           <p
             v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
             :key="i"
-            class="detail plan-issue"
+            :class="[DETAIL_CLASS, 'pt-0']"
             data-testid="db-mcp-approval-plan-issue"
           >
             <strong>{{ issue.severity }}</strong> {{ issue.message }}
           </p>
-          <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" class="detail">
+          <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" :class="DETAIL_CLASS">
             +{{ dbMcpStore.approval.pending.plan.issuesOmitted }} more
           </p>
         </div>
 
-        <p class="detail" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
-        <p v-if="dbMcpStore.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
+        <p :class="DETAIL_CLASS" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
+        <p v-if="dbMcpStore.approval.queued > 1" :class="DETAIL_CLASS" data-testid="db-mcp-approval-queue-count">
           1 of {{ dbMcpStore.approval.queued }} waiting
         </p>
       </div>
@@ -193,35 +201,3 @@ async function onApprove(requestId: string): Promise<void> {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.message {
-  /* P110 B37: margin: 0 0 var(--kira-s-2) (4px bottom) -> mb-1; padding: var(--kira-s-4)
-     var(--kira-s-5) 0 (8px top, 12px sides) -> pt-2 px-3. */
-  @apply whitespace-pre-wrap mb-1 pt-2 px-3;
-}
-
-.statement {
-  /* P110 B37: margin: 0 var(--kira-s-5) var(--kira-s-2) (12px sides, 4px bottom) -> mx-3 mb-1;
-     padding: var(--kira-s-2) var(--kira-s-3) (4px/6px) -> py-1 px-1.5; background/border become
-     bg-field/border border-border. */
-  @apply max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm mx-3 mb-1 py-1 px-1.5 bg-field border border-border;
-}
-
-.detail {
-  /* P110 B37: padding: 0 var(--kira-s-5) var(--kira-s-4) (12px sides, 8px bottom) -> px-3 pb-2;
-     color: var(--kira-fg-subtle) -> text-subtle. */
-  @apply m-0 px-3 pb-2 text-subtle;
-}
-
-.plan-block {
-  /* P110 B37: margin: 0 0 var(--kira-s-2) -> mb-1. */
-  @apply mb-1;
-}
-
-.plan-issue {
-  @apply pt-0;
-}
-</style>
