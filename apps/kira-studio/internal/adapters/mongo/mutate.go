@@ -18,15 +18,6 @@ import (
 // collide with genuine data.
 const documentSentinel = "$document"
 
-func resolveCollectionPath(path model.NodePath) (database, collection string, err error) {
-	segments := path.Segments
-	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "collection" {
-		return "", "", adapters.New(adapters.CodeNotFound,
-			"mutate requires a database/collection path, got: "+model.EncodePath(segments), nil)
-	}
-	return segments[0].Name, segments[1].Name, nil
-}
-
 // parseIdKey ports mutate.ts's parseIdKey.
 func parseIdKey(key model.RowValues) (any, error) {
 	if len(key) != 1 || key[0].Name != "_id" {
@@ -68,10 +59,11 @@ func renderOpText(op model.MutationRowOp, collectionName string) (string, error)
 // preview is mutate.ts's preview — synchronous (Adapter rule 3's discipline): no network, no
 // catalog lookup.
 func preview(plan model.MutationPlan) ([]string, error) {
-	_, collection, err := resolveCollectionPath(plan.Path)
+	_, objectSegment, err := requireTwoSegmentObjectPath(plan.Path, "mutate")
 	if err != nil {
 		return nil, err
 	}
+	collection := objectSegment.Name
 	out := make([]string, len(plan.Ops))
 	for i, op := range plan.Ops {
 		text, err := renderOpText(op, collection)
@@ -174,10 +166,11 @@ func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx,
 		return model.MutationResult{}, err
 	}
 
-	_, collectionName, err := resolveCollectionPath(plan.Path)
+	_, objectSegment, err := requireTwoSegmentObjectPath(plan.Path, "mutate")
 	if err != nil {
 		return model.MutationResult{}, err
 	}
+	collectionName := objectSegment.Name
 	collection := db.Collection(collectionName)
 
 	statements, err := preview(plan)

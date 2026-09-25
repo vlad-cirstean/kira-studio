@@ -2,7 +2,6 @@ package mongo
 
 import (
 	"context"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -219,19 +218,23 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unrecognized path depth", nil)
 }
 
-func requireTwoSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "collection" {
-		return model.PathSegment{}, model.PathSegment{}, adapters.New(adapters.CodeNotFound,
-			opName+" requires a database/collection path, got depth "+strconv.Itoa(len(segments)), nil)
+// requireTwoSegmentObjectPath is Describe/Definition/Read/Count/Mutate's shared database/collection
+// path check (P113 G2) — both positions are kind-exact here, unlike postgres/mysqlfamily's own
+// unconstrained-object-segment variants, since mongo's Describe/Definition never branch on the
+// object segment's Kind the way those do.
+func requireTwoSegmentObjectPath(path model.NodePath, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
+	segs, err := adapters.RequirePath(path, opName, adapters.Seg("database"), adapters.Seg("collection"))
+	if err != nil {
+		return model.PathSegment{}, model.PathSegment{}, err
 	}
-	return segments[0], segments[1], nil
+	return segs[0], segs[1], nil
 }
 
 // Describe is index.ts's describe. §8.5: "Mongo has no FK navigation in v1" — this stub satisfies
 // the Adapter contract without wiring detail no caller reaches; a document tab never calls
 // describe() (ground rules).
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path.Segments, "describe")
+	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path, "describe")
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
@@ -270,7 +273,7 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path.Segments, "definition")
+	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path, "definition")
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
@@ -282,7 +285,7 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 }
 
 func (a *Adapter) resolveCollectionTarget(path model.NodePath) (db *mongodriver.Database, collection string, err error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path.Segments, "read")
+	databaseSegment, objectSegment, err := requireTwoSegmentObjectPath(path, "read")
 	if err != nil {
 		return nil, "", err
 	}
