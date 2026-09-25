@@ -373,7 +373,7 @@ This server exists only inside the app process: `apps/kira-studio/cmd/` holds on
   expiry since M1 (`mcpauth.TTL`).
 - Its port is always `DefaultPort` **8766** (`internal/dbmcp/server.go`). A conflict on that port
   fails the enable outright with a message saying another process is using it — `bindHTTP` never
-  falls back to an OS-assigned port (`docs/ARCHITECTURE.md`'s DB MCP section).
+  falls back to a different, kernel-assigned port (`docs/ARCHITECTURE.md`'s DB MCP section).
 - Its endpoint is `http://127.0.0.1:<port>/mcp`, an ordinary `go-sdk/mcp` Streamable HTTP server
   (`internal/dbmcp/http.go`'s `bindHTTP`) — a JSON-RPC 2.0 `tools/call` POST with an `Authorization:
   Bearer <token>` header reaches it the same way any MCP Streamable HTTP client would; the SDK's own
