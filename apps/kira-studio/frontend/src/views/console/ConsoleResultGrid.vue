@@ -400,10 +400,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="row flex border-b border-border w-[var(--total-width)]"
+          class="group/row flex border-b border-border w-[var(--total-width)]"
           data-testid="console-result-kv-row"
           :data-row="rowIndices[vi.index]"
-          :class="[VIRTUAL_ROW_CLASS, { selected: isSelected(rowIndices[vi.index]!, 0) }]"
+          :class="VIRTUAL_ROW_CLASS"
           :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
           role="option"
           tabindex="0"
@@ -415,6 +415,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           <div
             class="cell overflow-hidden whitespace-nowrap cursor-default w-52 flex items-center text-ellipsis px-2"
             :class="[
+              isSelected(rowIndices[vi.index]!, 0) ? 'bg-select' : 'group-hover/row:bg-hover',
               {
                 'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
                 'search-match-current bg-search-match-current': isCurrentSearchMatch(
@@ -429,13 +430,16 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           </div>
           <div
             class="cell overflow-hidden cursor-default flex-1 flex items-center whitespace-pre-wrap break-words px-2"
-            :class="{
-              'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
-              'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
-                rowIndices[vi.index]!,
-                1,
-              ),
-            }"
+            :class="[
+              isSelected(rowIndices[vi.index]!, 1) ? 'bg-select' : 'group-hover/row:bg-hover',
+              {
+                'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
+                'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
+                  rowIndices[vi.index]!,
+                  1,
+                ),
+              },
+            ]"
           >
             {{ kvRowAt(rowIndices[vi.index]!).value }}
           </div>
@@ -448,26 +452,18 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-/* P110 B40: every plain base rule this file had (`.console-result-grid`, `.body`, `.no-rows`,
-   `.doc-body`/`-tree`/`-text`, `.kv-field`, `.kv-value`, and `.row`/`.cell`'s own base
-   declarations) moved onto the template as Tailwind utilities (scoped CSS is unlayered, so it
-   always wins over a layered utility on the same element regardless of class order, per this
-   plan's own §1 rule). What's left needs its relative rule to interact with a sibling class or
-   Monaco/child-component DOM this template has no element for:
-   - `.row:hover .cell:not(.selected)`: real `:hover` plus a descendant-selector guard.
-   - `.row.selected`: a state class overriding the same background property.
-   - `:deep(.doc-row)`: DocumentRow.vue's own root class, outside this component's scope-id.
-   `.row`/`.cell` stay as bare marker classes to anchor the two rules above; `.no-rows` stays as a
-   bare marker too — a real test dependency (interaction.spec.ts, sqs/kafka frontend specs all
-   locate results by `.no-rows`). */
-.row:hover .cell:not(.selected) {
-  @apply bg-hover;
-}
+/* P110 I2-16: `.row:hover .cell:not(.selected)`/`.row.selected` (each cell's own background)
+   moved onto each `.cell`'s own ternary (`isSelected(row, col) ? 'bg-select' :
+   'group-hover/row:bg-hover'`, `group/row` on the row) -- per-cell, not per-row-at-col-0 as the
+   old row-level `.selected` class read (§3.5.1's own precedence still holds: selected always wins
+   over hover, since the ternary never emits both). `.row`/`.cell` stay bare marker classes (no
+   rule left to anchor, kept for readability/tests); `.no-rows` stays a bare marker too — a real
+   test dependency (interaction.spec.ts, sqs/kafka frontend specs all locate results by
+   `.no-rows`). `.virtual-row` (I2-15) is VIRTUAL_ROW_CLASS now, same as before.
 
-/* P40 D10: same tokens grid/keyvalue's own search highlighting uses.
-   P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own any more --
-   bare marker classes, the tint/text-colour is `bg-search-match[-current] text-bg` alongside on
-   the same element (--color-search-match[-current] already @theme-registered, base.css). */
+   P40 D10: `.search-match`/`.search-match-current` above carry no rule of their own --
+   `bg-search-match[-current] text-bg` alongside on the same element
+   (--color-search-match[-current] already @theme-registered, base.css). */
 
 /* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
    this panel only styles its own #body slot content, read only (no edit/delete affordance, no
@@ -477,11 +473,4 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 :deep(.doc-row) {
   @apply cursor-default;
 }
-
-.row.selected {
-  @apply bg-select;
-}
-
-/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
-   virtualRows.ts), bound on each row's own `:class` -- see ProjectTree.vue's identical note. */
 </style>
