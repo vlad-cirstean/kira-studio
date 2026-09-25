@@ -215,8 +215,22 @@ watch(
     // F17 (P108 Part 10): mirrors onEditorBlur/onBeforeUnmount/onEditorKeydown's own "stage on
     // leave" rule — reseeding used to silently discard a dirty (unsaved) buffer whenever the
     // selected cell changed, or a background republish of the same cell changed its value (F1).
+    //
+    // Dirtiness here is judged against `prevCell.value` — what the buffer was seeded from, and
+    // what the user could have actually diverged from — never the shared `isDirty` computed
+    // (`doc.value !== opts.original()`): `original()` reads `selectedCell.value` live, which by
+    // this point already IS `c`, the cell this watch just received. Comparing against `c.value`
+    // instead of `prevCell.value` made an untouched buffer look "dirty" any time the same cell's
+    // published value swaps representation with no user edit at all — the grid mask preview
+    // toggling the same cell between its real and masked text is exactly that: `onEditorBlur`'s
+    // literal next call (toggling preview back on, which moves focus to the toolbar toggle) would
+    // then stage the buffer's stale-but-"dirty" text as a real edit, straight back into the page's
+    // own unmasked value and bypassing the preview entirely (SlickGridHost.vue's own `dataSource`
+    // extractor prefers a staged edit over `maskTransform`, by design — a real edit is never
+    // masked once committed).
+    const wasDirty = prevCell ? doc.value !== (prevCell.value ?? '') : false;
     if (
-      isDirty.value &&
+      wasDirty &&
       prevCell &&
       !viewerMode.value &&
       prevCell.onEdit &&
