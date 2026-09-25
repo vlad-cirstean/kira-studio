@@ -52,9 +52,6 @@ type Adapter struct {
 func (a *Adapter) Kind() string        { return "sqlite" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
 
-// getDB is runOnConn's own locked read of state.db (F3).
-func (a *Adapter) getDB() *sql.DB { return a.state.Load().db }
-
 // setConnected is Connect's own locked write of db/file/readOnly together (F3).
 func (a *Adapter) setConnected(db *sql.DB, file string, readOnly bool) {
 	a.state.Update(func(s *connState) { s.db = db; s.file = file; s.readOnly = readOnly })
@@ -64,9 +61,6 @@ func (a *Adapter) setConnected(db *sql.DB, file string, readOnly bool) {
 func (a *Adapter) clearConnected() {
 	a.state.Update(func(s *connState) { s.db = nil; s.file = "" })
 }
-
-// getReadOnly is Mutate's own locked read of state.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // Connect is index.ts's connect.
 func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig, op *adapters.OpCtx) (adapters.ConnectInfo, error) {
@@ -155,7 +149,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		a.inFlight.Wait()
-		if db := a.getDB(); db != nil {
+		if db := a.state.Load().db; db != nil {
 			if err := db.Close(); err != nil {
 				a.deps.Log("warn", "sqlite disconnect: "+err.Error())
 			}
@@ -185,7 +179,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 // instance instead, since their cancellation goes through a side connection, not sqlite3_interrupt).
 func runOnConn[T any](ctx context.Context, a *Adapter, opID string, fn func(context.Context, *sql.Conn) (T, error)) (T, error) {
 	var zero T
-	db := a.getDB()
+	db := a.state.Load().db
 	if db == nil {
 		return zero, adapters.New(adapters.CodeConnect, "adapter is not connected", nil)
 	}
@@ -398,7 +392,7 @@ func (a *Adapter) Preview(plan model.MutationPlan) ([]string, error) {
 // Mutate is index.ts's mutate.
 func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapters.OpCtx) (model.MutationResult, error) {
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (model.MutationResult, error) {
-		return mutate(driverCtx, conn, op, a.getReadOnly(), plan)
+		return mutate(driverCtx, conn, op, a.state.Load().readOnly, plan)
 	})
 }
 
