@@ -631,7 +631,7 @@ const statusLine = computed(() => {
 </script>
 
 <template>
-  <div class="console-view" data-testid="console-view" :data-path="tab.path">
+  <div class="h-full flex flex-col min-h-0" data-testid="console-view" :data-path="tab.path">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
@@ -795,7 +795,7 @@ const statusLine = computed(() => {
           }}</TooltipContent>
         </Tooltip>
         <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
-        <div class="saved-anchor">
+        <div class="relative">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -879,11 +879,11 @@ const statusLine = computed(() => {
          running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
     <Alert v-if="rt?.autoExplain" variant="warn" data-testid="console-auto-explain">
       <AlertDescription class="flex items-center gap-1.5">
-        <span class="auto-explain-message">{{ autoExplainMessage }}</span>
+        <span class="flex-1">{{ autoExplainMessage }}</span>
         <button
           v-if="canShowAutoExplainPlan"
           type="button"
-          class="auto-explain-action"
+          class="border-0 bg-none p-0 text-inherit underline cursor-pointer text-[length:inherit] shrink-0"
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >
@@ -903,9 +903,9 @@ const statusLine = computed(() => {
       <!-- P104: SplitterGroup wrapping the editor+results body and CellEditorDock.vue's own dock
            panel — the resize handle must sit as reka's own direct child alongside the panel it
            resizes (CellEditorDock.vue's own header comment). -->
-      <SplitterGroup direction="vertical" class="console-split">
-      <SplitterPanel class="console-split-top" :order="1">
-      <div class="editor-body">
+      <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
+      <SplitterPanel class="flex flex-col min-h-0" :order="1">
+      <div class="flex-1 basis-2/5 min-h-0 border-b border-border">
         <MonacoHost
           ref="editorHost"
           :doc="localDoc"
@@ -922,22 +922,22 @@ const statusLine = computed(() => {
         />
       </div>
 
-      <div v-if="rt && rt.results.length > 0" class="results-body" data-testid="console-results">
+      <div v-if="rt && rt.results.length > 0" class="flex-1 basis-3/5 min-h-0 flex flex-col" data-testid="console-results">
         <!-- Console.html's own console body shows one result at a time behind a strip, rather
              than stacking every statement's page — D2. Each chip is a result *set*, addressed by
              its stable key (state.ts's resultPageKey/nextSeq), not by position, so closing one
              doesn't re-key its siblings. -->
-        <div class="result-strip-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+        <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
           <div
             ref="resultStripRef"
-            class="result-strip"
+            class="flex items-center flex-1 min-w-0 overflow-x-auto gap-1 scrollbar-none"
             data-testid="console-result-strip"
             @wheel="onResultStripWheel"
           >
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm result-tab"
+              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 result-tab max-w-36 h-5.5 text-kira-xs"
               :class="[
                 result.key === rt.activeKey
                   ? 'bg-elevated border-border-strong text-fg'
@@ -952,17 +952,17 @@ const statusLine = computed(() => {
                    sibling now, not its child. -->
               <button
                 type="button"
-                class="result-tab-main"
+                class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
                 @click="consoleViewStore.setActiveResult(tab.id, result.key)"
                 @auxclick.middle="onResultMiddleClick(result.key)"
                 @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
               >
-                <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
-                <span class="result-tab-title">Result {{ i + 1 }}</span>
+                <CodiconIcon :name="iconForResult(result.key)" :size="13" class="shrink-0" />
+                <span class="overflow-hidden text-ellipsis whitespace-nowrap min-w-0">Result {{ i + 1 }}</span>
               </button>
               <button
                 type="button"
-                class="result-close"
+                class="result-close inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 opacity-0"
                 aria-label="Close result"
                 data-testid="console-result-close"
                 @click="consoleViewStore.closeResult(tab.id, result.key)"
@@ -1016,7 +1016,7 @@ const statusLine = computed(() => {
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"
         />
-        <div class="result-grid">
+        <div class="flex-1 min-h-0">
           <!-- D17: a plan result set renders through its own view — reusing the strip/close/
                eviction machinery above, but never ConsoleResultGrid, which resolves a Page that a
                plan result set does not have. -->
@@ -1044,101 +1044,15 @@ const statusLine = computed(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.console-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-/* P104: the SplitterGroup wrapping the editor+results body and CellEditorDock.vue's own dock
-   panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
-   PanelSplitter. */
-.console-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.console-split-top {
-  @apply flex flex-col min-h-0;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.cell-splitter` is now a bare marker class, kept only because cell-editor.spec.ts polls its
-   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). */
-
-.saved-anchor {
-  @apply relative;
-}
-
-.auto-explain-message {
-  @apply flex-1;
-}
-
-.auto-explain-action {
-  @apply border-0 bg-none p-0 text-inherit underline cursor-pointer text-[length:inherit] shrink-0;
-}
-
-.editor-body {
-  @apply flex-1 basis-2/5 min-h-0 border-b border-border;
-}
-
-/* P40 D7: flex:1 (not a fixed height) so the active result's grid always reaches the panel's
-   bottom edge — DataView.vue's own .grid-area rule (F1: the fixed-height .result-panel this used
-   to be left an empty band below the last row whenever a result had fewer rows than that height). */
-.results-body {
-  @apply flex-1 basis-3/5 min-h-0 flex flex-col;
-}
-
-/* One tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
-   TabStrip.vue's own tab strip uses, since a result set *is* a tab in every way that matters
-   here. The trailing status text keeps data-testid="console-status": the "N results" /
-   "Running…" / "Cancelled" line the deleted .status-line bar used to own (D4, wording
-   revised on the P46-2 regression pass — "result sets" read as a second, unrelated concept
-   sitting right next to a strip of chips already called "results" everywhere else in the UI).
-   P42 D6: a step smaller than the app's primary tabs (--kira-h-sm/--kira-t-xs vs. --kira-h-md/
-   --kira-t-sm) — the only way a secondary, in-panel strip actually reads as secondary — and
-   scrollable under the wheel once new-result-by-default (D5) means a working session accumulates
-   chips. No colour rail here: every result set in one console belongs to the same connection, so
-   it would carry no information the main tab strip's own rail doesn't already.
-   Item 6: the status text used to sit *inside* the same scrolling flex row as the chips
-   themselves, pushed via `ml-auto` to the far end of that row's *content* — once enough chips
-   accumulated to overflow the strip, that end sat off past the visible edge, so the status text
-   (the running/result-count readout) scrolled out of view along with the chips that pushed past
-   it. Splitting the chips into their own scrollable child, sized to the *remaining* width by
-   `flex: 1; min-width: 0`, keeps `.result-strip-row` itself unscrolled and exactly toolbar-width —
-   `ml-auto`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
-   scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
-.result-strip-row {
-  @apply gap-1;
-}
-
-/* P110 B37: scrollbar-width: none + ::-webkit-scrollbar { @apply hidden } becomes the shared
-   scrollbar-none utility (same conversion as TabStrip.vue/WorkbenchShell.vue). */
-.result-strip {
-  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-1 scrollbar-none;
-}
-
-.result-tab {
-  @apply max-w-36 h-5.5 text-kira-xs;
-}
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities (unlayered scoped CSS always wins over a layered utility regardless of class order,
+   per this plan's own §1 rule). `.cell-splitter` stays a bare marker class with no rule of its
+   own (P110 B32 -- cell-editor.spec.ts polls its box-shadow via getComputedStyle). `.result-tab`/
+   `.result-close` stay as bare markers to anchor the compound/descendant state rules below, which
+   still need their relative source order. */
 
 .result-tab:hover:not(.is-active) {
   @apply bg-hover;
-}
-
-/* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
-   whole chip — unstyled beyond filling the space .result-tab's own padding leaves it. */
-.result-tab-main {
-  @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
-}
-
-.result-tab-icon {
-  @apply shrink-0;
-}
-
-.result-tab-title {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
-}
-
-.result-close {
-  @apply inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 opacity-0;
 }
 
 .result-tab:hover .result-close,
@@ -1148,9 +1062,5 @@ const statusLine = computed(() => {
 
 .result-close:hover {
   @apply bg-hover;
-}
-
-.result-grid {
-  @apply flex-1 min-h-0;
 }
 </style>

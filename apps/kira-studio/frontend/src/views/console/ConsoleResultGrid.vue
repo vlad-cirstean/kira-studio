@@ -322,14 +322,14 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 </script>
 
 <template>
-  <div class="console-result-grid" data-testid="console-result-grid">
+  <div class="h-full min-h-0 flex flex-col text-kira-md font-data" data-testid="console-result-grid">
     <Alert v-if="copyError" variant="destructive" data-testid="console-copy-error">
       <AlertDescription>{{ copyError }}</AlertDescription>
     </Alert>
-    <div v-if="!page || page.rowCount === 0" class="no-rows">{{ page ? 'No rows' : '' }}</div>
+    <div v-if="!page || page.rowCount === 0" class="no-rows h-full flex items-center justify-center text-muted-foreground text-kira-sm">{{ page ? 'No rows' : '' }}</div>
     <!-- P31 D19/P24 D8 precedent: filtering to zero matches is a distinct empty state from "no
          data loaded" — same discipline as KeyValueView.vue's own EmptyState pair. -->
-    <div v-else-if="rowIndices.length === 0" class="no-rows" data-testid="console-no-matching-rows">
+    <div v-else-if="rowIndices.length === 0" class="no-rows h-full flex items-center justify-center text-muted-foreground text-kira-sm" data-testid="console-no-matching-rows">
       No matching rows
     </div>
     <ConsoleSlickGrid
@@ -340,12 +340,12 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       :tab-id="tabId"
       :connection-id="connectionId"
       :path="path"
-      class="body"
+      class="flex-1 min-h-0"
     />
     <div
       v-else-if="page.kind === 'document'"
       ref="docScrollEl"
-      class="body doc-body overflow-auto"
+      class="flex-1 min-h-0 p-1 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
       aria-label="Documents"
@@ -372,7 +372,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           <template #body>
             <div
               v-if="consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)"
-              class="doc-body-tree"
+              class="flex-1 min-h-0 border-t border-border bg-elevated overflow-hidden"
               data-testid="document-body"
             >
               <DocumentTree
@@ -381,7 +381,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
                 :row="documentRows[vi.index]!.index"
                 @toggle-path="(path) => documentRowsStore.togglePath(pageKey, documentRows[vi.index]!.index, path)"
               />
-              <pre v-else class="doc-body-text">{{ documentRow(pageKey, documentRows[vi.index]!.index)?.body }}</pre>
+              <pre v-else class="m-0 whitespace-pre-wrap break-words font-data py-1 px-2">{{ documentRow(pageKey, documentRows[vi.index]!.index)?.body }}</pre>
             </div>
           </template>
         </DocumentRow>
@@ -390,7 +390,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
     <div
       v-else
       ref="kvScrollEl"
-      class="body overflow-auto"
+      class="flex-1 min-h-0 overflow-auto"
       data-testid="virtual-list"
       role="listbox"
       aria-label="Result rows"
@@ -400,7 +400,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="row virtual-row"
+          class="row virtual-row flex border-b border-border w-[var(--total-width)]"
           data-testid="console-result-kv-row"
           :data-row="rowIndices[vi.index]"
           :class="{ selected: isSelected(rowIndices[vi.index]!, 0) }"
@@ -413,7 +413,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           @contextmenu="onKeyValueRowContextMenuFromEvent"
         >
           <div
-            class="cell kv-field"
+            class="cell overflow-hidden whitespace-nowrap cursor-default w-52 flex items-center text-muted-foreground text-ellipsis px-2"
             :class="{
               'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
               'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
@@ -425,7 +425,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
             {{ kvRowAt(rowIndices[vi.index]!).field }}
           </div>
           <div
-            class="cell kv-value"
+            class="cell overflow-hidden whitespace-nowrap cursor-default flex-1 flex items-center whitespace-pre-wrap break-words px-2"
             :class="{
               'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
               'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
@@ -445,34 +445,18 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.console-result-grid {
-  /* P19 D6: the copy-error strip is an always-possible sibling above whichever one of
-     no-rows/ConsoleSlickGrid/VirtualList is the actual body — a plain block stack would let that
-     sibling's height double-count against the 100% above, so this becomes a column and the body
-     takes what's left. */
-  @apply h-full min-h-0 flex flex-col text-kira-md font-data;
-}
-
-.body {
-  @apply flex-1 min-h-0;
-}
-
-/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
-
-.row {
-  @apply flex border-b border-border w-[var(--total-width)];
-}
-
-.cell {
-  @apply overflow-hidden whitespace-nowrap cursor-default;
-}
-
-/* No zebra striping (DataGrid.vue's own rule/comment: "the design's own _gridrows.html/
-   _style.css draws no alternating row colour, only the hover state") — P40 D17 parity. P30 §3.6
-   C6: the tabular branch's own equivalent (and its `.header-row`/`.gutter-cell` exclusions) left
-   with it — this is the key-value row's own hover feedback only now (`.cell:not(.selected)` is a
-   no-op guard here: a kv cell is never itself `.selected`, only its row is — `.row.selected`,
-   below). */
+/* P110 B40: every plain base rule this file had (`.console-result-grid`, `.body`, `.no-rows`,
+   `.doc-body`/`-tree`/`-text`, `.kv-field`, `.kv-value`, and `.row`/`.cell`'s own base
+   declarations) moved onto the template as Tailwind utilities (scoped CSS is unlayered, so it
+   always wins over a layered utility on the same element regardless of class order, per this
+   plan's own §1 rule). What's left needs its relative rule to interact with a sibling class or
+   Monaco/child-component DOM this template has no element for:
+   - `.row:hover .cell:not(.selected)`: real `:hover` plus a descendant-selector guard.
+   - `.row.selected`: a state class overriding the same background property.
+   - `:deep(.doc-row)`: DocumentRow.vue's own root class, outside this component's scope-id.
+   `.row`/`.cell` stay as bare marker classes to anchor the two rules above; `.no-rows` stays as a
+   bare marker too — a real test dependency (interaction.spec.ts, sqs/kafka frontend specs all
+   locate results by `.no-rows`). */
 .row:hover .cell:not(.selected) {
   @apply bg-hover;
 }
@@ -481,14 +465,6 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
    P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own any more --
    bare marker classes, the tint/text-colour is `bg-search-match[-current] text-bg` alongside on
    the same element (--color-search-match[-current] already @theme-registered, base.css). */
-
-.no-rows {
-  @apply h-full flex items-center justify-center text-muted-foreground text-kira-sm;
-}
-
-.doc-body {
-  @apply p-1;
-}
 
 /* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
    this panel only styles its own #body slot content, read only (no edit/delete affordance, no
@@ -501,21 +477,5 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 
 .row.selected {
   @apply bg-select;
-}
-
-.doc-body-tree {
-  @apply flex-1 min-h-0 border-t border-border bg-elevated overflow-hidden;
-}
-
-.doc-body-text {
-  @apply m-0 whitespace-pre-wrap break-words font-data py-1 px-2;
-}
-
-.kv-field {
-  @apply w-52 flex items-center text-muted-foreground text-ellipsis px-2;
-}
-
-.kv-value {
-  @apply flex-1 flex items-center whitespace-pre-wrap break-words px-2;
 }
 </style>

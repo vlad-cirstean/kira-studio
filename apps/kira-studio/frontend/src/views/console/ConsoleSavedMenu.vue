@@ -112,7 +112,9 @@ async function saveCurrent(): Promise<void> {
     </template>
     <template #footer>
       <Separator class="my-1" />
-      <button type="button" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover save-current" data-testid="console-save-current" @click="saveCurrent">
+      <!-- text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to
+           --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). -->
+      <button type="button" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full text-[var(--kira-accent)]" data-testid="console-save-current" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
         Save current query…
       </button>
@@ -133,13 +135,3 @@ async function saveCurrent(): Promise<void> {
     </template>
   </SavedListMenu>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to --kira-hover
-   (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
-.save-current {
-  @apply w-full text-[var(--kira-accent)] cursor-pointer;
-}
-</style>

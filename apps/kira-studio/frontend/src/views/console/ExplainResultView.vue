@@ -94,11 +94,11 @@ const rawLanguage = computed(() =>
 </script>
 
 <template>
-  <div class="explain-view" data-testid="explain-result-view">
+  <div class="h-full overflow-auto flex flex-col text-kira-sm gap-1.5 p-2" data-testid="explain-result-view">
     <template v-if="plan && result">
-      <div class="explain-header">
+      <div class="flex items-center flex-wrap gap-2">
         <div
-          class="verdict"
+          class="verdict flex items-center text-ok gap-1"
           :class="{ warn: plan.overThreshold }"
           data-testid="explain-verdict"
           :data-over-threshold="plan.overThreshold"
@@ -108,53 +108,50 @@ const rawLanguage = computed(() =>
         </div>
         <Tooltip v-if="nativeCostLabel">
           <TooltipTrigger as-child>
-            <span class="native-cost" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
+            <span class="text-muted-foreground text-kira-xs cursor-default" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
           </TooltipTrigger>
           <TooltipContent>Not comparable to another engine’s own cost figure — see the plan doc’s F17.</TooltipContent>
         </Tooltip>
       </div>
-      <p class="statement-excerpt font-data" data-testid="explain-statement">{{ result.statement }}</p>
+      <p class="text-muted-foreground text-kira-xs whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
 
-      <ul v-if="plan.issues.length > 0" class="issue-list" data-testid="explain-issues">
+      <ul v-if="plan.issues.length > 0" class="issue-list flex flex-col list-none m-0 p-0 gap-1" data-testid="explain-issues">
         <li v-for="(issue, i) in plan.issues" :key="i" :class="issue.severity" :data-severity="issue.severity">
           <CodiconIcon :name="issue.severity === 'warn' ? 'warning' : 'info'" :size="12" />
           <span>{{ issue.message }}</span>
         </li>
       </ul>
-      <p v-else class="no-issues" data-testid="explain-no-issues">No issues found.</p>
+      <p v-else class="text-subtle m-0" data-testid="explain-no-issues">No issues found.</p>
 
-      <div class="plan-tree" data-testid="explain-tree">
+      <div class="border border-border rounded-kira-sm py-1" data-testid="explain-tree">
         <div
           v-for="row in flatRows"
           :key="row.id"
-          class="plan-row"
+          class="plan-row flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5"
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >
           <button
             v-if="row.hasChildren"
             type="button"
-            class="plan-toggle"
+            class="inline-flex items-center w-3 shrink-0 cursor-pointer border-0 bg-transparent p-0"
             :aria-label="collapsedIds.has(row.id) ? 'Expand' : 'Collapse'"
             @click="toggleNode(row.id)"
           >
             <CodiconIcon :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'" :size="12" />
           </button>
-          <span v-else class="plan-toggle-spacer"></span>
-          <span class="plan-label">{{ row.node.label }}</span>
+          <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
+          <span class="font-data">{{ row.node.label }}</span>
           <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-xs"
             >~{{ row.node.estimatedRows.toLocaleString() }} rows</span
           >
           <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-xs">cost {{ row.node.cost.total.toLocaleString() }}</span>
-          <!-- P110 B15: no `muted` here -- `.plan-detail`'s own unlayered rule already sets
-               text-subtle/text-kira-xs and always wins over a co-present Tailwind utility class,
-               so `muted` never affected this element's rendering; nothing to replace it with. -->
-          <span v-if="row.node.detail" class="plan-detail font-data">{{ row.node.detail }}</span>
+          <span v-if="row.node.detail" class="text-subtle text-kira-xs font-data">{{ row.node.detail }}</span>
           <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-xs">{{ metricsLine(row.node) }}</span>
         </div>
       </div>
 
-      <div class="raw-toggle-row">
+      <div class="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -172,43 +169,25 @@ const rawLanguage = computed(() =>
         </Tooltip>
         <span class="text-kira-sm text-muted-foreground text-kira-xs">Raw</span>
       </div>
-      <div v-if="showRaw" class="raw-body" data-testid="explain-raw">
+      <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
       </div>
     </template>
-    <p v-else class="no-plan">No plan.</p>
+    <p v-else class="text-muted-foreground text-kira-xs m-0">No plan.</p>
   </div>
 </template>
 
 <style scoped>
 @reference "@theme/base.css";
 
-.explain-view {
-  @apply h-full overflow-auto flex flex-col text-kira-sm gap-1.5 p-2;
-}
-
-.explain-header {
-  @apply flex items-center flex-wrap gap-2;
-}
-
-.verdict {
-  @apply flex items-center text-ok gap-1;
-}
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.verdict`/`.plan-row` stay as bare markers to anchor their own compound/pseudo
+   variants below; `.issue-list` stays as a bare marker since `.issue-list li`/`li.warn`/`li.info`
+   are descendant selectors needing that ancestor class present in the DOM (Vue scoped CSS only
+   attributes the rightmost compound, so the ancestor class name itself must still exist). */
 
 .verdict.warn {
   @apply text-warn;
-}
-
-.native-cost {
-  @apply text-muted-foreground text-kira-xs cursor-default;
-}
-
-.statement-excerpt {
-  @apply text-muted-foreground text-kira-xs whitespace-pre-wrap break-words;
-}
-
-.issue-list {
-  @apply flex flex-col list-none m-0 p-0 gap-1;
 }
 
 .issue-list li {
@@ -223,53 +202,7 @@ const rawLanguage = computed(() =>
   @apply text-muted-foreground;
 }
 
-.no-issues {
-  @apply text-subtle m-0;
-}
-
-/* P110 B15: `.no-plan` used to share `.no-issues`'s own rule, but always paired with `muted` in
-   markup (line below) -- `.muted`'s own later declaration in this file won the `color`/font-size
-   tie against this shared rule (same specificity, later wins), so `.no-plan` actually rendered
-   text-muted-foreground/text-kira-xs, never text-subtle. Split out and baked in directly, so
-   deleting `.muted` doesn't silently flip this element over to text-subtle. */
-.no-plan {
-  @apply text-muted-foreground text-kira-xs m-0;
-}
-
-.plan-tree {
-  @apply border border-border rounded-kira-sm py-1;
-}
-
-.plan-row {
-  @apply flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5;
-}
-
 .plan-row:hover {
   @apply bg-hover;
-}
-
-.plan-toggle,
-.plan-toggle-spacer {
-  @apply inline-flex items-center w-3 shrink-0 cursor-pointer;
-}
-
-.plan-toggle {
-  @apply border-0 bg-transparent p-0;
-}
-
-.plan-label {
-  @apply font-data;
-}
-
-.plan-detail {
-  @apply text-subtle text-kira-xs;
-}
-
-.raw-toggle-row {
-  @apply flex items-center gap-1;
-}
-
-.raw-body {
-  @apply h-64 border border-border rounded-kira-sm overflow-hidden;
 }
 </style>
