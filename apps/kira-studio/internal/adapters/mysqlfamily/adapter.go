@@ -9,6 +9,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/relational"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -16,13 +17,8 @@ import (
 // connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
 // (F3) — a real data race, not a theoretical one, same class as postgres/adapter.go's own (the
 // running-query bookkeeping below is unrelated, tracker's own lock, P107 T2-3). Guarded together
-// via adapters.Guarded (P113 G1).
-type connState struct {
-	connSet         *ConnSet
-	cfg             *model.ResolvedConnectionConfig
-	primaryDatabase string
-	readOnly        bool
-}
+// via adapters.Guarded (P113 G1); shared with postgres's identical shape via relational.ConnState.
+type connState = relational.ConnState[*ConnSet]
 
 // Adapter is index.ts's MysqlFamilyAdapter — one implementation for both MariaDB and MySQL,
 // parameterized by a Profile (P34 D7/D9) plus a per-engine Caps literal (D10).
@@ -36,33 +32,33 @@ type Adapter struct {
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// getConnSet is every op's own locked read of state.connSet (F3) — requireEntry's RequireConnected
-// call takes its result, never state.connSet directly.
-func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().connSet }
+// getConnSet is every op's own locked read of state.ConnSet (F3) — requireEntry's RequireConnected
+// call takes its result, never state.ConnSet directly.
+func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().ConnSet }
 
-// setConnSet is Connect's own locked write of connSet/cfg together (F3) — P13 D1: assigned before
+// setConnSet is Connect's own locked write of ConnSet/Cfg together (F3) — P13 D1: assigned before
 // anything is opened, not after the probe succeeds.
 func (a *Adapter) setConnSet(connSet *ConnSet, cfg *model.ResolvedConnectionConfig) {
-	a.state.Update(func(s *connState) { s.connSet = connSet; s.cfg = cfg })
+	a.state.Update(func(s *connState) { s.ConnSet = connSet; s.Cfg = cfg })
 }
 
 // setConnected is Connect's own locked write of the two fields only a successful probe fills in
 // (F3).
 func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
-	a.state.Update(func(s *connState) { s.primaryDatabase = primaryDatabase; s.readOnly = readOnly })
+	a.state.Update(func(s *connState) { s.PrimaryDatabase = primaryDatabase; s.ReadOnly = readOnly })
 }
 
 // clearConnected is Disconnect's own locked write, once CloseAll (a real network call, run with no
 // lock held) has returned (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.state.Update(func(s *connState) { s.connSet = nil; s.primaryDatabase = "" })
+	a.state.Update(func(s *connState) { s.ConnSet = nil; s.PrimaryDatabase = "" })
 }
 
-// getPrimaryDatabase is Children's own locked read of state.primaryDatabase (F3).
-func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().primaryDatabase }
+// getPrimaryDatabase is Children's own locked read of state.PrimaryDatabase (F3).
+func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().PrimaryDatabase }
 
-// getReadOnly is Mutate/Execute's own locked read of state.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
+// getReadOnly is Mutate/Execute's own locked read of state.ReadOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().ReadOnly }
 
 // New constructs an Adapter for profile/caps — mariadb/adapter.go's and mysql/adapter.go's own
 // init() call this, each with their own Profile and Caps literal (P34 D7).
@@ -131,20 +127,13 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}, nil
 }
 
-// Disconnect is index.ts's disconnect.
+// Disconnect is index.ts's disconnect — relational.Disconnect carries the body shared with
+// postgres's identical Disconnect (P113 G1): F4's cancel-then-drain sequencing (KILL QUERY over a
+// side connection, this adapter's existing Cancel path, before Drain, whose own wait is bounded by
+// ctx rather than able to block this call for as long as the longest still-running query).
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	// F4: cancel every query this adapter still tracks as running (KILL QUERY over a side
-	// connection, this adapter's existing Cancel path) before Drain, whose own wait is now bounded
-	// by ctx rather than able to block this call for as long as the longest still-running query.
-	for _, opID := range a.tracker.Snapshot() {
-		_, _ = a.Cancel(ctx, opID)
-	}
-	a.tracker.Drain(ctx)
-	if connSet := a.getConnSet(); connSet != nil {
-		connSet.CloseAll(ctx)
-	}
-	a.clearConnected()
-	return nil
+	return relational.Disconnect(ctx, a.tracker.Snapshot(), a.Cancel, a.tracker.Drain, a.getConnSet(),
+		func(cs *ConnSet, ctx context.Context) { cs.CloseAll(ctx) }, a.clearConnected)
 }
 
 // requireEntry returns database's pinned connection together with a release func that must be
@@ -407,7 +396,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // killing someone else's does.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	running, ok := a.tracker.PopRunning(opID)
-	cfg := a.state.Load().cfg
+	cfg := a.state.Load().Cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}

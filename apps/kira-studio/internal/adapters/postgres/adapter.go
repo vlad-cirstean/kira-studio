@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/relational"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -22,13 +23,9 @@ func init() {
 // M6.1 already found for the running-query bookkeeping below (tracker's own, unrelated to this
 // state: pgx's own *Conn is not safe for concurrent use, and closing one mid-Query, were Disconnect
 // to race a still-in-flight query, is what tracker.Drain() itself guards against — see its own doc
-// comment). Guarded together via adapters.Guarded (P113 G1).
-type connState struct {
-	connSet         *ConnSet
-	cfg             *model.ResolvedConnectionConfig
-	primaryDatabase string
-	readOnly        bool
-}
+// comment). Guarded together via adapters.Guarded (P113 G1); shared with mysqlfamily's identical
+// shape via relational.ConnState.
+type connState = relational.ConnState[*ConnSet]
 
 // Adapter is index.ts's PostgresAdapter.
 type Adapter struct {
@@ -39,35 +36,35 @@ type Adapter struct {
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// getConnSet is every op's own locked read of state.connSet (F3) — requireClient's
-// RequireConnected call takes its result, never state.connSet directly.
-func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().connSet }
+// getConnSet is every op's own locked read of state.ConnSet (F3) — requireClient's
+// RequireConnected call takes its result, never state.ConnSet directly.
+func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().ConnSet }
 
-// setConnSet is Connect's own locked write of connSet/cfg together (F3) — P13 D1: assigned before
+// setConnSet is Connect's own locked write of ConnSet/Cfg together (F3) — P13 D1: assigned before
 // anything is opened, not after the probe succeeds, so the handle is reachable by Disconnect from
 // the instant connSet.Primary() could have opened a socket, and a probe failure (or a dropped
 // session mid-probe) never leaks it.
 func (a *Adapter) setConnSet(connSet *ConnSet, cfg *model.ResolvedConnectionConfig) {
-	a.state.Update(func(s *connState) { s.connSet = connSet; s.cfg = cfg })
+	a.state.Update(func(s *connState) { s.ConnSet = connSet; s.Cfg = cfg })
 }
 
 // setConnected is Connect's own locked write of the two fields only a successful probe fills in
 // (F3).
 func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
-	a.state.Update(func(s *connState) { s.primaryDatabase = primaryDatabase; s.readOnly = readOnly })
+	a.state.Update(func(s *connState) { s.PrimaryDatabase = primaryDatabase; s.ReadOnly = readOnly })
 }
 
 // clearConnected is Disconnect's own locked write, once CloseAll (a real network call, run with no
 // lock held) has returned (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.state.Update(func(s *connState) { s.connSet = nil; s.primaryDatabase = "" })
+	a.state.Update(func(s *connState) { s.ConnSet = nil; s.PrimaryDatabase = "" })
 }
 
-// getPrimaryDatabase is Children's own locked read of state.primaryDatabase (F3).
-func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().primaryDatabase }
+// getPrimaryDatabase is Children's own locked read of state.PrimaryDatabase (F3).
+func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().PrimaryDatabase }
 
-// getReadOnly is Read/Count/Mutate/Execute's own locked read of state.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
+// getReadOnly is Read/Count/Mutate/Execute's own locked read of state.ReadOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().ReadOnly }
 
 func (a *Adapter) Kind() string        { return "postgres" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
@@ -115,21 +112,14 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}, nil
 }
 
-// Disconnect is index.ts's disconnect.
+// Disconnect is index.ts's disconnect — relational.Disconnect carries the body shared with
+// mysqlfamily's identical Disconnect (P113 G1): F4's cancel-then-drain sequencing, nothing else
+// makes RunWithAbortRace's own background goroutines (inFlight's own doc comment) stop touching
+// their connection, and Drain's own wait is bounded by ctx rather than able to block this call for
+// as long as the longest still-running query.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	// F4: cancel every query this adapter still tracks as running, server-side, before Drain —
-	// nothing else makes RunWithAbortRace's own background goroutines (inFlight's own doc comment)
-	// stop touching their connection, and Drain's own wait is now bounded by ctx rather than able to
-	// block this call for as long as the longest still-running query.
-	for _, opID := range a.tracker.Snapshot() {
-		_, _ = a.Cancel(ctx, opID)
-	}
-	a.tracker.Drain(ctx)
-	if connSet := a.getConnSet(); connSet != nil {
-		connSet.CloseAll(ctx)
-	}
-	a.clearConnected()
-	return nil
+	return relational.Disconnect(ctx, a.tracker.Snapshot(), a.Cancel, a.tracker.Drain, a.getConnSet(),
+		func(cs *ConnSet, ctx context.Context) { cs.CloseAll(ctx) }, a.clearConnected)
 }
 
 // requireClient returns database's connection together with a release func that must be called
@@ -420,7 +410,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // Cancel is index.ts's cancel.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	running, ok := a.tracker.PopRunning(opID)
-	cfg := a.state.Load().cfg
+	cfg := a.state.Load().Cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}
