@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
           v-for="(name, index) in order"
           :key="name"
           class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item"
-          :class="{ 'is-pk': pkNames.has(name), 'is-dragging': dragIndex === index }"
+          :class="[{ 'is-pk': pkNames.has(name) }, dragIndex === index ? 'opacity-50' : '']"
           draggable="true"
           @dragstart="onDragStart(index)"
           @dragover.prevent="onDragOver(index)"
@@ -159,8 +159,7 @@ onBeforeUnmount(() => {
 /* P110 B40: `.columns-menu-item`'s own plain rule (cursor-pointer, gap-1) was already duplicated
    inline in the template -- dropped as redundant. `.drag-handle` folded onto its span the same
    way. `.columns-menu-item` itself stays a bare marker: tooltips.spec.ts locates by
-   `.columns-menu-item.is-pk`, and this compound variant still needs it. */
-.columns-menu-item.is-dragging {
-  @apply opacity-50;
-}
+   `.columns-menu-item.is-pk`, and this compound variant still needs it.
+   P110 I2-16: `.columns-menu-item.is-dragging` moved onto a plain ternary (`opacity-50`) -- no
+   test dependency on `is-dragging` itself (checked; only `is-pk` is real). */
 </style>
