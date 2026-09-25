@@ -89,7 +89,7 @@ onUnmounted(() => {
       No fields seen yet — load a page first.
     </div>
     <div v-else class="columns-menu-list">
-      <Label v-for="name in fieldNames" :key="name" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item">
+      <Label v-for="name in fieldNames" :key="name" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
         <Checkbox
           :model-value="selected.has(name)"
           class="size-3.5"
@@ -108,14 +108,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B34: `.columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` moved to base.css's own
-   `@utility` set, shared byte-for-byte with ColumnsMenu.vue. `.columns-menu-item` stays here:
-   no gap-1 (this list has no inline drag-handle icon, unlike ColumnsMenu.vue's own item). */
-.columns-menu-item {
-  @apply cursor-pointer;
-}
-</style>

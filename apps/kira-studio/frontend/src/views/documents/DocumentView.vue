@@ -643,7 +643,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="document-view" data-testid="document-view" :data-path="tab.path">
+  <div class="h-full flex flex-col min-h-0" data-testid="document-view" :data-path="tab.path">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore
          (plan's own "nothing hand-rolled survives as a component" for these layout containers).
          Item (regression pass, task batch P46-5): the old ViewChrome's own `:disabled="canRefresh
@@ -772,7 +772,7 @@ onUnmounted(() => {
               : 'Run an exact countDocuments() — the estimate above is metadata'
           }}</TooltipContent>
         </Tooltip>
-        <div class="projection-anchor">
+        <div class="relative">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -901,7 +901,7 @@ onUnmounted(() => {
          History button and Clear button match FilterToolbar.vue's own layout exactly — this row
          used to have neither. -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
-      <div class="history-anchor">
+      <div class="relative">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -930,7 +930,7 @@ onUnmounted(() => {
           />
         </Popover>
       </div>
-      <div class="filter-field">
+      <div class="flex-1 min-w-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <AutocompleteField
@@ -950,7 +950,7 @@ onUnmounted(() => {
           <TooltipContent>Mongo filter document — the query find() runs</TooltipContent>
         </Tooltip>
       </div>
-      <div class="sort-field">
+      <div class="w-72 shrink-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <AutocompleteField
@@ -1019,11 +1019,11 @@ onUnmounted(() => {
       </Button>
     </div>
     <template v-else>
-    <div v-if="creatingNew" class="new-doc-panel" data-testid="document-new">
+    <div v-if="creatingNew" class="h-55 shrink-0 flex flex-col border-b border-border bg-elevated" data-testid="document-new">
       <MonacoHost v-model:doc="newBuffer.doc.value" language="json" :read-only="false" />
-      <div class="edit-actions">
+      <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
         <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
-        <span class="edit-actions-spacer"></span>
+        <span class="flex-1 min-w-0"></span>
         <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" @click="commitCreate"
           >Save</Button
         >
@@ -1033,7 +1033,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="list-body" data-testid="document-list">
+    <div class="flex-1 min-h-0 overflow-y-auto" data-testid="document-list">
       <Alert
         v-if="!rt || rt.rowCount === 0"
         class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
@@ -1067,7 +1067,7 @@ onUnmounted(() => {
       <div
         v-else
         ref="scrollEl"
-        class="document-virtual-list overflow-y-auto"
+        class="overflow-y-auto h-full"
         data-testid="virtual-list"
         role="listbox"
         aria-label="Documents"
@@ -1104,8 +1104,8 @@ onUnmounted(() => {
               @select="onRowClick(vi.index)"
             >
               <template #actions>
-                <span class="doc-head-spacer"></span>
-                <div class="doc-row-actions">
+                <span class="flex-1 min-w-0"></span>
+                <div class="flex shrink-0 items-center gap-1">
                   <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
                   <Tooltip>
                     <TooltipTrigger as-child>
@@ -1152,7 +1152,7 @@ onUnmounted(() => {
                      expanded document's own body is out of scope (§6). -->
                 <div
                   v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                  class="doc-preview-match"
+                  class="doc-preview-match overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1"
                   data-testid="document-search-preview"
                 >
                   <template v-for="(seg, si) in previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)" :key="si">
@@ -1162,16 +1162,16 @@ onUnmounted(() => {
                 </div>
                 <div
                   v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                  class="doc-body"
+                  class="flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated"
                   data-testid="document-body"
                 >
                   <!-- The editor is the same code surface the definition view and the console views
                        use — the only difference is the language. -->
                   <template v-if="editingRow === rows[vi.index]">
                     <MonacoHost v-model:doc="editBuffer.doc.value" language="json" :read-only="false" />
-                    <div class="edit-actions">
+                    <div class="flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2">
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
-                      <span class="edit-actions-spacer"></span>
+                      <span class="flex-1 min-w-0"></span>
                       <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" @click="commitEdit"
                         >Save</Button
                       >
@@ -1203,94 +1203,19 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.document-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-/* AutocompleteField's own inheritAttrs:false lands a call-site class/style on its inner <input>,
-   never the wrapping box — P110 B25: the permanent filter row's "grow to fill" sizing is now a
-   `class="w-full"` prop straight on <AutocompleteField> (template above), routed to its own
-   InputGroup box, not a scoped `:deep(.p-input)` rule reaching across the component boundary. */
-.history-anchor {
-  @apply relative;
-}
-
-.filter-field {
-  @apply flex-1 min-w-0;
-}
-
-/* FilterToolbar.vue's orderby-input precedent: a fixed width beside the filter field that grows
-   to fill, same reasoning as `.filter-field` above. Widened from the SQL-style box's 230px — a
-   Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer than the old
-   `field ASC, field2 DESC` text it replaced. */
-.sort-field {
-  @apply w-72 shrink-0;
-}
-
-.projection-anchor {
-  @apply relative;
-}
-
-.new-doc-panel {
-  @apply h-55 shrink-0 flex flex-col border-b border-border bg-elevated;
-}
-
-.list-body {
-  @apply flex-1 min-h-0 overflow-y-auto;
-}
-
-.document-virtual-list {
-  @apply h-full;
-}
-
-/* P110 B34: `.virtual-row` moved to base.css's own `@utility virtual-row` (shared 9-file duplicate). */
-
-/* P48 F10-F12: the row shell and its head (.doc-row/.doc-head and friends, .expand-toggle,
-   .doc-id) now live in views/shared/document/DocumentRow.vue — this view only styles its own
-   #actions/#body slot content. The row's own total height is set inline from
-   documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
-   head and whatever's left for the body, never restates the number itself. */
-.doc-preview-match {
-  /* P110 B37: padding: 0 var(--kira-s-4) var(--kira-s-2) -- 8px sides, 4px bottom -- becomes
-     px-2 pb-1. */
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1;
-}
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.doc-preview-match` stays a bare marker: `:deep(.doc-row.search-match-current)
+   .doc-preview-match` targets DocumentRow.vue's own root class (outside this component's
+   scope-id) as the ancestor half, with no template element here to carry that half, so the
+   descendant selector needs `.doc-preview-match` itself still present to anchor its own half. */
 
 /* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not
-   inheritance) — this compound selector is what actually flips it on the current match.
-   :deep() on the ancestor half: `.doc-row.search-match-current` is DocumentRow.vue's own root
-   now, outside this component's scope-id — only `.doc-preview-match` itself needs scoping. */
+   inheritance) — this compound selector is what actually flips it on the current match. */
 :deep(.doc-row.search-match-current) .doc-preview-match {
   @apply text-bg;
 }
 
 .doc-preview-match mark {
   @apply rounded-kira-sm bg-warn text-bg;
-}
-
-/* Pushes .doc-row-actions to the trailing edge, the same role .doc-preview played before D1
-   emptied that slot. */
-.doc-head-spacer {
-  @apply flex-1 min-w-0;
-}
-
-.doc-row-actions {
-  @apply flex shrink-0 items-center gap-1;
-}
-
-/* flex: 1 over the row's own inline height (above) rather than a literal number — matches
-   HEAD_H + visibleLines().length * LINE_H (or the fixed editing height) exactly, whichever this
-   row currently is. */
-.doc-body {
-  @apply flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated;
-}
-
-.edit-actions {
-  @apply flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2;
-}
-
-/* Pushes Save/Cancel to the trailing edge, past P27 D28's EditBufferActions row. */
-.edit-actions-spacer {
-  @apply flex-1 min-w-0;
 }
 </style>
