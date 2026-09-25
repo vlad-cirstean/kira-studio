@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -34,4 +35,65 @@ func LeafChildren(kind string, leafKinds map[string]bool) (TreeChildren, error) 
 		return TreeChildren{Nodes: []model.TreeNode{}}, nil
 	}
 	return TreeChildren{}, New(CodeNotFound, "unexpected object kind: "+kind, nil)
+}
+
+// PathPart names one path.Segments position RequirePath checks (P113 G2): Label is the descriptive
+// word that position contributes to the error message; Kinds is the set of Kind values accepted
+// there — nil accepts any Kind, for a segment whose caller re-checks or dispatches on its own Kind
+// afterward (e.g. postgres's own Describe/Definition, which branch on the object segment's Kind
+// themselves).
+type PathPart struct {
+	Label string
+	Kinds []string
+}
+
+// Seg is the common PathPart: Kinds defaults to {label} — one position accepting exactly one Kind,
+// spelled the same as its own message label. Pass extra kinds to accept a set while keeping label's
+// descriptive word (e.g. Seg("table", "table", "view", "matview")).
+func Seg(label string, kinds ...string) PathPart {
+	if len(kinds) == 0 {
+		kinds = []string{label}
+	}
+	return PathPart{Label: label, Kinds: kinds}
+}
+
+// AnySeg is a PathPart that accepts any Kind at that position.
+func AnySeg(label string) PathPart {
+	return PathPart{Label: label}
+}
+
+// RequirePath checks path has exactly len(parts) segments, each one's Kind within that position's
+// accepted set, and returns the segments (P113 G2). Unifies the ~15 adapter-side
+// requireXSegmentPath/requireRelationPath/resolveXTarget helpers that each spelled out a
+// fixed-depth path check by hand, drifting on message format ("got depth N" vs "got: <path>") along
+// the way — this always reports "<op> requires a <label>/<label>/... path, got: <path>".
+func RequirePath(path model.NodePath, op string, parts ...PathPart) ([]model.PathSegment, error) {
+	segs := path.Segments
+	if len(segs) == len(parts) {
+		ok := true
+		for i, part := range parts {
+			if len(part.Kinds) == 0 {
+				continue
+			}
+			found := false
+			for _, k := range part.Kinds {
+				if segs[i].Kind == k {
+					found = true
+					break
+				}
+			}
+			if !found {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return segs, nil
+		}
+	}
+	labels := make([]string, len(parts))
+	for i, part := range parts {
+		labels[i] = part.Label
+	}
+	return nil, New(CodeNotFound, op+" requires a "+strings.Join(labels, "/")+" path, got: "+model.EncodePath(segs), nil)
 }

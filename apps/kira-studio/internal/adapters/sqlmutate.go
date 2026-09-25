@@ -356,8 +356,9 @@ func RunRelationalMutate(ctx context.Context, op *OpCtx, readOnly bool, plan mod
 // keeps its own three-segment resolveTablePath. Ported here in M1 because P58b's three adapters
 // all need it and M1 is the substrate milestone.
 func ResolveDatabaseTablePath(path model.NodePath) (database, table string, err error) {
-	if len(path.Segments) != 2 || path.Segments[0].Kind != "database" || path.Segments[1].Kind != "table" {
-		return "", "", New(CodeNotFound, "mutate requires a database/table path, got: "+model.EncodePath(path.Segments), nil)
+	segs, err := RequirePath(path, "mutate", Seg("database"), Seg("table"))
+	if err != nil {
+		return "", "", err
 	}
-	return path.Segments[0].Name, path.Segments[1].Name, nil
+	return segs[0].Name, segs[1].Name, nil
 }

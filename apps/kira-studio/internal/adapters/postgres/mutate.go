@@ -16,12 +16,13 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 
 // resolveTablePath is mutate.ts's own resolveTablePath — postgres's three-segment
 // database/schema/table form, distinct from sql-mutate.go's ResolveDatabaseTablePath (the
-// two-segment form clickhouse/mysql-family/sqlite share).
+// two-segment form clickhouse/mysql-family/sqlite share). The database segment stays
+// kind-unconstrained (P113 G2), same as before: Mutate's own root check already ran by the time this
+// is called.
 func resolveTablePath(path model.NodePath) (schema, table string, err error) {
-	segs := path.Segments
-	if len(segs) != 3 || segs[1].Kind != "schema" || segs[2].Kind != "table" {
-		return "", "", adapters.New(adapters.CodeNotFound,
-			"mutate requires a database/schema/table path, got: "+model.EncodePath(segs), nil)
+	segs, err := adapters.RequirePath(path, "mutate", adapters.AnySeg("database"), adapters.Seg("schema"), adapters.Seg("table"))
+	if err != nil {
+		return "", "", err
 	}
 	return segs[1].Name, segs[2].Name, nil
 }

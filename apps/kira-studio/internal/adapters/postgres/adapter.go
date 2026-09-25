@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 
@@ -196,20 +195,16 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true, "matview": true}
 
-func requireThreeSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, schemaSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 3 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
-		return model.PathSegment{}, model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got depth "+strconv.Itoa(len(segments)), nil)
-	}
-	return segments[0], segments[1], segments[2], nil
-}
-
 // Describe is index.ts's describe.
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
-	databaseSegment, schemaSegment, objectSegment, err := requireThreeSegmentObjectPath(path.Segments, "describe")
+	// P113 G2: adapters.RequirePath carries the depth+kind check requireThreeSegmentObjectPath used
+	// to spell out by hand — the object segment stays kind-unconstrained here, same as before,
+	// since Describe reports back whatever Kind it was given rather than filtering on it.
+	segs, err := adapters.RequirePath(path, "describe", adapters.Seg("database"), adapters.Seg("schema"), adapters.AnySeg("table"))
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
+	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
 
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
@@ -255,11 +250,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 // SchemaColumns is P22c D1's schema-wide sibling of Describe: every relation in a schema together
 // with its columns, in one round trip.
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
-	segments := path.Segments
-	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database/schema path, got depth "+strconv.Itoa(len(segments)), nil)
+	segs, err := adapters.RequirePath(path, "schemaColumns", adapters.Seg("database"), adapters.Seg("schema"))
+	if err != nil {
+		return nil, err
 	}
-	databaseSegment, schemaSegment := segments[0], segments[1]
+	databaseSegment, schemaSegment := segs[0], segs[1]
 
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
@@ -282,10 +277,14 @@ var definitionSupportedKinds = map[string]bool{"table": true, "view": true, "mat
 
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	databaseSegment, schemaSegment, objectSegment, err := requireThreeSegmentObjectPath(path.Segments, "definition")
+	// P113 G2: same depth/kind shape as Describe above — the object segment stays unconstrained
+	// here too; definitionSupportedKinds below is a separate, narrower filter Definition applies on
+	// top (fewer kinds than Describe's own leafObjectKinds), not a replacement for it.
+	segs, err := adapters.RequirePath(path, "definition", adapters.Seg("database"), adapters.Seg("schema"), adapters.AnySeg("table"))
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
 	if !definitionSupportedKinds[objectSegment.Kind] {
 		return model.ObjectDefinition{}, adapters.Unsupported("postgres", "definition for "+objectSegment.Kind)
 	}
@@ -299,21 +298,15 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	return buildDefinition(ctx, exec, path.Segments, schemaSegment.Name, objectSegment.Kind, objectSegment.Name)
 }
 
-func requireThreeSegmentDataPath(segments []model.PathSegment, opName string) (databaseSegment, schemaSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 3 || segments[0].Kind != "database" || segments[1].Kind != "schema" ||
-		(segments[2].Kind != "table" && segments[2].Kind != "view" && segments[2].Kind != "matview") {
-		return model.PathSegment{}, model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got: "+model.EncodePath(segments), nil)
-	}
-	return segments[0], segments[1], segments[2], nil
-}
-
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	databaseSegment, schemaSegment, objectSegment, err := requireThreeSegmentDataPath(req.Path.Segments, "read")
+	// P113 G2: unlike Describe/Definition above, the object segment is kind-checked here — Read only
+	// ever targets a table/view/matview, never a bare function or sequence.
+	segs, err := adapters.RequirePath(req.Path, "read", adapters.Seg("database"), adapters.Seg("schema"), adapters.Seg("table", "table", "view", "matview"))
 	if err != nil {
 		return nil, err
 	}
+	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
 	if err := assertReadOnlyFilterSortSafe(a.getReadOnly(), req.Filter, req.Sort); err != nil {
 		return nil, err
 	}
@@ -338,10 +331,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 // Count is index.ts's count. P13 D13: count() never reads columns/PK/indexes/oid off the target,
 // so it resolves only the qualified name — not the three catalog queries getReadTarget costs.
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	databaseSegment, schemaSegment, objectSegment, err := requireThreeSegmentDataPath(req.Path.Segments, "count")
+	segs, err := adapters.RequirePath(req.Path, "count", adapters.Seg("database"), adapters.Seg("schema"), adapters.Seg("table", "table", "view", "matview"))
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	databaseSegment, schemaSegment, objectSegment := segs[0], segs[1], segs[2]
 	if err := assertReadOnlyFilterSortSafe(a.getReadOnly(), req.Filter, nil); err != nil {
 		return adapters.CountResult{}, err
 	}
