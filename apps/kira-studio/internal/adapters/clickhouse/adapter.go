@@ -37,10 +37,6 @@ type Adapter struct {
 	tracker adapters.QueryTracker[string]
 }
 
-// getHandle is every op's own locked read of a.handle (F3) — requireHandle's RequireConnected call
-// takes its result, never a.handle directly.
-func (a *Adapter) getHandle() *Handle { return a.state.Load().handle }
-
 // setConnected is Connect's own locked write (F3).
 func (a *Adapter) setConnected(handle *Handle) {
 	a.state.Update(func(s *connState) {
@@ -53,9 +49,6 @@ func (a *Adapter) setConnected(handle *Handle) {
 func (a *Adapter) clearConnected() {
 	a.state.Update(func(s *connState) { s.handle = nil })
 }
-
-// getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 func (a *Adapter) Kind() string        { return "clickhouse" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
@@ -99,7 +92,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 		_, _ = a.Cancel(ctx, opID)
 	}
 	a.tracker.Drain(ctx)
-	if handle := a.getHandle(); handle != nil {
+	if handle := a.state.Load().handle; handle != nil {
 		handle.Client.CloseIdleConnections()
 	}
 	a.clearConnected()
@@ -316,7 +309,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	seq := a.newOpSeq(op.OpID)
-	return mutate(ctx, handle, seq.next(a), op, a.trackerFor(op.OpID), a.getReadOnly(), plan)
+	return mutate(ctx, handle, seq.next(a), op, a.trackerFor(op.OpID), a.state.Load().readOnly, plan)
 }
 
 // Execute is index.ts's execute.
@@ -346,7 +339,7 @@ func (a *Adapter) KeyTypes(context.Context, []model.NodePath, *adapters.OpCtx) (
 // own read-only flag.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	queryID, ok := a.tracker.PopRunning(opID)
-	handle := a.getHandle()
+	handle := a.state.Load().handle
 	if !ok || handle == nil {
 		return false, nil
 	}
@@ -365,5 +358,5 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 }
 
 func (a *Adapter) requireHandle() (*Handle, error) {
-	return adapters.RequireConnected(a.getHandle())
+	return adapters.RequireConnected(a.state.Load().handle)
 }
