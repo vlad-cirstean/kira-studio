@@ -19,6 +19,19 @@ callers), the dialog parts (`DialogHeader`/`DialogFooter`/`DialogTitle`, 33-37 c
 real `@tailwindcss/node` 4.3.3 output, either compiled `dist/assets/index-B65hMeBa.css` or a
 compile of the real `GU/theme/tailwind.css` root. None of it was assumed.
 
+**Amendment (user decisions, on top of `e009dbaf`).** The user decided the four §6 items that this
+plan first deferred. §3.11 designs them as I2-35..I2-39. §0, §1.3, §1.4, §3.1, §3.8, §6, §7 and §9
+are updated to match. Discovery for the amendment:
+- CodeGraph `codegraph_explore` on `alertVariants`/`Alert`, on the `ResizableHandle` blast radius
+  (8 rendering components), on `applyAppearance` (runtime-set tokens) and on the `cn()` `twMerge`
+  config.
+- Class-token sites, which are not graph symbols: grep, plus a scratch usage-count scan that
+  splits each colour and radius name by `PT/components/ui` vs app code.
+- The shadcn-vue `resizable.json` registry source, fetched and read.
+- reka-ui 2.10.5's `SplitterGroup`/`SplitterPanel` dist source.
+
+Counts in §3.11 are at `e009dbaf`.
+
 ## 0. Goal and acceptance
 
 Goal: remove every audit defect that still holds, plus the regressions the audit missed. The
@@ -52,7 +65,8 @@ Acceptance (orchestrator runs each, §9):
 7. **Arbitrary values.** Every §3.7 site is converted. What remains is on iter1's §1.2 allowlist or
    in §1.2 below.
 8. **Guard.** `scripts/check-theme-classes.sh` scans GU/KU for every retired name (§3.8). Every
-   name this iter retires is guarded.
+   name this iter retires is guarded. The I2-37/I2-38 alias checks also scan `PT/components/ui`,
+   which every other check excludes (§3.11.3).
 9. **Tokens.** `--kira-gap`, `--kira-window-inset`, `--kira-toolbar-h`, `--kira-viewhead-h` and
    `--spacing-kui-1..6` are gone. No comment still cites them.
 10. **Settings covered.**
@@ -63,6 +77,21 @@ Acceptance (orchestrator runs each, §9):
     `repo-workspace.spec.ts:444` excepted, its own phase) and `test:webview` pass.
     `test:visual:studio` and `test:visual:space` pass. The only re-records are the §1.4 disclosed
     changes, each named in its commit body.
+12. **One spinner speed** (§3.11.1).
+    - `kira-spin` returns 0 hits in `.vue`/`.ts`/`.css`.
+    - `codicon-modifier-spin` returns 0 hits in `.vue`.
+    - Every spinner uses `animate-spin` (1s).
+13. **One error alert** (§3.11.2).
+    - `alertVariants` has no `err` key.
+    - No `<Alert>` passes `variant="err"`.
+    - `error-text` returns 0 hits outside comments.
+14. **One name per value** (§3.11.3).
+    - The PT root declares no alias pair from the §3.11.3 table.
+    - `shadcn-bridge.css`'s `@theme inline` keeps exactly 4 names: `--color-primary`, `--color-primary-foreground`, `--color-muted-foreground` and `--color-border`. It keeps no `--radius-*`.
+    - The alias guard passes.
+15. **Resizable only** (§3.11.4).
+    - A value import of `SplitterGroup`/`SplitterPanel` from `reka-ui` exists only under `PT/components/ui/resizable/`.
+    - `<SplitterGroup` and `<SplitterPanel` return 0 template hits outside it.
 
 ## 1. Conventions
 
@@ -133,9 +162,12 @@ Acceptance (orchestrator runs each, §9):
     `--no-verify`.
   - Fast checks per commit: the hook, plus `build:studio`/`build:space` when a commit touches
     `@theme`, a `cn()` config or a Tailwind root.
-  - Expensive suites run once, at I2-33.
+  - Expensive suites run once, at I2-33. I2-35..I2-39 all sit before it in §7.
 - **Resumability.** Every decision is in this file.
-  - To resume, run `git log --oneline --grep 'P110 I2-'`. Resume at the first missing tag.
+  - §7's row order is the execution order. The amendment tags I2-35..I2-39 sit at their execution
+    slots, not at the end: I2-35 follows I2-2, and I2-36..I2-39 follow I2-32.
+  - To resume, run `git log --oneline --grep 'P110 I2-'`. Resume at the first §7 row, in table
+    order, whose tag is missing.
   - For a tag that is partly landed, re-grep that item's own "done when" check in §7 and continue
     with the files still failing it.
   - I2-1's measurements are committed into §3.6.4 of this file before anything depends on them.
@@ -159,13 +191,26 @@ Pre-approved: each one restores the pre-phase or plan-intended rendering.
   - git-ui em literals follow iter1 §6.4. Keep any site whose nearest step moves it more than 1px
     and add it to §1.2 with its measured size.
 
+**User-approved** (§6, I2-35/I2-36). Name each in its commit body:
+
+- Spinners: 0.7s becomes 1s on the 12 `animate-kira-spin` sites. The git-ui restack spinner
+  (`AppToolbar.vue:324`) changes from codicon's 1.5s stepped spin to a smooth 1s spin.
+- The 2 StreamView error alerts take the `destructive` look:
+  - They lose the `error/10` tint and the `error/20` border. They gain the elevated card surface
+    and the default border.
+  - The message text goes from full `text-error` to `text-error/90`.
+
+I2-37, I2-38 and I2-39 are pixel-identical by construction (§3.11.3, §3.11.4). Any diff there is
+a bug in that commit, not a disclosure.
+
 **Conditional.** Fix only if I2-1 or I2-21 measures it as real. Report it in the commit body.
 
 - The settings-field regressions (§3.6).
 - The DialogFooter overshoot (§3.10).
 
 **Any other visible change stops the implementer.** Write it in the commit body and ask the
-orchestrator. §6 lists decisions that need the user and are not part of this iter.
+orchestrator. §6 records the user decisions folded in as I2-35..I2-39 and the items still out of
+scope.
 
 ## 2. Audit corrections (verified at `e0bd15cd`)
 
@@ -216,6 +261,8 @@ Confirmed as stated (counts re-grepped at `e0bd15cd`):
 - **M2. Studio `cn` gaps.**
   - `max-w-completion-max-w` is unregistered (the audit saw this but rated it judgment).
   - `cn('animate-spin animate-kira-spin')` keeps both, because `animate` lacks `kira-spin`.
+    **Superseded by I2-35.** The user unified spinners on `animate-spin`, so `animate-kira-spin` is
+    deleted rather than registered.
 - **M3. Static same-property regressions.** Each one is a primitive-plus-override pair,
   mechanically merged, where emit order now picks the primitive's value:
   - `SF/views/grid/PreviewCommandPanel.vue:61`: `normal-case tracking-normal … uppercase
@@ -282,13 +329,12 @@ Confirmed as stated (counts re-grepped at `e0bd15cd`):
 
 **Merge config (I2-2).**
 
-- `PT/lib/utils.ts`: add `completion-max-w` to `spacing`. Add `animate: ['kira-spin']` to `theme`.
-  In tailwind-merge 3, the `animate` theme key is the group.
+- `PT/lib/utils.ts`: add `completion-max-w` to `spacing`. **Do not** add an `animate` entry:
+  I2-35 deletes `--animate-kira-spin` next (§3.11.1), and no other custom `--animate-*` exists.
 - `KU/cn.ts`: add `kui-xs`, `kui-sm` and `kui-base` to `text`.
 - Verify with a node one-liner, not by reading:
   - `cn('text-fg text-kira-sm')` keeps both.
   - `twMergeKv('kv:text-kui-fg kv:text-kui-base')` keeps both.
-  - `cn('animate-spin animate-kira-spin')` = `animate-kira-spin`.
 - Commit body: the before/after `kuiRowVariants()` output for `selected: false` and `true`.
 
 **Conflict script (I2-3), `scripts/check-class-conflicts.ts`, run by bun.**
@@ -334,7 +380,8 @@ Confirmed as stated (counts re-grepped at `e0bd15cd`):
     - `TONE = { idle: 'text-subtle', running: 'text-info', error: 'text-error' }` on the outer span
       (`inline-flex items-center gap-1 font-data text-kira-xs`).
     - `RING = { idle: 'border-border-strong', running: 'border-primary border-r-transparent
-      animate-kira-spin', error: 'border-error' }` on `size-3 shrink-0 rounded-full border-2`.
+      animate-spin', error: 'border-error' }` on `size-3 shrink-0 rounded-full border-2`.
+      `animate-spin`, not `animate-kira-spin`: I2-35 has already moved all 11 view copies.
     - `border-primary border-r-transparent` equals today's four longhands. The side longhand emits
       after the shorthand (compile-verified: `border-r-border-strong` > `border-border`).
   - Keep `data-testid="run-state"` and `"run-state-label"`. Drop the stray `label` class.
@@ -685,6 +732,15 @@ _Empty until I2-1 lands. I2-26 must not start while this section is empty._
    `GU/theme/tailwind.css:55`. `kv:text-muted` ×110 in 30 files becomes `kv:text-muted-foreground`,
    done with a sed and then an eyeball of `hover:`/`group-*:` variants. Without it, item 1 fails on
    day one. It also settles audit §6d's naming split.
+   - **Reconciled with I2-37 (§3.11.3). No overlap, no conflict.** I2-37's rule gives each value
+     one name. In the PT root, `muted-foreground` is the only name for description text. I2-30
+     applies that same rule to the `kv` root, and I2-37 does not touch GU/KU.
+   - After both commits, `muted` names nothing in either root. PT's `bg-muted` surface goes to
+     `bg-field` in I2-37. `muted-foreground` means description text in both roots.
+   - I2-30 stays exactly as written.
+   - I2-31's switch of every `check_class` call to the `_all` form covers only the calls that
+     exist when it lands. The I2-37/I2-38 alias checks land later and stay PT-root-only by design
+     (§3.11.3). Never convert them to `_all`.
 3. **Pre-phase names never guarded**, from `git show 6f6853c1:PT/primitives.css` and
    `…:PW/workbench.css` selector lists:
    - Plain `check_class_all`: `p-seg`, `has-stepper`, `ph-active`, every `sugg-*` name (enumerate
@@ -769,6 +825,441 @@ the hook.
 - **I2-25 hooks.** `PW/prompt/TextPromptDialog.vue:47` `text-prompt-title` becomes a testid.
   `SF/api/MethodSelect.vue:56` stray `row` goes (grep specs first). Guard both, attribute-scoped.
 
+### 3.11 User decisions (I2-35..I2-39)
+
+The user resolved the four items §6 first deferred (§6 keeps the record). Every count below was
+re-derived at `e009dbaf`, not copied from the audit. Two audit counts were wrong again: spinners
+(§3.11.1) and Resizable importers (§3.11.4).
+
+Before each of these commits, re-grep the current tree. I2-10, I2-21, I2-22 and I2-26 add or
+restyle `PT/components/ui` files before I2-37/I2-38 run, so those two commits work from a fresh
+enumeration, never from the counts here.
+
+#### 3.11.1 Spinner speed: one 1s spin (I2-35)
+
+**Decision.** The user chose to unify every spinner on Tailwind's default `animate-spin` (1s,
+linear).
+
+**Inventory.**
+
+- `animate-kira-spin` (0.7s) ×12:
+  - Run-state ring ×11, in the object key of the ring's `:class`: `EnvironmentsView:262`,
+    `VariableSetView:507`, `BrowseView:368`, `ConsoleView:868`, `DefinitionView:297`,
+    `DocumentView:887`, `DataView:281`, `GrpcRequestView:428`, `HttpRequestView:637`,
+    `KeyValuePane:784`, `StreamView:855`.
+  - `SF/workbench/GenerateDataDialog.vue:506`.
+- `animate-spin` (1s) ×6, already on target. The audit's "×10 git-ui" is stale.
+  - Studio: `SF/workbench/panels/OperationsPanel.vue:331`, `SF/views/grid/FkPreviewPopover.vue:157`,
+    `SF/project/TreeRow.vue:149`.
+  - git-ui: `GU/components/AppToolbar.vue:461`, `:482`, `GU/components/RefreshButton.vue:74`.
+- **Missed by the audit: a third speed.**
+  - `GU/components/AppToolbar.vue:324` uses `codicon codicon-sync codicon-modifier-spin`, which is
+    upstream codicon's `codicon-spin 1.5s steps(30)`.
+  - Iter1's pre-approved spinner change already moved its siblings at `:461`/`:482` to
+    `kv:animate-spin` (their comments say so). This one was missed.
+  - It is in scope: the user asked for one speed.
+
+**Mechanism.** One commit, placed right after I2-2. That way I2-3's first run and I2-4's
+`RunState` already see the final state.
+
+- Replace `animate-kira-spin` with `animate-spin` at all 12 sites. Both keyframes are
+  `to { transform: rotate(360deg) }` with linear timing, so only the duration changes.
+- `AppToolbar.vue:324`: replace `codicon-modifier-spin` with `kv:inline-block kv:animate-spin`, the
+  same as `:461`. Copy `:461`'s pre-approval comment above it.
+- In `PT/base.css`'s `@theme` (`:118-131`), delete the comment block, `--animate-kira-spin` and
+  `@keyframes kira-spin`. After that, no custom `--animate-*` exists in either root. That is why
+  I2-2 no longer registers `animate` (§3.1).
+- Guard, both in `check-theme-classes.sh`:
+  - `check_class 'animate-kira-spin' 'animate-spin'`.
+  - `check_class_in_attrs 'codicon-modifier-spin' 'kv:inline-block kv:animate-spin' "$GIT_UI_SRC
+    $KIRA_UI_SRC"`. It must be attribute-scoped: `GU/icons/codicon.css:8`'s header comment names
+    the class as prose. I2-31 later converts both calls to `_all`.
+
+**Risk.**
+
+- Visual specs run with `animations: 'disabled'`, so baselines are unchanged.
+- No spec asserts a duration. `ST`/`KT` have 0 hits for `kira-spin`, `animationDuration` and
+  `0.7s`.
+- Disclosed in §1.4.
+
+**Done when.**
+
+- `grep -rn 'kira-spin' apps packages --include=*.vue --include=*.ts --include=*.css` (excluding
+  `node_modules`/`dist`) returns 0 hits.
+- `codicon-modifier-spin` returns 0 hits in `.vue`.
+- Both guard lines are present.
+
+#### 3.11.2 Alert `err` onto `destructive` (I2-36)
+
+**Decision.** The user chose one error variant, `destructive`.
+
+**Inventory.** Taken from a template scan that includes multi-line `<Alert` tags and the dynamic
+`:variant` bindings.
+
+- `<Alert variant="err">` ×2:
+  - `SF/views/stream/StreamView.vue:1051` (`stream-error`)
+  - `SF/views/stream/StreamView.vue:1057` (`stream-action-error`)
+- No dynamic binding can yield `err`. Each is typed without it:
+  - `SF/views/httprequest/RawExchangePane.vue:92` `fidelityTone`: `'note' | 'warn'`.
+  - `SF/api/ImportReportStrip.vue:26` `tone`: `'warn' | 'note'`.
+  - `SF/project/DataGripImportDialog.vue:95` `reportTone`: `'note' | 'warn'`.
+  - That file's `'err'` at `:41`/`:124` feeds `<Badge>`, not `Alert`.
+- `<Alert variant="destructive">` ×37. These are unchanged.
+- `<Badge variant="err">` ×3 (`CellEditorView:552`, `TimelinePane:247`, `FkPreviewPopover:159`)
+  are out of scope.
+  - They use Badge's own cva, whose tone set is `default`/`chip`/`warn`/`err`/`ok`/`info`/`count`.
+  - Badge has no `destructive`, so there is no split there. Not touched.
+
+**Current difference** (`PT/components/ui/alert/index.ts`).
+
+- `err` (`:29`):
+  - `bg-error/10 border-error/20`
+  - description `text-error-text` (`#f3a3a3`)
+  - no root text colour
+- `destructive` (`:15-16`):
+  - `text-destructive bg-card`
+  - description `text-destructive/90`
+- StreamView already works around `err`:
+  - Both sites wrap the message in `<span class="text-error">` and put `text-error` on the icon.
+  - A comment at `:1046-1050` explains the workaround.
+
+**Mechanism.** One commit.
+
+- Change both sites to `variant="destructive"`.
+- Remove the `<span class="text-error">` wrappers. The message goes straight into
+  `AlertDescription`.
+- Remove the icons' `text-error`. The root's `text-destructive` is the same `--kira-error`, and the
+  icon inherits it.
+- Delete the workaround comment. The 2 strips now look the same as the other 37 error alerts.
+- Delete the `err` key and its P110 B23 comment (`:25-29`) from `alertVariants`.
+  - `Alert`'s prop type is `AlertVariants['variant']`.
+  - So `vue-tsc` (`typecheck:web:studio`, `typecheck:space-web`) rejects any future literal
+    `variant="err"`. The type is the guard for the prop value.
+- Delete the orphaned token pair. `text-error-text` has no other consumer (grepped), so remove:
+  - `--color-error-text` (`PT/base.css:53`)
+  - `--kira-error-text` (`PT/tokens.css:238`)
+- Guard: `check_class 'text-error-text' 'text-error'`.
+- Before committing, check whether either strip is in a visual baseline:
+  `grep -rn 'stream-error\|stream-action-error' ST/visual`. If one is, re-record it in this commit
+  and name it in the commit body.
+
+**Risk.**
+
+- The visible change is disclosed in §1.4.
+- The strips keep `data-testid="stream-error"` and `"stream-action-error"`.
+- The ui specs that read their text still match, because the text node is unchanged.
+
+**Done when.**
+
+- A multi-line-aware scan finds 0 `<Alert … variant="err">`. Use the I2-3 script's Vue AST pass, or
+  `grep -Pzo '<Alert[^>]*variant="err"'`.
+- `alertVariants` has no `err:` key.
+- `error-text` returns 0 hits outside comments.
+
+#### 3.11.3 One name per value: colours (I2-37) and radii (I2-38)
+
+**Decision.** The user asked to collapse each alias pair to one canonical name, as a real rename
+sweep. This supersedes I2-34's "document the split as intentional". The choice of surviving name
+was delegated, and is made below from the findings.
+
+**Finding 1: which pairs are real.** Two names form a pair when both utilities resolve to the same
+`--kira-*` variable in the PT root. Sources: `PT/shadcn-bridge.css` (`:root` plus `@theme inline`)
+and `PT/base.css` (`@theme`).
+
+| Value | kira name (`base.css`) | shadcn name(s) (`shadcn-bridge.css`) |
+|---|---|---|
+| `--kira-bg` | `bg` | `background` |
+| `--kira-fg` | `fg` | `foreground`, `card-foreground`, `popover-foreground`, `secondary-foreground`, `accent-foreground`, `sidebar-foreground`, `sidebar-accent-foreground` |
+| `--kira-bg-elevated` | `elevated` | `card`, `popover` |
+| `--kira-bg-chrome` | `chrome` | `sidebar` |
+| `--kira-bg-input` | `field` | `secondary`, `muted` |
+| `--kira-border-strong` | `border-strong` | `input` |
+| `--kira-focus` | `focus` | `ring`, `sidebar-ring` |
+| `--kira-hover` | `hover` | `accent`, `sidebar-accent` |
+| `--kira-error` | `error` | `destructive` |
+| `--kira-accent` | none | `primary`, `sidebar-primary` |
+| `--kira-accent-fg` | none | `primary-foreground`, `destructive-foreground`, `sidebar-primary-foreground` |
+| `--kira-border` | none | `border`, `sidebar-border` |
+| `--kira-conn-{blue,green,amber,violet,teal}` | `conn-*` | `chart-1..5` |
+
+Radius names are equal in value today, not by token:
+
+- `--radius-md` is 4px, the same as `kira-sm`.
+- `--radius-lg` is `var(--radius)`, which is `--kira-radius` (6px), the same as `kira`.
+- `--radius-xl` is 10px, the same as `kira-pill`.
+- `--radius-sm` is 2px and has no kira twin.
+
+Not pairs, because the values differ. These are out of scope:
+
+- `text-sm`/`text-base` vs `text-kira-*`.
+- `shadow-*` vs `shadow-kira*`.
+- `muted-foreground` (`--kira-fg-muted`), which has only one name.
+
+**Finding 2: usage.** Class tokens with comments excluded, from a scratch scan of SF, KF, PT, PW
+and the vscode extension src.
+
+- **App code** (everything except `PT/components/ui`) **uses kira names only.**
+  - Colour tokens: `muted-foreground` 284 (single name), `border` 187, `fg` 155, `border-strong`
+    114, `field` 105, `error` 71, `hover` 61, `primary` 51, `elevated` 40, `bg` 21, `chrome` 7,
+    `focus` 3.
+  - Radius tokens: `rounded-kira-sm` 117, `rounded-kira` 17.
+  - It has 0 shadcn alias names. The only outliers:
+    - `text-primary-foreground` ×1 (`SF/views/shared/DateTimePicker.vue:390`). That value has one
+      name, so it stays.
+    - `rounded-sm` ×3.
+- **`PT/components/ui` mixes both vocabularies.**
+  - 138 shadcn-alias colour tokens in 28 files:
+    - `destructive` 37
+    - `foreground` 20, `input` 20
+    - `ring` 12, `muted` 11, `accent-foreground` 10
+    - `popover`, `popover-foreground`, `accent` 5 each
+    - `background`, `secondary` 4 each
+    - `card`, `secondary-foreground` 2 each; `card-foreground` 1
+  - They sit beside 42 kira-name tokens: `error` 12, `fg` 8, `focus` 6, `border-strong` 5,
+    `hover` 5, `field` 4, `elevated` 2.
+  - `rounded-kira-sm` ×17.
+  - Shadcn radius names:
+    - `rounded-md` 7, `rounded-xl` 4, `rounded-sm` 2.
+    - `rounded-lg` 21, including the `-l`/`-r`/`-t`/`-b` side forms.
+  - `var(--radius)` ×3 inside the calc arbitraries in `input-group/index.ts`.
+- `sidebar-*`, `chart-*` and `destructive-foreground` have 0 uses anywhere.
+- The GU/KU `kv` root defines no shadcn names. Its colour names are the kira ones, and `muted`
+  becomes `muted-foreground` in I2-30.
+
+**Finding 3: the "user-settable seam" premise was wrong.** §6 first said the kira names are the
+user-settable seam. CodeGraph on `applyAppearance` (`PW/state/createSettingsStore.ts:82-97`)
+shows what runtime actually sets:
+
+- `--kira-font-family`
+- `--kira-font-size`
+- `--kira-row-height`
+- `--kira-graph-font-size`
+
+No colour or radius token is set at runtime. Both names in every pair read the same `--kira-*`
+variable. So which name survives has no runtime effect.
+
+**Choice: the kira name survives, repo-wide, including inside `PT/components/ui`.** A value whose
+only name is shadcn's keeps it: `primary`, `primary-foreground`, `border`, `muted-foreground`.
+
+Reasons:
+
+1. **One name per value.** The kira set already gives each value exactly one name. The shadcn set
+   is role-based and gives one value several names: `card` and `popover`; `secondary` and
+   `muted`; 7 names for `--kira-fg`. Collapsing onto shadcn would still need an arbitrary pick per
+   role.
+2. **Usage.** Kira names carry about 630 app tokens plus 42 inside `components/ui`. The shadcn
+   aliases carry 138, all inside `components/ui`. Keeping kira means renaming 138 tokens in 28
+   owned files. Keeping shadcn means renaming about 630 tokens across about 100 app files.
+3. **Family fit.**
+   - `error` belongs to the `error`/`warn`/`ok`/`info` tone family, which Badge and every text
+     tone use. `destructive` would split that family.
+   - `accent` meaning the hover surface contradicts the brand-colour reading. The bridge's own
+     comment (`shadcn-bridge.css:28-30`) warns about exactly this.
+   - `input` meaning `border-strong` misreads the same way on borders that are not inputs.
+4. **shadcn-vue's own model.** Registry files are copied in and then owned. This repo already
+   restyles them (iter1 §5.7, I2-10, I2-21), and renaming their colour names is the same kind of
+   edit. A future registry pull takes the same rename at pull time. The new guard makes lint fail
+   until it does.
+
+Rejected: split by context, shadcn names inside `components/ui` and kira names in app code. That
+was I2-34's original rule. It keeps two names per value, which is what the user asked to remove.
+
+**Reconciled with I2-30. No overlap, no conflict.** §3.8 item 2 has the details. I2-30 applies
+this same rule to the `kv` root. I2-37 and I2-38 touch only the PT root.
+
+**I2-37 colour mechanism.** One commit, PT root only.
+
+- **Rename.**
+  - Scope: `PT/components/ui/**`, plus any other hit the fresh enumeration finds.
+  - Keep every variant chain and every `/N` opacity suffix.
+  - Name map:
+    - `background` → `bg`
+    - `foreground`, `card-foreground`, `popover-foreground`, `secondary-foreground` and
+      `accent-foreground` → `fg`
+    - `card`, `popover` → `elevated`
+    - `secondary`, `muted` → `field`
+    - `input` → `border-strong`
+    - `ring`, as a colour only (`ring-ring`, `border-ring`, `outline-ring`) → `focus`
+    - `accent` → `hover`
+    - `destructive` → `error`
+  - Colour utility prefixes covered: `bg`, `text`, `border` and its sides, `ring`, `ring-offset`,
+    `outline`, `fill`, `stroke`, `divide`, `from`/`via`/`to`, `shadow`, `caret`, `decoration`,
+    `placeholder`.
+  - Never rename a prop or data value. These stay:
+    - `variant="destructive"` and `data-[variant=destructive]`
+    - the Alert `destructive` key, which is the user's I2-36 name
+    - the bare `ring`/`ring-1` width utilities
+  - Example, the Alert `destructive` variant after I2-36:
+    `text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90` becomes
+    `text-error bg-elevated *:data-[slot=alert-description]:text-error/90`.
+- **Delete from `shadcn-bridge.css`.**
+  - `:root` variables: `--background`, `--foreground`, `--card`, `--card-foreground`, `--popover`,
+    `--popover-foreground`, `--secondary`, `--secondary-foreground`, `--muted`, `--accent`,
+    `--accent-foreground`, `--destructive`, `--destructive-foreground`, `--input`, `--ring`,
+    `--chart-1..5` and all 8 `--sidebar*`.
+  - Their `@theme inline` `--color-*` twins.
+- **Keep** in `shadcn-bridge.css` `--primary`, `--primary-foreground`, `--muted-foreground` and
+  `--border`, with their `--color-*` entries.
+  - Each is its value's only name.
+  - Each also has a direct reader: `var(--primary)` at `DocumentRow:94`, `var(--muted-foreground)`
+    at `base.css:207` and `:252`, and `var(--border)` at `base.css:270`.
+  - `--radius` belongs to I2-38.
+- Reword the bridge's header comment and its `--accent`/`--input` comments (`:28-30`, `:36-40`).
+  Say which names survive and why.
+- **Guard.**
+  - Add `check_alias <regex> <replacement>` to `check-theme-classes.sh`. It is `check_class`
+    without the `components/ui` exclusion, over `SCAN_DIRS` only.
+  - Add one call per retired name, each using the prefix alternation above. Example:
+    `(?:bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|outline|fill|stroke|divide|from|via|to|shadow|caret|decoration|placeholder)-(?:background|foreground|card|…)(?:/\d+)?`.
+  - Reword the script header, which today says it "Excludes packages/theme/src/components/ui/".
+    Say that the alias checks deliberately scan it.
+  - Keep it PT-root-only: the `kv` root defines none of these names.
+- **Pixel-identical by construction.**
+  - Each rename maps to the same `--kira-*` variable (Finding 1).
+  - Both `@theme` styles declare at `:root`, and no subtree overrides a `--kira-*` colour.
+  - An I2-33 visual diff is a bug in this commit.
+- The conflict script, in lint since I2-9, re-checks every renamed `.vue` class set. Suppose a
+  component already held both names in one group; the rename makes them duplicates, and lint
+  fails. Keep one.
+
+**I2-38 radius mechanism.** One commit.
+
+- **New token (rung 3).**
+  - Add `--kira-radius-xs: 2px` to `PT/tokens.css`, next to `--kira-radius-sm` (`:63`).
+  - Add `--radius-kira-xs: var(--kira-radius-xs)` to `PT/base.css`.
+  - Add `'kira-xs'` to `radius` in `PT/lib/utils.ts`. The I2-3 self-check verifies it.
+  - Reason: the 2px step recurs 5 times (`OperationsPanel:323`, `TreeRow:173`,
+    `KF/repo/RepoSearchRow.vue:125`, `CommandItem:70`, `TooltipContent:27`). Once the bridge
+    override goes, `rounded-sm` would fall back to Tailwind's 4px default, a visible change.
+- **Rename by rendered value.**
+  - Map:
+    - `rounded-sm` → `rounded-kira-xs`
+    - `rounded-md` → `rounded-kira-sm`
+    - `rounded-lg` → `rounded-kira`
+    - `rounded-xl` → `rounded-kira-pill`
+  - Covers every side and corner form (`-t-`, `-l-`, `-b-`, `-r-`, `-tl-`, …) and every variant
+    chain, including the `!` sites (`CommandInput:31`, `CommandItem:70`, `Command:84`,
+    `CommandDialog:27`).
+- In `input-group/index.ts:14`, `:63` and `:65`, replace `var(--radius)` with `var(--kira-radius)`
+  inside the existing calc arbitraries. The value is the same, and the arbitraries are
+  registry-authored already.
+- Delete from `shadcn-bridge.css` the `:root` `--radius` and the `@theme inline`
+  `--radius-sm/md/lg/xl`.
+- **Guard.**
+  - Add a `check_alias` call for
+    `rounded(?:-(?:[trblse]|tl|tr|bl|br|ss|se|es|ee))?-(?:xs|sm|md|lg|xl|[2-4]xl)` over `SCAN_DIRS`
+    only.
+  - **Never extend it to GU/KU.** The `kv` root defines its own `--radius-sm`/`--radius-lg`
+    (`GU/theme/tailwind.css`), and `kv:rounded-sm` and `kv:rounded-lg` are that root's canonical
+    names.
+- `rounded-full` and `rounded-none` are static, not theme-backed, and unaffected.
+- **Risk.**
+  - `rounded-xl` → `rounded-kira-pill` puts the dialog corners on the pill token: `DialogContent`,
+    `Command`, `CommandDialog`, and `DialogFooter`'s `rounded-b-xl` if I2-21 kept it.
+  - The two values are equal today (10px). Before, they were separate derivations
+    (`--kira-radius + 4px` vs a literal).
+  - Accepted, because the user's rule is one name per value. The commit body names this coupling.
+
+**Done when**, for both commits:
+
+- The alias guard passes.
+- A scratch copy of `PT/components/ui/popover/PopoverContent.vue` with `bg-popover` put back fails
+  the guard. So does one with `rounded-md`.
+- `shadcn-bridge.css`'s `@theme inline` holds exactly `--color-primary`,
+  `--color-primary-foreground`, `--color-muted-foreground` and `--color-border`, and no `--radius-*`.
+- `build:studio` and `build:space` pass. Both commits touch `@theme`.
+
+#### 3.11.4 Resizable adoption (I2-39)
+
+**Decision.** The user chose to fold this in and move every call site onto the shadcn-vue
+`Resizable` wrapper.
+
+**Inventory.** From CodeGraph's `ResizableHandle` blast radius plus an import grep. **9 files
+import reka Splitter parts directly, not the audit's 8.** The audit missed `CellEditorDock.vue`,
+which imports `SplitterPanel` alone. Its panel is a child of each mounting view's group.
+
+- Files importing `SplitterGroup` and `SplitterPanel`:
+  - `SF/views/shared/keyvalue/KeyValuePane.vue:59`
+  - `SF/views/httprequest/HttpRequestView.vue:39`
+  - `SF/views/grpcrequest/GrpcRequestView.vue:21`
+  - `SF/views/browse/BrowseView.vue:19`
+  - `SF/views/grid/DataView.vue:17`
+  - `SF/views/stream/StreamView.vue:27`
+  - `SF/views/console/ConsoleView.vue:27`
+  - `PW/components/WorkbenchShell.vue:38`
+- File importing `SplitterPanel` only: `SF/views/shared/celleditor/CellEditorDock.vue:2`.
+- Template instances:
+  - `SplitterGroup` ×9: 2 in WorkbenchShell (`:133`, `:161`) and 1 per view.
+  - `SplitterPanel` ×15: 4 in WorkbenchShell; 2 each in HttpRequest, Grpc and Browse; 1 each in
+    KeyValue, Data, Stream, Console and CellEditorDock.
+  - `ResizableHandle` ×9, already the wrapper.
+
+**Registry source.** Fetched from `https://shadcn-vue.com/r/styles/reka-nova/resizable.json` and
+read.
+
+- `ResizablePanelGroup` wraps `SplitterGroup` with
+  `cn('flex h-full w-full data-[orientation=vertical]:flex-col', props.class)` and passes slot
+  props through.
+  - That base is a no-op here. reka-ui 2.10.5's `SplitterGroup` already sets `display:flex`,
+    `flex-direction`, `height:100%`, `width:100%` and `overflow:hidden` inline
+    (`reka-ui/dist/Splitter/SplitterGroup.js:507-511`). Inline styles beat classes.
+- `ResizablePanel` wraps `SplitterPanel` with `useForwardPropsEmits` and `useForwardExpose()`.
+  - It has no `class` prop. Class, testid and style fall through to the root.
+  - `useForwardExpose` keeps `resize()`/`collapse()` reachable through a template ref.
+
+**Mechanism.** One commit. Placed after I2-27, the last commit that edits these views' templates.
+
+- **Fetch** with iter1 §5.7's direct-curl procedure.
+  - Write only `ResizablePanel.vue` and `ResizablePanelGroup.vue` under
+    `PT/components/ui/resizable/`.
+  - Rewrite the `@/lib/utils` import to `@theme/lib/utils`.
+  - Keep the owned `ResizableHandle.vue`, which P110 B32 restyled. Never overwrite it.
+  - Export both new files from `resizable/index.ts`.
+  - License: MIT, the same registry as `field` and `empty`.
+  - Keep the registry sources verbatim. They carry no colour or radius names, so I2-37/I2-38 have
+    nothing to rename there.
+- **Convert all 9 files.**
+  - `SplitterGroup` → `ResizablePanelGroup`, `SplitterPanel` → `ResizablePanel`.
+  - Import both from `@theme/components/ui/resizable`.
+  - Every prop, `v-if`, `:order`, `size-unit`, `:default-size`/`:min-size`/`:max-size`, `@resize`
+    and `ref` stays as is.
+- **Call-site classes.** On the 6 group sites that read `class="flex flex-1 min-h-0 flex-col"`
+  (KeyValue, HttpRequest, Grpc, Data, Stream, Console), drop `flex` and `flex-col`, leaving
+  `class="flex-1 min-h-0"`. The base class and reka's inline style already set both. `gap-0.5`,
+  `h-full` and BrowseView's group classes (utilities by then, from I2-17) stay.
+- **WorkbenchShell typed refs** (`:65-66`).
+  - `resize()` is exposed at runtime but is not in `ResizablePanel`'s public type.
+  - Keep `useTemplateRef<InstanceType<typeof SplitterPanel>>` and change its import to
+    `import type { SplitterPanel } from 'reka-ui'`. A type-only import is allowed.
+  - `vGroup` (`:67`, fed to `useElementSize`) keeps working. VueUse's `unrefElement` takes the
+    wrapper instance's `$el`, which is reka's root div.
+- **Comments.**
+  - `ResizableHandle.vue:8-12` says "ResizablePanel/ResizablePanelGroup are not fetched…". Replace
+    it with one line saying all three parts are fetched and used.
+  - `CellEditorDock.vue`'s template comment (`:24-30`) names `SplitterResizeHandle`/`SplitterPanel`.
+    Update it to the wrapper names.
+
+**Risk.**
+
+- The DOM gains only `data-slot="resizable-panel"` / `"resizable-panel-group"`.
+- Confirm at commit time that no spec selects reka's own attributes: `grep -rn 'data-panel' ST KT`
+  should return 0 hits.
+- `ST/ui/cell-editor.spec.ts:1243` asserts sizes through reka's px-to-percent conversion. It is
+  unchanged, because the props pass straight through.
+- `:order` panels behave the same. The group context is provided and injected across wrapper
+  components; `ResizableHandle` already proves that.
+- knip: both new components gain callers in the same commit, so `lint:dead` stays clean. The
+  reason `ResizableHandle`'s comment gave for not fetching them no longer holds.
+- Behaviour is checked at I2-33: the tree, cell-editor, http/grpc and browse ui specs, plus Studio
+  visual.
+
+**Done when.**
+
+- `grep -rnE "import \{[^}]*\bSplitter(Group|Panel)\b[^}]*\} from 'reka-ui'"` over SF, KF, PW and
+  PT lists only `PT/components/ui/resizable/`. That regex matches value imports, not `import type`.
+- `<SplitterGroup` and `<SplitterPanel` return 0 template hits outside that directory.
+- `bun run lint:dead` passes.
+
 ## 4. Structure: one sequential implementer
 
 **Decision: one Sonnet implementer, sequential, whole plan.** Parallel streams were considered and
@@ -786,6 +1277,14 @@ ordering links:
 The work is also lopsided. The GU/KU share is about 60 small mechanical edits; Studio/Space/PW is
 most of the plan. So a split saves little wall time and needs cross-stream sequencing.
 CLAUDE.md: parallel only when genuinely independent. It is not.
+
+The amendment adds to that coupling:
+
+- I2-35..I2-39 touch the run-state views, `check-theme-classes.sh`, `PT/base.css`, `PT/lib/utils.ts`
+  and `shadcn-bridge.css`, all already edited by other rows.
+- I2-37/I2-38 must follow every commit that adds or restyles `components/ui` files.
+
+Still one sequential implementer.
 
 Context budget: the plan is long. If the implementer halts, the orchestrator re-spawns a fresh one
 with this file and `git log --grep 'P110 I2-'` (§1.3). That is the designed recovery, not a
@@ -806,34 +1305,57 @@ nothing strays outside the plan. Allowed paths:
 
 Nothing under `internal/`, `apps/*/internal/` or Go.
 
-## 6. Out of scope: user decisions, reported not fixed
+## 6. User decisions: deferred, then resolved
 
-Each item below is a visible change or a scope widening. Only the user can approve those
-(iter1 §1.4). The orchestrator raises them.
+As first committed (`e009dbaf`), this section listed six items as out of scope. Each was a visible
+change or a scope widening, and only the user can approve those (iter1 §1.4). The orchestrator
+asked the user about the first four. Each original bullet is kept below as written, followed by
+its resolution.
 
 - **Spinner speeds.** `animate-spin` 1s ×10 vs `animate-kira-spin` 0.7s ×12. Both are deliberate:
   `PT/base.css:118-125` keeps 0.7s, and iter1 §1.4 approved git-ui's 1s. Unifying is a timing
   change.
+  - **Resolved.** The user chose to unify on 1s `animate-spin`. Now in scope as §3.11.1, I2-35.
+  - Recount: `animate-spin` is ×6, not ×10.
+  - A third speed turned up and is included: codicon's 1.5s stepped spin at
+    `GU/components/AppToolbar.vue:324`.
 - **Alert `err` vs `destructive`.** They render differently (`PT/components/ui/alert/index.ts:15`,
   `:29`), so unifying is a colour change.
+  - **Resolved.** The user chose to unify on `destructive`. Now in scope as §3.11.2, I2-36.
+  - `err` has 2 consumers (StreamView). The variant and its orphaned `error-text` token are
+    deleted.
 - **Colour-name pairs** (`fg`/`foreground`, `bg`/`background`, …) and `rounded-kira-sm` =
   `rounded-md`. The kira names are the user-settable seam. I2-34 records the canonical rule in
   `docs/ARCHITECTURE.md` instead: kira names in app code, shadcn names inside `components/ui`.
+  - **Resolved.** The user chose to collapse each pair to one canonical name with a real rename
+    sweep, not documentation only. Now in scope as §3.11.3, I2-37 (colours) and I2-38 (radii).
+  - The kira name survives repo-wide.
+  - The "user-settable seam" premise above was wrong: no colour or radius token is set at runtime
+    (§3.11.3 Finding 3).
+  - I2-34 now records the one-name-per-value rule instead of the split.
 - **Resizable half-adoption** (audit §7): 8 importers use reka `SplitterGroup` directly. Not one of
   the 8 categories.
+  - **Resolved.** The user chose to fold it in and convert every call site. Now in scope as
+    §3.11.4, I2-39.
+  - The real count is 9 files. `CellEditorDock.vue` imports `SplitterPanel` alone.
+
+Still out of scope, and not part of this round of user decisions:
+
 - **Shared grid templates** (audit §1e, `VariableRow`/`VariableSetView`). Judgment, not in the 8
   categories.
 - **M11 view-header chrome ×11.**
 
 ## 7. Commit order (tag, subject, done when)
 
-Every subject ends with `(P110 I2-n)`. Every commit passes the hook.
+Every subject ends with `(P110 I2-n)`. Every commit passes the hook. Row order is execution order
+(§1.3). I2-35 runs right after I2-2, and I2-36..I2-39 run between I2-32 and I2-33.
 
 | Tag | Commit | Done when |
 |---|---|---|
 | I2-1 | `docs(v1.9): record settings field computed styles, pre-phase vs HEAD` | §3.6.4 filled |
 | I2-1b | `test(visual): settings baselines for Studio and Space` | both `test:visual:*` pass clean |
-| I2-2 | `fix(theme,kira-ui): register missing tailwind-merge groups` | the §3.1 one-liners hold |
+| I2-2 | `fix(theme,kira-ui): register missing tailwind-merge groups` | the §3.1 one-liners hold; no `animate` entry added |
+| I2-35 | `refactor(theme,git-ui): one 1s spinner, retire animate-kira-spin` | §3.11.1 done-when; guarded |
 | I2-3 | `chore(scripts): add class-conflict check (unwired)` | script runs and lists hits |
 | I2-4 | `feat(studio): RunState component, fixes label colour` | `runStateLabel` only in `RunState.vue`; spec colour assert |
 | I2-5 | `fix(studio): current search match text colour` | 3 ternaries |
@@ -860,11 +1382,24 @@ Every subject ends with `(P110 I2-n)`. Every commit passes the hook.
 | I2-30 | `refactor(git-ui): text-muted to text-muted-foreground` | `kv:text-muted(?!-)` 0 hits |
 | I2-31 | `build(guard): scan git-ui/kira-ui, add unguarded names` | §3.8 done-when |
 | I2-32 | `chore(theme): delete orphaned seam tokens` | 4 names 0 hits |
+| I2-36 | `refactor(studio,theme): stream error alerts onto destructive, drop err variant` | §3.11.2 done-when; `text-error-text` guarded |
+| I2-37 | `refactor(theme)!: one colour name per value, kira names survive` | §3.11.3 done-when (colour half); bridge `@theme inline` keeps 4 colour names |
+| I2-38 | `refactor(theme)!: one radius name per value, add rounded-kira-xs` | §3.11.3 done-when (radius half); no `--radius-*` in the bridge |
+| I2-39 | `refactor(studio,workbench): splitters onto Resizable wrappers` | §3.11.4 done-when |
 | I2-33 | `test: full suites, fixes` | §0.11 all green; fixes carry the I2-33 tag |
-| I2-34 | `docs: record P110 iter2` | `ARCHITECTURE.md` (conflict check, canonical names, `Empty`, row `class` rule); SPEC P110 row cites this file |
+| I2-34 | `docs: record P110 iter2` | `ARCHITECTURE.md`: conflict check; one name per value (§3.11.3); registry-pull rename step; `Empty`; row `class` rule; `Resizable` wrappers only; one spinner speed. SPEC P110 row cites this file |
 
 I2-29's `!`: kira-ui's exported theme partial loses tokens. The only host is git-ui's root, so
 there is no external consumer. Still, mark it breaking per Conventional Commits.
+
+I2-37/I2-38's `!` follows the same reasoning: `PT`'s theme loses the shadcn alias utilities and
+`--radius-*`. Studio and Space are its only consumers, but mark both commits breaking anyway.
+
+I2-34 amended (§6): the old wording was "canonical names: kira in app code, shadcn in
+`components/ui`". It now records the one-name-per-value rule and the step that goes with it: any
+future shadcn-vue registry pull renames alias names at pull time, and the alias guard enforces
+it. Also update `ARCHITECTURE.md:34`'s "moving the app's own legacy meanings onto their own names"
+sentence to match.
 
 ## 8. Risks and drift
 
@@ -881,6 +1416,12 @@ there is no external consumer. Still, mark it breaking per Conventional Commits.
   project hits launch timeouts, report it with the log line. Do not skip it.
 - **Mask prefix.** If v4 drops `-webkit-mask-*` in the git-ui root and the VS Code webview needs
   it, keep the `-webkit-` arbitraries and say so (§3.7).
+- **Registry pulls after I2-37/I2-38.** `components.json` (both apps) still points the shadcn-vue
+  CLI at `shadcn-bridge.css` with `cssVariables: true`. A CLI `add` would re-inject the deleted
+  vars. Keep iter1 §5.7's direct-curl procedure, and rename alias names at pull time; the alias
+  guard fails lint until that happens. `components.json` itself is not changed.
+- **Radius guard scope.** The `kv` root's own `rounded-sm`/`rounded-lg` are canonical there. The
+  I2-38 guard must never scan GU/KU (§3.11.3).
 - **Hook cost.** The conflict script adds a full SFC parse to every commit. If it exceeds about 5s,
   cache per-file results by mtime in `node_modules/.cache/`. Measure before adding a cache.
 
@@ -897,7 +1438,8 @@ there is no external consumer. Still, mark it breaking per Conventional Commits.
 4. `node -e` in the repo root:
    - `cn('text-subtle','text-info')` = `text-info`
    - `twMergeKv('kv:text-kui-fg kv:text-kui-base')` keeps both
-   - `cn('animate-spin animate-kira-spin')` = `animate-kira-spin`
+   - `cn('rounded-kira-xs rounded-kira-sm')` = `rounded-kira-sm` (I2-38 registration). This
+     replaces the original `animate-kira-spin` check: I2-35 deleted that token.
 5. `grep -c '^@utility' packages/theme/src/base.css` = 4.
 6. `grep -rlE '^<style' --include=*.vue apps packages | grep -v node_modules` lists exactly the 5
    files in §0.5.
@@ -913,8 +1455,17 @@ there is no external consumer. Still, mark it breaking per Conventional Commits.
    - `kv:text-muted(?!-)`, `-kui-[1-6]\b`
    - the 4 orphan token names
    - every §3.7 literal
+   - `kira-spin`, and `codicon-modifier-spin` in `.vue`
+   - `<Alert … variant="err">` (multi-line aware) and `error-text` outside comments
+   - value imports of `SplitterGroup`/`SplitterPanel` from `reka-ui` outside
+     `PT/components/ui/resizable/`
 8. Guard is real: a scratch copy of a GU file with `class="p-btn"` fails
    `check-theme-classes.sh`. `git stash` or discard it after.
 9. Settings: §3.6.4 is filled, and I2-26's commit shows the I2-1b baselines unchanged, or names
    each re-recorded pane.
 10. Run-state colour: `ST/ui/data-view.spec.ts` has the colour assertion, and it passes.
+11. The alias guard is real. Put `bg-popover` back into a scratch copy of
+    `PT/components/ui/popover/PopoverContent.vue` and confirm `check-theme-classes.sh` fails. Do
+    the same with `rounded-md`. Discard both copies.
+12. `shadcn-bridge.css`'s `@theme inline` lists exactly `--color-primary`,
+    `--color-primary-foreground`, `--color-muted-foreground` and `--color-border`.
