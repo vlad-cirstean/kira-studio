@@ -134,7 +134,7 @@ function onOpsResize(percent: number): void {
       <SplitterPanel
         v-if="projectVisible"
         ref="projectPanel"
-        class="panel-surface"
+        class="overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"
         data-testid="project-panel"
         size-unit="px"
         :default-size="projectWidth"
@@ -159,11 +159,17 @@ function onOpsResize(percent: number): void {
       <SplitterPanel class="min-w-0" :order="2">
         <template v-if="hasDock">
           <SplitterGroup ref="vGroup" direction="vertical" class="h-full gap-0.5">
-            <SplitterPanel class="editor-area" :order="1">
-              <div class="tab-strip-slot" data-testid="tab-strip">
+            <SplitterPanel
+              class="flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg"
+              :order="1"
+            >
+              <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
+                   the tab's own breathing room from this row's border-bottom, not a margin tacked
+                   on after it. -->
+              <div class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
                 <slot name="tab-strip"><TabStrip /></slot>
               </div>
-              <div class="main-view" data-testid="main-view">
+              <div class="flex-1 min-h-0" data-testid="main-view">
                 <slot name="main"><MainView /></slot>
               </div>
             </SplitterPanel>
@@ -177,7 +183,7 @@ function onOpsResize(percent: number): void {
             <SplitterPanel
               v-if="opsVisible"
               ref="opsPanel"
-              class="panel-surface"
+              class="overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"
               data-testid="operations-panel"
               :default-size="opsHeightPercent"
               :min-size="opsMinPercent"
@@ -189,11 +195,14 @@ function onOpsResize(percent: number): void {
             </SplitterPanel>
           </SplitterGroup>
         </template>
-        <div v-else class="editor-area h-full">
-          <div class="tab-strip-slot" data-testid="tab-strip">
+        <div v-else class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg">
+          <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is the
+               tab's own breathing room from this row's border-bottom, not a margin tacked on
+               after it. -->
+          <div class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
             <slot name="tab-strip"><TabStrip /></slot>
           </div>
-          <div class="main-view" data-testid="main-view">
+          <div class="flex-1 min-h-0" data-testid="main-view">
             <slot name="main"><MainView /></slot>
           </div>
         </div>
@@ -210,45 +219,3 @@ function onOpsResize(percent: number): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-.panel-surface {
-  overflow: hidden;
-  min-width: 0;
-  min-height: 0;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg);
-}
-
-.editor-area {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: var(--kira-radius);
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg);
-}
-
-.h-statusbar {
-  height: var(--kira-statusbar-h);
-}
-
-.tab-strip-slot {
-  /* Taller than a tab (--kira-h-md, 26px) by design — the extra height is the tab's own breathing
-     room from this row's border-bottom, not a margin tacked on after it. */
-  height: var(--kira-tabbar-h);
-  min-height: 0;
-  overflow: hidden;
-  flex-shrink: 0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-chrome);
-}
-
-.main-view {
-  flex: 1;
-  min-height: 0;
-}
-</style>
