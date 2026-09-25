@@ -52,6 +52,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import RunState from '@theme/RunState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -134,13 +135,6 @@ const iconColor = computed(() => connColorVar(connColor.value) ?? 'var(--kira-in
 
 // P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart).
 const runState = useRunState(() => props.tab?.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
 
 // The view header's breadcrumb: "connection / dbN / " for redis, "connection / bucket / " for
 // s3 — each engine's tree roots a key's/object's path at its own top-level segment kind (redis's
@@ -772,20 +766,7 @@ onUnmounted(() => {
           </Tooltip>
         </div>
         <span class="ml-auto" />
-        <span
-          data-testid="run-state"
-          class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
-          :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
-        >
-          <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
-          <span
-            class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
-            :class="{
-              'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
-              'border-error': runState.status === 'error',
-            }"
-          />
-        </span>
+        <RunState :state="runState" />
         <div class="flex items-center gap-1.5 min-w-0" />
       </div>
     </template>

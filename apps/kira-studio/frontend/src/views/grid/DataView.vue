@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import RunState from '@theme/RunState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -64,13 +65,6 @@ const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(-
 // P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
 const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
 const runState = useRunState(() => props.tab.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
@@ -269,20 +263,7 @@ function onCloseSearch(): void {
       </div>
       <DataToolbar :tab="tab" />
       <span class="ml-auto" />
-      <span
-        data-testid="run-state"
-        class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
-        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
-      >
-        <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
-        <span
-          class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
-          :class="{
-            'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
-            'border-error': runState.status === 'error',
-          }"
-        />
-      </span>
+      <RunState :state="runState" />
       <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
            accent-filled control on the whole screen. The preview-command eye sits in this same
            group. -->

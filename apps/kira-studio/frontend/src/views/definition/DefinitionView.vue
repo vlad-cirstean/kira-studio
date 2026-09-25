@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import RunState from '@theme/RunState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -194,13 +195,6 @@ const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.co
 // railColor mirrors ViewChrome.vue's own `connection ? (connection.color ?? null) : undefined`.
 const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
 const runState = useRunState(() => props.tab.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
 // Produced locally from the path — the same discipline SlickGridHost.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.
@@ -285,20 +279,7 @@ const breadcrumb = computed(() => {
         <TooltipContent>{{ pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints' }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
-      <span
-        data-testid="run-state"
-        class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
-        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
-      >
-        <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
-        <span
-          class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
-          :class="{
-            'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
-            'border-error': runState.status === 'error',
-          }"
-        />
-      </span>
+      <RunState :state="runState" />
       <div class="flex items-center gap-1.5 min-w-0">
         <!-- D7: Copy/notes describe the Source pane's raw text specifically — Structure has its
              own per-section content and count badges, nothing to copy as one document. -->

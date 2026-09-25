@@ -23,13 +23,6 @@ export function useRequestChrome(tab: () => { id: string; connectionId: string |
         : undefined,
   );
   const runState = useRunState(() => tab().id);
-  const runStateLabel = computed(() => {
-    if (runState.value.status === 'error') return 'failed';
-    if (runState.value.elapsedMs === null) return '—';
-    return runState.value.elapsedMs < 1000
-      ? `${Math.round(runState.value.elapsedMs)} ms`
-      : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-  });
 
   const incognito = computed(() => tabIncognitoStore.isIncognito(tab().id));
   function toggleIncognito(): void {
@@ -42,7 +35,6 @@ export function useRequestChrome(tab: () => { id: string; connectionId: string |
     connRecord,
     railColor,
     runState,
-    runStateLabel,
     incognito,
     toggleIncognito,
     envId,

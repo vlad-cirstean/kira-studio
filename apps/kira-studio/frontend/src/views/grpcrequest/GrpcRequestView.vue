@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
@@ -68,7 +69,7 @@ const methodResolved = computed(() => {
 
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
 // environment id it reads through while incognito.
-const { railColor, runState, runStateLabel, incognito, toggleIncognito, envId } = useRequestChrome(
+const { railColor, runState, incognito, toggleIncognito, envId } = useRequestChrome(
   () => props.tab,
 );
 
@@ -416,20 +417,7 @@ onUnmounted(() => {
         <TooltipContent>{{ !running && tab.state.service && tab.state.method && !methodResolved ? 'Waiting on the schema…' : 'Call' }}</TooltipContent>
       </Tooltip>
       <span class="ml-auto" />
-      <span
-        data-testid="run-state"
-        class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
-        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
-      >
-        <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
-        <span
-          class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
-          :class="{
-            'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
-            'border-error': runState.status === 'error',
-          }"
-        />
-      </span>
+      <RunState :state="runState" />
       <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
            icon-only action group, so this is its own toolbar-end group. -->
       <div class="flex items-center gap-1.5 min-w-0">

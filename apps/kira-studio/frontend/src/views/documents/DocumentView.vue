@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import RunState from '@theme/RunState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -154,13 +155,6 @@ const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--k
 // `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
 const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
 const runState = useRunState(() => props.tab.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
 
 // The view-head's breadcrumb prefix ("connection / database / "): derived from the already
 // loaded connection record and the tab's own path, purely for display — no new state.
@@ -875,21 +869,7 @@ onUnmounted(() => {
       <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
-          <span
-            data-testid="run-state"
-            class="inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
-            :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
-          >
-            <span data-testid="run-state-label" class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
-            ><span
-              class="h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
-              :class="{
-                'animate-spin border-t-primary border-r-transparent border-b-primary border-l-primary':
-                  runState.status === 'running',
-                'border-error': runState.status === 'error',
-              }"
-            />
-          </span>
+          <RunState :state="runState" />
         </TooltipTrigger>
       </Tooltip>
       <div class="flex items-center gap-1.5 min-w-0"></div>

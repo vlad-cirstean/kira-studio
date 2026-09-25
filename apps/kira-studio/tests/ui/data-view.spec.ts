@@ -15,6 +15,7 @@ import {
   sortIndicators,
 } from './support/grid';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import {
   BIG_ROWS_COLUMNS,
   BIG_ROWS_PATH,
@@ -1487,6 +1488,47 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.fill('[data-testid="filter-where-input"]', '(SELECT pg_sleep(2)) IS NULL OR id > 0');
   await page.press('[data-testid="filter-where-input"]', 'Enter');
   await expect(page.locator('[data-testid="toolbar-stop"]')).toBeEnabled();
+  // P110 I2-4: RunState.vue's TONE lookup — while running, the label reads --kira-info (#3794ff),
+  // not the idle text-subtle colour. `toolbar-stop`'s enabled state is a local, optimistic flag
+  // independent of opsStore, and this mocked `ui` tier never fires real control.onOpUpdate pushes
+  // (tests/ui/interaction.spec.ts's own header comment documents this as a hard, structural gap) —
+  // so the running state RunState reads has to be synthesised here via the same emitWailsEvent
+  // mechanism other specs already use for other push channels (e.g. workbench.spec.ts, IPC.keepAwake).
+  const activeTabId = await page
+    .locator('[data-testid="tab"][data-active="true"]')
+    .first()
+    .getAttribute('data-tab-id');
+  if (!activeTabId) throw new Error('expected an active tab id');
+  await emitWailsEvent(page, IPC.opUpdate, {
+    id: 'op-synthetic-run-state-colour',
+    connectionId: CONNECTION_ID,
+    tabId: activeTabId,
+    startedAt: new Date().toISOString(),
+    durationMs: null,
+    kind: 'read',
+    status: 'running',
+    rows: null,
+    command: null,
+    error: null,
+  });
+  await expect(page.locator('[data-testid="run-state"]').first()).toHaveCSS(
+    'color',
+    'rgb(55, 148, 255)',
+  );
+  // Close out the synthetic record so it doesn't linger as "running" once the real stop-flow below
+  // clears the optimistic rt.opId — opsStore only updates on the next matching-id push.
+  await emitWailsEvent(page, IPC.opUpdate, {
+    id: 'op-synthetic-run-state-colour',
+    connectionId: CONNECTION_ID,
+    tabId: activeTabId,
+    startedAt: new Date().toISOString(),
+    durationMs: 1,
+    kind: 'read',
+    status: 'cancelled',
+    rows: null,
+    command: null,
+    error: null,
+  });
   await page.click('[data-testid="toolbar-stop"]');
   // applyLoadFailure's cancelled branch clears rt.opId once the (real, captured) E_CANCELLED
   // error lands — the same flip that re-enables Refresh and disables Stop, with no op-log status
