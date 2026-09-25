@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/jackc/pgx/v5"
 
@@ -18,77 +17,57 @@ func init() {
 	})
 }
 
-// Adapter is index.ts's PostgresAdapter.
-type Adapter struct {
-	deps adapters.Deps
-
-	// mu guards every field below (F3): Connect/Disconnect write connSet/cfg/primaryDatabase/
-	// readOnly from whatever goroutine adapterhost dispatches them on, concurrently with any
-	// in-flight op reading them (requireClient's own RequireConnected(a.connSet), Read/Count/Mutate/
-	// Execute's own a.readOnly, Children's own a.primaryDatabase) — a real, race-detector-confirmed
-	// data race, not a theoretical one, the same class P58b M6.1 already found for the running-query
-	// bookkeeping below (tracker's own, unrelated to this mu: pgx's own *Conn is not safe for
-	// concurrent use, and closing one mid-Query, were Disconnect to race a still-in-flight query, is
-	// what tracker.Drain() itself guards against — see its own doc comment).
-	mu              sync.Mutex
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3) — a real, race-detector-confirmed data race, not a theoretical one, the same class P58b
+// M6.1 already found for the running-query bookkeeping below (tracker's own, unrelated to this
+// state: pgx's own *Conn is not safe for concurrent use, and closing one mid-Query, were Disconnect
+// to race a still-in-flight query, is what tracker.Drain() itself guards against — see its own doc
+// comment). Guarded together via adapters.Guarded (P113 G1).
+type connState struct {
 	connSet         *ConnSet
 	cfg             *model.ResolvedConnectionConfig
 	primaryDatabase string
 	readOnly        bool
+}
+
+// Adapter is index.ts's PostgresAdapter.
+type Adapter struct {
+	deps adapters.Deps
+
+	state adapters.Guarded[connState]
 
 	tracker adapters.QueryTracker[RunningQuery]
 }
 
-// getConnSet is every op's own locked read of a.connSet (F3) — requireClient's RequireConnected
-// call takes its result, never a.connSet directly.
-func (a *Adapter) getConnSet() *ConnSet {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.connSet
-}
+// getConnSet is every op's own locked read of state.connSet (F3) — requireClient's
+// RequireConnected call takes its result, never state.connSet directly.
+func (a *Adapter) getConnSet() *ConnSet { return a.state.Load().connSet }
 
 // setConnSet is Connect's own locked write of connSet/cfg together (F3) — P13 D1: assigned before
 // anything is opened, not after the probe succeeds, so the handle is reachable by Disconnect from
 // the instant connSet.Primary() could have opened a socket, and a probe failure (or a dropped
 // session mid-probe) never leaks it.
 func (a *Adapter) setConnSet(connSet *ConnSet, cfg *model.ResolvedConnectionConfig) {
-	a.mu.Lock()
-	a.connSet = connSet
-	a.cfg = cfg
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.connSet = connSet; s.cfg = cfg })
 }
 
 // setConnected is Connect's own locked write of the two fields only a successful probe fills in
 // (F3).
 func (a *Adapter) setConnected(primaryDatabase string, readOnly bool) {
-	a.mu.Lock()
-	a.primaryDatabase = primaryDatabase
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.primaryDatabase = primaryDatabase; s.readOnly = readOnly })
 }
 
 // clearConnected is Disconnect's own locked write, once CloseAll (a real network call, run with no
-// lock held) has returned (F3).
+// lock held) has returned (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.connSet = nil
-	a.primaryDatabase = ""
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.connSet = nil; s.primaryDatabase = "" })
 }
 
-// getPrimaryDatabase is Children's own locked read of a.primaryDatabase (F3).
-func (a *Adapter) getPrimaryDatabase() string {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.primaryDatabase
-}
+// getPrimaryDatabase is Children's own locked read of state.primaryDatabase (F3).
+func (a *Adapter) getPrimaryDatabase() string { return a.state.Load().primaryDatabase }
 
-// getReadOnly is Read/Count/Mutate/Execute's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+// getReadOnly is Read/Count/Mutate/Execute's own locked read of state.readOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 func (a *Adapter) Kind() string        { return "postgres" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
@@ -441,9 +420,7 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // Cancel is index.ts's cancel.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	running, ok := a.tracker.PopRunning(opID)
-	a.mu.Lock()
-	cfg := a.cfg
-	a.mu.Unlock()
+	cfg := a.state.Load().cfg
 	if !ok || cfg == nil {
 		return false, nil
 	}
