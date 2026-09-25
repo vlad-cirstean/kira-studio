@@ -62,7 +62,9 @@
     "test:go": "go test ./...",
     "test:compat": "sh scripts/db-compat.sh",
     "test:matrix": "sh scripts/test-matrix.sh",
-    "generate:wire": "sh scripts/generate-wire.sh"
+    "generate:wire": "sh scripts/generate-wire.sh",
+    "dedup:ts": "jscpd -c .jscpd.json",
+    "dedup:go": "git ls-files '*.go' | grep -v -e /page/wire/ -e /gitwire/ | go tool dupl -files -t 100"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
@@ -78,6 +80,7 @@
     "@vue/compiler-sfc": "3.5.42",
     "bun-types": "1.4.2",
     "flatbuffers": "25.9.23",
+    "jscpd": "5.3.2",
     "knip": "6.37.0",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
