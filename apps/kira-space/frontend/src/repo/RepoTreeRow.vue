@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoTreeRowVm } from './state/fileTree';
@@ -94,16 +95,11 @@ function onKeydown(e: KeyboardEvent): void {
     @keydown="onKeydown"
     @contextmenu.prevent.stop="onContextMenu"
   >
-    <button
-      type="button"
-      class="twisty"
-      :class="{ invisible: !row.hasChildren }"
-      tabindex="-1"
-      :aria-label="row.expanded ? 'Collapse' : 'Expand'"
-      @click.stop="row.hasChildren && emit('toggle', row)"
-    >
-      <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-    </button>
+    <TreeTwisty
+      :expanded="row.expanded"
+      :has-children="row.hasChildren"
+      @toggle="emit('toggle', row)"
+    />
     <CodiconIcon
       v-if="row.isDir"
       :name="dirIcon"

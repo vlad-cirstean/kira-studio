@@ -361,7 +361,7 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   // --- scenario 7: a read-only connection disables every mutation button ------------------
   const firstConnRow = connectionRow(page, 'Mutations DB');
   await expect(firstConnRow).toHaveCount(1);
-  await firstConnRow.locator('.twisty').click();
+  await firstConnRow.locator('[data-testid="tree-twisty"]').click();
 
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
@@ -383,7 +383,7 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await expect(roConnRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
-  await roConnRow.locator('.twisty').click();
+  await roConnRow.locator('[data-testid="tree-twisty"]').click();
   await expandRow(page, 'database:kira_test');
   await expandRow(page, 'database:kira_test/schema:app');
   const roCompositeRow = await findRow(page, COMPOSITE_PK_PATH);

@@ -49,7 +49,7 @@ test('sqs (frontend, mocked IPC) — flat queue tree, stream tab (batch, Poll-on
   const drainRow = await findRow(page, DRAIN_QUEUE_PATH);
   await expect(drainRow).toBeVisible();
   await expect(drainRow).toHaveAttribute('data-kind', 'queue');
-  await expect(drainRow.locator('.twisty')).toHaveClass(/invisible/);
+  await expect(drainRow.locator('[data-testid="tree-twisty"]')).toHaveClass(/invisible/);
   const emptyQueueRow = await findRow(page, EMPTY_QUEUE_PATH);
   await expect(emptyQueueRow).toBeVisible();
   const ordersQueueRow = await findRow(page, ORDERS_QUEUE_PATH);

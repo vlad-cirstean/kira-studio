@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoSearchRowVm } from './state/search';
@@ -76,14 +76,16 @@ function onKeydown(e: KeyboardEvent): void {
     @click="onClick"
     @keydown="onKeydown"
   >
-    <button
-      type="button"
-      class="flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 w-3.5 h-3.5"
-      tabindex="-1"
-      :aria-label="row.collapsed ? 'Expand' : 'Collapse'"
-    >
-      <CodiconIcon :name="row.collapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
-    </button>
+    <!-- P110 I2-13: shares TreeTwisty with the tree rows, but deliberately keeps no cursor-pointer
+         (base.css's own retired comment: "a real, deliberate difference") -- the whole row is
+         already the click target (onClick below), so the twisty here is decoration, not its own
+         control; @toggle mirrors that same row click rather than doing nothing under it. -->
+    <TreeTwisty
+      :expanded="!row.collapsed"
+      :has-children="true"
+      class="cursor-default"
+      @toggle="onClick"
+    />
     <span
       class="shrink-0 w-4 h-4 mask-contain mask-no-repeat mask-center"
       :style="fileIconStyle(row.path)"

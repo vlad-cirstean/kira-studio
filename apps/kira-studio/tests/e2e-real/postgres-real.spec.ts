@@ -77,15 +77,15 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
   await assertTooltipShows(page, statusDot, /^PostgreSQL \d+\./);
 
-  await connRow.locator('.twisty').click();
+  await connRow.locator('[data-testid="tree-twisty"]').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');
   await expect(dbRow).toBeVisible();
-  await dbRow.locator('.twisty').click();
+  await dbRow.locator('[data-testid="tree-twisty"]').click();
   const schemaRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/schema:app"]',
   );
   await expect(schemaRow).toBeVisible();
-  await schemaRow.locator('.twisty').click();
+  await schemaRow.locator('[data-testid="tree-twisty"]').click();
 
   const orderItemsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/schema:app/table:order_items"]',
@@ -151,10 +151,14 @@ test('real Postgres: keyset paging over app.big_rows, forward then back', async 
     timeout: 15_000,
   });
 
-  await connRow.locator('.twisty').click();
-  await page.locator('[data-testid="tree-row"][data-path="database:kira_test"] .twisty').click();
+  await connRow.locator('[data-testid="tree-twisty"]').click();
   await page
-    .locator('[data-testid="tree-row"][data-path="database:kira_test/schema:app"] .twisty')
+    .locator('[data-testid="tree-row"][data-path="database:kira_test"] [data-testid="tree-twisty"]')
+    .click();
+  await page
+    .locator(
+      '[data-testid="tree-row"][data-path="database:kira_test/schema:app"] [data-testid="tree-twisty"]',
+    )
     .click();
   const bigRowsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/schema:app/table:big_rows"]',

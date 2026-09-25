@@ -55,10 +55,10 @@ async function openTable(
     timeout: 15_000,
   });
 
-  await connRow.locator('.twisty').click();
+  await connRow.locator('[data-testid="tree-twisty"]').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:main"]');
   await expect(dbRow).toBeVisible();
-  await dbRow.locator('.twisty').click();
+  await dbRow.locator('[data-testid="tree-twisty"]').click();
 
   const tableRow = page.locator(
     `[data-testid="tree-row"][data-path="database:main/table:${tableName}"]`,

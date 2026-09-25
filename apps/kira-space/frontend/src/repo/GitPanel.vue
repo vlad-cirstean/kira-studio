@@ -7,6 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
 import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -427,21 +428,14 @@ onUnmounted(() => {
                 @keydown.space.prevent="onRowClick(repo.id)"
                 @contextmenu.prevent="onRepoContextMenu($event, repo)"
               >
-                <!-- RepoTreeRow.vue's .twisty, ported. -->
-                <button
-                  type="button"
-                  class="flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 cursor-pointer w-3.5 h-3.5"
-                  tabindex="-1"
-                  :aria-label="worktreesStore.isWorktreesExpanded(repo.id) ? 'Collapse worktrees' : 'Expand worktrees'"
+                <!-- P110 I2-13: RepoTreeRow.vue's own twisty, shared via TreeTwisty. -->
+                <TreeTwisty
+                  :expanded="worktreesStore.isWorktreesExpanded(repo.id)"
+                  :has-children="true"
                   :aria-expanded="worktreesStore.isWorktreesExpanded(repo.id)"
-                  data-testid="repo-row-expand"
-                  @click.stop="worktreesStore.toggleRepoWorktrees(repo.id)"
-                >
-                  <CodiconIcon
-                    :name="worktreesStore.isWorktreesExpanded(repo.id) ? 'chevron-down' : 'chevron-right'"
-                    :size="13"
-                  />
-                </button>
+                  testid="repo-row-expand"
+                  @toggle="worktreesStore.toggleRepoWorktrees(repo.id)"
+                />
                 <CodiconIcon name="source-control" :size="16" class="repo-icon shrink-0 text-muted-foreground" />
                 <Tooltip>
                   <TooltipTrigger as-child>

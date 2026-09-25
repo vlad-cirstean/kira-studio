@@ -94,7 +94,7 @@ test('collections — the tree renders and a request opens into the existing tab
   await expect(row(page, 'col-1')).toHaveText('Orders API');
   await expect(row(page, 'item-folder')).toHaveCount(0);
 
-  await row(page, 'col-1').locator('.twisty').click();
+  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
   await expect(row(page, 'item-folder')).toBeVisible();
   await expect(row(page, 'item-health')).toBeVisible();
   // The folder is collapsed in turn, so the request inside it is not rendered yet.
@@ -110,16 +110,16 @@ test('collections — the tree renders and a request opens into the existing tab
   await expect(row(page, 'item-folder').locator('.method')).toHaveCount(0);
 
   // Expanding the folder reveals the request at the next depth; collapsing hides it again.
-  await row(page, 'item-folder').locator('.twisty').click();
+  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
   await expect(row(page, 'item-create')).toBeVisible();
   await expect(row(page, 'item-create')).toHaveAttribute('data-depth', '2');
   await expect(row(page, 'item-create').locator('.method')).toHaveText('POST');
-  await row(page, 'item-folder').locator('.twisty').click();
+  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
   await expect(row(page, 'item-create')).toHaveCount(0);
 
   // Double-clicking a request opens the existing 'http-request' tab kind (D14), carrying the
   // **saved name** rather than the URL-derived title, and the saved body.
-  await row(page, 'item-folder').locator('.twisty').click();
+  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
   await row(page, 'item-create').dblclick();
   const view = page.locator('[data-testid="http-request-view"]');
   await expect(view).toBeVisible();
@@ -162,8 +162,8 @@ test('collections — editing marks the request dirty, and Save clears it', asyn
   const { window: page, control } = await relaunch({ control: CONTROL });
   await openHttpMode(page);
 
-  await row(page, 'col-1').locator('.twisty').click();
-  await row(page, 'item-folder').locator('.twisty').click();
+  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
+  await row(page, 'item-folder').locator('[data-testid="tree-twisty"]').click();
   await row(page, 'item-create').dblclick();
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 
@@ -302,7 +302,7 @@ test('collections — search filters the tree, keeps ancestors, and restores the
 
   // Expand the collection only — the folder stays collapsed, which is the state search must
   // restore afterwards.
-  await row(page, 'col-1').locator('.twisty').click();
+  await row(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
   await expect(row(page, 'item-folder')).toBeVisible();
   await expect(row(page, 'item-create')).toHaveCount(0);
 

@@ -80,10 +80,10 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 15_000 });
   await assertTooltipShows(page, statusDot, /^SQLite 3\./);
 
-  await connRow.locator('.twisty').click();
+  await connRow.locator('[data-testid="tree-twisty"]').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:main"]');
   await expect(dbRow).toBeVisible();
-  await dbRow.locator('.twisty').click();
+  await dbRow.locator('[data-testid="tree-twisty"]').click();
 
   const orderItemsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:main/table:order_items"]',

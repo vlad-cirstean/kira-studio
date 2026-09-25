@@ -202,7 +202,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // window.kira.treeChildren probe of that fact is dropped rather than ported).
   const wideTableRow = await findRow(page, WIDE_TABLE_PATH);
   await expect(wideTableRow).toHaveAttribute('data-kind', 'table');
-  await expect(wideTableRow.locator('.twisty')).not.toBeVisible();
+  await expect(wideTableRow.locator('[data-testid="tree-twisty"]')).not.toBeVisible();
 
   // P19 D1-D3: every other listed kind (views, materialized views, sequences, functions)
   // collapses into its own per-kind folder below the ungrouped tables, collapsed by default.
@@ -224,7 +224,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // D2/D4's own acceptance bar: expanding a folder is a pure render over already-fetched
   // children — zero IPC calls, zero op-log rows, asserted rather than assumed.
   const opsBeforeFolderExpand = opsCount(control.log());
-  await sequencesFolder.locator('.twisty').click();
+  await sequencesFolder.locator('[data-testid="tree-twisty"]').click();
   const sequenceRow = await findRow(page, SEQUENCE_PATH);
   await expect(sequenceRow).toBeVisible();
   await expect(sequenceRow).toHaveAttribute('data-kind', 'sequence');
@@ -232,7 +232,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
 
   // --- cache assertion (§7/§9.2): a cache hit produces zero new op-log rows --------------
   const opsBeforeCollapse = opsCount(control.log());
-  await (await findRow(page, '')).locator('.twisty').click(); // collapse the whole connection
+  await (await findRow(page, '')).locator('[data-testid="tree-twisty"]').click(); // collapse the whole connection
   await expandRow(page, '');
   expect(opsCount(control.log())).toBe(opsBeforeCollapse);
 
@@ -259,7 +259,8 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   const invalidateBeforeLeafRefresh = invalidateOnRefresh.length;
   await openRowMenu(page, WIDE_TABLE_PATH);
   await page.click('[data-testid="menu-item-refresh"]');
-  // A leaf has no twisty spinner to poll (P19 D5: wide_table's own `.twisty` is `invisible`, and
+  // A leaf has no twisty spinner to poll (P19 D5: wide_table's own `[data-testid="tree-twisty"]`
+  // is `invisible`, and
   // refreshObject never touches `treeState.loading` for it either way) — wait out the mocked
   // round trip with a fixed settle window instead, long enough for either the fixed behaviour
   // (one treeInvalidate call, nothing else) or the pre-fix one (treeInvalidate AND a treeChildren
@@ -361,7 +362,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
 
   // Collapse everything down to the bare connection row so a right-click well below it lands
   // on the virtual list's empty spacer, not on a `.tree-row` (which stops propagation itself).
-  await (await findRow(page, '')).locator('.twisty').click();
+  await (await findRow(page, '')).locator('[data-testid="tree-twisty"]').click();
   await page.locator('[data-testid="tree-background"]').click({
     button: 'right',
     position: { x: 10, y: 200 },
@@ -440,7 +441,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // clears entirely (same as the initial "nothing pinned at scrollTop 0" case above).
   await expect(stickyRows.last()).toHaveAttribute('data-path', APP_PATH);
   await expect(stickyRows.last().locator('[data-testid="tree-rail"]')).toBeVisible();
-  await stickyRows.last().locator('.twisty').click();
+  await stickyRows.last().locator('[data-testid="tree-twisty"]').click();
   await expect(stickyRows).toHaveCount(0);
   await expandRow(page, APP_PATH); // restore for the assertions that follow
 
@@ -502,8 +503,10 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // path-based `findRow`/`expandRow` helpers.
   async function expandNext(row: Locator): Promise<Locator> {
     await row.scrollIntoViewIfNeeded();
-    await row.locator('.twisty').click();
-    await expect(row.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
+    await row.locator('[data-testid="tree-twisty"]').click();
+    await expect(row.locator('[data-testid="tree-twisty"] .spin')).toHaveCount(0, {
+      timeout: 15_000,
+    });
     return row.locator('xpath=following-sibling::*[1]');
   }
   // Walks forward sibling by sibling from `start`, scrolling each candidate into view before
@@ -539,8 +542,10 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // scrollport's top below; without it there is not enough content left below conn2Row to fill
   // the viewport, and the browser refuses to open a gap under the last row.
   const conn2Sequences = await findFollowingGroup(conn2App, 'Sequences');
-  await conn2Sequences.locator('.twisty').click();
-  await expect(conn2Sequences.locator('.twisty .spin')).toHaveCount(0, { timeout: 15_000 });
+  await conn2Sequences.locator('[data-testid="tree-twisty"]').click();
+  await expect(conn2Sequences.locator('[data-testid="tree-twisty"] .spin')).toHaveCount(0, {
+    timeout: 15_000,
+  });
 
   // Right at the boundary: the band's outermost — only — row is now the second connection.
   // stickyBand.ts's own kept-loop requires a candidate's natural top to be strictly less than its
@@ -593,7 +598,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // no Events.On mock at all, so the automatic cache-invalidate-and-refetch the original asserted
   // here (D11) never fires — only the reconnect's own `connectionsConnect` call happens.
   const opsBeforeReconnect = opsCount(control.log());
-  await (await findRow(page, APP_PATH)).locator('.twisty').click();
+  await (await findRow(page, APP_PATH)).locator('[data-testid="tree-twisty"]').click();
   const appRowAgain = await expandRow(page, APP_PATH);
   await expect(appRowAgain.locator('[data-testid="error-popover-trigger"]')).toHaveCount(0);
   await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
@@ -605,7 +610,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   // app-row expand above reconnected it), so this is a normal fresh fetch with real children,
   // not an error.
   const analyticsRow = await findRow(page, ANALYTICS_PATH);
-  await analyticsRow.locator('.twisty').click();
+  await analyticsRow.locator('[data-testid="tree-twisty"]').click();
   await expect(analyticsRow.locator('[data-testid="error-popover-trigger"]')).toHaveCount(0, {
     timeout: 10_000,
   });

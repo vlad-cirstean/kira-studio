@@ -45,7 +45,7 @@ test('mariadb (frontend, mocked IPC) — connect, tree, data tab, count, filter,
   await expect(dbRow).toHaveAttribute('data-kind', 'database');
   const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
   await expect(orderItemsRow).toHaveAttribute('data-kind', 'table');
-  await expect(orderItemsRow.locator('.twisty')).not.toBeVisible();
+  await expect(orderItemsRow.locator('[data-testid="tree-twisty"]')).not.toBeVisible();
 
   // --- open a data tab, read a page, count (rows 4-5) ---------------------------------------
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();

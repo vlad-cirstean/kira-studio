@@ -53,12 +53,12 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   const groupsFolder = await findRow(page, '#consumerGroup');
   await expect(groupsFolder).toBeVisible();
   await expect(groupsFolder).toContainText('Consumer groups');
-  await groupsFolder.locator('.twisty').click();
+  await groupsFolder.locator('[data-testid="tree-twisty"]').click();
   const groupRow = await findRow(page, CONSUMER_GROUP_PATH);
   await expect(groupRow).toHaveAttribute('data-kind', 'consumerGroup');
 
   // --- P23 D3: a topic no longer expands — its twisty is hidden -------------------------------
-  await expect(ordersTopicRow.locator('.twisty')).not.toBeVisible();
+  await expect(ordersTopicRow.locator('[data-testid="tree-twisty"]')).not.toBeVisible();
 
   // --- open the orders topic: offsetWindow auto-loads on mount, no Poll button ----------------
   await ordersTopicRow.dblclick();

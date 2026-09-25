@@ -317,7 +317,7 @@ test('precedence is environment-over-collection', async ({ relaunch }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
   await openHttpMode(page);
-  await collectionRow(page, 'col-1').locator('.twisty').click();
+  await collectionRow(page, 'col-1').locator('[data-testid="tree-twisty"]').click();
   await page.locator('[data-testid="collection-row"][data-id="item-1"]').dblclick();
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 

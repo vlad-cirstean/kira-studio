@@ -168,7 +168,7 @@ test('tabs — independent state, context menu, colours', async ({ relaunch }) =
 
   // Reveal in project panel: collapse the tree, then assert the action re-expands and selects
   // the originating row.
-  await (await findRow(page, '')).locator('.twisty').click();
+  await (await findRow(page, '')).locator('[data-testid="tree-twisty"]').click();
   await tabLocator(page, tab3Id).click({ button: 'right' });
   await page.click('[data-testid="menu-item-reveal-in-project-panel"]');
   await expect(await findRow(page, ORDER_ITEMS_PATH)).toHaveClass(/selected/, { timeout: 10_000 });

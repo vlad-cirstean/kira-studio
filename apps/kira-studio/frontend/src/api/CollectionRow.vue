@@ -5,6 +5,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { methodTextClass } from '@theme/methodColor';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
@@ -95,9 +96,8 @@ const parts = computed<{ text: string; hit: boolean }[]>(() => {
   return out.length > 0 ? out : [{ text: name, hit: false }];
 });
 
-function onTwistyClick(e: MouseEvent): void {
-  e.stopPropagation();
-  if (props.row.hasChildren) emit('toggle', props.row);
+function onTwistyClick(): void {
+  emit('toggle', props.row);
 }
 
 // P105 §5.2(c): the container's own onTreeKeydown (CollectionsTree.vue) already claims Enter for
@@ -131,16 +131,7 @@ function onKeydown(e: KeyboardEvent): void {
   >
     <!-- Same reasoning as project/TreeRow.vue's twisty: its entire meaning is drawn by the
          chevron direction, so no tooltip, but :aria-label stays so it isn't nameless. -->
-    <button
-      type="button"
-      class="twisty"
-      :class="{ invisible: !row.hasChildren }"
-      tabindex="-1"
-      :aria-label="row.expanded ? 'Collapse' : 'Expand'"
-      @click="onTwistyClick"
-    >
-      <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-    </button>
+    <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick" />
 
     <!-- A fixed width so every row's name starts at the same x -- an unaligned ragged edge is
          exactly what makes a long request list hard to scan, which is the reason the chip exists
@@ -210,9 +201,7 @@ function onKeydown(e: KeyboardEvent): void {
   @apply bg-select;
 }
 
-/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as TreeRow.vue's/
-   RepoTreeRow.vue's own rule) -- mutations.spec.ts/fake-data.spec.ts/tree.spec.ts still select
-   `.twisty` directly, the name stays. `.twisty.invisible` dropped: it applied nothing beyond
-   Tailwind's own bare `.invisible` utility already does on the same element (:class="{ invisible:
-   !row.hasChildren }"). */
+/* P110 I2-13: `.twisty` (base.css's own `@utility twisty`) retired in favour of the shared
+   TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) --
+   mutations.spec.ts/fake-data.spec.ts/tree.spec.ts now select `[data-testid="tree-twisty"]`. */
 </style>

@@ -186,29 +186,11 @@
   height: var(--spacing-row);
 }
 
-/* A tree row's own disclosure-triangle button -- same utility set (order aside) in
-   CollectionRow.vue/TreeRow.vue/RepoTreeRow.vue (TreeRow.vue's own `border-none`/raw
-   `color: var(--kira-fg-muted)` real-compile/token-verified equal to `border-0`/
-   `text-muted-foreground` -- a 0-width border renders the same regardless of style, and
-   `--muted-foreground` is itself defined as `var(--kira-fg-muted)`, shadcn-bridge.css). All 3
-   files' own `.twisty.invisible` applied nothing beyond Tailwind's own bare `.invisible` utility
-   already does -- dropped rather than ported. RepoSearchRow.vue's own `.twisty` (no
-   cursor-pointer -- a real, deliberate difference) is left alone, out of scope here (B37's own
-   raw-declaration pass owns that file). */
-@utility twisty {
-  display: flex;
-  height: calc(var(--spacing) * 3.5);
-  width: calc(var(--spacing) * 3.5);
-  flex-shrink: 0;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  border-style: var(--tw-border-style);
-  border-width: 0px;
-  background-color: transparent;
-  padding: 0px;
-  color: var(--muted-foreground);
-}
+/* P110 I2-13: `twisty` (this file's own `@utility twisty`) retired in favour of the shared
+   TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) -- TreeRow.vue/
+   CollectionRow.vue/RepoTreeRow.vue/GitPanel.vue's own repo-row expand/RepoSearchRow.vue (the one
+   consumer that deliberately keeps no cursor-pointer, passed through via `class`) all take it now.
+   Every `.twisty` test locator became `[data-testid="tree-twisty"]`. */
 
 /* P110 I2-12: `columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` (below the 4+-component
    extraction bar, only ColumnsMenu.vue and ProjectionMenu.vue) inlined at both call sites as plain

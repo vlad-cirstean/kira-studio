@@ -812,12 +812,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   const expandDeltas: number[] = [];
   for (let i = 0; i < 20; i++) {
     const row = await findRow(page, APP_PATH);
-    await row.locator('.twisty').click(); // collapse — not measured
+    await row.locator('[data-testid="tree-twisty"]').click(); // collapse — not measured
     await expect(
       page.locator(`[data-testid="tree-row"][data-path="${BIG_ROWS_PATH}"]`),
     ).toHaveCount(0);
     const delta = await measureClickToDom(page, {
-      click: `[data-testid="tree-row"][data-path="${APP_PATH}"] .twisty`,
+      click: `[data-testid="tree-row"][data-path="${APP_PATH}"] [data-testid="tree-twisty"]`,
       observe: '[data-testid="tree-background"] .virtual-list',
       until: { selector: `[data-testid="tree-row"][data-path="${BIG_ROWS_PATH}"]` },
     });

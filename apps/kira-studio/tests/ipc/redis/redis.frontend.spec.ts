@@ -63,10 +63,10 @@ test('redis (frontend, mocked IPC) — connect, tree, keyvalue tabs, console', a
   await expandRow(page, '');
   const db0Row = await findRow(page, DB0_PATH);
   await expect(db0Row).toHaveAttribute('data-kind', 'database');
-  await expect(db0Row.locator('.twisty')).toHaveClass(/invisible/);
+  await expect(db0Row.locator('[data-testid="tree-twisty"]')).toHaveClass(/invisible/);
   const db1Row = await findRow(page, DB1_PATH);
   await expect(db1Row).toBeVisible();
-  await expect(db1Row.locator('.twisty')).toHaveClass(/invisible/);
+  await expect(db1Row.locator('[data-testid="tree-twisty"]')).toHaveClass(/invisible/);
 
   const browseView = page.locator('[data-testid="browse-view"]');
 

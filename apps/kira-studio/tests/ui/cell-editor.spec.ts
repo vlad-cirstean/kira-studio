@@ -711,7 +711,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   // mutations.spec.ts's own read-only scenario, which hits the identical ambiguity).
   const firstConnRow = connectionRow(page);
   await expect(firstConnRow).toHaveCount(1);
-  await firstConnRow.locator('.twisty').click();
+  await firstConnRow.locator('[data-testid="tree-twisty"]').click();
 
   await fillConnectionDialog(page, { name: 'Cell Editor DB (RO)', color: 'red', readOnly: true });
   const roConnRow = connectionRow(page, 'Cell Editor DB (RO)');
@@ -721,7 +721,7 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await expect(roConnRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
-  await roConnRow.locator('.twisty').click();
+  await roConnRow.locator('[data-testid="tree-twisty"]').click();
   await expandRow(page, DB_PATH);
   await expandRow(page, APP_PATH);
   const roFormatsRow = await findRow(page, FORMATS_PATH);

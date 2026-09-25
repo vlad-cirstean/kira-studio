@@ -205,7 +205,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
 
   // --- scenario 2: a disabled control (F5/D3) — a naive mouseenter implementation never sees
   // this hover at all, since Blink dispatches no pointer events on a disabled form control.
-  await connRow.locator('.twisty').click(); // collapse — keeps the two connections' tree paths distinct
+  await connRow.locator('[data-testid="tree-twisty"]').click(); // collapse — keeps the two connections' tree paths distinct
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
   await page.fill('[data-testid="connection-name"]', 'Tooltips DB (RO)');
@@ -227,7 +227,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await expect(roConnRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
-  await roConnRow.locator('.twisty').click();
+  await roConnRow.locator('[data-testid="tree-twisty"]').click();
   await expandRow(page, DB_PATH);
   await expandRow(page, APP_PATH);
   await (await findRow(page, COMPOSITE_PK_PATH)).dblclick();

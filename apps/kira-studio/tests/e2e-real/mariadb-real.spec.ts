@@ -88,10 +88,10 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
 
   // Step 7: tree expands straight to relations — MariaDB has no schema level, unlike Postgres's
   // database -> schema -> relation depth.
-  await mariaRow.locator('.twisty').click();
+  await mariaRow.locator('[data-testid="tree-twisty"]').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');
   await expect(dbRow).toBeVisible();
-  await dbRow.locator('.twisty').click();
+  await dbRow.locator('[data-testid="tree-twisty"]').click();
 
   const orderItemsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/table:order_items"]',
@@ -219,10 +219,10 @@ test('two native kinds in one session: both survive a reload and serve a real re
   // Kafka's own StreamPage over `topic:orders` (through the Go-native adapter's base64-encoded
   // chunks, toTypedArray's first branch — Kafka has no database:/schema: level, so topics sit
   // directly under the connection root).
-  await mariaRowFinal.locator('.twisty').click();
+  await mariaRowFinal.locator('[data-testid="tree-twisty"]').click();
   const mariaDbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');
   await expect(mariaDbRow).toBeVisible({ timeout: 10_000 });
-  await mariaDbRow.locator('.twisty').click();
+  await mariaDbRow.locator('[data-testid="tree-twisty"]').click();
   const regionsRow = page.locator(
     '[data-testid="tree-row"][data-path="database:kira_test/table:regions"]',
   );
@@ -231,7 +231,7 @@ test('two native kinds in one session: both survive a reload and serve a real re
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('[data-testid="grid-row"]').first()).toBeVisible({ timeout: 10_000 });
 
-  await kafkaRowFinal.locator('.twisty').click();
+  await kafkaRowFinal.locator('[data-testid="tree-twisty"]').click();
   const ordersTopicRowFinal = page.locator('[data-testid="tree-row"][data-path="topic:orders"]');
   await expect(ordersTopicRowFinal).toBeVisible({ timeout: 10_000 });
   await ordersTopicRowFinal.dblclick();

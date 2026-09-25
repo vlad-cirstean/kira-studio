@@ -282,6 +282,14 @@ check_class_in_attrs 'columns-menu-loading' 'p-2'
 check_class_in_attrs 'columns-menu-list' 'overflow-y-auto p-0.5'
 check_class_in_attrs 'columns-menu-footer' 'px-1.5 pb-1.5'
 
+# P110 I2-13: the tree-row disclosure-triangle button, folded into the shared TreeTwisty component
+# (packages/workbench/src/components/TreeTwisty.vue). Attribute-scoped: "twisty" is also plain
+# English prose used throughout tree-row/search-row comments and docs (e.g. "the twisty always
+# expands/collapses") -- a whole-file check_class would false-positive on every one of those.
+# `twisty-btn` (FiltersDialog.vue, a separate, unrelated control) never collides: the lookahead
+# that excludes trailing identifier/hyphen characters already keeps it out.
+check_class_in_attrs 'twisty' 'TreeTwisty (packages/workbench/src/components/TreeTwisty.vue)'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

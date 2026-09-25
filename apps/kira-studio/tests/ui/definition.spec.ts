@@ -341,7 +341,7 @@ test('Definition tab — tree grouping: folders collapsed by default, zero-IPC e
   // Tables render first, ungrouped, ahead of any folder.
   const wideTableRow = await findRow(page, WIDE_TABLE_PATH);
   await expect(wideTableRow).toBeVisible();
-  await expect(wideTableRow.locator('.twisty')).not.toBeVisible();
+  await expect(wideTableRow.locator('[data-testid="tree-twisty"]')).not.toBeVisible();
 
   for (const path of [
     VIEWS_FOLDER_PATH,
@@ -359,6 +359,6 @@ test('Definition tab — tree grouping: folders collapsed by default, zero-IPC e
   // children (no treeChildren fixture entry exists for the folder path itself — a real call here
   // would 422 as E_FIXTURE_MISS, so a passing test already proves the claim).
   expect(await page.locator(`[data-path="${INVOICE_SEQ_PATH}"]`).count()).toBe(0);
-  await (await findRow(page, SEQUENCES_FOLDER_PATH)).locator('.twisty').click();
+  await (await findRow(page, SEQUENCES_FOLDER_PATH)).locator('[data-testid="tree-twisty"]').click();
   await expect(await findRow(page, INVOICE_SEQ_PATH)).toBeVisible();
 });

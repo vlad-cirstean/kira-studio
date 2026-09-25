@@ -945,7 +945,10 @@ test('the method select opens an app-drawn menu, and PATCH gets its own colour, 
   const { window: page } = await relaunch({ control: CONTROL });
   await modeTab(page, 'api').click();
   await expect(page.locator('[data-testid="collection-row"][data-id="col-1"]')).toBeVisible();
-  await page.locator('[data-testid="collection-row"][data-id="col-1"]').locator('.twisty').click();
+  await page
+    .locator('[data-testid="collection-row"][data-id="col-1"]')
+    .locator('[data-testid="tree-twisty"]')
+    .click();
   await page.locator('[data-testid="collection-row"][data-id="item-1"]').dblclick();
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 
@@ -1289,7 +1292,10 @@ test('the overview panel opens from a request tab, lists both scopes with their 
   const { window: page } = await relaunch({ control: CONTROL });
   await modeTab(page, 'api').click();
   await expect(page.locator('[data-testid="collection-row"][data-id="col-1"]')).toBeVisible();
-  await page.locator('[data-testid="collection-row"][data-id="col-1"]').locator('.twisty').click();
+  await page
+    .locator('[data-testid="collection-row"][data-id="col-1"]')
+    .locator('[data-testid="tree-twisty"]')
+    .click();
   await page.locator('[data-testid="collection-row"][data-id="item-1"]').dblclick();
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 

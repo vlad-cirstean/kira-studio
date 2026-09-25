@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import TreeTwisty from '@workbench/components/TreeTwisty.vue';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import EngineIcon from '../theme/EngineIcon.vue';
@@ -87,9 +88,8 @@ function onDblClick(): void {
   emit('open', props.row);
 }
 
-function onTwistyClick(e: MouseEvent): void {
-  e.stopPropagation();
-  if (props.row.hasChildren) emit('toggle', props.row);
+function onTwistyClick(): void {
+  emit('toggle', props.row);
 }
 
 function onContextMenu(e: MouseEvent): void {
@@ -138,17 +138,10 @@ function onKeydown(e: KeyboardEvent): void {
          panel — no tooltip. :aria-label stays: P104 §6.2 made every icon-only control set its
          own explicit aria-label by hand (no more directive mirroring it in automatically), so
          dropping it here would leave this button nameless. -->
-    <button
-      type="button"
-      class="twisty"
-      :class="{ invisible: !row.hasChildren }"
-      tabindex="-1"
-      :aria-label="row.expanded ? 'Collapse' : 'Expand'"
-      @click="onTwistyClick"
-    >
+    <TreeTwisty :expanded="row.expanded" :has-children="row.hasChildren" @toggle="onTwistyClick">
       <CodiconIcon v-if="row.loading" name="loading" class="spin animate-spin" :size="13" />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-    </button>
+    </TreeTwisty>
 
     <span v-if="row.kind === 'connection'" class="size-4 flex items-center justify-center shrink-0">
       <Tooltip :disabled="!statusTitle">
@@ -215,14 +208,15 @@ function onKeydown(e: KeyboardEvent): void {
   @apply bg-select;
 }
 
-/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as CollectionRow.vue's/
-   RepoTreeRow.vue's own rule -- `border-none`/raw `color: var(--kira-fg-muted)` here verified
-   equal to `border-0`/`text-muted-foreground`). `.twisty.invisible` dropped: it applied nothing
-   beyond Tailwind's own bare `.invisible` utility already does on the same element (:class="{
-   invisible: !row.hasChildren }"). */
+/* P110 I2-13: `.twisty` (base.css's own `@utility twisty`) retired in favour of the shared
+   TreeTwisty component (packages/workbench/src/components/TreeTwisty.vue) -- CollectionRow.vue/
+   RepoTreeRow.vue/GitPanel.vue's own repo-row expand take it too. The loading-spinner override
+   below is this file's own slot content, the one real difference from the other 4 consumers'
+   plain chevron. */
 
 /* P110 B35: `.spin`/`.status-dot`/`.label` stay bare marker classes -- tree.spec.ts's own
-   `.twisty .spin` locator, and slick-grid.spec.ts/connections.spec.ts/tree.spec.ts/etc.'s own
+   `[data-testid="tree-twisty"] .spin` locator, and slick-grid.spec.ts/connections.spec.ts/
+   tree.spec.ts/etc.'s own
    `.status-dot` `data-status` assertions (60+ sites), plus font-roles.spec.ts's `.label` font
    check. Every declaration all three used to carry now sits directly on the element as Tailwind
    utilities instead (including `.spin`'s own `@apply animate-spin`, now just `animate-spin`

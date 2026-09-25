@@ -85,7 +85,7 @@ async function connectAndExpand(page: Page, name: string): Promise<void> {
   await expect(root.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
-  await root.locator('.twisty').click();
+  await root.locator('[data-testid="tree-twisty"]').click();
   await expandRow(page, DB_PATH);
   await expandRow(page, APP_PATH);
 }
@@ -372,7 +372,7 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
   // Collapse A's own root before B exists — A's descendant rows share the exact same `data-path`
   // values B will render, and findRow/expandRow match on `data-path` alone (tabs.spec.ts's own
   // convention, for the identical reason).
-  await connectionRootRow(page, 'Leaks A').locator('.twisty').click();
+  await connectionRootRow(page, 'Leaks A').locator('[data-testid="tree-twisty"]').click();
 
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');

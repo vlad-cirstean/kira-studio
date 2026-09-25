@@ -171,7 +171,7 @@ test('a tree change removes an open request item, and Save falls back to Save as
   // before the item row underneath it is visible at all.
   const collectionRow = page.locator('[data-testid="collection-row"][data-id="col-1"]');
   await expect(collectionRow).toBeVisible();
-  await collectionRow.locator('.twisty').click();
+  await collectionRow.locator('[data-testid="tree-twisty"]').click();
   const row = page.locator('[data-testid="collection-row"][data-id="item-1"]');
   await expect(row).toBeVisible();
   await row.dblclick();

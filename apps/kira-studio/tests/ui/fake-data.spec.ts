@@ -303,7 +303,7 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   // --- scenario 1: the button's gate on a read-only connection ------------------------------
   const firstConnRow = connectionRow(page, 'Fake Data DB');
   await expect(firstConnRow).toHaveCount(1);
-  await firstConnRow.locator('.twisty').click();
+  await firstConnRow.locator('[data-testid="tree-twisty"]').click();
 
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-postgres"]');
@@ -325,7 +325,7 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   await expect(roConnRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
     timeout: 10_000,
   });
-  await roConnRow.locator('.twisty').click();
+  await roConnRow.locator('[data-testid="tree-twisty"]').click();
   await expandRow(page, 'database:kira_test');
   await expandRow(page, 'database:kira_test/schema:app');
   const roCompositeRow = await findRow(page, COMPOSITE_PK_PATH);
