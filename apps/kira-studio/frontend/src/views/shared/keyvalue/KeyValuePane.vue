@@ -1127,14 +1127,17 @@ onUnmounted(() => {
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate w-56 shrink-0"
-                        :class="{
-                          'search-match bg-search-match': isSearchMatch(entry.i, 'field'),
-                          'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
-                            entry.i,
-                            'field',
-                          ),
-                        }"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate w-56 shrink-0"
+                        :class="[
+                          {
+                            'search-match bg-search-match': isSearchMatch(entry.i, 'field'),
+                            'search-match-current bg-search-match-current': isCurrentSearchMatch(
+                              entry.i,
+                              'field',
+                            ),
+                          },
+                          isCurrentSearchMatch(entry.i, 'field') ? 'text-bg' : 'text-fg',
+                        ]"
                         data-testid="keyvalue-field"
                       >
                         {{ rowAt(entry.i)?.field }}
@@ -1145,14 +1148,17 @@ onUnmounted(() => {
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
-                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md text-fg truncate flex-1 min-w-0"
-                        :class="{
-                          'search-match bg-search-match': isSearchMatch(entry.i, 'value'),
-                          'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
-                            entry.i,
-                            'value',
-                          ),
-                        }"
+                        class="flex items-center px-2 border-r border-b border-border font-data text-kira-md truncate flex-1 min-w-0"
+                        :class="[
+                          {
+                            'search-match bg-search-match': isSearchMatch(entry.i, 'value'),
+                            'search-match-current bg-search-match-current': isCurrentSearchMatch(
+                              entry.i,
+                              'value',
+                            ),
+                          },
+                          isCurrentSearchMatch(entry.i, 'value') ? 'text-bg' : 'text-fg',
+                        ]"
                         data-testid="keyvalue-value"
                       >
                         {{ rowAt(entry.i)?.value }}

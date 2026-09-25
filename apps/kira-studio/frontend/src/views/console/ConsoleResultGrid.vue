@@ -413,14 +413,17 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           @contextmenu="onKeyValueRowContextMenuFromEvent"
         >
           <div
-            class="cell overflow-hidden whitespace-nowrap cursor-default w-52 flex items-center text-muted-foreground text-ellipsis px-2"
-            :class="{
-              'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
-              'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(
-                rowIndices[vi.index]!,
-                0,
-              ),
-            }"
+            class="cell overflow-hidden whitespace-nowrap cursor-default w-52 flex items-center text-ellipsis px-2"
+            :class="[
+              {
+                'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 0),
+                'search-match-current bg-search-match-current': isCurrentSearchMatch(
+                  rowIndices[vi.index]!,
+                  0,
+                ),
+              },
+              isCurrentSearchMatch(rowIndices[vi.index]!, 0) ? 'text-bg' : 'text-muted-foreground',
+            ]"
           >
             {{ kvRowAt(rowIndices[vi.index]!).field }}
           </div>
