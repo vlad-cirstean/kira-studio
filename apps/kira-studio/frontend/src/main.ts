@@ -28,6 +28,9 @@ import { useTerminalsStore } from './state/terminals';
 // workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
 // base.css as two separate Tailwind roots and double its output.
 import '@workbench/workbench.css';
+// P110 I2-18 (M8): shared `.kira-ed-var*` decoration classes, painted by both MonacoHost.vue and
+// AutocompleteField.vue's own overlay -- see the file's own doc comment.
+import './editor/edDecorations.css';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useSettingsStore } from './state/settings';

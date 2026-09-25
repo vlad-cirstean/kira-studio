@@ -113,6 +113,22 @@ const highlighted = computed(() => !!props.language && props.language !== 'plain
 // reason enough for the paint-only overlay to exist behind the real input.
 const showOverlay = computed(() => highlighted.value || !!props.rangeHighlights);
 
+// P110 I2-18: `.autocomplete-field.is-grow .highlight-overlay`'s own compound (display/white-space/
+// line-height all fought the base rule, at higher specificity) folded into one ternary per state —
+// `leading-[normal]`/`leading-[inherit]` are both §1.2-allowlisted for this file's overlay only
+// (Tailwind's own `leading-normal` resolves to a fixed 1.5, not the CSS keyword `normal`).
+const overlayClass = computed(() =>
+  props.grow ? 'block whitespace-pre-wrap wrap-anywhere leading-[inherit]' : 'flex items-center whitespace-pre leading-[normal]',
+);
+// `.input-wrap input.has-overlay`/`textarea.has-overlay`'s own compound (relative/z-1/text-transparent/
+// caret-fg, at higher specificity than the input's own static text-fg) folded the same way — the real
+// input/textarea's own text color is the one property genuinely in play, so it moves into this
+// ternary rather than coexisting with a static `text-fg` (twMerge/cascade-order ambiguity the
+// check-class-conflicts guard exists to catch).
+const fieldOverlayClass = computed(() =>
+  showOverlay.value ? 'relative z-1 text-transparent caret-fg' : 'text-fg',
+);
+
 // Monaco is loaded lazily and shared (`loadMonaco()` is memoised app-wide) — a filter field on a
 // fresh session pulls the chunk the first time any editor surface does, not before. Until it
 // resolves the overlay repaints as plain, unstyled text (paintOverlayHtml's own `mod`-less early
@@ -472,7 +488,7 @@ const fieldAttrs = computed(
     ({
       value: props.modelValue,
       placeholder: props.placeholder,
-      class: { 'has-overlay': showOverlay.value },
+      class: fieldOverlayClass.value,
       autocomplete: 'off',
       spellcheck: 'false',
       role: 'combobox',
@@ -520,25 +536,39 @@ const fieldAttrs = computed(
              only in this module's own static class names — never raw markup from anywhere else, so
              `v-html` here paints exactly what `escapeHtml`/`mergeHighlightRanges` produced and
              nothing else. -->
+        <!-- Paint-only and never scrolled by the user directly (see onInputScroll) — sized/
+             positioned to sit exactly under the real <input> next to it, not the whole `.p-input`
+             box (which may also carry a `prefix` span ahead of this wrapper). The painted text
+             sizes to its own one line of content, not to this inset:0 box — centering it (`items-
+             center` in the non-grow branch of `overlayClass`) is what lines it up with the native
+             input's own vertically-centered line box (`.input-wrap`'s own align-items: center)
+             regardless of the current font-size setting. `onInputScroll` pans this element's own
+             scrollLeft, so the overflowing (flex, non-shrinking) text content is what actually
+             needs the horizontal scroll, not a nested child. `classFor` (api/state/
+             variableCompletion.ts) paints `.kira-ed-var*` into this overlay's `v-html` content —
+             see apps/kira-studio/frontend/src/editor/edDecorations.css (M8), shared with
+             MonacoHost.vue's own identical rules. -->
         <div
           v-if="showOverlay"
           ref="overlayRootRef"
-          class="highlight-overlay"
+          class="highlight-overlay absolute inset-0 pointer-events-none overflow-hidden font-data text-kira-sm bg-transparent"
+          :class="overlayClass"
           aria-hidden="true"
           v-html="overlayHtml"
         ></div>
         <!-- P110 B25: primitives.css's old `.p-input input,textarea{...}` reset, direct utilities
-             now (`text-fg`/`font-data`/`text-kira-sm` replace `color:inherit`/`font:inherit` --
-             form elements don't inherit either by UA default, so the original rule set them
-             explicitly too, just via the box's own computed values rather than repeating the
-             tokens). `.p-input.is-grow` (primitives.css, B31 residue) still targets this same
-             literal class name unconditionally applied above. -->
+             now (`font-data`/`text-kira-sm` replace `font:inherit` -- form elements don't inherit
+             either by UA default, so the original rule set them explicitly too, just via the box's
+             own computed values rather than repeating the tokens; text color moves through
+             `fieldOverlayClass`, in `fieldAttrs` below, since `.has-overlay` conditionally overrides
+             it). `.p-input.is-grow` (primitives.css, B31 residue) still targets this same literal
+             class name unconditionally applied above. -->
         <textarea
           v-if="grow"
           ref="inputRef"
           rows="1"
           wrap="soft"
-          class="min-w-0 flex-1 border-0 bg-transparent text-fg font-data text-kira-sm outline-none placeholder:text-muted-foreground"
+          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-sm outline-none placeholder:text-muted-foreground"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
         <!-- §1.2 allowlist: the two `::-webkit-*-spin-button` arbitrary utilities are pre-approved
@@ -549,7 +579,7 @@ const fieldAttrs = computed(
         <input
           v-else
           ref="inputRef"
-          class="min-w-0 flex-1 border-0 bg-transparent text-fg font-data text-kira-sm outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-sm outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
         <ComboboxAnchor :reference="inputRef ?? undefined" />
@@ -602,76 +632,14 @@ const fieldAttrs = computed(
         >{{ line }}</div
       >
     </div>
+    <!-- P110 I2-18: `.highlight-overlay`/`.autocomplete-field.is-grow .highlight-overlay` compounds
+         moved to `overlayClass` above (script setup); `.input-wrap input.has-overlay`/
+         `textarea.has-overlay` moved to `fieldOverlayClass`, in `fieldAttrs`. The real input/
+         textarea stays the only interactive/focusable/selectable element — its own text is painted
+         transparent so only the overlay's coloured glyphs underneath show through, while its native
+         caret (caret-color, unaffected by `color`) and selection painting keep working exactly as
+         before, and the overlay paints *behind* whichever of the two is rendered. No padding
+         difference between the two: this box is `inset: 0` on `.input-wrap`, and the textarea is
+         zero-padded inside the same box, so the two elements' first glyphs land on the same pixel. -->
   </AutocompleteRoot>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* Paint-only and never scrolled by the user directly (see onInputScroll) — sized/positioned to sit
-   exactly under the real `<input>` next to it, not the whole `.p-input` box (which may also carry a
-   `prefix` span ahead of this wrapper). `kira-font-family` is a monospace stack, so the overlay's
-   character grid lines up with the native input's own character-for-character regardless of which
-   of the two engines is laying out any given glyph — the one property this trick actually depends
-   on. */
-.highlight-overlay {
-  /* The painted text sizes to its own one line of content, not to this inset:0 box — centering it
-     here is what lines it up with the native input's own vertically-centered line box
-     (`.input-wrap`'s own align-items: center) regardless of the current font-size setting.
-     `onInputScroll` pans this element's own `scrollLeft`, so the overflowing (flex, non-shrinking)
-     text content is what actually needs the horizontal scroll, not a nested child. */
-  @apply absolute inset-0 pointer-events-none overflow-hidden whitespace-pre font-data text-kira-sm bg-transparent flex items-center;
-  /* line-height: normal stays raw, NOT leading-normal (P110 B37 declined despite the accepted B12
-     precedent elsewhere) -- Tailwind's leading-normal resolves to a fixed 1.5, not the CSS keyword
-     `normal`, and this rule's own comment above says line-height is "the one property this trick
-     actually depends on" for lining the overlay up with the real input's own line box; a fixed 1.5
-     is not proven identical to the browser/font's own `normal` metric here. Flagged, not pushed
-     past silently. */
-  line-height: normal;
-}
-
-/* Mirrors MonacoHost.vue's own identical rules — `classFor` (api/state/variableCompletion.ts)
-   paints the same three classes into this overlay's `v-html` content, which never reaches
-   MonacoHost's own scoped styles (they're two separate components' DOM). `:deep()` is required
-   either way: `v-html` content carries no `data-v-*` scoping attribute of its own. */
-.highlight-overlay :deep(.kira-ed-var) {
-  color: var(--kira-var-resolved);
-}
-
-.highlight-overlay :deep(.kira-ed-var-secret) {
-  color: var(--kira-var-resolved);
-  text-decoration: underline dotted var(--kira-syntax-meta);
-}
-
-.highlight-overlay :deep(.kira-ed-var-unknown) {
-  color: var(--kira-warn);
-  text-decoration: underline wavy var(--kira-warn);
-}
-
-/* The overlay must wrap on exactly the same boundaries as a `grow` textarea — same font, same
-   width, same white-space/overflow-wrap — and top-align rather than vertically centre a single
-   line. `line-height: inherit` picks up `1.45` from `.p-input.is-grow` — a `grow` textarea's own
-   line height comes from there, not from `normal` below, and the two must agree or the overlay's
-   lines and the textarea's own lines drift apart by line 2. `line-height: normal` on
-   `.highlight-overlay` above stays for every non-grow field, so no single-line field moves by a
-   pixel. */
-.autocomplete-field.is-grow .highlight-overlay {
-  /* line-height: inherit has no allowlisted Tailwind equivalent (section 1.2's closed allowlist has
-     no leading-[inherit] entry) -- left raw, everything else moved to @apply. */
-  @apply block whitespace-pre-wrap wrap-anywhere;
-  line-height: inherit;
-}
-
-/* The real input/textarea stays the only interactive/focusable/selectable element — its own text is
-   painted transparent so only the overlay's coloured glyphs underneath show through, while its
-   native caret (caret-color, unaffected by `color`) and selection painting keep working exactly as
-   before, and the overlay paints *behind* whichever of the two is rendered. Only applied when an
-   overlay actually exists (`highlighted`) — every other field using this component keeps today's
-   plain look untouched. No padding rule is needed here either — this box is `inset: 0` on
-   `.input-wrap`, and the textarea is zero-padded inside the same box (primitives.css), so the two
-   elements' first glyphs land on the same pixel; do not add a compensating offset. */
-.input-wrap input.has-overlay,
-.input-wrap textarea.has-overlay {
-  @apply relative z-1 text-transparent caret-fg;
-}
-</style>

@@ -624,8 +624,8 @@ watch(
   >
     <pre
       v-if="pending"
-      class="monaco-host-pending m-0 py-2 px-0 font-[family-name:var(--kira-font-data)] text-[length:var(--kira-font-size)] text-fg bg-bg whitespace-pre-wrap overflow-auto"
-      :class="{ 'monaco-host--single-line': singleLine }"
+      class="m-0 font-[family-name:var(--kira-font-data)] text-[length:var(--kira-font-size)] text-fg bg-bg overflow-auto"
+      :class="singleLine ? 'p-0 whitespace-pre' : 'py-2 px-0 whitespace-pre-wrap'"
       >{{ doc }}</pre
     >
   </div>
@@ -634,41 +634,16 @@ watch(
 <style scoped>
 @reference "@theme/base.css";
 
-/* P110 B40: `.monaco-host`/`.monaco-host-pending`'s own plain base rules moved onto the template
-   (scoped CSS is unlayered, always wins over a layered utility regardless of class order, per this
-   plan's own §1 rule) -- both class names stay as bare markers: `.monaco-host` is a real test
-   dependency (tests/ui/support/editorText.ts and every UI spec use it to find "the Monaco host"),
-   and both anchor the compound rule below, which needs both classes present simultaneously and so
-   stays scoped. */
-.monaco-host--single-line.monaco-host-pending {
-  @apply p-0 whitespace-pre;
-}
-
-/* wrapper CSS only, past this point -- the rules below target Monaco's own DOM (:deep(.monaco-editor),
-   :global(.monaco-hover), :global(.suggest-widget)) or classes injected into Monaco's tokenizer
-   output (:deep(.kira-ed-*)). Per the plan's own section 5.15/audit section 6: the SELECTORS stay
-   literal CSS (no template to put a class on), but the declarations inside still convert to @apply
-   where they map to a real utility -- @apply just inlines the utility's own declarations in place,
-   it does not require a template class attribute. P110 B37. */
+/* `.monaco-host` stays a bare marker: a real test dependency (tests/ui/support/editorText.ts and
+   every UI spec use it to find "the Monaco host") and the anchor every :deep()/:global() rule below
+   needs (no template to put a class on for Monaco's own child DOM). P110 I2-18: the
+   `.monaco-host--single-line.monaco-host-pending` compound moved to a ternary on the `<pre>` in the
+   template; `.kira-ed-var*` moved to the shared apps/kira-studio/frontend/src/editor/
+   edDecorations.css (M8), imported once from main.ts -- AutocompleteField.vue's overlay painted a
+   byte-identical copy of the same three rules. */
 .monaco-host--single-line,
 .monaco-host--single-line :deep(.monaco-editor) {
   @apply h-auto;
-}
-
-/* §4.1: app-owned `{{variable}}`/find-bar classes — byte-identical values to `theme.ts:176-251`,
-   only the class prefix renamed (`.cm-kira-*` -> `.kira-ed-*`). */
-.monaco-host :deep(.kira-ed-var) {
-  color: var(--kira-var-resolved);
-}
-
-.monaco-host :deep(.kira-ed-var-secret) {
-  color: var(--kira-var-resolved);
-  text-decoration: underline dotted var(--kira-syntax-meta);
-}
-
-.monaco-host :deep(.kira-ed-var-unknown) {
-  color: var(--kira-warn);
-  text-decoration: underline wavy var(--kira-warn);
 }
 
 .monaco-host :deep(.kira-ed-find-match) {

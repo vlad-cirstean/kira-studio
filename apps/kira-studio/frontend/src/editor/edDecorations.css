@@ -1,0 +1,29 @@
+/* P110 I2-18 (M8): the app-owned `{{variable}}` decoration classes that both engines paint --
+   MonacoHost.vue's own tokenizer output (theme.ts's `.cm-kira-*` -> `.kira-ed-*` rename) and
+   AutocompleteField.vue's `v-html` overlay (api/state/variableCompletion.ts's `classFor`). Both
+   copies carried byte-identical declarations under their own `:deep()`/scoped selector.
+   Deviation from the plan's literal "plain global selectors" wording, disclosed: Monaco's own
+   `.mtk*` token-color classes are injected as a runtime <style> tag at editor-mount time, after
+   this file's own build-time CSS -- two same-specificity (0,1,0) single-class selectors then tie
+   on cascade/injection order, and `.mtk*` started winning that tie once `.kira-ed-var` dropped to a
+   single class (api-ui-consistency.spec.ts's own "resolved {{variable}} has a colour of its own"
+   caught it, real regression, not a false positive). Anchored back to each engine's own real,
+   already-kept marker class (`.monaco-host`/`.highlight-overlay`) to restore the original two-class
+   (0,2,0) specificity that reliably wins the tie regardless of injection order -- same declarations,
+   same dedup (one shared rule set, not two copies), just not a *bare* class selector. */
+.monaco-host .kira-ed-var,
+.highlight-overlay .kira-ed-var {
+  color: var(--kira-var-resolved);
+}
+
+.monaco-host .kira-ed-var-secret,
+.highlight-overlay .kira-ed-var-secret {
+  color: var(--kira-var-resolved);
+  text-decoration: underline dotted var(--kira-syntax-meta);
+}
+
+.monaco-host .kira-ed-var-unknown,
+.highlight-overlay .kira-ed-var-unknown {
+  color: var(--kira-warn);
+  text-decoration: underline wavy var(--kira-warn);
+}
