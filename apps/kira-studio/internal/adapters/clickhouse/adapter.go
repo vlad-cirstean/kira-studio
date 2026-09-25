@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -18,18 +17,21 @@ func init() {
 
 var relationKinds = map[string]bool{"table": true, "view": true, "matview": true}
 
+// connState is handle/readOnly (F3): Connect/Disconnect write them from whatever goroutine
+// adapterhost dispatches them on, concurrently with any in-flight op reading them — Cancel already
+// locked its own read (below); Mutate/Execute/requireHandle did not, a real data race same class as
+// postgres/adapter.go's own. Guarded via adapters.Guarded (P113 G1). The running-query bookkeeping
+// lives in tracker's own lock (P107 T2-3), unrelated to this state.
+type connState struct {
+	handle   *Handle
+	readOnly bool
+}
+
 // Adapter is index.ts's ClickHouseAdapter.
 type Adapter struct {
 	deps adapters.Deps
 
-	// mu guards handle/readOnly (F3): Connect/Disconnect write them from whatever goroutine
-	// adapterhost dispatches them on, concurrently with any in-flight op reading them — Cancel
-	// already locked its own read (below); Mutate/Execute/requireHandle did not, a real data race
-	// same class as postgres/adapter.go's own. The running-query bookkeeping lives in tracker's own
-	// lock (P107 T2-3), unrelated to this mu.
-	mu       sync.Mutex
-	handle   *Handle
-	readOnly bool
+	state adapters.Guarded[connState]
 
 	// tracker's Q is the bare query_id string (D8), not a thread id or backend pid.
 	tracker adapters.QueryTracker[string]
@@ -37,33 +39,23 @@ type Adapter struct {
 
 // getHandle is every op's own locked read of a.handle (F3) — requireHandle's RequireConnected call
 // takes its result, never a.handle directly.
-func (a *Adapter) getHandle() *Handle {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.handle
-}
+func (a *Adapter) getHandle() *Handle { return a.state.Load().handle }
 
 // setConnected is Connect's own locked write (F3).
 func (a *Adapter) setConnected(handle *Handle) {
-	a.mu.Lock()
-	a.handle = handle
-	a.readOnly = handle.ReadOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.handle = handle
+		s.readOnly = handle.ReadOnly
+	})
 }
 
 // clearConnected is Disconnect's own locked write (F3).
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.handle = nil
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.handle = nil })
 }
 
 // getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 func (a *Adapter) Kind() string        { return "clickhouse" }
 func (a *Adapter) Caps() adapters.Caps { return caps }
