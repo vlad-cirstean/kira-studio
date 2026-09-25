@@ -10,21 +10,21 @@ import (
 
 // Channel holds today's exact IPC channel strings (packages/shared/protocol/ipc.ts's IPC const), which
 // are the Wails event names verbatim (P52 §7.1) — the renderer's subscribe mechanism changes, the
-// wire name does not. The six re-exported below (P103 Part 3) are byte-identical strings shared
-// with Kira Space, now defined once in repo-root internal/appevent — re-exported under their own
-// names here so no call site anywhere in this package has to change.
+// wire name does not. The ones re-exported below (P103 Part 3, widened P116) are byte-identical
+// strings shared with Kira Space, now defined once in repo-root internal/appevent — re-exported
+// under their own names here so no call site anywhere in this package has to change.
 const (
-	ChannelOpenSettings           = "kira:open-settings"
+	ChannelOpenSettings           = appevent.ChannelOpenSettings
 	ChannelNewConnection          = "kira:menu:new-connection"
 	ChannelNewRequest             = "kira:menu:new-request"
 	ChannelImportPostman          = "kira:menu:import-postman"
 	ChannelImportDataGrip         = "kira:menu:import-datagrip"
-	ChannelToggleProjectPanel     = "kira:menu:toggle-project-panel"
+	ChannelToggleProjectPanel     = appevent.ChannelToggleProjectPanel
 	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
 	ChannelCommandPalette         = "kira:menu:command-palette"
-	ChannelTabNext                = "kira:menu:tab-next"
-	ChannelTabPrev                = "kira:menu:tab-prev"
-	ChannelTabClose               = "kira:menu:tab-close"
+	ChannelTabNext                = appevent.ChannelTabNext
+	ChannelTabPrev                = appevent.ChannelTabPrev
+	ChannelTabClose               = appevent.ChannelTabClose
 	ChannelViewFind               = "kira:menu:view-find"
 	ChannelViewRefresh            = "kira:menu:view-refresh"
 	ChannelViewRun                = "kira:menu:view-run"
@@ -38,7 +38,7 @@ const (
 	ChannelSettingsChanged        = appevent.ChannelSettingsChanged
 	ChannelLayoutChanged          = appevent.ChannelLayoutChanged
 	ChannelOpUpdate               = "kira:op:update"
-	ChannelAppMetrics             = "kira:app:metrics"
+	ChannelAppMetrics             = appevent.ChannelAppMetrics
 	ChannelSchemaChanged          = "kira:schema:changed"
 	// ChannelGrpcCall is P11 D8's own new push channel — a server-streaming call's coalesced
 	// message batches, delivered with EmitTo (one window only, GrpcService.Call's own emitter
@@ -85,8 +85,9 @@ const (
 	// (not EmitTo) exactly like ChannelAgentSessions: one machine, one assertion, so every window's
 	// titlebar button must agree. Process-scoped, never persisted: an OS power assertion that
 	// outlives the reason a user made it is a surprise, and the persistent half of this feature is
-	// the Settings toggle.
-	ChannelKeepAwake = "kira:keepAwake:changed"
+	// the Settings toggle. P116: byte-identical to Kira Space's own channel of the same name,
+	// hoisted to repo-root internal/appevent.
+	ChannelKeepAwake = appevent.ChannelKeepAwake
 	// ChannelApiDataChanged is P112's own broadcast — every API-client mutation (collections,
 	// saved requests, variables, environments) Emits it with the scopes that mutation touched, so
 	// every window's TanStack Query cache invalidates exactly those keys (apidata.go).

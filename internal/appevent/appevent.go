@@ -48,9 +48,9 @@ func (ev *Events) Broadcast(channel string) {
 	ev.emit.Emit(channel, nil)
 }
 
-// The six channels below are byte-identical strings in both apps today — the menu/quit/close-flush
-// machinery's own wire vocabulary, never app-specific. Each app's bridge/events.go re-exports these
-// under its own ChannelX names so no call site outside this hoist has to change.
+// The channels below are byte-identical strings in both apps today — the menu/quit/close-flush/
+// window-chrome machinery's own wire vocabulary, never app-specific. Each app's bridge/events.go
+// re-exports these under its own ChannelX names so no call site outside this hoist has to change.
 const (
 	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
 	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
@@ -58,4 +58,13 @@ const (
 	ChannelLayoutChanged          = "kira:layout:changed"
 	ChannelTerminal               = "kira:terminal:data"
 	ChannelCodeSearch             = "kira:code:search"
+	// The seven below are P116's own hoist — Kira Studio's native-menu/window-chrome channels that
+	// Kira Space now wires too (window-chrome-parity G1-G5/G7), byte-identical strings on both sides.
+	ChannelOpenSettings       = "kira:open-settings"
+	ChannelToggleProjectPanel = "kira:menu:toggle-project-panel"
+	ChannelTabNext            = "kira:menu:tab-next"
+	ChannelTabPrev            = "kira:menu:tab-prev"
+	ChannelTabClose           = "kira:menu:tab-close"
+	ChannelKeepAwake          = "kira:keepAwake:changed"
+	ChannelAppMetrics         = "kira:app:metrics"
 )

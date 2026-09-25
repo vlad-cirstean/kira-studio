@@ -37,6 +37,18 @@ const (
 // opened it.
 const ChannelTerminal = appevent.ChannelTerminal
 
+// The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own
+// channels of the same name, hoisted to repo-root internal/appevent.
+const (
+	ChannelOpenSettings       = appevent.ChannelOpenSettings
+	ChannelToggleProjectPanel = appevent.ChannelToggleProjectPanel
+	ChannelTabNext            = appevent.ChannelTabNext
+	ChannelTabPrev            = appevent.ChannelTabPrev
+	ChannelTabClose           = appevent.ChannelTabClose
+	ChannelKeepAwake          = appevent.ChannelKeepAwake
+	ChannelAppMetrics         = appevent.ChannelAppMetrics
+)
+
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
 // Studio's own bridge.Events (internal/bridge/events.go), trimmed: this app has no
 // Connections/Oplog/Metrics/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely
