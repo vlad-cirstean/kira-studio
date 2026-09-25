@@ -36,8 +36,6 @@ function onHeadKeydown(e: KeyboardEvent): void {
   <div
     class="doc-row flex flex-col border-b border-border"
     :class="{
-      open: expanded,
-      selected,
       'search-match bg-search-match': searchMatch,
       'search-match-current bg-search-match-current': searchMatchCurrent,
     }"
@@ -45,6 +43,7 @@ function onHeadKeydown(e: KeyboardEvent): void {
   >
     <div
       class="doc-head flex shrink-0 items-center cursor-pointer gap-1.5 px-2 h-6.5"
+      :class="[expanded ? 'bg-elevated' : 'hover:bg-hover', selected ? 'shadow-[inset_2px_0_0_var(--primary)]' : '']"
       role="option"
       tabindex="0"
       :aria-selected="selected"
@@ -73,34 +72,15 @@ function onHeadKeydown(e: KeyboardEvent): void {
     </div>
     <slot name="body" />
   </div>
+  <!-- P110 I2-16: `.doc-head:hover`/`.doc-row.open > .doc-head`/`.doc-row.selected > .doc-head`
+       moved onto doc-head's own ternary. Pre-phase precedence: `.doc-row.open > .doc-head` (3
+       classes, specificity 0,3,0) beat `.doc-head:hover` (class+pseudo-class, 0,2,0) whenever both
+       applied -- open always won over hover. `expanded ? 'bg-elevated' : 'hover:bg-hover'`
+       reproduces that exactly (hover: emits only in the non-open branch, so it can never contend
+       with bg-elevated). `.doc-row.selected > .doc-head`'s inset shadow is a separate property
+       (box-shadow, not background) -- kept as its own independent ternary, unaffected by either
+       branch above, matching pre-phase behaviour where open/hover and selected could layer freely.
+       `open`/`selected` dropped from `.doc-row`'s own class object -- no rule or test anchors them
+       there any more (`.search-match`/`.search-match-current` stay: DocumentView.vue's own
+       `in-[.search-match-current]:text-bg` still needs that literal ancestor class). -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.doc-row`/`.doc-head` stay bare markers to anchor these compounds. */
-.doc-head:hover {
-  @apply bg-hover;
-}
-
-.doc-row.open > .doc-head {
-  @apply bg-elevated;
-}
-
-/* The row currently published to the cell editor (documents) or selected for the console's own
-   copy — a left rail, never a full-row tint, so it stays legible under `.open`'s own background
-   and a search match's highlight at the same time. */
-.doc-row.selected > .doc-head {
-  @apply shadow-[inset_2px_0_0_var(--primary)];
-}
-
-/* P31 D20: the same color-mix tint / solid-current pair KeyValueView.vue uses (and the deleted
-   DataGrid.vue used) —
-   a row-level tint (not `.doc-head`'s own opaque `.open` background, so `.selected`'s rail above
-   still reads through it) since a document match has no single cell to point at.
-   P110 B34: `.search-match`/`.search-match-current` above carry no rule of their own any more --
-   bare marker classes now, the tint itself is `bg-search-match[-current]` alongside them
-   (--color-search-match[-current] already @theme-registered, base.css). Deliberately no `text-bg`
-   here (unlike KeyValuePane.vue/ConsoleResultGrid.vue's own -current pairing): this row's current-
-   match state was never given a text-colour change, only the background -- kept exact. */
-</style>
