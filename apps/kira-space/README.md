@@ -4,8 +4,8 @@
 
 A native macOS git client: a commit graph, branch review and remote operations over a
 VS Code-adjacent code workspace (file tree, Monaco viewer, diffs, search) — built on Wails (Go)
-and Vue 3. The same backend also serves **Kira Space** (`apps/kira-space-vscode`), a VS Code
-extension that brings the same graph and review sidebar into an editor window.
+and Vue 3. The same backend also serves the **Kira Space VS Code extension**
+(`apps/kira-space-vscode`), which brings the same graph and review sidebar into an editor window.
 
 ## Status
 
@@ -29,7 +29,6 @@ extension that brings the same graph and review sidebar into an editor window.
 - **Diff tabs** — worktree-vs-HEAD diffs in Monaco's own diff editor.
 - **Search** — in-file via Monaco's own find widget; repository-wide in Go, with streamed results
   and no `ripgrep` subprocess.
-- **Quick Open (⌘P)** — a fuzzy file finder over the open repository.
 - **Git graph, natively** — the same `packages/git-ui` graph the VS Code extension uses, mounted
   as each workspace's pinned first tab, with the code-review layer (inline AI-review gutter icons,
   PR-review threads) alongside it.
@@ -43,10 +42,11 @@ extension that brings the same graph and review sidebar into an editor window.
 ## Git features
 
 The git backend runs inside this app — spawn discipline, porcelain parsing, the paged log walk,
-pre-flight hazard analysis, every write — and serves two frontends over it: a native **Git**
-module in this window (its own `AppMode`, with a pinned native graph tab and a native code-review
-layer, both described under Code workspace above), and **Kira Space**, a VS Code extension that
-dials the same backend over a Unix socket at `~/.kira-space/git.sock`. The `.vsix` ships inside
+pre-flight hazard analysis, every write — and serves two frontends over it: this window's own
+native workspace (a pinned native graph tab and a native code-review layer, both described under
+Code workspace above — this app has exactly one module, no `Studio`/`Api` mode switcher), and the
+**Kira Space** VS Code extension, which dials the same backend over a Unix socket at
+`~/.kira-space/git.sock`. The `.vsix` ships inside
 this app's own DMG rather than through the Marketplace, and installs from a *Connected editors*
 pane in Settings.
 
@@ -225,10 +225,13 @@ apps/kira-space/frontend/src    the Vue 3 app (bindings + the built bundle live 
 apps/kira-space/tests/unit      unit suite — no external resource
 apps/kira-space/tests/ui        Playwright against the built bundle, WebKit
 apps/kira-space-vscode          the Kira Space VS Code extension — the git module's second frontend
+internal             repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, and more
+packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/TabStrip), Pinia store factories, the Monaco editor bootstrap, both apps' test harnesses
 packages/git-ipc     the git contract, RPC/codec/validation, the socket channel, the FlatBuffers schema
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, ports
 packages/git-ui      the git graph/review UI, hosted by the extension and by this app's own native Git module
 packages/kira-ui     host-agnostic Vue components shared by this app's workbench and the git webviews
+packages/theme       shared design tokens/CSS both apps' frontends import, plus the shadcn-vue `components/ui/*` sets
 ```
 
 See [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)'s Git module section for the full

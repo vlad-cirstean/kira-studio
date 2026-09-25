@@ -139,9 +139,12 @@ A couple of things worth knowing up front:
   refresh, `⌘↩` run statement, `⇧⌘↩` run all, `⇧⌥F` format, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close
   tab, `⇧⌘W` close window, `⇧⌘N` new window.
 - **Settings** — staged in a per-dialog draft and applied as one patch on Save, with a Revert to
-  Defaults action. Appearance (font family/size, row density, word wrap, row coloring, commit date
-  format), Data (default page size), Cache (L2 byte budget, hit rate, clear caches), Advanced
-  (op-log retention, expensive-query row threshold, git log level).
+  Defaults action, across eight sections: Appearance (font family/size, row density, word wrap, row
+  coloring, commit date format), Data (default page size), Cache (L2 byte budget, hit rate, clear
+  caches), Api (HTTP version, request timeout, max response size), Scripts (the tab strip's own
+  launchable terminal scripts), Claude Code (session-activity reporting hooks, keep-Mac-awake while
+  a session runs), Database MCP (see below), Advanced (op-log retention, expensive-query row
+  threshold, git log level).
 
 ## Api features
 
@@ -170,8 +173,9 @@ A couple of things worth knowing up front:
 
 ## Database MCP features
 
-- **A local MCP server** — its own process-lifetime instance, its own loopback port (8766 by
-  default, falling back to an OS-assigned one if that's taken), its own bearer token. Off by
+- **A local MCP server** — its own process-lifetime instance, its own fixed loopback port 8766 (if
+  another process already holds it, enabling the server fails with a message saying so), its own
+  bearer token. Off by
   default; enabled from Settings → Database MCP, which shows the registration command before its
   Install button.
 - **Six tools** — `list_connections`, `list_children`, `describe_table`, `describe_schema`,
@@ -260,7 +264,7 @@ bun run dev:studio  # installs everything needed, then `wails3 task dev` — nat
 | `bun run test:e2e-real:studio` | Builds, then runs the full-stack wiring suite against a real `-tags server` Go binary (see Tests below) |
 | `bun run test:compat` | `scripts/db-compat.sh` — the same per-engine conformance suite against each kind's oldest and newest supported server image, on demand, not part of CI |
 | `bun run test:matrix` | `scripts/test-matrix.sh` — each adapter's full auth/config permutation matrix, on demand, not part of CI |
-| `bun run generate:wire` | `scripts/generate-wire.sh` — regenerates the Go and TypeScript FlatBuffers code from `wire.fbs`; not part of a normal build |
+| `bun run generate:wire` | `scripts/generate-wire.sh` — regenerates the Go and TypeScript FlatBuffers code from both `packages/shared/protocol/wire.fbs` and `packages/git-ipc/schema/gitwire.fbs`; not part of a normal build |
 | `bun run package:studio` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage:studio` runs `bun run setup` first, same as `dev:studio`). Carries no `.vsix` — see [`apps/kira-space/README.md`](apps/kira-space/README.md) for `package:space`, which does |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior, for both apps' bundles |
 
@@ -273,12 +277,13 @@ own `review.db` and `git.sock` moved there along with the rest of the git module
 
 **Git hooks:** `bun install` points `core.hooksPath` at `.githooks/` (via the `prepare` lifecycle
 script), which installs a `pre-commit` hook running `bun run lint` and `bun run typecheck` — about
-six seconds. Bypass it for a work-in-progress commit with `git commit --no-verify`.
+15 seconds — and a `pre-push` hook running `go build ./...`, `bun run lint:go` and `bun run
+lint:dead`. Bypass pre-commit for a work-in-progress commit with `git commit --no-verify`.
 
 ## Tests
 
-Four TypeScript suites under `apps/kira-studio/tests/` (`unit/`, `ui/`, `ipc/`, `e2e-real/`), plus
-the Go suite under `apps/kira-studio/`. `packages/db-fixtures/` is a shared fixture corpus
+Five TypeScript suites under `apps/kira-studio/tests/` (`unit/`, `ui/`, `ipc/`, `e2e-real/`,
+`visual/`), plus the Go suite under `apps/kira-studio/`. `packages/db-fixtures/` is a shared fixture corpus
 (fixtures + support code), not a spec suite of its own — no `xvfb` is needed for any tier. Kira
 Space's own test tiers, including the extension's webview suite, are documented in
 [`apps/kira-space/README.md`](apps/kira-space/README.md).
@@ -316,7 +321,7 @@ through Wails' generated bindings; bulk result pages travel over a dedicated bin
 plane — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)'s Process model section for the
 diagram.
 
-Two facts worth knowing before reading further:
+A few facts worth knowing before reading further:
 - **Every driver runs in-process in Go**, behind one adapter interface — the frontend never
   touches a wire protocol directly.
 - **Adapters are capability-driven** (`packages/shared/caps.ts`, mirrored by each Go adapter's own
@@ -338,13 +343,15 @@ apps/kira-studio/tests/ipc       per-adapter IPC-boundary suite — real Go back
 apps/kira-studio/tests/e2e-real  Playwright against a real `-tags server` Go binary
 apps/kira-space                  the git module and native code workspace — a separate app, see its own README
 apps/kira-space-vscode           the Kira Space VS Code extension — the git module's second frontend
+internal              repo-root Go shared by both apps: `shell`, `appevent`, `rpcstream`, `ipcerr`, `startupfail`, `appstorage`, and more
 packages/shared      wire protocol + domain types the Go side mirrors as its own source of truth
+packages/workbench   the shared workbench shell (TitleBar/StatusBar/MainView/TabStrip), Pinia store factories, the Monaco editor bootstrap, both apps' test harnesses
 packages/api-core    the Api module's DOM-free logic (substitution, curl/raw, dynamic values)
 packages/git-ipc     the git contract, RPC/codec/validation, the socket channel, the FlatBuffers schema (Kira Space's own)
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, ports (Kira Space's own)
 packages/git-ui      the git graph/review UI, hosted by the extension and by Kira Space's own native Git module
 packages/kira-ui     host-agnostic Vue components shared by Kira Space's workbench and the git webviews
-packages/theme       shared design tokens/CSS both apps' frontends import
+packages/theme       shared design tokens/CSS both apps' frontends import, plus the shadcn-vue `components/ui/*` sets
 packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
 docs                 architecture, performance, packaging, design system; docs/v1.9 is the live record
 scripts/demo-dbs     local fixture databases for manual testing

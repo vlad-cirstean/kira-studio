@@ -1,9 +1,10 @@
 # `tests/visual/` — pixel-diff regression (v1.4 P6)
 
-Five specs, one canonical at-rest screenshot each: the workbench shell, the data grid, the SQL
-console, the connection dialog, the Schema (DDL) editor. Reuses `tests/ui/`'s own fixtures/support
-(the built bundle, both mocked wire planes) — see `docs/v1.4/plans/P6-visual-regression.md` for the
-full design record.
+Six specs: one canonical at-rest screenshot each for the workbench shell, the data grid, the SQL
+console, the connection dialog and the Schema (DDL) editor, plus `settings.spec.ts` (P110 I2-1b)
+alone contributing 8, one per Settings pane. Reuses `tests/ui/`'s own fixtures/support (the built
+bundle, both mocked wire planes) — see `docs/v1.4/plans/P6-visual-regression.md` for the full design
+record.
 
 ## Baselines are regenerated only from the `ui` CI job's own environment
 

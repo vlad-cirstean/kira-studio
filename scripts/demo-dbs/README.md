@@ -14,8 +14,9 @@ See its own section below.
 Kafka uses the same image/mode as the `@testcontainers/kafka` harness `packages/db-fixtures/support/kafka.ts`
 provides (confluentinc/cp-kafka in KRaft mode) — re-exported by `tests/e2e-real/support/kafka.ts`
 for that tier's Playwright specs. SQS and S3 share one
-LocalStack container (`SERVICES=sqs,s3`), same as `@testcontainers/localstack`'s own harnesses —
-see `packages/db-fixtures/support/sqs.ts` and `packages/db-fixtures/support/s3.ts`.
+LocalStack container (`SERVICES=sqs,s3`), same as the Go LocalStack harness
+`apps/kira-studio/internal/adapters/testsupport/localstack.go` uses for the adapter tests and
+`internal/ipcfixture`'s fixture generators.
 
 ## Requirements
 
