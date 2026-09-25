@@ -352,10 +352,12 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       @scroll="docVirtual.onScroll"
     >
       <div :style="{ height: `${docVirtual.totalSize.value}px`, position: 'relative' }">
+        <!-- P48 F10-F12: this read-only copy of DocumentRow (no edit/delete affordance) wants no
+             pointer cursor outside its head; DocumentRow.vue itself doesn't opt into that. -->
         <DocumentRow
           v-for="vi in docVirtual.virtualItems.value"
           :key="String(vi.key)"
-          :class="VIRTUAL_ROW_CLASS"
+          :class="[VIRTUAL_ROW_CLASS, 'cursor-default']"
           data-testid="console-result-doc-row"
           :data-row="documentRows[vi.index]?.index"
           :view="documentRows[vi.index]!"
@@ -448,29 +450,3 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 I2-16: `.row:hover .cell:not(.selected)`/`.row.selected` (each cell's own background)
-   moved onto each `.cell`'s own ternary (`isSelected(row, col) ? 'bg-select' :
-   'group-hover/row:bg-hover'`, `group/row` on the row) -- per-cell, not per-row-at-col-0 as the
-   old row-level `.selected` class read (§3.5.1's own precedence still holds: selected always wins
-   over hover, since the ternary never emits both). `.row`/`.cell` stay bare marker classes (no
-   rule left to anchor, kept for readability/tests); `.no-rows` stays a bare marker too — a real
-   test dependency (interaction.spec.ts, sqs/kafka frontend specs all locate results by
-   `.no-rows`). `.virtual-row` (I2-15) is VIRTUAL_ROW_CLASS now, same as before.
-
-   P40 D10: `.search-match`/`.search-match-current` above carry no rule of their own --
-   `bg-search-match[-current] text-bg` alongside on the same element
-   (--color-search-match[-current] already @theme-registered, base.css). */
-
-/* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
-   this panel only styles its own #body slot content, read only (no edit/delete affordance, no
-   editing chip). `:deep()` since `.doc-row` is that component's own root, outside this panel's
-   scope-id — the one place this copy genuinely differed from the document view's (F11): no
-   pointer cursor over the row outside its head. */
-:deep(.doc-row) {
-  @apply cursor-default;
-}
-</style>
