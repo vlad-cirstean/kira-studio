@@ -5,6 +5,12 @@
 // panel *after* its handle in the vertical group needs no sign-flipped delta the way the hand-rolled
 // version did.
 //
+// P110 I2-39: every direct reka SplitterGroup/SplitterPanel below now goes through the shadcn-vue
+// ResizablePanelGroup/ResizablePanel wrapper instead (closing the half-adoption gap plan §3.11.4
+// named) -- the comments throughout this file that describe reka's own underlying behaviour still
+// say "SplitterGroup"/"SplitterPanel" on purpose, since that is the real component these wrappers
+// forward props/emits to unchanged; only the template tags and the value imports moved.
+//
 // Nesting orientation is load-bearing, not a style choice: OUTER horizontal (project | main), with
 // a vertical group nested *inside* main's own panel for editor-area/ops, is the one topology proven
 // stable (a full interaction.spec.ts/leaks.spec.ts pass, real grid interaction after opening ops).
@@ -33,9 +39,13 @@
 // the whole tab on the very first grid interaction after opening the Operations panel, every time.
 // The project panel keeps `sizeUnit="px"` — it's the outer, rarely-resized group here again, the
 // exact shape already proven safe.
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { useElementSize } from '@vueuse/core';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
+// I2-39: type-only -- resize() is exposed by reka's SplitterPanel at runtime (ResizablePanel
+// forwards it unchanged) but isn't in ResizablePanel's own public prop/emit type, so the typed
+// ref below still names SplitterPanel directly. No value import: the template uses the
+// ResizablePanel/ResizablePanelGroup wrappers above.
+import type { SplitterPanel } from 'reka-ui';
 import { computed, useSlots, useTemplateRef, watch } from 'vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
@@ -130,8 +140,8 @@ function onOpsResize(percent: number): void {
        CSS grid — found via a tree.spec.ts virtualization-boundary regression the grid version never
        had; SplitterGroup's own default alignment otherwise leaves this 2px unaccounted for. -->
   <div class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5 px-1.5 pb-0.5 bg-chrome">
-    <SplitterGroup direction="horizontal" class="flex-1 min-h-0 gap-0.5">
-      <SplitterPanel
+    <ResizablePanelGroup direction="horizontal" class="flex-1 min-h-0 gap-0.5">
+      <ResizablePanel
         v-if="projectVisible"
         ref="projectPanel"
         class="overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"
@@ -145,7 +155,7 @@ function onOpsResize(percent: number): void {
         @resize="onProjectResize"
       >
         <slot name="panel" />
-      </SplitterPanel>
+      </ResizablePanel>
       <!-- P110 B32: ResizableHandle's own shared defaults add the P16 divider look (a static
            shadow line, cleared on hover/drag) that this handle never had -- overridden back to
            2px/no-shadow here to keep today's exact appearance; everything else (bg-transparent,
@@ -156,10 +166,10 @@ function onOpsResize(percent: number): void {
         :hit-area-margins="{ coarse: 8, fine: 4 }"
       />
 
-      <SplitterPanel class="min-w-0" :order="2">
+      <ResizablePanel class="min-w-0" :order="2">
         <template v-if="hasDock">
-          <SplitterGroup ref="vGroup" direction="vertical" class="h-full gap-0.5">
-            <SplitterPanel
+          <ResizablePanelGroup ref="vGroup" direction="vertical" class="h-full gap-0.5">
+            <ResizablePanel
               class="flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg"
               :order="1"
             >
@@ -172,7 +182,7 @@ function onOpsResize(percent: number): void {
               <div class="flex-1 min-h-0" data-testid="main-view">
                 <slot name="main"><MainView /></slot>
               </div>
-            </SplitterPanel>
+            </ResizablePanel>
             <!-- Same override as the project handle above (its own comment), mirrored for the
                  vertical orientation. -->
             <ResizableHandle
@@ -180,7 +190,7 @@ function onOpsResize(percent: number): void {
               class="data-[orientation=vertical]:h-0.5 data-[orientation=vertical]:shadow-none"
               :hit-area-margins="{ coarse: 8, fine: 4 }"
             />
-            <SplitterPanel
+            <ResizablePanel
               v-if="opsVisible"
               ref="opsPanel"
               class="overflow-hidden min-w-0 min-h-0 rounded-kira border border-border bg-bg"
@@ -192,8 +202,8 @@ function onOpsResize(percent: number): void {
               @resize="onOpsResize"
             >
               <slot name="dock" />
-            </SplitterPanel>
-          </SplitterGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </template>
         <div v-else class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg">
           <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is the
@@ -206,8 +216,8 @@ function onOpsResize(percent: number): void {
             <slot name="main"><MainView /></slot>
           </div>
         </div>
-      </SplitterPanel>
-    </SplitterGroup>
+      </ResizablePanel>
+    </ResizablePanelGroup>
 
     <!-- The old grid template stays four rows (main/splitops/ops/status) whether or not ops is
          open when hasDock (Risk §11's own "structural, not a zero-height row" point) — even a

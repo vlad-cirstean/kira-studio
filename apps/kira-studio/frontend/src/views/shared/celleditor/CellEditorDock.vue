@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SplitterPanel } from 'reka-ui';
+import { ResizablePanel } from '@theme/components/ui/resizable';
 import { computed } from 'vue';
 import { useCellSelectionStore } from '../../../state/cellSelection';
 import { useLayoutStore } from '../../../state/layout';
@@ -21,14 +21,15 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
 </script>
 
 <template>
-  <!-- P104: a plain content panel — the drag handle (SplitterResizeHandle) that used to be this
-       component's own first template child now lives in each mounting view's own SplitterGroup,
-       since a resize handle must be reka's direct child alongside the panel it sits next to
-       (SplitterPanel.vue's own `order` doc: "required for groups with conditionally rendered
-       panels" — every mounting view gates that handle on the same `cell` condition this panel's
-       own `v-if` uses). Still owns its own size/min/max/resize wiring (layoutStore), so there is
-       exactly one place that reads/writes the cell-editor height, not one per mounting view. -->
-  <SplitterPanel
+  <!-- P104/I2-39: a plain content panel — the drag handle (ResizableHandle, wrapping reka's
+       SplitterResizeHandle) that used to be this component's own first template child now lives
+       in each mounting view's own ResizablePanelGroup, since a resize handle must be reka's
+       direct child alongside the panel it sits next to (reka's SplitterPanel `order` doc:
+       "required for groups with conditionally rendered panels" — every mounting view gates that
+       handle on the same `cell` condition this panel's own `v-if` uses). Still owns its own
+       size/min/max/resize wiring (layoutStore), so there is exactly one place that reads/writes
+       the cell-editor height, not one per mounting view. -->
+  <ResizablePanel
     v-if="cell"
     class="min-h-0 overflow-hidden bg-bg"
     data-testid="cell-editor"
@@ -41,5 +42,5 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
     @resize="layoutStore.setCellEditorHeight"
   >
     <CellEditorView :cell="cell" :read-only="readOnly" />
-  </SplitterPanel>
+  </ResizablePanel>
 </template>

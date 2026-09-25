@@ -6,7 +6,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +17,6 @@ import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
@@ -48,9 +47,9 @@ const gridViewStore = useGridViewStore();
 const cellSelectionStore = useCellSelectionStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
-// P104: CellEditorDock.vue is now a plain SplitterPanel (its own header comment) — the resize
-// handle beside it must be this view's own direct SplitterGroup child, gated on the same
-// condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
+// P104/I2-39: CellEditorDock.vue is now a plain ResizablePanel (its own header comment) — the
+// resize handle beside it must be this view's own direct ResizablePanelGroup child, gated on
+// the same condition CellEditorDock's own `v-if` uses, or the handle would sit next to nothing.
 const hasCellDock = computed(() => cellSelectionStore.selectedCellFor(props.tab.id) !== null);
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -352,8 +351,8 @@ function onCloseSearch(): void {
       @close="onCloseSearch"
     />
 
-    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
-      <SplitterPanel class="flex flex-col min-h-0" :order="1">
+    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
+      <ResizablePanel class="flex flex-col min-h-0" :order="1">
         <Empty v-if="needsReconnect" data-testid="reconnect-panel">
           <Button
             variant="dialog-primary"
@@ -414,13 +413,13 @@ function onCloseSearch(): void {
             <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
           </div>
         </template>
-      </SplitterPanel>
+      </ResizablePanel>
       <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
            component -- `.cell-splitter` is a bare marker class, kept only because
            cell-editor.spec.ts polls its box-shadow via getComputedStyle (no rule of its own
            attaches to the name any more). -->
       <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" />
-    </SplitterGroup>
+    </ResizablePanelGroup>
   </div>
 </template>

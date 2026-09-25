@@ -24,7 +24,7 @@ import {
   InputGroupInput,
 } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
   Tooltip,
@@ -38,7 +38,6 @@ import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
@@ -764,8 +763,8 @@ onUnmounted(() => {
       @close="closeRequestFind"
     />
 
-    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
-      <SplitterPanel
+    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
+      <ResizablePanel
         class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="http-request-pane"
         size-unit="px"
@@ -815,14 +814,14 @@ onUnmounted(() => {
           :filter-query="fieldFilterQuery"
           :show-descriptions="tab.state.fieldDescriptions"
         />
-      </SplitterPanel>
+      </ResizablePanel>
 
       <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <SplitterPanel class="min-h-0" data-testid="http-response-pane-slot" :order="2">
+      <ResizablePanel class="min-h-0" data-testid="http-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
-      </SplitterPanel>
-    </SplitterGroup>
+      </ResizablePanel>
+    </ResizablePanelGroup>
     <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
          Tailwind utilities. `.url-field` and `.request-pane` stay bare markers —
          api-ui-consistency.spec.ts selects both directly. `.request-splitter` (ResizableHandle

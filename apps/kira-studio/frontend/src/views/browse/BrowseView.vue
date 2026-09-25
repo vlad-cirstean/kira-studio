@@ -6,7 +6,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +19,6 @@ import { useDebounceFn } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -413,8 +412,8 @@ onMounted(() => {
           Reconnect & load
         </Button>
       </Empty>
-      <SplitterGroup v-else direction="horizontal" class="flex flex-row flex-1 min-h-0">
-        <SplitterPanel
+      <ResizablePanelGroup v-else direction="horizontal" class="flex flex-row flex-1 min-h-0">
+        <ResizablePanel
           class="min-w-0 flex flex-col min-h-0"
           size-unit="px"
           :default-size="listWidth"
@@ -537,14 +536,14 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </SplitterPanel>
+        </ResizablePanel>
 
         <!-- P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
              ResizableHandle.vue's own shared component -- no test polls this handle by class, so no
              marker class belongs on it either. -->
         <ResizableHandle :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-        <SplitterPanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
+        <ResizablePanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
           <Alert
             v-else
@@ -554,7 +553,7 @@ onMounted(() => {
             <CodiconIcon :name="emptyPreviewIcon" :size="24" class="text-subtle" />
             <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyPreviewLabel }}</AlertTitle>
           </Alert>
-        </SplitterPanel>
-      </SplitterGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
   </div>
 </template>

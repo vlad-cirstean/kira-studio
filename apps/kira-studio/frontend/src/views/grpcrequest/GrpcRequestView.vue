@@ -7,7 +7,7 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
   Tooltip,
@@ -20,7 +20,6 @@ import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useSavedGrpcRequest, useVariableRows } from '../../api/state/apiQueries';
@@ -512,8 +511,8 @@ onUnmounted(() => {
       <EnvironmentSelect :tab-id="tab.id" />
     </ViewToolbar>
 
-    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
-      <SplitterPanel
+    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
+      <ResizablePanel
         class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="grpc-request-pane"
         size-unit="px"
@@ -554,14 +553,14 @@ onUnmounted(() => {
           />
         </template>
         <SchemaBrowser v-else :tab="tab" />
-      </SplitterPanel>
+      </ResizablePanel>
 
       <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <SplitterPanel class="min-h-0" data-testid="grpc-response-pane-slot" :order="2">
+      <ResizablePanel class="min-h-0" data-testid="grpc-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
-      </SplitterPanel>
-    </SplitterGroup>
+      </ResizablePanel>
+    </ResizablePanelGroup>
     <!-- P110 B40: every plain single-selector rule this file had moved onto the template as
          Tailwind utilities. `.grpc-target-field` and `.request-pane` stay bare markers:
          api-ui-consistency.spec.ts selects both directly (no rule of their own attaches to either

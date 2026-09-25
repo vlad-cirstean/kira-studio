@@ -11,7 +11,7 @@ import { Empty } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { ResizableHandle } from '@theme/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import {
   Tooltip,
@@ -27,7 +27,6 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
-import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
@@ -622,11 +621,11 @@ onUnmounted(() => {
 
 <template>
   <div class="h-full flex flex-col min-h-0" data-testid="stream-view" :data-path="tab.path">
-    <!-- P104: SplitterGroup wraps the inlined header+toolbar chrome + CellEditorDock, since the
-         resize handle must sit as reka's own direct child alongside the panel it resizes
-         (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
-    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
-    <SplitterPanel class="flex flex-col min-h-0" :order="1">
+    <!-- P104/I2-39: ResizablePanelGroup wraps the inlined header+toolbar chrome + CellEditorDock,
+         since the resize handle must sit as reka's own direct child alongside the panel it
+         resizes (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
+    <ResizablePanelGroup direction="vertical" class="flex-1 min-h-0">
+    <ResizablePanel class="flex flex-col min-h-0" :order="1">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
          Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
          `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
@@ -1272,10 +1271,10 @@ onUnmounted(() => {
         </template>
       </div>
       </template>
-    </SplitterPanel>
+    </ResizablePanel>
     <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
-    </SplitterGroup>
+    </ResizablePanelGroup>
     <!-- P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared
          component -- `.cell-splitter` above is a bare marker class, kept only because
          cell-editor.spec.ts polls its box-shadow via getComputedStyle.

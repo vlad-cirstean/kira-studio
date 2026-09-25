@@ -5,11 +5,11 @@ import type { SplitterResizeHandleEmits, SplitterResizeHandleProps } from 'reka-
 import { SplitterResizeHandle, useForwardPropsEmits } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
 
-// P110 B32: fetched from shadcn-vue.com/r/styles/reka-nova/resizable.json (P99 4.2's direct-curl
-// procedure) -- ResizablePanel/ResizablePanelGroup are not fetched alongside this, since every
-// consumer keeps its own direct SplitterGroup/SplitterPanel (reka-ui) unchanged; only the resize
-// handle itself gets a shared component (a component with no call site is dead code knip
-// reports -- P99 4.4).
+// P110 B32/I2-39: fetched from shadcn-vue.com/r/styles/reka-nova/resizable.json (P99 4.2's
+// direct-curl procedure). All three registry parts are fetched and used: this handle (B32,
+// restyled below) plus ResizablePanel/ResizablePanelGroup (I2-39, kept registry-verbatim aside
+// from the @/lib/utils import rewrite) -- every SplitterGroup/SplitterPanel call site now goes
+// through the wrapper trio, closing the half-adoption gap named in plan §3.11.4.
 //
 // The registry's own default classes (a thin bg-border line, no divider/hover treatment) are
 // replaced entirely with the P16 design system's own PanelSplitter.vue `divider` look, folded
