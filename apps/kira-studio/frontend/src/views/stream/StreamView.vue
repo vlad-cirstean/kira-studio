@@ -14,7 +14,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
@@ -719,23 +719,15 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>Poll for messages</TooltipContent>
         </Tooltip>
-        <Tooltip v-else>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :disabled="!rt?.hasMore"
-                aria-label="Next page"
-                data-testid="stream-next"
-                @click="streamViewStore.goNext(tab.id)"
-              >
-                <CodiconIcon name="arrow-right" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Next page</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-else
+          icon="arrow-right"
+          label="Next page"
+          data-testid="stream-next"
+          disabled-trigger
+          :disabled="!rt?.hasMore"
+          @click="streamViewStore.goNext(tab.id)"
+        />
       </div>
 
       <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides

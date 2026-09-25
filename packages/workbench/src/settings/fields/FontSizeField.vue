@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import type { AppearanceSettings } from '@shared/domain/settings';
 import { FONT_SIZE_RANGE } from '@shared/domain/settings';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, useId } from 'vue';
@@ -44,23 +42,14 @@ const fieldId = useId();
   <Field>
     <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Data font size</Label>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontSize') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-appearance-fontSize"
-              :disabled="isAtDefault('appearance', 'fontSize')"
-              aria-label="Reset to default"
-              @click="resetLeaf('appearance', 'fontSize')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        data-testid="settings-reset-appearance-fontSize"
+        :disabled-trigger="isAtDefault('appearance', 'fontSize')"
+        :disabled="isAtDefault('appearance', 'fontSize')"
+        @click="resetLeaf('appearance', 'fontSize')"
+      />
     </div>
     <NumberStepperInput
       :id="fieldId"

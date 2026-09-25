@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { AppearanceSettings } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 
 // I2-18: the word-wrap checkbox row (checkbox, reset button) was byte-identical between
@@ -41,23 +40,14 @@ const wordWrapId = useId();
       <Label :for="wordWrapId" class="text-kira-sm">Word wrap</Label>
       <slot />
     </Field>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto"
-            data-testid="settings-reset-appearance-wordWrap"
-            :disabled="isAtDefault('appearance', 'wordWrap')"
-            aria-label="Reset to default"
-            @click="resetLeaf('appearance', 'wordWrap')"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Reset to default</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="discard"
+      label="Reset to default"
+      class="ml-auto"
+      data-testid="settings-reset-appearance-wordWrap"
+      :disabled-trigger="isAtDefault('appearance', 'wordWrap')"
+      :disabled="isAtDefault('appearance', 'wordWrap')"
+      @click="resetLeaf('appearance', 'wordWrap')"
+    />
   </FieldGroup>
 </template>

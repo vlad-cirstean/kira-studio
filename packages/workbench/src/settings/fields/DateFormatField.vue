@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import type { AppearanceSettings } from '@shared/domain/settings';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 
 // I2-18: the commit-date leaf (select, reset button, helper text) was byte-identical between
@@ -31,23 +29,14 @@ const fieldId = useId();
   <Field>
     <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Commit date</Label>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('appearance', 'dateFormat') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-appearance-dateFormat"
-              :disabled="isAtDefault('appearance', 'dateFormat')"
-              aria-label="Reset to default"
-              @click="resetLeaf('appearance', 'dateFormat')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        data-testid="settings-reset-appearance-dateFormat"
+        :disabled-trigger="isAtDefault('appearance', 'dateFormat')"
+        :disabled="isAtDefault('appearance', 'dateFormat')"
+        @click="resetLeaf('appearance', 'dateFormat')"
+      />
     </div>
     <NativeSelect
       :id="fieldId"

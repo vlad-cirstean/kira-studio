@@ -3,7 +3,6 @@ import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
-import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
@@ -227,23 +226,15 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
       @update:open="onHistoryOpenChange"
     >
       <div class="relative flex">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger ref="historyAnchorRef">
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :disabled="trailing"
-                aria-label="History"
-                data-testid="variable-history"
-                @click="onHistoryClick"
-              >
-                <CodiconIcon name="history" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>History</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="history"
+          label="History"
+          ref="historyAnchorRef"
+          disabled-trigger
+          :disabled="trailing"
+          data-testid="variable-history"
+          @click="onHistoryClick"
+        />
         <PopoverAnchor :reference="(historyAnchorRef?.$el as HTMLElement) ?? undefined" />
       </div>
       <VariableHistoryMenu v-if="variableSetStore.variableId === row.id" />

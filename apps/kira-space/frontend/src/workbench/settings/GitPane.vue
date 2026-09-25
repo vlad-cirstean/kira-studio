@@ -1,16 +1,9 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, ref, useId, watch } from 'vue';
 import {
@@ -97,23 +90,14 @@ const graphFontSizeId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="protectedBranchesId" class="text-kira-sm">Protected branch patterns (one per line)</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'protectedBranches') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-git-protectedBranches"
-              :disabled="isAtDefault('git', 'protectedBranches')"
-              aria-label="Reset to default"
-              @click="resetProtectedBranches"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-git-protectedBranches"
+          :disabled-trigger="isAtDefault('git', 'protectedBranches')"
+          :disabled="isAtDefault('git', 'protectedBranches')"
+          @click="resetProtectedBranches"
+        />
       </div>
       <Textarea
         :id="protectedBranchesId"
@@ -131,23 +115,14 @@ const graphFontSizeId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="fetchAutoIntervalMinutesId" class="text-kira-sm">Auto-fetch interval (minutes)</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'fetchAutoIntervalMinutes') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-git-fetchAutoIntervalMinutes"
-              :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
-              aria-label="Reset to default"
-              @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-git-fetchAutoIntervalMinutes"
+          :disabled-trigger="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+          :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+          @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
+        />
       </div>
       <NumberStepperInput
         :id="fetchAutoIntervalMinutesId"
@@ -173,23 +148,14 @@ const graphFontSizeId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="gitPathId" class="text-kira-sm">Git executable path</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'gitPath') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-git-gitPath"
-              :disabled="isAtDefault('git', 'gitPath')"
-              aria-label="Reset to default"
-              @click="resetLeaf('git', 'gitPath')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-git-gitPath"
+          :disabled-trigger="isAtDefault('git', 'gitPath')"
+          :disabled="isAtDefault('git', 'gitPath')"
+          @click="resetLeaf('git', 'gitPath')"
+        />
       </div>
       <Input
         :id="gitPathId"
@@ -207,23 +173,14 @@ const graphFontSizeId = useId();
     <Field class="items-center">
       <div class="flex items-center justify-between gap-1">
         <Label :for="graphFontSizeId" class="text-kira-sm">Font size</Label>
-        <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'graphFontSize') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-git-graphFontSize"
-              :disabled="isAtDefault('git', 'graphFontSize')"
-              aria-label="Reset to default"
-              @click="resetLeaf('git', 'graphFontSize')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="discard"
+          label="Reset to default"
+          data-testid="settings-reset-git-graphFontSize"
+          :disabled-trigger="isAtDefault('git', 'graphFontSize')"
+          :disabled="isAtDefault('git', 'graphFontSize')"
+          @click="resetLeaf('git', 'graphFontSize')"
+        />
       </div>
       <NumberStepperInput
         :id="graphFontSizeId"

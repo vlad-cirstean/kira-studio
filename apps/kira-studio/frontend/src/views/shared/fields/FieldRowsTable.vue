@@ -4,15 +4,9 @@
   generic="T extends { name: string; value: string; enabled?: boolean; description?: string }"
 >
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
@@ -381,23 +375,14 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
       <div class="flex min-w-0 items-center gap-1">
         <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
       </div>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :disabled="entry.index >= rows.length"
-              aria-label="Remove"
-              :data-testid="`${testidPrefix}-remove`"
-              @click="removeRow(entry.index)"
-            >
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Remove</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Remove"
+        :data-testid="`${testidPrefix}-remove`"
+        :disabled-trigger="entry.index >= rows.length"
+        :disabled="entry.index >= rows.length"
+        @click="removeRow(entry.index)"
+      />
     </div>
   </div>
 </template>

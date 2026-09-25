@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
-import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
 import SearchOptionToggles from '@workbench/components/SearchOptionToggles.vue';
 import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
@@ -137,20 +134,13 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         data-testid="repo-search-stop"
         @click="repoSearchStore.cancelRepoSearch(repoId)"
       />
-      <Tooltip v-else>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            data-testid="repo-search-run"
-            aria-label="Search"
-            @click="runSearch"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Search</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-else
+        icon="search"
+        label="Search"
+        data-testid="repo-search-run"
+        @click="runSearch"
+      />
     </div>
     <!-- Note-tinted background, error-tinted text -- the span carries text-error directly rather
          than on AlertDescription itself: the note variant's own

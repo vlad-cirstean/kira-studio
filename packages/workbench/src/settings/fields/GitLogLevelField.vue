@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import type { GitLogLevel } from '@shared/domain/settings';
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useId } from 'vue';
 
 // I2-18: the git-log-level select (options, reset button) was byte-identical between kira-studio's
@@ -31,23 +29,14 @@ const fieldId = useId();
   <Field>
     <div class="flex items-center justify-between gap-1">
       <Label :for="fieldId">Git log level</Label>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="settings-reset-advanced-gitLogLevel"
-              :disabled="isAtDefault('advanced', 'gitLogLevel')"
-              aria-label="Reset to default"
-              @click="resetLeaf('advanced', 'gitLogLevel')"
-            >
-              <CodiconIcon name="discard" :size="13" />
-            </Button>
-          </TooltipDisabledTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Reset to default</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="discard"
+        label="Reset to default"
+        data-testid="settings-reset-advanced-gitLogLevel"
+        :disabled-trigger="isAtDefault('advanced', 'gitLogLevel')"
+        :disabled="isAtDefault('advanced', 'gitLogLevel')"
+        @click="resetLeaf('advanced', 'gitLogLevel')"
+      />
     </div>
     <NativeSelect
       :id="fieldId"
