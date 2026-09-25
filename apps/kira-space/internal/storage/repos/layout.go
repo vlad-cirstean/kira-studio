@@ -3,7 +3,6 @@ package repos
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
@@ -31,16 +30,7 @@ func decodeLayout(stored map[string]json.RawMessage) model.Layout {
 }
 
 func (r *LayoutRepo) GetAll() (model.Layout, error) {
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if r.selectAll != nil {
-		rows, err = r.selectAll.Query()
-	} else {
-		rows, err = r.DB.Query(appstorage.LayoutSelectAllSQL)
-	}
-	stored, err := appstorage.ScanLeafRows(rows, err)
+	stored, err := appstorage.QueryLeaves(r.DB, r.selectAll, appstorage.LayoutSelectAllSQL)
 	if err != nil {
 		return model.Layout{}, err
 	}
@@ -64,27 +54,10 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 			}
 		}
 
-		leaves := []struct {
-			key   string
-			value any
-		}{
-			{"panel.project.visible", merged.Panel.Project.Visible},
-			{"panel.project.width", merged.Panel.Project.Width},
-		}
-		for _, l := range leaves {
-			encoded, err := json.Marshal(l.value)
-			if err != nil {
-				return fmt.Errorf("repos/layout: encode %s: %w", l.key, err)
-			}
-			if _, err := tx.Exec(
-				`INSERT INTO ui_layout (key, value) VALUES (?, ?)
-				   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-				l.key, string(encoded),
-			); err != nil {
-				return fmt.Errorf("repos/layout: upsert %s: %w", l.key, err)
-			}
-		}
-		return nil
+		return appstorage.UpsertLeafList(tx, "ui_layout", []appstorage.Leaf{
+			{Key: "panel.project.visible", Value: merged.Panel.Project.Visible},
+			{Key: "panel.project.width", Value: merged.Panel.Project.Width},
+		})
 	})
 	if err != nil {
 		return model.Layout{}, err

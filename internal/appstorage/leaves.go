@@ -35,6 +35,49 @@ func ScanLeafRows(rows *sql.Rows, queryErr error) (map[string]json.RawMessage, e
 	return stored, nil
 }
 
+// QueryLeaves runs GetAll's own select-then-scan (both apps' own LayoutRepo.GetAll/SettingsRepo.
+// GetAll, P113 G5): selectAll's prepared query when the caller's repo has one, an ad-hoc query
+// against fallbackSQL otherwise — the same fallback UpdateLeaves' own read step below uses.
+func QueryLeaves(db *sql.DB, selectAll *sql.Stmt, fallbackSQL string) (map[string]json.RawMessage, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if selectAll != nil {
+		rows, err = selectAll.Query()
+	} else {
+		rows, err = db.Query(fallbackSQL)
+	}
+	return ScanLeafRows(rows, err)
+}
+
+// Leaf is one key/value pair UpsertLeafList writes — Value is json.Marshal-ed as-is, matching
+// UpsertLeaf's (internal/appsettings) own single-leaf shape.
+type Leaf struct {
+	Key   string
+	Value any
+}
+
+// UpsertLeafList upserts every entry in leaves into table, in order (both apps' own LayoutRepo.Set,
+// P113 G5): the identical encode-then-"INSERT ... ON CONFLICT" loop each ran over its own leaves
+// slice.
+func UpsertLeafList(tx *sql.Tx, table string, leaves []Leaf) error {
+	for _, l := range leaves {
+		encoded, err := json.Marshal(l.Value)
+		if err != nil {
+			return fmt.Errorf("appstorage: encode %s: %w", l.Key, err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO `+table+` (key, value) VALUES (?, ?)
+			   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+			l.Key, string(encoded),
+		); err != nil {
+			return fmt.Errorf("appstorage: upsert %s: %w", l.Key, err)
+		}
+	}
+	return nil
+}
+
 // UpdateLeaves runs the tx/read/apply/commit frame every leaf-table Set repeats (both apps' own
 // layout and settings repos, P107 I2-1): begin a transaction, scan the leaves currently stored
 // (via selectAll when the caller prepared one, an ad-hoc query against fallbackSQL otherwise
