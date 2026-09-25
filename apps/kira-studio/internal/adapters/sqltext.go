@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -398,6 +400,29 @@ func JoinConsoleStatements(statements []string, lineCommentPrefixes ...string) s
 		}
 	}
 	return strings.Join(parts, ";\n")
+}
+
+// BeginReadOnlyConsole opens a console batch's BEGIN READ ONLY wrap (P113 G1): postgres and
+// mysqlfamily's own console.go each hand-rolled this identically apart from the BEGIN SQL text and
+// how their own conn type executes a statement and maps its error. exec runs one statement against
+// that connection; waitInFlight is the connection's own RunWithAbortRace drain (F2: every
+// in-flight background goroutine touching conn must finish before COMMIT); mapErr is the adapter's
+// own driver-error mapper.
+//
+// On success, the returned cleanup must be deferred unconditionally — issuing COMMIT against an
+// already-aborted transaction is itself how these engines end one, regardless of the batch's own
+// outcome. cleanup is detached from ctx (context.WithoutCancel) so a cancelled op still ends the
+// transaction, or the pinned connection is left inside it for whatever op runs next.
+func BeginReadOnlyConsole(ctx context.Context, beginSQL string, exec func(context.Context, string) error, waitInFlight func(), mapErr func(error) error) (cleanup func(), err error) {
+	if execErr := exec(ctx, beginSQL); execErr != nil {
+		return nil, mapErr(execErr)
+	}
+	return func() {
+		waitInFlight()
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = exec(cleanupCtx, "COMMIT")
+	}, nil
 }
 
 // SingleStatusPage ports sql-text.ts's singleStatusPage: the one-column, one-row "status" page a

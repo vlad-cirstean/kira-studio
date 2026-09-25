@@ -196,24 +196,19 @@ func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track T
 	op.SetCommand(adapters.JoinConsoleStatements(statements, "--"))
 
 	if readOnly {
-		if _, err := conn.Exec(ctx, "BEGIN READ ONLY"); err != nil {
-			return nil, mapError(err)
+		// P113 G1: adapters.BeginReadOnlyConsole carries the shared BEGIN/COMMIT wrap postgres and
+		// mysqlfamily hand-rolled identically. Confirmed empirically that Postgres ends an
+		// already-aborted transaction's COMMIT with a ROLLBACK command tag, not an error — safe to
+		// call unconditionally. F2: waitInFlight blocks on every RunWithAbortRace goroutine this
+		// batch spawned still touching conn (the same non-concurrency-safe *pgx.Conn) before COMMIT.
+		cleanup, err := adapters.BeginReadOnlyConsole(ctx, "BEGIN READ ONLY", func(ctx context.Context, sql string) error {
+			_, err := conn.Exec(ctx, sql)
+			return err
+		}, conn.waitInFlight, func(err error) error { return mapError(err) })
+		if err != nil {
+			return nil, err
 		}
-		defer func() {
-			// Detached from ctx: an op cancelled mid-batch must still end this transaction, or the
-			// pinned connection is left inside it (aborted or not) for whatever op runs next. Safe to
-			// call unconditionally regardless of the loop's own outcome — issuing COMMIT against an
-			// already-aborted transaction is itself how Postgres ends one (confirmed empirically: the
-			// server reports back a ROLLBACK command tag, not an error).
-			// F2: wait for every RunWithAbortRace goroutine this batch spawned to actually finish
-			// touching conn before issuing COMMIT on it — otherwise an aborted statement's own
-			// background goroutine (still running conn.Query/conn.Exec) races this cleanup on the
-			// same non-concurrency-safe *pgx.Conn.
-			conn.waitInFlight()
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
-			defer cancel()
-			_, _ = conn.Exec(cleanupCtx, "COMMIT")
-		}()
+		defer cleanup()
 	}
 
 	results := make([]rawResult, 0, len(statements))

@@ -164,17 +164,17 @@ func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQue
 	op.SetCommand(adapters.JoinConsoleStatements(statements, "--", "#"))
 
 	if readOnly {
-		if _, err := conn.ExecContext(ctx, "START TRANSACTION READ ONLY"); err != nil {
-			return nil, mapError(err)
+		// P113 G1: adapters.BeginReadOnlyConsole carries the shared BEGIN/COMMIT wrap postgres and
+		// mysqlfamily hand-rolled identically. F2: waitInFlight blocks on every RunWithAbortRace
+		// goroutine this batch spawned still touching conn before COMMIT.
+		cleanup, err := adapters.BeginReadOnlyConsole(ctx, "START TRANSACTION READ ONLY", func(ctx context.Context, sql string) error {
+			_, err := conn.ExecContext(ctx, sql)
+			return err
+		}, conn.waitInFlight, func(err error) error { return mapError(err) })
+		if err != nil {
+			return nil, err
 		}
-		defer func() {
-			// F2: wait for every RunWithAbortRace goroutine this batch spawned to actually finish
-			// touching conn before issuing COMMIT on it.
-			conn.waitInFlight()
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
-			defer cancel()
-			_, _ = conn.ExecContext(cleanupCtx, "COMMIT")
-		}()
+		defer cleanup()
 	}
 
 	pages := make([]page.Page, len(statements))
