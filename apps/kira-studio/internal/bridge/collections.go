@@ -49,7 +49,7 @@ type CollectionsTree struct {
 func (s *CollectionsService) List() (CollectionsTree, error) {
 	collections, items, err := s.Deps.Repos.Collections.List()
 	if err != nil {
-		return CollectionsTree{}, ipcerr.Internal(err.Error())
+		return CollectionsTree{}, ipcerr.InternalErr(err)
 	}
 	return CollectionsTree{Collections: collections, Items: items}, nil
 }
@@ -88,7 +88,7 @@ func (s *CollectionsService) SaveRequest(args CollectionsSaveRequestArgs) (ItemS
 	}
 	item, err := s.Deps.Repos.Collections.SaveRequest(args.ItemID, args.Name, args.Request)
 	if err != nil {
-		return ItemSummary{}, ipcerr.Internal(err.Error())
+		return ItemSummary{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
 	return item, nil
@@ -110,7 +110,7 @@ func (s *CollectionsService) SaveGrpcRequest(args CollectionsSaveGrpcRequestArgs
 	}
 	item, err := s.Deps.Repos.Collections.SaveGrpcRequest(args.ItemID, args.Name, args.Request)
 	if err != nil {
-		return ItemSummary{}, ipcerr.Internal(err.Error())
+		return ItemSummary{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange(), savedRequestChange(args.ItemID))
 	return item, nil
@@ -126,7 +126,7 @@ func (s *CollectionsService) CreateCollection(args CollectionsCreateCollectionAr
 	}
 	c, err := s.Deps.Repos.Collections.CreateCollection(args.Name)
 	if err != nil {
-		return CollectionSummary{}, ipcerr.Internal(err.Error())
+		return CollectionSummary{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange())
 	return c, nil
@@ -152,7 +152,7 @@ func (s *CollectionsService) CreateItem(args CollectionsCreateItemArgs) (ItemSum
 	}
 	item, err := s.Deps.Repos.Collections.CreateItem(args.CollectionID, args.ParentID, args.Kind, args.Name, args.Request)
 	if err != nil {
-		return ItemSummary{}, ipcerr.Internal(err.Error())
+		return ItemSummary{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange())
 	return item, nil
@@ -176,7 +176,7 @@ func (s *CollectionsService) CreateGrpcItem(args CollectionsCreateGrpcItemArgs) 
 	}
 	item, err := s.Deps.Repos.Collections.CreateGrpcItem(args.CollectionID, args.ParentID, args.Name, args.Request)
 	if err != nil {
-		return ItemSummary{}, ipcerr.Internal(err.Error())
+		return ItemSummary{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange())
 	return item, nil
@@ -198,7 +198,7 @@ func (s *CollectionsService) Rename(args CollectionsTargetArgs) error {
 		return ipcerr.BadRequest("name is required")
 	}
 	if err := s.Deps.Repos.Collections.Rename(args.ID, args.Target, args.Name); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, treeChange())
 	return nil
@@ -209,7 +209,7 @@ func (s *CollectionsService) Delete(args CollectionsTargetArgs) error {
 		return err
 	}
 	if err := s.Deps.Repos.Collections.Delete(args.ID, args.Target); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	if args.Target == "collection" {
 		emitApiData(s.Deps.Events, treeChange(), variablesChange(model.VariableScopeCollection, args.ID))
@@ -290,7 +290,7 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 	}
 	collection, err := s.Deps.Repos.Collections.ImportTree(tree)
 	if err != nil {
-		return ImportReport{}, ipcerr.Internal(err.Error())
+		return ImportReport{}, ipcerr.InternalErr(err)
 	}
 	// P112: ImportTree committed here, on every path below — success, rollback success (net-zero
 	// change, one harmless refetch) and rollback failure (the partially imported collection stays
@@ -321,7 +321,7 @@ func (s *CollectionsService) Import(args CollectionsImportArgs) (ImportReport, e
 					err.Error(), collection.Name, delErr,
 				))
 			}
-			return ImportReport{}, ipcerr.Internal(err.Error())
+			return ImportReport{}, ipcerr.InternalErr(err)
 		}
 	}
 
@@ -380,7 +380,7 @@ func writeFileAtomically(path string, write func(*os.File) error) error {
 	if err := write(f); err != nil {
 		_ = f.Close()
 		cleanup()
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	if err := f.Sync(); err != nil {
 		_ = f.Close()
@@ -437,7 +437,7 @@ func (s *CollectionsService) Export(args CollectionsExportArgs) (ExportReport, e
 	}
 	tree, err := s.Deps.Repos.Collections.LoadTree(args.CollectionID)
 	if err != nil {
-		return ExportReport{}, ipcerr.Internal(err.Error())
+		return ExportReport{}, ipcerr.InternalErr(err)
 	}
 
 	if err := writeFileAtomically(args.Path, func(f *os.File) error { return postman.Write(f, tree) }); err != nil {

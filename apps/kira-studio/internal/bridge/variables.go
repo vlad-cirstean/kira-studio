@@ -35,7 +35,7 @@ func (s *VariablesService) CreateEnvironment(args VariablesCreateEnvironmentArgs
 	}
 	env, err := s.Deps.Repos.Variables.CreateEnvironment(args.Name, args.Description, args.Color)
 	if err != nil {
-		return model.Environment{}, ipcerr.Internal(err.Error())
+		return model.Environment{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange())
 	return env, nil
@@ -59,7 +59,7 @@ func (s *VariablesService) UpdateEnvironment(args VariablesUpdateEnvironmentArgs
 		return ipcerr.BadRequest("invalid color")
 	}
 	if err := s.Deps.Repos.Variables.UpdateEnvironment(args.ID, args.Name, args.Description, args.Color); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
@@ -74,7 +74,7 @@ func (s *VariablesService) DeleteEnvironment(args VariablesEnvironmentIDArgs) er
 		return ipcerr.BadRequest("id is required")
 	}
 	if err := s.Deps.Repos.Variables.DeleteEnvironment(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange(), variablesChange(model.VariableScopeEnvironment, args.ID))
 	return nil
@@ -87,7 +87,7 @@ func (s *VariablesService) DuplicateEnvironment(args VariablesEnvironmentIDArgs)
 	}
 	env, err := s.Deps.Repos.Variables.DuplicateEnvironment(args.ID)
 	if err != nil {
-		return model.Environment{}, ipcerr.Internal(err.Error())
+		return model.Environment{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange())
 	return env, nil
@@ -97,7 +97,7 @@ func (s *VariablesService) DuplicateEnvironment(args VariablesEnvironmentIDArgs)
 // repo's own transaction alone.
 func (s *VariablesService) SetActiveEnvironment(args VariablesEnvironmentIDArgs) error {
 	if err := s.Deps.Repos.Variables.SetActiveEnvironment(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
@@ -109,7 +109,7 @@ type VariablesReorderEnvironmentsArgs struct {
 
 func (s *VariablesService) ReorderEnvironments(args VariablesReorderEnvironmentsArgs) error {
 	if err := s.Deps.Repos.Variables.ReorderEnvironments(args.IDs); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, environmentsChange())
 	return nil
@@ -169,7 +169,7 @@ func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, err
 	}
 	v, err := s.Deps.Repos.Variables.Upsert(args.Scope, args.OwnerID, args.ID, args.Name, args.Value, args.IsSecret, args.Description)
 	if err != nil {
-		return model.Variable{}, ipcerr.Internal(err.Error())
+		return model.Variable{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, variablesChange(v.Scope, v.OwnerID))
 	return v, nil
@@ -185,7 +185,7 @@ func (s *VariablesService) Delete(args VariablesIDArgs) error {
 	}
 	scope, ownerID, err := s.Deps.Repos.Variables.Delete(args.ID)
 	if err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, variablesChange(scope, ownerID))
 	return nil
@@ -202,7 +202,7 @@ func (s *VariablesService) Reorder(args VariablesReorderArgs) error {
 		return err
 	}
 	if err := s.Deps.Repos.Variables.Reorder(args.Scope, args.OwnerID, args.IDs); err != nil {
-		return ipcerr.Internal(err.Error())
+		return ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, variablesChange(args.Scope, args.OwnerID))
 	return nil
@@ -225,7 +225,7 @@ func (s *VariablesService) ApplyBulk(args VariablesApplyBulkArgs) (model.Variabl
 	}
 	result, err := s.Deps.Repos.Variables.ApplyBulk(args.Scope, args.OwnerID, args.Entries)
 	if err != nil {
-		return model.VariableBulkResult{}, ipcerr.Internal(err.Error())
+		return model.VariableBulkResult{}, ipcerr.InternalErr(err)
 	}
 	emitApiData(s.Deps.Events, variablesChange(args.Scope, args.OwnerID))
 	return result, nil
