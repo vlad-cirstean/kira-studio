@@ -51,7 +51,7 @@ const resetTitle = computed<string>(
 </script>
 
 <template>
-  <span class="edit-buffer-actions">
+  <span class="flex items-center shrink-0 gap-1.5">
     <Badge
       v-if="buffer.isDirty.value"
       variant="warn"
@@ -117,11 +117,3 @@ const resetTitle = computed<string>(
     </Tooltip>
   </span>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.edit-buffer-actions {
-  @apply flex items-center shrink-0 gap-1.5;
-}
-</style>

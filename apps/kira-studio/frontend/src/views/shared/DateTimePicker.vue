@@ -235,8 +235,8 @@ const secondText = computed<string>({
 </script>
 
 <template>
-  <div class="dtp" data-testid="datetime-picker">
-    <div class="dtp-month-row">
+  <div class="flex flex-col gap-1 p-1.5" data-testid="datetime-picker">
+    <div class="flex items-center justify-between">
       <Tooltip>
         <TooltipTrigger as-child>
           <Button
@@ -253,9 +253,11 @@ const secondText = computed<string>({
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
+          <!-- P42 D33a: a plain <button> now, so the label itself is the mode-cycling control --
+               reset to look like the <span> it replaces rather than a bordered control. -->
           <button
             type="button"
-            class="dtp-month-label"
+            class="dtp-month-label border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1"
             data-testid="datetime-picker-month"
             @click="cycleMode"
           >
@@ -279,17 +281,17 @@ const secondText = computed<string>({
         <TooltipContent>{{ pageNextTitle }}</TooltipContent>
       </Tooltip>
     </div>
-    <div class="dtp-body" data-testid="datetime-picker-mode" :data-mode="mode">
+    <div data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
-        <div class="dtp-weekdays">
-          <span v-for="w in WEEKDAY_LABELS" :key="w" class="dtp-weekday">{{ w }}</span>
+        <div class="grid grid-cols-7 gap-0.5">
+          <span v-for="w in WEEKDAY_LABELS" :key="w" class="flex items-center justify-center text-subtle text-kira-xs h-4.5">{{ w }}</span>
         </div>
-        <div class="dtp-days">
+        <div class="grid grid-cols-7 gap-0.5">
           <button
             v-for="cell in days"
             :key="`${cell.year}-${cell.month}-${cell.day}`"
             type="button"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day"
+            class="h-control flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
@@ -300,12 +302,14 @@ const secondText = computed<string>({
           </button>
         </div>
       </template>
-      <div v-else-if="mode === 'months'" class="dtp-grid4">
+      <!-- The month grid (3x4) and year-block grid (4x4, item 19's "16-year block") share this
+           layout — same day-cell chip, just a 4-column grid instead of a 7-column one (D33a). -->
+      <div v-else-if="mode === 'months'" class="grid grid-cols-4 gap-0.5">
         <button
           v-for="(name, i) in MONTH_NAMES"
           :key="name"
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day"
+          class="h-control flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
           data-testid="datetime-picker-month-cell"
           :data-selected="i === viewMonth"
           :class="{ 'is-selected': i === viewMonth }"
@@ -314,12 +318,12 @@ const secondText = computed<string>({
           {{ name.slice(0, 3) }}
         </button>
       </div>
-      <div v-else class="dtp-grid4">
+      <div v-else class="grid grid-cols-4 gap-0.5">
         <button
           v-for="y in yearBlock"
           :key="y"
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day"
+          class="h-control flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
           data-testid="datetime-picker-year-cell"
           :data-selected="y === viewYear"
           :class="{ 'is-selected': y === viewYear }"
@@ -329,7 +333,7 @@ const secondText = computed<string>({
         </button>
       </div>
     </div>
-    <div class="dtp-clock">
+    <div class="flex items-center border-t border-border gap-0.5 pt-1">
       <Input
         v-model="hourText"
         type="number"
@@ -338,7 +342,7 @@ const secondText = computed<string>({
         class="w-14"
         data-testid="datetime-picker-hour"
       />
-      <span class="dtp-clock-sep">:</span>
+      <span class="text-subtle">:</span>
       <Input
         v-model="minuteText"
         type="number"
@@ -347,7 +351,7 @@ const secondText = computed<string>({
         class="w-14"
         data-testid="datetime-picker-minute"
       />
-      <span class="dtp-clock-sep">:</span>
+      <span class="text-subtle">:</span>
       <Input
         v-model="secondText"
         type="number"
@@ -370,42 +374,10 @@ const secondText = computed<string>({
 
 <style scoped>
 @reference "@theme/base.css";
-
-.dtp {
-  @apply flex flex-col gap-1 p-1.5;
-}
-
-.dtp-month-row {
-  @apply flex items-center justify-between;
-}
-
-/* P42 D33a: a plain <button> now, so the label itself is the mode-cycling control — reset to
-   look like the <span> it replaces rather than a bordered control. */
-.dtp-month-label {
-  @apply border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.dtp-month-label`/`.dtp-day` stay bare markers to anchor these compounds. */
 .dtp-month-label:hover {
   @apply bg-hover;
-}
-
-.dtp-weekdays,
-.dtp-days {
-  @apply grid grid-cols-7 gap-0.5;
-}
-
-/* The month grid (3x4) and year-block grid (4x4, item 19's "16-year block") share this — same
-   .dtp-day chip, just a 4-column grid instead of a 7-column one (D33a). */
-.dtp-grid4 {
-  @apply grid grid-cols-4 gap-0.5;
-}
-
-.dtp-weekday {
-  @apply flex items-center justify-center text-subtle text-kira-xs h-4.5;
-}
-
-.dtp-day {
-  @apply w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5;
 }
 
 .dtp-day.is-today {
@@ -416,13 +388,5 @@ const secondText = computed<string>({
    --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input. */
 .dtp-day.is-selected {
   @apply bg-primary text-primary-foreground;
-}
-
-.dtp-clock {
-  @apply flex items-center border-t border-border gap-0.5 pt-1;
-}
-
-.dtp-clock-sep {
-  @apply text-subtle;
 }
 </style>

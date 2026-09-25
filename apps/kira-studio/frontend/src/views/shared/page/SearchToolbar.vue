@@ -253,7 +253,7 @@ onUnmounted(() => {
        so it's obvious what's being searched — and it only ever walks the loaded rows. -->
   <div
     ref="rootEl"
-    class="search-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border"
+    class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border bg-elevated"
     :data-testid="`${testidPrefix}search-toolbar`"
   >
     <span
@@ -262,7 +262,7 @@ onUnmounted(() => {
     >
       <CodiconIcon name="search" :size="13" />
     </span>
-    <div class="search-input">
+    <div class="w-52 shrink-0">
       <Input
         ref="searchInput"
         v-model="query"
@@ -353,7 +353,7 @@ onUnmounted(() => {
 
     <span
       v-if="errorMessage"
-      class="text-kira-sm search-error"
+      class="text-kira-sm whitespace-nowrap overflow-hidden text-ellipsis text-error"
       :data-testid="`${testidPrefix}search-error`"
       >{{ errorMessage }}</span
     >
@@ -366,7 +366,7 @@ onUnmounted(() => {
            used to set `scanning` false while a newer scan was still genuinely running, falling
            through to this same branch with a partial `index: -1` entry underneath it; that path is
            closed by `startSearch`'s own handle-identity check, not by this template. -->
-      <span class="text-kira-sm text-muted-foreground search-count" :data-testid="`${testidPrefix}search-count`">
+      <span class="text-kira-sm text-muted-foreground whitespace-nowrap" :data-testid="`${testidPrefix}search-count`">
         <template v-if="scanning">{{ foundSoFar }}…</template>
         <template v-else-if="entry && entry.matches.length > 0">
           <b class="font-data">{{ entry.index + 1 }}</b> of
@@ -424,23 +424,3 @@ onUnmounted(() => {
     </Tooltip>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.search-toolbar {
-  @apply bg-elevated;
-}
-
-.search-input {
-  @apply w-52 shrink-0;
-}
-
-.search-count {
-  @apply whitespace-nowrap;
-}
-
-.search-error {
-  @apply whitespace-nowrap overflow-hidden text-ellipsis text-error;
-}
-</style>

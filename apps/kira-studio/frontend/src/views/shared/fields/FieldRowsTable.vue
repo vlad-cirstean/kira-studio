@@ -270,15 +270,21 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
 </script>
 
 <template>
+  <!-- P16 D13: flex:1 rather than height:100% -- this is no longer always its flex-column
+       parent's only child (HttpRequestView.vue's own filter row, when open, is a sibling above
+       it), and a percentage height would ignore that sibling's own space and overflow past it. -->
   <div
     ref="containerRef"
-    class="field-rows-table"
+    class="flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5"
     :data-testid="containerTestid"
   >
+    <!-- P22b D9: a grid, not independent flex items -- named columns (gridTemplateColumns, above)
+         keep every row's name/value/trailing/remove cells at the same width regardless of what an
+         individual row happens to render inside one of them (F13). -->
     <div
       v-for="entry in displayRows"
       :key="entry.index"
-      class="field-row"
+      class="field-row grid items-center gap-1"
       :style="{ gridTemplateColumns }"
       :data-testid="`${testidPrefix}-row`"
     >
@@ -291,7 +297,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <div class="field-cell">
+      <div class="min-w-0">
         <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is
              (`X-{{tenant}}-Id`), and until now it was the one editable Api surface that painted
              none and hovered none. The gate widens from `nameCandidates` alone to "either a name
@@ -329,7 +335,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
         :is-trailing="entry.index >= rows.length"
         :update="(v: string) => updateField(entry.index, 'value', v)"
       >
-        <div class="field-cell">
+        <div class="min-w-0">
           <AutocompleteField
             v-if="valueVariableSupport"
             grow
@@ -357,7 +363,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
       <!-- P22b D6: plain prose about the field, not a value — no autocomplete, no {{variable}}
            colouring. Behind showDescriptions (D7) so a table with no descriptions in it does not
            pay a fourth AutocompleteField-width column for nothing. -->
-      <div v-if="showDescriptions" class="field-cell">
+      <div v-if="showDescriptions" class="min-w-0">
         <InputGroup>
           <InputGroupTextarea
             :model-value="entry.row.description ?? ''"
@@ -372,7 +378,7 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
            (kind select, plus a conditional Choose-file button/caption/remove) varies row to row,
            unlike showEnabled above, so it needs one stable cell to vary *inside* rather than
            shifting the grid's own column count. -->
-      <div class="field-cell-trailing">
+      <div class="flex min-w-0 items-center gap-1">
         <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
       </div>
       <Tooltip>
@@ -396,28 +402,3 @@ useEventListener(containerRef, 'keydown', onContainerKeydown);
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.field-rows-table {
-  /* P16 D13: flex:1 rather than height:100% — this is no longer always its flex-column parent's
-     only child (HttpRequestView.vue's own filter row, when open, is a sibling above it), and a
-     percentage height would ignore that sibling's own space and overflow past it. */
-  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
-}
-
-/* P22b D9: a grid, not independent flex items — named columns (gridTemplateColumns, above) keep
-   every row's name/value/trailing/remove cells at the same width regardless of what an individual
-   row happens to render inside one of them (F13). */
-.field-row {
-  @apply grid items-center gap-1;
-}
-
-.field-cell {
-  @apply min-w-0;
-}
-
-.field-cell-trailing {
-  @apply flex min-w-0 items-center gap-1;
-}
-</style>

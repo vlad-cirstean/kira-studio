@@ -134,11 +134,11 @@ useEventListener(rootEl, 'keydown', onKeydown);
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
-  <div ref="rootEl" class="response-find-bar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="http-find-bar">
+  <div ref="rootEl" class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border bg-elevated" data-testid="http-find-bar">
     <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground">
       <CodiconIcon name="search" :size="13" />
     </span>
-    <div class="find-input">
+    <div class="w-52 shrink-0">
       <Input
         ref="findInput"
         v-model="query"
@@ -198,7 +198,7 @@ useEventListener(rootEl, 'keydown', onKeydown);
         <TooltipContent>Regular expression</TooltipContent>
       </Tooltip>
     </div>
-    <span class="text-kira-sm text-muted-foreground find-count" data-testid="http-find-count">
+    <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
     </span>
     <Tooltip>
@@ -227,19 +227,3 @@ useEventListener(rootEl, 'keydown', onKeydown);
     </Tooltip>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.response-find-bar {
-  @apply bg-elevated shrink-0;
-}
-
-.find-input {
-  @apply w-52 shrink-0;
-}
-
-.find-count {
-  @apply whitespace-nowrap;
-}
-</style>

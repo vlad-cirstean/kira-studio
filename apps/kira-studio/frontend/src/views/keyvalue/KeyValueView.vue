@@ -14,15 +14,7 @@ defineProps<{ tab: KeyValueTabRecord }>();
 </script>
 
 <template>
-  <div class="keyvalue-view" data-testid="keyvalue-view" :data-path="tab.path">
+  <div class="h-full flex flex-col min-h-0" data-testid="keyvalue-view" :data-path="tab.path">
     <KeyValuePane :view-key="tab.id" :tab="tab" />
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.keyvalue-view {
-  @apply h-full flex flex-col min-h-0;
-}
-</style>

@@ -70,7 +70,7 @@ function onJump(e: Event): void {
 </script>
 
 <template>
-  <div class="group pager" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
+  <div class="group gap-0.5" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
     <Tooltip>
       <TooltipTrigger as-child>
         <TooltipDisabledTrigger>
@@ -105,9 +105,17 @@ function onJump(e: Event): void {
       </TooltipTrigger>
       <TooltipContent>Previous page</TooltipContent>
     </Tooltip>
-    <span class="page-label text-kira-sm text-muted-foreground">
+    <span class="inline-flex items-center whitespace-nowrap gap-0.5 text-kira-sm text-muted-foreground">
       page
-      <div class="page-input">
+      <div class="w-12">
+        <!-- P22 D2: F3 shows the page-number box is already the same 22px height as the icon
+             buttons beside it — the complaint's real cause is visual weight, a bordered/filled box
+             in a row of transparent icon buttons. At rest this drops the fill/border so all five
+             pager controls read as one weight; :focus/:hover restore both, the same "engaged
+             control" idiom NativeSelect (borderless default variant, bordered opt-in) already
+             uses. P110 B25: the `:deep(input)` class props above move directly onto <Input> —
+             `not-focus:`/`not-hover:` (Tailwind's own built-in variants) replace the old
+             `:not(:focus):not(:hover)` compound selector. -->
         <Input
           v-model="pageInputValue"
           type="number"
@@ -155,27 +163,3 @@ function onJump(e: Event): void {
     </Tooltip>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.pager {
-  @apply gap-0.5;
-}
-
-.page-label {
-  @apply inline-flex items-center whitespace-nowrap gap-0.5;
-}
-
-.page-input {
-  @apply w-12;
-}
-
-/* P22 D2: F3 shows the page-number box is already the same 22px height as the icon buttons
-   beside it — the complaint's real cause is visual weight, a bordered/filled box in a row of
-   transparent icon buttons. At rest this drops the fill/border so all five pager controls read
-   as one weight; :focus/:hover restore both, the same "engaged control" idiom NativeSelect
-   (borderless default variant, bordered opt-in) already uses. P110 B25: the `:deep(input)` class
-   props above move directly onto <Input> — `not-focus:`/`not-hover:` (Tailwind's own built-in
-   variants) replace the old `:not(:focus):not(:hover)` compound selector. */
-</style>

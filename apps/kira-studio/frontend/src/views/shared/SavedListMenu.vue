@@ -61,14 +61,14 @@ defineSlots<{
 
 <template>
   <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestId">
-    <div class="saved-list-menu-inner">
+    <div class="max-h-100 overflow-y-auto">
       <div class="h-control-sm flex items-center px-1.5 text-kira-xs text-subtle uppercase tracking-wider">{{ title }}</div>
-      <div v-if="saved.length === 0" class="empty-row text-kira-sm text-subtle">{{ emptySavedText }}</div>
+      <div v-if="saved.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptySavedText }}</div>
       <div v-else role="listbox" :aria-label="title">
         <div
           v-for="entry in saved"
           :key="entry.id"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover entry-row"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover"
           :data-testid="savedEntryTestId"
           role="option"
           tabindex="0"
@@ -79,7 +79,7 @@ defineSlots<{
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="pin-button"
+                class="pin-button flex shrink-0 cursor-pointer border-0 bg-transparent p-0 text-subtle"
                 :class="{ pinned: isPinned(entry) }"
                 @click.stop="emit('togglePin', entry)"
               >
@@ -89,7 +89,7 @@ defineSlots<{
             <TooltipContent>Pin</TooltipContent>
           </Tooltip>
           <slot name="entry" :entry="entry" />
-          <span class="entry-actions">
+          <span class="flex shrink-0 gap-0.5">
             <slot name="entry-actions" :entry="entry" />
             <Tooltip>
               <TooltipTrigger as-child>
@@ -106,12 +106,12 @@ defineSlots<{
       <template v-if="recent">
         <Separator class="my-1" />
         <div class="h-control-sm flex items-center px-1.5 text-kira-xs text-subtle uppercase tracking-wider">Recent</div>
-        <div v-if="recent.length === 0" class="empty-row text-kira-sm text-subtle">{{ emptyRecentText }}</div>
+        <div v-if="recent.length === 0" class="text-kira-sm text-subtle py-1 px-1.5">{{ emptyRecentText }}</div>
         <div v-else role="listbox" aria-label="Recent">
           <div
             v-for="entry in recent"
             :key="entry.id"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover entry-row"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover"
             :data-testid="recentEntryTestId"
             role="option"
             tabindex="0"
@@ -130,17 +130,10 @@ defineSlots<{
 
 <style scoped>
 @reference "@theme/base.css";
-
-.saved-list-menu-inner {
-  @apply max-h-100 overflow-y-auto;
-}
-
-.empty-row {
-  @apply py-1 px-1.5;
-}
-
-.entry-row {
-  @apply cursor-pointer;
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.pin-button` stays a bare marker to anchor this compound. */
+.pin-button.pinned {
+  @apply text-warn;
 }
 
 /* flex-1/overflow-hidden/text-ellipsis/whitespace-nowrap used to live here as a single
@@ -151,16 +144,4 @@ defineSlots<{
    (what a real click/tap lands on) fell on the trailing action buttons instead of the row's own
    content (console.spec.ts's saved-query-apply scenario caught it). Each caller now applies these
    Tailwind classes directly on its own entry-name span instead. */
-
-.pin-button {
-  @apply flex shrink-0 cursor-pointer border-0 bg-transparent p-0 text-subtle;
-}
-
-.pin-button.pinned {
-  @apply text-warn;
-}
-
-.entry-actions {
-  @apply flex shrink-0 gap-0.5;
-}
 </style>

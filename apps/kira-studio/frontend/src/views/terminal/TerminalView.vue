@@ -63,7 +63,7 @@ async function onDismissHooksPrompt(): Promise<void> {
   <TerminalHostView :tab="tab" :deps="deps">
     <div
       v-if="showHooksPrompt"
-      class="claude-code-hooks-prompt"
+      class="claude-code-hooks-prompt flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5"
       data-testid="claude-code-hooks-prompt"
     >
       <span v-if="hooksJustEnabled">
@@ -98,10 +98,8 @@ async function onDismissHooksPrompt(): Promise<void> {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.claude-code-hooks-prompt {
-  @apply flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5;
-}
+/* P110 B40: `.claude-code-hooks-prompt` stays a bare marker to anchor this descendant selector;
+   its own plain rule moved onto the template as Tailwind utilities. */
 .claude-code-hooks-prompt span {
   @apply flex-1;
 }

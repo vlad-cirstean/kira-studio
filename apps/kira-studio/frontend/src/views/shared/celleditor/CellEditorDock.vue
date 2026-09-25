@@ -30,7 +30,7 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
        exactly one place that reads/writes the cell-editor height, not one per mounting view. -->
   <SplitterPanel
     v-if="cell"
-    class="cell-dock"
+    class="min-h-0 overflow-hidden bg-bg"
     data-testid="cell-editor"
     :data-tab-id="tabId"
     size-unit="px"
@@ -43,11 +43,3 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
     <CellEditorView :cell="cell" :read-only="readOnly" />
   </SplitterPanel>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.cell-dock {
-  @apply min-h-0 overflow-hidden bg-bg;
-}
-</style>
