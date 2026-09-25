@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"strconv"
-	"sync"
 
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -19,70 +18,57 @@ func init() {
 	})
 }
 
-// Adapter is index.ts's KafkaAdapter.
-type Adapter struct {
-	deps adapters.Deps
-
-	// mu guards every field below (F3): Connect/Disconnect write client/admin/opts/readOnly from
-	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
-	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
-	mu     sync.Mutex
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3), guarded together via adapters.Guarded (P113 G1).
+type connState struct {
 	client *kgo.Client
 	admin  *kadm.Client
 	// opts is the resolved seed/security options connect() built the long-lived client from —
 	// reused to build each browse's own ephemeral kgo.Client (P58e E5) without re-resolving the
-	// connection config on every read().
+	// connection config on every read(). Reassigned wholesale by setConnected/clearConnected, never
+	// mutated in place, so Load's own copy is safe for it.
 	opts     []kgo.Opt
 	readOnly bool
 }
 
-// getClient is Read/Mutate's own locked read of a.client (F3).
-func (a *Adapter) getClient() *kgo.Client {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.client
+// Adapter is index.ts's KafkaAdapter.
+type Adapter struct {
+	deps adapters.Deps
+
+	state adapters.Guarded[connState]
 }
+
+// getClient is Read/Mutate's own locked read of a.client (F3).
+func (a *Adapter) getClient() *kgo.Client { return a.state.Load().client }
 
 // getAdmin is every op's own locked read of a.admin (F3) — requireAdmin's RequireConnected call
 // takes its result, never a.admin directly.
-func (a *Adapter) getAdmin() *kadm.Client {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.admin
-}
+func (a *Adapter) getAdmin() *kadm.Client { return a.state.Load().admin }
 
 // getOpts is Read's own locked read of a.opts (F3).
-func (a *Adapter) getOpts() []kgo.Opt {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.opts
-}
+func (a *Adapter) getOpts() []kgo.Opt { return a.state.Load().opts }
 
 // getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *kgo.Client, admin *kadm.Client, opts []kgo.Opt, readOnly bool) {
-	a.mu.Lock()
-	a.client = client
-	a.admin = admin
-	a.opts = opts
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = client
+		s.admin = admin
+		s.opts = opts
+		s.readOnly = readOnly
+	})
 }
 
 // clearConnected is Disconnect's own locked write, once client.Close (a real network call, run
 // with no lock held) has returned (F3).
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.client = nil
-	a.admin = nil
-	a.opts = nil
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = nil
+		s.admin = nil
+		s.opts = nil
+	})
 }
 
 func (a *Adapter) Kind() string        { return "kafka" }
