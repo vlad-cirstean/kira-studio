@@ -175,16 +175,16 @@ async function onConfirm(): Promise<void> {
         <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
       </Alert>
 
-      <div class="row-list" data-testid="datagrip-preview-rows">
+      <div class="flex flex-col py-1" data-testid="datagrip-preview-rows">
         <div
           v-for="row in rows"
           :key="row.uuid"
-          class="ds-row"
-          :class="{ 'is-off': !row.importable }"
+          class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
+          :class="{ 'text-muted-foreground': !row.importable }"
           :data-testid="`datagrip-row-${row.uuid}`"
           :data-importable="row.importable"
         >
-          <span class="row-check">
+          <span class="w-4 shrink-0 flex justify-center">
             <Checkbox
               v-if="row.importable"
               :model-value="datagripImportStore.selected.has(row.uuid)"
@@ -194,18 +194,18 @@ async function onConfirm(): Promise<void> {
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
           </span>
-          <span v-if="row.importable" class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
+          <span v-if="row.importable" class="shrink-0 flex" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
             <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
           </span>
-          <span v-else class="engine-mark text-subtle"><CodiconIcon name="circle-slash" :size="15" /></span>
+          <span v-else class="shrink-0 flex text-subtle"><CodiconIcon name="circle-slash" :size="15" /></span>
 
-          <span class="ds-name">{{ row.name }}</span>
+          <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.name }}</span>
 
           <template v-if="row.importable">
-            <span class="ds-target text-subtle">
+            <span class="whitespace-nowrap text-kira-sm text-subtle">
               {{ row.host ? `${row.host}:${row.port}` : '' }}<span v-if="row.database">/{{ row.database }}</span>
             </span>
-            <span v-if="row.username" class="ds-username text-subtle">{{ row.username }}</span>
+            <span v-if="row.username" class="whitespace-nowrap text-kira-sm text-subtle">{{ row.username }}</span>
             <Tooltip v-if="looksAlreadyImported(row)">
               <TooltipTrigger as-child>
                 <Badge variant="warn" data-testid="datagrip-row-duplicate">
@@ -224,10 +224,10 @@ async function onConfirm(): Promise<void> {
             </Badge>
           </template>
           <template v-else>
-            <span class="ds-skip ml-auto" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
+            <span class="text-kira-sm text-muted-foreground ml-auto" data-testid="datagrip-row-skip-reason">{{ skipLabel(row) }}</span>
           </template>
 
-          <span v-if="row.warnings.length > 0" class="ds-warnings">
+          <span v-if="row.warnings.length > 0" class="flex shrink-0 gap-0.5">
             <Tooltip v-for="w in row.warnings" :key="w">
               <TooltipTrigger as-child>
                 <span class="size-4 flex items-center justify-center shrink-0 text-subtle">
@@ -238,7 +238,7 @@ async function onConfirm(): Promise<void> {
             </Tooltip>
           </span>
         </div>
-        <span v-if="rows.length === 0" class="empty-note">No data sources found in this project.</span>
+        <span v-if="rows.length === 0" class="text-center p-3 text-muted-foreground">No data sources found in this project.</span>
       </div>
     </div>
 
@@ -252,17 +252,17 @@ async function onConfirm(): Promise<void> {
         </AlertDescription>
       </Alert>
 
-      <div class="row-list" data-testid="datagrip-report-rows">
+      <div class="flex flex-col py-1" data-testid="datagrip-report-rows">
         <div
           v-for="row in report.rows"
           :key="row.uuid"
-          class="ds-row"
+          class="flex items-center gap-1.5 h-6.5 px-3 border-b border-border text-kira-md"
           :data-testid="`datagrip-report-row-${row.uuid}`"
         >
-          <span class="engine-mark" :class="row.created ? 'text-ok' : 'text-error'">
+          <span class="shrink-0 flex" :class="row.created ? 'text-ok' : 'text-error'">
             <CodiconIcon :name="row.created ? 'check' : 'error'" :size="15" />
           </span>
-          <span class="ds-name">{{ row.name }}</span>
+          <span class="min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap">{{ row.name }}</span>
           <Badge
             class="ml-auto"
             :variant="reportOutcome(row).tone"
@@ -309,59 +309,3 @@ async function onConfirm(): Promise<void> {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.row-list {
-  @apply flex flex-col;
-  padding: var(--kira-s-2) 0;
-}
-
-.ds-row {
-  @apply flex items-center;
-  gap: var(--kira-s-3);
-  height: var(--kira-h-md);
-  padding: 0 var(--kira-s-5);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-md);
-}
-
-.ds-row.is-off {
-  color: var(--kira-fg-muted);
-}
-
-.row-check {
-  @apply w-4 shrink-0 flex justify-center;
-}
-
-.engine-mark {
-  @apply shrink-0 flex;
-}
-
-.ds-name {
-  @apply min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.ds-target,
-.ds-username {
-  @apply whitespace-nowrap;
-  font-size: var(--kira-t-sm);
-}
-
-.ds-skip {
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-}
-
-.ds-warnings {
-  @apply flex shrink-0;
-  gap: var(--kira-s-1);
-}
-
-.empty-note {
-  @apply text-center;
-  padding: var(--kira-s-5);
-  color: var(--kira-fg-muted);
-}
-</style>
