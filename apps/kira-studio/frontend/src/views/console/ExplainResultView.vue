@@ -98,8 +98,8 @@ const rawLanguage = computed(() =>
     <template v-if="plan && result">
       <div class="flex items-center flex-wrap gap-2">
         <div
-          class="verdict flex items-center text-ok gap-1"
-          :class="{ warn: plan.overThreshold }"
+          class="flex items-center gap-1"
+          :class="plan.overThreshold ? 'text-warn' : 'text-ok'"
           data-testid="explain-verdict"
           :data-over-threshold="plan.overThreshold"
         >
@@ -115,8 +115,14 @@ const rawLanguage = computed(() =>
       </div>
       <p class="text-muted-foreground text-kira-xs whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
 
-      <ul v-if="plan.issues.length > 0" class="issue-list flex flex-col list-none m-0 p-0 gap-1" data-testid="explain-issues">
-        <li v-for="(issue, i) in plan.issues" :key="i" :class="issue.severity" :data-severity="issue.severity">
+      <ul v-if="plan.issues.length > 0" class="flex flex-col list-none m-0 p-0 gap-1" data-testid="explain-issues">
+        <li
+          v-for="(issue, i) in plan.issues"
+          :key="i"
+          class="flex items-start gap-1"
+          :class="issue.severity === 'warn' ? 'text-warn' : 'text-muted-foreground'"
+          :data-severity="issue.severity"
+        >
           <CodiconIcon :name="issue.severity === 'warn' ? 'warning' : 'info'" :size="12" />
           <span>{{ issue.message }}</span>
         </li>
@@ -127,7 +133,7 @@ const rawLanguage = computed(() =>
         <div
           v-for="row in flatRows"
           :key="row.id"
-          class="plan-row flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5"
+          class="flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5 hover:bg-hover"
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >
@@ -175,34 +181,7 @@ const rawLanguage = computed(() =>
     </template>
     <p v-else class="text-muted-foreground text-kira-xs m-0">No plan.</p>
   </div>
+  <!-- P110 I2-16: `.verdict.warn`/`.issue-list li[.warn/.info]`/`.plan-row:hover` all moved onto
+       the template as ternaries/utilities -- `issue.severity` is exhaustively 'warn'/'info'
+       (planModel.ts's own PlanIssue), so the <li> ternary needs no default branch. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.verdict`/`.plan-row` stay as bare markers to anchor their own compound/pseudo
-   variants below; `.issue-list` stays as a bare marker since `.issue-list li`/`li.warn`/`li.info`
-   are descendant selectors needing that ancestor class present in the DOM (Vue scoped CSS only
-   attributes the rightmost compound, so the ancestor class name itself must still exist). */
-
-.verdict.warn {
-  @apply text-warn;
-}
-
-.issue-list li {
-  @apply flex items-start gap-1;
-}
-
-.issue-list li.warn {
-  @apply text-warn;
-}
-
-.issue-list li.info {
-  @apply text-muted-foreground;
-}
-
-.plan-row:hover {
-  @apply bg-hover;
-}
-</style>
