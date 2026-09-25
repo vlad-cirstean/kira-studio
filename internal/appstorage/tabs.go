@@ -98,9 +98,25 @@ func ReplaceKeyed(db *sql.DB, table, keyColumn, scopeValue string, keys []string
 	return nil
 }
 
-// WindowExistsChecker is the one method SaveWindowTabs needs from an app's own *repos.WindowsRepo.
+// WindowExistsChecker is the one method CheckWindow/SaveWindowTabs need from an app's own
+// *repos.WindowsRepo.
 type WindowExistsChecker interface {
 	Exists(key string) (bool, error)
+}
+
+// CheckWindow is List/Save's shared guard (P113 G4, P107 I2-6): reject a windowKey that names no
+// `windows` row with a real E_BAD_REQUEST, rather than letting Save surface TabsRepo.Save's own raw
+// FOREIGN KEY constraint failure (C4) — List has no such constraint to fall back on, so it runs the
+// same check up front purely for a consistent error.
+func CheckWindow(windows WindowExistsChecker, windowKey string) error {
+	ok, err := windows.Exists(windowKey)
+	if err != nil {
+		return ipcerr.Internal(err.Error())
+	}
+	if !ok {
+		return ipcerr.BadRequest("unknown window: " + windowKey)
+	}
+	return nil
 }
 
 // TabsSaver is the one method SaveWindowTabs needs from an app's own *repos.TabsRepo — Save's own
@@ -110,19 +126,28 @@ type TabsSaver[T any] interface {
 	Save(windowKey string, records []T) error
 }
 
-// SaveWindowTabs is both apps' own bridge.TabsService.Save (P107 I2-6): reject a windowKey that
-// names no `windows` row with a real E_BAD_REQUEST, rather than letting it surface as TabsRepo.
-// Save's own raw FOREIGN KEY constraint failure (C4), then persist.
+// TabsLister is the one method ListWindowTabs needs from an app's own *repos.TabsRepo.
+type TabsLister[T any] interface {
+	List(windowKey string) ([]T, error)
+}
+
+// SaveWindowTabs is both apps' own bridge.TabsService.Save (P107 I2-6): CheckWindow's guard, then
+// persist.
 func SaveWindowTabs[T any](windows WindowExistsChecker, tabs TabsSaver[T], windowKey string, records []T) error {
-	ok, err := windows.Exists(windowKey)
-	if err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	if !ok {
-		return ipcerr.BadRequest("unknown window: " + windowKey)
+	if err := CheckWindow(windows, windowKey); err != nil {
+		return err
 	}
 	if err := tabs.Save(windowKey, records); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
 	return nil
+}
+
+// ListWindowTabs is both apps' own bridge.TabsService.List (P113 G4): CheckWindow's guard, then the
+// list itself.
+func ListWindowTabs[T any](windows WindowExistsChecker, tabs TabsLister[T], windowKey string) ([]T, error) {
+	if err := CheckWindow(windows, windowKey); err != nil {
+		return nil, err
+	}
+	return ipcerr.InternalResult(tabs.List(windowKey))
 }
