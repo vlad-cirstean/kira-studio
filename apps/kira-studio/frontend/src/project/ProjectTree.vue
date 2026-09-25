@@ -241,3 +241,21 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </Alert>
   </div>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* P110 test-fix: restored from base.css's shared `@utility virtual-row`/`sticky-row` (P110 B34) --
+   those are Tailwind-layered, and lose to TreeRow.vue's own unlayered `.tree-row { @apply ...
+   relative ...; }` on this same (fallthrough) root element, breaking absolute positioning of
+   every virtualized row (see base.css's own note on this revert). Local + unlayered here instead,
+   exactly as before B34, so it always wins regardless of what else the row itself sets. */
+.sticky-row {
+  @apply absolute left-0 right-0 z-1;
+  background: var(--kira-bg);
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
+</style>

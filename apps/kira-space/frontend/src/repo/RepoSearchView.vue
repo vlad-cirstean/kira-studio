@@ -231,3 +231,16 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* P110 test-fix: restored from base.css's shared `@utility virtual-row` (P110 B34) -- see
+   kira-studio's ProjectTree.vue identical note and base.css's own revert comment: it is
+   Tailwind-layered and loses to any unlayered scoped rule (e.g. a row component's own row class,
+   if it sets `position`) on the same fallthrough root element. Local + unlayered here instead. */
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
+</style>
+

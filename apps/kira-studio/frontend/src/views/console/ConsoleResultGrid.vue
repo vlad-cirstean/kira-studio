@@ -478,4 +478,12 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 .row.selected {
   @apply bg-select;
 }
+
+/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
+   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
+   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
+   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
 </style>

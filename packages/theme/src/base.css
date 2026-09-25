@@ -162,28 +162,20 @@
   --wails-draggable: none;
 }
 
-/* P110 B34: a virtualized row/item wrapper's own absolute-positioning shape -- byte-identical
-   `@apply absolute top-0 left-0 w-full;` copied across 9 files (BrowseView/StreamView/
-   DocumentView/ConsoleResultGrid/ProjectTree/RepoFileTree/RepoSearchView/OperationsPanel/
-   CollectionsTree). */
-@utility virtual-row {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  width: 100%;
-}
-
-/* A virtualized tree/list's own sticky occluder row -- position/z-index/background copied
-   identically (mixed @apply/raw forms) across CollectionsTree/ProjectTree/RepoFileTree, each
-   with the comment "opaque and full-width so it fully occludes whatever real row has scrolled up
-   behind it" (P28 D2). */
-@utility sticky-row {
-  position: absolute;
-  left: 0px;
-  right: 0px;
-  z-index: 1;
-  background-color: var(--color-bg);
-}
+/* P110 B34 tried a shared `@utility virtual-row`/`sticky-row` pair here (9+3 file dedup) --
+   reverted (P110 test-fix): both need `position` to win on their element, and `@utility` always
+   registers into Tailwind's layered `utilities` layer, which LOSES to any unlayered scoped rule
+   on the same element regardless of specificity or source order (this file's own established
+   rule, see e.g. StreamView.vue's `.stream-row.search-match` precedent below). ProjectTree.vue's
+   row is TreeRow.vue's root element, which also carries TreeRow's own unlayered `.tree-row {
+   @apply ... relative ...; }` -- once virtual-row/sticky-row became layered, that unlayered
+   `position: relative` started beating their `position: absolute`, collapsing the virtualized
+   list's row positioning (confirmed via `git bisect` against tree.spec.ts: passes at this
+   commit's parent, fails here, and fails specifically because of this file's own diff -- passes
+   again with just this file's virtual-row/sticky-row change reverted, everything else in the
+   commit still applied). Each of the 9 (+3 for sticky-row) consuming files keeps its own local,
+   unlayered `.virtual-row`/`.sticky-row` scoped rule instead -- byte-identical declarations,
+   just no longer shared, so no consuming file can ever lose this fight to another unlayered rule. */
 
 /* The "nothing here yet" panel shape -- byte-identical across 15 files (KeyValuePane,
    RawExchangePane, CookiesPane, ResponseHistoryList, both request kinds' ResponsePane,

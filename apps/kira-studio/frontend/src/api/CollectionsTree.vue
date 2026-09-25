@@ -216,3 +216,21 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* P110 test-fix: restored from base.css's shared `@utility virtual-row`/`sticky-row` (P110 B34) --
+   see ProjectTree.vue's identical note and base.css's own revert comment: those are
+   Tailwind-layered and lose to any unlayered scoped rule (e.g. CollectionRow.vue's own row class,
+   if it sets `position`) on the same fallthrough root element. Local + unlayered here instead. */
+.sticky-row {
+  @apply absolute left-0 right-0 z-1;
+  background: var(--kira-bg);
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
+</style>
+
