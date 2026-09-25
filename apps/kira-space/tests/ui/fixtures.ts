@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { createUiFixtures, type UiFixturesOptions } from '@workbench/testing/ui/fixtures';
 import { mergeBootSnapshots } from './support/bootSnapshots';
+import { type GitStreamMockArgs, installGitStreamMockOnInit } from './support/gitStreamMock';
 import { type ControlMockHandle, installControlMocks } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
 
@@ -17,6 +18,11 @@ export type KiraApp = { window: Page } & KiraAppExtra;
 
 export interface RelaunchOptions extends UiFixturesOptions {
   control?: readonly ControlSnapshot[];
+  /** P114 §3.2: set only when boot itself opens the git transport (a restored, active repo-file
+   *  tab) — installed via `installGitStreamMockOnInit`, before `relaunch()`'s one navigation. See
+   *  `support/gitStreamMock.ts`'s own doc comment for why that's a different install path than the
+   *  per-spec `installGitStreamMock` default. */
+  gitStream?: GitStreamMockArgs;
 }
 
 /**
@@ -25,14 +31,18 @@ export interface RelaunchOptions extends UiFixturesOptions {
  * fixture here: that whole mechanism (mockStream.ts) is Studio's own bulk-data grid-page protocol
  * (`window._wails.streamFactory('data')`), which this app has no counterpart for — the one stream
  * this app's own repo-graph mount opens (`window._wails.streamFactory('git')`) is a different wire
- * entirely, mocked per-spec by `installGitStreamMock` (support/gitStreamMock.ts), not by this
- * fixture's own boot-time `relaunch()`.
+ * entirely, mocked per-spec by `installGitStreamMock` (support/gitStreamMock.ts) by default, or via
+ * this fixture's own `gitStream` option when boot itself opens the transport.
  */
 export const test = createUiFixtures<KiraAppExtra, RelaunchOptions>({
   distDir: DIST_DIR,
-  installMocks: async (page, options) => ({
-    control: await installControlMocks(page, mergeBootSnapshots(options?.control ?? [])),
-  }),
+  installMocks: async (page, options) => {
+    const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
+    if (options?.gitStream) {
+      await installGitStreamMockOnInit(page, options.gitStream);
+    }
+    return { control };
+  },
 });
 
 export { expect } from '@playwright/test';
