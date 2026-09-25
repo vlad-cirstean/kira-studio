@@ -79,8 +79,13 @@ export function splitSqlStatements(source: string, options?: SplitSqlOptions): S
 
 /** Where `s`'s own trimmed text actually starts within its raw (untrimmed) `[start, end)` span —
  *  `s.start` alone is not that boundary: it sits right after the *previous* statement's `;`, so it
- *  still includes any blank line/whitespace between the two statements. */
-function trimmedStart(source: string, s: SqlStatement): number {
+ *  still includes any blank line/whitespace between the two statements. Exported (as
+ *  `trimmedStatementStart`) so a caret placed at a *statement's* own position — never `s.start`
+ *  itself — lands somewhere `statementAtOffset` unambiguously attributes to that statement, not
+ *  its predecessor (ConsoleView.vue's own onFormat, real-interaction fix: Format's `;\n\n` join
+ *  separator is wide enough that `s.start` sits inside the gap `statementAtOffset` gives to the
+ *  *previous* statement, where a typed `;\n` separator was narrow enough this never surfaced). */
+export function trimmedStatementStart(source: string, s: SqlStatement): number {
   const raw = source.slice(s.start, s.end);
   return s.start + (raw.length - raw.trimStart().length);
 }
@@ -103,7 +108,7 @@ export function statementAtOffset(
     const s = statements[i];
     if (!s) continue;
     const next = statements[i + 1];
-    const ownedEnd = next ? trimmedStart(source, next) - 1 : source.length;
+    const ownedEnd = next ? trimmedStatementStart(source, next) - 1 : source.length;
     if (cursor <= ownedEnd) return s;
   }
   return statements[statements.length - 1] ?? null;

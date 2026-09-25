@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { EditorLanguageId } from '@shared/domain/editor';
-import { splitSqlStatements, statementAtCursor, statementAtOffset } from '@shared/domain/sql-split';
+import {
+  splitSqlStatements,
+  statementAtCursor,
+  statementAtOffset,
+  trimmedStatementStart,
+} from '@shared/domain/sql-split';
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -468,7 +473,18 @@ function onFormat(): void {
     if (beforeIndex >= 0) {
       const after = splitSqlStatements(result.text, splitOptions);
       const target = after[beforeIndex];
-      void nextTick(() => editorHost.value?.setCursor(target?.start ?? 0));
+      // Real-interaction fix: `target.start` is the RAW boundary — it sits right after the
+      // previous statement's `;`, still covering the blank line Format's own joiner
+      // (joinFormattedStatements' `;\n\n`) inserts between statements. statementAtOffset's own
+      // documented ownership rule (sql-split.ts) attributes that whitespace gap to the PRECEDING
+      // statement, not this one — so a plain typed `;\n` separator (narrow enough the caret never
+      // landed inside the gap) masked this, but Format's wider `;\n\n` separator does not: Run
+      // statement's own statementAtCursor call, made moments later against this exact caret
+      // position, then resolved to the wrong (earlier) statement. trimmedStatementStart skips past
+      // that leading whitespace to the statement's real first character, matching what
+      // statementAtOffset already considers "inside" it.
+      const target0 = target ? trimmedStatementStart(result.text, target) : 0;
+      void nextTick(() => editorHost.value?.setCursor(target0));
     }
     // D13: set only after setText's own reactive round trip has settled — the
     // props.tab.state.text watcher above also calls resetStalePreviewState() whenever the text
