@@ -63,3 +63,25 @@ func Wrap(err error) error {
 	}
 	return Internal(err.Error())
 }
+
+// InternalResult is the bridge layer's dominant shape (P113 G3): a bound method that calls a repo/
+// service method and, on error, folds it into Internal(err.Error()) verbatim — never Wrap's
+// structured-error passthrough. A call site reads `return ipcerr.InternalResult(svc.X(...))`
+// instead of the five-line if-err block. On error it returns T's zero value, matching every
+// existing call site's own `return zero, ipcerr.Internal(err.Error())`.
+func InternalResult[T any](v T, err error) (T, error) {
+	if err != nil {
+		var zero T
+		return zero, Internal(err.Error())
+	}
+	return v, nil
+}
+
+// InternalErr is InternalResult's error-only counterpart, for bound methods that return only
+// error. Nil-safe: nil in, nil out.
+func InternalErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	return Internal(err.Error())
+}
