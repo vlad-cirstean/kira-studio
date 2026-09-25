@@ -3,6 +3,7 @@ import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -13,12 +14,7 @@ import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
@@ -661,41 +657,23 @@ onUnmounted(() => {
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar :border="isKafka ? 'bottom' : 'none'">
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="stream-refresh"
-                :disabled="isBatch"
-                aria-label="Refresh"
-                @click="onRefresh"
-              >
-                <CodiconIcon name="refresh" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'text-error': running }"
-                data-testid="stream-stop"
-                :disabled="!running"
-                aria-label="Stop"
-                @click="onStop"
-              >
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          disabled-trigger
+          data-testid="stream-refresh"
+          :disabled="isBatch"
+          @click="onRefresh"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'text-error': running }"
+          data-testid="stream-stop"
+          :disabled="!running"
+          @click="onStop"
+        />
       </div>
       <!-- Toolbar-consistency pass: a leading separator after the built-in refresh/stop group,
            matching every other view's #toolbar slot (KeyValueView.vue, DocumentView.vue) and
@@ -785,21 +763,15 @@ onUnmounted(() => {
 
       <div class="flex items-center gap-1.5 min-w-0">
         <div class="relative">
-          <Tooltip v-if="canInsert">
-            <TooltipTrigger as-child>
-              <Button
-                ref="addMessageTriggerEl"
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Add message"
-                data-testid="stream-add-message"
-                @click="composeOpen = !composeOpen"
-              >
-                <CodiconIcon name="add" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ isKafka ? 'Produce a message' : 'Send a message' }}</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            v-if="canInsert"
+            icon="add"
+            :label="isKafka ? 'Produce a message' : 'Send a message'"
+            aria-label="Add message"
+            ref="addMessageTriggerEl"
+            data-testid="stream-add-message"
+            @click="composeOpen = !composeOpen"
+          />
           <Popover :open="composeOpen && canInsert" @update:open="(v) => (composeOpen = v)">
             <PopoverAnchor :reference="(addMessageTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
             <PopoverContent align="end" class="w-96 p-0" data-testid="stream-add-message-panel">
@@ -811,40 +783,23 @@ onUnmounted(() => {
             </PopoverContent>
           </Popover>
         </div>
-        <Tooltip v-if="canDelete">
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :disabled="!hasSelectedRow"
-                aria-label="Delete message"
-                data-testid="stream-delete-message"
-                @click="onDeleteMessage"
-              >
-                <CodiconIcon name="trash" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{
-            hasSelectedRow ? 'Delete the selected message' : 'Select a message first'
-          }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': rt?.searchOpen }"
-              aria-label="Search this page"
-              data-testid="stream-search-toggle"
-              @click="onToggleSearch"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Search this page</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="canDelete"
+          icon="trash"
+          :label="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
+          aria-label="Delete message"
+          disabled-trigger
+          :disabled="!hasSelectedRow"
+          data-testid="stream-delete-message"
+          @click="onDeleteMessage"
+        />
+        <TooltipIconButton
+          icon="search"
+          label="Search this page"
+          :class="{ 'bg-field text-fg': rt?.searchOpen }"
+          data-testid="stream-search-toggle"
+          @click="onToggleSearch"
+        />
       </div>
       <span class="ml-auto" />
       <Tooltip :disabled="true">
@@ -860,20 +815,12 @@ onUnmounted(() => {
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
         <div class="relative">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Filter history"
-                data-testid="stream-filter-history-button"
-                @click="filterHistoryOpen = !filterHistoryOpen"
-              >
-                <CodiconIcon name="history" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Filter history</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="history"
+            label="Filter history"
+            data-testid="stream-filter-history-button"
+            @click="filterHistoryOpen = !filterHistoryOpen"
+          />
           <StreamFilterHistoryMenu
             v-if="filterHistoryOpen"
             :tab-id="tab.id"
@@ -982,21 +929,13 @@ onUnmounted(() => {
               <TooltipContent>{{ timestampError }}</TooltipContent>
             </Tooltip>
             <span class="relative shrink-0">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    ref="timestampCalendarTriggerEl"
-                    variant="toolbar"
-                    size="kira-icon"
-                    aria-label="Pick a date and time"
-                    data-testid="stream-filter-timestamp-calendar"
-                    @click="timestampCalendarOpen = !timestampCalendarOpen"
-                  >
-                    <CodiconIcon name="calendar" :size="13" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Pick a date and time</TooltipContent>
-              </Tooltip>
+              <TooltipIconButton
+                icon="calendar"
+                label="Pick a date and time"
+                ref="timestampCalendarTriggerEl"
+                data-testid="stream-filter-timestamp-calendar"
+                @click="timestampCalendarOpen = !timestampCalendarOpen"
+              />
               <Popover :open="timestampCalendarOpen" @update:open="(v) => (timestampCalendarOpen = v)">
                 <PopoverAnchor :reference="(timestampCalendarTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
                 <PopoverContent

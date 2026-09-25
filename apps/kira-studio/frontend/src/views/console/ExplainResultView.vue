@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -158,21 +158,14 @@ const rawLanguage = computed(() =>
       </div>
 
       <div class="flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': showRaw }"
-              aria-label="Show the raw EXPLAIN output"
-              data-testid="explain-raw-toggle"
-              @click="showRaw = !showRaw"
-            >
-              <CodiconIcon name="code" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Show the raw EXPLAIN output the server returned</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="code"
+          label="Show the raw EXPLAIN output the server returned"
+          aria-label="Show the raw EXPLAIN output"
+          :class="{ 'bg-field text-fg': showRaw }"
+          data-testid="explain-raw-toggle"
+          @click="showRaw = !showRaw"
+        />
         <span class="text-muted-foreground text-kira-xs">Raw</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">

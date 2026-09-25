@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import { PopoverContent } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatRelative } from '@workbench/util/format';
 import { useVariableSetStore } from './state/variables';
 
@@ -64,34 +63,19 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
             displayValue(entry)
           }}</span>
         </div>
-        <Tooltip v-if="notYetRevealed(entry)">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Reveal"
-              data-testid="variable-history-reveal"
-              @click="onReveal(entry.id)"
-            >
-              <CodiconIcon name="eye" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Reveal</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Restore"
-              data-testid="variable-history-restore"
-              @click="onRestore(entry)"
-            >
-              <CodiconIcon name="reply" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Restore</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="notYetRevealed(entry)"
+          icon="eye"
+          label="Reveal"
+          data-testid="variable-history-reveal"
+          @click="onReveal(entry.id)"
+        />
+        <TooltipIconButton
+          icon="reply"
+          label="Restore"
+          data-testid="variable-history-restore"
+          @click="onRestore(entry)"
+        />
       </div>
     </div>
   </PopoverContent>

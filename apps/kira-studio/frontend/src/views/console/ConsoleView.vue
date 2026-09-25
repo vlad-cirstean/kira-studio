@@ -10,16 +10,12 @@ import {
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -672,41 +668,23 @@ const statusLine = computed(() => {
              their own — see runStatement/runAll above): it stays disabled whenever there's nothing
              to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
              permanently-grey button sitting in the rail for no reason a user can see. -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="console-refresh"
-                :disabled="!needsReconnect"
-                aria-label="Refresh"
-                @click="onReconnectAndLoad"
-              >
-                <CodiconIcon name="refresh" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'text-error': running }"
-                data-testid="console-stop"
-                :disabled="!running"
-                aria-label="Stop"
-                @click="onStop"
-              >
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          disabled-trigger
+          data-testid="console-refresh"
+          :disabled="!needsReconnect"
+          @click="onReconnectAndLoad"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'text-error': running }"
+          data-testid="console-stop"
+          :disabled="!running"
+          @click="onStop"
+        />
       </div>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -785,25 +763,16 @@ const statusLine = computed(() => {
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
              this is what makes a run replace the last result set instead of stacking a new one,
              so the pressed/"active" look tracks *replace* mode, the inverse of the stored flag. -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
-              aria-label="New result set toggle"
-              data-testid="console-new-result-toggle"
-              @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
-            >
-              <CodiconIcon name="layers" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{
-            tab.state.newResultSet
+        <TooltipIconButton
+          icon="layers"
+          :label="tab.state.newResultSet
               ? 'Running adds a new result set — click to replace instead'
-              : 'Running replaces the current result sets — click to add a new one instead'
-          }}</TooltipContent>
-        </Tooltip>
+              : 'Running replaces the current result sets — click to add a new one instead'"
+          aria-label="New result set toggle"
+          :class="{ 'bg-field text-fg is-active': !tab.state.newResultSet }"
+          data-testid="console-new-result-toggle"
+          @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
+        />
         <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
         <div class="relative">
           <Tooltip>
@@ -829,21 +798,14 @@ const statusLine = computed(() => {
         <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
         <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
              is gated off the same way expand/collapse-all above is gated on document-ness. -->
-        <Tooltip v-if="!activeResultIsPlan">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
-              aria-label="Find in the active result set"
-              data-testid="console-search"
-              @click="onToggleSearch"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Find in the active result set</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="!activeResultIsPlan"
+          icon="search"
+          label="Find in the active result set"
+          :class="{ 'bg-field text-fg': !!rt?.searchOpen }"
+          data-testid="console-search"
+          @click="onToggleSearch"
+        />
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
@@ -973,34 +935,18 @@ const statusLine = computed(() => {
                a document row's only other way to reveal its full body (the cell editor dock) is
                gone as a redundant second copy of this same DocumentTree (P42 D11). -->
           <template v-if="activeResultIsDocument">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Expand all"
-                  data-testid="console-expand-all"
-                  @click="onExpandAllResults"
-                >
-                  <CodiconIcon name="expand-all" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Expand all</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Collapse all"
-                  data-testid="console-collapse-all"
-                  @click="onCollapseAllResults"
-                >
-                  <CodiconIcon name="collapse-all" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Collapse all</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              icon="expand-all"
+              label="Expand all"
+              data-testid="console-expand-all"
+              @click="onExpandAllResults"
+            />
+            <TooltipIconButton
+              icon="collapse-all"
+              label="Collapse all"
+              data-testid="console-collapse-all"
+              @click="onCollapseAllResults"
+            />
           </template>
         </div>
         <SearchToolbar

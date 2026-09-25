@@ -3,18 +3,14 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -670,38 +666,21 @@ onUnmounted(() => {
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar>
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="document-refresh"
-              aria-label="Refresh"
-              @click="onRefresh"
-            >
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'text-error': running }"
-                data-testid="document-stop"
-                :disabled="!running"
-                aria-label="Stop"
-                @click="onStop"
-              >
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          data-testid="document-refresh"
+          @click="onRefresh"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'text-error': running }"
+          data-testid="document-stop"
+          :disabled="!running"
+          @click="onStop"
+        />
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- Real-interaction fix (reported bug — the pager sits on the right instead of where it
@@ -802,71 +781,39 @@ onUnmounted(() => {
             </PopoverContent>
           </Popover>
         </div>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Expand all"
-              data-testid="document-expand-all"
-              @click="onExpandAll"
-            >
-              <CodiconIcon name="expand-all" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Expand all</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Collapse all"
-              data-testid="document-collapse-all"
-              @click="onCollapseAll"
-            >
-              <CodiconIcon name="collapse-all" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Collapse all</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="expand-all"
+          label="Expand all"
+          data-testid="document-expand-all"
+          @click="onExpandAll"
+        />
+        <TooltipIconButton
+          icon="collapse-all"
+          label="Collapse all"
+          data-testid="document-collapse-all"
+          @click="onCollapseAll"
+        />
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0"></div>
       <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
            affordance in the toolbar (deletion lives on the row's own context menu). -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :disabled="!canInsert"
-                aria-label="Add a document"
-                data-testid="document-add"
-                @click="onAddDocument"
-              >
-                <CodiconIcon name="add" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>{{ insertTitle }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': rt?.searchOpen }"
-              aria-label="Search this page"
-              data-testid="document-toolbar-search"
-              @click="onToggleSearch"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Search this page</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="add"
+          :label="insertTitle"
+          aria-label="Add a document"
+          disabled-trigger
+          :disabled="!canInsert"
+          data-testid="document-add"
+          @click="onAddDocument"
+        />
+        <TooltipIconButton
+          icon="search"
+          label="Search this page"
+          :class="{ 'bg-field text-fg': rt?.searchOpen }"
+          data-testid="document-toolbar-search"
+          @click="onToggleSearch"
+        />
       </div>
       <span class="ml-auto" />
       <Tooltip :disabled="true">
@@ -884,21 +831,13 @@ onUnmounted(() => {
          used to have neither. -->
     <ViewToolbar border="none">
       <div class="relative">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              ref="filterHistoryTriggerEl"
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Saved & recent filters"
-              data-testid="document-filter-history-button"
-              @click="filterHistoryOpen = !filterHistoryOpen"
-            >
-              <CodiconIcon name="history" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Saved & recent filters</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="history"
+          label="Saved & recent filters"
+          ref="filterHistoryTriggerEl"
+          data-testid="document-filter-history-button"
+          @click="filterHistoryOpen = !filterHistoryOpen"
+        />
         <Popover :open="filterHistoryOpen" @update:open="(v) => (filterHistoryOpen = v)">
           <PopoverAnchor :reference="(filterHistoryTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
           <FilterHistoryMenu
@@ -1085,41 +1024,25 @@ onUnmounted(() => {
                 <span class="flex-1 min-w-0"></span>
                 <div class="flex shrink-0 items-center gap-1">
                   <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <TooltipDisabledTrigger>
-                        <Button
-                          variant="toolbar"
-                          size="kira-icon"
-                          :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
-                          :disabled="!editGate.editable"
-                          aria-label="Edit"
-                          data-testid="document-edit"
-                          @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
-                        >
-                          <CodiconIcon name="edit" :size="13" />
-                        </Button>
-                      </TooltipDisabledTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ editGate.editable ? 'Edit' : editGate.label }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <TooltipDisabledTrigger>
-                        <Button
-                          variant="toolbar"
-                          size="kira-icon"
-                          :disabled="!canDelete"
-                          aria-label="Delete"
-                          data-testid="document-delete"
-                          @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
-                        >
-                          <CodiconIcon name="trash" :size="13" />
-                        </Button>
-                      </TooltipDisabledTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ deleteTitle }}</TooltipContent>
-                  </Tooltip>
+                  <TooltipIconButton
+                    icon="edit"
+                    :label="editGate.editable ? 'Edit' : editGate.label"
+                    aria-label="Edit"
+                    disabled-trigger
+                    :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
+                    :disabled="!editGate.editable"
+                    data-testid="document-edit"
+                    @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
+                  />
+                  <TooltipIconButton
+                    icon="trash"
+                    :label="deleteTitle"
+                    aria-label="Delete"
+                    disabled-trigger
+                    :disabled="!canDelete"
+                    data-testid="document-delete"
+                    @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
+                  />
                 </div>
               </template>
               <template #body>

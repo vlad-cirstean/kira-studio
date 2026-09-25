@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { unrefElement, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
@@ -123,43 +122,30 @@ onUnmounted(() => {
       </template>
       <template v-else>0 of 0</template>
     </span>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" aria-label="Previous match" data-testid="stream-search-prev" @click="prev">
-          <CodiconIcon name="chevron-up" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Previous match</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" aria-label="Next match" data-testid="stream-search-next" @click="next">
-          <CodiconIcon name="chevron-down" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Next match</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="chevron-up"
+      label="Previous match"
+      data-testid="stream-search-prev"
+      @click="prev"
+    />
+    <TooltipIconButton
+      icon="chevron-down"
+      label="Next match"
+      data-testid="stream-search-next"
+      @click="next"
+    />
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <!-- P31 D17: same filter *mode* as views/shared/page/SearchToolbar.vue (P24 D1/D9) — hides every
          non-matching row. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': filtering }"
-            aria-label="Show only matching rows"
-            data-testid="stream-search-filter-rows"
-            @click="toggleFilter"
-          >
-            <CodiconIcon name="filter" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{
-          filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
-        }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="filter"
+        :label="filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'"
+        aria-label="Show only matching rows"
+        :class="{ 'bg-field text-fg': filtering }"
+        data-testid="stream-search-filter-rows"
+        @click="toggleFilter"
+      />
     </div>
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
     <span class="text-kira-xs text-subtle" data-testid="stream-search-scope">
@@ -168,21 +154,13 @@ onUnmounted(() => {
       </template>
       <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
     </span>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          class="ml-auto"
-          aria-label="Close"
-          data-testid="stream-search-close"
-          @click="close"
-        >
-          <CodiconIcon name="close" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Close</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="close"
+      label="Close"
+      class="ml-auto"
+      data-testid="stream-search-close"
+      @click="close"
+    />
   </ViewToolbar>
 </template>
 

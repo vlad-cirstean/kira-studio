@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
@@ -96,19 +96,11 @@ async function saveCurrent(): Promise<void> {
       </Tooltip>
     </template>
     <template #entry-actions="{ entry }">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Rename"
-            @click.stop="rename(entry)"
-          >
-            <CodiconIcon name="edit" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Rename</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="edit"
+        label="Rename"
+        @click.stop="rename(entry)"
+      />
     </template>
     <template #footer>
       <Separator class="my-1" />

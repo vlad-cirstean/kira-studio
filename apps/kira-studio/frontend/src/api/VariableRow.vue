@@ -1,17 +1,13 @@
 <script setup lang="ts">
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
 import { ref, useTemplateRef, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
@@ -192,21 +188,15 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
         @update:model-value="onValueInput(String($event))"
         @blur="emit('blur')"
       />
-      <Tooltip v-if="row.isSecret">
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': visible }"
-            aria-label="Reveal"
-            data-testid="variable-reveal"
-            @click="onEyeClick"
-          >
-            <CodiconIcon name="eye" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ notYetRevealed() ? 'Reveal' : 'Toggle visibility' }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        v-if="row.isSecret"
+        icon="eye"
+        :label="notYetRevealed() ? 'Reveal' : 'Toggle visibility'"
+        aria-label="Reveal"
+        :class="{ 'bg-field text-fg': visible }"
+        data-testid="variable-reveal"
+        @click="onEyeClick"
+      />
     </div>
     <div class="flex min-w-0 items-center gap-1 description-cell">
       <Input
@@ -258,22 +248,13 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
       </div>
       <VariableHistoryMenu v-if="variableSetStore.variableId === row.id" />
     </Popover>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :disabled="props.trailing"
-            aria-label="Remove"
-            data-testid="variable-remove"
-            @click="emit('remove')"
-          >
-            <CodiconIcon name="trash" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>Remove</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="trash"
+      label="Remove"
+      disabled-trigger
+      :disabled="props.trailing"
+      data-testid="variable-remove"
+      @click="emit('remove')"
+    />
   </div>
 </template>

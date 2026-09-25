@@ -2,6 +2,7 @@
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
@@ -494,21 +495,14 @@ function onBulkClose(): void {
       <span class="ml-auto" />
       <RunState :state="runState" />
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip v-if="ownerExists">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': bulkMode }"
-              aria-label="Edit as .env text"
-              data-testid="variables-bulk-toggle"
-              @click="bulkMode = !bulkMode"
-            >
-              <CodiconIcon name="code" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Edit as .env text</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          v-if="ownerExists"
+          icon="code"
+          label="Edit as .env text"
+          :class="{ 'bg-field text-fg': bulkMode }"
+          data-testid="variables-bulk-toggle"
+          @click="bulkMode = !bulkMode"
+        />
       </div>
     </ViewToolbar>
 
