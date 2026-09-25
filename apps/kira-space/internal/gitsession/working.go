@@ -3,7 +3,6 @@ package gitsession
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
@@ -34,46 +33,9 @@ func (e *RepoEntry) WorkingDetail(ctx context.Context) ([]porcelain.FileChange, 
 		base = porcelain.ParseEmptyTreeHash(hashRaw)
 	}
 
-	var (
-		numstat    []porcelain.NumstatEntry
-		nameStatus []porcelain.NameStatusEntry
-		errs       [2]error
-	)
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.WorkingNumstatArgs(base))
-		if rerr != nil {
-			errs[0] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[0] = rerr
-			return
-		}
-		numstat, errs[0] = porcelain.ParseNumstatRecords(recs)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.WorkingNameStatusArgs(base))
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		nameStatus, errs[1] = porcelain.ParseNameStatusRecords(recs)
-	}()
-	wg.Wait()
-	for _, spawnErr := range errs {
-		if spawnErr != nil {
-			return nil, spawnErr
-		}
+	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.WorkingNumstatArgs(base), porcelain.WorkingNameStatusArgs(base))
+	if err != nil {
+		return nil, err
 	}
 
 	changes := porcelain.CombineFileChanges(numstat, nameStatus)

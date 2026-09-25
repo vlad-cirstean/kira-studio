@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
@@ -518,44 +517,9 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 		return RangeFilesResult{}, ErrUnrelatedHistories
 	}
 
-	var numstat []porcelain.NumstatEntry
-	var nameStatus []porcelain.NameStatusEntry
-	var spawnErrs [2]error
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.NumstatArgs(&mb, tip))
-		if rerr != nil {
-			spawnErrs[0] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			spawnErrs[0] = rerr
-			return
-		}
-		numstat, spawnErrs[0] = porcelain.ParseNumstatRecords(recs)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.NameStatusArgs(&mb, tip))
-		if rerr != nil {
-			spawnErrs[1] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			spawnErrs[1] = rerr
-			return
-		}
-		nameStatus, spawnErrs[1] = porcelain.ParseNameStatusRecords(recs)
-	}()
-	wg.Wait()
-	for _, spawnErr := range spawnErrs {
-		if spawnErr != nil {
-			return RangeFilesResult{}, spawnErr
-		}
+	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.NumstatArgs(&mb, tip), porcelain.NameStatusArgs(&mb, tip))
+	if err != nil {
+		return RangeFilesResult{}, err
 	}
 	changes := porcelain.CombineFileChanges(numstat, nameStatus)
 

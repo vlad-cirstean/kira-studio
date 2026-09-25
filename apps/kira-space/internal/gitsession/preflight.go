@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
@@ -23,11 +25,7 @@ func (e *RepoEntry) rewrittenPaths(ctx context.Context, target string) ([]string
 	if err := validOpArg("target", target); err != nil {
 		return nil, err
 	}
-	raw, err := e.runOne(ctx, gitops.RewrittenPathsArgs(target))
-	if err != nil {
-		return nil, err
-	}
-	recs, err := allRecords(raw)
+	recs, err := e.runRecords(ctx, gitops.RewrittenPathsArgs(target))
 	if err != nil {
 		return nil, err
 	}
@@ -582,71 +580,49 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 
 	numstatArgs, _ := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
 
-	var statusResult porcelain.StatusResult
-	var inProgress *gitpreflight.InProgressOperation
-	var stashPaths []string
-	var stashUntrackedPaths []string
-	var errs [3]error
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		statusResult, inProgress, errs[0] = e.statusAndInProgress(ctx)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, numstatArgs)
+	var (
+		statusResult   porcelain.StatusResult
+		inProgress     *gitpreflight.InProgressOperation
+		stashPaths     []string
+		untrackedPaths []string
+		g              errgroup.Group
+	)
+	g.Go(func() error {
+		var serr error
+		statusResult, inProgress, serr = e.statusAndInProgress(ctx)
+		return serr
+	})
+	g.Go(func() error {
+		recs, rerr := e.runRecords(ctx, numstatArgs)
 		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[1] = rerr
-			return
+			return rerr
 		}
 		numstat, perr := porcelain.ParseNumstatRecords(recs)
 		if perr != nil {
-			errs[1] = perr
-			return
+			return perr
 		}
 		stashPaths = make([]string, len(numstat))
 		for i, n := range numstat {
 			stashPaths[i] = n.Path
 		}
-	}()
+		return nil
+	})
 	if entry.UntrackedSha != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			raw, rerr := e.runOne(ctx, porcelain.StashUntrackedLsTreeArgs(*entry.UntrackedSha))
-			if rerr != nil {
-				errs[2] = rerr
-				return
-			}
-			recs, rerr := allRecords(raw)
-			if rerr != nil {
-				errs[2] = rerr
-				return
-			}
-			stashUntrackedPaths = make([]string, len(recs))
-			for i, r := range recs {
-				stashUntrackedPaths[i] = string(r)
-			}
-		}()
+		g.Go(func() error {
+			var uerr error
+			untrackedPaths, uerr = e.stashUntrackedPaths(ctx, *entry.UntrackedSha)
+			return uerr
+		})
 	}
-	wg.Wait()
-	for _, spawnErr := range errs {
-		if spawnErr != nil {
-			return gitpreflight.StashPopPreflight{}, spawnErr
-		}
+	if err := g.Wait(); err != nil {
+		return gitpreflight.StashPopPreflight{}, err
 	}
 
 	// D4: a real filesystem stat per untracked path — never a git spawn (probe 3: an ignored file,
 	// or one status elides, still collides; default `status` output omits ignored paths by design).
 	existingUntrackedPaths := []string{}
 	root := repoWorkingDir(e.Summary)
-	for _, p := range stashUntrackedPaths {
+	for _, p := range untrackedPaths {
 		if _, statErr := os.Stat(filepath.Join(root, p)); statErr == nil {
 			existingUntrackedPaths = append(existingUntrackedPaths, p)
 		}
@@ -657,13 +633,13 @@ func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha
 	if stashPaths == nil {
 		stashPaths = []string{}
 	}
-	if stashUntrackedPaths == nil {
-		stashUntrackedPaths = []string{}
+	if untrackedPaths == nil {
+		untrackedPaths = []string{}
 	}
 
 	return gitpreflight.ClassifyStashPop(gitpreflight.ClassifyStashPopInput{
 		Stash: entry, TargetSha: target, Prediction: prediction,
-		StashPaths: stashPaths, StashUntrackedPaths: stashUntrackedPaths,
+		StashPaths: stashPaths, StashUntrackedPaths: untrackedPaths,
 		Dirty: gitpreflight.DirtyPaths(statusResult), ExistingUntrackedPaths: existingUntrackedPaths,
 		InProgress: inProgress,
 	}), nil

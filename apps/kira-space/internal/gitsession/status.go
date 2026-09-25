@@ -44,12 +44,7 @@ func (e *RepoEntry) statusAndInProgress(ctx context.Context) (porcelain.StatusRe
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		raw, err := e.runOne(ctx, porcelain.StatusArgs())
-		if err != nil {
-			statusErr = err
-			return
-		}
-		recs, err := allRecords(raw)
+		recs, err := e.runRecords(ctx, porcelain.StatusArgs())
 		if err != nil {
 			statusErr = err
 			return

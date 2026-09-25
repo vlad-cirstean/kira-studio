@@ -3,7 +3,8 @@ package gitsession
 import (
 	"context"
 	"errors"
-	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
@@ -194,65 +195,26 @@ func (e *RepoEntry) StashShow(ctx context.Context, sha, scope string) (StashShow
 
 	numstatArgs, nameStatusArgs := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
 
-	var numstat []porcelain.NumstatEntry
-	var nameStatus []porcelain.NameStatusEntry
-	var untrackedPaths []string
-	var errs [3]error
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, numstatArgs)
-		if rerr != nil {
-			errs[0] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[0] = rerr
-			return
-		}
-		numstat, errs[0] = porcelain.ParseNumstatRecords(recs)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, nameStatusArgs)
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		nameStatus, errs[1] = porcelain.ParseNameStatusRecords(recs)
-	}()
+	var (
+		numstat        []porcelain.NumstatEntry
+		nameStatus     []porcelain.NameStatusEntry
+		untrackedPaths []string
+		g              errgroup.Group
+	)
+	g.Go(func() error {
+		var ferr error
+		numstat, nameStatus, ferr = e.fileChanges(ctx, numstatArgs, nameStatusArgs)
+		return ferr
+	})
 	if entry.UntrackedSha != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			raw, rerr := e.runOne(ctx, porcelain.StashUntrackedLsTreeArgs(*entry.UntrackedSha))
-			if rerr != nil {
-				errs[2] = rerr
-				return
-			}
-			recs, rerr := allRecords(raw)
-			if rerr != nil {
-				errs[2] = rerr
-				return
-			}
-			untrackedPaths = make([]string, len(recs))
-			for i, r := range recs {
-				untrackedPaths[i] = string(r)
-			}
-		}()
+		g.Go(func() error {
+			var uerr error
+			untrackedPaths, uerr = e.stashUntrackedPaths(ctx, *entry.UntrackedSha)
+			return uerr
+		})
 	}
-	wg.Wait()
-	for _, spawnErr := range errs {
-		if spawnErr != nil {
-			return StashShowResult{}, spawnErr
-		}
+	if err := g.Wait(); err != nil {
+		return StashShowResult{}, err
 	}
 
 	changes := porcelain.CombineFileChanges(numstat, nameStatus)

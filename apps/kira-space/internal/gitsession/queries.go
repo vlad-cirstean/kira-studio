@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
@@ -120,6 +121,65 @@ func allRecords(raw []byte) ([][]byte, error) {
 	return recs, nil
 }
 
+// runRecords runs one read-only spawn and splits its stdout into records — runOne+allRecords's own
+// shared shape, repeated across every diff-tree/numstat/name-status/ls-tree spawn in this package
+// (P113 G8).
+func (e *RepoEntry) runRecords(ctx context.Context, args []string) ([][]byte, error) {
+	raw, err := e.runOne(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	return allRecords(raw)
+}
+
+// fileChanges runs a numstat and a name-status spawn concurrently and parses each — the two-way
+// half of CommitDetail/RangeFiles/StashShow/WorkingDetail's own shared fan-out (P113 G8). Neither
+// spawn's error takes deterministic precedence over the other's (no gitsession test pins an order);
+// errgroup.Wait returns whichever of the two errors is observed first.
+func (e *RepoEntry) fileChanges(ctx context.Context, numstatArgs, nameStatusArgs []string) ([]porcelain.NumstatEntry, []porcelain.NameStatusEntry, error) {
+	var (
+		numstat    []porcelain.NumstatEntry
+		nameStatus []porcelain.NameStatusEntry
+		g          errgroup.Group
+	)
+	g.Go(func() error {
+		recs, err := e.runRecords(ctx, numstatArgs)
+		if err != nil {
+			return err
+		}
+		var perr error
+		numstat, perr = porcelain.ParseNumstatRecords(recs)
+		return perr
+	})
+	g.Go(func() error {
+		recs, err := e.runRecords(ctx, nameStatusArgs)
+		if err != nil {
+			return err
+		}
+		var perr error
+		nameStatus, perr = porcelain.ParseNameStatusRecords(recs)
+		return perr
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, err
+	}
+	return numstat, nameStatus, nil
+}
+
+// stashUntrackedPaths runs a stash's own untracked ls-tree and turns each record into a path string
+// — StashShow's and stash-pop preflight's own shared third leg of the stash fan-out (P113 G8).
+func (e *RepoEntry) stashUntrackedPaths(ctx context.Context, untrackedSha string) ([]string, error) {
+	recs, err := e.runRecords(ctx, porcelain.StashUntrackedLsTreeArgs(untrackedSha))
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, len(recs))
+	for i, r := range recs {
+		paths[i] = string(r)
+	}
+	return paths, nil
+}
+
 // resolveFrom validates parentIndex against parents (a root commit has none, and is valid only at
 // parentIndex 0 — its own diff is against the empty tree) and returns the argv-ready `from` a
 // diff-tree spawn needs: nil selects --root.
@@ -174,57 +234,27 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		body       string
 		numstat    []porcelain.NumstatEntry
 		nameStatus []porcelain.NameStatusEntry
-		errs       [3]error
+		g          errgroup.Group
 	)
-	var wg sync.WaitGroup
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+	g.Go(func() error {
 		raw, rerr := e.runOne(ctx, porcelain.ShowBodyAndSignatureArgs(sha))
 		if rerr != nil {
-			errs[0] = rerr
-			return
+			return rerr
 		}
 		rec, rerr := oneRecord(raw)
 		if rerr != nil {
-			errs[0] = rerr
-			return
+			return rerr
 		}
-		sig, trailers, body, errs[0] = porcelain.ParseShowBodyAndSignature(rec)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.NumstatArgs(from, sha))
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[1] = rerr
-			return
-		}
-		numstat, errs[1] = porcelain.ParseNumstatRecords(recs)
-	}()
-	go func() {
-		defer wg.Done()
-		raw, rerr := e.runOne(ctx, porcelain.NameStatusArgs(from, sha))
-		if rerr != nil {
-			errs[2] = rerr
-			return
-		}
-		recs, rerr := allRecords(raw)
-		if rerr != nil {
-			errs[2] = rerr
-			return
-		}
-		nameStatus, errs[2] = porcelain.ParseNameStatusRecords(recs)
-	}()
-	wg.Wait()
-	for _, spawnErr := range errs {
-		if spawnErr != nil {
-			return porcelain.CommitDetail{}, spawnErr
-		}
+		sig, trailers, body, rerr = porcelain.ParseShowBodyAndSignature(rec)
+		return rerr
+	})
+	g.Go(func() error {
+		var ferr error
+		numstat, nameStatus, ferr = e.fileChanges(ctx, porcelain.NumstatArgs(from, sha), porcelain.NameStatusArgs(from, sha))
+		return ferr
+	})
+	if err := g.Wait(); err != nil {
+		return porcelain.CommitDetail{}, err
 	}
 
 	detail := porcelain.CommitDetail{
