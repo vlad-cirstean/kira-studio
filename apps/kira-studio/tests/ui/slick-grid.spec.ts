@@ -1828,7 +1828,7 @@ test('P22 Pass B follow-up — a range selection under an active filter only cop
   // The pending-row count itself confirms it: exactly the 4 visible rows, not the 86 hidden ones
   // in between (which don't render while the filter is active, so their own class can't be
   // asserted via a DOM lookup for an absent row) and not the pre-fix range's full 90-row span.
-  await expect(page.locator('.p-chip.warn')).toHaveText('4 rows pending');
+  await expect(page.locator('[data-testid="pending-count-chip"]')).toHaveText('4 rows pending');
 });
 
 // P16 D3/D4: two new-coverage cases from §4 of the P16 plan. order_items (F2's own real-capture

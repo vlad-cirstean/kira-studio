@@ -288,7 +288,7 @@ function onCloseSearch(): void {
            group. -->
       <div class="flex items-center gap-1.5 min-w-0">
         <template v-if="tabHasPending">
-          <Badge variant="warn"
+          <Badge variant="warn" data-testid="pending-count-chip"
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">

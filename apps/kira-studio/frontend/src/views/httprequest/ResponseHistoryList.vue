@@ -212,7 +212,7 @@ async function onClear(): Promise<void> {
             <Badge variant="chip" :class="methodTextClass(httpMethodToken(entry.method))">{{ entry.method }}</Badge>
             <Tooltip>
               <TooltipTrigger as-child>
-                <Badge :variant="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</Badge>
+                <Badge :variant="statusClass(entry.status)" data-testid="http-history-status-chip">{{ entry.status }} {{ entry.statusText }}</Badge>
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>

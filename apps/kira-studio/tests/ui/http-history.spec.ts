@@ -111,7 +111,7 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
 
   // P22b D1: a secondary status surface (the history list) now carries the code's meaning too —
   // not as a bare chip, since a dense list row has no room for a full sentence on its own line.
-  await rows.nth(1).locator('.p-chip').last().hover();
+  await rows.nth(1).locator('[data-testid="http-history-status-chip"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'the server has no resource at this URL',
   );
