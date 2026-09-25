@@ -45,7 +45,6 @@ import {
   alignmentFor,
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
-  GUTTER_WIDTH,
   headerAwareMinWidth,
   initialWidths,
   pageColumnIndexFor,
@@ -55,6 +54,13 @@ import {
 } from '../shared/page/columns';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
+import {
+  computeCellFillHash,
+  gutterColumn,
+  renderedPageRowBand,
+  subscribeRangeSelecting,
+  subscribeRowHeight,
+} from '../shared/slick/gridHostShared';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
@@ -468,37 +474,21 @@ function buildColumns(
   storedWidths: Record<string, number>,
   meta: ObjectMeta | null,
 ): KiraColumn[] {
+  // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
+  // canCellBeActive(row, 0), which `handleClick`'s row branch checks
+  // (slick.hybridselectionmodel.ts:497). Tab/Left-arrow landing on the gutter is the one side
+  // effect (D8 vetoes editing there; a gutter active cell becomes a row selection).
+  // P22 Pass B, C1/§5 D10 — F3: cellAttrs/headerCellAttrs are per-column static attribute bags,
+  // applied once per cell/header BUILD (alongside SlickGrid's own role/tabIndex/aria-describedby),
+  // never per retained row — the whole `data-testid`/`data-*` surface this app's tests/ui/ suite
+  // needs is free at this granularity; only the row's own `data-row` correction (below,
+  // tagRenderedRows) needs an actual per-render pass, and rows are ~200, not ~2 400 cells.
   const cols: KiraColumn[] = [
-    {
-      id: GUTTER_FIELD,
-      field: GUTTER_FIELD,
-      name: '',
-      width: GUTTER_WIDTH,
-      minWidth: GUTTER_WIDTH,
-      maxWidth: GUTTER_WIDTH,
-      resizable: false,
-      sortable: false,
-      // D2 — changed from Pass A's false/false: F1's row-select-on-gutter (§5 D4, C4) requires
-      // canCellBeActive(row, 0), which `handleClick`'s row branch checks
-      // (slick.hybridselectionmodel.ts:497). Tab/Left-arrow landing on the gutter is the one
-      // side effect (D8 vetoes editing there; a gutter active cell becomes a row selection).
-      focusable: true,
-      selectable: true,
-      cssClass: 'kira-gutter',
-      formatter: gutterFormatter,
-      // P22 Pass B, C1/§5 D10 — F3: cellAttrs/headerCellAttrs are per-column static attribute
-      // bags, applied once per cell/header BUILD (alongside SlickGrid's own role/tabIndex/
-      // aria-describedby), never per retained row — the whole `data-testid`/`data-*` surface
-      // this app's tests/ui/ suite needs is free at this granularity; only the row's own
-      // `data-row` correction (below, tagRenderedRows) needs an actual per-render pass, and rows
-      // are ~200, not ~2 400 cells.
-      cellAttrs: { 'data-testid': 'grid-gutter-cell' },
-      headerCellAttrs: {
-        'data-testid': 'grid-select-all',
-        role: 'button',
-        'aria-label': 'Select all cells',
-      },
-    },
+    gutterColumn(GUTTER_FIELD, gutterFormatter, 'grid-gutter-cell', {
+      'data-testid': 'grid-select-all',
+      role: 'button',
+      'aria-label': 'Select all cells',
+    }),
   ];
   if (!page) return cols;
   const measured = initialWidths(page);
@@ -883,39 +873,6 @@ function refreshSelEdges(selOverride?: Selection | null): void {
   });
 }
 
-// D4 (fix) — the drag-in-progress twin of the fill SlickGrid's own selection-model integration
-// draws at commit (`this.setCellCssStyles(this._options.selectedCellCssClass, hash)`,
-// `slick.grid.ts`'s own `selectedCellCssClass` handling — same layer key as the CSS class value
-// itself, `'kira-cell-selected'`, reused here so a commit's own real write and this preview's own
-// writes land on the identical `setCellCssStyles` layer and one replaces the other cleanly, never
-// both existing at once). Bounded by the rendered range the same way the edge layer already is.
-function computeCellFillHash(sel: Selection | null): EdgeHash {
-  const hash: EdgeHash = {};
-  if (!grid || !dataSource || !sel) return hash;
-  const { start, end } = grid.lastRenderedRowBounds;
-  if (end < start) return hash;
-  const cls = 'kira-cell-selected';
-  if (sel.kind === 'cell' || sel.kind === 'range') {
-    const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
-    const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
-    const r0 = Math.min(anchorRow, sel.row);
-    const r1 = Math.max(anchorRow, sel.row);
-    const c0 = Math.min(anchorCol, sel.col);
-    const c1 = Math.max(anchorCol, sel.col);
-    for (let pos = start; pos <= end; pos++) {
-      const pageRow = dataSource.getItem(pos).row;
-      if (pageRow < r0 || pageRow > r1) continue;
-      const row: Record<string, string> = {};
-      for (let c = c0; c <= c1; c++) {
-        const field = fieldAtDisplayCol(c);
-        if (field) row[field] = cls;
-      }
-      hash[pos] = row;
-    }
-  }
-  return hash;
-}
-
 // D4 (fix) — live visual feedback for a cell-range drag. SlickHybridSelectionModel's own
 // `handleCellRangeSelected` intentionally no-ops for a CELL-mode `onCellRangeSelecting` call
 // (only `onCellRangeSelected`, at drag end, calls `setSelectedRanges` — §4.1 item 3's own
@@ -937,11 +894,15 @@ function computeCellFillHash(sel: Selection | null): EdgeHash {
 // the real commit. The committed `onSelectedRangesChanged` handler (unchanged) supersedes every
 // layer this writes the moment the drag actually ends.
 function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
-  if (!selectionModel || selectionModel.currentSelectionModeIsRow()) return;
+  if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
   refreshSelEdges(pageSel);
-  grid?.setCellCssStyles('kira-cell-selected', computeCellFillHash(pageSel));
+  const ds = dataSource;
+  grid.setCellCssStyles(
+    'kira-cell-selected',
+    computeCellFillHash(pageSel, grid.lastRenderedRowBounds, (pos) => ds.getItem(pos).row, fieldAtDisplayCol),
+  );
 }
 
 /** C5/§5 D5 — bounded by what the user staged (`pendingFor(tabId).edits`, a handful of rows in
@@ -1012,18 +973,13 @@ let lastCssLayerBand = { start: 0, end: -1 };
 
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
-  const { start, end } = grid.lastRenderedRowBounds;
-  const length = dataSource.getLength();
-  if (length <= 0 || end < start) return;
-  const first = dataSource.getItem(Math.max(0, Math.min(start, length - 1)));
-  const last = dataSource.getItem(Math.max(0, Math.min(end, length - 1)));
-  const lo = Math.min(first.row, last.row);
-  const hi = Math.max(first.row, last.row);
-  setVisibleWindow(props.tabId, lo, hi + 1);
-  setVisibleRows(props.tabId, lo, hi + 1);
+  const band = renderedPageRowBand(grid, dataSource);
+  if (!band) return;
+  setVisibleWindow(props.tabId, band.lo, band.hi + 1);
+  setVisibleRows(props.tabId, band.lo, band.hi + 1);
 
-  if (start !== lastCssLayerBand.start || end !== lastCssLayerBand.end) {
-    lastCssLayerBand = { start, end };
+  if (band.start !== lastCssLayerBand.start || band.end !== lastCssLayerBand.end) {
+    lastCssLayerBand = { start: band.start, end: band.end };
     refreshSelEdges();
     refreshStagedLayer();
   }
@@ -2122,10 +2078,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onBeforeEditCell, onBeforeEditCell);
   eventHandler.subscribe(grid.onClick, onGridClick);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
-  const cellRangeSelector = selectionModel.getCellRangeSelector();
-  if (cellRangeSelector) {
-    eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
-  }
+  subscribeRangeSelecting(eventHandler, selectionModel, onCellRangeSelecting);
 
   // P104 §6.4 — the constructor call above already ran SlickGrid's own synchronous header build
   // (see the postscript comment just below), so both `.slick-header-columns` panes exist in `el`
@@ -2400,13 +2353,7 @@ watch(
   },
 );
 
-watch(rowHeight, (h) => {
-  if (!grid) return;
-  rootRef.value?.style.setProperty('--kira-header-row-height', `${h}px`);
-  grid.setOptions({ rowHeight: h });
-  grid.updateRowCount();
-  grid.render();
-});
+subscribeRowHeight(rowHeight, () => grid, rootRef);
 
 // §5 D8 — keeps the grid's own `editable` option live across a writability change that happens
 // after mount (a caps probe resolving, a connection flipping read-only). No invalidate/render

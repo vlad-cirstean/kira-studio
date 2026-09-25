@@ -26,7 +26,6 @@ import {
   alignmentFor,
   columnHeaderTooltip,
   DEFAULT_COLUMN_WIDTH,
-  GUTTER_WIDTH,
   headerAwareMinWidth,
   initialWidthsByIndex,
   resetMeasureCtx,
@@ -41,6 +40,13 @@ import {
   type GridDataSourceState,
   type RowHandle,
 } from '../shared/slick/dataSource';
+import {
+  computeCellFillHash,
+  gutterColumn,
+  renderedPageRowBand,
+  subscribeRangeSelecting,
+  subscribeRowHeight,
+} from '../shared/slick/gridHostShared';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import {
   rowsForColumnOps as sharedRowsForColumnOps,
@@ -175,21 +181,7 @@ function cellFormatter(
 // finding, verbatim).
 function buildColumns(page: TabularPage): KiraColumn[] {
   const cols: KiraColumn[] = [
-    {
-      id: GUTTER_FIELD,
-      field: GUTTER_FIELD,
-      name: '',
-      width: GUTTER_WIDTH,
-      minWidth: GUTTER_WIDTH,
-      maxWidth: GUTTER_WIDTH,
-      resizable: false,
-      sortable: false,
-      focusable: true,
-      selectable: true,
-      cssClass: 'kira-gutter',
-      formatter: gutterFormatter,
-      cellAttrs: { 'data-testid': 'console-result-gutter-cell' },
-    },
+    gutterColumn(GUTTER_FIELD, gutterFormatter, 'console-result-gutter-cell'),
   ];
   // Finding 6 (round 2) — indexed, not name-keyed (`initialWidths` would silently collide on a
   // duplicate column name, e.g. `SELECT 1 AS x, 2 AS x`) — the one remaining name-keyed
@@ -314,18 +306,13 @@ let lastSelEdgeBand = { start: 0, end: -1 };
 
 function onGridRendered(): void {
   if (!grid || !dataSource) return;
-  const { start, end } = grid.lastRenderedRowBounds;
-  const length = dataSource.getLength();
-  if (length <= 0 || end < start) return;
-  const first = dataSource.getItem(Math.max(0, Math.min(start, length - 1)));
-  const last = dataSource.getItem(Math.max(0, Math.min(end, length - 1)));
-  const lo = Math.min(first.row, last.row);
-  const hi = Math.max(first.row, last.row);
-  setVisibleRows(props.tabId, lo, hi + 1);
-  setVisibleWindow(props.pageKey, lo, hi + 1);
+  const band = renderedPageRowBand(grid, dataSource);
+  if (!band) return;
+  setVisibleRows(props.tabId, band.lo, band.hi + 1);
+  setVisibleWindow(props.pageKey, band.lo, band.hi + 1);
 
-  if (start !== lastSelEdgeBand.start || end !== lastSelEdgeBand.end) {
-    lastSelEdgeBand = { start, end };
+  if (band.start !== lastSelEdgeBand.start || band.end !== lastSelEdgeBand.end) {
+    lastSelEdgeBand = { start: band.start, end: band.end };
     refreshSelEdges();
   }
 }
@@ -371,37 +358,24 @@ function refreshSelEdges(selOverride?: Selection | null): void {
 // the drag-END `onCellRangeSelected` reaches `setSelectedRanges`), and `dragToSelect: true` — needed
 // for the gutter's own row-range drag, which has no such early return and so already painted live —
 // zeroes the stock decorator's border, so a cell-range drag painted nothing at all until mouseup.
-function computeCellFillHash(sel: Selection | null): EdgeHash {
-  const hash: EdgeHash = {};
-  if (!grid || !dataSource || !sel) return hash;
-  const { start, end } = grid.lastRenderedRowBounds;
-  if (end < start) return hash;
-  if (sel.kind !== 'cell' && sel.kind !== 'range') return hash;
-  const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
-  const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
-  const r0 = Math.min(anchorRow, sel.row);
-  const r1 = Math.max(anchorRow, sel.row);
-  const c0 = Math.min(anchorCol, sel.col);
-  const c1 = Math.max(anchorCol, sel.col);
-  for (let pos = start; pos <= end; pos++) {
-    const pageRow = dataSource.getItem(pos).row;
-    if (pageRow < r0 || pageRow > r1) continue;
-    const row: Record<string, string> = {};
-    for (let c = c0; c <= c1; c++) row[colField(c)] = 'kira-cell-selected';
-    hash[pos] = row;
-  }
-  return hash;
-}
-
 // Deliberately never writes `currentSelection`: a drag passing back over its own anchor cell
 // transiently looks like a completed one-cell selection, and the committed
 // `onSelectedRangesChanged` supersedes every layer this writes the moment the drag actually ends.
 function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
-  if (!selectionModel || selectionModel.currentSelectionModeIsRow()) return;
+  if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
   refreshSelEdges(pageSel);
-  grid?.setCellCssStyles('kira-cell-selected', computeCellFillHash(pageSel));
+  const ds = dataSource;
+  grid.setCellCssStyles(
+    'kira-cell-selected',
+    computeCellFillHash(
+      pageSel,
+      grid.lastRenderedRowBounds,
+      (pos) => ds.getItem(pos).row,
+      (c) => colField(c),
+    ),
+  );
 }
 
 // P19 D8: a real SlickHybridSelectionModel, configured identically to SlickGridHost.vue's own
@@ -786,10 +760,7 @@ onMounted(() => {
   eventHandler.subscribe(grid.onColumnsResized, onColumnsResized);
   eventHandler.subscribe(grid.onKeyDown, onKeydown);
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
-  const cellRangeSelector = selectionModel.getCellRangeSelector();
-  if (cellRangeSelector) {
-    eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
-  }
+  subscribeRangeSelecting(eventHandler, selectionModel, onCellRangeSelecting);
 
   // P99 §9.3: not useEventListener/useResizeObserver — same declined reasoning as
   // SlickGridHost.vue's own identical pair: registration order against SlickGrid's internal scroll
@@ -830,13 +801,7 @@ onUnmounted(() => {
   page = null;
 });
 
-watch(rowHeight, (h) => {
-  if (!grid) return;
-  rootRef.value?.style.setProperty('--kira-header-row-height', `${h}px`);
-  grid.setOptions({ rowHeight: h });
-  grid.updateRowCount();
-  grid.render();
-});
+subscribeRowHeight(rowHeight, () => grid, rootRef);
 
 // P31 D11/F13 — a font change leaves every unstored column sized for whatever font was active
 // when columns.ts's shared measuring context was first created, for the rest of the session.
