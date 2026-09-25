@@ -1129,11 +1129,11 @@ onUnmounted(() => {
                      expanded document's own body is out of scope (§6). -->
                 <div
                   v-if="isSearchMatch(rows[vi.index]) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
-                  class="doc-preview-match overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1"
+                  class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1 in-[.search-match-current]:text-bg"
                   data-testid="document-search-preview"
                 >
                   <template v-for="(seg, si) in previewSegments(rows[vi.index], rowAt(rows[vi.index])!.body)" :key="si">
-                    <mark v-if="seg.matched">{{ seg.text }}</mark>
+                    <mark v-if="seg.matched" class="rounded-kira-sm bg-warn text-bg">{{ seg.text }}</mark>
                     <template v-else>{{ seg.text }}</template>
                   </template>
                 </div>
@@ -1175,27 +1175,12 @@ onUnmounted(() => {
     </div>
     </template>
   </div>
+  <!-- P110 I2-16: `.doc-preview-match` (dropped, no other consumer) -- `:deep(.doc-row.search-
+       match-current) .doc-preview-match { text-bg }` replaced by Tailwind v4's `in-*` variant
+       directly on the element: `in-[.search-match-current]:text-bg` matches whenever an ancestor
+       carries that literal class, same compound-selector effect, compile-verified. `.doc-preview-
+       match mark` moved onto the template `<mark>` itself (`rounded-kira-sm bg-warn text-bg`) --
+       a real template element here (not v-html), so no `[&_mark]:` indirection needed.
+       P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+       virtualRows.ts), bound on DocumentRow's own `:class` -- see ProjectTree.vue's identical note. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.doc-preview-match` stays a bare marker: `:deep(.doc-row.search-match-current)
-   .doc-preview-match` targets DocumentRow.vue's own root class (outside this component's
-   scope-id) as the ancestor half, with no template element here to carry that half, so the
-   descendant selector needs `.doc-preview-match` itself still present to anchor its own half. */
-
-/* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not
-   inheritance) — this compound selector is what actually flips it on the current match. */
-:deep(.doc-row.search-match-current) .doc-preview-match {
-  @apply text-bg;
-}
-
-.doc-preview-match mark {
-  @apply rounded-kira-sm bg-warn text-bg;
-}
-
-/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
-   virtualRows.ts), bound on DocumentRow's own `:class` -- see ProjectTree.vue's identical note. */
-</style>
