@@ -62,11 +62,7 @@ func (s *CollectionsService) GetRequest(args CollectionsItemArgs) (model.SavedRe
 	if args.ItemID == "" {
 		return model.SavedRequest{}, ipcerr.BadRequest("itemId is required")
 	}
-	req, err := s.Deps.Repos.Collections.GetRequest(args.ItemID)
-	if err != nil {
-		return model.SavedRequest{}, ipcerr.Internal(err.Error())
-	}
-	return req, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Collections.GetRequest(args.ItemID))
 }
 
 // GetGrpcRequest is GetRequest's own gRPC sibling (P11 D12).
@@ -74,11 +70,7 @@ func (s *CollectionsService) GetGrpcRequest(args CollectionsItemArgs) (model.Sav
 	if args.ItemID == "" {
 		return model.SavedGrpcRequest{}, ipcerr.BadRequest("itemId is required")
 	}
-	req, err := s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID)
-	if err != nil {
-		return model.SavedGrpcRequest{}, ipcerr.Internal(err.Error())
-	}
-	return req, nil
+	return ipcerr.InternalResult(s.Deps.Repos.Collections.GetGrpcRequest(args.ItemID))
 }
 
 type CollectionsSaveRequestArgs struct {

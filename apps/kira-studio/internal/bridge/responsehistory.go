@@ -31,11 +31,7 @@ type ResponseHistoryScopeArgs struct {
 
 // List returns newest-first, at most 20 entries by construction (Record's own per-scope trim).
 func (s *ResponseHistoryService) List(args ResponseHistoryScopeArgs) ([]model.ResponseHistoryEntry, error) {
-	entries, err := s.Deps.Repos.ResponseHistory.List(scopeKey(args.ItemID, args.TabID))
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return entries, nil
+	return ipcerr.InternalResult(s.Deps.Repos.ResponseHistory.List(scopeKey(args.ItemID, args.TabID)))
 }
 
 type ResponseHistoryIDArgs struct {
@@ -46,28 +42,18 @@ func (s *ResponseHistoryService) Get(args ResponseHistoryIDArgs) (model.Response
 	if args.ID == "" {
 		return model.ResponseHistorySnapshot{}, ipcerr.BadRequest("id is required")
 	}
-	snap, err := s.Deps.Repos.ResponseHistory.Get(args.ID)
-	if err != nil {
-		return model.ResponseHistorySnapshot{}, ipcerr.Internal(err.Error())
-	}
-	return snap, nil
+	return ipcerr.InternalResult(s.Deps.Repos.ResponseHistory.Get(args.ID))
 }
 
 func (s *ResponseHistoryService) Delete(args ResponseHistoryIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Deps.Repos.ResponseHistory.Delete(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.ResponseHistory.Delete(args.ID))
 }
 
 func (s *ResponseHistoryService) Clear(args ResponseHistoryScopeArgs) error {
-	if err := s.Deps.Repos.ResponseHistory.Clear(scopeKey(args.ItemID, args.TabID)); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.ResponseHistory.Clear(scopeKey(args.ItemID, args.TabID)))
 }
 
 type ResponseHistoryAdoptArgs struct {

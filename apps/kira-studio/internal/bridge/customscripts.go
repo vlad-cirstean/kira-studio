@@ -17,11 +17,7 @@ type CustomScriptsService struct {
 }
 
 func (s *CustomScriptsService) List() ([]model.CustomScript, error) {
-	rows, err := s.Deps.Repos.CustomScripts.List()
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return rows, nil
+	return ipcerr.InternalResult(s.Deps.Repos.CustomScripts.List())
 }
 
 // broadcastList re-lists and emits — called after every mutation below, so a caller never reads a

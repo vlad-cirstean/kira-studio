@@ -18,11 +18,7 @@ type GrpcHistoryScopeArgs struct {
 
 // List returns newest-first, at most 20 entries by construction (Record's own per-scope trim).
 func (s *GrpcHistoryService) List(args GrpcHistoryScopeArgs) ([]model.GrpcCallHistoryEntry, error) {
-	entries, err := s.Deps.Repos.GrpcHistory.List(scopeKey(args.ItemID, args.TabID))
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return entries, nil
+	return ipcerr.InternalResult(s.Deps.Repos.GrpcHistory.List(scopeKey(args.ItemID, args.TabID)))
 }
 
 type GrpcHistoryIDArgs struct {
@@ -33,28 +29,18 @@ func (s *GrpcHistoryService) Get(args GrpcHistoryIDArgs) (model.GrpcCallSnapshot
 	if args.ID == "" {
 		return model.GrpcCallSnapshot{}, ipcerr.BadRequest("id is required")
 	}
-	snap, err := s.Deps.Repos.GrpcHistory.Get(args.ID)
-	if err != nil {
-		return model.GrpcCallSnapshot{}, ipcerr.Internal(err.Error())
-	}
-	return snap, nil
+	return ipcerr.InternalResult(s.Deps.Repos.GrpcHistory.Get(args.ID))
 }
 
 func (s *GrpcHistoryService) Delete(args GrpcHistoryIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Deps.Repos.GrpcHistory.Delete(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.GrpcHistory.Delete(args.ID))
 }
 
 func (s *GrpcHistoryService) Clear(args GrpcHistoryScopeArgs) error {
-	if err := s.Deps.Repos.GrpcHistory.Clear(scopeKey(args.ItemID, args.TabID)); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.GrpcHistory.Clear(scopeKey(args.ItemID, args.TabID)))
 }
 
 type GrpcHistoryAdoptArgs struct {

@@ -21,22 +21,14 @@ func (s *QueriesService) List(args QueriesListArgs) ([]model.SavedQuery, error) 
 	if args.ConnectionID == "" {
 		return nil, ipcerr.BadRequest("connectionId is required")
 	}
-	list, err := s.Deps.Repos.SavedQueries.ListFilters(args.ConnectionID, args.Path)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.ListFilters(args.ConnectionID, args.Path))
 }
 
 func (s *QueriesService) ListConsole(args QueriesListArgs) ([]model.SavedQuery, error) {
 	if args.ConnectionID == "" {
 		return nil, ipcerr.BadRequest("connectionId is required")
 	}
-	list, err := s.Deps.Repos.SavedQueries.ListConsole(args.ConnectionID, args.Path)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.ListConsole(args.ConnectionID, args.Path))
 }
 
 type QueriesSaveArgs struct {
@@ -51,11 +43,7 @@ func (s *QueriesService) Save(args QueriesSaveArgs) (model.SavedQuery, error) {
 	if args.ConnectionID == "" {
 		return model.SavedQuery{}, ipcerr.BadRequest("connectionId is required")
 	}
-	q, err := s.Deps.Repos.SavedQueries.SaveFilter(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned)
-	if err != nil {
-		return model.SavedQuery{}, ipcerr.Internal(err.Error())
-	}
-	return q, nil
+	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.SaveFilter(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned))
 }
 
 type QueriesSaveConsoleArgs struct {
@@ -70,11 +58,7 @@ func (s *QueriesService) SaveConsole(args QueriesSaveConsoleArgs) (model.SavedQu
 	if args.ConnectionID == "" {
 		return model.SavedQuery{}, ipcerr.BadRequest("connectionId is required")
 	}
-	q, err := s.Deps.Repos.SavedQueries.SaveConsole(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned)
-	if err != nil {
-		return model.SavedQuery{}, ipcerr.Internal(err.Error())
-	}
-	return q, nil
+	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.SaveConsole(args.ConnectionID, args.Path, args.Name, args.Body, args.Pinned))
 }
 
 type QueriesUpdateArgs struct {
@@ -87,11 +71,7 @@ func (s *QueriesService) Update(args QueriesUpdateArgs) (model.SavedQuery, error
 	if args.ID == "" {
 		return model.SavedQuery{}, ipcerr.BadRequest("id is required")
 	}
-	q, err := s.Deps.Repos.SavedQueries.Update(args.ID, model.SavedQueryPatch{Name: args.Name, Pinned: args.Pinned})
-	if err != nil {
-		return model.SavedQuery{}, ipcerr.Internal(err.Error())
-	}
-	return q, nil
+	return ipcerr.InternalResult(s.Deps.Repos.SavedQueries.Update(args.ID, model.SavedQueryPatch{Name: args.Name, Pinned: args.Pinned}))
 }
 
 type QueriesIDArgs struct {
@@ -102,20 +82,14 @@ func (s *QueriesService) Delete(args QueriesIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Deps.Repos.SavedQueries.Delete(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.SavedQueries.Delete(args.ID))
 }
 
 func (s *QueriesService) Touch(args QueriesIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	if err := s.Deps.Repos.SavedQueries.Touch(args.ID); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.SavedQueries.Touch(args.ID))
 }
 
 type QueriesHistoryListArgs struct {
@@ -131,11 +105,7 @@ func (s *QueriesService) HistoryList(args QueriesHistoryListArgs) ([]model.Filte
 	if args.Limit < 1 || args.Limit > 100 {
 		return nil, ipcerr.BadRequest("limit must be between 1 and 100")
 	}
-	list, err := s.Deps.Repos.FilterHistory.List(args.ConnectionID, args.Path, args.Limit)
-	if err != nil {
-		return nil, ipcerr.Internal(err.Error())
-	}
-	return list, nil
+	return ipcerr.InternalResult(s.Deps.Repos.FilterHistory.List(args.ConnectionID, args.Path, args.Limit))
 }
 
 type QueriesHistoryRecordArgs struct {
@@ -149,8 +119,5 @@ func (s *QueriesService) HistoryRecord(args QueriesHistoryRecordArgs) error {
 	if args.ConnectionID == "" {
 		return ipcerr.BadRequest("connectionId is required")
 	}
-	if err := s.Deps.Repos.FilterHistory.Record(args.ConnectionID, args.Path, args.Where, args.OrderBy); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return ipcerr.InternalErr(s.Deps.Repos.FilterHistory.Record(args.ConnectionID, args.Path, args.Where, args.OrderBy))
 }
