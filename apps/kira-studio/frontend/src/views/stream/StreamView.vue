@@ -1191,7 +1191,7 @@ onUnmounted(() => {
                 }"
               >
                 <div
-                  class="flex items-center justify-end px-2 border-r border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
+                  class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
                   role="option"
                   tabindex="0"
                   :aria-selected="rt?.selectedRow === rowIndices[vi.index]"

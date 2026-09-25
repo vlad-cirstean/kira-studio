@@ -1123,7 +1123,7 @@ onUnmounted(() => {
                   @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
-                  <div class="flex items-center justify-end px-2 border-r border-r-border-strong border-b border-border bg-elevated font-data text-kira-xs text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
+                  <div class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10 shrink-0">{{ entry.i + 1 }}</div>
                   <Tooltip>
                     <TooltipTrigger as-child>
                       <div
