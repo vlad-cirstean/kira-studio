@@ -180,12 +180,15 @@ const keepAwakeTooltip = computed(() => {
 </template>
 
 <style scoped>
+@reference "@theme/base.css";
+
 /* CRITICAL (D2): --wails-draggable inherits from the shared TitleBar's own root, and
    isDraggableEvent (drag.ts) reads the event *target's* computed style — every interactive child
    here must explicitly override it (wails-no-drag, inline on the button/action-row above), or
    clicking a mode tab would also start a window drag. Only the live :hover state below can't move
-   onto a static class. */
+   onto a static class -- P110 B37: its own background: var(--kira-hover) declaration still
+   converts to @apply bg-hover in place, though (same selector, same cascade position). */
 .mode-tab:hover:not(.is-active) {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 </style>

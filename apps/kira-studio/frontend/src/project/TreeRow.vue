@@ -204,13 +204,15 @@ function onKeydown(e: KeyboardEvent): void {
 
 /* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
    (real-compile/token-verified equal to CollectionRow.vue's own Tailwind-native form). Its
-   `:hover`/`.selected` stay here -- one declaration each, no property overlap with the shell. */
+   `:hover`/`.selected` stay here -- one declaration each, no property overlap with the shell.
+   P110 B37: their own raw background: var(--kira-hover/select) become @apply bg-hover/bg-select
+   in place (same selectors, same cascade position). */
 .tree-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .tree-row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 /* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as CollectionRow.vue's/

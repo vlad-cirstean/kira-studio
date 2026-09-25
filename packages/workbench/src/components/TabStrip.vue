@@ -359,8 +359,12 @@ useEventListener(stripRef, 'dragend', onDragEnd);
    marker classes to anchor the selectors below; `.is-active`/`.tab-file-icon`/`.tab-title`/
    `.tab-close` are also real test dependencies (slick-grid.spec.ts, budgets.spec.ts,
    repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). */
+/* P110 B37: raw background: var(--kira-hover)/var(--kira-state-on) and opacity: 0/1 declarations
+   below all convert to @apply in place (same selectors, same cascade position) -- content: ''
+   becomes content-[''], section 1.2's own allowlist entry for this exact attention-dot pseudo-
+   element. */
 .tab-chip:hover:not(.is-active) {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 /* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one. */
@@ -368,19 +372,17 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   @apply relative;
 }
 .tab-chip.is-attention::after {
-  @apply absolute top-1 right-1 w-1.5 h-1.5 rounded-full;
-  content: '';
-  background: var(--kira-state-on);
+  @apply absolute top-1 right-1 w-1.5 h-1.5 rounded-full content-[''] bg-state-on;
 }
 
 .tab-close {
-  opacity: 0;
+  @apply opacity-0;
 }
 .tab-chip:hover .tab-close,
 .tab-chip.is-active .tab-close {
-  opacity: 1;
+  @apply opacity-100;
 }
 .tab-close:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 </style>

@@ -1453,21 +1453,21 @@ const preconnectText = computed({
    ported -- the label has no direct text of its own (only a form control plus two spans that set
    their own font-size), so all three were no-ops. `.kind` itself stays as a bare marker class:
    the three rules below are real conditional CSS (a hover exclusion, a compound selected/focus-
-   within selector, an off-state), not simple value substitutions, so they are not mechanically
-   reducible to per-element utility classes without changing which one wins on the shared
-   `background`/`border-color` properties -- left as scoped, unlayered CSS exactly as before. */
+   within selector, an off-state), not mechanically reducible to per-element utility classes on the
+   template without changing which one wins on the shared `background`/`border-color` properties --
+   the SELECTORS stay as scoped, unlayered CSS exactly as before. P110 B37: their own declarations
+   still convert to @apply in place, though (same selectors, same source order, no cascade change --
+   @apply only substitutes the property value's own syntax). */
 .kind:hover:not(.is-off) {
-  background: var(--kira-hover);
-  border-color: var(--kira-border-strong);
+  @apply bg-hover border-border-strong;
 }
 
 .kind.is-selected,
 .kind:focus-within {
-  border-color: var(--kira-focus);
+  @apply border-focus;
 }
 
 .kind.is-off {
-  opacity: 0.4;
-  cursor: default;
+  @apply opacity-40 cursor-default;
 }
 </style>
