@@ -6,6 +6,7 @@ import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
@@ -181,7 +182,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
           <template v-for="slot in band" :key="slot.row.key">
             <CollectionRow
-              class="sticky-row"
+              :class="STICKY_ROW_CLASS"
               :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
               :row="slot.row"
               :selected="collectionsStore.selected === slot.row.key"
@@ -198,7 +199,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         <div :style="{ height: `${totalSize}px`, position: 'relative' }">
           <template v-for="item in virtualItems" :key="String(item.key)">
             <CollectionRow
-              class="virtual-row"
+              :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
               :row="collectionsStore.visibleRows[item.index]"
               :selected="collectionsStore.selected === collectionsStore.visibleRows[item.index].key"
@@ -215,22 +216,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
       </div>
     </div>
   </div>
+  <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
+       (packages/workbench/src/util/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 test-fix: restored from base.css's shared `@utility virtual-row`/`sticky-row` (P110 B34) --
-   see ProjectTree.vue's identical note and base.css's own revert comment: those are
-   Tailwind-layered and lose to any unlayered scoped rule (e.g. CollectionRow.vue's own row class,
-   if it sets `position`) on the same fallthrough root element. Local + unlayered here instead. */
-.sticky-row {
-  @apply absolute left-0 right-0 z-1;
-  background: var(--kira-bg);
-}
-
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
-</style>
 

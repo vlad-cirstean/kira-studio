@@ -2,6 +2,21 @@ import { useVirtualizer } from '@tanstack/vue-virtual';
 import { useResizeObserver } from '@vueuse/core';
 import { computed, onMounted, type Ref, ref, watch } from 'vue';
 
+// P110 I2-15: the 9 consuming files' own scoped `.virtual-row`/`.sticky-row` copies (each byte-
+// identical, restored per-file after base.css's shared `@utility virtual-row`/`sticky-row` (P110
+// B34) was reverted -- an unlayered scoped rule is required to beat a row's own unlayered `.tree-
+// row { position: relative }`; a `@utility` is Tailwind-layered and always loses that fight) --
+// now that I2-14 dropped every row's own unlayered `position: relative` in favour of a plain
+// `relative` utility class merged through `cn()`/`tailwind-merge`, a parent can bind these two
+// literal strings directly as the row's `class` prop: `cn()` resolves the position conflict itself
+// (last one wins on the same property, so `absolute` always beats `relative`), and a plain `<div>`
+// row has no `relative` to conflict with in the first place. The sticky row's own background
+// (`bg-bg`) moved onto the row's own `stateClass` ternary in I2-14 -- never here, so this stays
+// position-only, unlike the old `.sticky-row { @apply absolute left-0 right-0 z-1; background:
+// var(--kira-bg); }`.
+export const VIRTUAL_ROW_CLASS = 'absolute top-0 left-0 w-full';
+export const STICKY_ROW_CLASS = 'absolute left-0 right-0 z-1';
+
 // P104 §3.4: the old hand-rolled virtual list's own recipe, rebuilt on @tanstack/vue-virtual
 // directly at each call site rather than kept as a wrapper component (§9 rule 4) -- this is the
 // shared *behaviour* (windowing, scrollstate, scrollToIndex), never a re-rendered wrapper; the

@@ -20,7 +20,7 @@ import RunState from '@theme/RunState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -1068,7 +1068,7 @@ onUnmounted(() => {
             <DocumentRow
               v-if="rowAt(rows[vi.index])"
               data-testid="document-row"
-              class="virtual-row"
+              :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
               @contextmenu="onRowContextMenu($event, rows[vi.index])"
               :view="rowAt(rows[vi.index])!.view"
@@ -1196,11 +1196,6 @@ onUnmounted(() => {
   @apply rounded-kira-sm bg-warn text-bg;
 }
 
-/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
-   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
-   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
-   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+   virtualRows.ts), bound on DocumentRow's own `:class` -- see ProjectTree.vue's identical note. */
 </style>

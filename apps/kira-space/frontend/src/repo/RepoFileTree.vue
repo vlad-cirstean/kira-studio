@@ -2,6 +2,7 @@
 import { useDebounceFn, useEventListener } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
@@ -101,7 +102,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
       <div class="sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
         <template v-for="slot in band" :key="slot.row.key">
           <RepoTreeRow
-            class="sticky-row"
+            :class="STICKY_ROW_CLASS"
             :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
             :row="slot.row"
             :selected="selected === slot.row.key"
@@ -116,7 +117,7 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
       <div :style="{ height: `${totalSize}px`, position: 'relative' }">
         <template v-for="item in virtualItems" :key="String(item.key)">
           <RepoTreeRow
-            class="virtual-row"
+            :class="VIRTUAL_ROW_CLASS"
             :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
             :row="rows[item.index]"
             :selected="selected === rows[item.index].key"
@@ -130,22 +131,8 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
       </div>
     </div>
   </div>
+  <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
+       (packages/workbench/src/util/virtualRows.ts) -- see kira-studio's ProjectTree.vue's
+       identical note. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 test-fix: restored from base.css's shared `@utility virtual-row`/`sticky-row` (P110 B34) --
-   see kira-studio's ProjectTree.vue identical note and base.css's own revert comment: those are
-   Tailwind-layered and lose to any unlayered scoped rule (e.g. RepoTreeRow.vue's own row class, if
-   it sets `position`) on the same fallthrough root element. Local + unlayered here instead. */
-.sticky-row {
-  @apply absolute left-0 right-0 z-1;
-  background: var(--kira-bg);
-}
-
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
-</style>
 

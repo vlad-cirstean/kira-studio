@@ -300,6 +300,16 @@ check_class_in_attrs 'twisty' 'TreeTwisty (packages/workbench/src/components/Tre
 check_class_in_attrs 'tree-row' 'the shared literal utility string via cn() (see base.css)'
 check_class_in_attrs 'spin' 'animate-spin plus data-testid="tree-row-spinner"'
 
+# P110 I2-15: the 9(+3) file `.virtual-row`/`.sticky-row` scoped-copy duplicate, replaced by
+# VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts) bound directly
+# as each row's own class. Attribute-scoped: both names are heavy prose in this migration's own
+# comments (this file's own replacement messages above included) and `sticky-row` is also a
+# substring of real, ongoing `data-testid` values (`tree-sticky-row`, `collection-sticky-row`,
+# `repo-tree-sticky-row`) -- never `class`/`:class` attribute values, so the attribute scope
+# leaves them alone.
+check_class_in_attrs 'virtual-row' 'VIRTUAL_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
+check_class_in_attrs 'sticky-row' 'STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts)'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

@@ -4,6 +4,7 @@ import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
+import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useSettingsStore } from '../state/settings';
@@ -201,7 +202,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
           <template v-for="slot in band" :key="slot.row.key">
             <TreeRow
-              class="sticky-row"
+              :class="STICKY_ROW_CLASS"
               :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
               :row="slot.row"
               :selected="treeStore.selected === slot.row.key"
@@ -216,7 +217,7 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         <div :style="{ height: `${totalSize}px`, position: 'relative' }">
           <template v-for="item in virtualItems" :key="String(item.key)">
             <TreeRow
-              class="virtual-row"
+              :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
               :row="treeStore.visibleRows[item.index]"
               :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
@@ -240,22 +241,8 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
       </AlertDescription>
     </Alert>
   </div>
+  <!-- P110 I2-15: `.sticky-row`/`.virtual-row` moved to VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS
+       (packages/workbench/src/util/virtualRows.ts), bound directly as TreeRow's own `class` prop
+       -- `cn()` resolves the position conflict against TreeRow's own `relative` (I2-14 dropped the
+       old unlayered `.tree-row { position: relative }` this used to have to out-specificity). -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 test-fix: restored from base.css's shared `@utility virtual-row`/`sticky-row` (P110 B34) --
-   those are Tailwind-layered, and lose to TreeRow.vue's own unlayered `.tree-row { @apply ...
-   relative ...; }` on this same (fallthrough) root element, breaking absolute positioning of
-   every virtualized row (see base.css's own note on this revert). Local + unlayered here instead,
-   exactly as before B34, so it always wins regardless of what else the row itself sets. */
-.sticky-row {
-  @apply absolute left-0 right-0 z-1;
-  background: var(--kira-bg);
-}
-
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
-</style>

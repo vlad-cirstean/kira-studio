@@ -147,20 +147,13 @@
   --wails-draggable: none;
 }
 
-/* P110 B34 tried a shared `@utility virtual-row`/`sticky-row` pair here (9+3 file dedup) --
-   reverted (P110 test-fix): both need `position` to win on their element, and `@utility` always
-   registers into Tailwind's layered `utilities` layer, which LOSES to any unlayered scoped rule
-   on the same element regardless of specificity or source order (this file's own established
-   rule, see e.g. StreamView.vue's `.stream-row.search-match` precedent below). ProjectTree.vue's
-   row is TreeRow.vue's root element, which also carries TreeRow's own unlayered `.tree-row {
-   @apply ... relative ...; }` -- once virtual-row/sticky-row became layered, that unlayered
-   `position: relative` started beating their `position: absolute`, collapsing the virtualized
-   list's row positioning (confirmed via `git bisect` against tree.spec.ts: passes at this
-   commit's parent, fails here, and fails specifically because of this file's own diff -- passes
-   again with just this file's virtual-row/sticky-row change reverted, everything else in the
-   commit still applied). Each of the 9 (+3 for sticky-row) consuming files keeps its own local,
-   unlayered `.virtual-row`/`.sticky-row` scoped rule instead -- byte-identical declarations,
-   just no longer shared, so no consuming file can ever lose this fight to another unlayered rule. */
+/* P110 I2-15: `virtual-row`/`sticky-row` (the 9+3 file scoped-copy duplicate B34 tried and
+   reverted here, see git history) now live as plain exported string constants --
+   VIRTUAL_ROW_CLASS/STICKY_ROW_CLASS (packages/workbench/src/util/virtualRows.ts) -- bound
+   directly on each row's own `class`/`:class`, never as a `@utility`. I2-14 already dropped every
+   row component's own unlayered `.tree-row { position: relative }` in favour of a plain `relative`
+   Tailwind utility merged through `cn()`/`tailwind-merge`, which resolves the position conflict
+   itself (last one wins on the same property) -- the layering problem B34 hit no longer exists. */
 
 /* P110 I2-10/11: `.empty-state`/`-icon`/`-title` (the 15-file duplicate above) retired -- every
    consumer now uses the shared `Empty`/`EmptyMedia`/`EmptyTitle`/`EmptyDescription` components

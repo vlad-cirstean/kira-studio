@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { connColorVar } from '@theme/connColor';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -305,9 +305,9 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
           <template v-for="vi in virtualItems" :key="String(vi.key)">
             <div
               v-if="listItems[vi.index].kind === 'op'"
-              class="grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center gap-2 px-2 cursor-pointer select-text h-4.5 hover:bg-hover virtual-row"
+              class="grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center gap-2 px-2 cursor-pointer select-text h-4.5 hover:bg-hover"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-              :class="{ 'text-error': listItems[vi.index].record.status === 'error' }"
+              :class="[VIRTUAL_ROW_CLASS, { 'text-error': listItems[vi.index].record.status === 'error' }]"
               data-testid="op-row"
               :data-status="listItems[vi.index].record.status"
               role="option"
@@ -357,7 +357,8 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
             </div>
             <div
               v-else-if="listItems[vi.index].kind === 'detail-command'"
-              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm virtual-row"
+              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm"
+              :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <MonacoHost
@@ -374,7 +375,8 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
             </div>
             <div
               v-else
-              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm virtual-row"
+              class="grid items-center grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap h-4.5 text-muted-foreground bg-elevated p-0 ops-detail-cm"
+              :class="VIRTUAL_ROW_CLASS"
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
             >
               <MonacoHost
@@ -432,11 +434,6 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   @apply px-2;
 }
 
-/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
-   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
-   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
-   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+   virtualRows.ts), bound on each row `:class` -- see ProjectTree.vue's identical note. */
 </style>

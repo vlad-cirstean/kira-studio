@@ -25,7 +25,7 @@ import { useEventListener } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -1177,15 +1177,18 @@ onUnmounted(() => {
               <div
                 v-for="vi in virtualItems"
                 :key="String(vi.key)"
-                class="stream-row flex border-b border-border cursor-pointer h-row virtual-row"
+                class="stream-row flex border-b border-border cursor-pointer h-row"
                 data-testid="stream-row"
                 :data-row-index="rowIndices[vi.index]"
                 :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
-                :class="{
-                  selected: rt?.selectedRow === rowIndices[vi.index],
-                  'search-match': matchSet.has(rowIndices[vi.index]),
-                  'search-match-current': currentMatchRow === rowIndices[vi.index],
-                }"
+                :class="[
+                  VIRTUAL_ROW_CLASS,
+                  {
+                    selected: rt?.selectedRow === rowIndices[vi.index],
+                    'search-match': matchSet.has(rowIndices[vi.index]),
+                    'search-match-current': currentMatchRow === rowIndices[vi.index],
+                  },
+                ]"
               >
                 <div
                   class="flex items-center justify-end px-2 border-r border-b border-border border-r-border-strong bg-elevated font-data text-kira-xs text-subtle truncate relative w-10"
@@ -1323,11 +1326,6 @@ onUnmounted(() => {
   @apply bg-hover;
 }
 
-/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
-   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
-   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
-   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+   virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. */
 </style>

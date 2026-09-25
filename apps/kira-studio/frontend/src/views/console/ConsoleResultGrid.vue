@@ -2,7 +2,7 @@
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
@@ -355,7 +355,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <DocumentRow
           v-for="vi in docVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="virtual-row"
+          :class="VIRTUAL_ROW_CLASS"
           data-testid="console-result-doc-row"
           :data-row="documentRows[vi.index]?.index"
           :view="documentRows[vi.index]!"
@@ -400,10 +400,10 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         <div
           v-for="vi in kvVirtual.virtualItems.value"
           :key="String(vi.key)"
-          class="row virtual-row flex border-b border-border w-[var(--total-width)]"
+          class="row flex border-b border-border w-[var(--total-width)]"
           data-testid="console-result-kv-row"
           :data-row="rowIndices[vi.index]"
-          :class="{ selected: isSelected(rowIndices[vi.index]!, 0) }"
+          :class="[VIRTUAL_ROW_CLASS, { selected: isSelected(rowIndices[vi.index]!, 0) }]"
           :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
           role="option"
           tabindex="0"
@@ -482,11 +482,6 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
   @apply bg-select;
 }
 
-/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
-   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
-   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
-   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+   virtualRows.ts), bound on each row's own `:class` -- see ProjectTree.vue's identical note. */
 </style>

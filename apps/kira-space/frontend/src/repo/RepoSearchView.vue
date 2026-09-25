@@ -5,7 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useEventListener } from '@vueuse/core';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, useTemplateRef } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
@@ -218,7 +218,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
       <div :style="{ height: `${totalSize}px`, position: 'relative' }">
         <template v-for="item in virtualItems" :key="String(item.key)">
           <RepoSearchRow
-            class="virtual-row"
+            :class="VIRTUAL_ROW_CLASS"
             :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
             :row="rows[item.index]"
             :selected="selected === rows[item.index].key"
@@ -230,17 +230,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
       </div>
     </div>
   </div>
+  <!-- P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+       virtualRows.ts) -- see kira-studio's ProjectTree.vue's identical note. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 test-fix: restored from base.css's shared `@utility virtual-row` (P110 B34) -- see
-   kira-studio's ProjectTree.vue identical note and base.css's own revert comment: it is
-   Tailwind-layered and loses to any unlayered scoped rule (e.g. a row component's own row class,
-   if it sets `position`) on the same fallthrough root element. Local + unlayered here instead. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
-</style>
 

@@ -17,7 +17,7 @@ import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
-import { useVirtualRows } from '@workbench/util/virtualRows';
+import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { SplitterGroup, SplitterPanel } from 'reka-ui';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -485,11 +485,11 @@ onMounted(() => {
                 <div
                   v-for="vi in virtualItems"
                   :key="String(vi.key)"
-                  class="browse-row virtual-row"
+                  class="browse-row"
                   data-testid="browse-row"
                   :data-path="filteredNodes[vi.index]?.path"
                   :data-kind="filteredNodes[vi.index]?.kind"
-                  :class="{ selected: rt?.selected === filteredNodes[vi.index]?.path }"
+                  :class="[VIRTUAL_ROW_CLASS, { selected: rt?.selected === filteredNodes[vi.index]?.path }]"
                   :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
                   role="option"
                   tabindex="0"
@@ -601,13 +601,8 @@ onMounted(() => {
   @apply h-full;
 }
 
-/* P110 test-fix: base.css's shared `@utility virtual-row` (P110 B34) reverted -- Tailwind-layered
-   utilities lose to any unlayered scoped rule on the same element regardless of specificity or
-   source order; see ProjectTree.vue's identical note and base.css's own revert comment for the
-   confirmed regression this caused elsewhere. Local + unlayered here instead, as before B34. */
-.virtual-row {
-  @apply absolute top-0 left-0 w-full;
-}
+/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
+   virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. */
 
 .empty {
   @apply h-full flex items-center justify-center text-kira-sm;
