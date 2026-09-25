@@ -605,9 +605,9 @@ const preconnectText = computed({
       class="flex flex-col p-0 gap-0 w-155 h-136"
     >
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-      <DialogHeader v-if="step === 'engine'" class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+      <DialogHeader v-if="step === 'engine'">
         <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
-        <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
+        <DialogTitle>{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
         <span class="flex min-w-0 ml-auto">
           <span v-if="!isEdit" class="steps">
             <span class="step on"><span class="n">1</span>Engine</span>
@@ -633,11 +633,11 @@ const preconnectText = computed({
       </DialogHeader>
       <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
            is identity here, not a control (changed via "Change engine" back to step 1). -->
-      <DialogHeader v-else class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+      <DialogHeader v-else>
         <span class="flex shrink-0" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
           <EngineIcon :kind="draft.kind" :size="13" />
         </span>
-        <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
+        <DialogTitle>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
         <Tooltip>
           <TooltipTrigger as-child>
             <Button variant="toolbar" size="kira" class="ml-auto" @click="step = 'engine'">
@@ -1385,7 +1385,7 @@ const preconnectText = computed({
     </template>
       </div>
 
-      <DialogFooter v-if="step === 'engine'" class="border-t border-border bg-transparent">
+      <DialogFooter v-if="step === 'engine'">
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
@@ -1394,7 +1394,7 @@ const preconnectText = computed({
           </Button>
         </span>
       </DialogFooter>
-      <DialogFooter v-else class="border-t border-border bg-transparent">
+      <DialogFooter v-else>
         <div class="flex items-center gap-1.5 min-w-0">
           <Button variant="dialog" size="kira-lg" data-testid="connection-test" @click="onTest">
             <CodiconIcon name="plug" :size="13" />

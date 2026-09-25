@@ -121,8 +121,8 @@ async function onSave(): Promise<void> {
       data-testid="schema-dialog"
       class="flex flex-col p-0 gap-0 w-180 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal"
+      <DialogHeader>
+        <DialogTitle
           >Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >
         <DialogClose as-child>
@@ -173,7 +173,7 @@ async function onSave(): Promise<void> {
       </Alert>
     </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span v-if="saveError" class="text-kira-xs leading-normal text-error" data-testid="schema-save-error">{{
           saveError
         }}</span>

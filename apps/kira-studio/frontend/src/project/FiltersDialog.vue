@@ -147,9 +147,9 @@ const connectionName = computed(
       data-testid="filters-dialog"
       class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+      <DialogHeader>
         <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="filter" :size="13" /></span>
-        <DialogTitle class="text-kira-lg font-normal"
+        <DialogTitle
           >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
         >
         <DialogClose as-child>
@@ -281,7 +281,7 @@ const connectionName = computed(
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="help text-kira-xs leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>

@@ -104,8 +104,8 @@ watch(
       data-testid="upload-dialog"
       class="flex flex-col p-0 gap-0 w-120 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Upload file</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Upload file</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -141,7 +141,7 @@ watch(
         </Alert>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">Cancel</Button>
           <Button

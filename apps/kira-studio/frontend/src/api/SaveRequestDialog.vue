@@ -78,8 +78,8 @@ function splitTarget(value: string): [string, string | null] {
       data-testid="save-request-dialog"
       class="flex flex-col p-0 gap-0 w-120"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Save request</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Save request</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -117,7 +117,7 @@ function splitTarget(value: string): [string, string | null] {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="saveDialogStore.closeSaveDialog">Cancel</Button>
           <Button

@@ -143,9 +143,9 @@ async function onConfirm(): Promise<void> {
       data-testid="datagrip-import-dialog"
       class="flex flex-col p-0 gap-0 w-180 h-140"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+      <DialogHeader>
         <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
-        <DialogTitle class="text-kira-lg font-normal">{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
+        <DialogTitle>{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -275,7 +275,7 @@ async function onConfirm(): Promise<void> {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <template v-if="!report">
           <span class="help">{{ datagripImportStore.projectPath }}</span>
           <span class="flex items-center gap-1 ml-auto">

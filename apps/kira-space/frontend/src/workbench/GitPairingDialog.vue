@@ -71,8 +71,8 @@ async function onApprove(): Promise<void> {
       data-testid="git-pairing-dialog"
       class="flex flex-col p-0 gap-0 w-105 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Editor wants to connect</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Editor wants to connect</DialogTitle>
         <DialogClose as-child>
           <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" @click="onDeny">
             <CodiconIcon name="close" :size="13" />
@@ -98,7 +98,7 @@ async function onApprove(): Promise<void> {
         </p>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1 ml-auto">
           <Button ref="denyButton" variant="dialog" size="kira-lg" data-testid="git-pairing-deny" @click="onDeny">
             Deny

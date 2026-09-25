@@ -57,8 +57,8 @@ function onCancel(): void {
       data-testid="git-credential-dialog"
       class="flex flex-col p-0 gap-0 w-110 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Git credentials</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Git credentials</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -91,7 +91,7 @@ function onCancel(): void {
         />
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
             Cancel

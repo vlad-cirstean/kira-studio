@@ -54,8 +54,8 @@ onMounted(() => {
       data-testid="import-curl-dialog"
       class="flex flex-col p-0 gap-0 w-140 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Import from curl</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Import from curl</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -99,7 +99,7 @@ onMounted(() => {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1.5 ml-auto">
           <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
           <Button

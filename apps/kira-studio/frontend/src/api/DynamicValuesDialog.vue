@@ -71,8 +71,8 @@ function close(): void {
       data-testid="dynamic-values-dialog"
       class="flex flex-col p-0 gap-0 w-120 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Dynamic values</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Dynamic values</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -126,7 +126,7 @@ function close(): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1.5 justify-end w-full">
           <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
         </span>

@@ -232,8 +232,8 @@ onUnmounted(() => {
       data-testid="http-diff-dialog"
       class="flex flex-col p-0 gap-0 w-225 h-160"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Compare responses</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Compare responses</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -351,7 +351,7 @@ onUnmounted(() => {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1.5 justify-end w-full">
           <Button variant="dialog" size="kira" data-testid="http-diff-close" @click="emit('close')">Close</Button>
         </span>

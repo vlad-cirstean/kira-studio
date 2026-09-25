@@ -119,8 +119,8 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
       data-testid="db-mcp-approval-dialog"
       class="flex flex-col p-0 gap-0 w-130 max-h-4/5"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">{{ dialogTitle }}</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>{{ dialogTitle }}</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -177,7 +177,7 @@ const DETAIL_CLASS = 'm-0 px-3 pb-2 text-subtle';
         </p>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1 ml-auto">
           <Button
             ref="denyButton"

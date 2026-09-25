@@ -236,8 +236,8 @@ function onSequenceStartChange(index: number, start: number): void {
       data-testid="generate-data-dialog"
       class="flex flex-col p-0 gap-0 w-170 max-h-[82vh]"
     >
-      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
-        <DialogTitle class="text-kira-lg font-normal">Generate data</DialogTitle>
+      <DialogHeader>
+        <DialogTitle>Generate data</DialogTitle>
         <DialogClose as-child>
           <Button
             variant="ghost"
@@ -494,7 +494,7 @@ function onSequenceStartChange(index: number, start: number): void {
     </div>
       </div>
 
-      <DialogFooter class="border-t border-border bg-transparent">
+      <DialogFooter>
         <span class="flex items-center gap-1 ml-auto">
           <!-- P104 §3: RunState inlined -- status is always 'running' here (elapsedMs is always
                null, so the label is always the em dash RunState's own computed would give it). -->

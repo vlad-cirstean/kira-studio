@@ -16,8 +16,13 @@ const forwardedProps = useForwardProps(delegatedProps)
   <DialogTitle
     data-slot="dialog-title"
     v-bind="forwardedProps"
-    :class="cn('text-base leading-none font-medium cn-font-heading', props.class)"
+    :class="cn('cn-font-heading text-kira-lg font-normal', props.class)"
   >
     <slot />
   </DialogTitle>
+  <!-- P110 I2-21 (§3.10): base is today's already-merged 17-site override. `leading-none` is gone
+       -- twMerge already dropped it once a later font-size (`text-kira-lg`) landed on top of the
+       old `text-base leading-none font-medium` base, verified with the real cn() before this
+       change (empirically: cn('text-base leading-none font-medium cn-font-heading', 'text-kira-lg
+       font-normal') => 'cn-font-heading text-kira-lg font-normal', no leading-none survives). -->
 </template>
