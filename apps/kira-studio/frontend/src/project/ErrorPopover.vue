@@ -71,29 +71,35 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <span class="error-popover-host">
+  <span class="min-w-0 ml-auto shrink">
     <button
       ref="triggerRef"
       type="button"
-      class="error-trigger"
+      class="flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer gap-1 text-error text-kira-sm"
       data-testid="error-popover-trigger"
       :aria-label="`Error: ${props.message}`"
       @click="toggle"
     >
       <CodiconIcon name="error" :size="13" />
-      <span class="error-trigger-text">{{ props.message }}</span>
+      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ props.message }}</span>
     </button>
 
     <Teleport to="body">
+      <!-- P28 D17(c): the menu rung. This was a bare 200 -- above the dialog scrim (then 100) and
+           below the tooltip (then 300). Both relationships are preserved by the ladder: 300 sits
+           above --kira-z-dialog and below --kira-z-tooltip. -->
       <div
         v-if="open"
         ref="popoverRef"
-        class="error-popover bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden"
+        class="bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed w-80 max-h-60 flex flex-col z-(--kira-z-menu) max-w-[calc(100vw-8px)] text-kira-md"
         data-testid="error-popover"
         :style="style"
       >
-        <div class="error-popover-body">{{ props.message }}</div>
-        <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 error-popover-actions">
+        <div class="overflow-auto whitespace-pre-wrap break-words p-2 text-error font-data">{{ props.message }}</div>
+        <!-- Footer is the same 28px band used everywhere a toolbar sits at the edge of a
+             floating surface, with the border moved to the top since this one closes
+             the popover instead of opening it. -->
+        <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-t border-border">
           <Button variant="toolbar" size="kira" class="ml-auto" @click="copyText(props.message)">Copy</Button>
           <Button variant="toolbar" size="kira" @click="close">Close</Button>
         </div>
@@ -101,47 +107,3 @@ onUnmounted(() => {
     </Teleport>
   </span>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.error-popover-host {
-  @apply min-w-0 ml-auto shrink;
-}
-
-.error-trigger {
-  @apply flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer;
-  gap: var(--kira-s-2);
-  color: var(--kira-error);
-  font-size: var(--kira-t-sm);
-}
-
-.error-trigger-text {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.error-popover {
-  /* P28 D17(c): the menu rung. This was a bare 200 — above the dialog scrim (then 100) and below
-     the tooltip (then 300). Both relationships are preserved by the ladder: 300 sits above
-     --kira-z-dialog and below --kira-z-tooltip. */
-  @apply fixed w-80 max-h-60 flex flex-col;
-  z-index: var(--kira-z-menu);
-  max-width: calc(100vw - 8px);
-  font-size: var(--kira-t-md);
-}
-
-.error-popover-body {
-  @apply overflow-auto whitespace-pre-wrap break-words;
-  padding: var(--kira-s-4);
-  color: var(--kira-error);
-  font-family: var(--kira-font-data);
-}
-
-/* Footer is the same 28px band used everywhere a toolbar sits at the edge of a
-   floating surface, with the border moved to the top since this one closes
-   the popover instead of opening it. */
-.error-popover-actions {
-  @apply shrink-0;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-}
-</style>
