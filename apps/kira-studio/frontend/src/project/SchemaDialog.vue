@@ -139,13 +139,13 @@ async function onSave(): Promise<void> {
         </DialogClose>
       </DialogHeader>
 
-    <div class="flex flex-col gap-2 p-3 schema-dialog-body">
-      <span class="help">
+    <div class="flex flex-col gap-2 p-3 h-[60vh]">
+      <span class="help leading-normal text-subtle text-kira-xs">
         Table and column completion for this connection normally fills in on its own from the
         connection's own cached schema metadata — no setup needed. Paste a schema here only to
         override that: a schema that doesn't exist yet, or a connection this app can't introspect.
       </span>
-      <div class="editor-wrap">
+      <div class="flex-1 min-h-0 overflow-hidden rounded-kira-sm border border-border">
         <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
              dispatch, project/ may not import views/ per biome.json) gives dialect-correct
              keyword/type-name completion here — useful for hand-typing VARCHAR, NUMERIC(10,2),
@@ -161,10 +161,10 @@ async function onSave(): Promise<void> {
           @update:doc="onDocChange"
         />
       </div>
-      <Alert variant="note" class="summary-strip" data-testid="schema-parse-summary">
+      <Alert variant="note" class="self-stretch rounded-kira-sm border border-border" data-testid="schema-parse-summary">
         <AlertDescription>
           <span v-if="parseSummary">{{ parseSummary }}</span>
-          <span v-else class="empty-note">
+          <span v-else class="text-subtle text-kira-xs">
             Paste output from <span class="font-data">pg_dump --schema-only</span>,
             <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
             whichever your connection's own engine gives you.
@@ -174,10 +174,10 @@ async function onSave(): Promise<void> {
     </div>
 
       <DialogFooter class="border-t border-border bg-transparent">
-        <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
+        <span v-if="saveError" class="leading-normal text-kira-xs text-error" data-testid="schema-save-error">{{
           saveError
         }}</span>
-        <span v-else class="help">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span v-else class="help leading-normal text-subtle text-kira-xs">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
@@ -189,37 +189,3 @@ async function onSave(): Promise<void> {
   </Dialog>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.schema-dialog-body {
-  @apply h-[60vh];
-}
-
-.help {
-  @apply leading-normal;
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-}
-
-.field-error {
-  @apply leading-normal;
-  font-size: var(--kira-t-xs);
-  color: var(--kira-error);
-}
-
-.editor-wrap {
-  @apply flex-1 min-h-0 overflow-hidden rounded-kira-sm;
-  border: var(--kira-border-width) solid var(--kira-border);
-}
-
-.summary-strip {
-  @apply self-stretch rounded-kira-sm;
-  border: var(--kira-border-width) solid var(--kira-border);
-}
-
-.empty-note {
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-subtle);
-}
-</style>
