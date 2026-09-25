@@ -73,9 +73,9 @@ const keepAwakeTooltip = computed(() => {
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm mode-tab wails-no-drag"
+        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm wails-no-drag"
         :class="[
-          modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+          modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
           { 'is-active': modeStore.active === mode },
         ]"
         data-testid="mode-tab"
@@ -176,19 +176,13 @@ const keepAwakeTooltip = computed(() => {
     <template #settings>
       <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
     </template>
+    <!-- CRITICAL (D2): --wails-draggable inherits from the shared TitleBar's own root, and
+         isDraggableEvent (drag.ts) reads the event *target's* computed style — every interactive
+         child here must explicitly override it (wails-no-drag, inline on the button/action-row
+         above), or clicking a mode tab would also start a window drag. P110 I2-18: the mode tab's
+         hover now lives in the `:class` ternary above (`hover:bg-hover` only in the inactive
+         branch), replacing `.mode-tab:hover:not(.is-active)` -- `is-active` itself stays a real
+         class (terminal-module.spec.ts/mode-switch.spec.ts/etc. assert `toHaveClass(/is-active/)`
+         on it), `mode-tab` was marker-only and dropped. -->
   </TitleBarBase>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* CRITICAL (D2): --wails-draggable inherits from the shared TitleBar's own root, and
-   isDraggableEvent (drag.ts) reads the event *target's* computed style — every interactive child
-   here must explicitly override it (wails-no-drag, inline on the button/action-row above), or
-   clicking a mode tab would also start a window drag. Only the live :hover state below can't move
-   onto a static class -- P110 B37: its own background: var(--kira-hover) declaration still
-   converts to @apply bg-hover in place, though (same selector, same cascade position). */
-.mode-tab:hover:not(.is-active) {
-  @apply bg-hover;
-}
-</style>

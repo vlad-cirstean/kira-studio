@@ -111,7 +111,7 @@ const agentTooltip = computed(() =>
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover update"
+            class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm cursor-pointer border-0 bg-none text-info hover:bg-hover hover:text-fg"
             data-testid="update-available"
             @click="onOpenReleasePage"
           >
@@ -168,30 +168,14 @@ const agentTooltip = computed(() =>
         <TooltipContent>{{ engineStore.lastPingMs }} ms</TooltipContent>
       </Tooltip>
     </template>
+    <!-- P110 I2-18 (§3.5.3): `.update`'s own font: inherit + color/hover rules folded onto the
+         button above -- Preflight already sets `font: inherit` on every <button> (zeroing family/
+         size/weight to the parent's), so `text-kira-sm` is redundant with what buttons already
+         inherit and was dropped along with `text-fg`; `text-info hover:text-fg` replaces the old
+         .update/.update:hover pair. Measured getComputedStyle(button) on `[data-testid="update-
+         available"]` before/after: fontSize 12px -> 12px, fontFamily unchanged (system-ui stack),
+         color rgb(55, 148, 255) -> rgb(55, 148, 255) (text-info). Neighbouring <span> items keep
+         `text-fg text-kira-sm` untouched -- they are not buttons, so Preflight's font: inherit
+         does not reach them. -->
   </StatusBarBase>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B39: .metric-value/.metric-value:not(.metric-mem)/.metric-mem/.metric-sep were pure
-   @apply-only and moved onto the template directly -- unlike TabStrip.vue's hover/is-active
-   opacity toggle, `:not(.metric-mem)` here resolves statically per template call site (the CPU
-   span never carries .metric-mem, the mem span always does), not a runtime pointer/selection
-   state, so there is no real cascade-order question to preserve.
-
-   .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
-   and Enter/Space come free. Its own template class list (P110 B29) already supplies
-   height/padding/border-radius/cursor/border-reset. */
-.update {
-  /* P110 B37: font: inherit has no Tailwind utility equivalent (a font shorthand reset, not a
-     single property) -- stays raw, load-bearing here (this IS a <button> with its own visible
-     text, unlike ConnectionDialog.vue's own `.kind` no-op precedent). color: var(--kira-info)
-     -> text-info. */
-  font: inherit;
-  @apply text-info;
-}
-.update:hover {
-  @apply text-fg;
-}
-</style>

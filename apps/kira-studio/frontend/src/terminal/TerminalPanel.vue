@@ -238,7 +238,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                 v-for="script in filteredRecords"
                 :key="script.id"
                 type="button"
-                class="quick-command-row flex items-center gap-1 py-1 px-1.5 cursor-default select-none"
+                class="flex items-center gap-1 py-1 px-1.5 cursor-default select-none hover:bg-hover"
                 :data-testid="`quick-command-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent="onContextMenu($event, script)"
@@ -280,11 +280,3 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.quick-command-row:hover {
-  @apply bg-hover;
-}
-</style>
