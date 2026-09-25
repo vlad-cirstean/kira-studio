@@ -22,11 +22,6 @@ export const alertVariants = cva(
         // `*:data-[slot=alert-description]:…` targeting.
         warn: 'bg-warn/10 border-warn/20 *:data-[slot=alert-description]:text-warn-text *:[svg]:text-current',
         note: 'bg-info/8 border-info/20 *:data-[slot=alert-description]:text-note-text *:[svg]:text-current',
-        // P110 B23: same tone-vocabulary fold as warn/note above, for the primitives.css
-        // `.p-strip.err` raw-declaration consumers -- bg-error/10 border-error/20 exactly
-        // matches `.p-strip.err`'s rgba(241, 76, 76, 0.1) background, and --kira-error-text
-        // already IS `.p-strip.err`'s own #f3a3a3 (§1.4's disclosed token promotion).
-        err: 'bg-error/10 border-error/20 *:data-[slot=alert-description]:text-error-text *:[svg]:text-current',
       },
     },
     defaultVariants: {

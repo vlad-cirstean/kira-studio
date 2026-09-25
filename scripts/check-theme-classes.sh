@@ -462,6 +462,13 @@ check_class_in_attrs_all 'splitter' 'a local splitter-track class/data attribute
 #     own `.p-status.is-on`/`.p-completion-row.is-on` (a later B-item's own job) are real, unrelated
 #     survivors.
 
+# P110 I2-36: the `err` Alert variant is retired (unified onto `destructive`) -- its own
+# `text-error-text` (`--color-error-text`/`--kira-error-text`) had no other consumer, so both the
+# class and its backing tokens are deleted together. `_all` form (I2-31's now-established pattern
+# postdates the plan's own literal `check_class` wording for this item; no legitimate GU/KU or
+# prose survivor exists for this name either).
+check_class_all 'text-error-text' 'text-error'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

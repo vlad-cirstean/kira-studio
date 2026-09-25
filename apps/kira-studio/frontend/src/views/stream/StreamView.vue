@@ -1036,20 +1036,15 @@ onUnmounted(() => {
       </AlertDescription>
     </Alert>
 
-    <!-- This view's error tone keeps its own brighter text-error (not the shared err variant's
-         softer text-error-text) -- its retired scoped tone class chose the base error token, not
-         the "-text" one every other tone consumer uses. Put the color on a plain child instead of
-         AlertDescription itself: the variant's own `*:data-[slot=alert-description]:text-error-
-         text` selector out-specifies a bare `.text-error` on that same [data-slot] element. -->
-    <Alert v-if="rt?.status === 'error' && rt.error" variant="err" data-testid="stream-error">
-      <CodiconIcon name="error" :size="13" class="text-error" />
-      <AlertDescription><span class="text-error">{{ rt.error.message }}</span></AlertDescription>
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="stream-error">
+      <CodiconIcon name="error" :size="13" />
+      <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
     <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-    <Alert v-if="rt?.actionError" variant="err" data-testid="stream-action-error">
-      <CodiconIcon name="error" :size="13" class="text-error" />
-      <AlertDescription><span class="text-error">{{ rt.actionError }}</span></AlertDescription>
+    <Alert v-if="rt?.actionError" variant="destructive" data-testid="stream-action-error">
+      <CodiconIcon name="error" :size="13" />
+      <AlertDescription>{{ rt.actionError }}</AlertDescription>
     </Alert>
 
     <StreamSearchToolbar

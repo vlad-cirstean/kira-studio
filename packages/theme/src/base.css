@@ -50,7 +50,6 @@
   --color-state-on: var(--kira-state-on);
   --color-warn-text: var(--kira-warn-text);
   --color-note-text: var(--kira-note-text);
-  --color-error-text: var(--kira-error-text);
   /* P110 B6: the grid/document/keyvalue/stream search toolbars' match tint, promoted to real
      utilities ahead of their scoped-block conversions (B34+). 7 and 5 recurring uses. */
   --color-search-match: var(--kira-search-match);
