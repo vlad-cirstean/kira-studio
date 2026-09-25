@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 const connectionSelectColumns = `
@@ -180,12 +181,10 @@ func (r *ConnectionsRepo) KindOf(connID string) (string, bool) {
 
 // Get returns (nil, nil) when no row with this id exists (or the row failed validation).
 func (r *ConnectionsRepo) Get(connID string) (*model.ConnectionSummary, error) {
-	row := r.DB.QueryRow(`SELECT `+connectionSelectColumns+` FROM connections WHERE id = ?`, connID)
-	c, err := scanConnectionRow(row)
+	c, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.ConnectionSummary, error) {
+		return scanConnectionRow(row)
+	}, `SELECT `+connectionSelectColumns+` FROM connections WHERE id = ?`, connID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("repos/connections: get %s: %w", connID, err)
 	}
 	return c, nil
@@ -204,8 +203,8 @@ func (r *ConnectionsRepo) insertTx(connID string, insert func(tx *sql.Tx, sortOr
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	var sortOrder int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM connections`).Scan(&sortOrder); err != nil {
+	sortOrder, err := sqlitex.NextSortOrder(tx, "connections", "")
+	if err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: next sort order: %w", err)
 	}
 	if err := insert(tx, sortOrder); err != nil {

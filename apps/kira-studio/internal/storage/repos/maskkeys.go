@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // maskKeyBytes is the correlation key's own size (plan §2.5: "32 random bytes, per connection").
@@ -30,17 +31,20 @@ func NewMaskKeys(db *sql.DB, cipher Cipher) *MaskKeysRepo {
 // Get returns the connection's own key, or nil when none has been minted yet (” stored). Never
 // mints — EnsureKey is the only writer.
 func (r *MaskKeysRepo) Get(connectionID string) ([]byte, error) {
-	var stored string
-	if err := r.db.QueryRow(`SELECT mask_correlation_key FROM connections WHERE id = ?`, connectionID).Scan(&stored); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
+	stored, err := sqlitex.QueryOne(r.db, func(row *sql.Row) (*string, error) {
+		var s string
+		if err := row.Scan(&s); err != nil {
+			return nil, err
 		}
+		return &s, nil
+	}, `SELECT mask_correlation_key FROM connections WHERE id = ?`, connectionID)
+	if err != nil {
 		return nil, fmt.Errorf("repos/maskkeys: get %s: %w", connectionID, err)
 	}
-	if stored == "" {
+	if stored == nil || *stored == "" {
 		return nil, nil
 	}
-	plain, err := r.cipher.Decrypt(secrets.ScopeMaskKey, stored)
+	plain, err := r.cipher.Decrypt(secrets.ScopeMaskKey, *stored)
 	if err != nil {
 		return nil, fmt.Errorf("repos/maskkeys: decrypt %s: %w", connectionID, err)
 	}

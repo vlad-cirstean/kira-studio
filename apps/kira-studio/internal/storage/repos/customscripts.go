@@ -40,15 +40,17 @@ func (r *CustomScriptsRepo) List() ([]model.CustomScript, error) {
 
 // Get reads one row by id, (nil, nil) when not found.
 func (r *CustomScriptsRepo) Get(id string) (*model.CustomScript, error) {
-	row := r.DB.QueryRow(`SELECT `+customScriptsSelectColumns+` FROM custom_scripts WHERE id = ?`, id)
-	rec, err := scanCustomScriptRow(row)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.CustomScript, error) {
+		s, err := scanCustomScriptRow(row)
+		if err != nil {
+			return nil, err
+		}
+		return &s, nil
+	}, `SELECT `+customScriptsSelectColumns+` FROM custom_scripts WHERE id = ?`, id)
 	if err != nil {
 		return nil, fmt.Errorf("repos/customscripts: get %s: %w", id, err)
 	}
-	return &rec, nil
+	return rec, nil
 }
 
 // Create inserts a new row, sort_order set to one past the current max — CodeReposRepo.Create's
@@ -58,9 +60,9 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 	if err := fields.Validate(); err != nil {
 		return model.CustomScript{}, fmt.Errorf("repos/customscripts: %w", err)
 	}
-	var maxOrder sql.NullInt64
-	if err := r.DB.QueryRow(`SELECT MAX(sort_order) FROM custom_scripts`).Scan(&maxOrder); err != nil {
-		return model.CustomScript{}, fmt.Errorf("repos/customscripts: max sort_order: %w", err)
+	sortOrder, err := sqlitex.NextSortOrder(r.DB, "custom_scripts", "")
+	if err != nil {
+		return model.CustomScript{}, fmt.Errorf("repos/customscripts: next sort order: %w", err)
 	}
 	now := kiratime.NowISO()
 	rec := model.CustomScript{
@@ -69,7 +71,7 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 		Command:    fields.Command,
 		WorkingDir: fields.WorkingDir,
 		Color:      fields.Color,
-		SortOrder:  int(maxOrder.Int64) + 1,
+		SortOrder:  sortOrder,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}

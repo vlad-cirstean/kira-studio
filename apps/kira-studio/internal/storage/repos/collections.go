@@ -174,8 +174,8 @@ func (r *CollectionsRepo) CreateCollection(name string) (model.Collection, error
 	if name == "" {
 		return model.Collection{}, fmt.Errorf("repos/collections: name is required")
 	}
-	var order int
-	if err := r.DB.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_collections`).Scan(&order); err != nil {
+	order, err := sqlitex.NextSortOrder(r.DB, "api_collections", "")
+	if err != nil {
 		return model.Collection{}, fmt.Errorf("repos/collections: next collection order: %w", err)
 	}
 	c := model.Collection{
@@ -291,12 +291,7 @@ func createItem(db *sql.DB, item model.CollectionItem, requestJSON string) (mode
 }
 
 func nextItemOrder(tx *sql.Tx, collectionID string, parentID *string) (int, error) {
-	var order int
-	err := tx.QueryRow(
-		`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_items
-		  WHERE collection_id = ? AND parent_id IS ?`,
-		collectionID, parentID,
-	).Scan(&order)
+	order, err := sqlitex.NextSortOrder(tx, "api_items", "collection_id = ? AND parent_id IS ?", collectionID, parentID)
 	if err != nil {
 		return 0, fmt.Errorf("repos/collections: next item order: %w", err)
 	}
@@ -550,8 +545,8 @@ func (r *CollectionsRepo) ImportTree(tree *postman.Tree) (model.Collection, erro
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var order int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_collections`).Scan(&order); err != nil {
+	order, err := sqlitex.NextSortOrder(tx, "api_collections", "")
+	if err != nil {
 		return model.Collection{}, fmt.Errorf("repos/collections: next collection order: %w", err)
 	}
 	now := kiratime.NowISO()

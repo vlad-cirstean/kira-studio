@@ -35,15 +35,17 @@ func (r *CodeReposRepo) List() ([]model.CodeRepo, error) {
 // Get reads one row by id, (nil, nil) when not found — CodeWorkspaceService's own callers
 // distinguish "not found" from a real error rather than getting sql.ErrNoRows leaking upward.
 func (r *CodeReposRepo) Get(id string) (*model.CodeRepo, error) {
-	row := r.DB.QueryRow(`SELECT `+codeReposSelectColumns+` FROM code_repos WHERE id = ?`, id)
-	rec, err := scanCodeRepoRow(row)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.CodeRepo, error) {
+		c, err := scanCodeRepoRow(row)
+		if err != nil {
+			return nil, err
+		}
+		return &c, nil
+	}, `SELECT `+codeReposSelectColumns+` FROM code_repos WHERE id = ?`, id)
 	if err != nil {
 		return nil, fmt.Errorf("repos: get code repo %s: %w", id, err)
 	}
-	return &rec, nil
+	return rec, nil
 }
 
 // Create inserts a new row, sort_order set to one past the current max — repo_id's UNIQUE index is
@@ -54,11 +56,11 @@ func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 	if err := rec.Validate(); err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos: %w", err)
 	}
-	var maxOrder sql.NullInt64
-	if err := r.DB.QueryRow(`SELECT MAX(sort_order) FROM code_repos`).Scan(&maxOrder); err != nil {
-		return model.CodeRepo{}, fmt.Errorf("repos: code repo max sort_order: %w", err)
+	sortOrder, err := sqlitex.NextSortOrder(r.DB, "code_repos", "")
+	if err != nil {
+		return model.CodeRepo{}, fmt.Errorf("repos: code repo next sort order: %w", err)
 	}
-	rec.SortOrder = int(maxOrder.Int64) + 1
+	rec.SortOrder = sortOrder
 	if _, err := r.DB.Exec(
 		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.CreatedAt,

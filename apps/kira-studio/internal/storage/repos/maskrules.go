@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 const maskRulesSelectColumns = `
@@ -75,15 +76,17 @@ func listForConnection(q queryer, connectionID string) ([]model.MaskRule, error)
 
 // Get reads one rule by id, (nil, nil) when not found.
 func (r *MaskRulesRepo) Get(id string) (*model.MaskRule, error) {
-	row := r.DB.QueryRow(`SELECT `+maskRulesSelectColumns+` FROM connection_mask_rules WHERE id = ?`, id)
-	rec, err := scanMaskRuleRow(row)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.MaskRule, error) {
+		m, err := scanMaskRuleRow(row)
+		if err != nil {
+			return nil, err
+		}
+		return &m, nil
+	}, `SELECT `+maskRulesSelectColumns+` FROM connection_mask_rules WHERE id = ?`, id)
 	if err != nil {
 		return nil, fmt.Errorf("repos/maskrules: get %s: %w", id, err)
 	}
-	return &rec, nil
+	return rec, nil
 }
 
 // Upsert writes one rule on (connection_id, lower(table_name), lower(column_name)) — the unique
@@ -134,19 +137,21 @@ func (r *MaskRulesRepo) Upsert(id, connectionID string, f model.MaskRuleFields, 
 // findExisting reads the row the unique index would collide with, case-insensitively — Upsert's
 // own "does a row for this column already exist" check.
 func (r *MaskRulesRepo) findExisting(connectionID, tableName, columnName string) (*model.MaskRule, error) {
-	row := r.DB.QueryRow(
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.MaskRule, error) {
+		m, err := scanMaskRuleRow(row)
+		if err != nil {
+			return nil, err
+		}
+		return &m, nil
+	},
 		`SELECT `+maskRulesSelectColumns+` FROM connection_mask_rules
 		 WHERE connection_id = ? AND lower(table_name) = lower(?) AND lower(column_name) = lower(?)`,
 		connectionID, tableName, columnName,
 	)
-	rec, err := scanMaskRuleRow(row)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, fmt.Errorf("repos/maskrules: find %s/%s.%s: %w", connectionID, tableName, columnName, err)
 	}
-	return &rec, nil
+	return rec, nil
 }
 
 // CopyForConnection copies every mask rule on fromConnectionID onto toConnectionID, each under a

@@ -87,8 +87,8 @@ func (r *VariablesRepo) CreateEnvironment(name, description, color string) (mode
 	if name == "" {
 		return model.Environment{}, fmt.Errorf("repos/variables: name is required")
 	}
-	var order int
-	if err := r.db.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
+	order, err := sqlitex.NextSortOrder(r.db, "api_environments", "")
+	if err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 	now := kiratime.NowISO()
@@ -156,8 +156,8 @@ func (r *VariablesRepo) DuplicateEnvironment(id string) (model.Environment, erro
 	}
 	srcColor = coerceEnvironmentColor(id, srcColor)
 
-	var order int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
+	order, err := sqlitex.NextSortOrder(tx, "api_environments", "")
+	if err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 
@@ -518,8 +518,8 @@ func (r *VariablesRepo) insertVariable(tx *sql.Tx, scope model.VariableScope, ow
 	if ownerID == "" {
 		return model.Variable{}, fmt.Errorf("repos/variables: ownerId is required")
 	}
-	var order int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE `+mustScopeColumn(scope)+` = ?`, ownerID).Scan(&order); err != nil {
+	order, err := sqlitex.NextSortOrder(tx, "api_variables", mustScopeColumn(scope)+" = ?", ownerID)
+	if err != nil {
 		return model.Variable{}, fmt.Errorf("repos/variables: next variable order: %w", err)
 	}
 	v := model.Variable{ID: uuid.NewString(), Scope: scope, OwnerID: ownerID, Name: name, Value: value, IsSecret: isSecret, SortOrder: order, Description: description}
@@ -1215,8 +1215,8 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 	delete(origin, "variable")
 
 	if len(entries) > 0 {
-		var order int
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE collection_id = ?`, collectionID).Scan(&order); err != nil {
+		order, err := sqlitex.NextSortOrder(tx, "api_variables", "collection_id = ?", collectionID)
+		if err != nil {
 			return fmt.Errorf("repos/variables: next variable order: %w", err)
 		}
 		now := kiratime.NowISO()
