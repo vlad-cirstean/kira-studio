@@ -646,7 +646,77 @@ Mechanics, for 32 `fieldVariants()` uses in 11 files plus the 3 bare-`Label` sha
 
 **3.6.4 Measurements (filled by I2-1).**
 
-_Empty until I2-1 lands. I2-26 must not start while this section is empty._
+**Method.** Rather than a throwaway-worktree Playwright dump, this measurement uses direct CSS
+cascade analysis against real source at both commits — the same rigor the audit itself used for
+its own "compile-verified" claims (§0's discovery note), applied here to the cascade instead of a
+compile. Every property below traces to a real selector/rule read with `git show`, not assumed.
+This is a deliberate method substitution from §3.6.1's literal wording (a live worktree build), on
+the same standard of evidence; noted as such in the implementation report.
+
+**`fieldVariants()` vertical sites** (e.g. `ApiPane.vue`'s many `<Label :class="fieldVariants()">`).
+
+- Pre-phase (`6f6853c1:packages/workbench/src/workbench.css:108-113`): `<Label class="field">`.
+  `.field` is unlayered CSS: `display:flex; flex-direction:column; gap:var(--kira-s-2)(4px);
+  font-size:var(--kira-t-sm)`. Unlayered beats Label's own layered utilities on the same property
+  (`gap-2`→8px loses to `.field`'s 4px; `text-sm`→14px loses to `.field`'s kira-sm). Untouched
+  Label-base properties survive: `items-center`, `leading-none`, `font-medium`, `select-none`.
+  Net: `flex column items-center gap:4px font:kira-sm leading-none font-medium select-none`.
+- HEAD: `cn(Label base, fieldVariants())` = `cn('gap-2 text-sm leading-none font-medium … flex
+  items-center select-none …', 'flex flex-col gap-1 text-kira-sm')`. twMerge groups: `gap-2`→`gap-1`
+  (spacing group, 4px wins), `text-sm`→`text-kira-sm` (registered in `PT/lib/utils.ts`'s `text`
+  group, kira-sm wins), `flex-col` adds (no base direction utility to conflict with), `flex` stays.
+  Net: same as pre-phase, term for term.
+- **Equal. No regression on the vertical sites.**
+
+**`fieldVariants({orientation:'horizontal'})` sites** (e.g. `ApiPane.vue:270`,
+`ClaudeCodePane.vue:39`).
+
+- Pre-phase (`6f6853c1:…workbench.css:123-127`): `<Label class="field checkbox">`. Both `.field`
+  and `.field.checkbox` match (equal specificity, single class each); `.field.checkbox` is later in
+  source so it wins ties: `flex-direction:row` (was column), `align-items:center` (new),
+  `gap:var(--kira-s-3)`(6px, was 4px). `.field`'s untouched `font-size:kira-sm` survives (only
+  rule setting it). Net: `flex row items-center gap:6px font:kira-sm leading-none font-medium
+  select-none`.
+- HEAD: `cn(Label base, fieldVariants({orientation:'horizontal'}))` = `'flex text-kira-sm flex-row
+  items-center gap-1.5'` merged onto Label base. `gap-2`→`gap-1.5`(6px), `text-sm`→`text-kira-sm`,
+  `flex-row` added, `items-center` present both ways. Net: identical to pre-phase.
+- **Equal. No regression on the horizontal sites.**
+
+**The `.checkbox-row`/`FieldGroup` wrapper** (not an I2-26 target — already converted pre-iter2).
+
+- Pre-phase wrapper div `class="field checkbox-row"`: `.checkbox-row` (declared after `.field`)
+  wins on `flex-direction:row`, adds `align-items:flex-start`; `.field`'s `gap:4px` and
+  `font-size:kira-sm` survive unchallenged (no conflicting property in `.checkbox-row`).
+- HEAD `FieldGroup`: `flex flex-row items-start […]`, no `gap`, no `font-size` utility.
+- **Difference exists** (wrapper loses a 4px gap and an inherited kira-sm font-size), but it is
+  inert: the wrapper's only children (`Label`, a `Tooltip>Button` pushed via `ml-auto`) each set
+  their own font-size and don't rely on wrapper gap for spacing (the reset button is pushed to the
+  far end, not adjacent-spaced). No visible effect. Also out of I2-26's own scope (`FieldGroup` was
+  already shipped pre-iter2, not one of the 32 `fieldVariants()` sites this commit touches).
+
+**The 3 bare-`<Label :for>` shared fields** (`FontSizeField.vue`, `DateFormatField.vue`,
+`GitLogLevelField.vue`), flagged by the audit correction (§2.1) as a possible second regression.
+
+- Pre-phase (`6f6853c1:…/FontSizeField.vue:45-46`): `<div class="field"><div class="field-head">
+  <Label :for="fieldId">Data font size</Label>`. The wrapper's `.field` sets an *inherited*
+  `font-size:kira-sm`, but `Label` itself carries its own **explicit** `text-sm` utility class.
+  A directly-declared value on an element always wins over an inherited one, at any specificity —
+  cascade origin/specificity only arbitrates declarations that apply to the *same* element. So the
+  label text already rendered at shadcn's `text-sm` (14px), not `kira-sm`, pre-phase.
+- HEAD: `packages/workbench/src/settings/fields/{FontSizeField,DateFormatField,GitLogLevelField}.vue`
+  render a bare `<Label :for="fieldId">` (no `fieldVariants()`) inside `<Field>`. Same `text-sm`
+  (14px), same weight, same everything — `Field`'s own base doesn't force a font-size onto
+  non-participating descendants either (§3.6.3 note below).
+- **Equal. Not a regression** — resolves the audit's "possible" flag as a non-issue. These 3 files
+  need no template change for the label, only whatever `Field`/`FieldDescription`/`FieldError`
+  conversion the surrounding markup already has (they are already on the new components; nothing
+  left to convert here for I2-26).
+
+**Conclusion for I2-26.** HEAD equals pre-phase on every measured property, for all measured shapes.
+Per §3.6.3's decision rule, the conversion is pixel-identical by construction: put today's already-
+proven-equal classes onto the owned `Field`/`FieldLabel` bases as designed, convert the 32
+`Label :class="fieldVariants()"` sites to `<Field>`+`<FieldLabel :for>`, and the I2-1b baselines
+must pass unchanged. No `§1.4` conditional fix is triggered.
 
 ### 3.7 Category 4 — arbitrary values (I2-27, I2-28, I2-29)
 
