@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strconv"
-	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -17,56 +16,44 @@ func init() {
 	})
 }
 
-// Adapter is index.ts's RedisAdapter.
-type Adapter struct {
-	deps adapters.Deps
-
-	// mu guards every field below (F3): Connect/Disconnect write set/defaultDbIndex/readOnly from
-	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
-	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
-	mu             sync.Mutex
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3) — set/defaultDbIndex/readOnly, guarded together via adapters.Guarded (P113 G1).
+type connState struct {
 	set            *dbConnectionSet
 	defaultDbIndex int
 	readOnly       bool
 }
 
-// getSet is every op's own locked read of a.set (F3) — requireSet's RequireConnected call takes
-// its result, never a.set directly.
-func (a *Adapter) getSet() *dbConnectionSet {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.set
+// Adapter is index.ts's RedisAdapter.
+type Adapter struct {
+	deps adapters.Deps
+
+	state adapters.Guarded[connState]
 }
 
-// getDefaultDbIndex is Execute's own locked read of a.defaultDbIndex (F3).
-func (a *Adapter) getDefaultDbIndex() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.defaultDbIndex
-}
+// getSet is every op's own locked read of state.set (F3) — requireSet's RequireConnected call
+// takes its result, never state.set directly.
+func (a *Adapter) getSet() *dbConnectionSet { return a.state.Load().set }
 
-// getReadOnly is Mutate/Execute's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+// getDefaultDbIndex is Execute's own locked read of state.defaultDbIndex (F3).
+func (a *Adapter) getDefaultDbIndex() int { return a.state.Load().defaultDbIndex }
+
+// getReadOnly is Mutate/Execute's own locked read of state.readOnly (F3).
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(set *dbConnectionSet, defaultDbIndex int, readOnly bool) {
-	a.mu.Lock()
-	a.set = set
-	a.defaultDbIndex = defaultDbIndex
-	a.readOnly = readOnly
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.set = set
+		s.defaultDbIndex = defaultDbIndex
+		s.readOnly = readOnly
+	})
 }
 
 // clearConnected is Disconnect's own locked write, once closeAll (a real network call, run with no
-// lock held) has returned (F3).
+// lock held) has returned (F3). readOnly is deliberately left set.
 func (a *Adapter) clearConnected() {
-	a.mu.Lock()
-	a.set = nil
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) { s.set = nil })
 }
 
 func (a *Adapter) Kind() string        { return "redis" }

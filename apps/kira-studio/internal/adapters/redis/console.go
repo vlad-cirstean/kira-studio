@@ -259,7 +259,7 @@ func (a *Adapter) ClassifyStatement(ctx context.Context, statement string) (adap
 	if len(tokens) == 0 {
 		return adapters.ClassUnknown, nil
 	}
-	conn, err := set.get(ctx, a.defaultDbIndex)
+	conn, err := set.get(ctx, a.getDefaultDbIndex())
 	if err != nil {
 		return adapters.ClassUnknown, err
 	}
