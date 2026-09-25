@@ -125,7 +125,8 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
 const tabs = computed(() => host.tabs.tabsForWorkspace(host.activeWorkspace.value));
 
 // P72 §7: split out of `tabs` so the template can render the pinned tab in a fixed leading slot,
-// outside `.tab-strip`'s own `overflow-x: auto` — it never scrolls away with everything else.
+// outside the scrolling tab row's own `overflow-x: auto` — it never scrolls away with everything
+// else.
 const pinnedTabs = computed(() =>
   tabs.value.filter((tab) => isPinned(tab)).map((tab) => ({ tab, icon: host.iconFor(tab) })),
 );
@@ -205,20 +206,24 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   <!-- P91 §8: always one wrapper — the Terminal module's own normal initial state is zero tabs,
        which needs the "+" (below) just as much as a populated strip does. -->
   <div
-    class="tab-strip-wrapper"
-    :class="{ 'is-empty': tabs.length === 0 }"
+    class="h-full flex items-center min-w-0"
+    :class="{ 'px-1': tabs.length === 0 }"
     :data-testid="tabs.length > 0 ? 'tab-strip-wrapper' : 'tab-strip-empty'"
   >
-    <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of `.tab-strip`, outside its
-         `overflow-x: auto`, so it never scrolls away. Icon-only: the repo name moves to the
+    <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of the scrolling tab row,
+         outside its `overflow-x: auto`, so it never scrolls away. Icon-only: the repo name moves to the
          tooltip/`aria-label` (`titleFor`), the chrome is one glyph. Never draggable (§6.1) and
          never has a close button, so neither is wired here at all rather than guarded per-tab. -->
-    <div v-if="pinnedTabs.length > 0" class="tab-strip-pinned" data-testid="tab-strip-pinned">
+    <div
+      v-if="pinnedTabs.length > 0"
+      class="h-full flex items-center gap-0.5 shrink-0 pt-0.5 pl-1"
+      data-testid="tab-strip-pinned"
+    >
       <Tooltip v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip is-pinned"
+            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip"
             :class="[
               tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
               { 'is-active': tab.active },
@@ -233,19 +238,29 @@ useEventListener(stripRef, 'dragend', onDragEnd);
             @click="onClick(tab)"
             @contextmenu.prevent="onContextMenu($event, tab)"
           >
-            <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
-            <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
+            <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
+            <span
+              v-else
+              class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground"
+              :style="icon.fileStyle"
+              aria-hidden="true"
+            />
           </button>
         </TooltipTrigger>
         <TooltipContent>{{ titleFor(tab) }}</TooltipContent>
       </Tooltip>
-      <span class="tab-strip-separator" aria-hidden="true"></span>
+      <span class="self-stretch shrink-0 w-px my-1 mr-0.5 bg-border" aria-hidden="true"></span>
     </div>
-    <div ref="stripRef" class="tab-strip" data-testid="tab-strip-row" @wheel="onWheel">
+    <div
+      ref="stripRef"
+      class="h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 scrollbar-none pt-0.5 px-1"
+      data-testid="tab-strip-row"
+      @wheel="onWheel"
+    >
       <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
            HTML and unreachable by keyboard — the close button is this tab's sibling now, not its
            child. `draggable`/drag* stay on this wrapper (the whole chip is the drag handle);
-           click/dblclick/auxclick/contextmenu move onto `.tab-main`. -->
+           click/dblclick/auxclick/contextmenu move onto the tab's own inner button. -->
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
@@ -254,8 +269,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
           tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
           {
             'is-active': tab.active,
-            'is-dragging': dragId === tab.id,
-            'is-preview': host.tabs.isPreview(tab.id),
+            'opacity-50': dragId === tab.id,
             'is-attention': isAttention(tab),
           },
         ]"
@@ -272,31 +286,43 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
         <button
           type="button"
-          class="tab-main"
+          class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
           @click="onClick(tab)"
           @dblclick="host.tabs.promoteTab(tab.id)"
           @auxclick.middle="onMiddleClick(tab)"
           @contextmenu.prevent="onContextMenu($event, tab)"
         >
-          <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
-          <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
+          <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
+          <span
+            v-else
+            class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground"
+            :style="icon.fileStyle"
+            aria-hidden="true"
+          />
           <Tooltip v-if="indicatorFor(tab)">
             <TooltipTrigger as-child>
-              <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="tab-incognito" />
+              <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="shrink-0 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
           </Tooltip>
-          <span class="tab-title">{{ titleFor(tab) }}</span>
+          <span class="tab-title truncate min-w-0" :class="{ italic: host.tabs.isPreview(tab.id) }">{{
+            titleFor(tab)
+          }}</span>
           <Tooltip v-if="badgeFor(tab)">
             <TooltipTrigger as-child>
-              <CodiconIcon :name="badgeFor(tab)!.icon" :size="12" class="tab-badge" data-testid="tab-badge" />
+              <CodiconIcon
+                :name="badgeFor(tab)!.icon"
+                :size="12"
+                class="shrink-0 text-muted-foreground"
+                data-testid="tab-badge"
+              />
             </TooltipTrigger>
             <TooltipContent>{{ badgeFor(tab)!.tooltip }}</TooltipContent>
           </Tooltip>
         </button>
         <button
           type="button"
-          class="tab-close"
+          class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm"
           aria-label="Close tab"
           data-testid="tab-close"
           @click="onClose($event, tab)"
@@ -305,8 +331,8 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         </button>
       </div>
     </div>
-    <!-- P83 §9.1/P91 §8: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s
-         own leading-edge fix at the other end. Per-app "new tab" affordance — the whole
+    <!-- P83 §9.1/P91 §8: a third fixed child, after the scrolling tab row, mirroring the pinned
+         tab's own leading-edge fix at the other end. Per-app "new tab" affordance — the whole
          `data-testid="tab-strip-actions"` wrapper is slot content (not a wrapper this component
          owns), so each app keeps its own `v-if="showNewTab"` gating the element's very presence in
          the DOM. P110 B13: the wrapper and button are now plain Tailwind utility classes inlined in
@@ -319,82 +345,24 @@ useEventListener(stripRef, 'dragend', onDragEnd);
 <style scoped>
 @reference "@theme/base.css";
 
-/* P72 §7: the actual flex row — `.tab-strip-pinned` (fixed) and `.tab-strip` (scrolling) are its
-   two children, so the pinned tab sits outside the latter's own `overflow-x` entirely instead of
-   scrolling away with it. */
-.tab-strip-wrapper {
-  @apply h-full flex items-center min-w-0;
-}
-
-.tab-strip-wrapper.is-empty {
-  padding: 0 var(--kira-s-2);
-}
-
-.tab-strip-pinned {
-  @apply h-full flex items-center gap-0.5 shrink-0;
-  padding: 2px 0 0 4px;
-}
-
-.tab-chip.is-pinned {
-  padding: 0 var(--kira-s-2);
-}
-
-/* The visible "and after it the tab bar begins" boundary. */
-.tab-strip-separator {
-  @apply self-stretch shrink-0;
-  width: var(--kira-border-width);
-  margin: 4px 2px 4px 0;
-  background: var(--kira-border);
-}
-
-.tab-strip {
-  /* Scrolls with too many tabs open, but the track itself stays hidden — reachable by wheel
-     (onWheel above), trackpad, or drag either way, with no visible scrollbar chrome. */
-  @apply h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none];
-  padding: 2px 4px 0;
-}
-
-.tab-strip::-webkit-scrollbar {
-  @apply hidden;
-}
-
+/* P110 B36: only what a static utility class genuinely can't express stays here. Everything else
+   (layout/spacing/colour) moved onto the template as inline utility classes — see this file's own
+   git history for the byte-for-byte mapping. What's left, and why:
+   - `.tab-chip:hover:not(.is-active)` / `.tab-close:hover` / the hover half of the close button's
+     opacity toggle: real `:hover` on one element driving another (or itself) — no static class can
+     stand in for a live pointer state.
+   - `.tab-chip.is-attention::after`: a generated pseudo-element (dot badge) — nothing in the DOM to
+     hang a utility class on.
+   - `.tab-file-icon`'s `mask-*`/`-webkit-mask-*`: no Tailwind utility covers `mask-position`/
+     `mask-repeat`/`mask-size` in this version (confirmed via compile check) — RepoSearchRow.vue and
+     RepoTreeRow.vue carry the identical six-declaration block for the same seti-icon masking, same
+     conclusion there.
+   `.tab-chip`/`.is-active`/`.is-attention`/`.tab-close`/`.tab-file-icon`/`.tab-title` stay as bare
+   marker classes to anchor the selectors below; `.is-active`/`.tab-file-icon`/`.tab-title`/
+   `.tab-close` are also real test dependencies (slick-grid.spec.ts, budgets.spec.ts,
+   repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). */
 .tab-chip:hover:not(.is-active) {
   background: var(--kira-hover);
-}
-
-.tab-chip.is-dragging {
-  @apply opacity-50;
-}
-
-/* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
-   whole chip — unstyled beyond filling the space .tab-chip's own padding/gap leaves it. */
-.tab-main {
-  @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
-}
-
-.tab-icon {
-  @apply shrink-0;
-}
-
-/* RepoTreeRow.vue's own .node-icon, ported for the identical `{ filePath }` marker — a repo-file
-   tab's own seti icon, not a codicon glyph. */
-.tab-file-icon {
-  @apply w-3.5 h-3.5 text-muted-foreground;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-}
-
-.tab-title {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
-}
-
-/* C5 §5.1: the preview-tab affordance — VS Code's own convention for "opened, not yet promoted". */
-.tab-chip.is-preview .tab-title {
-  @apply italic;
 }
 
 /* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one. */
@@ -407,27 +375,25 @@ useEventListener(stripRef, 'dragend', onDragEnd);
   background: var(--kira-state-on);
 }
 
-.tab-badge {
-  @apply shrink-0;
-  color: var(--kira-fg-muted);
-}
-
-/* P71 §5.1: mirrors .tab-badge's own colour — a small, unobtrusive mark, not a warning. */
-.tab-incognito {
-  @apply shrink-0;
-  color: var(--kira-fg-muted);
-}
-
 .tab-close {
-  @apply shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 opacity-0 rounded-kira-sm;
+  opacity: 0;
 }
-
 .tab-chip:hover .tab-close,
 .tab-chip.is-active .tab-close {
-  @apply opacity-100;
+  opacity: 1;
 }
-
 .tab-close:hover {
   background: var(--kira-hover);
+}
+
+/* RepoTreeRow.vue's own .node-icon, ported for the identical `{ filePath }` marker — a repo-file
+   tab's own seti icon, not a codicon glyph. */
+.tab-file-icon {
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 </style>
