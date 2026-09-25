@@ -142,18 +142,25 @@ function onKeydown(e: KeyboardEvent): void {
       <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
 
+    <!-- A fixed width so every row's name starts at the same x -- an unaligned ragged edge is
+         exactly what makes a long request list hard to scan, which is the reason the chip exists
+         at all. -->
     <Badge
       v-if="row.kind === 'request' && row.protocol === 'grpc'"
-      class="method"
+      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs"
       :variant="grpcMethodClass(row.method)"
       data-testid="grpc-collection-chip"
     >
       gRPC
     </Badge>
-    <Badge v-else-if="row.kind === 'request'" variant="chip" class="method" :class="methodTextClass(httpMethodToken(row.method))">{{
-      row.method
-    }}</Badge>
-    <CodiconIcon v-else :name="icon" :size="13" class="node-icon" />
+    <Badge
+      v-else-if="row.kind === 'request'"
+      variant="chip"
+      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs"
+      :class="methodTextClass(httpMethodToken(row.method))"
+      >{{ row.method }}</Badge
+    >
+    <CodiconIcon v-else :name="icon" :size="13" class="shrink-0 text-muted-foreground" />
 
     <!-- D13: inline rename doubles as the naming step for all three creation paths, so there is
          one naming interaction instead of a prompt dialog this app does not have. It is also VS
@@ -162,7 +169,7 @@ function onKeydown(e: KeyboardEvent): void {
       v-if="renaming"
       ref="inputRef"
       v-model="draft"
-      class="rename-input"
+      class="min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 font-[inherit] text-fg bg-field outline-none border-primary"
       data-testid="collection-rename-input"
       @click.stop
       @dblclick.stop
@@ -172,9 +179,10 @@ function onKeydown(e: KeyboardEvent): void {
     />
     <Tooltip v-else>
       <TooltipTrigger as-child>
-        <span class="label">
+        <span class="min-w-0 overflow-hidden text-ellipsis">
           <template v-for="(part, i) in parts" :key="i">
-            <mark v-if="part.hit">{{ part.text }}</mark>
+            <!-- The same yellow search-match tint every other search-capable view in the app uses. -->
+            <mark v-if="part.hit" class="rounded-kira-sm text-inherit bg-warn/25">{{ part.text }}</mark>
             <template v-else>{{ part.text }}</template>
           </template>
         </span>
@@ -189,7 +197,11 @@ function onKeydown(e: KeyboardEvent): void {
 
 /* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
    (real-compile-verified equal to TreeRow.vue's own raw form). Its `:hover`/`.selected` stay here
-   -- one declaration each, no property overlap with the shell. */
+   -- one declaration each, no property overlap with the shell. P110 B38: kept as scoped CSS rather
+   than moved to the template (unlike this file's other, plain @apply-only rules) -- `:hover` and
+   `.selected` interact (equal specificity, source order decides which background wins on a
+   selected+hovered row), and reproducing that as conditional template classes risks a real
+   rendering change for zero benefit; both already compile via @apply. */
 .tree-row:hover {
   @apply bg-hover;
 }
@@ -203,27 +215,4 @@ function onKeydown(e: KeyboardEvent): void {
    `.twisty` directly, the name stays. `.twisty.invisible` dropped: it applied nothing beyond
    Tailwind's own bare `.invisible` utility already does on the same element (:class="{ invisible:
    !row.hasChildren }"). */
-
-.node-icon {
-  @apply shrink-0 text-muted-foreground;
-}
-
-/* A fixed width so every row's name starts at the same x — an unaligned ragged edge is exactly
-   what makes a long request list hard to scan, which is the reason the chip exists at all. */
-.method {
-  @apply w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs;
-}
-
-.label {
-  @apply min-w-0 overflow-hidden text-ellipsis;
-}
-
-.label mark {
-  /* The same yellow search-match tint every other search-capable view in the app uses. */
-  @apply rounded-kira-sm text-inherit bg-warn/25;
-}
-
-.rename-input {
-  @apply min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 font-[inherit] text-fg bg-field outline-none border-primary;
-}
 </style>

@@ -136,26 +136,39 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
 </script>
 
 <template>
+  <!-- P22b D9: a grid, not independent flex items -- F13's own finding was that adjacent rows'
+       name/value/description columns never lined up, since each field carried its own `flex`
+       value and a secret row's reveal button (inside the value cell) shifted its neighbours.
+       Named, fixed-fraction columns: handle, name, value, description, secret toggle, history,
+       remove. grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
+       allowlist gap as VariableSetView.vue's own header-row and VariablesOverviewPanel.vue's
+       overview-row -- a pre-existing value relocated, not a new one. -->
   <div
     ref="rootEl"
-    class="variable-row"
-    :class="{ 'is-dragging': dragging }"
+    class="grid items-center gap-1 px-1.5 py-1 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] variable-row"
+    :class="{ 'opacity-50': dragging }"
     data-testid="variable-row"
     :data-id="row.id"
     :draggable="!trailing && !filtered"
   >
     <Tooltip v-if="filtered && !trailing">
       <TooltipTrigger as-child>
-        <span class="drag-handle" aria-hidden="true" data-testid="variable-grip">
+        <span class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="variable-grip">
           <CodiconIcon name="gripper" :size="13" />
         </span>
       </TooltipTrigger>
       <TooltipContent>Clear the filter to reorder</TooltipContent>
     </Tooltip>
-    <span v-else class="drag-handle" :class="{ 'is-disabled': trailing }" aria-hidden="true" data-testid="variable-grip">
+    <span
+      v-else
+      class="flex cursor-grab items-center text-subtle"
+      :class="{ invisible: trailing }"
+      aria-hidden="true"
+      data-testid="variable-grip"
+    >
       <CodiconIcon name="gripper" :size="13" />
     </span>
-    <div class="cell name-cell">
+    <div class="flex min-w-0 items-center gap-1 name-cell">
       <Input
         :model-value="row.name"
         placeholder="name"
@@ -165,8 +178,11 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
       />
       <Badge v-if="duplicate" variant="warn" data-testid="variable-duplicate">duplicate</Badge>
     </div>
-    <div class="cell value-cell">
-      <span v-if="notYetRevealed()" class="masked-value" data-testid="variable-value-masked">••••••••</span>
+    <div class="flex min-w-0 items-center gap-1 value-cell">
+      <!-- tracking-widest (0.1em) is the widest step Tailwind's default scale has; at this row's
+           inherited body font-size (--kira-font-size, 12px default) that is 1.2px, not the
+           original flat 2px, but nothing further out exists on the scale. -->
+      <span v-if="notYetRevealed()" class="flex-1 text-subtle tracking-widest" data-testid="variable-value-masked">••••••••</span>
       <Input
         v-else
         :type="row.isSecret && !visible ? 'password' : 'text'"
@@ -192,7 +208,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
         <TooltipContent>{{ notYetRevealed() ? 'Reveal' : 'Toggle visibility' }}</TooltipContent>
       </Tooltip>
     </div>
-    <div class="cell description-cell">
+    <div class="flex min-w-0 items-center gap-1 description-cell">
       <Input
         :model-value="row.description"
         placeholder="description"
@@ -203,7 +219,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
-        <TooltipDisabledTrigger class="secret-toggle">
+        <TooltipDisabledTrigger class="flex items-center">
           <Checkbox
             :model-value="row.isSecret"
             :disabled="secretsUnavailable && !row.isSecret"
@@ -220,7 +236,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
       :open="showHistory && variableSetStore.variableId === row.id"
       @update:open="onHistoryOpenChange"
     >
-      <div class="history-anchor">
+      <div class="relative flex">
         <Tooltip>
           <TooltipTrigger as-child>
             <TooltipDisabledTrigger ref="historyAnchorRef">
@@ -261,49 +277,3 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
     </Tooltip>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P22b D9: a grid, not independent flex items — F13's own finding was that adjacent rows' name/
-   value/description columns never lined up, since each field carried its own `flex` value and a
-   secret row's reveal button (inside the value cell) shifted its neighbours. Named, fixed-fraction
-   columns: handle, name, value, description, secret toggle, history, remove. */
-.variable-row {
-  /* P110 B37: grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
-     allowlist gap as VariableSetView.vue's own header-row and VariablesOverviewPanel.vue's
-     overview-row -- a pre-existing value relocated, not a new one. */
-  @apply grid items-center gap-1 px-1.5 py-1 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto];
-}
-
-.variable-row.is-dragging {
-  @apply opacity-50;
-}
-
-.drag-handle {
-  @apply flex cursor-grab items-center text-subtle;
-}
-
-.drag-handle.is-disabled {
-  @apply invisible;
-}
-
-.cell {
-  @apply flex min-w-0 items-center gap-1;
-}
-
-/* v1.9 tailwind-declines deep dive: tracking-widest (0.1em) is the widest step Tailwind's default
-   scale has; at this row's inherited body font-size (--kira-font-size, 12px default) that is
-   1.2px, not the original flat 2px, but nothing further out exists on the scale. */
-.masked-value {
-  @apply flex-1 text-subtle tracking-widest;
-}
-
-.secret-toggle {
-  @apply flex items-center;
-}
-
-.history-anchor {
-  @apply relative flex;
-}
-</style>
