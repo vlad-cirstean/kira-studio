@@ -17,6 +17,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
 // Spec is one git invocation, deliberately narrow: Args never includes "git" itself (Runner owns
@@ -283,11 +285,20 @@ func Run(ctx context.Context, r Runner, gitPath string, spec Spec) (Result, erro
 // precedent for the pattern) so a test can observe whether cmd.Cancel's SIGKILL escalation was
 // actually invoked — proving a stopped timer, not merely inferring it from a real pid-reuse
 // scenario, which isn't reproducible on demand.
-var killGroup = func(pid int, sig syscall.Signal) error {
-	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return err
-	}
-	return nil
+var killGroup = procgroup.Kill
+
+// killAndWait is execProcess.Close/bufferedExecProcess.Close's own shared shape (P113 G10): send a
+// group SIGTERM, arm a SIGKILL escalation, wait for the process to actually exit, then disarm the
+// timer. Unlike cmd.Cancel's own escalation (wired once, at Start, for a ctx-driven cancellation),
+// this is a second, explicit kill path a caller triggers directly by calling Close — so it arms its
+// own separate timer rather than reusing stopEscalate/cmd.Cancel's.
+func killAndWait(pid int, wait func()) {
+	_ = killGroup(pid, syscall.SIGTERM)
+	escalate := time.AfterFunc(gracefulStopDelay, func() {
+		_ = killGroup(pid, syscall.SIGKILL)
+	})
+	wait()
+	escalate.Stop()
 }
 
 // execRunner is the one real Runner: os/exec, nothing else. Stateless — the resolved git path is
@@ -319,29 +330,16 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	// reader parked behind a grandchild that outlived git itself (F3): only a group-wide kill
 	// reaches that grandchild and lets it close its own copy of the pipe.
 	//
-	// escalate is read by execProcess.reap, below, once cmd.Wait has returned — G31 round-2
+	// stopEscalate is read by execProcess.reap, below, once cmd.Wait has returned — G31 round-2
 	// architecture/security review, finding #11: without stopping it there, a group that exits
 	// cleanly on SIGTERM (the overwhelmingly common case) still left this timer armed for the full
 	// gracefulStopDelay, each one a live goroutine referencing this cmd, and — narrower but
 	// real — a SIGKILL fired at cmd.Process.Pid's process GROUP after that delay could land on an
-	// unrelated group that has since reused the same pid. Reading escalate only after cmd.Wait
+	// unrelated group that has since reused the same pid. Calling stopEscalate only after cmd.Wait
 	// returns is safe with no lock: Wait is documented to block until any goroutine running Cancel
 	// has finished, which is exactly the happens-before this needs (execProcess.Close, just below,
 	// already relies on the identical guarantee for its own, separately-armed escalate timer).
-	var escalate *time.Timer
-	cmd.Cancel = func() error {
-		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		escalate = time.AfterFunc(gracefulStopDelay, func() {
-			_ = killGroup(cmd.Process.Pid, syscall.SIGKILL)
-		})
-		return nil
-	}
-	cmd.WaitDelay = gracefulStopDelay
-	stopEscalate := func() {
-		if escalate != nil {
-			escalate.Stop()
-		}
-	}
+	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	if spec.buffered {
 		return startBuffered(cmd, spec, stopEscalate)
@@ -532,12 +530,7 @@ func (p *execProcess) Close() error {
 			_ = p.stdin.Close()
 		}
 		if p.cmd.Process != nil {
-			_ = killGroup(p.cmd.Process.Pid, syscall.SIGTERM)
-			escalate := time.AfterFunc(gracefulStopDelay, func() {
-				_ = killGroup(p.cmd.Process.Pid, syscall.SIGKILL)
-			})
-			_, _ = p.Wait()
-			escalate.Stop()
+			killAndWait(p.cmd.Process.Pid, func() { _, _ = p.Wait() })
 		}
 	})
 	return nil
@@ -597,12 +590,7 @@ func (p *bufferedExecProcess) Wait() (Result, error) {
 func (p *bufferedExecProcess) Close() error {
 	p.closeOnce.Do(func() {
 		if p.cmd.Process != nil {
-			_ = killGroup(p.cmd.Process.Pid, syscall.SIGTERM)
-			escalate := time.AfterFunc(gracefulStopDelay, func() {
-				_ = killGroup(p.cmd.Process.Pid, syscall.SIGKILL)
-			})
-			_, _ = p.Wait()
-			escalate.Stop()
+			killAndWait(p.cmd.Process.Pid, func() { _, _ = p.Wait() })
 		}
 	})
 	return nil

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
 // GracefulStopDelay bounds Run's own cmd.Cancel SIGTERM-then-SIGKILL escalation and cmd.WaitDelay
@@ -87,12 +89,7 @@ func Locate(lookPath func(string) (string, error), stat func(string) (os.FileInf
 // killGroup signals pid's whole process group — ESRCH (already gone) is not an error, every other
 // Kill failure is. A var, not a plain func, so a test can observe whether Run's own SIGKILL
 // escalation was actually invoked.
-var killGroup = func(pid int, sig syscall.Signal) error {
-	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return err
-	}
-	return nil
-}
+var killGroup = procgroup.Kill
 
 // Run is the argv-only spawn every local tool in this codebase makes: os/exec never interprets
 // args, so a path or token containing a space is passed as one argument by construction — no sh,
@@ -114,20 +111,12 @@ func Run(ctx context.Context, path string, args []string) error {
 	// unlike a spawn this app has already fully resolved and can run against a scrubbed
 	// environment.
 	cmd.Env = os.Environ()
-	var escalate *time.Timer
-	cmd.Cancel = func() error {
-		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		escalate = time.AfterFunc(GracefulStopDelay, func() { _ = killGroup(cmd.Process.Pid, syscall.SIGKILL) })
-		return nil
-	}
-	cmd.WaitDelay = GracefulStopDelay
+	stopEscalate := procgroup.GracefulCancel(cmd, GracefulStopDelay, killGroup)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	if escalate != nil {
-		escalate.Stop()
-	}
+	stopEscalate()
 	if err == nil {
 		return nil
 	}

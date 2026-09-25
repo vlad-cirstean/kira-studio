@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
 // PrepareTimeout is D12's own hard timeout — unconditional, no setting anywhere raises it. A
@@ -67,12 +69,7 @@ type osRunner struct{}
 
 // A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
 // precedent) so a test can observe whether cmd.Cancel's SIGKILL escalation was actually invoked.
-var killGroup = func(pid int, sig syscall.Signal) error {
-	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return err
-	}
-	return nil
-}
+var killGroup = procgroup.Kill
 
 // Run spawns BuildArgv(spec.Shell, spec.LoginShell, spec.Script) under spec.Dir/spec.Env, per
 // D12: stdin is never set on the *exec.Cmd, which os/exec documents as reading from the null
@@ -91,19 +88,14 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	// escalate is read after cmd.Wait() returns, below — G31 round-2 architecture/security review,
-	// finding #11: without stopping it there, a group that exits cleanly on SIGTERM left this timer
-	// armed for the full gracefulStopDelay regardless, and a SIGKILL fired at cmd.Process.Pid's
-	// process group after that delay could — narrowly, but really — land on an unrelated group that
-	// has since reused the same pid. No lock is needed: cmd.Wait is documented to block until any
-	// goroutine running Cancel has finished, which is exactly the happens-before this needs.
-	var escalate *time.Timer
-	cmd.Cancel = func() error {
-		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		escalate = time.AfterFunc(gracefulStopDelay, func() { _ = killGroup(cmd.Process.Pid, syscall.SIGKILL) })
-		return nil
-	}
-	cmd.WaitDelay = gracefulStopDelay
+	// stopEscalate is read after cmd.Wait() returns, below — G31 round-2 architecture/security
+	// review, finding #11: without stopping it there, a group that exits cleanly on SIGTERM left
+	// this timer armed for the full gracefulStopDelay regardless, and a SIGKILL fired at
+	// cmd.Process.Pid's process group after that delay could — narrowly, but really — land on an
+	// unrelated group that has since reused the same pid. No lock is needed: cmd.Wait is documented
+	// to block until any goroutine running Cancel has finished, which is exactly the happens-before
+	// this needs.
+	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	collector := newOutputCollector(spec.OnBatch)
 	cmd.Stdout = collector.stdoutWriter()
@@ -128,9 +120,7 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 	}()
 
 	waitErr := cmd.Wait()
-	if escalate != nil {
-		escalate.Stop()
-	}
+	stopEscalate()
 	close(tickerDone)
 	collector.flush()
 

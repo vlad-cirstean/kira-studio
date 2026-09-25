@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
 // versionProbeTimeout/authProbeTimeout/apiTimeout are D2's three named timeouts — every spawn this
@@ -103,12 +105,7 @@ var gracefulStopDelay = 2 * time.Second
 
 // A var, not a plain func (internal/preconnect/supervisor.go's own killSignal is this codebase's
 // precedent) so a test can observe whether cmd.Cancel's SIGKILL escalation was actually invoked.
-var killGroup = func(pid int, sig syscall.Signal) error {
-	if err := syscall.Kill(-pid, sig); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return err
-	}
-	return nil
-}
+var killGroup = procgroup.Kill
 
 func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, error) {
 	timeout := spec.Timeout
@@ -123,31 +120,21 @@ func (execRunner) Run(ctx context.Context, ghPath string, spec Spec) (Result, er
 	// Own process group (F5's own discipline, mirroring gitclient/runner.go:230): a group signal
 	// reaches whatever `gh` itself forks, not just the direct child.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// escalate is read after cmd.Run() returns, below — G31 round-2 architecture/security review,
-	// finding #11: without stopping it there, a group that exits cleanly on SIGTERM left this timer
-	// armed for the full gracefulStopDelay regardless, and a SIGKILL fired at cmd.Process.Pid's
-	// process group after that delay could — narrowly, but really — land on an unrelated group that
-	// has since reused the same pid. No lock is needed: cmd.Run (Start+Wait) is documented to block
-	// until any goroutine running Cancel has finished, which is exactly the happens-before this
-	// needs.
-	var escalate *time.Timer
-	cmd.Cancel = func() error {
-		_ = killGroup(cmd.Process.Pid, syscall.SIGTERM)
-		escalate = time.AfterFunc(gracefulStopDelay, func() {
-			_ = killGroup(cmd.Process.Pid, syscall.SIGKILL)
-		})
-		return nil
-	}
-	cmd.WaitDelay = gracefulStopDelay
+	// stopEscalate is read after cmd.Run() returns, below — G31 round-2 architecture/security
+	// review, finding #11: without stopping it there, a group that exits cleanly on SIGTERM left
+	// this timer armed for the full gracefulStopDelay regardless, and a SIGKILL fired at
+	// cmd.Process.Pid's process group after that delay could — narrowly, but really — land on an
+	// unrelated group that has since reused the same pid. No lock is needed: cmd.Run (Start+Wait)
+	// is documented to block until any goroutine running Cancel has finished, which is exactly the
+	// happens-before this needs.
+	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	runErr := cmd.Run()
-	if escalate != nil {
-		escalate.Stop()
-	}
+	stopEscalate()
 
 	// runCtx's own deadline (spec.Timeout) or the caller's outer ctx being cancelled is reported as
 	// a genuine error — never folded into Result.ExitCode — exactly mirroring
