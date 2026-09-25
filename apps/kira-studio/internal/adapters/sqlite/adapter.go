@@ -280,20 +280,13 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 var leafObjectKinds = map[string]bool{"table": true, "view": true}
 
-func requireTwoSegmentPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 2 || segments[0].Kind != "database" || (segments[1].Kind != "table" && segments[1].Kind != "view") {
-		return model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got depth "+strconv.Itoa(len(segments)), nil)
-	}
-	return segments[0], segments[1], nil
-}
-
 // Describe is index.ts's describe.
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(path.Segments, "describe")
+	segs, err := adapters.RequirePath(path, "describe", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (model.ObjectMeta, error) {
 		exec := execFor(driverCtx, conn, op)
 		target, err := getReadTarget(exec, databaseSegment.Name, objectSegment.Name)
@@ -336,10 +329,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 // SchemaColumns is P22c D1's schema-wide sibling of Describe: every relation in the database
 // together with its columns, in one round trip.
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
-	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got depth "+strconv.Itoa(len(path.Segments)), nil)
+	segs, err := adapters.RequirePath(path, "schemaColumns", adapters.Seg("database"))
+	if err != nil {
+		return nil, err
 	}
-	databaseSegment := path.Segments[0]
+	databaseSegment := segs[0]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) ([]model.RelationColumns, error) {
 		exec := execFor(driverCtx, conn, op)
 		return listSchemaColumns(exec, databaseSegment.Name)
@@ -348,10 +342,11 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(path.Segments, "definition")
+	segs, err := adapters.RequirePath(path, "definition", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (model.ObjectDefinition, error) {
 		exec := execFor(driverCtx, conn, op)
 		return buildDefinition(exec, path.Segments, databaseSegment.Name, objectSegment.Kind, objectSegment.Name)
@@ -360,10 +355,11 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(req.Path.Segments, "read")
+	segs, err := adapters.RequirePath(req.Path, "read", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return nil, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (page.Page, error) {
 		exec := execFor(driverCtx, conn, op)
 		target, err := getReadTarget(exec, databaseSegment.Name, objectSegment.Name)
@@ -383,10 +379,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 
 // Count is index.ts's count.
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(req.Path.Segments, "count")
+	segs, err := adapters.RequirePath(req.Path, "count", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) (adapters.CountResult, error) {
 		target := QualifiedName{Database: databaseSegment.Name, Table: objectSegment.Name}
 		return countRows(driverCtx, conn, op, target, req.Filter)
