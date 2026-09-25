@@ -27,6 +27,7 @@ import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
+import SwatchRadio from '@theme/SwatchRadio.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -771,30 +772,13 @@ const preconnectText = computed({
               >
                 <Tooltip v-for="color in connectionColors" :key="color">
                   <TooltipTrigger as-child>
-                    <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="connection-color"
-                        class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                        :value="color"
-                        :checked="draft.color === color"
-                        :aria-label="color === 'none' ? 'No colour' : color"
-                        :data-testid="`color-${color}`"
-                        @change="draft.color = color"
-                      />
-                      <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
-                           an *empty* sibling element — &nbsp; keeps this decorative span non-empty
-                           (verified in VariableSetView.vue's own identical swatch pattern). -->
-                      <span
-                        aria-hidden="true"
-                        class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                        :class="{
-                          'outline-2 outline-offset-2 outline-fg': draft.color === color,
-                          'swatch-none': color === 'none',
-                        }"
-                        :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                        >&nbsp;</span>
-                    </label>
+                    <SwatchRadio
+                      name="connection-color"
+                      :value="color"
+                      :color="color"
+                      :checked="draft.color === color"
+                      @change="draft.color = color"
+                    />
                   </TooltipTrigger>
                   <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
                 </Tooltip>

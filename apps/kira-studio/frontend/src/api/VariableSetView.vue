@@ -16,6 +16,7 @@ import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
+import SwatchRadio from '@theme/SwatchRadio.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
@@ -586,30 +587,13 @@ function onBulkClose(): void {
         >
           <Tooltip v-for="color in PALETTE_COLOR_CHOICES" :key="color">
             <TooltipTrigger as-child>
-              <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
-                <input
-                  type="radio"
-                  name="environment-color"
-                  class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  :value="color"
-                  :checked="owningEnvironment.color === color"
-                  :aria-label="color === 'none' ? 'No colour' : color"
-                  :data-testid="`color-${color}`"
-                  @change="onEnvColorChange(color)"
-                />
-                <!-- Biome's noLabelWithoutControl can't see the label's own <input> child past an
-                     *empty* sibling element (verified in isolation) — the &nbsp; keeps this span
-                     non-empty; aria-hidden means it is never announced either way. -->
-                <span
-                  aria-hidden="true"
-                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                  :class="{
-                    'outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color,
-                    'swatch-none': color === 'none',
-                  }"
-                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                  >&nbsp;</span>
-              </label>
+              <SwatchRadio
+                name="environment-color"
+                :value="color"
+                :color="color"
+                :checked="owningEnvironment.color === color"
+                @change="onEnvColorChange(color)"
+              />
             </TooltipTrigger>
             <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
           </Tooltip>

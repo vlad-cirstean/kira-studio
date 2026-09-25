@@ -6,6 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import SwatchRadio from '@theme/SwatchRadio.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, reactive, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../state/customScripts';
@@ -170,29 +171,13 @@ async function onAddScript(): Promise<void> {
           >
             <Tooltip v-for="color in scriptColors" :key="color">
               <TooltipTrigger as-child>
-                <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
-                  <input
-                    type="radio"
-                    :name="`script-color-${script.id}`"
-                    class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    :value="color"
-                    :checked="script.color === color"
-                    :aria-label="color === 'none' ? 'No colour' : color"
-                    :data-testid="`color-${color}`"
-                    @change="onScriptColorChange(script, color)"
-                  />
-                  <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
-                       an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
-                  <span
-                    aria-hidden="true"
-                    class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                    :class="{
-                      'outline-2 outline-offset-2 outline-fg': script.color === color,
-                      'swatch-none': color === 'none',
-                    }"
-                    :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                    >&nbsp;</span>
-                </label>
+                <SwatchRadio
+                  :name="`script-color-${script.id}`"
+                  :value="color"
+                  :color="color"
+                  :checked="script.color === color"
+                  @change="onScriptColorChange(script, color)"
+                />
               </TooltipTrigger>
               <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
             </Tooltip>
@@ -252,29 +237,13 @@ async function onAddScript(): Promise<void> {
         >
           <Tooltip v-for="color in scriptColors" :key="color">
             <TooltipTrigger as-child>
-              <label class="swatch-label relative flex h-4 w-4 shrink-0 cursor-pointer">
-                <input
-                  type="radio"
-                  name="new-script-color"
-                  class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  :value="color"
-                  :checked="newScriptColor === color"
-                  :aria-label="color === 'none' ? 'No colour' : color"
-                  :data-testid="`color-${color}`"
-                  @change="newScriptColor = color"
-                />
-                <!-- P105 §7: noLabelWithoutControl can't see a label's own <input> child past
-                     an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
-                <span
-                  aria-hidden="true"
-                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
-                  :class="{
-                    'outline-2 outline-offset-2 outline-fg': newScriptColor === color,
-                    'swatch-none': color === 'none',
-                  }"
-                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-                  >&nbsp;</span>
-              </label>
+              <SwatchRadio
+                name="new-script-color"
+                :value="color"
+                :color="color"
+                :checked="newScriptColor === color"
+                @change="newScriptColor = color"
+              />
             </TooltipTrigger>
             <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
           </Tooltip>
