@@ -146,14 +146,17 @@ function onKeydown(e: KeyboardEvent): void {
       :aria-label="row.expanded ? 'Collapse' : 'Expand'"
       @click="onTwistyClick"
     >
-      <CodiconIcon v-if="row.loading" name="loading" class="spin" :size="13" />
+      <CodiconIcon v-if="row.loading" name="loading" class="spin animate-spin" :size="13" />
       <CodiconIcon v-else :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
 
     <span v-if="row.kind === 'connection'" class="size-4 flex items-center justify-center shrink-0">
       <Tooltip :disabled="!statusTitle">
         <TooltipTrigger as-child>
-          <span class="status-dot" :data-status="row.status" />
+          <span
+            class="status-dot shrink-0 w-2 h-2 rounded-full bg-disabled data-[status=connected]:bg-ok data-[status=connecting]:bg-warn data-[status=connecting]:animate-pulse data-[status=error]:bg-error"
+            :data-status="row.status"
+          />
         </TooltipTrigger>
         <TooltipContent v-if="statusTitle">{{ statusTitle }}</TooltipContent>
       </Tooltip>
@@ -161,13 +164,13 @@ function onKeydown(e: KeyboardEvent): void {
     <span v-if="connectionKind" class="size-4 flex items-center justify-center shrink-0">
       <EngineIcon :kind="connectionKind" :size="13" />
     </span>
-    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="node-icon" />
+    <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="shrink-0 text-muted-foreground" />
 
     <Tooltip>
       <TooltipTrigger as-child>
-        <span class="label">
+        <span class="label overflow-hidden text-ellipsis min-w-0">
           <template v-for="(part, i) in parts" :key="i">
-            <mark v-if="part.hit">{{ part.text }}</mark>
+            <mark v-if="part.hit" class="rounded-sm bg-search-match text-inherit">{{ part.text }}</mark>
             <template v-else>{{ part.text }}</template>
           </template>
         </span>
@@ -175,7 +178,7 @@ function onKeydown(e: KeyboardEvent): void {
       <TooltipContent>{{ row.name }}</TooltipContent>
     </Tooltip>
 
-    <span v-if="row.badges?.length" class="badges">
+    <span v-if="row.badges?.length" class="flex gap-0.5 shrink-0">
       <Badge v-for="badge in row.badges" :key="badge" variant="count">{{ badge }}</Badge>
     </span>
 
@@ -188,11 +191,11 @@ function onKeydown(e: KeyboardEvent): void {
          truncated by default, full text on hover" shape. -->
     <Tooltip v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail">
       <TooltipTrigger as-child>
-        <span class="detail error-text" data-testid="connection-error-detail">{{ row.statusDetail }}</span>
+        <span class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-error" data-testid="connection-error-detail">{{ row.statusDetail }}</span>
       </TooltipTrigger>
       <TooltipContent>{{ row.statusDetail }}</TooltipContent>
     </Tooltip>
-    <span v-else-if="row.detail" class="detail">{{ row.detail }}</span>
+    <span v-else-if="row.detail" class="ml-auto shrink min-w-0 overflow-hidden text-ellipsis text-muted-foreground text-kira-sm">{{ row.detail }}</span>
   </div>
 </template>
 
@@ -216,70 +219,20 @@ function onKeydown(e: KeyboardEvent): void {
    beyond Tailwind's own bare `.invisible` utility already does on the same element (:class="{
    invisible: !row.hasChildren }"). */
 
-/* Selected directly by tests/ui/tree.spec.ts's own `.twisty .spin` locator — class name kept,
-   body reuses Tailwind's built-in spin animation. */
-.spin {
-  @apply animate-spin;
-}
+/* P110 B35: `.spin`/`.status-dot`/`.label` stay bare marker classes -- tree.spec.ts's own
+   `.twisty .spin` locator, and slick-grid.spec.ts/connections.spec.ts/tree.spec.ts/etc.'s own
+   `.status-dot` `data-status` assertions (60+ sites), plus font-roles.spec.ts's `.label` font
+   check. Every declaration all three used to carry now sits directly on the element as Tailwind
+   utilities instead (including `.spin`'s own `@apply animate-spin`, now just `animate-spin`
+   alongside the marker). `.status-dot[data-status='...']` became `data-[status=...]:` variants on
+   the same element -- the standard Tailwind data-attribute variant, already used throughout this
+   app's shadcn components (DropdownMenuItem.vue, DialogScrollContent.vue, etc.).
 
-.status-dot {
-  @apply shrink-0 w-2 h-2 rounded-full;
-  background: var(--kira-fg-disabled);
-}
+   The `connecting` state's hand-rolled `tree-row-pulse` keyframes (1s ease-in-out, opacity
+   1 to 0.35) are dropped for Tailwind's own `animate-pulse` (2s cubic-bezier, opacity 1 to 0.5) --
+   pre-approved (plan 1.4: "TreeRow pulse becomes animate-pulse"), so this is a disclosed, not a
+   silent, visual change: a connecting row's dot now pulses slower and shallower.
 
-.status-dot[data-status='connected'] {
-  background: var(--kira-ok);
-}
-
-.status-dot[data-status='connecting'] {
-  background: var(--kira-warn);
-  animation: tree-row-pulse 1s ease-in-out infinite;
-}
-
-.status-dot[data-status='error'] {
-  background: var(--kira-error);
-}
-
-/* Tailwind's built-in animate-pulse is 2s cubic-bezier, opacity 1→0.5 — this dot's own 1s
-   ease-in-out, opacity 1→0.35 doesn't match either value, so the keyframes stay hand-written. */
-@keyframes tree-row-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.node-icon {
-  @apply shrink-0;
-  color: var(--kira-fg-muted);
-}
-
-.label {
-  @apply overflow-hidden text-ellipsis min-w-0;
-}
-
-.label mark {
-  /* Same yellow search-match tint as DataGrid.vue/StreamView.vue/etc. (D21) — one highlight
-     color for every search-capable view in the app. */
-  @apply rounded-sm;
-  background: var(--kira-search-match);
-  color: inherit;
-}
-
-.badges {
-  @apply flex gap-0.5 shrink-0;
-}
-
-.detail {
-  @apply ml-auto shrink min-w-0 overflow-hidden text-ellipsis;
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-}
-
-.error-text {
-  color: var(--kira-error);
-}
+   `.node-icon`/`.badges`/`.detail`/`.error-text` had no test dependency, so those class names
+   dropped entirely once their declarations moved onto the elements. */
 </style>
