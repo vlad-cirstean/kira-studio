@@ -58,9 +58,8 @@ function updateRow(index: number, patch: Partial<HttpFormDataFieldState>): void 
   patchHttpRequestTabState(props.tab.id, { formData: next });
 }
 
-function onKindChange(index: number, e: Event): void {
-  const kind = (e.target as HTMLSelectElement).value as 'text' | 'file';
-  updateRow(index, { kind });
+function onKindChange(index: number, value: unknown): void {
+  updateRow(index, { kind: String(value) as 'text' | 'file' });
 }
 
 // D4: chooseBodyFile is Go's own picker, wrapped once (files.ts) — the result never carries the
@@ -126,8 +125,8 @@ function onClearFile(index: number): void {
       <NativeSelect
         variant="bordered"
         data-testid="http-formdata-kind"
-        :value="row.kind"
-        @change="onKindChange(index, $event)"
+        :model-value="row.kind"
+        @update:model-value="(v) => onKindChange(index, v)"
       >
         <option value="text">Text</option>
         <option value="file">File</option>

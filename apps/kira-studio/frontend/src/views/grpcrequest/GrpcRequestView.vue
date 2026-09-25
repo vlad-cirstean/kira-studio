@@ -101,9 +101,8 @@ const methodOptions = computed(() => {
   return out;
 });
 const selectedMethodValue = computed(() => `${props.tab.state.service}|${props.tab.state.method}`);
-function onMethodSelect(e: Event): void {
-  const value = (e.target as HTMLSelectElement).value;
-  const [service, method] = value.split('|');
+function onMethodSelect(rawValue: unknown): void {
+  const [service, method] = String(rawValue).split('|');
   const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema ?? null;
   const m = findMethod(schema, service, method);
   patchGrpcRequestTabState(props.tab.id, {
@@ -391,9 +390,9 @@ onUnmounted(() => {
           variant="bordered"
           class="w-full"
           data-testid="grpc-method-select"
-          :value="selectedMethodValue"
+          :model-value="selectedMethodValue"
           :disabled="methodOptions.length === 0"
-          @change="onMethodSelect"
+          @update:model-value="onMethodSelect"
         >
           <option value="" disabled>Choose a method…</option>
           <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>

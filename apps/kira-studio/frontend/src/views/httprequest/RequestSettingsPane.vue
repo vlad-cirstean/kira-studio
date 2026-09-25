@@ -31,8 +31,8 @@ function patch(fields: Partial<HttpRequestTabRecord['state']['settings']>): void
 const settings = computed(() => props.tab.state.settings);
 const global = computed(() => settingsStore.api);
 
-function onHttpVersionChange(e: Event): void {
-  patch({ httpVersion: (e.target as HTMLSelectElement).value as (typeof HTTP_VERSIONS)[number] });
+function onHttpVersionChange(value: unknown): void {
+  patch({ httpVersion: String(value) as (typeof HTTP_VERSIONS)[number] });
 }
 function onHttpVersionInherit(inherit: boolean): void {
   patch({ httpVersion: inherit ? null : global.value.httpVersion });
@@ -114,8 +114,8 @@ const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-x
         size="kira-lg"
         data-testid="http-settings-httpVersion"
         :disabled="settings.httpVersion === null"
-        :value="settings.httpVersion ?? global.httpVersion"
-        @change="onHttpVersionChange"
+        :model-value="settings.httpVersion ?? global.httpVersion"
+        @update:model-value="onHttpVersionChange"
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </NativeSelect>

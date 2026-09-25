@@ -27,8 +27,8 @@ import type { SettingsPaneProps } from './types';
 // `v-else-if="activeSection === 'Api'"` branch — P90 §2.7's own global Api section.
 const props = defineProps<SettingsPaneProps>();
 
-function onHttpVersionChange(e: Event): void {
-  props.draft.api.httpVersion = (e.target as HTMLSelectElement).value as ApiSettings['httpVersion'];
+function onHttpVersionChange(value: unknown): void {
+  props.draft.api.httpVersion = String(value) as ApiSettings['httpVersion'];
 }
 function onRequestTimeoutMsInput(e: Event): void {
   props.draft.api.requestTimeoutMs = Number((e.target as HTMLInputElement).value);
@@ -115,8 +115,8 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         variant="bordered"
         size="kira-lg"
         data-testid="settings-api-httpVersion"
-        :value="draft.api.httpVersion"
-        @change="onHttpVersionChange"
+        :model-value="draft.api.httpVersion"
+        @update:model-value="onHttpVersionChange"
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </NativeSelect>

@@ -370,9 +370,9 @@ function onSequenceStartChange(index: number, start: number): void {
           <NativeSelect
             variant="bordered"
             :data-testid="`generate-data-recipe-${plan.column.name}`"
-            :value="recipeSelectValue(plan.recipe)"
+            :model-value="recipeSelectValue(plan.recipe)"
             :disabled="running"
-            @change="onRecipeChange(index, ($event.target as HTMLSelectElement).value)"
+            @update:model-value="(v) => onRecipeChange(index, String(v))"
           >
             <option value="skip">Skip</option>
             <option value="null">NULL</option>

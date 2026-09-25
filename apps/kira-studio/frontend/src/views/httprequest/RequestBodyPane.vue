@@ -103,8 +103,8 @@ function setSelection(next: HttpBodySelection): void {
   patchHttpRequestTabState(props.tab.id, { bodyMode: next });
 }
 
-function onCodeLanguageChange(e: Event): void {
-  const codeLanguage = (e.target as HTMLSelectElement).value as HttpCodeLanguage;
+function onCodeLanguageChange(value: unknown): void {
+  const codeLanguage = String(value) as HttpCodeLanguage;
   patchHttpRequestTabState(props.tab.id, { codeLanguage });
   beautifyError.value = null;
 }
@@ -172,8 +172,8 @@ const caption = computed(() =>
         v-if="tab.state.bodyMode === 'code' && tab.state.codeLanguage !== 'json'"
         variant="bordered"
         data-testid="http-body-code-language"
-        :value="tab.state.codeLanguage"
-        @change="onCodeLanguageChange"
+        :model-value="tab.state.codeLanguage"
+        @update:model-value="onCodeLanguageChange"
       >
         <option v-for="opt in CODE_LANGUAGE_OPTIONS" :key="opt.value" :value="opt.value">
           {{ opt.label }}

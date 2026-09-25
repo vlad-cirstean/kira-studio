@@ -18,8 +18,8 @@ const props = defineProps<SettingsPaneProps>();
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 
-function onDefaultPageSizeChange(e: Event): void {
-  const value = Number((e.target as HTMLSelectElement).value);
+function onDefaultPageSizeChange(rawValue: unknown): void {
+  const value = Number(rawValue);
   const pageSize = PAGE_SIZES.find((size) => size === value);
   if (!pageSize) return;
   props.draft.data.defaultPageSize = pageSize;
@@ -53,8 +53,8 @@ function onDefaultPageSizeChange(e: Event): void {
         variant="bordered"
         size="kira-lg"
         data-testid="settings-default-page-size"
-        :value="draft.data.defaultPageSize"
-        @change="onDefaultPageSizeChange"
+        :model-value="draft.data.defaultPageSize"
+        @update:model-value="onDefaultPageSizeChange"
       >
         <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
       </NativeSelect>

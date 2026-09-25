@@ -1250,9 +1250,9 @@ const preconnectText = computed({
                 >
                 <NativeSelect
                   variant="bordered"
-                  :value="rule.kind"
+                  :model-value="rule.kind"
                   data-testid="mask-rule-kind"
-                  @change="onChangeMaskRuleKind(rule.id, ($event.target as HTMLSelectElement).value as MaskKind)"
+                  @update:model-value="(v) => onChangeMaskRuleKind(rule.id, String(v) as MaskKind)"
                 >
                   <option value="name">Name</option>
                   <option value="email">Email</option>

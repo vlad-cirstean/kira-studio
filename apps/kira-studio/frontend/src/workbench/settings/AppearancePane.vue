@@ -41,8 +41,8 @@ const currentFontIsListed = computed(() =>
   FONT_CHOICES.some((f) => f.stack === props.draft.appearance.fontFamily),
 );
 
-function onFontFamilyChange(e: Event): void {
-  props.draft.appearance.fontFamily = (e.target as HTMLSelectElement).value;
+function onFontFamilyChange(value: unknown): void {
+  props.draft.appearance.fontFamily = String(value);
 }
 
 function onRowColoringChange(checked: boolean): void {
@@ -84,8 +84,8 @@ const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === '
         variant="bordered"
         size="kira-lg"
         data-testid="settings-font-family"
-        :value="draft.appearance.fontFamily"
-        @change="onFontFamilyChange"
+        :model-value="draft.appearance.fontFamily"
+        @update:model-value="onFontFamilyChange"
       >
         <optgroup v-if="!currentFontIsListed" label="Current">
           <option :value="draft.appearance.fontFamily">{{ draft.appearance.fontFamily }}</option>
