@@ -53,7 +53,6 @@ function select(method: HttpMethod): void {
           v-for="m in HTTP_METHODS"
           :key="m"
           type="button"
-          class="row"
           :class="
             cn(
               'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full font-semibold',

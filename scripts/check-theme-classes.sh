@@ -321,6 +321,16 @@ check_class_in_attrs 'definition-table' 'border-r border-border last:border-r-0 
 # `data-testid="number-step-up"`/`"number-step-down"`.
 check_class 'step-btn' 'data-testid="number-step-up"/"number-step-down" (packages/theme/src/NumberStepperInput.vue)'
 
+# P110 I2-25: TextPromptDialog.vue's `text-prompt-title` was already orphaned as of I2-8 (no
+# scoped style ever defined it, dropped from the template there) -- guarded here so it never
+# comes back. MethodSelect.vue's and EnvironmentSelect.vue's stray `row` class was the same shape
+# (the real styling already lived in the sibling utility string) -- dropped, guarded too. `row` is
+# scoped to just these two known consumer files, not the whole source tree: it is also an
+# ordinary loop-variable/property name inside other files' `:class` JS expressions (`row.status`,
+# `row.method`, `row.shadowed`, ...), which a whole-tree attribute scan would false-positive on.
+check_class_in_attrs 'text-prompt-title' 'dropped -- was already orphaned (I2-8)' "$WORKBENCH_SRC/prompt/TextPromptDialog.vue"
+check_class_in_attrs 'row' 'the sibling utility string already carries all real styling' "$FRONTEND_SRC/api/MethodSelect.vue $FRONTEND_SRC/api/EnvironmentSelect.vue"
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

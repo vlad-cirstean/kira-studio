@@ -97,7 +97,7 @@ function manage(): void {
       <div class="flex flex-col p-0.5">
         <button
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
           data-testid="api-environment-option-none"
           data-value=""
           @click="selectNone"
@@ -112,7 +112,7 @@ function manage(): void {
           v-for="env in variablesStore.environments"
           :key="env.id"
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
           data-testid="api-environment-option"
           :data-value="env.id"
           @click="selectEnvironment(env.id)"
@@ -131,7 +131,7 @@ function manage(): void {
         <div class="my-0.5 border-t border-border" />
         <button
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full"
           data-testid="api-environment-manage"
           @click="manage"
         >
