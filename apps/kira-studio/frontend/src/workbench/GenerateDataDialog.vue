@@ -534,14 +534,14 @@ function onSequenceStartChange(index: number, start: number): void {
 @reference "@theme/base.css";
 
 .generate-form {
-  @apply flex flex-col;
-  gap: var(--kira-s-4);
-  padding: var(--kira-s-4) var(--kira-s-5);
+  /* P110 B37: gap: var(--kira-s-4) (8px) -> gap-2; padding: var(--kira-s-4) var(--kira-s-5)
+     (8px/12px) -> py-2 px-3. */
+  @apply flex flex-col gap-2 py-2 px-3;
 }
 
 .run-fields {
-  @apply flex items-center;
-  gap: var(--kira-s-3);
+  /* P110 B37: gap: var(--kira-s-3) (6px) -> gap-1.5. */
+  @apply flex items-center gap-1.5;
 }
 
 .field-label {
@@ -549,13 +549,14 @@ function onSequenceStartChange(index: number, start: number): void {
 }
 
 .recipe-table {
-  @apply flex flex-col overflow-y-auto max-h-64;
-  gap: var(--kira-s-1);
+  /* P110 B37: gap: var(--kira-s-1) (2px) -> gap-0.5. */
+  @apply flex flex-col overflow-y-auto max-h-64 gap-0.5;
 }
 
 .recipe-row {
-  @apply grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center;
-  gap: var(--kira-s-2);
+  /* P110 B37: gap: var(--kira-s-2) (4px) -> gap-1. grid-cols-[...] is a pre-existing arbitrary-value
+     class already, not a raw declaration -- untouched. */
+  @apply grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1;
 }
 
 .recipe-head {
@@ -567,22 +568,24 @@ function onSequenceStartChange(index: number, start: number): void {
 }
 
 .warning-list {
-  @apply m-0;
-  padding-left: var(--kira-s-4);
+  /* P110 B37: padding-left: var(--kira-s-4) (8px) -> pl-2. */
+  @apply m-0 pl-2;
 }
 
 .preview-toggle {
-  @apply bg-none border-none cursor-pointer p-0;
-  color: var(--kira-accent);
+  /* P110 B37: color: var(--kira-accent) -> text-primary (shadcn-bridge.css's own --primary is
+     --kira-accent -- same equivalence the audit already established for the run-state
+     border-*-accent/primary sites). */
+  @apply bg-none border-none cursor-pointer p-0 text-primary;
 }
 
 .preview-toggle:disabled {
-  @apply cursor-not-allowed;
-  color: var(--kira-fg-muted);
+  /* P110 B37: color: var(--kira-fg-muted) -> text-muted-foreground. */
+  @apply cursor-not-allowed text-muted-foreground;
 }
 
 .preview-body {
-  @apply h-52;
-  margin-top: var(--kira-s-2);
+  /* P110 B37: margin-top: var(--kira-s-2) (4px) -> mt-1. */
+  @apply h-52 mt-1;
 }
 </style>

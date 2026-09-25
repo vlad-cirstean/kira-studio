@@ -61,8 +61,11 @@ function onRevealBlameCommit(): void {
    (P110 B29) already supplies the UA chrome reset. No accent color — a blame readout is
    informational, not something needing attention. */
 .blame {
+  /* P110 B37: font: inherit has no Tailwind utility equivalent (a font shorthand reset) -- stays
+     raw, load-bearing (a real <button> with its own visible text). color: var(--kira-fg) ->
+     text-fg. */
   font: inherit;
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 .blame:disabled {
   @apply cursor-default;

@@ -198,27 +198,27 @@ async function onApprove(requestId: string): Promise<void> {
 @reference "@theme/base.css";
 
 .message {
-  @apply whitespace-pre-wrap;
-  margin: 0 0 var(--kira-s-2);
-  padding: var(--kira-s-4) var(--kira-s-5) 0;
+  /* P110 B37: margin: 0 0 var(--kira-s-2) (4px bottom) -> mb-1; padding: var(--kira-s-4)
+     var(--kira-s-5) 0 (8px top, 12px sides) -> pt-2 px-3. */
+  @apply whitespace-pre-wrap mb-1 pt-2 px-3;
 }
 
 .statement {
-  @apply max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm;
-  margin: 0 var(--kira-s-5) var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  background: var(--kira-bg-input);
-  border: 1px solid var(--kira-border);
+  /* P110 B37: margin: 0 var(--kira-s-5) var(--kira-s-2) (12px sides, 4px bottom) -> mx-3 mb-1;
+     padding: var(--kira-s-2) var(--kira-s-3) (4px/6px) -> py-1 px-1.5; background/border become
+     bg-field/border border-border. */
+  @apply max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm mx-3 mb-1 py-1 px-1.5 bg-field border border-border;
 }
 
 .detail {
-  @apply m-0;
-  padding: 0 var(--kira-s-5) var(--kira-s-4);
-  color: var(--kira-fg-subtle);
+  /* P110 B37: padding: 0 var(--kira-s-5) var(--kira-s-4) (12px sides, 8px bottom) -> px-3 pb-2;
+     color: var(--kira-fg-subtle) -> text-subtle. */
+  @apply m-0 px-3 pb-2 text-subtle;
 }
 
 .plan-block {
-  margin: 0 0 var(--kira-s-2);
+  /* P110 B37: margin: 0 0 var(--kira-s-2) -> mb-1. */
+  @apply mb-1;
 }
 
 .plan-issue {

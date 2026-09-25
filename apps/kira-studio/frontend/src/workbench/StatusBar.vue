@@ -185,17 +185,22 @@ const agentTooltip = computed(() =>
   @apply min-w-[9ch]; /* "1234.5 MB" */
 }
 .metric-sep {
-  color: var(--kira-fg-subtle);
+  /* P110 B37: color: var(--kira-fg-subtle) -> text-subtle. */
+  @apply text-subtle;
 }
 
 /* .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
    and Enter/Space come free. Its own template class list (P110 B29) already supplies
    height/padding/border-radius/cursor/border-reset. */
 .update {
+  /* P110 B37: font: inherit has no Tailwind utility equivalent (a font shorthand reset, not a
+     single property) -- stays raw, load-bearing here (this IS a <button> with its own visible
+     text, unlike ConnectionDialog.vue's own `.kind` no-op precedent). color: var(--kira-info)
+     -> text-info. */
   font: inherit;
-  color: var(--kira-info);
+  @apply text-info;
 }
 .update:hover {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 </style>

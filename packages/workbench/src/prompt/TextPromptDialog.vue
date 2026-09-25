@@ -62,11 +62,12 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 @reference "@theme/base.css";
 
 .text-prompt-scrim {
-  @apply fixed inset-0 flex items-center justify-center bg-black/50;
   /* P28 D17(c)'s own dialog rung, not a bare z-30 — strictly higher, so unifying every call site
      on it (including GitPanel.vue, raised directly from the panel with no popover backdrop of its
-     own to clear) is a safe superset, never a visible change at any of the three. */
-  z-index: var(--kira-z-dialog);
+     own to clear) is a safe superset, never a visible change at any of the three.
+     P110 B37: z-index: var(--kira-z-dialog) -> z-(--kira-z-dialog), section 1.2's own var-based
+     z-index allowlist entry. */
+  @apply fixed inset-0 flex items-center justify-center bg-black/50 z-(--kira-z-dialog);
 }
 
 .text-prompt-box {
