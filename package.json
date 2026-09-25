@@ -75,6 +75,7 @@
     "@types/vscode": "1.134.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vscode/vsce": "3.9.2",
+    "@vue/compiler-sfc": "3.5.42",
     "bun-types": "1.4.2",
     "flatbuffers": "25.9.23",
     "knip": "6.37.0",
