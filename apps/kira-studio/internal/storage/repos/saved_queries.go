@@ -42,22 +42,16 @@ func scanSavedQueryRow(row rowScanner) (*model.SavedQuery, error) {
 	}
 	switch q.Kind {
 	case "filter":
-		var fb model.FilterBody
-		// DisallowUnknownFields is what actually distinguishes a filter body from a console
-		// body: FilterBody/ConsoleBody's fields don't overlap, and json.Unmarshal alone
-		// silently ignores a console body's "text" key when decoding into FilterBody instead
-		// of rejecting it.
-		dec := json.NewDecoder(strings.NewReader(body))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&fb); err != nil {
+		// decodeStrict's DisallowUnknownFields is what actually distinguishes a filter body from
+		// a console body: FilterBody/ConsoleBody's fields don't overlap, and json.Unmarshal alone
+		// silently ignores a console body's "text" key when decoding into FilterBody instead of
+		// rejecting it.
+		if _, err := decodeStrict[model.FilterBody](body); err != nil {
 			slog.Warn("dropping saved query: body does not match filter shape", "scope", "storage/saved-queries", "id", q.ID)
 			return nil, nil
 		}
 	case "console":
-		var cb model.ConsoleBody
-		dec := json.NewDecoder(strings.NewReader(body))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&cb); err != nil {
+		if _, err := decodeStrict[model.ConsoleBody](body); err != nil {
 			slog.Warn("dropping saved query: body does not match console shape", "scope", "storage/saved-queries", "id", q.ID)
 			return nil, nil
 		}
@@ -67,6 +61,16 @@ func scanSavedQueryRow(row rowScanner) (*model.SavedQuery, error) {
 	}
 	q.Body = json.RawMessage(body)
 	return &q, nil
+}
+
+// decodeStrict decodes body into T, rejecting unknown fields — the same check scanSavedQueryRow
+// uses to tell a filter body from a console body (see comment above).
+func decodeStrict[T any](body string) (T, error) {
+	var v T
+	dec := json.NewDecoder(strings.NewReader(body))
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&v)
+	return v, err
 }
 
 func (r *SavedQueriesRepo) listByKind(connectionID, path, kind string) ([]model.SavedQuery, error) {
@@ -134,12 +138,14 @@ func (r *SavedQueriesRepo) mustGet(queryID string) (model.SavedQuery, error) {
 	return *q, nil
 }
 
-func (r *SavedQueriesRepo) SaveFilter(connectionID, path, name string, body model.FilterBody, pinned bool) (model.SavedQuery, error) {
+// save encodes body, inserts it under kind, and applies pinned — SaveFilter/SaveConsole's shared
+// shape (P113 G6).
+func (r *SavedQueriesRepo) save(connectionID, path, name, kind string, body any, pinned bool) (model.SavedQuery, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: encode filter body: %w", err)
+		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: encode %s body: %w", kind, err)
 	}
-	q, err := r.insert(connectionID, path, name, "filter", encoded)
+	q, err := r.insert(connectionID, path, name, kind, encoded)
 	if err != nil {
 		return model.SavedQuery{}, err
 	}
@@ -152,22 +158,12 @@ func (r *SavedQueriesRepo) SaveFilter(connectionID, path, name string, body mode
 	return q, nil
 }
 
+func (r *SavedQueriesRepo) SaveFilter(connectionID, path, name string, body model.FilterBody, pinned bool) (model.SavedQuery, error) {
+	return r.save(connectionID, path, name, "filter", body, pinned)
+}
+
 func (r *SavedQueriesRepo) SaveConsole(connectionID, path, name string, body model.ConsoleBody, pinned bool) (model.SavedQuery, error) {
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: encode console body: %w", err)
-	}
-	q, err := r.insert(connectionID, path, name, "console", encoded)
-	if err != nil {
-		return model.SavedQuery{}, err
-	}
-	if pinned {
-		if err := r.setPinned(q.ID, true); err != nil {
-			return model.SavedQuery{}, err
-		}
-		return r.mustGet(q.ID)
-	}
-	return q, nil
+	return r.save(connectionID, path, name, "console", body, pinned)
 }
 
 func (r *SavedQueriesRepo) setPinned(queryID string, pinned bool) error {
