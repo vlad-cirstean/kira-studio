@@ -20,7 +20,10 @@
  * by `kv:` utilities. `kv:z-[var(--kui-z-modal,50)]` stays an arbitrary value (§1.1 rung 4): it
  * reads a raw `--kui-*` custom property with its own fallback, not a value on any Tailwind scale,
  * and isn't reused by `KuiTooltip`/`KuiPopoverPanel`/`KuiContextMenu`'s own distinct classes.
- * `kv:max-h-[85vh]`/`kv:text-[1.05em]` are one-off literals with no scale step close enough.
+ * `kv:max-h-[85vh]` is a one-off literal with no scale step close enough.
+ * P110 I2-28: the title's `1.05em` (relative to the inherited ~12px body size) lands 0.4px from
+ * `--kv-t-lg` (13px) -- closer than the earlier "no scale step close enough" claim accounted for
+ * -- so it is `kv:text-lg` now, not an arbitrary value.
  */
 import { onClickOutside } from '@vueuse/core';
 import { computed, ref, useId } from 'vue';
@@ -77,7 +80,7 @@ onClickOutside(rootEl, close);
       >
         <h2
           :id="titleId"
-          class="kv:shrink-0 kv:m-0 kv:mb-kui-4 kv:text-[1.05em]"
+          class="kv:shrink-0 kv:m-0 kv:mb-kui-4 kv:text-lg"
         >
           <slot name="title">{{ title }}</slot>
         </h2>

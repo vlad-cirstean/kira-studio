@@ -14,10 +14,10 @@
  * conflicting `kv:` utilities for the same property are ever both present on one button (§1's own
  * cascade-ordering rule). Local to this component only — no other file composes this class set,
  * confirmed by grep — so it isn't exported from `index.ts`, unlike `kuiRowVariants`.
- * `kv:px-[3px]` (the badge's horizontal padding) stays an arbitrary value (§1.1 rung 4): 3px has
- * no step on the kept spacing scale. `kv:leading-[var(--kui-control-h-sm,14px)]` also stays
- * arbitrary: it reads the same raw `--kui-*` var `kv:h-kui-control-sm` already maps to, and
- * Tailwind's `leading-*` scale has no matching step to reuse instead.
+ * P110 I2-28: the badge's horizontal padding is `kv:px-0.75` (3px on the default spacing scale,
+ * not a one-off arbitrary value as first thought) and its line-height is `kv:leading-kui-control-sm`
+ * (theme/tailwind-theme.css), a registered name for the same raw `--kui-control-h-sm` var
+ * `kv:h-kui-control-sm` already maps to.
  */
 import { cva } from 'class-variance-authority';
 import type { KuiSegmentedOption } from './optionTypes.ts';
@@ -69,7 +69,7 @@ const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
       <span class="codicon" :class="option.icon" aria-hidden="true"></span>
       <span
         v-if="option.badge !== undefined"
-        class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-[3px] kv:rounded-full kv:bg-kui-hover kv:text-kui-xs kv:leading-[var(--kui-control-h-sm,14px)]"
+        class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-hover kv:text-kui-xs kv:leading-kui-control-sm"
         data-testid="kui-segmented-badge"
         >{{ option.badge }}</span
       >

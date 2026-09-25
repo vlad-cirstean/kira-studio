@@ -59,4 +59,9 @@
   --spacing-kui-control: var(--kui-control-h, 22px);
   --spacing-kui-control-sm: var(--kui-control-h-sm, 14px);
   --spacing-kui-icon-box: var(--kui-icon-box, 16px);
+
+  /* P110 I2-28: KuiSegmented.vue's own badge line-height reads the same raw `--kui-control-h-sm`
+     var `--spacing-kui-control-sm` already maps to -- a design seam, not a one-off arbitrary
+     value, so it gets a real registered name instead of `leading-[var(--kui-control-h-sm,14px)]`. */
+  --leading-kui-control-sm: var(--kui-control-h-sm, 14px);
 }

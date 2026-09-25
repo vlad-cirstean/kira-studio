@@ -111,6 +111,9 @@
   --text-sm: var(--kv-t-sm);
   --text-base: var(--kv-t-md);
   --text-lg: var(--kv-t-lg);
+  /* P110 I2-28: the fixed 12px codicon glyph size (`FileTree.vue` ×2, `ReviewCommitRow.vue`), a
+     literal recurring 3 times, not a step on the `--kv-t-*` type scale. */
+  --text-codicon: 12px;
 
   /* Fonts */
   --font-data: var(--kv-font-data);

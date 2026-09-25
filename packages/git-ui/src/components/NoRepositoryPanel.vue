@@ -64,7 +64,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <h2 class="kv:m-0 kv:text-lg kv:font-semibold">Open a repository</h2>
     <ul
       v-if="repoState.candidates.value.length > 0"
-      class="kv:flex kv:flex-col kv:gap-0.5 kv:m-0 kv:p-0 kv:list-none kv:max-w-[420px] kv:w-full"
+      class="kv:flex kv:flex-col kv:gap-0.5 kv:m-0 kv:p-0 kv:list-none kv:max-w-105 kv:w-full"
     >
       <li v-for="candidate in repoState.candidates.value" :key="candidate.path">
         <!-- P108 F4: disabled while any open (this candidate, another candidate, the bootstrap
@@ -83,12 +83,12 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     <template v-else>
       <p
         v-if="refreshError"
-        class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center"
+        class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center"
         data-testid="no-repository-refresh-error"
       >
         Couldn't check this workspace's folders for a Git repository — {{ refreshError }}.
       </p>
-      <p v-else class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center">
+      <p v-else class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center">
         Kira Space follows the folders open in this VS Code window. None of them is a Git
         repository — open one with File → Open Folder.
       </p>
@@ -98,7 +98,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
     </template>
     <p
       v-if="pickError"
-      class="kv:max-w-[420px] kv:m-0 kv:text-muted kv:text-center"
+      class="kv:max-w-105 kv:m-0 kv:text-muted kv:text-center"
       data-testid="no-repository-pick-error"
     >
       Couldn't open that repository — {{ pickError }}.

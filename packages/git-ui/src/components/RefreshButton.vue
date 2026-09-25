@@ -80,7 +80,7 @@ defineExpose({ refresh: doRefresh });
   >
     <span
       v-if="hasPendingChange"
-      class="kv:absolute kv:top-[3px] kv:right-[3px] kv:size-1.5 kv:rounded-full kv:bg-focus"
+      class="kv:absolute kv:top-0.75 kv:right-0.75 kv:size-1.5 kv:rounded-full kv:bg-focus"
       aria-hidden="true"
     ></span>
   </KuiButton>

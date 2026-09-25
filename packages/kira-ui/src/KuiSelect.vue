@@ -32,7 +32,7 @@ function onChange(event: Event): void {
   <span :class="cn('kv:relative kv:inline-flex kv:items-center', props.class)">
     <select
       :id="props.id"
-      class="kv:h-kui-control kv:py-0 kv:pr-kui-6 kv:pl-kui-4 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:[font-family:inherit] kv:text-kui-sm kv:appearance-none kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
+      class="kv:h-kui-control kv:py-0 kv:pr-kui-6 kv:pl-kui-4 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:appearance-none kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
       :value="props.modelValue"
       :aria-label="props.ariaLabel"
       @change="onChange"

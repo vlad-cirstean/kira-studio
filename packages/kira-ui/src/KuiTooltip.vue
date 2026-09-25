@@ -7,8 +7,8 @@
 //
 // P110 A6: controls.css's `.kui-tooltip` replaced by `kv:` utilities. `kv:max-w-80` is the default
 // numeric spacing scale (320px = 80 × the kept 4px `--spacing` step, rung 1, §1.1), not a new
-// token. `kv:leading-[1.4]` stays an arbitrary value (rung 4): no default line-height step lands
-// within a visually-equivalent margin of this exact value.
+// token. P110 I2-28: `kv:leading-[1.4]` becomes `kv:leading-snug` (Tailwind's default 1.375 --
+// 0.025 off, well under a visually-equivalent margin).
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { computeFloatPosition } from './floatingPosition.ts';
 import { getAnchorElement, tooltipState } from './tooltip.ts';
@@ -54,7 +54,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
       v-if="tooltipState.open"
       :id="tooltipState.id ?? undefined"
       ref="tipRef"
-      class="kv:fixed kv:z-[var(--kui-z-tooltip,40)] kv:max-w-80 kv:py-kui-2 kv:px-kui-3 kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float kv:text-kui-sm kv:leading-[1.4] kv:whitespace-pre-wrap kv:pointer-events-none"
+      class="kv:fixed kv:z-[var(--kui-z-tooltip,40)] kv:max-w-80 kv:py-kui-2 kv:px-kui-3 kv:bg-kui-bg-panel kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui-float kv:shadow-kui-float kv:text-kui-sm kv:leading-snug kv:whitespace-pre-wrap kv:pointer-events-none"
       role="tooltip"
       data-testid="kui-tooltip"
       :style="style"

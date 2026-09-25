@@ -135,7 +135,7 @@ defineExpose({
   >
     <div
       v-if="title"
-      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-kui-3 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-[0.06em] kv:truncate"
+      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-kui-3 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-wider kv:truncate"
       aria-hidden="true"
     >
       {{ title }}

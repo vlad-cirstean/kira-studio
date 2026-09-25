@@ -23,7 +23,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * (default, catch-all) colour group instead and could wrongly cancel a real text colour utility
  * placed next to it.
  */
-const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text'>({
+const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text' | 'leading'>({
   prefix: 'kv',
   extend: {
     theme: {
@@ -55,8 +55,13 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text'>(
       shadow: ['float', 'kui-float'],
       // P110 I2-2: M1 -- `kv:text-kui-xs`/`-sm`/`-base` (kuiRowVariants, KuiTextInput) read as
       // colour utilities without these, and drop a static `kv:text-kui-fg`/`-selected-fg` colour
-      // on the same element as a false same-group conflict.
-      text: ['kui-icon', 'kui-xs', 'kui-sm', 'kui-base'],
+      // on the same element as a false same-group conflict. P110 I2-28: `codicon`
+      // (GU/theme/tailwind.css's `--text-codicon`) is the same shape -- a font-size name, not a
+      // t-shirt step.
+      text: ['kui-icon', 'kui-xs', 'kui-sm', 'kui-base', 'codicon'],
+      // P110 I2-28: `kv:leading-kui-control-sm` (KuiSegmented.vue), the same design-seam pattern
+      // as the spacing names above.
+      leading: ['kui-control-sm'],
     },
   },
 });

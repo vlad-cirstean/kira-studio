@@ -320,7 +320,7 @@ const prIcon = computed(() => {
     v-if="detail"
     :class="
       expanded
-        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-[70%] kv:overflow-auto'
+        ? 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-initial kv:min-h-[min(220px,60%)] kv:max-h-7/10 kv:overflow-auto'
         : 'kv-detail-pane-meta kv:flex kv:flex-col kv:gap-1 kv:p-2 kv:flex-none kv:max-h-1/5 kv:overflow-hidden'
     "
     data-testid="commit-meta"

@@ -675,7 +675,7 @@ watch(visibleBranchNames, (names) => {
                 >
                 <span
                   v-if="row.checkedOutIn"
-                  class="kv:text-[0.8em] kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted"
+                  class="kv:text-xs kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted"
                   v-kui-tooltip="`Checked out in ${row.checkedOutIn}`"
                 >
                   worktree

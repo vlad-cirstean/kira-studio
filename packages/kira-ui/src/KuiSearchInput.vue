@@ -94,7 +94,7 @@ defineExpose({ focus: () => inputEl.value?.focus() });
     ></span>
     <input
       ref="inputEl"
-      class="kv:w-full kv:h-full kv:py-0 kv:px-kui-6 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:[font-family:inherit] kv:text-kui-sm kv:placeholder:text-kui-fg-muted kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
+      class="kv:w-full kv:h-full kv:py-0 kv:px-kui-6 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:placeholder:text-kui-fg-muted kv:focus-visible:border-kui-focus-border kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1"
       type="text"
       :value="props.modelValue"
       :placeholder="props.placeholder"

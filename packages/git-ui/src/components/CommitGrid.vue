@@ -1273,7 +1273,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
       aria-hidden="true"
     ></span>
     <KuiColumnResizeHandle
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftGraph}px` }"
       label="Resize graph column"
       :value="widths.graph"
@@ -1283,7 +1283,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftAuthor}px` }"
       label="Resize author column"
       :value="widths.author"
@@ -1293,7 +1293,7 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
     />
     <KuiColumnResizeHandle
       v-if="!detailOpen"
-      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-[5px] kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
+      class="kv:absolute kv:top-0 kv:bottom-0 kv:w-1.25 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
       :style="{ left: `${handleLeftDate}px` }"
       label="Resize date column"
       :value="widths.date"

@@ -104,13 +104,13 @@ function onMenuSelect(id: string): void {
       <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
-        class="kv:whitespace-nowrap kv:text-[0.8em] kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
+        class="kv:whitespace-nowrap kv:text-xs kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
         v-kui-tooltip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
       <span
         v-if="rowModel(entry).auto"
-        class="kv:whitespace-nowrap kv:text-[0.8em] kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
+        class="kv:whitespace-nowrap kv:text-xs kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
         v-kui-tooltip="'Created automatically by an auto-stashed checkout'"
         >auto</span
       >

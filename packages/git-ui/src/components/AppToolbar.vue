@@ -461,7 +461,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       <!-- Pre-approved spinner change (§1.4/§6.4): stepped 1.5s rotation -> Tailwind's smooth 1s
            `animate-spin`. -->
       <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
-      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-[260px]">{{ progressText }}</span>
+      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">{{ progressText }}</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"
@@ -482,7 +482,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       data-testid="worktree-prepare-progress"
     >
       <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
-      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-[260px]">Preparing worktree…</span>
+      <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">Preparing worktree…</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"

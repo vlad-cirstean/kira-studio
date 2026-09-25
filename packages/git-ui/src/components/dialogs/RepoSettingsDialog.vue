@@ -211,7 +211,7 @@ async function save(): Promise<void> {
           v-model.number="draft['kiraSpace.graph.pageSize']"
           :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
           :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit kv:w-[8em]"
+          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit kv:w-24"
         />
       </label>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-graph-scope">

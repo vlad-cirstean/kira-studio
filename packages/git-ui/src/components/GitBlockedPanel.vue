@@ -30,6 +30,6 @@ const copy = computed(() => {
       aria-hidden="true"
     ></span>
     <h2 class="kv:m-0 kv:text-lg kv:font-semibold">{{ copy.title }}</h2>
-    <p class="kv:m-0 kv:max-w-[480px] kv:text-muted">{{ copy.detail }}</p>
+    <p class="kv:m-0 kv:max-w-120 kv:text-muted">{{ copy.detail }}</p>
   </div>
 </template>

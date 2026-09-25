@@ -547,7 +547,7 @@ function reviewToggleTitle(path: string): string {
                rows' checkbox column aligned underneath it. -->
           <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
           <span
-            class="codicon kv:text-[12px] kv:w-3"
+            class="codicon kv:text-codicon kv:w-3"
             :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
             aria-hidden="true"
           ></span>
@@ -579,7 +579,7 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
+            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
@@ -610,7 +610,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -671,7 +671,7 @@ function reviewToggleTitle(path: string): string {
                rows' checkbox column aligned underneath it. -->
           <span v-if="reviewStates" class="kv:w-3.5 kv:shrink-0" aria-hidden="true"></span>
           <span
-            class="codicon kv:text-[12px] kv:w-3"
+            class="codicon kv:text-codicon kv:w-3"
             :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
             aria-hidden="true"
           ></span>
@@ -703,7 +703,7 @@ function reviewToggleTitle(path: string): string {
             @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
           />
           <span
-            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:[mask-size:contain] kv:[mask-repeat:no-repeat] kv:[mask-position:center] kv:[-webkit-mask-size:contain] kv:[-webkit-mask-repeat:no-repeat] kv:[-webkit-mask-position:center]"
+            class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
@@ -737,7 +737,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-[1.6] kv:contrast-[1.15]"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span

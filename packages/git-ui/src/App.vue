@@ -1811,7 +1811,7 @@ onBeforeUnmount(() => {
       class="kv:flex kv:flex-col kv:items-center kv:justify-center kv:gap-2 kv:h-full kv:p-4 kv:text-center kv:text-fg"
       data-testid="boot-error"
     >
-      <p class="kv:m-0 kv:max-w-[480px] kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
+      <p class="kv:m-0 kv:max-w-120 kv:text-muted">Kira Space isn't reachable — {{ bootError }}</p>
       <!-- Cancels KuiButton's own default-variant background/text/hover so the retry action here
            keeps this panel's plain panel-bg/app-fg look (this button's own established
            override, unaffected by hovering — same effect the old unlayered `.kv-boot-error
@@ -1933,7 +1933,7 @@ onBeforeUnmount(() => {
           >
             <hr
               v-if="breakpoint === 'wide'"
-              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-[5px] kv:m-0 kv:-ml-0.5 kv:border-0 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:[outline:none]"
+              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-1.25 kv:m-0 kv:-ml-0.5 kv:border-0 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
               aria-orientation="vertical"
               aria-label="Resize detail pane"
               :aria-valuenow="detailWidth"

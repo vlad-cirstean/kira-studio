@@ -30,12 +30,12 @@ import { cn } from './cn.ts';
 import KuiIconBox from './KuiIconBox.vue';
 
 const kuiButtonVariants = cva(
-  // Base = today's `.kui-button` rule. `[font-family:inherit]`: this package's build has no
-  // preflight (git-ui/theme/tailwind.css, A1), so a raw `<button>` needs it stated explicitly —
-  // otherwise the standalone VS Code webview (no host preflight either) would show the platform's
+  // Base = today's `.kui-button` rule. `font-inherit` (P110 I2-28, GU/theme/tailwind.css's
+  // registered `--font-inherit: inherit`): this package's build has no preflight
+  // (git-ui/theme/tailwind.css, A1), so a raw `<button>` needs it stated explicitly — otherwise
+  // the standalone VS Code webview (no host preflight either) would show the platform's
   // form-control font instead of inheriting Kira's, same reasoning as the explicit `py-0` below.
-  // §1.1 rung 4 arbitrary value, one-off, no scale step.
-  'kv:inline-flex kv:items-center kv:gap-kui-2 kv:min-h-kui-control kv:py-0 kv:px-kui-3 kv:bg-transparent kv:text-kui-fg-muted kv:border kv:border-transparent kv:rounded-kui kv:[font-family:inherit] kv:text-kui-sm kv:no-underline kv:cursor-pointer kv:shrink-0 kv:enabled:hover:bg-kui-hover kv:enabled:hover:text-kui-fg kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1 kv:disabled:opacity-60 kv:disabled:cursor-default',
+  'kv:inline-flex kv:items-center kv:gap-kui-2 kv:min-h-kui-control kv:py-0 kv:px-kui-3 kv:bg-transparent kv:text-kui-fg-muted kv:border kv:border-transparent kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:no-underline kv:cursor-pointer kv:shrink-0 kv:enabled:hover:bg-kui-hover kv:enabled:hover:text-kui-fg kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1 kv:disabled:opacity-60 kv:disabled:cursor-default',
   {
     variants: {
       variant: {
@@ -99,7 +99,7 @@ defineExpose({
     <slot />
     <span
       v-if="count !== undefined"
-      class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-[3px] kv:rounded-full kv:bg-kui-selected kv:text-kui-selected-fg kv:text-[0.75em] kv:leading-kui-control-sm"
+      class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-selected kv:text-kui-selected-fg kv:text-[0.75em] kv:leading-kui-control-sm"
       >{{ count }}</span
     >
   </button>

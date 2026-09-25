@@ -118,7 +118,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
           aria-hidden="true"
         ></span>
         <span class="kv:truncate">{{ row.shortName }}</span>
-        <span class="kv:text-[0.75em] kv:text-muted">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span class="kv:text-xs kv:text-muted">{{ row.annotation ? "annotated" : "lightweight" }}</span>
         <span
           v-if="row.annotation"
           class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted"
