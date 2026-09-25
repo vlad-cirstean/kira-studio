@@ -144,7 +144,7 @@ function onKeydown(e: KeyboardEvent): void {
     <span class="text-kira-xs text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
     <span class="overflow-hidden text-ellipsis"
       >{{ previewParts.before
-      }}<span class="rounded-sm bg-search-match">{{ previewParts.match }}</span
+      }}<span class="rounded-kira-xs bg-search-match">{{ previewParts.match }}</span
       >{{ previewParts.after }}</span
     >
   </div>

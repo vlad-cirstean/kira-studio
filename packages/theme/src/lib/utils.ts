@@ -25,7 +25,7 @@ const twMerge = extendTailwindMerge({
         // next to it on the same element read as a false conflict.
         'completion-max-w',
       ],
-      radius: ['kira-sm', 'kira', 'kira-lg', 'kira-pill'],
+      radius: ['kira-xs', 'kira-sm', 'kira', 'kira-lg', 'kira-pill'],
       shadow: ['kira', 'kira-dialog'],
     },
   },

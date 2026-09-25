@@ -9,20 +9,19 @@
    palette.
 
    P110 I2-37/I2-38: one name per value, repo-wide, kira names win (docs/v1.9/plans/
-   P110-css-tailwind-migration-iter2.md §3.11.3) -- every shadcn alias that duplicated a kira name
-   was renamed away in PT/components/ui and deleted from here. What's left is each value's *only*
-   name: --primary/--primary-foreground (no kira twin), --muted-foreground (no kira twin), --border
-   (no kira twin), and --radius (I2-38's radius step scale, still feeding the @theme inline
-   rounded-sm/md/lg/xl utilities that rounded-kira-xs/rounded-kira-sm/rounded-kira/rounded-kira-
-   pill now alias, in that order). A future `shadcn-vue add` re-pull of any file under
-   components/ui takes the same rename at pull time -- check_alias (scripts/check-theme-classes.sh)
-   fails lint until it does. */
+   P110-css-tailwind-migration-iter2.md §3.11.3) -- every shadcn colour AND radius alias that
+   duplicated a kira name was renamed away in PT/components/ui and deleted from here (I2-38 also
+   dropped --radius and its shadcn-scale @theme inline radius-step twins: every former shadcn-scale
+   site now reads rounded-kira-xs/rounded-kira-sm/rounded-kira/rounded-kira-pill directly, base.css's
+   own tokens.css-backed radius scale). What's left is each remaining value's *only* name:
+   --primary/--primary-foreground (no kira twin), --muted-foreground (no kira twin), --border (no
+   kira twin). A future `shadcn-vue add` re-pull of any file under components/ui takes the same
+   rename at pull time -- check_alias (scripts/check-theme-classes.sh) fails lint until it does. */
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: var(--kira-radius);
   --primary: var(--kira-accent);
   --primary-foreground: var(--kira-accent-fg);
   --muted-foreground: var(--kira-fg-muted);
@@ -34,8 +33,4 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
 }

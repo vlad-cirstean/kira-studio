@@ -188,7 +188,7 @@ function onKeydown(e: KeyboardEvent): void {
       <TooltipTrigger as-child>
         <span class="label overflow-hidden text-ellipsis min-w-0">
           <template v-for="(part, i) in parts" :key="i">
-            <mark v-if="part.hit" class="rounded-sm bg-search-match text-inherit">{{ part.text }}</mark>
+            <mark v-if="part.hit" class="rounded-kira-xs bg-search-match text-inherit">{{ part.text }}</mark>
             <template v-else>{{ part.text }}</template>
           </template>
         </span>

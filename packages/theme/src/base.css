@@ -78,6 +78,9 @@
   --color-conn-magenta: var(--kira-conn-magenta);
   --color-conn-grey: var(--kira-conn-grey);
 
+  /* P110 I2-38: xs is the replacement for shadcn's own retired 4px radius alias -- see
+     tokens.css's --kira-radius-xs comment. */
+  --radius-kira-xs: var(--kira-radius-xs);
   --radius-kira-sm: var(--kira-radius-sm);
   --radius-kira: var(--kira-radius);
   --radius-kira-lg: var(--kira-radius-lg);

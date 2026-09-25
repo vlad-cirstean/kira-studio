@@ -320,7 +320,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span class="flex items-center min-w-0 gap-1">
                 <span
                   v-if="connectionFor(listItems[vi.index].record)"
-                  class="w-2 h-2 shrink-0 rounded-sm"
+                  class="w-2 h-2 shrink-0 rounded-kira-xs"
                   :style="{ background: connColorVar(connectionFor(listItems[vi.index].record)?.color) ?? 'none' }"
                 />
                 <span class="truncate min-w-0">{{ connectionFor(listItems[vi.index].record)?.name ?? '—' }}</span>

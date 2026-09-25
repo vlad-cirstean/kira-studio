@@ -506,6 +506,16 @@ check_alias "${ALIAS_COLOR_PREFIX}-ring(?:/\\d+)?" 'the -focus equivalent (e.g. 
 check_alias "${ALIAS_COLOR_PREFIX}-accent(?:/\\d+)?" 'the -hover equivalent (e.g. bg-accent -> bg-hover)'
 check_alias "${ALIAS_COLOR_PREFIX}-destructive(?:/\\d+)?" 'the -error equivalent (e.g. text-destructive -> text-error), never the variant="destructive" prop value'
 
+# P110 I2-38: one radius name per value, repo-wide -- kira names win (§3.11.3's radius half).
+# PT-root only, never extended to GU/KU: the kv root defines its own --radius-sm/--radius-lg
+# (packages/git-ui/src/theme/tailwind.css) with different, legitimate meanings.
+ALIAS_ROUNDED_SIDE='(?:t|r|b|l|tl|tr|bl|br|ss|se|es|ee)'
+check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-sm!?" 'the rounded-kira-xs equivalent (e.g. rounded-sm -> rounded-kira-xs)'
+check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-md!?" 'the rounded-kira-sm equivalent (e.g. rounded-md -> rounded-kira-sm)'
+check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-lg!?" 'the rounded-kira equivalent (e.g. rounded-lg -> rounded-kira)'
+check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-xl!?" 'the rounded-kira-pill equivalent (e.g. rounded-xl -> rounded-kira-pill)'
+check_alias 'var\(--radius(-sm|-md|-lg|-xl)?\)' 'var(--kira-radius) (or the matching --kira-radius-* step) -- shadcn-bridge.css no longer defines --radius'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else
