@@ -53,18 +53,20 @@ function openRecent(entry: RecentTableEntry): void {
 
 <template>
   <!-- FirstRun.html — no connections at all: one button, no duplicate engine grid. -->
-  <div v-if="!hasConnections" class="start" data-testid="first-run">
-    <div class="start-inner first-run">
+  <div v-if="!hasConnections" class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="first-run">
+    <div class="w-96 flex flex-col items-center text-center gap-4">
       <span class="start-mark text-subtle"><CodiconIcon name="database" :size="32" /></span>
-      <div class="start-title">No connections yet</div>
-      <div class="start-sub text-muted-foreground">
+      <!-- P24 D31: no bold text anywhere in the app -- --kira-t-xl (text-kira-xl, the scale's
+           largest step) already carries the emphasis a first-run heading needs. -->
+      <div class="tracking-normal text-kira-xl text-fg">No connections yet</div>
+      <div class="leading-normal mt-0 text-kira-md text-muted-foreground">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <!-- P110 B26: --kira-s-2 (4px) -> gap-1 is a real, quantified mismatch against
            dialog/kira-lg's own gap-1.5 (6px) -- kept as a class override rather than a new Button
            size, since only these two call sites need it. Padding/height/border/background/colour
            all already match dialog/dialog-primary + kira-lg exactly (both pre-existing tokens). -->
-      <span class="first-run-actions">
+      <span class="flex gap-1.5">
         <Button
           type="button"
           variant="dialog-primary"
@@ -91,29 +93,29 @@ function openRecent(entry: RecentTableEntry): void {
   </div>
 
   <!-- Empty.html — connections exist, nothing open: recent tables and nothing else. -->
-  <div v-else class="start" data-testid="no-tab-open">
-    <div class="start-inner">
-      <div class="start-title">Kira Studio</div>
-      <div class="start-sub text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
+  <div v-else class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="no-tab-open">
+    <div class="w-140 max-w-full">
+      <div class="tracking-normal text-kira-xl text-fg">Kira Studio</div>
+      <div class="text-kira-lg mt-1.5 text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
 
       <template v-if="recentTablesStore.entries.length > 0">
-        <div class="col-label text-subtle">Recent tables</div>
-        <div class="start-list">
+        <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">Recent tables</div>
+        <div class="flex flex-col">
           <button
             v-for="entry in recentTablesStore.entries"
             :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
             type="button"
-            class="start-row"
+            class="w-full flex items-center cursor-pointer text-left rounded-kira-sm h-6.5 gap-1.5 px-1.5 text-fg text-kira-md hover:bg-hover"
             @click="openRecent(entry)"
           >
             <span
-              class="rail-dot"
+              class="w-0.5 h-3.5 rounded-xs shrink-0"
               :style="{ background: connColorVar(connectionFor(entry)?.color) ?? 'none' }"
             />
             <span class="size-4 flex items-center justify-center shrink-0" :style="{ color: iconColorFor(entry) }">
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
-            <span class="entry-path">{{ entry.path }}</span>
+            <span class="truncate min-w-0">{{ entry.path }}</span>
             <span class="ml-auto text-kira-xs text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
           </button>
         </div>
@@ -122,75 +124,3 @@ function openRecent(entry: RecentTableEntry): void {
   </div>
 </template>
 
-<style scoped>
-@reference "@theme/base.css";
-
-.start {
-  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto;
-  padding: var(--kira-s-6);
-}
-
-.start-inner {
-  @apply w-140 max-w-full;
-}
-
-.first-run-actions {
-  @apply flex;
-  gap: var(--kira-s-3);
-}
-
-.start-inner.first-run {
-  @apply w-96 flex flex-col items-center text-center;
-  gap: var(--kira-s-4);
-}
-
-.start-title {
-  /* P24 D31: no bold text anywhere in the app — --kira-t-xl (the scale's largest step) already
-     carries the emphasis a first-run heading needs. */
-  @apply tracking-normal;
-  font-size: var(--kira-t-xl);
-  color: var(--kira-fg);
-}
-
-.start-sub {
-  font-size: var(--kira-t-lg);
-  margin-top: var(--kira-s-3);
-}
-
-.first-run .start-sub {
-  @apply leading-normal mt-0;
-  font-size: var(--kira-t-md);
-}
-
-.col-label {
-  @apply uppercase tracking-wider;
-  font-size: var(--kira-t-sm);
-  margin-bottom: var(--kira-s-3);
-  margin-top: var(--kira-s-6);
-}
-
-.start-list {
-  @apply flex flex-col;
-}
-
-.start-row {
-  @apply w-full flex items-center cursor-pointer text-left rounded-kira-sm;
-  height: var(--kira-h-md);
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-3);
-  color: var(--kira-fg);
-  font-size: var(--kira-t-md);
-}
-
-.start-row:hover {
-  background: var(--kira-hover);
-}
-
-.rail-dot {
-  @apply w-0.5 h-3.5 rounded-xs shrink-0;
-}
-
-.entry-path {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
-}
-</style>
