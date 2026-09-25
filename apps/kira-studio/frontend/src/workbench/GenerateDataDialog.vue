@@ -253,9 +253,9 @@ function onSequenceStartChange(index: number, start: number): void {
       </DialogHeader>
 
       <div class="overflow-auto">
-    <div class="generate-form">
-      <div class="run-fields">
-        <Label class="field-label text-kira-sm text-muted-foreground">Rows</Label>
+    <div class="flex flex-col gap-2 py-2 px-3">
+      <div class="flex items-center gap-1.5">
+        <Label class="p-0 text-kira-sm text-muted-foreground">Rows</Label>
         <!-- P104 §2: `ref` on a wrapping display:contents span (not the InputGroup component
              itself, which forwards no DOM ref) -- keeps run-fields' flex layout untouched since the
              wrapper contributes no box of its own. -->
@@ -301,7 +301,7 @@ function onSequenceStartChange(index: number, start: number): void {
           </InputGroupAddon>
         </InputGroup>
         </span>
-        <Label class="field-label text-kira-sm text-muted-foreground">Seed</Label>
+        <Label class="p-0 text-kira-sm text-muted-foreground">Seed</Label>
         <span ref="seedGroupRef" class="contents">
         <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
           <InputGroupInput
@@ -349,8 +349,10 @@ function onSequenceStartChange(index: number, start: number): void {
         </span>
       </div>
 
-      <div class="recipe-table">
-        <div class="recipe-row recipe-head text-kira-sm text-muted-foreground">
+      <div class="flex flex-col overflow-y-auto max-h-64 gap-0.5">
+        <!-- grid-cols-[...] is a pre-existing arbitrary-value class already, not a raw
+             declaration -- untouched (P110 B37/B39). -->
+        <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1 p-0 text-kira-sm text-muted-foreground">
           <span>Column</span>
           <span>Type</span>
           <span>Recipe</span>
@@ -359,12 +361,12 @@ function onSequenceStartChange(index: number, start: number): void {
         <div
           v-for="(plan, index) in plans"
           :key="plan.column.name"
-          class="recipe-row"
+          class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1"
           data-testid="generate-data-column-row"
           :data-column="plan.column.name"
         >
           <span class="col-name">{{ plan.column.name }}</span>
-          <span class="col-type text-muted-foreground">{{ plan.column.dataType }}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">{{ plan.column.dataType }}</span>
           <NativeSelect
             variant="bordered"
             :data-testid="`generate-data-recipe-${plan.column.name}`"
@@ -454,7 +456,7 @@ function onSequenceStartChange(index: number, start: number): void {
       <Alert v-if="warnings.length" variant="warn" data-testid="generate-data-warnings">
         <CodiconIcon name="warning" :size="14" class="text-warn-text" />
         <AlertDescription>
-          <ul class="warning-list">
+          <ul class="m-0 pl-2">
             <li v-for="w in warnings" :key="w">{{ w }}</li>
           </ul>
         </AlertDescription>
@@ -463,14 +465,14 @@ function onSequenceStartChange(index: number, start: number): void {
       <div class="preview-section">
         <button
           type="button"
-          class="preview-toggle text-kira-sm"
+          class="bg-none border-none cursor-pointer p-0 text-primary disabled:cursor-not-allowed disabled:text-muted-foreground text-kira-sm"
           data-testid="generate-data-preview-toggle"
           :disabled="noUsableColumns"
           @click="onTogglePreview"
         >
           {{ previewOpen ? 'Hide preview' : 'Preview SQL' }}
         </button>
-        <div v-if="previewOpen" class="preview-body" data-testid="generate-data-preview">
+        <div v-if="previewOpen" class="h-52 mt-1" data-testid="generate-data-preview">
           <div v-if="previewLoading" class="text-muted-foreground text-kira-sm">Loading…</div>
           <div v-else-if="previewError" class="text-kira-sm" data-testid="generate-data-preview-error">
             {{ previewError }}
@@ -529,63 +531,3 @@ function onSequenceStartChange(index: number, start: number): void {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.generate-form {
-  /* P110 B37: gap: var(--kira-s-4) (8px) -> gap-2; padding: var(--kira-s-4) var(--kira-s-5)
-     (8px/12px) -> py-2 px-3. */
-  @apply flex flex-col gap-2 py-2 px-3;
-}
-
-.run-fields {
-  /* P110 B37: gap: var(--kira-s-3) (6px) -> gap-1.5. */
-  @apply flex items-center gap-1.5;
-}
-
-.field-label {
-  @apply p-0;
-}
-
-.recipe-table {
-  /* P110 B37: gap: var(--kira-s-1) (2px) -> gap-0.5. */
-  @apply flex flex-col overflow-y-auto max-h-64 gap-0.5;
-}
-
-.recipe-row {
-  /* P110 B37: gap: var(--kira-s-2) (4px) -> gap-1. grid-cols-[...] is a pre-existing arbitrary-value
-     class already, not a raw declaration -- untouched. */
-  @apply grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center gap-1;
-}
-
-.recipe-head {
-  @apply p-0;
-}
-
-.col-type {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.warning-list {
-  /* P110 B37: padding-left: var(--kira-s-4) (8px) -> pl-2. */
-  @apply m-0 pl-2;
-}
-
-.preview-toggle {
-  /* P110 B37: color: var(--kira-accent) -> text-primary (shadcn-bridge.css's own --primary is
-     --kira-accent -- same equivalence the audit already established for the run-state
-     border-*-accent/primary sites). */
-  @apply bg-none border-none cursor-pointer p-0 text-primary;
-}
-
-.preview-toggle:disabled {
-  /* P110 B37: color: var(--kira-fg-muted) -> text-muted-foreground. */
-  @apply cursor-not-allowed text-muted-foreground;
-}
-
-.preview-body {
-  /* P110 B37: margin-top: var(--kira-s-2) (4px) -> mt-1. */
-  @apply h-52 mt-1;
-}
-</style>
