@@ -11,9 +11,9 @@ export const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-card text-card-foreground',
+        default: 'bg-elevated text-fg',
         destructive:
-          'text-destructive bg-card *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+          'text-error bg-elevated *:data-[slot=alert-description]:text-error/90 *:[svg]:text-current',
         // P108 F15: `warn`/`note` fold in the `.strip-warn`/`.strip-note` (+ `-text`) tone classes
         // that used to be hand-copied, byte-for-byte, into 12 separate `<style scoped>` blocks
         // (ImportReportStrip.vue's own D16 comment named it "the same tone vocabulary

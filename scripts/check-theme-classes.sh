@@ -7,9 +7,14 @@
 # `text-muted` never matches `text-muted-foreground`, and `bg-input` never matches a
 # `--kira-bg-input` custom-property reference.
 #
-# Excludes packages/theme/src/components/ui/ -- shadcn-vue's own registry-authored components
-# speak shadcn's own vocabulary (bg-input/30, text-muted-foreground, border-input, ...), which is
-# never a "retired name" hit here even where a retired name is a substring of it.
+# Excludes packages/theme/src/components/ui/ for check_class/check_class_in_attrs/their _all
+# forms -- shadcn-vue's own registry-authored components used to speak shadcn's own vocabulary
+# (bg-input/30, text-muted-foreground, border-input, ...), which was never a "retired name" hit
+# there even where a retired name was a substring of it. P110 I2-37/I2-38's check_alias below is
+# the deliberate exception: every shadcn colour/radius alias that duplicated a kira name was
+# renamed away inside components/ui too (one name per value, repo-wide), so those checks scan it
+# on purpose -- a re-pulled registry file that still says bg-card must fail lint, same as any
+# other file.
 #
 # Every commit that retires a class name appends its own `check_class` call here, in the same
 # commit that does the rename/deletion (P110 plan §5.12). Never a batch add at the end.
@@ -164,6 +169,25 @@ check_class_in_attrs_all() {
   hits=$(printf '%s\n%s\n' "$base_hits" "$gu_ku_hits" | grep -v '^$' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired class '$name' still used in a class attribute -- replace with '$replacement':" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+
+# check_alias <retired-name-regex> <replacement>
+# P110 I2-37/I2-38: check_class WITHOUT the components/ui exclusion -- one name per value, repo-
+# wide (§3.11.3), so a shadcn alias colour/radius name is retired everywhere PT reaches, including
+# its own registry-authored components. PT-root only: SCAN_DIRS never includes GU/KU, and this
+# function takes no [scan-dirs] override -- the kv root defines none of these shadcn names for
+# colours, and defines its OWN --radius-sm/--radius-lg with different, legitimate meanings, so it
+# must never be extended there.
+check_alias() {
+  name="$1"
+  replacement="$2"
+  hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "(?<![-\\w])(?:[a-z0-9-]+:)*${name}(?![-\\w])" $SCAN_DIRS 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: retired alias '$name' still used -- replace with '$replacement':" >&2
     echo "$hits" >&2
     STATUS=1
   fi
@@ -468,6 +492,19 @@ check_class_in_attrs_all 'splitter' 'a local splitter-track class/data attribute
 # postdates the plan's own literal `check_class` wording for this item; no legitimate GU/KU or
 # prose survivor exists for this name either).
 check_class_all 'text-error-text' 'text-error'
+
+# P110 I2-37: one colour name per value, repo-wide -- kira names win, including inside
+# PT/components/ui (§3.11.3's own Finding 1/Choice). PT-root only (check_alias never takes a
+# [scan-dirs] override); the kv root defines none of these shadcn names.
+ALIAS_COLOR_PREFIX='(?:bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|outline|fill|stroke|divide|from|via|to|shadow|caret|decoration|placeholder)'
+check_alias "${ALIAS_COLOR_PREFIX}-background(?:/\\d+)?" 'the -bg equivalent (e.g. bg-background -> bg-bg)'
+check_alias "${ALIAS_COLOR_PREFIX}-(?:foreground|card-foreground|popover-foreground|secondary-foreground|accent-foreground)(?:/\\d+)?" 'the -fg equivalent (e.g. text-foreground -> text-fg)'
+check_alias "${ALIAS_COLOR_PREFIX}-(?:card|popover)(?:/\\d+)?" 'the -elevated equivalent (e.g. bg-card -> bg-elevated)'
+check_alias "${ALIAS_COLOR_PREFIX}-(?:secondary|muted)(?:/\\d+)?" 'the -field equivalent (e.g. bg-muted -> bg-field)'
+check_alias "${ALIAS_COLOR_PREFIX}-input(?:/\\d+)?" 'the -border-strong equivalent (e.g. border-input -> border-border-strong)'
+check_alias "${ALIAS_COLOR_PREFIX}-ring(?:/\\d+)?" 'the -focus equivalent (e.g. ring-ring -> ring-focus)'
+check_alias "${ALIAS_COLOR_PREFIX}-accent(?:/\\d+)?" 'the -hover equivalent (e.g. bg-accent -> bg-hover)'
+check_alias "${ALIAS_COLOR_PREFIX}-destructive(?:/\\d+)?" 'the -error equivalent (e.g. text-destructive -> text-error), never the variant="destructive" prop value'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2

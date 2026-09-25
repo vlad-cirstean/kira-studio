@@ -377,7 +377,8 @@ const secondText = computed<string>({
       </Tooltip>
     </div>
     <!-- P110 I2-18: `.dtp-month-label`/`.dtp-day` compound rules moved to conditional classes above.
-         bg-primary/text-primary-foreground, never bg-accent: shadcn-bridge.css maps --color-accent to
-         --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input. -->
+         bg-primary/text-primary-foreground, never bg-hover: hover reads --kira-hover (grey), same
+         workaround as api/CollectionRow.vue's rename-input. P110 I2-37 retired the shadcn accent
+         alias this comment used to warn against; hover is its I2-37 replacement name. -->
   </div>
 </template>

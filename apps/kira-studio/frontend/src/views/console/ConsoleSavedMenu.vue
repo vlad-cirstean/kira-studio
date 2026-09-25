@@ -112,9 +112,10 @@ async function saveCurrent(): Promise<void> {
     </template>
     <template #footer>
       <Separator class="my-1" />
-      <!-- text-primary not text-accent: shadcn-bridge.css maps --color-accent to --kira-hover
-           (grey); --primary maps to --kira-accent, same workaround as api/CollectionRow.vue's
-           rename-input (Part 3). -->
+      <!-- text-primary not text-hover: hover reads --kira-hover (grey); --primary maps to
+           --kira-accent, same workaround as api/CollectionRow.vue's rename-input (Part 3). P110
+           I2-37 retired the shadcn accent alias this comment used to warn against; hover is its
+           I2-37 replacement name. -->
       <button type="button" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover w-full text-primary" data-testid="console-save-current" @click="saveCurrent">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
         Save current query…

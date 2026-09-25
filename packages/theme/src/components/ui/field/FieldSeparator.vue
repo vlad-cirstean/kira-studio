@@ -20,7 +20,7 @@ const props = defineProps<{
     <Separator class="absolute inset-0 top-1/2" />
     <span
       v-if="$slots.default"
-      class="text-muted-foreground px-2 relative mx-auto block w-fit bg-background"
+      class="text-muted-foreground px-2 relative mx-auto block w-fit bg-bg"
       data-slot="field-separator-content"
     >
       <slot />

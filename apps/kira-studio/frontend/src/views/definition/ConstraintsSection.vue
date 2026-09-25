@@ -100,5 +100,6 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:bor
        ColumnsSection.vue's own comment). `.header-key`/`.is-fk` dropped -- no test dependency on
        this file's own table (see ColumnsSection.vue's comment for the check). `.ref-link:hover`
        became `hover:text-primary` on the <button> itself (P104 §7.2: text-primary is the real
-       brand accent, not text-accent). -->
+       brand accent, not text-hover -- hover is I2-37's replacement name for the retired shadcn
+       accent alias). -->
 </template>

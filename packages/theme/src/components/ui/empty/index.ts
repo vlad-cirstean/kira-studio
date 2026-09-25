@@ -18,7 +18,7 @@ export const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: 'text-subtle',
-        icon: 'bg-muted text-foreground flex size-8 shrink-0 items-center justify-center rounded-lg [&_svg:not([class*=size-])]:size-4',
+        icon: 'bg-field text-fg flex size-8 shrink-0 items-center justify-center rounded-lg [&_svg:not([class*=size-])]:size-4',
       },
     },
     defaultVariants: {

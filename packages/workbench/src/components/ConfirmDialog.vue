@@ -47,7 +47,7 @@ function onConfirm(): void {
       <!-- P110 I2-21: DialogFooter's own base changed (§3.10, M9) -- this explicit class restates
            the old merged default so this dialog's look stays put. -->
       <DialogFooter
-        class="items-stretch gap-2 border-t bg-muted/50 -mx-4 -mb-4 rounded-b-xl p-4 flex-col-reverse sm:flex-row sm:justify-end"
+        class="items-stretch gap-2 border-t bg-field/50 -mx-4 -mb-4 rounded-b-xl p-4 flex-col-reverse sm:flex-row sm:justify-end"
       >
         <Button variant="dialog" size="kira-lg" data-testid="confirm-dialog-cancel" @click="onCancel">
           Cancel
