@@ -21,6 +21,12 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 const host = useWorkbenchHost();
 const contextMenuStore = useContextMenuStore();
 
+// P110 I2-20: `.tab-chip.is-attention::after`'s generated pseudo-element dot, as a conditional
+// class string -- content-[''] is section 1.2's own allowlist entry for this exact attention-dot
+// pseudo-element.
+const ATTENTION_CLASS =
+  "relative after:absolute after:top-1 after:right-1 after:size-1.5 after:rounded-full after:bg-state-on after:content-['']";
+
 function isPinned(tab: TabLike): boolean {
   return host.kinds[tab.kind]?.pinned === true;
 }
@@ -223,9 +229,9 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip"
+            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
             :class="[
-              tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+              tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
               { 'is-active': tab.active },
             ]"
             data-testid="tab"
@@ -264,13 +270,13 @@ useEventListener(stripRef, 'dragend', onDragEnd);
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm tab-chip"
+        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm group/tab"
         :class="[
-          tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
+          tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
+          isAttention(tab) ? ATTENTION_CLASS : '',
           {
             'is-active': tab.active,
             'opacity-50': dragId === tab.id,
-            'is-attention': isAttention(tab),
           },
         ]"
         data-testid="tab"
@@ -322,7 +328,8 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         </button>
         <button
           type="button"
-          class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm"
+          class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm hover:bg-hover"
+          :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
           aria-label="Close tab"
           data-testid="tab-close"
           @click="onClose($event, tab)"
@@ -339,50 +346,13 @@ useEventListener(stripRef, 'dragend', onDragEnd);
          each app's own WorkbenchShell.vue, not a tab strip actions/tab new class published
          from workbench.css — the data-testid is what's shared now. -->
     <slot name="new-tab" />
+    <!-- P110 I2-20: `.tab-chip`'s hover/attention/close-reveal rules moved into `:class` ternaries
+         above -- `group/tab` on each chip replaces `.tab-chip:hover .tab-close`/`.tab-chip.is-active
+         .tab-close` (`group-hover/tab:opacity-100`, plus the active branch's own `opacity-100`).
+         ATTENTION_CLASS (P86 §14.2: a Claude Code session waiting on you, in a tab that is not the
+         active one) replaces `.tab-chip.is-attention`/`::after`. `.tab-chip`/`.is-attention` were
+         marker-only (no CSS-class test locator); `.is-active`/`.tab-file-icon`/`.tab-title`/
+         `.tab-close` stay real classes (slick-grid.spec.ts, budgets.spec.ts,
+         repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). -->
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B36: only what a static utility class genuinely can't express stays here. Everything else
-   (layout/spacing/colour, including .tab-file-icon's own mask-size/mask-repeat/mask-position —
-   Tailwind's own mask-contain/mask-no-repeat/mask-center, confirmed via compile check to emit both
-   the -webkit- prefixed and unprefixed forms) moved onto the template as inline utility classes —
-   see this file's own git history for the byte-for-byte mapping. What's left, and why:
-   - `.tab-chip:hover:not(.is-active)` / `.tab-close:hover` / the hover half of the close button's
-     opacity toggle: real `:hover` on one element driving another (or itself) — no static class can
-     stand in for a live pointer state.
-   - `.tab-chip.is-attention::after`: a generated pseudo-element (dot badge) — nothing in the DOM to
-     hang a utility class on.
-   `.tab-chip`/`.is-active`/`.is-attention`/`.tab-close`/`.tab-file-icon`/`.tab-title` stay as bare
-   marker classes to anchor the selectors below; `.is-active`/`.tab-file-icon`/`.tab-title`/
-   `.tab-close` are also real test dependencies (slick-grid.spec.ts, budgets.spec.ts,
-   repo-workspace.spec.ts, font-roles.spec.ts, multiwindow-real.spec.ts, definition.spec.ts). */
-/* P110 B37: raw background: var(--kira-hover)/var(--kira-state-on) and opacity: 0/1 declarations
-   below all convert to @apply in place (same selectors, same cascade position) -- content: ''
-   becomes content-[''], section 1.2's own allowlist entry for this exact attention-dot pseudo-
-   element. */
-.tab-chip:hover:not(.is-active) {
-  @apply bg-hover;
-}
-
-/* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one. */
-.tab-chip.is-attention {
-  @apply relative;
-}
-.tab-chip.is-attention::after {
-  @apply absolute top-1 right-1 w-1.5 h-1.5 rounded-full content-[''] bg-state-on;
-}
-
-.tab-close {
-  @apply opacity-0;
-}
-.tab-chip:hover .tab-close,
-.tab-chip.is-active .tab-close {
-  @apply opacity-100;
-}
-.tab-close:hover {
-  @apply bg-hover;
-}
-</style>
