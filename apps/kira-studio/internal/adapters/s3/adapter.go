@@ -36,16 +36,6 @@ type Adapter struct {
 	state adapters.Guarded[connState]
 }
 
-// getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
-// takes its result, never a.client directly.
-func (a *Adapter) getClient() *awss3.Client { return a.state.Load().client }
-
-// getScopedBucket is Children's own locked read of a.scopedBucket (F3).
-func (a *Adapter) getScopedBucket() string { return a.state.Load().scopedBucket }
-
-// getReadOnly is Mutate's own locked read of a.readOnly (F3).
-func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
-
 // setConnected is Connect's own locked write of every field a successful connect fills in (F3).
 func (a *Adapter) setConnected(client *awss3.Client, scopedBucket string, readOnly bool) {
 	a.state.Update(func(s *connState) {
@@ -92,7 +82,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 }
 
 func (a *Adapter) requireClient() (*awss3.Client, error) {
-	return adapters.RequireConnected(a.getClient())
+	return adapters.RequireConnected(a.state.Load().client)
 }
 
 // Children is index.ts's children.
@@ -103,7 +93,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	}
 	segments := path.Segments
 	if len(segments) == 0 {
-		nodes, err := listBuckets(ctx, client, a.getScopedBucket())
+		nodes, err := listBuckets(ctx, client, a.state.Load().scopedBucket)
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
@@ -206,7 +196,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutate(ctx, client, op, a.getReadOnly(), plan, a.deps.Log)
+	return mutate(ctx, client, op, a.state.Load().readOnly, plan, a.deps.Log)
 }
 
 // Execute is index.ts's execute — caps.SQL is false; never reached.
