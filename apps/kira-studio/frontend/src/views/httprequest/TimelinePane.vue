@@ -196,7 +196,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 </script>
 
 <template>
-  <div class="timeline-pane" data-testid="http-timeline-pane">
+  <div class="flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5" data-testid="http-timeline-pane">
     <template v-if="activeTimeline && activeTimeline.hops.length > 0">
       <!-- D15: a failed send's own partial timeline — the failure sentence names the phase the
            request never got past, from the same measured phases the hop below already shows. -->
@@ -212,31 +212,31 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
         </AlertDescription>
       </Alert>
 
-      <div v-if="!failedTimeline" class="timeline-summary-row">
-        <div class="text-kira-xs text-subtle timeline-summary" data-testid="http-timeline-summary">
+      <div v-if="!failedTimeline" class="flex items-center justify-between gap-1.5">
+        <div class="text-kira-xs text-subtle px-0.5" data-testid="http-timeline-summary">
           {{ summary }}
         </div>
-        <div class="timeline-legend text-kira-xs text-subtle" data-testid="http-timeline-legend">
-          <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="legend-item">
-            <span class="legend-swatch" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
+        <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-xs text-subtle" data-testid="http-timeline-legend">
+          <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="inline-flex items-center gap-0.5">
+            <span class="inline-block h-2 w-2 rounded-kira-sm" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
           </span>
-          <span class="legend-item">
-            <span class="legend-swatch bg-conn-grey" />Unattributed
+          <span class="inline-flex items-center gap-0.5">
+            <span class="inline-block h-2 w-2 rounded-kira-sm bg-conn-grey" />Unattributed
           </span>
         </div>
       </div>
 
-      <div class="timeline-hops">
+      <div class="flex flex-col gap-1.5">
         <div
           v-for="hop in activeTimeline.hops"
           :key="hop.index"
-          class="timeline-hop"
+          class="flex flex-col gap-0.5 rounded-kira border border-border p-1"
           data-testid="http-timeline-hop"
         >
-          <div class="hop-caption font-data" data-testid="http-timeline-hop-caption">
-            <span class="hop-index">{{ hop.index + 1 }}</span>
+          <div class="flex items-center gap-1 text-kira-xs font-data" data-testid="http-timeline-hop-caption">
+            <span class="text-muted-foreground">{{ hop.index + 1 }}</span>
             <span>{{ hop.method }}</span>
-            <span class="hop-url">{{ hop.url }}</span>
+            <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ hop.url }}</span>
             <span>→</span>
             <Tooltip v-if="hop.status > 0">
               <TooltipTrigger as-child>
@@ -249,18 +249,18 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </Badge>
           </div>
 
-          <div class="hop-track">
-            <div class="hop-bar" :style="hopBarStyle(hop)">
+          <div class="relative h-3 overflow-hidden rounded-kira-sm bg-field">
+            <div class="absolute inset-y-0 flex min-w-0.5" :style="hopBarStyle(hop)">
               <span
                 v-for="(seg, i) in hopSegments(hop)"
                 :key="i"
-                class="hop-segment"
+                class="h-full"
                 :style="{ width: `${seg.widthPct}%`, backgroundColor: seg.colorVar }"
               />
             </div>
           </div>
 
-          <div class="hop-phases text-kira-xs text-subtle">
+          <div class="flex flex-wrap gap-1.5 text-kira-xs text-subtle">
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
@@ -276,31 +276,31 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </template>
           </div>
 
-          <div v-if="hopNotes(hop).length > 0" class="hop-notes text-kira-xs text-subtle">
+          <div v-if="hopNotes(hop).length > 0" class="flex flex-col gap-0.5 text-kira-xs text-subtle">
             <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
           </div>
 
-          <details v-if="hop.headers && hop.headers.length > 0" class="group hop-headers">
+          <details v-if="hop.headers && hop.headers.length > 0" class="group mt-0.5">
             <summary
               class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
               Response headers
             </summary>
-            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-xs hop-header-row">
+            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-xs py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
           </details>
           <details
             v-else-if="hop.index === activeTimeline!.hops.length - 1 && response?.headers.length"
-            class="group hop-headers"
+            class="group mt-0.5"
           >
             <summary
               class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
               Response headers
             </summary>
-            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-xs hop-header-row">
+            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-xs py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
@@ -327,82 +327,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 <style scoped>
 @reference "@theme/base.css";
 
-.timeline-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
-}
-
-.timeline-summary-row {
-  @apply flex items-center justify-between gap-1.5;
-}
-
-.timeline-summary {
-  @apply px-0.5;
-}
-
-.timeline-hops {
-  @apply flex flex-col gap-1.5;
-}
-
-.timeline-hop {
-  @apply flex flex-col gap-0.5 rounded-kira border border-border p-1;
-}
-
-.hop-caption {
-  @apply flex items-center gap-1 text-kira-xs;
-}
-
-.hop-index {
-  @apply text-muted-foreground;
-}
-
-.hop-url {
-  @apply min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.hop-track {
-  @apply relative h-3 overflow-hidden rounded-kira-sm bg-field;
-}
-
-.hop-bar {
-  @apply absolute inset-y-0 flex min-w-0.5;
-}
-
-.hop-segment {
-  @apply h-full;
-}
-
-.hop-phases {
-  @apply flex flex-wrap gap-1.5;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.hop-phase` stays a bare marker to anchor this attribute-conditional rule. */
 .hop-phase[data-present='false'] {
   @apply opacity-60;
-}
-
-.hop-notes {
-  @apply flex flex-col gap-0.5;
-}
-
-.hop-headers {
-  @apply mt-0.5;
-}
-
-/* The name/value row's own display/gap/font-size utilities live on the template class list;
-   this local hook only adds vertical breathing room. */
-.hop-header-row {
-  @apply py-0.5;
-}
-
-.timeline-legend {
-  @apply flex flex-wrap gap-1.5 px-0.5;
-}
-
-.legend-item {
-  @apply inline-flex items-center gap-0.5;
-}
-
-.legend-swatch {
-  @apply inline-block h-2 w-2 rounded-kira-sm;
 }
 
 /* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */

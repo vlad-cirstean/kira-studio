@@ -96,7 +96,7 @@ function onClearFile(index: number): void {
     @update:rows="onUpdateRows"
   >
     <template #value="{ row, update }">
-      <div v-if="row.kind === 'text'" class="field-cell">
+      <div v-if="row.kind === 'text'" class="flex-1 min-w-0">
         <AutocompleteField
           v-if="variables"
           grow
@@ -138,7 +138,7 @@ function onClearFile(index: number): void {
         </Button>
         <Tooltip v-if="row.fileName">
           <TooltipTrigger as-child>
-            <span class="text-kira-xs text-muted-foreground formdata-file-caption" data-testid="http-formdata-file-caption">
+            <span class="text-kira-xs text-muted-foreground whitespace-nowrap p-0" data-testid="http-formdata-file-caption">
               {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
             </span>
           </TooltipTrigger>
@@ -158,7 +158,7 @@ function onClearFile(index: number): void {
           </TooltipTrigger>
           <TooltipContent>Clear file</TooltipContent>
         </Tooltip>
-        <div class="field-cell">
+        <div class="flex-1 min-w-0">
           <Input
             :model-value="row.contentType"
             placeholder="Content type"
@@ -170,17 +170,3 @@ function onClearFile(index: number): void {
     </template>
   </FieldRowsTable>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* Vue scoped CSS attributes slotted content with the *passing* component's scope id, not
-   FieldRowsTable's — so its own .field-cell rule doesn't reach these slots; repeated here. */
-.field-cell {
-  @apply flex-1 min-w-0;
-}
-
-.formdata-file-caption {
-  @apply whitespace-nowrap p-0;
-}
-</style>

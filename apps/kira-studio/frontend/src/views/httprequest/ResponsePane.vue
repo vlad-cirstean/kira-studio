@@ -301,12 +301,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="response-pane" data-testid="http-response-pane">
+  <div class="flex h-full min-h-0 flex-col" data-testid="http-response-pane">
     <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="http-send-error">
       <AlertDescription>{{ rt.error.message }}</AlertDescription>
     </Alert>
 
-    <div class="response-status-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <div class="response-status-row h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <template v-if="response">
         <Tooltip>
           <TooltipTrigger as-child>
@@ -321,7 +321,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="text-kira-xs text-subtle pane-jump-link"
+              class="text-kira-xs text-subtle pane-jump-link cursor-pointer border-0 bg-none p-0 font-[inherit]"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
@@ -430,7 +430,7 @@ onUnmounted(() => {
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="text-kira-xs text-subtle redirect-caption pane-jump-link"
+          class="text-kira-xs text-subtle pane-jump-link block w-full text-left cursor-pointer border-0 bg-none p-0 font-[inherit]"
           data-testid="http-redirects"
           @click="viewTimeline"
         >
@@ -445,7 +445,7 @@ onUnmounted(() => {
       :tab="tab"
       @compare="onCompare"
     />
-    <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers-pane" data-testid="http-response-headers">
+    <div v-else-if="tab.state.responsePane === 'headers'" class="flex flex-1 min-h-0 flex-col" data-testid="http-response-headers">
       <template v-if="response">
         <InputGroup>
           <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
@@ -458,12 +458,12 @@ onUnmounted(() => {
         </InputGroup>
         <span
           v-if="headerFilter.trim()"
-          class="text-kira-xs subtle response-headers-count"
+          class="text-kira-xs subtle px-1.5 pt-1 pb-0"
           data-testid="http-response-headers-count"
         >
           {{ filteredHeaders.length }} of {{ response.headers.length }} headers
         </span>
-        <div class="response-headers">
+        <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
           <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-xs" data-testid="response-header-row">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
             <span class="wrap-anywhere font-data">{{ h.value }}</span>
@@ -484,11 +484,11 @@ onUnmounted(() => {
     />
     <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
     <CookiesPane v-else-if="tab.state.responsePane === 'cookies'" mode="response" :response="response" />
-    <div v-else class="response-body">
+    <div v-else class="response-body flex flex-1 min-h-0 flex-col">
       <template v-if="response">
         <span
           v-if="response.bodyEncoding === 'base64'"
-          class="text-kira-sm text-muted-foreground binary-note"
+          class="text-kira-sm text-muted-foreground p-1.5"
           data-testid="http-response-binary"
         >
           {{ response.bodyBytes }} bytes of binary data
@@ -508,7 +508,7 @@ onUnmounted(() => {
         <button
           v-if="hasHistory"
           type="button"
-          class="history-hint-link"
+          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary"
           data-testid="http-history-hint"
           @click="viewHistory"
         >
@@ -523,52 +523,13 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.response-pane {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-.response-status-row {
-  @apply gap-1;
-}
-
-.redirect-caption {
-  @apply block w-full px-1.5 py-1 text-left;
-}
-
-/* D11: http-elapsed and http-redirects, still the same dim text they always were, now clickable —
-   a plain button reset rather than AppButton's own chrome, so the status row's look is unchanged. */
-.pane-jump-link {
-  @apply cursor-pointer border-0 bg-none p-0 font-[inherit];
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.response-status-row`/`.response-body` stay bare markers (test locators); D11: http-
+   elapsed and http-redirects, still the same dim text they always were, clickable — `.pane-jump-
+   link` stays a bare marker to anchor this hover rule (a plain button reset rather than AppButton's
+   own chrome, so the status row's look is unchanged). */
 .pane-jump-link:hover {
   @apply text-fg;
 }
-
-.response-body {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.binary-note {
-  @apply p-1.5;
-}
-
-.response-headers-pane {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.response-headers-count {
-  @apply px-1.5 pt-1 pb-0;
-}
-
-.response-headers {
-  @apply flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5;
-}
-
-.history-hint-link {
-  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
-}
-
 /* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

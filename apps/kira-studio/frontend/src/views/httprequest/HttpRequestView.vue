@@ -491,7 +491,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="http-request-view" data-testid="http-request-view">
+  <div class="flex h-full min-h-0 flex-col" data-testid="http-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="view-head">
       <span
@@ -509,7 +509,7 @@ onUnmounted(() => {
            eight kinds would answer false to is shared machinery for a cosmetic gain (§8 OQ-8). -->
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="dirty-mark" role="img" data-testid="http-dirty" aria-label="Unsaved changes">•</span>
+          <span class="text-warn leading-none text-kira-lg" role="img" data-testid="http-dirty" aria-label="Unsaved changes">•</span>
         </TooltipTrigger>
         <TooltipContent>Unsaved changes</TooltipContent>
       </Tooltip>
@@ -580,7 +580,7 @@ onUnmounted(() => {
         testid="http-method-select"
         @update:model-value="onMethodChange"
       />
-      <div class="url-field">
+      <div class="url-field min-w-0 flex-1">
         <AutocompleteField
           class="w-full"
           :model-value="tab.state.url"
@@ -737,7 +737,7 @@ onUnmounted(() => {
         <TooltipContent>Find in the request body</TooltipContent>
       </Tooltip>
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
-        <div ref="overviewAnchorRef" class="overview-anchor">
+        <div ref="overviewAnchorRef" class="relative flex">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -775,9 +775,9 @@ onUnmounted(() => {
       @close="closeRequestFind"
     />
 
-    <SplitterGroup direction="vertical" class="request-response-split">
+    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
       <SplitterPanel
-        class="request-pane"
+        class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="http-request-pane"
         size-unit="px"
         :default-size="requestPaneHeight"
@@ -830,7 +830,7 @@ onUnmounted(() => {
 
       <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <SplitterPanel class="response-pane-slot" data-testid="http-response-pane-slot" :order="2">
+      <SplitterPanel class="min-h-0" data-testid="http-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
       </SplitterPanel>
     </SplitterGroup>
@@ -839,48 +839,8 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.overview-anchor {
-  @apply relative flex;
-}
-
-.http-request-view {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-/* P15 D4: AutocompleteField's inheritAttrs: false lands a call site's own class/style on the inner
-   <input>, never the wrapping box that actually sizes it (F3) — the app's existing wrapper, used
-   at ten other call sites, fixes it here too. Was `style="flex: 1"` directly on <AutocompleteField>,
-   which landed on the input (already flex: 1) and did nothing — the URL field never grew with the
-   window. api-ui-consistency.spec.ts selects `.url-field` directly — kept as a marker class. P110
-   B25: AutocompleteField's own `class="w-full"` prop (template above) does the actual sizing now;
-   this wrapper only supplies the flex-1/min-w-0 that lets it grow in the toolbar row. */
-.url-field {
-  @apply min-w-0 flex-1;
-}
-
-.request-response-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-/* api-ui-consistency.spec.ts selects `.request-pane` directly — kept as a marker class. */
-.request-pane {
-  @apply flex min-h-0 flex-col overflow-hidden;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.request-splitter` is now a bare marker class, kept because http-request.spec.ts/
-   grpc-request.spec.ts poll its box-shadow via getComputedStyle (no rule of its own attaches to
-   the name any more). P22 D13 (F22): the request/response boundary used to be 4px of nothing
-   until the pointer crossed it -- this is why the handle carries an explicit height at all. */
-
-.dirty-mark {
-  @apply text-warn leading-none text-kira-lg;
-}
-
-/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
-   min-h-0 is the only thing this class still needs to contribute. */
-.response-pane-slot {
-  @apply min-h-0;
-}
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.url-field` and `.request-pane` stay bare markers — api-ui-consistency.spec.ts
+   selects both directly. `.request-splitter` (ResizableHandle below) already carried no rule of
+   its own (P110 B32) — http-request.spec.ts/grpc-request.spec.ts poll its box-shadow instead. */
 </style>

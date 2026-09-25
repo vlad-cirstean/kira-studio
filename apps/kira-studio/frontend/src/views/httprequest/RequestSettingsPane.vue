@@ -87,6 +87,10 @@ const effectiveFollowRedirects = computed(
 function onEditGlobalDefaults(): void {
   settingsStore.openSettingsAt('Api');
 }
+
+// P110 B40: `.inherit`'s own shared class string, repeated 7 times in this file's template --
+// the DEF_TH/DEF_TD const idiom views/definition/*.vue already uses.
+const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-xs';
 </script>
 
 <template>
@@ -94,7 +98,7 @@ function onEditGlobalDefaults(): void {
     <Label :class="fieldVariants()">
       <div class="flex items-center justify-between gap-1">
         <span>HTTP version</span>
-        <Label class="inherit">
+        <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.httpVersion === null"
             data-testid="http-settings-httpVersion-inherit"
@@ -121,7 +125,7 @@ function onEditGlobalDefaults(): void {
     <Label :class="fieldVariants()">
       <div class="flex items-center justify-between gap-1">
         <span>Request timeout (ms)</span>
-        <Label class="inherit">
+        <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
             data-testid="http-settings-requestTimeoutMs-inherit"
@@ -149,7 +153,7 @@ function onEditGlobalDefaults(): void {
     <Label :class="fieldVariants()">
       <div class="flex items-center justify-between gap-1">
         <span>Max response size (MB)</span>
-        <Label class="inherit">
+        <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxResponseMb === null"
             data-testid="http-settings-maxResponseMb-inherit"
@@ -186,7 +190,7 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         <span>Verify SSL certificates</span>
       </Label>
-      <Label class="inherit">
+      <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.sslVerify === null"
           data-testid="http-settings-sslVerify-inherit"
@@ -211,7 +215,7 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         <span>Follow redirects</span>
       </Label>
-      <Label class="inherit">
+      <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.followRedirects === null"
           data-testid="http-settings-followRedirects-inherit"
@@ -227,7 +231,7 @@ function onEditGlobalDefaults(): void {
     <Label :class="fieldVariants()">
       <div class="flex items-center justify-between gap-1">
         <span>Max redirects</span>
-        <Label class="inherit">
+        <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxRedirects === null"
             data-testid="http-settings-maxRedirects-inherit"
@@ -265,7 +269,7 @@ function onEditGlobalDefaults(): void {
         </Checkbox>
         <span>Disable cookie jar</span>
       </Label>
-      <Label class="inherit">
+      <Label :class="INHERIT_LABEL">
         <Checkbox
           :model-value="settings.disableCookieJar === null"
           data-testid="http-settings-disableCookieJar-inherit"
@@ -278,20 +282,8 @@ function onEditGlobalDefaults(): void {
     </FieldGroup>
     <FieldDescription>Global: {{ global.disableCookieJar ? 'off' : 'on' }}</FieldDescription>
 
-    <button type="button" class="hint-link" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
+    <button type="button" class="self-start cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
       Edit global defaults…
     </button>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.inherit {
-  @apply flex items-center gap-1 text-muted-foreground text-kira-xs;
-}
-
-.hint-link {
-  @apply self-start cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
-}
-</style>

@@ -88,18 +88,18 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 </script>
 
 <template>
-  <div v-if="mode === 'request'" class="cookies-pane" data-testid="http-request-cookies">
+  <div v-if="mode === 'request'" class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-request-cookies">
     <Alert v-if="disableCookieJar" class="empty-state" data-testid="http-cookies-jar-off">
       <CodiconIcon name="circle-slash" :size="24" class="text-subtle" />
       <AlertTitle class="text-kira-md text-muted-foreground font-normal">
         The cookie jar is off for this request
       </AlertTitle>
-      <button type="button" class="hint-link" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
+      <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
         Edit global defaults…
       </button>
     </Alert>
     <template v-else>
-      <div class="cookies-toolbar">
+      <div class="flex items-center gap-1">
         <InputGroup>
           <InputGroupAddon>
             <CodiconIcon name="search" :size="13" />
@@ -114,7 +114,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
         <Button
           variant="dialog"
           size="kira"
-          class="clear-all-button"
+          class="shrink-0"
           :disabled="requestCookies.length === 0"
           data-testid="http-cookies-clear-all"
           @click="onClearAll"
@@ -124,17 +124,17 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       </div>
       <span
         v-if="filter.trim()"
-        class="text-kira-xs subtle cookies-count"
+        class="text-kira-xs subtle px-1.5 pt-1 pb-0"
         data-testid="http-cookies-filtered-count"
       >
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies
       </span>
-      <div v-if="requestCookies.length > 0" class="cookies-list">
-        <div v-for="c in filteredRequestCookies" :key="c.name" class="flex gap-1.5 text-kira-xs cookie-row">
-          <div class="cookie-body">
+      <div v-if="requestCookies.length > 0" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
+        <div v-for="c in filteredRequestCookies" :key="c.name" class="flex text-kira-xs items-start justify-between gap-1">
+          <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
             <span class="wrap-anywhere font-data">{{ c.value }}</span>
-            <span v-if="attributeLine(c)" class="cookie-attributes">{{ attributeLine(c) }}</span>
+            <span v-if="attributeLine(c)" class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">{{ attributeLine(c) }}</span>
           </div>
           <Tooltip>
             <TooltipTrigger as-child>
@@ -155,22 +155,22 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       <Alert v-else class="empty-state" data-testid="http-cookies-empty">
         <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md text-muted-foreground font-normal">No cookies for this request's URL</AlertTitle>
-        <button type="button" class="hint-link" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
+        <button type="button" class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
       </Alert>
     </template>
   </div>
 
-  <div v-else class="cookies-pane" data-testid="http-response-cookies">
+  <div v-else class="flex flex-1 min-h-0 flex-col overflow-auto" data-testid="http-response-cookies">
     <template v-if="response">
       <template v-if="sentCookies.length > 0 || receivedCookies.length > 0">
-        <div v-if="sentCookies.length > 0" class="cookies-group">
-          <h3 class="cookies-group-head">Sent</h3>
-          <div class="cookies-list">
-            <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="flex gap-1.5 text-kira-xs cookie-row">
-              <div class="cookie-body">
+        <div v-if="sentCookies.length > 0" class="pt-1.5">
+          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">Sent</h3>
+          <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
+            <div v-for="(c, i) in sentCookies" :key="`sent-${i}`" class="flex text-kira-xs items-start justify-between gap-1">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
-                <span class="cookie-attributes">
+                <span class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}
@@ -179,14 +179,14 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
             </div>
           </div>
         </div>
-        <div v-if="receivedCookies.length > 0" class="cookies-group">
-          <h3 class="cookies-group-head">Received</h3>
-          <div class="cookies-list">
-            <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="flex gap-1.5 text-kira-xs cookie-row">
-              <div class="cookie-body">
+        <div v-if="receivedCookies.length > 0" class="pt-1.5">
+          <h3 class="m-0 px-1.5 py-0 text-muted-foreground text-kira-sm">Received</h3>
+          <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
+            <div v-for="(c, i) in receivedCookies" :key="`received-${i}`" class="flex text-kira-xs items-start justify-between gap-1">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
                 <span class="wrap-anywhere font-data">{{ c.value }}</span>
-                <span class="cookie-attributes">
+                <span class="text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)]">
                   <template v-if="showHopIndex">Hop {{ c.hop }}</template>
                   <template v-if="showHopIndex && attributeLine(c)"> · </template>
                   {{ attributeLine(c) }}
@@ -207,55 +207,3 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
     </Alert>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.cookies-pane {
-  @apply flex flex-1 min-h-0 flex-col overflow-auto;
-}
-
-.cookies-toolbar {
-  @apply flex items-center gap-1;
-}
-
-.clear-all-button {
-  @apply shrink-0;
-}
-
-.cookies-count {
-  @apply px-1.5 pt-1 pb-0;
-}
-
-.cookies-list {
-  @apply flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5;
-}
-
-.cookie-row {
-  @apply items-start justify-between gap-1;
-}
-
-.cookie-body {
-  @apply flex min-w-0 flex-1 flex-col;
-}
-
-/* AutocompleteField.vue's own hover-panel shape (P71 §8.2): a value line, then a muted second
-   line for everything that isn't the value itself. */
-.cookie-attributes {
-  @apply text-muted-foreground text-kira-xs font-[family-name:var(--kira-font-data)];
-}
-
-.cookies-group {
-  @apply pt-1.5;
-}
-
-.cookies-group-head {
-  @apply m-0 px-1.5 py-0 text-muted-foreground text-kira-sm;
-}
-
-.hint-link {
-  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
-</style>

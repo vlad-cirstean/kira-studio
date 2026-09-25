@@ -114,8 +114,8 @@ async function onClear(): Promise<void> {
 </script>
 
 <template>
-  <div class="history-pane" data-testid="http-history-list">
-    <div class="history-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+  <div class="flex flex-1 min-h-0 flex-col" data-testid="http-history-list">
+    <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
       <span class="ml-auto" />
       <Button
@@ -142,7 +142,7 @@ async function onClear(): Promise<void> {
     <Alert v-if="entries.length === 0" class="empty-state" data-testid="http-history-empty">
       <CodiconIcon name="history" :size="24" class="text-subtle" />
       <AlertTitle class="text-kira-md text-muted-foreground font-normal">No past responses yet</AlertTitle>
-      <span class="text-kira-xs text-subtle scratch-note">
+      <span class="text-kira-xs text-subtle mt-0.5">
         <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
         <template v-else>
           Sending this request will record one.
@@ -176,14 +176,14 @@ async function onClear(): Promise<void> {
 
     <div
       v-if="entries.length > 0 && filteredEntries.length > 0"
-      class="history-rows"
+      class="flex flex-1 min-h-0 flex-col overflow-auto"
       role="listbox"
       aria-label="Response history"
     >
       <div
         v-for="(entry, i) in filteredEntries"
         :key="entry.id"
-        class="history-row"
+        class="history-row flex cursor-pointer gap-1 border-b border-border px-1.5 py-1"
         :class="{ 'is-viewing': entry.id === viewingId }"
         data-testid="http-history-row"
         role="option"
@@ -201,11 +201,11 @@ async function onClear(): Promise<void> {
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <div class="history-row-main">
-          <div class="history-row-line">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="text-kira-xs text-subtle history-time">{{ formatRelative(entry.sentAt) }}</span>
+                <span class="text-kira-xs text-subtle min-w-16">{{ formatRelative(entry.sentAt) }}</span>
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
@@ -235,12 +235,12 @@ async function onClear(): Promise<void> {
               <TooltipContent>Delete</TooltipContent>
             </Tooltip>
           </div>
-          <div v-if="showUrl(i)" class="text-kira-xs text-subtle history-url">{{ entry.url }}</div>
+          <div v-if="showUrl(i)" class="text-kira-xs text-subtle overflow-hidden text-ellipsis whitespace-nowrap">{{ entry.url }}</div>
         </div>
       </div>
     </div>
 
-    <div v-if="atCap" class="text-kira-xs text-subtle history-cap-note" data-testid="http-history-cap-note">
+    <div v-if="atCap" class="text-kira-xs text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="http-history-cap-note">
       Only the last {{ HISTORY_PER_SCOPE_LIMIT }} are kept — older responses are removed
       automatically.
     </div>
@@ -249,51 +249,11 @@ async function onClear(): Promise<void> {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.history-pane {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.history-toolbar {
-  @apply gap-1;
-}
-
-.scratch-note {
-  @apply mt-0.5;
-}
-
-.history-rows {
-  @apply flex flex-1 min-h-0 flex-col overflow-auto;
-}
-
-.history-row {
-  @apply flex cursor-pointer gap-1 border-b border-border px-1.5 py-1;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.history-row` stays a bare marker to anchor this hover/is-viewing compound. */
 .history-row:hover,
 .history-row.is-viewing {
   @apply bg-hover;
 }
-
-.history-row-main {
-  @apply flex min-w-0 flex-1 flex-col gap-0.5;
-}
-
-.history-row-line {
-  @apply flex items-center gap-1;
-}
-
-.history-time {
-  @apply min-w-16;
-}
-
-.history-url {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.history-cap-note {
-  @apply shrink-0 border-t border-border px-1.5 py-1;
-}
-
 /* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

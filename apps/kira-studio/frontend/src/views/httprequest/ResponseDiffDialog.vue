@@ -242,18 +242,18 @@ onUnmounted(() => {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto flex-1 min-h-0">
-    <div v-if="loadingSnapshots" class="diff-status text-kira-xs text-subtle">Loading…</div>
+    <div v-if="loadingSnapshots" class="p-2 text-kira-xs text-subtle">Loading…</div>
     <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
-    <div v-else-if="snapA && snapB" class="diff-body">
-      <div class="diff-summary" data-testid="http-diff-summary">
-        <div class="diff-summary-side">
+    <div v-else-if="snapA && snapB" class="flex h-full min-h-0 flex-col">
+      <div class="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5" data-testid="http-diff-summary">
+        <div class="flex flex-col gap-0.5">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs text-subtle diff-summary-time">{{ formatRelative(snapA.entry.sentAt) }}</span>
+              <span class="text-kira-xs text-subtle self-start">{{ formatRelative(snapA.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapA.entry.sentAt }}</TooltipContent>
           </Tooltip>
-          <div class="diff-summary-col">
+          <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
                 <Badge :variant="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
@@ -266,15 +266,15 @@ onUnmounted(() => {
             <span class="text-kira-xs text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
           </div>
         </div>
-        <span class="diff-arrow">→</span>
-        <div class="diff-summary-side">
+        <span class="text-muted-foreground">→</span>
+        <div class="flex flex-col gap-0.5">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs text-subtle diff-summary-time">{{ formatRelative(snapB.entry.sentAt) }}</span>
+              <span class="text-kira-xs text-subtle self-start">{{ formatRelative(snapB.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapB.entry.sentAt }}</TooltipContent>
           </Tooltip>
-          <div class="diff-summary-col">
+          <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
                 <Badge :variant="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
@@ -289,8 +289,11 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="diff-headers" data-testid="http-diff-headers">
-        <div class="diff-header-row diff-header-head text-kira-xs text-subtle">
+      <div class="max-h-40 shrink-0 overflow-auto border-b border-border px-2 py-1" data-testid="http-diff-headers">
+        <!-- P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as
+             the api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a
+             new one. -->
+        <div class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
           <span></span>
           <span></span>
           <span>before</span>
@@ -299,16 +302,16 @@ onUnmounted(() => {
         <div
           v-for="row in changedHeaderRows"
           :key="row.name"
-          class="diff-header-row"
+          class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
           :class="row.status"
           data-testid="http-diff-header-row"
         >
           <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
-          <span class="font-data diff-header-name">{{ row.name }}</span>
-          <span class="font-data diff-header-value">{{ row.a ?? '—' }}</span>
-          <span class="font-data diff-header-value">{{ row.b ?? '—' }}</span>
+          <span class="font-data text-muted-foreground">{{ row.name }}</span>
+          <span class="font-data [overflow-wrap:anywhere]">{{ row.a ?? '—' }}</span>
+          <span class="font-data [overflow-wrap:anywhere]">{{ row.b ?? '—' }}</span>
         </div>
-        <details v-if="unchangedHeaderRows.length > 0" class="group diff-header-unchanged">
+        <details v-if="unchangedHeaderRows.length > 0" class="group">
           <summary
             class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
           >
@@ -317,13 +320,13 @@ onUnmounted(() => {
           <div
             v-for="row in unchangedHeaderRows"
             :key="row.name"
-            class="diff-header-row unchanged"
+            class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] unchanged"
             data-testid="http-diff-header-row-unchanged"
           >
             <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
-            <span class="font-data diff-header-name">{{ row.name }}</span>
-            <span class="font-data diff-header-value">{{ row.a }}</span>
-            <span class="font-data diff-header-value">{{ row.b }}</span>
+            <span class="font-data text-muted-foreground">{{ row.name }}</span>
+            <span class="font-data [overflow-wrap:anywhere]">{{ row.a }}</span>
+            <span class="font-data [overflow-wrap:anywhere]">{{ row.b }}</span>
           </div>
         </details>
       </div>
@@ -334,11 +337,11 @@ onUnmounted(() => {
         </AlertDescription>
       </Alert>
       <template v-else>
-        <div v-if="!commonFormat" class="text-kira-xs text-subtle diff-raw-note">
+        <div v-if="!commonFormat" class="text-kira-xs text-subtle shrink-0 px-2 py-1">
           Comparing raw bytes — the two bodies aren't both JSON or both XML.
         </div>
-        <div v-if="mergeLoading" class="diff-status text-kira-xs text-subtle">Loading the compare view…</div>
-        <div ref="mergeHostRef" class="diff-merge-host" data-testid="http-diff-merge"></div>
+        <div v-if="mergeLoading" class="p-2 text-kira-xs text-subtle">Loading the compare view…</div>
+        <div ref="mergeHostRef" class="diff-merge-host flex-1 min-h-0 overflow-auto" data-testid="http-diff-merge"></div>
       </template>
     </div>
       </div>
@@ -354,49 +357,9 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
-
-.diff-status {
-  @apply p-2;
-}
-
-.diff-body {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-.diff-summary {
-  @apply flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5;
-}
-
-.diff-summary-side {
-  @apply flex flex-col gap-0.5;
-}
-
-.diff-summary-time {
-  @apply self-start;
-}
-
-.diff-summary-col {
-  @apply flex items-center gap-1;
-}
-
-.diff-arrow {
-  @apply text-muted-foreground;
-}
-
-.diff-headers {
-  @apply max-h-40 shrink-0 overflow-auto border-b border-border px-2 py-1;
-}
-
-.diff-header-row {
-  /* P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as the
-     api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a new one. */
-  @apply grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr];
-}
-
-.diff-header-head {
-  @apply text-subtle uppercase tracking-wider;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.diff-header-row`/`.diff-header-status` stay bare markers to anchor this
+   compound-selector trio; `.diff-merge-host` stays a bare marker to anchor this :deep() rule. */
 .diff-header-row.added .diff-header-status {
   @apply text-ok;
 }
@@ -407,22 +370,6 @@ onUnmounted(() => {
 
 .diff-header-row.changed .diff-header-status {
   @apply text-warn;
-}
-
-.diff-header-name {
-  @apply text-muted-foreground;
-}
-
-.diff-header-value {
-  @apply [overflow-wrap:anywhere];
-}
-
-.diff-raw-note {
-  @apply shrink-0 px-2 py-1;
-}
-
-.diff-merge-host {
-  @apply flex-1 min-h-0 overflow-auto;
 }
 
 .diff-merge-host :deep(.monaco-diff-editor) {

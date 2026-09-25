@@ -207,7 +207,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
 </script>
 
 <template>
-  <div class="raw-exchange-pane" data-testid="http-raw-pane">
+  <div class="flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5" data-testid="http-raw-pane">
     <template v-if="wire || showReconstructed">
       <template v-if="wire">
         <Alert :variant="fidelityTone" data-testid="http-wire-fidelity">
@@ -235,9 +235,9 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
       </template>
 
       <template v-for="section in rawSections" :key="section.key">
-        <div class="raw-section">
-          <div class="raw-section-header">
-            <span class="text-kira-xs text-subtle font-data raw-caption" :data-testid="section.captionTestid">
+        <div class="flex min-h-52 flex-col gap-0.5">
+          <div class="flex items-center gap-1">
+            <span class="text-kira-xs text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap" :data-testid="section.captionTestid">
               {{ section.caption }}
             </span>
             <span class="ml-auto" />
@@ -253,7 +253,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
           <Alert v-if="section.noteBefore" variant="note" :data-testid="section.noteBeforeTestid">
             <AlertDescription>{{ section.noteBefore }}</AlertDescription>
           </Alert>
-          <div class="raw-editor">
+          <div class="flex-1 min-h-52 overflow-hidden rounded-kira border border-border">
             <MonacoHost
               :ref="(el) => setHostRef(section.key, el)"
               :doc="section.doc"
@@ -282,29 +282,3 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
     </Alert>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.raw-exchange-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
-}
-
-.raw-section {
-  @apply flex min-h-52 flex-col gap-0.5;
-}
-
-.raw-section-header {
-  @apply flex items-center gap-1;
-}
-
-.raw-caption {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.raw-editor {
-  @apply flex-1 min-h-52 overflow-hidden rounded-kira border border-border;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
-</style>

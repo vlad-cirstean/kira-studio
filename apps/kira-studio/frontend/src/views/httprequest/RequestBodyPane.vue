@@ -153,8 +153,8 @@ const caption = computed(() =>
 </script>
 
 <template>
-  <div class="body-pane">
-    <div class="body-mode-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+  <div class="flex flex-1 min-h-0 flex-col">
+    <div class="h-bar shrink-0 flex items-center gap-1 overflow-x-auto px-2 border-b border-border">
       <ToggleGroup
         type="single"
         :model-value="selection"
@@ -190,7 +190,7 @@ const caption = computed(() =>
       </Tooltip>
     </div>
 
-    <div v-if="caption" class="text-kira-xs text-subtle body-caption" data-testid="http-body-content-type-caption">
+    <div v-if="caption" class="text-kira-xs text-subtle px-1.5 pt-0 pb-1" data-testid="http-body-content-type-caption">
       {{ caption }}
     </div>
 
@@ -241,19 +241,3 @@ const caption = computed(() =>
     <BinaryBodyPicker v-else-if="tab.state.bodyMode === 'file'" :tab="tab" />
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.body-pane {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.body-mode-row {
-  @apply gap-1 overflow-x-auto;
-}
-
-.body-caption {
-  @apply px-1.5 pt-0 pb-1;
-}
-</style>
