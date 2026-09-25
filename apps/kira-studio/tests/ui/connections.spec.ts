@@ -303,7 +303,7 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   const portInput = page.locator('[data-testid="connection-port"]');
   const stepButtons = portInput
     .locator('xpath=parent::fieldset[@data-slot="input-group"]')
-    .locator('.step-btn');
+    .locator('[data-testid="number-step-up"], [data-testid="number-step-down"]');
   await expect(stepButtons).toHaveCount(2);
   for (const btn of await stepButtons.all()) {
     const btnBox = await btn.boundingBox();

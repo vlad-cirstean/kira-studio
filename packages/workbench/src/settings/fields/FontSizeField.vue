@@ -4,12 +4,11 @@ import { FONT_SIZE_RANGE } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import type { ComputedRef, Ref } from 'vue';
-import { computed, ref, useId } from 'vue';
+import { computed, useId } from 'vue';
 
 // I2-18: the data font-size field (stepper, range error, reset button) was byte-identical between
 // kira-studio's and kira-space's own AppearancePane.vue — moved here once, around P105 §4.2's own
@@ -34,9 +33,6 @@ const fontSizeError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('appearance.fontSize', fontSizeError);
-
-const fontSizeGroupRef = ref<HTMLElement | null>(null);
-const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
 
 // F3: see DateFormatField.vue's own comment -- `for` + `id` ties the label to the actual number
 // input, not the stepper buttons (already `tabindex="-1"`/`aria-hidden` decorative) or the Reset
@@ -66,49 +62,15 @@ const fieldId = useId();
         <TooltipContent>Reset to default</TooltipContent>
       </Tooltip>
     </div>
-    <div class="size-input" ref="fontSizeGroupRef">
-      <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-        <InputGroupInput
-          :id="fieldId"
-          type="number"
-          :min="FONT_SIZE_RANGE.min"
-          :max="FONT_SIZE_RANGE.max"
-          class="h-full font-data"
-          :aria-invalid="!!fontSizeError || undefined"
-          data-testid="settings-font-size"
-          :model-value="String(appearance.fontSize)"
-          @input="onFontSizeInput"
-        />
-        <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <InputGroupButton
-                class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                tabindex="-1"
-                aria-hidden="true"
-                @mousedown.prevent="fontSizeStepper.stepBy(1)"
-              >
-                <CodiconIcon name="chevron-up" :size="9" />
-              </InputGroupButton>
-            </TooltipTrigger>
-            <TooltipContent>Increase</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <InputGroupButton
-                class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                tabindex="-1"
-                aria-hidden="true"
-                @mousedown.prevent="fontSizeStepper.stepBy(-1)"
-              >
-                <CodiconIcon name="chevron-down" :size="9" />
-              </InputGroupButton>
-            </TooltipTrigger>
-            <TooltipContent>Decrease</TooltipContent>
-          </Tooltip>
-        </InputGroupAddon>
-      </InputGroup>
-    </div>
+    <NumberStepperInput
+      :id="fieldId"
+      :min="FONT_SIZE_RANGE.min"
+      :max="FONT_SIZE_RANGE.max"
+      :aria-invalid="!!fontSizeError || undefined"
+      data-testid="settings-font-size"
+      :model-value="String(appearance.fontSize)"
+      @input="onFontSizeInput"
+    />
     <FieldError v-if="fontSizeError" data-testid="settings-font-size-error">
       {{ fontSizeError }}
     </FieldError>

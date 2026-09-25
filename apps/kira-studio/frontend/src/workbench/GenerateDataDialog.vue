@@ -4,11 +4,10 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
@@ -51,27 +50,6 @@ const rowCount = ref(100);
 const seed = ref(0);
 const plans = ref<ColumnPlan[]>([]);
 
-// P104 §2: TextField's number stepper -> ui/input-group recipe. Rows/Seed are singular fields;
-// each recipe row's own sequence-start field is per-row, so its group elements live in a Map
-// keyed by column name (same convention as RepoMultiDiffView.vue's own per-path container Map).
-const rowCountGroupRef = ref<HTMLElement | null>(null);
-const rowCountStepper = useNumberStepper(rowCountGroupRef);
-const seedGroupRef = ref<HTMLElement | null>(null);
-const seedStepper = useNumberStepper(seedGroupRef);
-const sequenceStartGroups = new Map<string, HTMLElement>();
-function setSequenceStartGroup(columnName: string, el: Element | null): void {
-  if (el instanceof HTMLElement) sequenceStartGroups.set(columnName, el);
-  else sequenceStartGroups.delete(columnName);
-}
-function stepSequenceStart(columnName: string, dir: 1 | -1): void {
-  const container = sequenceStartGroups.get(columnName);
-  const el = container?.querySelector('input');
-  if (!el || el.disabled) return;
-  if (dir > 0) el.stepUp();
-  else el.stepDown();
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-}
 
 const previewOpen = ref(false);
 const previewStatements = ref<string[]>([]);
@@ -256,94 +234,21 @@ function onSequenceStartChange(index: number, start: number): void {
     <div class="flex flex-col gap-2 py-2 px-3">
       <div class="flex items-center gap-1.5">
         <Label class="p-0 text-kira-sm text-muted-foreground">Rows</Label>
-        <!-- P104 §2: `ref` on a wrapping display:contents span (not the InputGroup component
-             itself, which forwards no DOM ref) -- keeps run-fields' flex layout untouched since the
-             wrapper contributes no box of its own. -->
-        <span ref="rowCountGroupRef" class="contents">
-        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
-          <InputGroupInput
-            :model-value="String(rowCount)"
-            type="number"
-            class="h-full font-data"
-            data-testid="generate-data-row-count"
-            :disabled="running"
-            @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
-          />
-          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  :disabled="running"
-                  @mousedown.prevent="rowCountStepper.stepBy(1)"
-                >
-                  <CodiconIcon name="chevron-up" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Increase</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  :disabled="running"
-                  @mousedown.prevent="rowCountStepper.stepBy(-1)"
-                >
-                  <CodiconIcon name="chevron-down" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Decrease</TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
-        </InputGroup>
-        </span>
+        <NumberStepperInput
+          :model-value="String(rowCount)"
+          group-class="h-control"
+          data-testid="generate-data-row-count"
+          :disabled="running"
+          @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
+        />
         <Label class="p-0 text-kira-sm text-muted-foreground">Seed</Label>
-        <span ref="seedGroupRef" class="contents">
-        <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
-          <InputGroupInput
-            :model-value="String(seed)"
-            type="number"
-            class="h-full font-data"
-            data-testid="generate-data-seed"
-            :disabled="running"
-            @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
-          />
-          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  :disabled="running"
-                  @mousedown.prevent="seedStepper.stepBy(1)"
-                >
-                  <CodiconIcon name="chevron-up" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Increase</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  :disabled="running"
-                  @mousedown.prevent="seedStepper.stepBy(-1)"
-                >
-                  <CodiconIcon name="chevron-down" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Decrease</TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
-        </InputGroup>
-        </span>
+        <NumberStepperInput
+          :model-value="String(seed)"
+          group-class="h-control"
+          data-testid="generate-data-seed"
+          :disabled="running"
+          @update:model-value="(v: string | number) => (seed = Math.trunc(Number(v)) || 0)"
+        />
         <span v-if="rowCount > BATCH_SIZE" class="text-kira-sm text-muted-foreground" data-testid="generate-data-batch-note">
           {{ Math.ceil(rowCount / BATCH_SIZE) }} batches of {{ BATCH_SIZE }}
         </span>
@@ -390,52 +295,14 @@ function onSequenceStartChange(index: number, start: number): void {
             :disabled="running"
             @update:model-value="(v) => onConstantChange(index, String(v))"
           />
-          <span
+          <NumberStepperInput
             v-else-if="plan.recipe.kind === 'sequence'"
-            class="contents"
-            :ref="(el) => setSequenceStartGroup(plan.column.name, el as Element | null)"
-          >
-            <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-field">
-              <InputGroupInput
-                :model-value="String(plan.recipe.start)"
-                type="number"
-                class="h-full font-data"
-                :data-testid="`generate-data-sequence-start-${plan.column.name}`"
-                :disabled="running"
-                @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
-              />
-              <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <InputGroupButton
-                      class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      :disabled="running"
-                      @mousedown.prevent="stepSequenceStart(plan.column.name, 1)"
-                    >
-                      <CodiconIcon name="chevron-up" :size="9" />
-                    </InputGroupButton>
-                  </TooltipTrigger>
-                  <TooltipContent>Increase</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <InputGroupButton
-                      class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      :disabled="running"
-                      @mousedown.prevent="stepSequenceStart(plan.column.name, -1)"
-                    >
-                      <CodiconIcon name="chevron-down" :size="9" />
-                    </InputGroupButton>
-                  </TooltipTrigger>
-                  <TooltipContent>Decrease</TooltipContent>
-                </Tooltip>
-              </InputGroupAddon>
-            </InputGroup>
-          </span>
+            :model-value="String(plan.recipe.start)"
+            group-class="h-control"
+            :data-testid="`generate-data-sequence-start-${plan.column.name}`"
+            :disabled="running"
+            @update:model-value="(v: string | number) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
+          />
           <span v-else class="text-muted-foreground"></span>
         </div>
       </div>

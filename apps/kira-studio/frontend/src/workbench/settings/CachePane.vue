@@ -3,7 +3,6 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldError, fieldVariants } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -11,9 +10,9 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
-import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { formatBytes } from '@workbench/util/format';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';
 import { CACHE_L2_BUDGET_MB_RANGE } from '../../state/settingsDomain';
@@ -38,10 +37,6 @@ const cacheBudgetError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('cache.l2BudgetMb', cacheBudgetError);
-
-// P104 §2: TextField's number stepper -> ui/input-group recipe.
-const l2BudgetMbGroupRef = ref<HTMLElement | null>(null);
-const l2BudgetMbStepper = useNumberStepper(l2BudgetMbGroupRef);
 
 const hitRateLabel = computed(() => {
   const stats = cacheStatsStore.stats;
@@ -85,48 +80,14 @@ async function onClearCaches(): Promise<void> {
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <span ref="l2BudgetMbGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-          <InputGroupInput
-            type="number"
-            :min="CACHE_L2_BUDGET_MB_RANGE.min"
-            :max="CACHE_L2_BUDGET_MB_RANGE.max"
-            class="h-full font-data"
-            :aria-invalid="!!cacheBudgetError || undefined"
-            data-testid="settings-cache-budget"
-            :model-value="String(draft.cache.l2BudgetMb)"
-            @input="onCacheBudgetInput"
-          />
-          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="l2BudgetMbStepper.stepBy(1)"
-                >
-                  <CodiconIcon name="chevron-up" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Increase</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="l2BudgetMbStepper.stepBy(-1)"
-                >
-                  <CodiconIcon name="chevron-down" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Decrease</TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
-        </InputGroup>
-      </span>
+      <NumberStepperInput
+        :min="CACHE_L2_BUDGET_MB_RANGE.min"
+        :max="CACHE_L2_BUDGET_MB_RANGE.max"
+        :aria-invalid="!!cacheBudgetError || undefined"
+        data-testid="settings-cache-budget"
+        :model-value="String(draft.cache.l2BudgetMb)"
+        @input="onCacheBudgetInput"
+      />
       <FieldError v-if="cacheBudgetError" data-testid="settings-cache-budget-error">
         {{ cacheBudgetError }}
       </FieldError>

@@ -315,6 +315,12 @@ check_class_in_attrs 'sticky-row' 'STICKY_ROW_CLASS (packages/workbench/src/util
 # DEF_TD constant (`border-r border-border last:border-r-0`) -- the marker class itself is dead.
 check_class_in_attrs 'definition-table' 'border-r border-border last:border-r-0 on DEF_TD'
 
+# P110 I2-22: the InputGroup+Tooltip+InputGroupButton number-stepper recipe (14 sites across 7
+# files), replaced by the shared NumberStepperInput component (packages/theme/src/
+# NumberStepperInput.vue), which drops the `step-btn` hook class entirely in favour of
+# `data-testid="number-step-up"`/`"number-step-down"`.
+check_class 'step-btn' 'data-testid="number-step-up"/"number-step-down" (packages/theme/src/NumberStepperInput.vue)'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

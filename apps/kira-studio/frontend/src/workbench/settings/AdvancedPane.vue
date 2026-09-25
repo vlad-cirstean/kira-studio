@@ -2,7 +2,6 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError, fieldVariants } from '@theme/components/ui/field';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import {
   Tooltip,
@@ -10,9 +9,9 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
-import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
@@ -30,12 +29,6 @@ function onOpLogRetentionInput(e: Event): void {
 function onExpensiveQueryRowsInput(e: Event): void {
   props.draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
 }
-
-// P104 §2: TextField's number stepper -> ui/input-group recipe.
-const opLogRetentionGroupRef = ref<HTMLElement | null>(null);
-const opLogRetentionStepper = useNumberStepper(opLogRetentionGroupRef);
-const expensiveQueryRowsGroupRef = ref<HTMLElement | null>(null);
-const expensiveQueryRowsStepper = useNumberStepper(expensiveQueryRowsGroupRef);
 
 const opLogRetentionError = computed<string | null>(() => {
   const v = props.draft.advanced.opLogRetentionDays;
@@ -81,48 +74,14 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <span ref="opLogRetentionGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-          <InputGroupInput
-            type="number"
-            :min="OP_LOG_RETENTION_DAYS_RANGE.min"
-            :max="OP_LOG_RETENTION_DAYS_RANGE.max"
-            class="h-full font-data"
-            :aria-invalid="!!opLogRetentionError || undefined"
-            data-testid="settings-oplog-retention"
-            :model-value="String(draft.advanced.opLogRetentionDays)"
-            @input="onOpLogRetentionInput"
-          />
-          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="opLogRetentionStepper.stepBy(1)"
-                >
-                  <CodiconIcon name="chevron-up" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Increase</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="opLogRetentionStepper.stepBy(-1)"
-                >
-                  <CodiconIcon name="chevron-down" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Decrease</TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
-        </InputGroup>
-      </span>
+      <NumberStepperInput
+        :min="OP_LOG_RETENTION_DAYS_RANGE.min"
+        :max="OP_LOG_RETENTION_DAYS_RANGE.max"
+        :aria-invalid="!!opLogRetentionError || undefined"
+        data-testid="settings-oplog-retention"
+        :model-value="String(draft.advanced.opLogRetentionDays)"
+        @input="onOpLogRetentionInput"
+      />
       <FieldError v-if="opLogRetentionError" data-testid="settings-oplog-retention-error">
         {{ opLogRetentionError }}
       </FieldError>
@@ -150,48 +109,14 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
           <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <span ref="expensiveQueryRowsGroupRef" class="contents">
-        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-          <InputGroupInput
-            type="number"
-            :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
-            :max="EXPENSIVE_QUERY_ROWS_RANGE.max"
-            class="h-full font-data"
-            :aria-invalid="!!expensiveQueryRowsError || undefined"
-            data-testid="settings-expensive-query-rows"
-            :model-value="String(draft.advanced.expensiveQueryRows)"
-            @input="onExpensiveQueryRowsInput"
-          />
-          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="expensiveQueryRowsStepper.stepBy(1)"
-                >
-                  <CodiconIcon name="chevron-up" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Increase</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <InputGroupButton
-                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  @mousedown.prevent="expensiveQueryRowsStepper.stepBy(-1)"
-                >
-                  <CodiconIcon name="chevron-down" :size="9" />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>Decrease</TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
-        </InputGroup>
-      </span>
+      <NumberStepperInput
+        :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
+        :max="EXPENSIVE_QUERY_ROWS_RANGE.max"
+        :aria-invalid="!!expensiveQueryRowsError || undefined"
+        data-testid="settings-expensive-query-rows"
+        :model-value="String(draft.advanced.expensiveQueryRows)"
+        @input="onExpensiveQueryRowsInput"
+      />
       <FieldError
         v-if="expensiveQueryRowsError"
         data-testid="settings-expensive-query-rows-error"

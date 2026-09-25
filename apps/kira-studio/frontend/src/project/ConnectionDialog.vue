@@ -21,13 +21,12 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import NumberStepperInput from '@theme/NumberStepperInput.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -204,14 +203,6 @@ function setPort(value: string): void {
   const n = Number.parseFloat(value);
   d.port = Number.isNaN(n) ? null : n;
 }
-
-// P104 §2: TextField's number stepper -> ui/input-group recipe. Each InputGroup's own root is
-// queried for its live <input> by useNumberStepper rather than threading a ref through
-// InputGroupInput (which forwards none of its own).
-const portGroupRef = ref<HTMLElement | null>(null);
-const portStepper = useNumberStepper(portGroupRef);
-const throttleGroupRef = ref<HTMLElement | null>(null);
-const throttleStepper = useNumberStepper(throttleGroupRef);
 
 function setUri(value: string): void {
   const d = draft.value;
@@ -864,45 +855,13 @@ const preconnectText = computed({
                   @update:model-value="draft.host = String($event)"
                 />
               </div>
-              <div class="flex flex-col gap-1 flex-none basis-24 text-kira-sm" ref="portGroupRef">
+              <div class="flex flex-col gap-1 flex-none basis-24 text-kira-sm">
                 <Label class="text-kira-sm leading-none text-muted-foreground">Port</Label>
-                <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-                  <InputGroupInput
-                    :model-value="draft.port != null ? String(draft.port) : ''"
-                    type="number"
-                    class="h-full font-data"
-                    data-testid="connection-port"
-                    @update:model-value="(v: string | number) => setPort(String(v))"
-                  />
-                  <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <InputGroupButton
-                          class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                          tabindex="-1"
-                          aria-hidden="true"
-                          @mousedown.prevent="portStepper.stepBy(1)"
-                        >
-                          <CodiconIcon name="chevron-up" :size="9" />
-                        </InputGroupButton>
-                      </TooltipTrigger>
-                      <TooltipContent>Increase</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <InputGroupButton
-                          class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                          tabindex="-1"
-                          aria-hidden="true"
-                          @mousedown.prevent="portStepper.stepBy(-1)"
-                        >
-                          <CodiconIcon name="chevron-down" :size="9" />
-                        </InputGroupButton>
-                      </TooltipTrigger>
-                      <TooltipContent>Decrease</TooltipContent>
-                    </Tooltip>
-                  </InputGroupAddon>
-                </InputGroup>
+                <NumberStepperInput
+                  :model-value="draft.port != null ? String(draft.port) : ''"
+                  data-testid="connection-port"
+                  @update:model-value="(v: string | number) => setPort(String(v))"
+                />
               </div>
             </div>
             <span v-if="fieldErrors.host" class="text-error text-kira-xs leading-normal">{{ fieldErrors.host }}</span>
@@ -1026,48 +985,16 @@ const preconnectText = computed({
 
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
             <Label class="text-kira-sm leading-none text-muted-foreground">Throttle commands <span class="text-subtle">— per second</span></Label>
-            <div class="w-24" ref="throttleGroupRef">
-              <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field">
-                <InputGroupInput
-                  type="number"
-                  :min="0"
-                  :max="CONNECTION_THROTTLE_RANGE.max"
-                  step="0.5"
-                  class="h-full font-data"
-                  :aria-invalid="!!throttlePerSecError"
-                  data-testid="connection-throttle"
-                  :model-value="String(draft.throttlePerSec)"
-                  @update:model-value="(v: string | number) => setThrottlePerSec(String(v))"
-                />
-                <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <InputGroupButton
-                        class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                        tabindex="-1"
-                        aria-hidden="true"
-                        @mousedown.prevent="throttleStepper.stepBy(1)"
-                      >
-                        <CodiconIcon name="chevron-up" :size="9" />
-                      </InputGroupButton>
-                    </TooltipTrigger>
-                    <TooltipContent>Increase</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <InputGroupButton
-                        class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
-                        tabindex="-1"
-                        aria-hidden="true"
-                        @mousedown.prevent="throttleStepper.stepBy(-1)"
-                      >
-                        <CodiconIcon name="chevron-down" :size="9" />
-                      </InputGroupButton>
-                    </TooltipTrigger>
-                    <TooltipContent>Decrease</TooltipContent>
-                  </Tooltip>
-                </InputGroupAddon>
-              </InputGroup>
+            <div class="w-24">
+              <NumberStepperInput
+                :min="0"
+                :max="CONNECTION_THROTTLE_RANGE.max"
+                step="0.5"
+                :aria-invalid="!!throttlePerSecError"
+                data-testid="connection-throttle"
+                :model-value="String(draft.throttlePerSec)"
+                @update:model-value="(v: string | number) => setThrottlePerSec(String(v))"
+              />
             </div>
             <span v-if="throttlePerSecError" class="text-error text-kira-xs leading-normal" data-testid="connection-throttle-error">
               {{ throttlePerSecError }}
