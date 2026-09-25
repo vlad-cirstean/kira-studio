@@ -300,6 +300,23 @@ func PrimaryKeyFromIndexes(indexes []model.IndexMeta) []string {
 	return nil
 }
 
+// MarkPrimaryKey stamps IsPrimaryKey on each of cols per pk (P113 G1) — postgres and mysqlfamily's
+// own Describe both built a pkColumns set from a PrimaryKeyFromIndexes result and re-stamped every
+// column against it identically.
+func MarkPrimaryKey(cols []model.ColumnMeta, pk []string) []model.ColumnMeta {
+	pkColumns := make(map[string]struct{}, len(pk))
+	for _, c := range pk {
+		pkColumns[c] = struct{}{}
+	}
+	marked := make([]model.ColumnMeta, len(cols))
+	for i, c := range cols {
+		_, isPK := pkColumns[c.Name]
+		c.IsPrimaryKey = isPK
+		marked[i] = c
+	}
+	return marked
+}
+
 // KeyShape is the Go analogue of resolveKeyShape's return object.
 type KeyShape struct {
 	Columns    []model.ColumnMeta

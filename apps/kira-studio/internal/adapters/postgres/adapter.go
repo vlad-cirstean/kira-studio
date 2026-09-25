@@ -242,16 +242,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 		return model.ObjectMeta{}, err
 	}
 	primaryKey := adapters.PrimaryKeyFromIndexes(indexes)
-	pkColumns := make(map[string]struct{}, len(primaryKey))
-	for _, c := range primaryKey {
-		pkColumns[c] = struct{}{}
-	}
-	columns := make([]model.ColumnMeta, len(rawColumns))
-	for i, c := range rawColumns {
-		_, isPK := pkColumns[c.Name]
-		c.IsPrimaryKey = isPK
-		columns[i] = c
-	}
+	columns := adapters.MarkPrimaryKey(rawColumns, primaryKey)
 
 	return model.ObjectMeta{
 		Path: model.EncodePath(path.Segments), Kind: objectSegment.Kind, Name: objectSegment.Name,
