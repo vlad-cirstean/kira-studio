@@ -168,7 +168,7 @@ const connectionName = computed(
 
       <div class="overflow-auto">
     <div class="flex flex-col gap-2 p-3">
-      <span class="help leading-normal text-kira-xs text-subtle">
+      <span class="help text-kira-xs leading-normal text-subtle">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
       </span>
@@ -275,14 +275,14 @@ const connectionName = computed(
         </AlertDescription>
       </Alert>
 
-      <span class="help cached-note leading-normal text-kira-xs text-subtle self-start">
+      <span class="help cached-note text-kira-xs leading-normal text-subtle self-start">
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
     </div>
       </div>
 
       <DialogFooter class="border-t border-border bg-transparent">
-        <span class="help leading-normal text-kira-xs text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span class="help text-kira-xs leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>

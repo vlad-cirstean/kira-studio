@@ -112,7 +112,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
           <p
-            class="font-data m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs"
+            class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs leading-normal"
             data-testid="db-mcp-command"
           >
             {{ dbMcpStore.status.command }}

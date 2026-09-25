@@ -67,7 +67,7 @@ const vsixOutcomeMessage = computed(() => {
       </p>
       <template v-else>
         <p
-          class="font-data m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs"
+          class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs leading-normal"
           data-testid="git-vsix-command"
         >
           {{ gitClientsStore.vsix.command }}
@@ -116,7 +116,7 @@ const vsixOutcomeMessage = computed(() => {
           <!-- P110 B12: .git-client-info is unstyled (no flex) -- kept as an inline span with
                .helper-text's own utility-class equivalent, not FieldDescription (a <p>), so this
                stays inline exactly as it renders today. -->
-          <span class="leading-normal text-subtle text-kira-xs">
+          <span class="text-subtle text-kira-xs leading-normal">
             <template v-if="client.revokedAt">Revoked</template>
             <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
           </span>

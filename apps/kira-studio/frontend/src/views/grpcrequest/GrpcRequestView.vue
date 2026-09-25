@@ -295,7 +295,7 @@ onUnmounted(() => {
       </Badge>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="text-warn leading-none text-kira-lg" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
+          <span class="text-warn text-kira-lg leading-none" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
         </TooltipTrigger>
         <TooltipContent>Unsaved changes</TooltipContent>
       </Tooltip>

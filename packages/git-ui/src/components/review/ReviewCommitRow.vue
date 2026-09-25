@@ -210,7 +210,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 <template>
   <div
     v-if="commit"
-    class="kv:flex kv:flex-col kv:border-b kv:border-panel-border kv:cursor-pointer kv:group kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-2"
+    class="kv:flex kv:flex-col kv:border-b kv:border-panel-border kv:cursor-pointer kv:group kv:focus-visible:outline-1 kv:focus-visible:outline-focus kv:focus-visible:-outline-offset-2"
     role="treeitem"
     :aria-expanded="expanded"
     :tabindex="focused ? 0 : -1"

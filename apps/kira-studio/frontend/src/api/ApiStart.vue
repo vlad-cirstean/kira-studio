@@ -34,7 +34,7 @@ function onImportCurl(): void {
     <div class="flex w-105 max-w-full flex-col items-center gap-2 text-center">
       <span class="text-subtle"><CodiconIcon name="globe" :size="32" /></span>
       <div class="tracking-normal text-fg text-kira-xl">No request open</div>
-      <div class="text-muted-foreground leading-normal text-kira-md">
+      <div class="text-muted-foreground text-kira-md leading-normal">
         Send a request and see its response here.
       </div>
       <div class="flex flex-wrap items-center justify-center gap-1">

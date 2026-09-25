@@ -59,7 +59,7 @@ function openRecent(entry: RecentTableEntry): void {
       <!-- P24 D31: no bold text anywhere in the app -- --kira-t-xl (text-kira-xl, the scale's
            largest step) already carries the emphasis a first-run heading needs. -->
       <div class="tracking-normal text-kira-xl text-fg">No connections yet</div>
-      <div class="leading-normal mt-0 text-kira-md text-muted-foreground">
+      <div class="mt-0 text-kira-md leading-normal text-muted-foreground">
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <!-- P110 B26: --kira-s-2 (4px) -> gap-1 is a real, quantified mismatch against

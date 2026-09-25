@@ -87,10 +87,10 @@ async function save(patch: SettingsPatch): Promise<void> {
              plain inline spans today, so kept as spans with .field-error's/.helper-text's own
              utility-class equivalent, not FieldError/FieldDescription (a <div>/<p>), which would
              introduce blockification that isn't there now. -->
-        <span v-if="f.saveError" class="leading-normal text-error text-kira-xs" data-testid="settings-save-error">{{
+        <span v-if="f.saveError" class="text-error text-kira-xs leading-normal" data-testid="settings-save-error">{{
           f.saveError
         }}</span>
-        <span v-else class="leading-normal text-subtle text-kira-xs" data-testid="settings-footer-status">{{
+        <span v-else class="text-subtle text-kira-xs leading-normal" data-testid="settings-footer-status">{{
           f.isDirty ? 'Unsaved changes' : ''
         }}</span>
       </span>

@@ -291,11 +291,14 @@ const secondText = computed<string>({
             v-for="cell in days"
             :key="`${cell.year}-${cell.month}-${cell.day}`"
             type="button"
-            class="flex items-center gap-1 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
+            class="flex items-center gap-1 rounded-kira-sm text-kira-md cursor-pointer hover:bg-hover dtp-day w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5"
             data-testid="datetime-picker-day"
             :data-in-month="cell.inMonth"
             :data-selected="cell.isSelected"
-            :class="{ 'is-selected': cell.isSelected, 'is-today': cell.isToday, 'text-subtle': !cell.inMonth }"
+            :class="[
+              { 'is-selected': cell.isSelected, 'is-today': cell.isToday },
+              cell.inMonth ? 'text-fg' : 'text-subtle',
+            ]"
             @click="pickDay(cell)"
           >
             {{ cell.day }}

@@ -185,9 +185,9 @@ async function onAddScript(): Promise<void> {
                        an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
                   <span
                     aria-hidden="true"
-                    class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                    class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
                     :class="{
-                      'outline outline-2 outline-offset-2 outline-fg': script.color === color,
+                      'outline-2 outline-offset-2 outline-fg': script.color === color,
                       'swatch-none': color === 'none',
                     }"
                     :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
@@ -267,9 +267,9 @@ async function onAddScript(): Promise<void> {
                      an *empty* sibling element — &nbsp; keeps this decorative span non-empty. -->
                 <span
                   aria-hidden="true"
-                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
                   :class="{
-                    'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color,
+                    'outline-2 outline-offset-2 outline-fg': newScriptColor === color,
                     'swatch-none': color === 'none',
                   }"
                   :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"

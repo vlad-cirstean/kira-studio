@@ -428,7 +428,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
             {{ kvRowAt(rowIndices[vi.index]!).field }}
           </div>
           <div
-            class="cell overflow-hidden whitespace-nowrap cursor-default flex-1 flex items-center whitespace-pre-wrap break-words px-2"
+            class="cell overflow-hidden cursor-default flex-1 flex items-center whitespace-pre-wrap break-words px-2"
             :class="{
               'search-match bg-search-match': isSearchMatch(rowIndices[vi.index]!, 1),
               'search-match-current bg-search-match-current text-bg': isCurrentSearchMatch(

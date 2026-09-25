@@ -219,8 +219,8 @@ async function onSave(): Promise<void> {
             v-for="section in sections"
             :key="section"
             type="button"
-            class="text-left rounded-kira-sm bg-transparent border-none cursor-pointer h-5.5 px-1.5 text-muted-foreground text-kira-md hover:bg-hover"
-            :class="{ 'bg-select! text-fg!': activeSection === section }"
+            class="text-left rounded-kira-sm border-none cursor-pointer h-5.5 px-1.5 text-kira-md hover:bg-hover"
+            :class="activeSection === section ? 'bg-select text-fg' : 'bg-transparent text-muted-foreground'"
             :data-testid="`settings-section-${section}`"
             @click="activeSection = section"
           >

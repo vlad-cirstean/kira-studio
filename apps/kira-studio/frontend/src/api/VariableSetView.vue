@@ -600,9 +600,9 @@ function onBulkClose(): void {
                      non-empty; aria-hidden means it is never announced either way. -->
                 <span
                   aria-hidden="true"
-                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
+                  class="swatch pointer-events-none h-4 w-4 shrink-0 overflow-hidden rounded-full peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fg"
                   :class="{
-                    'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color,
+                    'outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color,
                     'swatch-none': color === 'none',
                   }"
                   :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"

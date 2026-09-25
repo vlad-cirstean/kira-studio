@@ -140,7 +140,7 @@ async function onSave(): Promise<void> {
       </DialogHeader>
 
     <div class="flex flex-col gap-2 p-3 h-[60vh]">
-      <span class="help leading-normal text-subtle text-kira-xs">
+      <span class="help text-subtle text-kira-xs leading-normal">
         Table and column completion for this connection normally fills in on its own from the
         connection's own cached schema metadata — no setup needed. Paste a schema here only to
         override that: a schema that doesn't exist yet, or a connection this app can't introspect.
@@ -174,10 +174,10 @@ async function onSave(): Promise<void> {
     </div>
 
       <DialogFooter class="border-t border-border bg-transparent">
-        <span v-if="saveError" class="leading-normal text-kira-xs text-error" data-testid="schema-save-error">{{
+        <span v-if="saveError" class="text-kira-xs leading-normal text-error" data-testid="schema-save-error">{{
           saveError
         }}</span>
-        <span v-else class="help leading-normal text-subtle text-kira-xs">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span v-else class="help text-subtle text-kira-xs leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">

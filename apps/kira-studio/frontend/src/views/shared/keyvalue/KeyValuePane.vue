@@ -1062,7 +1062,7 @@ onUnmounted(() => {
         @close="onCloseSearch"
       />
 
-      <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 flex-1 min-h-0 border-0 rounded-none">
+      <div class="bg-bg overflow-hidden flex flex-col flex-1 min-h-0 border-0 rounded-none">
         <div class="h-control-lg shrink-0 flex bg-elevated border-b border-border-strong">
           <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-10 shrink-0"></div>
           <div class="flex items-center gap-1 px-2 border-r border-border text-kira-sm text-muted-foreground overflow-hidden whitespace-nowrap w-56 shrink-0">
