@@ -187,10 +187,9 @@ function onKeydown(e: KeyboardEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.tree-row {
-  @apply relative flex cursor-default items-center gap-1 whitespace-nowrap select-none pr-2 text-kira-md h-row;
-}
-
+/* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
+   (real-compile-verified equal to TreeRow.vue's own raw form). Its `:hover`/`.selected` stay here
+   -- one declaration each, no property overlap with the shell. */
 .tree-row:hover {
   @apply bg-hover;
 }
@@ -199,11 +198,11 @@ function onKeydown(e: KeyboardEvent): void {
   @apply bg-select;
 }
 
-/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as RepoTreeRow.vue's
-   own rule) -- mutations.spec.ts/fake-data.spec.ts/tree.spec.ts still select `.twisty` directly,
-   the name stays. `.twisty.invisible` dropped: it applied nothing beyond Tailwind's own bare
-   `.invisible` utility already does on the same element (:class="{ invisible: !row.hasChildren
-   }"). */
+/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as TreeRow.vue's/
+   RepoTreeRow.vue's own rule) -- mutations.spec.ts/fake-data.spec.ts/tree.spec.ts still select
+   `.twisty` directly, the name stays. `.twisty.invisible` dropped: it applied nothing beyond
+   Tailwind's own bare `.invisible` utility already does on the same element (:class="{ invisible:
+   !row.hasChildren }"). */
 
 .node-icon {
   @apply shrink-0 text-muted-foreground;

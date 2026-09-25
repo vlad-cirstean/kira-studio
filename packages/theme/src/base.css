@@ -217,12 +217,34 @@
   font-weight: var(--font-weight-normal);
 }
 
+/* A tree row shell -- CollectionRow.vue/project/TreeRow.vue's own `.tree-row` base declarations
+   (real-compile-verified equal: `gap-1`==`--kira-s-2`, `pr-2`==`--kira-s-4`, `h-row`==
+   `--kira-row-height`, `text-kira-md`==`--kira-t-md`, TreeRow.vue's own raw form vs. CollectionRow
+   .vue's Tailwind-native one). Its own `:hover`/`.selected` background rules stay per-file (a
+   single declaration each, no property overlap with this shell, nothing gained by sharing them). */
+@utility tree-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: default;
+  gap: var(--spacing);
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+  padding-right: calc(var(--spacing) * 2);
+  font-size: var(--text-kira-md);
+  height: var(--spacing-row);
+}
+
 /* A tree row's own disclosure-triangle button -- same utility set (order aside) in
-   CollectionRow.vue/RepoTreeRow.vue. `.twisty.invisible` (both files) applied nothing beyond
-   Tailwind's own bare `.invisible` utility already does -- dropped rather than ported.
-   project/TreeRow.vue's own `.twisty` (raw declarations, not yet Tailwind) and
-   RepoSearchRow.vue's (no cursor-pointer -- a real, deliberate difference) are left alone, out
-   of scope here (B35/B37's own raw-declaration passes own those files). */
+   CollectionRow.vue/TreeRow.vue/RepoTreeRow.vue (TreeRow.vue's own `border-none`/raw
+   `color: var(--kira-fg-muted)` real-compile/token-verified equal to `border-0`/
+   `text-muted-foreground` -- a 0-width border renders the same regardless of style, and
+   `--muted-foreground` is itself defined as `var(--kira-fg-muted)`, shadcn-bridge.css). All 3
+   files' own `.twisty.invisible` applied nothing beyond Tailwind's own bare `.invisible` utility
+   already does -- dropped rather than ported. RepoSearchRow.vue's own `.twisty` (no
+   cursor-pointer -- a real, deliberate difference) is left alone, out of scope here (B37's own
+   raw-declaration pass owns that file). */
 @utility twisty {
   display: flex;
   height: calc(var(--spacing) * 3.5);

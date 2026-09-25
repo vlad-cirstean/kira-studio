@@ -199,14 +199,9 @@ function onKeydown(e: KeyboardEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.tree-row {
-  @apply flex items-center relative cursor-default whitespace-nowrap select-none;
-  height: var(--kira-row-height);
-  gap: var(--kira-s-2);
-  padding-right: var(--kira-s-4);
-  font-size: var(--kira-t-md);
-}
-
+/* P110 B34: `.tree-row`'s own base declarations moved to base.css's own `@utility tree-row`
+   (real-compile/token-verified equal to CollectionRow.vue's own Tailwind-native form). Its
+   `:hover`/`.selected` stay here -- one declaration each, no property overlap with the shell. */
 .tree-row:hover {
   background: var(--kira-hover);
 }
@@ -215,14 +210,11 @@ function onKeydown(e: KeyboardEvent): void {
   background: var(--kira-select);
 }
 
-.twisty {
-  @apply shrink-0 w-3.5 h-3.5 flex items-center justify-center bg-transparent border-none p-0 cursor-pointer;
-  color: var(--kira-fg-muted);
-}
-
-.twisty.invisible {
-  @apply invisible;
-}
+/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as CollectionRow.vue's/
+   RepoTreeRow.vue's own rule -- `border-none`/raw `color: var(--kira-fg-muted)` here verified
+   equal to `border-0`/`text-muted-foreground`). `.twisty.invisible` dropped: it applied nothing
+   beyond Tailwind's own bare `.invisible` utility already does on the same element (:class="{
+   invisible: !row.hasChildren }"). */
 
 /* Selected directly by tests/ui/tree.spec.ts's own `.twisty .spin` locator — class name kept,
    body reuses Tailwind's built-in spin animation. */
