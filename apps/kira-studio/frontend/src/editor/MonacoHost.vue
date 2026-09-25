@@ -619,12 +619,12 @@ watch(
        instead to find "the Monaco host" generically inside a call site's own more specific one. -->
   <div
     ref="rootRef"
-    class="monaco-host"
+    class="monaco-host h-full min-h-0 overflow-hidden"
     :class="{ 'monaco-host--single-line': singleLine }"
   >
     <pre
       v-if="pending"
-      class="monaco-host-pending"
+      class="monaco-host-pending m-0 py-2 px-0 font-[family-name:var(--kira-font-data)] text-[length:var(--kira-font-size)] text-fg bg-bg whitespace-pre-wrap overflow-auto"
       :class="{ 'monaco-host--single-line': singleLine }"
       >{{ doc }}</pre
     >
@@ -634,14 +634,12 @@ watch(
 <style scoped>
 @reference "@theme/base.css";
 
-.monaco-host {
-  @apply h-full min-h-0 overflow-hidden;
-}
-
-.monaco-host-pending {
-  @apply m-0 py-2 px-0 font-[family-name:var(--kira-font-data)] text-[length:var(--kira-font-size)] text-fg bg-bg whitespace-pre-wrap overflow-auto;
-}
-
+/* P110 B40: `.monaco-host`/`.monaco-host-pending`'s own plain base rules moved onto the template
+   (scoped CSS is unlayered, always wins over a layered utility regardless of class order, per this
+   plan's own §1 rule) -- both class names stay as bare markers: `.monaco-host` is a real test
+   dependency (tests/ui/support/editorText.ts and every UI spec use it to find "the Monaco host"),
+   and both anchor the compound rule below, which needs both classes present simultaneously and so
+   stays scoped. */
 .monaco-host--single-line.monaco-host-pending {
   @apply p-0 whitespace-pre;
 }
