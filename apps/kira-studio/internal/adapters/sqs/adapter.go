@@ -2,7 +2,6 @@ package sqs
 
 import (
 	"context"
-	"sync"
 
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 
@@ -17,25 +16,27 @@ func init() {
 	})
 }
 
+// connState is every field Connect/Disconnect write concurrently with an in-flight op reading them
+// (F3), guarded together via adapters.Guarded (P113 G1). It also folds in the pre-existing "two
+// tabs on one connection are two goroutines through one *Adapter in Go" guard the queueURLs cache
+// already carried.
+type connState struct {
+	client   *awssqs.Client
+	readOnly bool
+
+	// queueURLs is P58d D9: name -> URL, populated by listQueues (free — it already has every URL
+	// while paging) and by resolveQueueURL on a miss; avoids a GetQueueUrl round trip on every
+	// read()/count() call.
+	queueURLs map[string]string
+
+	receiptHandles *receiptHandles
+}
+
 // Adapter is index.ts's SqsAdapter.
 type Adapter struct {
 	deps adapters.Deps
 
-	// mu guards every field below (F3): Connect/Disconnect write client/readOnly/queueURLs/
-	// receiptHandles from whatever goroutine adapterhost dispatches them on, concurrently with any
-	// in-flight op reading them — the same class of unguarded-field race Part 4's own F3 fixed for
-	// the SQL engines. It also folds in the pre-existing "two tabs on one connection are two
-	// goroutines through one *Adapter in Go" guard the queueURLs cache already carried.
-	mu       sync.Mutex
-	client   *awssqs.Client
-	readOnly bool
-
-	// P58d D9: name -> URL, populated by listQueues (free — it already has every URL while paging)
-	// and by resolveQueueURL on a miss; avoids a GetQueueUrl round trip on every read()/count()
-	// call.
-	queueURLs map[string]string
-
-	receiptHandles *receiptHandles
+	state adapters.Guarded[connState]
 }
 
 func (a *Adapter) Kind() string        { return "sqs" }
@@ -52,47 +53,36 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if _, err := listQueues(ctx, client); err != nil {
 		return adapters.ConnectInfo{}, err
 	}
-	a.mu.Lock()
-	a.client = client
-	a.readOnly = cfg.ReadOnly
-	a.queueURLs = map[string]string{}
-	a.receiptHandles = newReceiptHandles()
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		s.client = client
+		s.readOnly = cfg.ReadOnly
+		s.queueURLs = map[string]string{}
+		s.receiptHandles = newReceiptHandles()
+	})
 	return adapters.ConnectInfo{ServerVersion: "Amazon SQS"}, nil
 }
 
-// Disconnect is index.ts's disconnect. Clears both adapter-local caches under the mutex — the
+// Disconnect is index.ts's disconnect. Clears both adapter-local caches under the lock — the
 // property checkpoint scenario 16 asserts.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.mu.Lock()
-	a.client = nil
-	a.queueURLs = nil
-	handles := a.receiptHandles
-	a.receiptHandles = nil
-	a.mu.Unlock()
+	var handles *receiptHandles
+	a.state.Update(func(s *connState) {
+		s.client = nil
+		s.queueURLs = nil
+		handles = s.receiptHandles
+		s.receiptHandles = nil
+	})
 	if handles != nil {
 		handles.clear()
 	}
 	return nil
 }
 
-func (a *Adapter) getClient() *awssqs.Client {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.client
-}
+func (a *Adapter) getClient() *awssqs.Client { return a.state.Load().client }
 
-func (a *Adapter) getReadOnly() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.readOnly
-}
+func (a *Adapter) getReadOnly() bool { return a.state.Load().readOnly }
 
-func (a *Adapter) getReceiptHandles() *receiptHandles {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.receiptHandles
-}
+func (a *Adapter) getReceiptHandles() *receiptHandles { return a.state.Load().receiptHandles }
 
 func (a *Adapter) requireClient() (*awssqs.Client, error) {
 	return adapters.RequireConnected(a.getClient())
@@ -103,17 +93,19 @@ func (a *Adapter) requireClient() (*awssqs.Client, error) {
 // Disconnect, and writing to a nil map panics — recovered by safeRun into a bare E_INTERNAL before
 // this fix, but a genuine bug regardless of the recover.
 func (a *Adapter) cacheQueueURL(name, url string) {
-	a.mu.Lock()
-	if a.queueURLs != nil {
-		a.queueURLs[name] = url
-	}
-	a.mu.Unlock()
+	a.state.Update(func(s *connState) {
+		if s.queueURLs != nil {
+			s.queueURLs[name] = url
+		}
+	})
 }
 
 func (a *Adapter) cachedQueueURL(name string) (string, bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	url, ok := a.queueURLs[name]
+	// View, not Load: queueURLs is mutated in place by cacheQueueURL (never reassigned wholesale
+	// after Connect), so the index lookup must stay inside the same critical section as that write.
+	var url string
+	var ok bool
+	a.state.View(func(s connState) { url, ok = s.queueURLs[name] })
 	return url, ok
 }
 

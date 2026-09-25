@@ -25,3 +25,14 @@ func (g *Guarded[T]) Update(fn func(*T)) {
 	fn(&g.v)
 	g.mu.Unlock()
 }
+
+// View runs fn with the current value while holding the lock. Load's own copy is enough whenever a
+// caller only needs T's scalar/pointer fields, but a field that is itself a map or slice mutated in
+// place by a later Update (never reassigned wholesale) needs the read to stay inside the same
+// critical section as that mutation, or it races the map/slice's own backing storage even though
+// the struct copy itself was safe. fn must not do I/O.
+func (g *Guarded[T]) View(fn func(T)) {
+	g.mu.Lock()
+	fn(g.v)
+	g.mu.Unlock()
+}
