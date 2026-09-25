@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Input } from '@theme/components/ui/input';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -307,47 +303,30 @@ onMounted(() => {
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar border="none">
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" data-testid="browse-refresh" aria-label="Refresh" @click="onReload">
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          data-testid="browse-refresh"
+          @click="onReload"
+        />
       </div>
         <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
              only what is view-scoped: filter, upload, and the refresh/stop group above. -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-field text-fg': filterOpen }"
-              aria-label="Filter"
-              data-testid="browse-filter-toggle"
-              @click="toggleFilter"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Filter</TooltipContent>
-        </Tooltip>
-        <Tooltip v-if="canUpload">
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Upload file…"
-              data-testid="browse-upload"
-              @click="onUploadClick"
-            >
-              <CodiconIcon name="cloud-upload" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Upload file…</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="search"
+          label="Filter"
+          :class="{ 'bg-field text-fg': filterOpen }"
+          data-testid="browse-filter-toggle"
+          @click="toggleFilter"
+        />
+        <TooltipIconButton
+          v-if="canUpload"
+          icon="cloud-upload"
+          label="Upload file…"
+          data-testid="browse-upload"
+          @click="onUploadClick"
+        />
       <span class="ml-auto" />
       <Tooltip :disabled="true">
         <TooltipTrigger as-child>
@@ -369,20 +348,13 @@ onMounted(() => {
               data-testid="browse-filter"
               @update:model-value="(v) => (filterText = String(v))"
             />
-            <Tooltip v-if="filterText">
-              <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Clear search"
-                  data-testid="browse-filter-clear"
-                  @click="filterText = ''"
-                >
-                  <CodiconIcon name="close" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Clear search</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              v-if="filterText"
+              icon="close"
+              label="Clear search"
+              data-testid="browse-filter-clear"
+              @click="filterText = ''"
+            />
           </div>
         </div>
         <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="browse-error">
@@ -427,23 +399,14 @@ onMounted(() => {
                toolbar utility band (the same 26px in-view band every other toolbar already is)
                rather than inventing a header. -->
           <ViewToolbar data-testid="browse-list-head">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <TooltipDisabledTrigger>
-                  <Button
-                    variant="toolbar"
-                    size="kira-icon"
-                    :disabled="atRoot"
-                    aria-label="Back"
-                    data-testid="browse-up"
-                    @click="onUp"
-                  >
-                    <CodiconIcon name="chevron-left" :size="13" />
-                  </Button>
-                </TooltipDisabledTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Back</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              icon="chevron-left"
+              label="Back"
+              disabled-trigger
+              :disabled="atRoot"
+              data-testid="browse-up"
+              @click="onUp"
+            />
             <span class="flex items-center min-w-0 overflow-hidden gap-0.5">
               <template v-for="(crumb, i) in crumbs" :key="crumb.path">
                 <span v-if="i > 0" class="text-subtle">/</span>

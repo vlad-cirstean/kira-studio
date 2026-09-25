@@ -5,6 +5,7 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -167,20 +168,12 @@ async function onClear(): Promise<void> {
           <TooltipContent>{{ entry.calledAt }}</TooltipContent>
         </Tooltip>
         <span class="ml-auto" />
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Delete"
-              data-testid="grpc-history-delete"
-              @click.stop="onDelete(entry.id)"
-            >
-              <CodiconIcon name="trash" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Delete</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="trash"
+          label="Delete"
+          data-testid="grpc-history-delete"
+          @click.stop="onDelete(entry.id)"
+        />
       </div>
     </div>
 

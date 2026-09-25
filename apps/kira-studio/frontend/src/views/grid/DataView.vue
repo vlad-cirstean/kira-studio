@@ -1,18 +1,13 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
@@ -226,41 +221,23 @@ function onCloseSearch(): void {
     />
     <ViewToolbar data-testid="data-toolbar">
       <div class="flex items-center gap-1.5 min-w-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="toolbar-refresh"
-                :disabled="!!rt?.opId"
-                aria-label="Refresh"
-                @click="onRefresh"
-              >
-                <CodiconIcon name="refresh" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Refresh</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <TooltipDisabledTrigger>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'text-error': !!rt?.opId }"
-                data-testid="toolbar-stop"
-                :disabled="!rt?.opId"
-                aria-label="Stop"
-                @click="onStop"
-              >
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
-            </TooltipDisabledTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stop</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="refresh"
+          label="Refresh"
+          disabled-trigger
+          data-testid="toolbar-refresh"
+          :disabled="!!rt?.opId"
+          @click="onRefresh"
+        />
+        <TooltipIconButton
+          icon="debug-stop"
+          label="Stop"
+          disabled-trigger
+          :class="{ 'text-error': !!rt?.opId }"
+          data-testid="toolbar-stop"
+          :disabled="!rt?.opId"
+          @click="onStop"
+        />
       </div>
       <DataToolbar :tab="tab" />
       <span class="ml-auto" />
@@ -275,61 +252,36 @@ function onCloseSearch(): void {
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
             <div ref="previewAnchorRef" class="relative">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <TooltipDisabledTrigger>
-                    <Button
-                      variant="toolbar"
-                      size="kira-icon"
-                      data-testid="toolbar-preview-command"
-                      :disabled="!isWritable"
-                      aria-label="Preview the SQL for pending changes"
-                      @click="previewOpen = !previewOpen"
-                    >
-                      <CodiconIcon name="eye" :size="13" />
-                    </Button>
-                  </TooltipDisabledTrigger>
-                </TooltipTrigger>
-                <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
-              </Tooltip>
+              <TooltipIconButton
+                icon="eye"
+                :label="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
+                aria-label="Preview the SQL for pending changes"
+                disabled-trigger
+                data-testid="toolbar-preview-command"
+                :disabled="!isWritable"
+                @click="previewOpen = !previewOpen"
+              />
               <PopoverAnchor :reference="previewAnchorRef ?? undefined" />
             </div>
             <PreviewCommandPanel v-if="previewOpen" :tab-id="tab.id" @close="previewOpen = false" />
           </Popover>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  data-testid="toolbar-discard-changes"
-                  :disabled="!isWritable"
-                  aria-label="Discard pending changes"
-                  @click="onDiscard"
-                >
-                  <CodiconIcon name="discard" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Discard pending changes</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TooltipDisabledTrigger>
-                <Button
-                  variant="toolbar-primary"
-                  size="kira-icon"
-                  data-testid="toolbar-commit-changes"
-                  :disabled="!isWritable"
-                  aria-label="Commit pending changes"
-                  @click="onCommit"
-                >
-                  <CodiconIcon name="save" :size="13" />
-                </Button>
-              </TooltipDisabledTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Commit pending changes</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="discard"
+            label="Discard pending changes"
+            disabled-trigger
+            data-testid="toolbar-discard-changes"
+            :disabled="!isWritable"
+            @click="onDiscard"
+          />
+          <TooltipIconButton
+            icon="save"
+            label="Commit pending changes"
+            disabled-trigger
+            variant="toolbar-primary"
+            data-testid="toolbar-commit-changes"
+            :disabled="!isWritable"
+            @click="onCommit"
+          />
         </template>
       </div>
     </ViewToolbar>

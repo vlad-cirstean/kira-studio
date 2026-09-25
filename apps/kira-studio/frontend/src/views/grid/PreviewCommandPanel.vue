@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -61,21 +60,13 @@ function close(): void {
       <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
         <span>Preview SQL</span>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              class="ml-auto"
-              aria-label="Close"
-              data-testid="preview-command-close"
-              @click="close"
-            >
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Close</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="close"
+          label="Close"
+          class="ml-auto"
+          data-testid="preview-command-close"
+          @click="close"
+        />
       </div>
       <div v-if="isLoading" class="p-2 text-kira-sm text-muted-foreground">Loading…</div>
       <div

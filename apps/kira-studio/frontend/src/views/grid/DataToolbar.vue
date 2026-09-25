@@ -2,15 +2,11 @@
 import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -343,97 +339,54 @@ function onDeleteRow(): void {
   <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
 
   <div class="flex items-center gap-1.5 min-w-0">
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            data-testid="toolbar-add-row"
-            :disabled="!isWritable"
-            aria-label="Add a row"
-            @click="onAddRow"
-          >
-            <CodiconIcon name="add" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>
-        {{
-          isWritable
+    <TooltipIconButton
+      icon="add"
+      :label="isWritable
             ? 'Add a row'
             : rt?.maskPreview
               ? 'Values are masked — turn the preview off to edit'
-              : 'Connection is read-only'
-        }}
-      </TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            data-testid="toolbar-generate-data"
-            :disabled="!canGenerateData"
-            aria-label="Generate data"
-            @click="onGenerateData"
-          >
-            <CodiconIcon name="wand" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ generateDataTooltip }}</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            data-testid="toolbar-delete-row"
-            :disabled="!canDeleteRows"
-            aria-label="Delete selected row(s)"
-            @click="onDeleteRow"
-          >
-            <CodiconIcon name="trash" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ deleteRowTooltip }}</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          :class="{ 'bg-field text-fg': rt?.searchOpen }"
-          data-testid="toolbar-search"
-          aria-label="Search this page"
-          @click="onToggleSearch"
-        >
-          <CodiconIcon name="search" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Search this page</TooltipContent>
-    </Tooltip>
-    <Tooltip v-if="hasMaskRules">
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg is-active': rt?.maskPreview }"
-            :disabled="hasPendingChanges"
-            data-testid="toolbar-mask-preview"
-            aria-label="Toggle masking preview"
-            @click="onToggleMaskPreview"
-          >
-            <CodiconIcon name="eye-closed" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ maskPreviewTooltip }}</TooltipContent>
-    </Tooltip>
+              : 'Connection is read-only'"
+      aria-label="Add a row"
+      disabled-trigger
+      data-testid="toolbar-add-row"
+      :disabled="!isWritable"
+      @click="onAddRow"
+    />
+    <TooltipIconButton
+      icon="wand"
+      :label="generateDataTooltip"
+      aria-label="Generate data"
+      disabled-trigger
+      data-testid="toolbar-generate-data"
+      :disabled="!canGenerateData"
+      @click="onGenerateData"
+    />
+    <TooltipIconButton
+      icon="trash"
+      :label="deleteRowTooltip"
+      aria-label="Delete selected row(s)"
+      disabled-trigger
+      data-testid="toolbar-delete-row"
+      :disabled="!canDeleteRows"
+      @click="onDeleteRow"
+    />
+    <TooltipIconButton
+      icon="search"
+      label="Search this page"
+      :class="{ 'bg-field text-fg': rt?.searchOpen }"
+      data-testid="toolbar-search"
+      @click="onToggleSearch"
+    />
+    <TooltipIconButton
+      v-if="hasMaskRules"
+      icon="eye-closed"
+      :label="maskPreviewTooltip"
+      aria-label="Toggle masking preview"
+      disabled-trigger
+      :class="{ 'bg-field text-fg is-active': rt?.maskPreview }"
+      :disabled="hasPendingChanges"
+      data-testid="toolbar-mask-preview"
+      @click="onToggleMaskPreview"
+    />
   </div>
 </template>

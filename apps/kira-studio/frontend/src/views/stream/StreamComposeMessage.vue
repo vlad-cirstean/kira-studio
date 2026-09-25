@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, ref } from 'vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
@@ -61,20 +61,12 @@ async function submit(): Promise<void> {
     <div class="flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground normal-case tracking-normal">
       <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="add" :size="13" /></span>
       <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto"
-            aria-label="Close"
-            @click="emit('close')"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Close</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="close"
+        label="Close"
+        class="ml-auto"
+        @click="emit('close')"
+      />
     </div>
 
     <div class="flex flex-col gap-1.5 p-2">

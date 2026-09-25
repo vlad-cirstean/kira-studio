@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
@@ -166,20 +167,12 @@ function selectMethod(service: string, method: string): void {
             </TooltipTrigger>
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                class="ml-auto"
-                aria-label="Remove"
-                @click="removeImportPath(i)"
-              >
-                <CodiconIcon name="close" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Remove</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="close"
+            label="Remove"
+            class="ml-auto"
+            @click="removeImportPath(i)"
+          />
         </div>
         <div v-if="tab.state.importPaths.length === 0" class="text-kira-xs text-subtle">
           No import paths — the .proto file's own directory is used

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -129,22 +129,14 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   <!-- LAW 02 / README: one row, two prefixed inputs, one verb — permanent, so Clear rather than
        a close button that would make the grid change height under you. -->
   <div class="relative">
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button
-          ref="historyTriggerEl"
-          variant="toolbar"
-          size="kira-icon"
-          :class="{ 'bg-field text-fg': historyOpen }"
-          data-testid="filter-history-button"
-          aria-label="Saved & recent filters"
-          @click="historyOpen = !historyOpen"
-        >
-          <CodiconIcon name="history" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Saved & recent filters</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="history"
+      label="Saved & recent filters"
+      ref="historyTriggerEl"
+      :class="{ 'bg-field text-fg': historyOpen }"
+      data-testid="filter-history-button"
+      @click="historyOpen = !historyOpen"
+    />
     <Popover :open="historyOpen" @update:open="(v) => (historyOpen = v)">
       <PopoverAnchor :reference="(historyTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
       <FilterHistoryMenu
