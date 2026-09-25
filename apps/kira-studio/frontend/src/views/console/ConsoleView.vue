@@ -933,7 +933,7 @@ const statusLine = computed(() => {
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 result-tab max-w-36 h-5.5 text-kira-xs"
+              class="inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 result-tab max-w-36 h-5.5 text-kira-xs"
               :class="[
                 result.key === rt.activeKey
                   ? 'bg-elevated border-border-strong text-fg'

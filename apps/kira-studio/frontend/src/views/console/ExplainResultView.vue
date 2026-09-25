@@ -167,7 +167,7 @@ const rawLanguage = computed(() =>
           </TooltipTrigger>
           <TooltipContent>Show the raw EXPLAIN output the server returned</TooltipContent>
         </Tooltip>
-        <span class="text-kira-sm text-muted-foreground text-kira-xs">Raw</span>
+        <span class="text-muted-foreground text-kira-xs">Raw</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />

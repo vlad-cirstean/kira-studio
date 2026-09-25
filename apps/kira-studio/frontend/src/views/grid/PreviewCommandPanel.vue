@@ -58,7 +58,7 @@ function close(): void {
 <template>
   <PopoverContent align="end" class="w-120 gap-0 p-0" data-testid="preview-command-panel">
     <div class="max-h-96 flex flex-col">
-      <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
+      <div class="normal-case tracking-normal flex items-center shrink-0 h-control-lg gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground">
         <span class="size-4 flex items-center justify-center shrink-0"><CodiconIcon name="code" :size="13" /></span>
         <span>Preview SQL</span>
         <Tooltip>
