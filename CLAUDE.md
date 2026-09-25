@@ -56,6 +56,22 @@ duplicated here; this file only points at them.
   anything. **Parallel subagents only when the plan's work is genuinely independent** (unrelated
   adapters, non-overlapping fixes) — never split one continuous, order-dependent piece of work
   across subagents to run it concurrently.
+- **A genuinely independent split runs as named streams** (Stream A, Stream B, …), each its own git
+  worktree off the same base commit — the pre-commit hook lints/typechecks the whole tree, so
+  implementers sharing one checkout fail each other's commits on half-done edits. The plan itself
+  states the split explicitly: a per-stream file-ownership table with zero overlap, plus
+  confirmation there's no ordering dependency *between* streams (only within each stream's own
+  commits, which still land in order — a split just runs several such sequences concurrently
+  instead of one, it doesn't change the "commits land in order" rule). No overlap/no-ordering
+  confirmation in the plan means no split — default back to one sequential implementer (P110's own
+  iter2 plan rejected a split for exactly this reason: real overlaps in a shared script, and a
+  rename dependency chain between two would-be streams). Cap concurrent streams at 2 unless the
+  user sets otherwise. Landing: once every stream's implementer finishes and its result is
+  independently verified, rebase the streams onto the chapter branch in any order (conflict-free is
+  the expected outcome since ownership is disjoint — a real conflict means the ownership boundary
+  was wrong, not something to just resolve and move past), remove the worktrees, push. A worktree
+  survives a container restart since it's just a directory on disk — resume a stopped stream from
+  its last commit there, never restart it from scratch.
 - **Implement the whole plan first, then test once and fix what's found** — don't gate every
   intermediate commit on the full test suite. Fast checks (typecheck, lint, build) are cheap and
   fine per-commit; an expensive suite (end-to-end/UI, a real-hardware check) runs once near phase
