@@ -90,7 +90,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
 <template>
   <div class="contents" v-show="active">
     <h3 class="section-subhead">Git remote operations</h3>
-    <p class="muted-note">
+    <p class="text-subtle text-kira-xs">
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>

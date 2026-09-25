@@ -82,11 +82,11 @@ async function save(patch: SettingsPatch): Promise<void> {
     </template>
 
     <template #footer="f">
-      <span class="footer-status">
-        <!-- P110 B12: .footer-status has no `flex` of its own (unlike Kira Studio's own copy) --
-             its children are plain inline spans today, so kept as spans with .field-error's/
-             .helper-text's own utility-class equivalent, not FieldError/FieldDescription (a
-             <div>/<p>), which would introduce blockification that isn't there now. -->
+      <span class="flex-1 min-w-0">
+        <!-- P110 B12/B36: no `flex` here (unlike Kira Studio's own copy) -- its children are
+             plain inline spans today, so kept as spans with .field-error's/.helper-text's own
+             utility-class equivalent, not FieldError/FieldDescription (a <div>/<p>), which would
+             introduce blockification that isn't there now. -->
         <span v-if="f.saveError" class="leading-normal text-error text-kira-xs" data-testid="settings-save-error">{{
           f.saveError
         }}</span>
@@ -110,42 +110,3 @@ async function save(patch: SettingsPatch): Promise<void> {
   </SettingsShell>
 </template>
 
-<style>
-@reference "@theme/base.css";
-
-/* P103 Part 2 (§5.5): every class below is used by more than one of this app's own settings panes
- * (workbench/settings/*.vue) or by this file's own footer slot — plain global CSS, not `scoped`,
- * for the same reason as Kira Studio's own copy of this comment: a `scoped` block only reaches
- * markup this file's own template renders, and most of this markup lives in sibling pane
- * components instead. Moved verbatim from the former single-file SettingsDialog.vue's own
- * `<style scoped>` block.
- *
- * `.git-vsix-install`/`.git-clients-list`/`.git-client-row`/`.git-client-info`/`.git-client-label`
- * are NOT here: grepping the whole repo for a rule defining any of them (not their use) turns up
- * nothing, in this file's own former style block or anywhere else — they are unstyled today, the
- * same gap `.section-subhead` (SettingsShell.vue's own workbench.css addition) documents. Left
- * unstyled, exactly as they are today; inventing a rule for them now would be new styling, outside
- * this phase's own "move code, don't add it" rule. */
-.footer-status {
-  @apply flex-1 min-w-0;
-}
-
-/* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown
-   ahead of every Install button that follows one. */
-.command-text {
-  @apply m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm;
-  padding: var(--kira-s-2);
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-xs);
-}
-
-.muted-note {
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
-}
-
-.action-button {
-  @apply self-start;
-}
-</style>

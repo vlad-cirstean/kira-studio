@@ -62,17 +62,20 @@ const vsixOutcomeMessage = computed(() => {
     <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
          VsixStatus, but the click itself always re-resolves through Install. -->
     <div class="git-vsix-install">
-      <p v-if="!gitClientsStore.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
+      <p v-if="!gitClientsStore.vsix.bundled" class="text-subtle text-kira-xs" data-testid="git-vsix-not-bundled">
         The extension ships inside the packaged app. This build has none.
       </p>
       <template v-else>
-        <p class="font-data command-text" data-testid="git-vsix-command">
+        <p
+          class="font-data m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs"
+          data-testid="git-vsix-command"
+        >
           {{ gitClientsStore.vsix.command }}
         </p>
         <Button
           variant="dialog"
           size="kira-lg"
-          class="action-button"
+          class="self-start"
           :disabled="vsixInstalling"
           data-testid="git-vsix-install-button"
           @click="onInstallVsCodeIntegration"
@@ -89,7 +92,7 @@ const vsixOutcomeMessage = computed(() => {
       </FieldDescription>
       <p
         v-if="gitClientsStore.vsix.bundled && !gitClientsStore.vsix.codeAvailable && gitClientsStore.vsix.probed.length > 0"
-        class="muted-note"
+        class="text-subtle text-kira-xs"
         data-testid="git-vsix-probed"
       >
         Looked for VS Code's <span class="font-data">code</span> command at:
@@ -97,7 +100,7 @@ const vsixOutcomeMessage = computed(() => {
       </p>
     </div>
 
-    <p v-if="gitClientsStore.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
+    <p v-if="gitClientsStore.clients.length === 0" class="text-subtle text-kira-xs" data-testid="git-clients-empty">
       No editors have been paired yet. A VS Code editor pairs by connecting to
       <span class="font-data">~/.kira-space/git.sock</span>.
     </p>
