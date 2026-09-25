@@ -89,8 +89,8 @@ async function onClear(): Promise<void> {
 </script>
 
 <template>
-  <div class="history-pane" data-testid="grpc-history-list">
-    <div class="history-toolbar h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+  <div class="flex flex-1 min-h-0 flex-col" data-testid="grpc-history-list">
+    <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
       <span class="ml-auto" />
       <Button
@@ -139,14 +139,14 @@ async function onClear(): Promise<void> {
 
     <div
       v-if="entries.length > 0 && filteredEntries.length > 0"
-      class="history-rows"
+      class="flex flex-1 min-h-0 flex-col overflow-auto"
       role="listbox"
       aria-label="Call history"
     >
       <div
         v-for="entry in filteredEntries"
         :key="entry.id"
-        class="history-row"
+        class="history-row flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1"
         :class="{ 'is-viewing': entry.id === viewingId }"
         data-testid="grpc-history-row"
         role="option"
@@ -186,7 +186,7 @@ async function onClear(): Promise<void> {
       </div>
     </div>
 
-    <div v-if="atCap" class="text-kira-xs text-subtle history-cap-note" data-testid="grpc-history-cap-note">
+    <div v-if="atCap" class="text-kira-xs text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="grpc-history-cap-note">
       Only the last {{ GRPC_HISTORY_PER_SCOPE_LIMIT }} are kept — older calls are removed
       automatically.
     </div>
@@ -196,29 +196,11 @@ async function onClear(): Promise<void> {
 <style scoped>
 @reference "@theme/base.css";
 
-.history-pane {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.history-toolbar {
-  @apply gap-1;
-}
-
-.history-rows {
-  @apply flex flex-1 min-h-0 flex-col overflow-auto;
-}
-
-.history-row {
-  @apply flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.history-row` stays a bare marker to anchor this hover/is-viewing compound. */
 .history-row:hover,
 .history-row.is-viewing {
   @apply bg-hover;
-}
-
-.history-cap-note {
-  @apply shrink-0 border-t border-border px-1.5 py-1;
 }
 
 /* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared

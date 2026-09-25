@@ -103,8 +103,8 @@ function selectMethod(service: string, method: string): void {
 </script>
 
 <template>
-  <div class="schema-browser" data-testid="grpc-schema-browser">
-    <div class="source-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+  <div class="flex h-full min-h-0 flex-col overflow-auto" data-testid="grpc-schema-browser">
+    <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <ToggleGroup
         type="single"
         :model-value="tab.state.descriptorMode"
@@ -153,13 +153,15 @@ function selectMethod(service: string, method: string): void {
       </Button>
     </div>
 
-    <div v-if="tab.state.descriptorMode === 'proto'" class="import-paths" data-testid="grpc-import-paths">
+    <div v-if="tab.state.descriptorMode === 'proto'" class="flex flex-col gap-0.5 border-b border-border px-1.5 py-1" data-testid="grpc-import-paths">
       <span class="text-kira-sm text-muted-foreground uppercase tracking-wider">Import paths</span>
-      <div class="import-path-list">
+      <!-- D14: a real cap + scroll, so a large .proto tree's import list can never push the
+           source row and the whole service browser off the pane. -->
+      <div class="flex max-h-32 flex-col overflow-auto">
         <div v-for="(p, i) in tab.state.importPaths" :key="i" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs font-data import-path-text">{{ p }}</span>
+              <span class="text-kira-xs font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ p }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
@@ -182,7 +184,7 @@ function selectMethod(service: string, method: string): void {
           No import paths — the .proto file's own directory is used
         </div>
       </div>
-      <div class="add-row">
+      <div class="flex items-center gap-1">
         <Input
           v-model="newImportPath"
           placeholder="Add an import path…"
@@ -214,20 +216,23 @@ function selectMethod(service: string, method: string): void {
         </InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
-    <div class="service-list" data-testid="grpc-service-list">
+    <div class="flex-1 min-h-0 overflow-auto px-1.5 py-1" data-testid="grpc-service-list">
       <template v-if="rt?.schema && filteredServices.length > 0">
-        <div v-for="svc in filteredServices" :key="svc.name" class="service-group">
-          <div class="text-kira-sm text-muted-foreground uppercase tracking-wider service-name" data-testid="grpc-service-name">{{ svc.name }}</div>
+        <div v-for="svc in filteredServices" :key="svc.name" class="mb-1.5">
+          <div class="text-kira-sm text-muted-foreground uppercase tracking-wider py-0.5" data-testid="grpc-service-name">{{ svc.name }}</div>
+          <!-- The row's own template class list (P110 B29) supplies height/display/align-items/
+               gap/padding/border-radius/color/font-size/cursor and its own hover/selected
+               background; the extra classes here only supply what that list does not. -->
           <button
             v-for="m in svc.methods"
             :key="m.name"
             type="button"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer method-row"
+            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer w-full justify-between border-0 bg-none text-left font-[inherit]"
             :class="(tab.state.service === svc.name && tab.state.method === m.name) ? 'bg-select' : 'hover:bg-hover'"
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
-            <span class="method-name font-data">{{ m.name }}</span>
+            <span class="text-kira-sm font-data">{{ m.name }}</span>
             <Badge
               v-if="m.serverStreaming || m.clientStreaming"
               variant="ok"
@@ -256,59 +261,3 @@ function selectMethod(service: string, method: string): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.schema-browser {
-  @apply flex h-full min-h-0 flex-col overflow-auto;
-}
-
-.source-row {
-  @apply gap-1;
-}
-
-.import-paths {
-  @apply flex flex-col gap-0.5 border-b border-border px-1.5 py-1;
-}
-
-/* D14: a real cap + scroll, so a large .proto tree's import list can never push the source row
-   and the whole service browser off the pane. */
-.import-path-list {
-  @apply flex max-h-32 flex-col overflow-auto;
-}
-
-.import-path-text {
-  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.add-row {
-  @apply flex items-center gap-1;
-}
-
-.service-list {
-  @apply flex-1 min-h-0 overflow-auto px-1.5 py-1;
-}
-
-.service-group {
-  @apply mb-1.5;
-}
-
-.service-name {
-  @apply py-0.5;
-}
-
-/* The row's own template class list (P110 B29) supplies height/display/align-items/gap/padding/
-   border-radius/color/font-size/cursor and its own hover/selected background; this button only
-   needs what that list does not supply. */
-.method-row {
-  @apply w-full justify-between border-0 bg-none text-left font-[inherit];
-}
-
-.method-name {
-  @apply text-kira-sm;
-}
-
-/* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared
-   across ResponsePane/SchemaBrowser/CallHistoryList, `.empty-state` a 15-file duplicate). */
-</style>

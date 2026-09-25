@@ -279,7 +279,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="grpc-request-view" data-testid="grpc-request-view">
+  <div class="flex h-full min-h-0 flex-col" data-testid="grpc-request-view">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
@@ -295,7 +295,7 @@ onUnmounted(() => {
       </Badge>
       <Tooltip v-if="dirty">
         <TooltipTrigger as-child>
-          <span class="dirty-mark" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
+          <span class="text-warn leading-none text-kira-lg" role="img" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
         </TooltipTrigger>
         <TooltipContent>Unsaved changes</TooltipContent>
       </Tooltip>
@@ -364,7 +364,7 @@ onUnmounted(() => {
            window. P110 B25: the wrapper's own width now lands as a `class="w-full"` prop straight
            onto AutocompleteField (routed to its own InputGroup box), not a scoped `:deep(.p-input)`
            rule reaching across the component boundary. -->
-      <div class="grpc-target-field">
+      <div class="grpc-target-field min-w-0 flex-1">
         <AutocompleteField
           class="w-full"
           :model-value="tab.state.target"
@@ -386,7 +386,7 @@ onUnmounted(() => {
            label (P110 B24: now a class="w-full" passed straight to NativeSelect, not a scoped
            descendant rule). Both fields are flex: 1 in this one toolbar row, so they share the
            free space evenly and stay responsive at either extreme of window size. -->
-      <div class="grpc-method-field">
+      <div class="min-w-0 flex-1">
         <NativeSelect
           variant="bordered"
           class="w-full"
@@ -495,7 +495,7 @@ onUnmounted(() => {
         <TooltipContent>{{ tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions' }}</TooltipContent>
       </Tooltip>
       <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
-        <div ref="overviewAnchorRef" class="overview-anchor">
+        <div ref="overviewAnchorRef" class="relative flex">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -524,9 +524,9 @@ onUnmounted(() => {
       <EnvironmentSelect :tab-id="tab.id" />
     </div>
 
-    <SplitterGroup direction="vertical" class="request-response-split">
+    <SplitterGroup direction="vertical" class="flex flex-1 min-h-0 flex-col">
       <SplitterPanel
-        class="request-pane"
+        class="request-pane flex min-h-0 flex-col overflow-hidden"
         data-testid="grpc-request-pane"
         size-unit="px"
         :default-size="requestPaneHeight"
@@ -570,7 +570,7 @@ onUnmounted(() => {
 
       <ResizableHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <SplitterPanel class="response-pane-slot" data-testid="grpc-response-pane-slot" :order="2">
+      <SplitterPanel class="min-h-0" data-testid="grpc-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
       </SplitterPanel>
     </SplitterGroup>
@@ -580,51 +580,9 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-/* P18 D14/F14: HttpRequestView.vue's own .url-field idiom, verbatim — the wrapper (not the inner
-   input) is what actually sizes in the toolbar row. api-ui-consistency.spec.ts selects
-   `.grpc-target-field` directly — kept as a marker class. P110 B25: AutocompleteField's own
-   `class="w-full"` prop (template above) does the actual sizing now; this wrapper only supplies
-   the flex-1/min-w-0 that lets it grow inside the toolbar row. */
-.grpc-target-field {
-  @apply min-w-0 flex-1;
-}
-
-/* P22b D10: the method select's own sibling of .grpc-target-field above. P110 B24: NativeSelect is
-   a child component now, so its width comes from the `class="w-full"` passed at the call site
-   (merged onto its root <select> via cn()) rather than a scoped descendant rule reaching across
-   the component boundary. */
-.grpc-method-field {
-  @apply min-w-0 flex-1;
-}
-
-.overview-anchor {
-  @apply relative flex;
-}
-
-.grpc-request-view {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-.request-response-split {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-.request-pane {
-  @apply flex min-h-0 flex-col overflow-hidden;
-}
-
-/* P110 B32: the divider styling itself moved into ResizableHandle.vue's own shared component --
-   `.request-splitter` is now a bare marker class, kept because grpc-request.spec.ts polls its
-   box-shadow via getComputedStyle (no rule of its own attaches to the name any more). P22 D13
-   (F22): the request/response boundary used to be 4px of nothing until the pointer crossed it. */
-
-.dirty-mark {
-  @apply text-warn leading-none text-kira-lg;
-}
-
-/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
-   min-h-0 is the only thing this class still needs to contribute. */
-.response-pane-slot {
-  @apply min-h-0;
-}
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.grpc-target-field` and `.request-pane` stay bare markers: api-ui-consistency.spec.ts
+   selects both directly (no rule of their own attaches to either name any more).
+   `.request-splitter` is the same kind of bare marker (P110 B32) — grpc-request.spec.ts polls its
+   box-shadow via getComputedStyle. */
 </style>

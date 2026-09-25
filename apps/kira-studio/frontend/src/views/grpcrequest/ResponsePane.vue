@@ -270,7 +270,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="response-pane" data-testid="grpc-response-pane">
+  <div class="flex h-full min-h-0 flex-col" data-testid="grpc-response-pane">
     <Alert
       v-if="rt?.status === 'error' && rt.error"
       variant="destructive"
@@ -282,7 +282,7 @@ onUnmounted(() => {
     <!-- P18 D14 (P15 D1's gRPC sibling): the status row, the pane switcher and every strip render
          from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
          opened tab used to show no Messages/Metadata/History switcher at all. -->
-    <div class="response-status-row h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
+    <div class="response-status-row h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <template v-if="hasCode">
         <Tooltip v-if="codeHint">
           <TooltipTrigger as-child>
@@ -338,7 +338,7 @@ onUnmounted(() => {
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->
-    <div v-if="statusMessage" class="text-kira-xs text-subtle status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
+    <div v-if="statusMessage" class="text-kira-xs text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
     <Alert v-if="viewing" variant="note" data-testid="grpc-history-band">
       <AlertDescription class="flex items-center gap-3">
@@ -394,9 +394,9 @@ onUnmounted(() => {
     </Alert>
 
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
-    <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
+    <div v-else-if="tab.state.responsePane === 'metadata'" class="flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5" data-testid="grpc-response-metadata">
       <div class="metadata-group">
-        <div class="metadata-group-title text-kira-xs text-muted-foreground">Header</div>
+        <div class="mb-0.5 text-kira-xs text-muted-foreground">Header</div>
         <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-xs">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
           <span class="wrap-anywhere font-data">{{ h.value }}</span>
@@ -404,7 +404,7 @@ onUnmounted(() => {
         <div v-if="header.length === 0" class="text-kira-xs text-subtle">No header metadata</div>
       </div>
       <div class="metadata-group">
-        <div class="metadata-group-title text-kira-xs text-muted-foreground">Trailer</div>
+        <div class="mb-0.5 text-kira-xs text-muted-foreground">Trailer</div>
         <div v-for="(t, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-xs">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ t.name }}</span>
           <span class="wrap-anywhere font-data">{{ t.value }}</span>
@@ -412,22 +412,28 @@ onUnmounted(() => {
         <div v-if="trailer.length === 0" class="text-kira-xs text-subtle">No trailer metadata</div>
       </div>
     </div>
-    <div v-else class="message-list" data-testid="grpc-message-list">
+    <div v-else class="flex flex-1 min-h-0 flex-col" data-testid="grpc-message-list">
+      <!-- P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against —
+           this component owns it directly, VirtualList.vue no longer wraps it. -->
       <div
         v-if="messages.length > 0"
         ref="scrollRef"
-        class="message-virtual-list"
+        class="flex-1 min-h-0 overflow-auto"
         data-testid="virtual-list"
       >
-        <div class="message-virtual-inner" :style="{ height: `${totalMessagesSize}px` }">
+        <div class="relative w-full" :style="{ height: `${totalMessagesSize}px` }">
           <div
             v-for="entry in visibleMessages"
             :key="entry.row.index"
-            class="message-entry"
+            class="flex flex-col absolute top-0 left-0 w-full"
             data-testid="grpc-message-entry"
             :style="{ transform: `translateY(${entry.row.start}px)` }"
           >
-            <button type="button" class="message-header" @click="toggleExpanded(entry.m.seq)">
+            <!-- height (not padding) so this row's own rendered height stays exactly
+                 MESSAGE_ROW_HEIGHT (22px, the script's own numeric constant, kept equal to
+                 --kira-h-sm here) — VirtualList positions every row assuming that exact height,
+                 border included via box-sizing. -->
+            <button type="button" class="message-header box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer" @click="toggleExpanded(entry.m.seq)">
               <span class="text-kira-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
               <span class="text-kira-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
@@ -443,7 +449,11 @@ onUnmounted(() => {
               <span class="ml-auto" />
               <span class="text-kira-xs text-subtle">#{{ entry.m.seq }}</span>
             </button>
-            <div v-if="expanded.has(entry.m.seq)" class="message-detail">
+            <!-- Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay
+                 numerically equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON
+                 document taller than this scrolls inside MonacoHost's own scroller instead of
+                 growing the row. -->
+            <div v-if="expanded.has(entry.m.seq)" class="box-border h-50 overflow-auto border-b border-border">
               <MonacoHost
                 :ref="(el) => setMessageHost(entry.m.seq, el)"
                 :doc="entry.m.json"
@@ -461,7 +471,7 @@ onUnmounted(() => {
         <button
           v-if="hasHistory"
           type="button"
-          class="history-hint-link"
+          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary"
           data-testid="grpc-history-hint"
           @click="viewHistory"
         >
@@ -483,64 +493,12 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.response-pane {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-.response-status-row {
-  @apply gap-1;
-}
-
-.status-message {
-  @apply px-1.5 pt-0 pb-1;
-}
-
-.message-list {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
-/* P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against — this
-   component owns it directly now, VirtualList.vue no longer wraps it. */
-.message-virtual-list {
-  @apply flex-1 min-h-0 overflow-auto;
-}
-
-.message-virtual-inner {
-  @apply relative w-full;
-}
-
-.message-entry {
-  @apply flex flex-col absolute top-0 left-0 w-full;
-}
-
-/* height (not padding) so this row's own rendered height stays exactly MESSAGE_ROW_HEIGHT
-   (22px, the script's own numeric constant, kept equal to --kira-h-sm here) — VirtualList
-   positions every row assuming that exact height, border included via box-sizing. */
-.message-header {
-  @apply box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer;
-}
-
+/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
+   utilities. `.response-status-row` stays a bare marker: api-ui-consistency.spec.ts locates it
+   directly (no rule of its own attaches to the name any more). `.message-header` stays a marker
+   to anchor this hover rule. */
 .message-header:hover {
   @apply bg-hover;
-}
-
-/* Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay numerically
-   equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON document taller than this
-   scrolls inside MonacoHost's own scroller instead of growing the row. */
-.message-detail {
-  @apply box-border h-50 overflow-auto border-b border-border;
-}
-
-.metadata-groups {
-  @apply flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5;
-}
-
-.metadata-group-title {
-  @apply mb-0.5;
-}
-
-.history-hint-link {
-  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
 }
 
 /* P110 B34: `.empty-state`/`-icon`/`-title` moved to base.css's own `@utility` trio (shared
