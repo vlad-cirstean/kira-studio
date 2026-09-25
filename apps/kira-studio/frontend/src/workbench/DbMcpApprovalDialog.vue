@@ -2,8 +2,8 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
-import { useIntervalFn } from '@vueuse/core';
-import { computed, nextTick, ref, watch } from 'vue';
+import { usePendingDecision } from '@workbench/util/usePendingDecision';
+import { computed } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
 
 const dbMcpStore = useDbMcpStore();
@@ -12,53 +12,14 @@ const dbMcpStore = useDbMcpStore();
 // precedent applied to run_query's prompt-mode gate. An AI client is blocked while the human
 // decides, the same semantics pairing's own trust prompt has, so this reuses that answer rather
 // than a dock or a notification queue. Renders nothing while dbMcpStore.approval.pending is null.
-
-const denyButton = ref<InstanceType<typeof Button> | null>(null);
-const now = ref(Date.now());
-
-// Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
-// unmounted per approval), so a plain onMounted only ever fires once, at app boot — a 1s
-// interval started there would tick for the app's entire lifetime even though the dialog itself
-// renders nothing while dbMcpStore.approval.pending is null (DialogFrame's own v-if below).
-// useIntervalFn's own pause()/resume() (immediate: false) is started/stopped instead as pending
-// flips non-null/null.
-const { pause: pauseTick, resume: resumeTick } = useIntervalFn(
-  () => {
-    now.value = Date.now();
-  },
-  1000,
-  { immediate: false },
-);
-
-// This also fixes denyButton's own focus call: run from onMounted, it only ever executed once, at
-// that same app-boot mount — with DialogFrame's v-if false and nothing in the DOM yet, so
-// denyButton.value was always null there and Deny was never actually focused. nextTick here runs
-// it after each approval's own DOM update instead, so it sticks for real.
 //
-// P108 Part 12 F2: watches requestId, not just pending-vs-not — a queue advance (A approved/denied
-// while B is already queued) swaps pending from A straight to B with no null in between. The old
-// boolean source never re-fired for that swap, so focus silently stayed on Approve for B (a second
-// Enter or key repeat could then approve a request the user never reviewed).
-watch(
-  () => dbMcpStore.approval.pending?.requestId ?? null,
-  (requestId) => {
-    if (requestId) {
-      now.value = Date.now();
-      resumeTick();
-      // Deny is the default focus, an approval dialog whose Enter key runs a write or DDL
-      // statement is the wrong default.
-      void nextTick(() => denyButton.value?.$el?.focus());
-    } else {
-      pauseTick();
-    }
-  },
-  { immediate: true },
-);
-
-const remainingSeconds = computed(() => {
-  const expires = dbMcpStore.approval.pending?.expiresAtMs;
-  if (expires === undefined) return 0;
-  return Math.max(0, Math.ceil((expires - now.value) / 1000));
+// P108 Part 12 F2 fixed this to key on requestId, not a `pending !== null` boolean — a queue
+// advance (A approved/denied while B is already queued) swaps pending from A straight to B with no
+// null in between, and the old boolean source never re-fired for that swap. P113 F5 extracts that
+// fix into usePendingDecision, shared with GitPairingDialog.vue (which had the same bug).
+const { remainingSeconds } = usePendingDecision({
+  pendingId: () => dbMcpStore.approval.pending?.requestId,
+  expiresAtMs: () => dbMcpStore.approval.pending?.expiresAtMs,
 });
 
 const CLASS_WORDS: Record<string, string> = {
