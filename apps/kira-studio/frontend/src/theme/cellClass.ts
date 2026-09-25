@@ -49,7 +49,7 @@ const FLAG_CLASS_NAMES: { [K in keyof CellClassFlags]-?: string } = {
 };
 
 /** Builds a `:class` object from a cell's state flags — see {@link CellClassFlags}. */
-export function cellClass(flags: CellClassFlags): Record<string, boolean> {
+function cellClass(flags: CellClassFlags): Record<string, boolean> {
   const out: Record<string, boolean> = {};
   for (const key of Object.keys(FLAG_CLASS_NAMES) as (keyof CellClassFlags)[]) {
     if (flags[key]) out[FLAG_CLASS_NAMES[key]] = true;
