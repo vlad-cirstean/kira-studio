@@ -1109,13 +1109,10 @@ const statusLine = computed(() => {
   @apply gap-1;
 }
 
+/* P110 B37: scrollbar-width: none + ::-webkit-scrollbar { @apply hidden } becomes the shared
+   scrollbar-none utility (same conversion as TabStrip.vue/WorkbenchShell.vue). */
 .result-strip {
-  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-1;
-  scrollbar-width: none;
-}
-
-.result-strip::-webkit-scrollbar {
-  @apply hidden;
+  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-1 scrollbar-none;
 }
 
 .result-tab {

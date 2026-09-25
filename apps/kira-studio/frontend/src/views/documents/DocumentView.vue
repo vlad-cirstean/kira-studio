@@ -1251,8 +1251,9 @@ onUnmounted(() => {
    documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
    head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data;
-  padding: 0 var(--kira-s-4) var(--kira-s-2);
+  /* P110 B37: padding: 0 var(--kira-s-4) var(--kira-s-2) -- 8px sides, 4px bottom -- becomes
+     px-2 pb-1. */
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm font-data px-2 pb-1;
 }
 
 /* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not

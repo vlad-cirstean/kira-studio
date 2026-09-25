@@ -152,7 +152,7 @@ onUnmounted(() => {
 
       <div class="fk-preview-body">
         <div v-if="state.status === 'loading'" class="fk-preview-loading">
-          <CodiconIcon name="loading" class="spin" :size="14" />
+          <CodiconIcon name="loading" class="animate-spin" :size="14" />
         </div>
         <Badge v-else-if="state.status === 'error'" variant="err">{{ state.message }}</Badge>
         <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" variant="note" data-testid="fk-preview-empty">
@@ -213,17 +213,8 @@ onUnmounted(() => {
   @apply flex items-center justify-center h-10 text-muted-foreground;
 }
 
-.spin {
-  animation: fk-preview-spin 1s linear infinite;
-}
-@keyframes fk-preview-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* P110 B37: .spin/@keyframes fk-preview-spin deleted -- Tailwind's own animate-spin (1s linear
+   infinite, rotate 0->360) is byte-identical, confirmed via compile check. */
 
 .fk-preview-table {
   @apply w-full border-collapse text-kira-sm;

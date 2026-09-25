@@ -388,8 +388,9 @@ onUnmounted(() => {
 }
 
 .diff-header-row {
-  grid-template-columns: 72px 160px 1fr 1fr;
-  @apply grid gap-1 py-0.5 text-kira-xs;
+  /* P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as the
+     api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a new one. */
+  @apply grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr];
 }
 
 .diff-header-head {
