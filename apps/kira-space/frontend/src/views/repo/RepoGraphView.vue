@@ -109,7 +109,7 @@ onActivated(() => handle?.setVisible?.(true));
   <div
     v-if="!errorMessage"
     ref="container"
-    class="repo-graph-host"
+    class="h-full w-full"
     data-testid="repo-graph-host"
   />
   <Alert v-else class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
@@ -117,11 +117,3 @@ onActivated(() => handle?.setVisible?.(true));
     <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ errorMessage }}</AlertTitle>
   </Alert>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-graph-host {
-  @apply h-full w-full;
-}
-</style>

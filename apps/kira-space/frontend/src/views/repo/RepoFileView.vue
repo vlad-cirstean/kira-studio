@@ -272,7 +272,7 @@ onUnmounted(() => {
 
 <template>
   <template v-if="state === 'loading' || state === 'found'">
-    <div v-if="isMarkdown" class="repo-file">
+    <div v-if="isMarkdown" class="flex flex-col h-full w-full">
       <div class="h-bar shrink-0 flex items-center gap-1.5 px-2">
         <ToggleGroup
           type="single"
@@ -291,19 +291,21 @@ onUnmounted(() => {
         </ToggleGroup>
       </div>
       <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
-           toggle, only hidden, so scroll position/selection/find state survive a round trip. -->
-      <div v-show="view === 'source'" ref="container" class="monaco-host" data-testid="repo-file-editor" />
+           toggle, only hidden, so scroll position/selection/find state survive a round trip.
+           flex-1/min-h-0 (not h-full/w-full, the standalone-mount branch below) since this is
+           nested in the markdown toolbar's own flex column. -->
+      <div v-show="view === 'source'" ref="container" class="monaco-host flex-1 min-h-0" data-testid="repo-file-editor" />
       <!-- D11: `markdown-it`'s `html: false` (markdownReading.ts) escapes any literal HTML tag in
            the source, so this is the one `v-html` in this view that's safe. -->
       <div
         v-if="view === 'reading'"
         ref="readingPane"
-        class="md-reading"
+        class="md-reading flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4"
         data-testid="repo-file-markdown"
         v-html="renderedHtml"
       />
     </div>
-    <div v-else ref="container" class="monaco-host" data-testid="repo-file-editor" />
+    <div v-else ref="container" class="monaco-host h-full w-full" data-testid="repo-file-editor" />
   </template>
   <Alert
     v-else-if="state === 'binary'"
@@ -338,26 +340,18 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.monaco-host {
-  @apply h-full w-full;
-}
+/* P110 B40: .monaco-host/.repo-file/.md-reading's own base declarations moved onto the template
+   directly -- each of .monaco-host's two mount points (markdown vs. plain-file branch, mutually
+   exclusive per state.value) is template-static, so the descendant-selector override this used to
+   need is resolved per branch instead. `.monaco-host` stays a bare marker class (a real,
+   heavily-used test dependency across many spec files, not just this view's own); `.md-reading`
+   stays one too, since every rule below targets markdown-rendered `v-html` content with no
+   template element of its own to carry a class.
 
-/* D11: column flex only when a markdown file grows the Source/Reading toolbar — every other file
-   type keeps the single unwrapped .monaco-host above, byte-identical to before this phase. */
-.repo-file {
-  @apply flex flex-col h-full w-full;
-}
-.repo-file .monaco-host {
-  @apply flex-1 min-h-0;
-}
-
-/* D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
+   D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
    zeroes margin/padding on `*`, font-size/font-weight on headings, and list-style on lists, so
    every block element below restates its own spacing (and headings their own scale, P73 §7); that
    is expected here, not a workaround. */
-.md-reading {
-  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4;
-}
 /* v1.9 tailwind-declines deep dive: Tailwind ships a real `max-w-prose` utility (65ch) for
    exactly this — readable line length — narrower than the original 72ch but the same intent. */
 .md-reading > :deep(*) {

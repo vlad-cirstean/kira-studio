@@ -119,15 +119,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!repoId" class="repo-multi-diff-root">
+  <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
     <Alert class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
       <AlertTitle class="text-kira-md font-normal text-muted-foreground">This tab has no repository.</AlertTitle>
     </Alert>
   </div>
-  <div v-else class="repo-multi-diff-root" data-testid="repo-multi-diff-view">
-    <div v-for="section in sections" :key="section.path" class="section">
-      <div class="section-header">
+  <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">
+    <div v-for="section in sections" :key="section.path" class="flex flex-none flex-col border-b border-border">
+      <div class="flex flex-none items-center gap-1 py-1 px-1.5">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -142,8 +142,8 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>{{ section.expanded ? 'Collapse' : 'Expand' }}</TooltipContent>
         </Tooltip>
-        <span class="path" :title="section.path">{{ basename(section.path) }}</span>
-        <span class="path-dir" :title="section.path">{{ section.path }}</span>
+        <span class="font-semibold overflow-hidden text-ellipsis whitespace-nowrap" :title="section.path">{{ basename(section.path) }}</span>
+        <span class="path-dir flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm" :title="section.path">{{ section.path }}</span>
         <Button
           v-if="section.expanded && sectionState[section.path] === 'found'"
           variant="toolbar"
@@ -159,7 +159,7 @@ onUnmounted(() => {
         <div
           v-if="sectionState[section.path] === 'loading' || sectionState[section.path] === 'found'"
           :ref="(el) => setContainer(section.path, el)"
-          class="monaco-host"
+          class="monaco-host flex-none h-[60vh] w-full"
           data-testid="repo-multi-diff-editor"
         />
         <Alert
@@ -201,31 +201,3 @@ onUnmounted(() => {
     </Alert>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-multi-diff-root {
-  @apply h-full overflow-y-auto flex flex-col;
-}
-
-.section {
-  @apply flex flex-none flex-col border-b border-border;
-}
-
-.section-header {
-  @apply flex flex-none items-center gap-1 py-1 px-1.5;
-}
-
-.path {
-  @apply font-semibold overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.path-dir {
-  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm;
-}
-
-.monaco-host {
-  @apply flex-none h-[60vh] w-full;
-}
-</style>

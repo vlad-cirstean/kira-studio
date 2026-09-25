@@ -114,10 +114,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="repo-diff-root">
+  <div class="h-full flex flex-col">
     <!-- P92 item 7: the same action the repo.goToFileFromDiff palette command runs — P74 built the
          behaviour and gave it no other affordance. -->
-    <div v-if="state === 'found'" class="diff-actions">
+    <div v-if="state === 'found'" class="flex flex-none border-b border-border py-1 px-1.5">
       <Button variant="toolbar" size="kira" data-testid="repo-diff-go-to-file" @click="onGoToFile">
         <CodiconIcon name="go-to-file" :size="13" />
         Go to file
@@ -126,7 +126,7 @@ onUnmounted(() => {
     <div
       v-if="state === 'loading' || state === 'found'"
       ref="container"
-      class="monaco-host"
+      class="monaco-host flex-auto min-h-0 w-full"
       data-testid="repo-diff-editor"
     />
     <Alert
@@ -159,19 +159,3 @@ onUnmounted(() => {
     </Alert>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-diff-root {
-  @apply h-full flex flex-col;
-}
-
-.diff-actions {
-  @apply flex flex-none border-b border-border py-1 px-1.5;
-}
-
-.monaco-host {
-  @apply flex-auto min-h-0 w-full;
-}
-</style>

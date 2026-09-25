@@ -56,11 +56,12 @@ function submit(): void {
 </script>
 
 <template>
-  <div class="review-thread" data-testid="review-thread">
+  <!-- §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. -->
+  <div class="box-border w-full h-full bg-elevated border-t border-b border-border-strong text-fg text-xs flex flex-col gap-1.5 overflow-auto select-text py-2 px-3" data-testid="review-thread">
     <template v-if="mode === 'view' && comment">
-      <div v-if="anchorLabel" class="review-thread-anchor">{{ anchorLabel }}</div>
-      <div class="review-thread-body">{{ comment.body }}</div>
-      <div class="review-thread-actions">
+      <div v-if="anchorLabel" class="text-warn italic">{{ anchorLabel }}</div>
+      <div class="whitespace-pre-wrap break-words">{{ comment.body }}</div>
+      <div class="flex justify-end gap-1.5">
         <Button variant="toolbar" size="kira" @click="emit('close')">
           <CodiconIcon name="close" :size="13" />
           Close
@@ -74,14 +75,14 @@ function submit(): void {
     <template v-else>
       <textarea
         v-model="draft"
-        class="review-thread-input"
+        class="box-border w-full resize-y bg-field text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2 focus:outline-none focus:border-focus"
         placeholder="Leave a review comment…"
         rows="3"
         data-testid="review-thread-input"
         @keydown.meta.enter="submit"
         @keydown.ctrl.enter="submit"
       />
-      <div class="review-thread-actions">
+      <div class="flex justify-end gap-1.5">
         <Button variant="toolbar" size="kira" @click="emit('cancel')">Cancel</Button>
         <Button variant="toolbar-primary" size="kira" @click="submit">
           <CodiconIcon name="comment" :size="13" />
@@ -91,32 +92,3 @@ function submit(): void {
     </template>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.review-thread {
-  /* §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. */
-  @apply box-border w-full h-full bg-elevated border-t border-b border-border-strong text-fg text-xs flex flex-col gap-1.5 overflow-auto select-text py-2 px-3;
-}
-
-.review-thread-anchor {
-  @apply text-warn italic;
-}
-
-.review-thread-body {
-  @apply whitespace-pre-wrap break-words;
-}
-
-.review-thread-input {
-  @apply box-border w-full resize-y bg-field text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2;
-}
-
-.review-thread-input:focus {
-  @apply outline-none border-focus;
-}
-
-.review-thread-actions {
-  @apply flex justify-end gap-1.5;
-}
-</style>
