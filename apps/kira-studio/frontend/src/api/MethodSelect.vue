@@ -34,11 +34,11 @@ function select(method: HttpMethod): void {
 
 <template>
   <Popover v-model:open="open">
-    <div class="method-anchor">
+    <div class="relative flex">
       <PopoverTrigger as-child>
         <button
           type="button"
-          :class="cn(nativeSelectVariants({ variant: 'bordered' }), 'method-select', methodTextClass(httpMethodToken(props.modelValue)))"
+          :class="cn(nativeSelectVariants({ variant: 'bordered' }), 'font-semibold font-data', methodTextClass(httpMethodToken(props.modelValue)))"
           :data-testid="testid"
           :data-value="props.modelValue"
         >
@@ -48,15 +48,15 @@ function select(method: HttpMethod): void {
       </PopoverTrigger>
     </div>
     <PopoverContent align="start" class="w-36 gap-0 p-0" data-testid="method-menu">
-      <div class="method-menu">
+      <div class="flex flex-col p-0.5">
         <button
           v-for="m in HTTP_METHODS"
           :key="m"
           type="button"
-          class="row method-menu-item"
+          class="row"
           :class="
             cn(
-              'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover',
+              'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full font-semibold',
               methodTextClass(httpMethodToken(m)),
             )
           "
@@ -64,7 +64,7 @@ function select(method: HttpMethod): void {
           :data-value="m"
           @click="select(m)"
         >
-          <span class="label">{{ m }}</span>
+          <span class="flex-1">{{ m }}</span>
           <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="m === props.modelValue" name="check" :size="13" />
           </span>
@@ -73,34 +73,3 @@ function select(method: HttpMethod): void {
     </PopoverContent>
   </Popover>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.method-anchor {
-  @apply relative flex;
-}
-
-/* F12's own comment, restated: border/background/padding/cursor come from
-   nativeSelectVariants({variant:'bordered'}) (unaffected by the element swap); the chevron is
-   drawn explicitly since a <button> has no ::picker-icon of its own to rely on. */
-.method-select {
-  @apply font-semibold font-data;
-}
-
-.method-menu {
-  @apply flex flex-col p-0.5;
-}
-
-.method-menu-item {
-  @apply w-full rounded-kira-sm font-semibold;
-}
-
-.method-menu-item .label {
-  @apply flex-1;
-}
-
-/* P22 D7: the method colour class paints text only (no fill), so this row no longer needs a
-   brightness workaround to fight it — the plain hover background every other menu row already
-   has now applies here too. */
-</style>

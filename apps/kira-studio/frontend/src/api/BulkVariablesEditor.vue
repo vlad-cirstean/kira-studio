@@ -113,7 +113,7 @@ function onCancel(): void {
 </script>
 
 <template>
-  <div class="bulk-editor" data-testid="variables-bulk-editor">
+  <div class="flex h-full min-h-0 flex-col gap-1 px-1.5 py-1" data-testid="variables-bulk-editor">
     <Alert variant="note" data-testid="variables-bulk-hint">
       <AlertDescription>
         Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
@@ -123,7 +123,7 @@ function onCancel(): void {
       </AlertDescription>
     </Alert>
 
-    <div class="bulk-body">
+    <div class="flex-1 min-h-52 overflow-hidden rounded-kira border border-border">
       <MonacoHost
         :doc="text"
         language="plain"
@@ -137,7 +137,7 @@ function onCancel(): void {
       <AlertDescription>{{ parseError.message }}</AlertDescription>
     </Alert>
     <template v-else-if="diff">
-      <div class="bulk-summary" data-testid="variables-bulk-summary">{{ summary }}</div>
+      <div class="text-subtle text-kira-sm" data-testid="variables-bulk-summary">{{ summary }}</div>
       <Alert v-if="diff.hasRenameRisk" variant="warn" data-testid="variables-bulk-rename-warning">
         <AlertDescription>
           Renaming a key here removes the old one and its value history. Rename in the table to
@@ -150,7 +150,7 @@ function onCancel(): void {
       <AlertDescription>{{ applyError }}</AlertDescription>
     </Alert>
 
-    <div class="bulk-actions">
+    <div class="flex justify-end gap-1">
       <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">Cancel</Button>
       <Button
         variant="toolbar-primary"
@@ -164,23 +164,3 @@ function onCancel(): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.bulk-editor {
-  @apply flex h-full min-h-0 flex-col gap-1 px-1.5 py-1;
-}
-
-.bulk-body {
-  @apply flex-1 min-h-52 overflow-hidden rounded-kira border border-border;
-}
-
-.bulk-summary {
-  @apply text-subtle text-kira-sm;
-}
-
-.bulk-actions {
-  @apply flex justify-end gap-1;
-}
-</style>

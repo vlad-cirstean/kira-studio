@@ -70,11 +70,11 @@ function manage(): void {
 
 <template>
   <Popover v-model:open="open">
-    <div class="environment-anchor ml-auto">
+    <div class="relative flex min-w-0 flex-initial ml-auto">
       <PopoverTrigger as-child>
         <button
           type="button"
-          :class="[nativeSelectVariants({ variant: 'bordered' }), 'environment-select']"
+          :class="[nativeSelectVariants({ variant: 'bordered' }), 'min-w-0']"
           data-testid="api-environment-select"
           :data-value="activeEnvironmentId"
         >
@@ -84,7 +84,7 @@ function manage(): void {
             data-testid="conn-dot"
             :style="{ '--kira-rail': connColorVar(activeEnvironment?.color) }"
           />
-          <span class="environment-select-label">{{ activeEnvironment?.name ?? 'No environment' }}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ activeEnvironment?.name ?? 'No environment' }}</span>
           <CodiconIcon name="chevron-down" :size="12" />
         </button>
       </PopoverTrigger>
@@ -94,16 +94,16 @@ function manage(): void {
       class="w-52 gap-0 p-0"
       data-testid="api-environment-menu"
     >
-      <div class="environment-menu">
+      <div class="flex flex-col p-0.5">
         <button
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
           data-testid="api-environment-option-none"
           data-value=""
           @click="selectNone"
         >
           <span class="size-1.25 rounded-full shrink-0 bg-none border border-disabled" data-testid="conn-dot" />
-          <span class="label">No environment</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">No environment</span>
           <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="activeEnvironmentId === ''" name="check" :size="13" />
           </span>
@@ -112,7 +112,7 @@ function manage(): void {
           v-for="env in variablesStore.environments"
           :key="env.id"
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
           data-testid="api-environment-option"
           :data-value="env.id"
           @click="selectEnvironment(env.id)"
@@ -123,53 +123,21 @@ function manage(): void {
             data-testid="conn-dot"
             :style="{ '--kira-rail': connColorVar(env.color) }"
           />
-          <span class="label">{{ env.name }}</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ env.name }}</span>
           <span class="size-4 flex items-center justify-center shrink-0">
             <CodiconIcon v-if="env.id === activeEnvironmentId" name="check" :size="13" />
           </span>
         </button>
-        <div class="environment-menu-separator" />
+        <div class="my-0.5 border-t border-border" />
         <button
           type="button"
-          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row environment-menu-item"
+          class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover row w-full"
           data-testid="api-environment-manage"
           @click="manage"
         >
-          <span class="label">Manage environments…</span>
+          <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Manage environments…</span>
         </button>
       </div>
     </PopoverContent>
   </Popover>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.environment-anchor {
-  @apply relative flex min-w-0 flex-initial;
-}
-
-.environment-select {
-  @apply min-w-0;
-}
-
-.environment-select-label {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.environment-menu {
-  @apply flex flex-col p-0.5;
-}
-
-.environment-menu-item {
-  @apply w-full gap-1 rounded-kira-sm;
-}
-
-.environment-menu-item .label {
-  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.environment-menu-separator {
-  @apply my-0.5 border-t border-border;
-}
-</style>

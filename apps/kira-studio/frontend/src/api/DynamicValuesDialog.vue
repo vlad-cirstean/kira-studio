@@ -87,7 +87,7 @@ function close(): void {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto">
-    <div class="flex flex-col gap-0.5 p-1 dynamic-values-body">
+    <div class="flex flex-col gap-0.5 p-1 overflow-y-auto">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter" data-testid="dynamic-values-filter" />
@@ -109,15 +109,15 @@ function close(): void {
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover dynamic-values-row w-full border-0 text-left"
+            class="h-auto flex items-center justify-between gap-1 px-1.5 py-1 min-h-6.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover w-full border-0 text-left"
             data-testid="dynamic-values-fake-row"
             :data-name="entry.name"
             @click="onCopy(entry.name)"
           >
-            <code class="reference" data-testid="dynamic-values-reference">{{
+            <code class="shrink-0 text-fg font-data" data-testid="dynamic-values-reference">{{
               reference(entry.name)
             }}</code>
-            <Badge variant="info" class="sample" data-testid="dynamic-values-sample">{{
+            <Badge variant="info" class="min-w-0 overflow-hidden text-ellipsis" data-testid="dynamic-values-sample">{{
               samples[entry.name] ?? ''
             }}</Badge>
           </button>
@@ -135,27 +135,3 @@ function close(): void {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* The body's own flex/gap/padding utilities live inline in the template now (P110 B27); this body
-   also needs to scroll within the dialog's own fixed max-height. */
-.dynamic-values-body {
-  @apply overflow-y-auto;
-}
-
-.dynamic-values-row {
-  @apply h-auto justify-between px-1.5 py-1 min-h-6.5;
-}
-
-.reference {
-  @apply shrink-0 text-fg font-data;
-}
-
-.sample {
-  @apply min-w-0 overflow-hidden text-ellipsis;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
-</style>
