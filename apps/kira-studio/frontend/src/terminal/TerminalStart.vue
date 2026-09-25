@@ -23,8 +23,8 @@ function onNewTerminal(): void {
 </script>
 
 <template>
-  <div class="start" data-testid="terminal-start">
-    <div class="start-inner">
+  <div class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="terminal-start">
+    <div class="w-105 max-w-full">
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">No terminal open</AlertTitle>
@@ -51,15 +51,3 @@ function onNewTerminal(): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.start {
-  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-4;
-}
-
-.start-inner {
-  @apply w-105 max-w-full;
-}
-</style>

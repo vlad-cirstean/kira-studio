@@ -137,10 +137,10 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 </script>
 
 <template>
-  <div data-testid="terminal-panel" class="terminal-panel">
+  <div data-testid="terminal-panel">
     <div ref="rootEl" class="flex h-full flex-col">
       <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
-        <span class="panel-title">Quick commands</span>
+        <span class="font-semibold">Quick commands</span>
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -201,8 +201,8 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           </InputGroup>
         </div>
         <div class="min-h-0 flex-1">
-          <div class="terminal-panel-body">
-            <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
+          <div class="flex flex-col h-full overflow-y-auto">
+            <div v-if="adding" class="flex flex-col gap-1 p-1.5 border-b border-border" data-testid="quick-command-add-row">
               <Input
                 v-model="newName"
                 placeholder="Name"
@@ -215,7 +215,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                 class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
                 data-testid="quick-command-add-command"
               />
-              <div class="quick-command-add-actions">
+              <div class="flex justify-end gap-1">
                 <Button variant="dialog" size="kira-lg" @click="cancelAdd">Cancel</Button>
                 <Button
                   variant="dialog-primary"
@@ -226,32 +226,32 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                   >Add</Button
                 >
               </div>
-              <span v-if="addError" class="field-error">{{ addError }}</span>
+              <span v-if="addError" class="text-error text-kira-xs leading-normal">{{ addError }}</span>
             </div>
 
             <div
               v-if="filteredRecords.length > 0"
-              class="quick-command-list"
+              class="flex flex-col"
               data-testid="quick-command-list"
             >
               <button
                 v-for="script in filteredRecords"
                 :key="script.id"
                 type="button"
-                class="quick-command-row"
+                class="quick-command-row flex items-center gap-1 py-1 px-1.5 cursor-default select-none"
                 :data-testid="`quick-command-${script.id}`"
                 @click="runScript(script)"
                 @contextmenu.prevent="onContextMenu($event, script)"
               >
                 <span
                   v-if="script.color !== 'none'"
-                  class="swatch"
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
                   :style="{ background: connColorVar(script.color) }"
                 />
-                <CodiconIcon v-else name="play" :size="13" class="run-icon" />
-                <div class="quick-command-text">
-                  <span class="quick-command-name">{{ script.name }}</span>
-                  <span class="quick-command-command">{{ script.command }}</span>
+                <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
+                <div class="flex-1 min-w-0 flex flex-col">
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-xs">{{ script.command }}</span>
                 </div>
               </button>
             </div>
@@ -284,57 +284,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.panel-title {
-  @apply font-semibold;
-}
-
-.terminal-panel-body {
-  @apply flex flex-col h-full overflow-y-auto;
-}
-
-.quick-command-list {
-  @apply flex flex-col;
-}
-
-.quick-command-row {
-  @apply flex items-center gap-1 py-1 px-1.5 cursor-default select-none;
-}
-
 .quick-command-row:hover {
   @apply bg-hover;
-}
-
-.run-icon {
-  @apply shrink-0 text-muted-foreground;
-}
-
-.swatch {
-  @apply w-2.5 h-2.5 rounded-full shrink-0;
-}
-
-.quick-command-text {
-  @apply flex-1 min-w-0 flex flex-col;
-}
-
-.quick-command-name {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.quick-command-command {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-xs;
-}
-
-.quick-command-add {
-  @apply flex flex-col gap-1 p-1.5 border-b border-border;
-}
-
-.quick-command-add-actions {
-  @apply flex justify-end gap-1;
-}
-
-.field-error {
-  /* P110 B12: leading-normal inlined -- was the shared workbench.css `.field-error` rule's own
-     contribution, now deleted along with the rest of the shared field vocabulary. */
-  @apply text-error text-kira-xs leading-normal;
 }
 </style>
