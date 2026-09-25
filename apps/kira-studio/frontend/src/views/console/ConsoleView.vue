@@ -933,13 +933,12 @@ const statusLine = computed(() => {
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 result-tab max-w-36 h-5.5 text-kira-xs"
-              :class="[
+              class="group/tab inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 max-w-36 h-5.5 text-kira-xs"
+              :class="
                 result.key === rt.activeKey
-                  ? 'bg-elevated border-border-strong text-fg'
-                  : 'border-transparent text-muted-foreground',
-                { 'is-active': result.key === rt.activeKey },
-              ]"
+                  ? 'is-active bg-elevated border-border-strong text-fg'
+                  : 'border-transparent text-muted-foreground hover:bg-hover'
+              "
               data-testid="console-result-tab"
               :data-active="result.key === rt.activeKey"
             >
@@ -958,7 +957,8 @@ const statusLine = computed(() => {
               </button>
               <button
                 type="button"
-                class="result-close inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 opacity-0"
+                class="inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 hover:bg-hover"
+                :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
                 aria-label="Close result"
                 data-testid="console-result-close"
                 @click="consoleViewStore.closeResult(tab.id, result.key)"
@@ -1031,32 +1031,15 @@ const statusLine = computed(() => {
       </SplitterPanel>
       <!-- P40 D11: a console result has no addressable row/table to write back to at all — a
            viewer, not an editor refusing this particular cell (F12/F13). -->
+      <!-- P110 B32: `.cell-splitter` stays a bare marker class with no rule of its own --
+           cell-editor.spec.ts polls its box-shadow via getComputedStyle. -->
       <ResizableHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
       </SplitterGroup>
   </div>
+  <!-- P110 I2-16: `.result-tab`/`.result-close`'s own hover/active rules moved onto the template --
+       `group/tab` on the tab, its own ternary for the inactive-hover background (`is-active` stays
+       a real marker class, console.spec.ts's own `toHaveClass(/is-active/)` assertion); the close
+       button's opacity is `isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'`, its
+       own hover background a plain `hover:bg-hover`. -->
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities (unlayered scoped CSS always wins over a layered utility regardless of class order,
-   per this plan's own §1 rule). `.cell-splitter` stays a bare marker class with no rule of its
-   own (P110 B32 -- cell-editor.spec.ts polls its box-shadow via getComputedStyle). `.result-tab`/
-   `.result-close` stay as bare markers to anchor the compound/descendant state rules below, which
-   still need their relative source order. */
-
-.result-tab:hover:not(.is-active) {
-  @apply bg-hover;
-}
-
-.result-tab:hover .result-close,
-.result-tab.is-active .result-close {
-  @apply opacity-100;
-}
-
-.result-close:hover {
-  @apply bg-hover;
-}
-</style>
