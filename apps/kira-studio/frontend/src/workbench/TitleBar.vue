@@ -58,12 +58,22 @@ const keepAwakeTooltip = computed(() => {
 
 <template>
   <TitleBarBase>
-    <div class="mode-tabs">
+    <!-- No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read
+         as redundant next to the mode switcher). Centered on the bar's true full width via
+         absolute positioning, deliberately NOT `justify-content: center` inside the flex row —
+         that would center within the *padded* box, not the window, and reads visibly off-centre. -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5">
+      <!-- P15 D9: px-3 (12px) -- the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px)
+           inside a 38px bar leaves 6px of clearance, the same --kira-s-3 the bar already uses as
+           its own right padding. wails-no-drag: isDraggableEvent (drag.ts) reads the event
+           target's computed style, so every interactive child of the shared, wails-drag-carrying
+           TitleBar root must explicitly override it, or clicking a mode tab would also start a
+           window drag. -->
       <button
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm mode-tab"
+        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm mode-tab wails-no-drag"
         :class="[
           modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground',
           { 'is-active': modeStore.active === mode },
@@ -79,7 +89,7 @@ const keepAwakeTooltip = computed(() => {
           data-testid="mode-tab-icon"
           ><CodiconIcon :name="MODES[mode].icon" :size="16"
         /></span>
-        <span class="mode-label">{{ MODES[mode].label }}</span>
+        <span class="mode-label leading-[var(--kira-control-inline-h)]">{{ MODES[mode].label }}</span>
       </button>
     </div>
 
@@ -170,35 +180,11 @@ const keepAwakeTooltip = computed(() => {
 </template>
 
 <style scoped>
-@reference "@theme/base.css";
-
-/* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
-   redundant next to the mode switcher). Centered on the bar's true full width via absolute
-   positioning, deliberately NOT `justify-content: center` inside the flex row — that would center
-   within the *padded* box, not the window, and reads visibly off-centre. */
-.mode-tabs {
-  @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5;
-}
-
 /* CRITICAL (D2): --wails-draggable inherits from the shared TitleBar's own root, and
-   isDraggableEvent (drag.ts) reads the event *target's* computed style — so every interactive
-   child here must explicitly override it, or clicking a mode tab would also start a window drag. */
-.mode-tab {
-  --wails-draggable: none;
-  /* P15 D9: the tab chip's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) inside a 38px bar
-     leaves 6px of clearance, the same --kira-s-3 the bar already uses as its own right padding. */
-  padding: 0 var(--kira-s-5);
-  gap: var(--kira-s-2);
-}
-/* P18 D15/F18: the icon sits in a real box (AppButton.vue's own stated law — "icons never
-   float unboxed next to text", P110 B20's utilities on the element itself) and the label in a
-   real <span>, both real flex items. The icon's own line-height is set inline (leading-[…]
-   above); the residual sub-pixel optical nudge the same comment used to carry here was always
-   translateY(var(--kira-icon-optical-y, 0px)) with the var never set elsewhere -- a permanent
-   no-op (D5's own ink measurement found nothing left to correct), dropped rather than ported. */
-.mode-tab .mode-label {
-  line-height: var(--kira-control-inline-h);
-}
+   isDraggableEvent (drag.ts) reads the event *target's* computed style — every interactive child
+   here must explicitly override it (wails-no-drag, inline on the button/action-row above), or
+   clicking a mode tab would also start a window drag. Only the live :hover state below can't move
+   onto a static class. */
 .mode-tab:hover:not(.is-active) {
   background: var(--kira-hover);
 }

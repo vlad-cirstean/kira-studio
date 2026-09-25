@@ -17,29 +17,14 @@
 </script>
 
 <template>
-  <div class="title-bar">
+  <!-- P1 D2/C8: wails-drag carries --wails-draggable: drag so the bar behaves like a native title
+       bar -- dragging it moves the window, double-clicking it zooms/minimises per System Settings,
+       both for free. Inert (ordinary DOM) on Linux dev builds and under tests/ui (a static file
+       server, no Wails window at all). -->
+  <div class="relative flex items-center shrink-0 wails-drag h-titlebar min-h-titlebar pl-titlebar-inset pr-1.5 bg-chrome">
     <slot />
   </div>
   <Teleport to="body">
     <slot name="settings" />
   </Teleport>
 </template>
-
-<style scoped>
-/* P1 D2/C8: the root carries --wails-draggable: drag so the bar behaves like a native title bar —
-   dragging it moves the window, double-clicking it zooms/minimises per System Settings, both for
-   free. Inert (ordinary DOM) on Linux dev builds and under tests/ui (a static file server, no Wails
-   window at all). */
-.title-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  --wails-draggable: drag;
-  height: var(--kira-titlebar-h);
-  min-height: var(--kira-titlebar-h);
-  padding-left: var(--kira-titlebar-inset-left);
-  padding-right: var(--kira-s-3);
-  background: var(--kira-bg-chrome);
-}
-</style>
