@@ -272,6 +272,16 @@ check_class_in_attrs 'empty-state' 'Empty (packages/theme/src/components/ui/empt
 check_class 'empty-state-icon' 'EmptyMedia'
 check_class 'empty-state-title' 'EmptyTitle'
 
+# P110 I2-12: ColumnsMenu.vue/ProjectionMenu.vue's shared popover shell, inlined as plain utilities
+# at both call sites (below the 4+-component extraction bar). Attribute-scoped: `columns-menu-footer`
+# also survives as a real `data-testid` value on both files, which a whole-file check_class would
+# false-positive against.
+check_class_in_attrs 'columns-menu-inner' 'max-h-80 flex flex-col'
+check_class_in_attrs 'columns-menu-header' 'flex border-b border-border gap-1 p-1'
+check_class_in_attrs 'columns-menu-loading' 'p-2'
+check_class_in_attrs 'columns-menu-list' 'overflow-y-auto p-0.5'
+check_class_in_attrs 'columns-menu-footer' 'px-1.5 pb-1.5'
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else

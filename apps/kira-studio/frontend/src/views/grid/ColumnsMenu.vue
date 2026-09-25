@@ -101,15 +101,15 @@ onBeforeUnmount(() => {
 
 <template>
   <PopoverContent align="end" class="w-52 gap-0 p-0" data-testid="columns-menu">
-    <div class="columns-menu-inner">
-      <div class="columns-menu-header">
+    <div class="max-h-80 flex flex-col">
+      <div class="flex border-b border-border gap-1 p-1">
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
         <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">None</Button>
       </div>
-      <div v-if="!meta" class="columns-menu-loading text-kira-sm text-muted-foreground">Loading columns…</div>
+      <div v-if="!meta" class="p-2 text-kira-sm text-muted-foreground">Loading columns…</div>
       <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked. -->
-      <div v-else class="columns-menu-list">
+      <div v-else class="overflow-y-auto p-0.5">
         <Label
           v-for="(name, index) in order"
           :key="name"
@@ -146,7 +146,7 @@ onBeforeUnmount(() => {
         </Label>
       </div>
       <Separator class="my-1" />
-      <div class="columns-menu-footer text-kira-xs text-subtle" data-testid="columns-menu-footer">
+      <div class="px-1.5 pb-1.5 text-kira-xs text-subtle" data-testid="columns-menu-footer">
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>

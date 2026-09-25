@@ -210,36 +210,11 @@
   color: var(--muted-foreground);
 }
 
-/* ColumnsMenu.vue/ProjectionMenu.vue's shared popover shell -- byte-identical (as utility sets)
-   in both files, even though the plan's own extraction gate ("only if the two templates are
-   truly the same") is not met: ColumnsMenu.vue's own list is drag-reorderable with a PK lock,
-   ProjectionMenu.vue's is a plain checkbox list, so no shared component. `.columns-menu-item`
-   (gap-1 on ColumnsMenu.vue only, for its inline drag-handle icon) and ColumnsMenu.vue's own
-   `.is-dragging`/`.drag-handle` stay per-file -- a real difference, not copy-paste drift. */
-@utility columns-menu-inner {
-  max-height: calc(var(--spacing) * 80);
-  display: flex;
-  flex-direction: column;
-}
-@utility columns-menu-header {
-  display: flex;
-  border-bottom-style: var(--tw-border-style);
-  border-bottom-width: 1px;
-  border-color: var(--border);
-  gap: var(--spacing);
-  padding: var(--spacing);
-}
-@utility columns-menu-loading {
-  padding: calc(var(--spacing) * 2);
-}
-@utility columns-menu-list {
-  overflow-y: auto;
-  padding: calc(var(--spacing) * 0.5);
-}
-@utility columns-menu-footer {
-  padding-inline: calc(var(--spacing) * 1.5);
-  padding-bottom: calc(var(--spacing) * 1.5);
-}
+/* P110 I2-12: `columns-menu-inner`/`-header`/`-loading`/`-list`/`-footer` (below the 4+-component
+   extraction bar, only ColumnsMenu.vue and ProjectionMenu.vue) inlined at both call sites as plain
+   utilities -- `max-h-80 flex flex-col`, `flex border-b border-border gap-1 p-1`, `p-2`,
+   `overflow-y-auto p-0.5`, `px-1.5 pb-1.5`. Guarded in check-theme-classes.sh. `.columns-menu-item`
+   (ColumnsMenu.vue's own local scoped marker, never a `@utility` here) is unaffected. */
 
 html,
 body,

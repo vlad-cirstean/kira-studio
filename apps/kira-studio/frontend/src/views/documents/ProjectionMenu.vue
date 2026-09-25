@@ -76,8 +76,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="columns-menu-inner">
-    <div class="columns-menu-header">
+  <div class="max-h-80 flex flex-col">
+    <div class="flex border-b border-border gap-1 p-1">
       <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
         >All</Button
       >
@@ -85,10 +85,10 @@ onUnmounted(() => {
         >None</Button
       >
     </div>
-    <div v-if="fieldNames.length === 0" class="columns-menu-loading text-kira-sm text-muted-foreground">
+    <div v-if="fieldNames.length === 0" class="p-2 text-kira-sm text-muted-foreground">
       No fields seen yet — load a page first.
     </div>
-    <div v-else class="columns-menu-list">
+    <div v-else class="overflow-y-auto p-0.5">
       <Label v-for="name in fieldNames" :key="name" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
         <Checkbox
           :model-value="selected.has(name)"
@@ -102,7 +102,7 @@ onUnmounted(() => {
       </Label>
     </div>
     <Separator class="my-1" />
-    <div class="columns-menu-footer text-kira-xs text-subtle" data-testid="document-projection-menu-footer">
+    <div class="px-1.5 pb-1.5 text-kira-xs text-subtle" data-testid="document-projection-menu-footer">
       {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
       loaded page; `_id` is always returned.
     </div>
