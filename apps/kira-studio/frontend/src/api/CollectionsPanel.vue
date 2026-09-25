@@ -206,9 +206,12 @@ onUnmounted(() => {
         </InputGroupAddon>
       </InputGroup>
       <div class="min-h-0 flex-1">
-        <div class="panel-body">
+        <div class="flex h-full min-h-0 flex-col">
           <ImportReportStrip />
-          <div class="panel-category" :class="{ collapsed: !collectionsExpanded }">
+          <!-- P22b D8: the collections tree's own category -- flex: 1 always, so its own collapse
+               (a rarer action than environments', which starts collapsed by default) never fights
+               environments-category's fixed 40% cap below for space. -->
+          <div class="flex flex-1 min-h-0 flex-col" :class="{ collapsed: !collectionsExpanded }">
             <button
               type="button"
               class="panel-category-head"
@@ -218,7 +221,7 @@ onUnmounted(() => {
               <CodiconIcon :name="collectionsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
               <span>Collections</span>
             </button>
-            <CollectionsTree v-if="collectionsExpanded" class="tree-body" />
+            <CollectionsTree v-if="collectionsExpanded" class="flex-1 min-h-0" />
           </div>
           <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
                ("remove the environment list from alongside the collections list entirely"). The
@@ -233,7 +236,7 @@ onUnmounted(() => {
       <Alert class="empty-state" data-testid="collections-empty">
         <CodiconIcon name="folder-library" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md text-muted-foreground font-normal">No collections yet</AlertTitle>
-        <span class="text-kira-xs text-subtle side-empty-text"
+        <span class="text-kira-xs text-subtle leading-normal"
           >Create one from the <b>+</b> above, or import a Postman collection.</span
         >
       </Alert>
@@ -244,21 +247,12 @@ onUnmounted(() => {
 <style scoped>
 @reference "@theme/base.css";
 
-.panel-body {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-/* P22b D8: the collections tree's own category — flex: 1 always, so its own collapse (a rarer
-   action than environments', which starts collapsed by default) never fights environments-
-   category's fixed 40% cap below for space. */
-.panel-category {
-  @apply flex flex-1 min-h-0 flex-col;
-}
-
 /* No new primitive (F12): reuses the definition-section-title idiom (uppercase/muted/t-sm/
    letter-spacing) the views/definition/*Section.vue components share — promote to a real
    component only if a second panel wants this exact category shape (P18's own "promote when a
-   second consumer appears" rule). */
+   second consumer appears" rule). `all: unset` has no Tailwind utility equivalent (a full
+   property reset) and this file's only other @apply-only rules moved to the template (P110
+   B38d) -- this is the sole rule left needing a real scoped-CSS selector. */
 .panel-category-head {
   all: unset;
   @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted-foreground uppercase tracking-wider h-control text-kira-sm;
@@ -266,14 +260,4 @@ onUnmounted(() => {
 .panel-category-head:hover {
   @apply text-fg;
 }
-
-.tree-body {
-  @apply flex-1 min-h-0;
-}
-
-.side-empty-text {
-  @apply leading-normal;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
 </style>

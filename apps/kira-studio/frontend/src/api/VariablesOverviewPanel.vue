@@ -87,7 +87,7 @@ function editEnvironmentVariables(): void {
 
 <template>
   <PopoverContent align="start" class="w-96 gap-0 p-0" data-testid="variables-overview">
-    <div class="overview-panel">
+    <div class="flex max-h-105 flex-col">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
@@ -98,7 +98,7 @@ function editEnvironmentVariables(): void {
         </InputGroupAddon>
       </InputGroup>
 
-      <div class="overview-list">
+      <div class="flex flex-col gap-0.5 overflow-y-auto p-1">
         <Alert
           v-if="isFiltered && filteredRows.length === 0"
           class="empty-state"
@@ -115,11 +115,21 @@ function editEnvironmentVariables(): void {
           <CodiconIcon name="symbol-variable" :size="24" class="text-subtle" />
           <AlertTitle class="text-kira-md text-muted-foreground font-normal">No variables in scope</AlertTitle>
         </Alert>
+        <!-- P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover
+             has no use for (handle, secret toggle, history, remove) -- name, value, scope,
+             description, in the DOM order below. `description` is the last column specifically
+             because it is the only one of the four that renders conditionally (F13/D9): a missing
+             trailing grid item just leaves its own cell empty rather than shifting `scope` into
+             its place, which an *earlier* optional column would.
+             grid-cols-[1.2fr_2fr_auto_1.5fr] -- an arbitrary value not on the plan's own section
+             1.2 allowlist, flagged for the plan owner (same disclosed gap as B36c's
+             grid-cols-[90px_140px_...] in OperationsPanel.vue): a pre-existing value relocated
+             into Tailwind's own syntax, not a new one. -->
         <div
           v-for="row in filteredRows"
           :key="`${row.scope}:${row.id}`"
-          class="overview-row"
-          :class="{ shadowed: row.shadowed }"
+          class="grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5 grid-cols-[1.2fr_2fr_auto_1.5fr]"
+          :class="{ 'opacity-50': row.shadowed }"
           data-testid="variables-overview-row"
           :data-scope="row.scope"
           :data-shadowed="row.shadowed"
@@ -128,7 +138,7 @@ function editEnvironmentVariables(): void {
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="reference"
+                class="min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-data"
                 data-testid="variables-overview-name"
                 @click="onCopy(row.name)"
                 >{{ reference(row.name) }}</button
@@ -137,7 +147,7 @@ function editEnvironmentVariables(): void {
             <TooltipContent>Copy</TooltipContent>
           </Tooltip>
           <Badge v-if="row.isSecret" variant="warn" data-testid="variables-overview-secret">secret</Badge>
-          <span v-else class="overview-value" data-testid="variables-overview-value">{{ row.value }}</span>
+          <span v-else class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle" data-testid="variables-overview-value">{{ row.value }}</span>
           <Tooltip v-if="row.shadowed">
             <TooltipTrigger as-child>
               <Badge
@@ -156,13 +166,13 @@ function editEnvironmentVariables(): void {
             data-testid="variables-overview-scope"
             >{{ row.scope }}</Badge
           >
-          <span v-if="row.description" class="overview-description" data-testid="variables-overview-description">{{
+          <span v-if="row.description" class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-xs" data-testid="variables-overview-description">{{
             row.description
           }}</span>
         </div>
       </div>
 
-      <div class="overview-footer">
+      <div class="flex flex-col gap-0.5 border-t border-border p-1">
         <button
           v-if="canEdit"
           type="button"
@@ -198,49 +208,9 @@ function editEnvironmentVariables(): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.overview-panel {
-  @apply flex max-h-105 flex-col;
-}
-
-.overview-list {
-  @apply flex flex-col gap-0.5 overflow-y-auto p-1;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own `@utility empty-state` (15-file duplicate). */
-
-/* P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover has no use
-   for (handle, secret toggle, history, remove) — name, value, scope, description, in the DOM
-   order below. `description` is the last column specifically because it is the only one of the
-   four that renders conditionally (F13/D9): a missing trailing grid item just leaves its own cell
-   empty rather than shifting `scope` into its place, which an *earlier* optional column would. */
-.overview-row {
-  /* P110 B37: grid-cols-[1.2fr_2fr_auto_1.5fr] -- an arbitrary value not on the plan's own section
-     1.2 allowlist, flagged for the plan owner (same disclosed gap as B36c's
-     grid-cols-[90px_140px_...] in OperationsPanel.vue): a pre-existing value relocated into
-     Tailwind's own syntax, not a new one. */
-  @apply grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5 grid-cols-[1.2fr_2fr_auto_1.5fr];
-}
-
-.overview-row.shadowed {
-  @apply opacity-50;
-}
-
-.reference {
-  @apply min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 bg-transparent p-0 text-left font-data;
-}
-
-.overview-value {
-  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle;
-}
-
-.overview-description {
-  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-xs;
-}
-
-.overview-footer {
-  @apply flex flex-col gap-0.5 border-t border-border p-1;
-}
-
+/* `all: unset` has no Tailwind utility equivalent (a full property reset) -- this file's only
+   other @apply-only rules moved to the template (P110 B38d); .overview-link (2 template sites,
+   both footer buttons) is the sole rule left needing a real scoped-CSS selector. */
 .overview-link {
   all: unset;
   @apply inline-flex cursor-pointer items-center gap-1 text-info text-kira-sm;
