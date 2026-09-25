@@ -282,7 +282,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="browse-view" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
+  <div class="h-full flex flex-col min-h-0" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
@@ -412,9 +412,9 @@ onMounted(() => {
           Reconnect & load
         </Button>
       </Empty>
-      <SplitterGroup v-else direction="horizontal" class="browse-body">
+      <SplitterGroup v-else direction="horizontal" class="flex flex-row flex-1 min-h-0">
         <SplitterPanel
-          class="list-pane"
+          class="min-w-0 flex flex-col min-h-0"
           size-unit="px"
           :default-size="listWidth"
           :min-size="220"
@@ -426,7 +426,7 @@ onMounted(() => {
                ViewChrome's own toolbar into the pane whose list they act on. Reuses the same
                toolbar utility band (the same 26px in-view band every other toolbar already is)
                rather than inventing a header. -->
-          <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border list-head" data-testid="browse-list-head">
+          <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border" data-testid="browse-list-head">
             <Tooltip>
               <TooltipTrigger as-child>
                 <TooltipDisabledTrigger>
@@ -444,14 +444,18 @@ onMounted(() => {
               </TooltipTrigger>
               <TooltipContent>Back</TooltipContent>
             </Tooltip>
-            <span class="breadcrumb">
+            <span class="flex items-center min-w-0 overflow-hidden gap-0.5">
               <template v-for="(crumb, i) in crumbs" :key="crumb.path">
-                <span v-if="i > 0" class="crumb-sep">/</span>
+                <span v-if="i > 0" class="text-subtle">/</span>
                 <button
                   type="button"
-                  class="crumb"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-sm px-0.5"
+                  :class="
+                    i === crumbs.length - 1
+                      ? 'text-fg cursor-default'
+                      : 'text-muted-foreground cursor-pointer hover:text-fg hover:underline'
+                  "
                   data-testid="browse-crumb"
-                  :class="{ 'is-current': i === crumbs.length - 1 }"
                   @click="onCrumbClick(crumb.path)"
                 >
                   {{ crumb.name }}
@@ -460,14 +464,14 @@ onMounted(() => {
             </span>
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </div>
-          <div class="border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0 body-panel">
-            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty text-muted-foreground">Loading…</div>
-            <div v-else-if="rt.nodes.length === 0" class="empty text-muted-foreground" data-testid="browse-empty">
+          <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
+            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground">Loading…</div>
+            <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground" data-testid="browse-empty">
               No items
             </div>
             <div
               v-else-if="filteredNodes.length === 0"
-              class="empty text-muted-foreground"
+              class="h-full flex items-center justify-center text-kira-sm text-muted-foreground"
               data-testid="browse-empty"
             >
               No matching items
@@ -475,21 +479,26 @@ onMounted(() => {
             <div
               v-else
               ref="scrollEl"
-              class="body overflow-auto"
+              class="h-full overflow-auto"
               data-testid="virtual-list"
               role="listbox"
               aria-label="Keys"
               @scroll="onScroll"
             >
               <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+                <!-- P110 I2-15/I2-17: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/
+                     src/util/virtualRows.ts) -- see ProjectTree.vue's identical note. -->
                 <div
                   v-for="vi in virtualItems"
                   :key="String(vi.key)"
-                  class="browse-row"
+                  class="flex items-center cursor-default border-b border-border gap-1 px-2"
                   data-testid="browse-row"
                   :data-path="filteredNodes[vi.index]?.path"
                   :data-kind="filteredNodes[vi.index]?.kind"
-                  :class="[VIRTUAL_ROW_CLASS, { selected: rt?.selected === filteredNodes[vi.index]?.path }]"
+                  :class="[
+                    VIRTUAL_ROW_CLASS,
+                    rt?.selected === filteredNodes[vi.index]?.path ? 'bg-select' : 'hover:bg-hover',
+                  ]"
                   :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
                   role="option"
                   tabindex="0"
@@ -511,7 +520,7 @@ onMounted(() => {
                       "
                       :size="13"
                   /></span>
-                  <span class="row-name">{{ filteredNodes[vi.index]?.name }}</span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ filteredNodes[vi.index]?.name }}</span>
                   <Badge
                     v-if="
                       filteredNodes[vi.index]?.kind === 'key' &&
@@ -520,7 +529,7 @@ onMounted(() => {
                     data-testid="browse-key-type"
                     >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</Badge
                   >
-                  <span v-if="filteredNodes[vi.index]?.detail" class="row-detail text-muted-foreground">{{
+                  <span v-if="filteredNodes[vi.index]?.detail" class="shrink-0 text-kira-xs text-muted-foreground">{{
                     filteredNodes[vi.index]?.detail
                   }}</span>
                 </div>
@@ -529,11 +538,18 @@ onMounted(() => {
           </div>
         </SplitterPanel>
 
+        <!-- P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
+             ResizableHandle.vue's own shared component -- no test polls this handle by class, so no
+             marker class belongs on it either. -->
         <ResizableHandle :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-        <SplitterPanel class="detail-pane" data-testid="browse-detail-pane" :order="2">
+        <SplitterPanel class="min-w-0 flex flex-col min-h-0" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
-          <Alert v-else class="preview-empty" data-testid="browse-preview-empty">
+          <Alert
+            v-else
+            class="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
+            data-testid="browse-preview-empty"
+          >
             <CodiconIcon :name="emptyPreviewIcon" :size="24" class="text-subtle" />
             <AlertTitle class="text-kira-md text-muted-foreground font-normal">{{ emptyPreviewLabel }}</AlertTitle>
           </Alert>
@@ -541,96 +557,3 @@ onMounted(() => {
       </SplitterGroup>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.browse-view {
-  @apply h-full flex flex-col min-h-0;
-}
-
-.breadcrumb {
-  @apply flex items-center min-w-0 overflow-hidden gap-0.5;
-}
-
-.crumb {
-  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted-foreground text-kira-sm px-0.5;
-}
-
-.crumb:hover {
-  @apply text-fg underline;
-}
-
-.crumb.is-current {
-  @apply text-fg cursor-default;
-}
-
-.crumb.is-current:hover {
-  @apply no-underline;
-}
-
-.crumb-sep {
-  @apply text-subtle;
-}
-
-/* P63 §2.1: list pane (left) | splitter | detail pane (right) — the vertical split. */
-.browse-body {
-  @apply flex flex-row flex-1 min-h-0;
-}
-
-/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
-   min-w-0/flex layout is all this class still needs to contribute (HttpRequestView.vue's own
-   .response-pane-slot precedent). */
-.list-pane {
-  @apply min-w-0 flex flex-col min-h-0;
-}
-
-.detail-pane {
-  @apply min-w-0 flex flex-col min-h-0;
-}
-
-/* P110 B32: the divider styling itself (col-resize, horizontal orientation) moved into
-   ResizableHandle.vue's own shared component -- no test polls this handle by class, so the
-   marker class itself is dropped too, not just its rule. */
-
-.body-panel {
-  @apply flex-1 min-h-0 border-0 rounded-none;
-}
-
-.body {
-  @apply h-full;
-}
-
-/* P110 I2-15: `.virtual-row` moved to VIRTUAL_ROW_CLASS (packages/workbench/src/util/
-   virtualRows.ts), bound on the row's own `:class` -- see ProjectTree.vue's identical note. */
-
-.empty {
-  @apply h-full flex items-center justify-center text-kira-sm;
-}
-
-/* The old shared empty-state shape, for the detail pane's unselected state. */
-.preview-empty {
-  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
-}
-
-.browse-row {
-  @apply flex items-center cursor-default border-b border-border gap-1 px-2;
-}
-
-.browse-row:hover {
-  @apply bg-hover;
-}
-
-.browse-row.selected {
-  @apply bg-select;
-}
-
-.row-name {
-  @apply flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
-}
-
-.row-detail {
-  @apply shrink-0 text-kira-xs;
-}
-
-</style>

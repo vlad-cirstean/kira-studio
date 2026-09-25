@@ -132,6 +132,12 @@ interface HeaderRow {
   b: string | null;
   status: 'added' | 'removed' | 'changed' | 'unchanged';
 }
+const HEADER_STATUS_CLASS: Record<HeaderRow['status'], string> = {
+  added: 'text-ok',
+  removed: 'text-error',
+  changed: 'text-warn',
+  unchanged: '',
+};
 const headerRows = computed<HeaderRow[]>(() => {
   if (!snapA.value || !snapB.value) return [];
   const order: string[] = [];
@@ -293,7 +299,7 @@ onUnmounted(() => {
         <!-- P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as
              the api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a
              new one. -->
-        <div class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
+        <div class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
           <span></span>
           <span></span>
           <span>before</span>
@@ -302,11 +308,10 @@ onUnmounted(() => {
         <div
           v-for="row in changedHeaderRows"
           :key="row.name"
-          class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
-          :class="row.status"
+          class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
           data-testid="http-diff-header-row"
         >
-          <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
+          <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
           <span class="font-data text-muted-foreground">{{ row.name }}</span>
           <span class="font-data [overflow-wrap:anywhere]">{{ row.a ?? '—' }}</span>
           <span class="font-data [overflow-wrap:anywhere]">{{ row.b ?? '—' }}</span>
@@ -320,10 +325,10 @@ onUnmounted(() => {
           <div
             v-for="row in unchangedHeaderRows"
             :key="row.name"
-            class="diff-header-row grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] unchanged"
+            class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
             data-testid="http-diff-header-row-unchanged"
           >
-            <span class="diff-header-status text-kira-xs">{{ row.status }}</span>
+            <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
             <span class="font-data text-muted-foreground">{{ row.name }}</span>
             <span class="font-data [overflow-wrap:anywhere]">{{ row.a }}</span>
             <span class="font-data [overflow-wrap:anywhere]">{{ row.b }}</span>
@@ -357,21 +362,9 @@ onUnmounted(() => {
 
 <style scoped>
 @reference "@theme/base.css";
-/* P110 B40: every plain single-selector rule this file had moved onto the template as Tailwind
-   utilities. `.diff-header-row`/`.diff-header-status` stay bare markers to anchor this
-   compound-selector trio; `.diff-merge-host` stays a bare marker to anchor this :deep() rule. */
-.diff-header-row.added .diff-header-status {
-  @apply text-ok;
-}
-
-.diff-header-row.removed .diff-header-status {
-  @apply text-error;
-}
-
-.diff-header-row.changed .diff-header-status {
-  @apply text-warn;
-}
-
+/* P110 I2-17: header status colors moved to HEADER_STATUS_CLASS lookup map on the status span.
+   `.diff-merge-host` stays a bare marker to anchor this :deep() rule -- can't be expressed as a
+   template utility since it targets a child Monaco renders into the ref'd div. */
 .diff-merge-host :deep(.monaco-diff-editor) {
   @apply h-full;
 }
