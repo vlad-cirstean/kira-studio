@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Button } from '@theme/components/ui/button';
 import { FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Input } from '@theme/components/ui/input';
@@ -182,20 +182,12 @@ async function onAddScript(): Promise<void> {
               <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
             </Tooltip>
           </fieldset>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Remove this script"
-                data-testid="custom-script-remove"
-                @click="onRemoveScript(script)"
-              >
-                <CodiconIcon name="trash" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Remove this script</TooltipContent>
-          </Tooltip>
+          <TooltipIconButton
+            icon="trash"
+            label="Remove this script"
+            data-testid="custom-script-remove"
+            @click="onRemoveScript(script)"
+          />
         </div>
         <div class="flex flex-col w-full">
           <Input

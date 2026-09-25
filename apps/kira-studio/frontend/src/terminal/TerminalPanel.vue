@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -141,50 +141,27 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
     <div ref="rootEl" class="flex h-full flex-col">
       <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
         <span class="font-semibold">Quick commands</span>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              class="ml-auto"
-              :data-active="showSearch"
-              :aria-label="showSearch ? 'Hide search' : 'Search'"
-              data-testid="toggle-search"
-              @click="toggleSearch"
-            >
-              <CodiconIcon name="search" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Add a quick command"
-              data-testid="quick-command-add"
-              @click="openAddRow"
-            >
-              <CodiconIcon name="add" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Add a quick command</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Manage scripts"
-              data-testid="quick-commands-manage"
-              @click="settingsStore.openSettingsAt('Scripts')"
-            >
-              <CodiconIcon name="settings-gear" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Manage scripts…</TooltipContent>
-        </Tooltip>
+        <TooltipIconButton
+          icon="search"
+          :label="showSearch ? 'Hide search' : 'Search'"
+          class="ml-auto"
+          :data-active="showSearch"
+          data-testid="toggle-search"
+          @click="toggleSearch"
+        />
+        <TooltipIconButton
+          icon="add"
+          label="Add a quick command"
+          data-testid="quick-command-add"
+          @click="openAddRow"
+        />
+        <TooltipIconButton
+          icon="settings-gear"
+          label="Manage scripts…"
+          aria-label="Manage scripts"
+          data-testid="quick-commands-manage"
+          @click="settingsStore.openSettingsAt('Scripts')"
+        />
       </div>
       <template v-if="!empty">
         <div v-if="showSearch" class="shrink-0 border-b border-border px-1.5 py-1">

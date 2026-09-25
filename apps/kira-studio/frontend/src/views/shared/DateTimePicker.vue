@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
@@ -237,20 +236,13 @@ const secondText = computed<string>({
 <template>
   <div class="flex flex-col gap-1 p-1.5" data-testid="datetime-picker">
     <div class="flex items-center justify-between">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Previous"
-            data-testid="datetime-picker-prev-month"
-            @click="pagePrev"
-          >
-            <CodiconIcon name="chevron-left" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ pagePrevTitle }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="chevron-left"
+        :label="pagePrevTitle"
+        aria-label="Previous"
+        data-testid="datetime-picker-prev-month"
+        @click="pagePrev"
+      />
       <Tooltip>
         <TooltipTrigger as-child>
           <!-- P42 D33a: a plain <button> now, so the label itself is the mode-cycling control --
@@ -266,20 +258,13 @@ const secondText = computed<string>({
         </TooltipTrigger>
         <TooltipContent>Jump by month or year</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Next"
-            data-testid="datetime-picker-next-month"
-            @click="pageNext"
-          >
-            <CodiconIcon name="chevron-right" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ pageNextTitle }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="chevron-right"
+        :label="pageNextTitle"
+        aria-label="Next"
+        data-testid="datetime-picker-next-month"
+        @click="pageNext"
+      />
     </div>
     <div data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
@@ -367,14 +352,12 @@ const secondText = computed<string>({
         class="w-14"
         data-testid="datetime-picker-second"
       />
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" aria-label="Now" data-testid="datetime-picker-now" @click="pickNow">
-            <CodiconIcon name="clock" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Now</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="clock"
+        label="Now"
+        data-testid="datetime-picker-now"
+        @click="pickNow"
+      />
     </div>
     <!-- P110 I2-18: `.dtp-month-label`/`.dtp-day` compound rules moved to conditional classes above.
          bg-primary/text-primary-foreground, never bg-hover: hover reads --kira-hover (grey), same

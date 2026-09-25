@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, useTemplateRef } from 'vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
@@ -34,40 +33,24 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   <div ref="rootEl" class="flex h-full flex-col">
     <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
       <span>Connections</span>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="ml-auto"
-            :data-active="showSearch"
-            :aria-label="showSearch ? 'Hide search' : 'Search'"
-            data-testid="toggle-search"
-            @click="toggleSearch"
-          >
-            <CodiconIcon name="search" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="search"
+        :label="showSearch ? 'Hide search' : 'Search'"
+        class="ml-auto"
+        :data-active="showSearch"
+        data-testid="toggle-search"
+        @click="toggleSearch"
+      />
       <!-- P28 D18: the DataGrip import moved to the menu bar (App → Import DataGrip
            Connections…). It is a once-per-machine action and did not earn a permanent slot in a
            four-button header. StudioStart.vue's own first-run button stays: an empty state is
            exactly when a menu-bar-only affordance is hardest to find. -->
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="New connection"
-            data-testid="add-connection"
-            @click="connectionDialogStore.openCreateDialog"
-          >
-            <CodiconIcon name="add" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>New connection</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="add"
+        label="New connection"
+        data-testid="add-connection"
+        @click="connectionDialogStore.openCreateDialog"
+      />
     </div>
     <template v-if="!empty">
       <div v-if="showSearch" class="shrink-0 border-b border-border px-1.5 py-1">

@@ -1,13 +1,6 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Badge } from '@theme/components/ui/badge';
-import { Button } from '@theme/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipDisabledTrigger,
-  TooltipTrigger,
-} from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { EditBuffer } from './useEditBuffer';
 
@@ -62,58 +55,35 @@ const resetTitle = computed<string>(
     <Badge v-if="showBytes" :data-testid="`${testidPrefix}-byte-badge`">{{
       buffer.byteLabel.value
     }}</Badge>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': buffer.formatted.value === 'indented' }"
-            aria-label="Beautify"
-            :data-testid="`${testidPrefix}-beautify-indented`"
-            :disabled="!buffer.canBeautify.value"
-            @click="buffer.applyBeautify('indented')"
-          >
-            <CodiconIcon name="expand-all" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ beautifyIndentedTitle }}</TooltipContent>
-    </Tooltip>
-    <Tooltip v-if="showCompact">
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': buffer.formatted.value === 'compact' }"
-            aria-label="Minify"
-            :data-testid="`${testidPrefix}-beautify-compact`"
-            :disabled="!buffer.canBeautify.value"
-            @click="buffer.applyBeautify('compact')"
-          >
-            <CodiconIcon name="collapse-all" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ beautifyCompactTitle }}</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <TooltipDisabledTrigger>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            aria-label="Revert"
-            :data-testid="`${testidPrefix}-beautify-reset`"
-            :disabled="!buffer.isDirty.value"
-            @click="buffer.reset()"
-          >
-            <CodiconIcon name="discard" :size="13" />
-          </Button>
-        </TooltipDisabledTrigger>
-      </TooltipTrigger>
-      <TooltipContent>{{ resetTitle }}</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="expand-all"
+      :label="beautifyIndentedTitle"
+      aria-label="Beautify"
+      disabled-trigger
+      :class="{ 'bg-field text-fg': buffer.formatted.value === 'indented' }"
+      :data-testid="`${testidPrefix}-beautify-indented`"
+      :disabled="!buffer.canBeautify.value"
+      @click="buffer.applyBeautify('indented')"
+    />
+    <TooltipIconButton
+      v-if="showCompact"
+      icon="collapse-all"
+      :label="beautifyCompactTitle"
+      aria-label="Minify"
+      disabled-trigger
+      :class="{ 'bg-field text-fg': buffer.formatted.value === 'compact' }"
+      :data-testid="`${testidPrefix}-beautify-compact`"
+      :disabled="!buffer.canBeautify.value"
+      @click="buffer.applyBeautify('compact')"
+    />
+    <TooltipIconButton
+      icon="discard"
+      :label="resetTitle"
+      aria-label="Revert"
+      disabled-trigger
+      :data-testid="`${testidPrefix}-beautify-reset`"
+      :disabled="!buffer.isDirty.value"
+      @click="buffer.reset()"
+    />
   </span>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -91,14 +91,11 @@ defineSlots<{
           <slot name="entry" :entry="entry" />
           <span class="flex shrink-0 gap-0.5">
             <slot name="entry-actions" :entry="entry" />
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button variant="toolbar" size="kira-icon" aria-label="Delete" @click.stop="emit('delete', entry)">
-                  <CodiconIcon name="trash" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete</TooltipContent>
-            </Tooltip>
+            <TooltipIconButton
+              icon="trash"
+              label="Delete"
+              @click.stop="emit('delete', entry)"
+            />
           </span>
         </div>
       </div>

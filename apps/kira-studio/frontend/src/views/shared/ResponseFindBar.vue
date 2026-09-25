@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Button } from '@theme/components/ui/button';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { unrefElement, useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
@@ -157,78 +156,49 @@ useEventListener(
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
          options in the data views. -->
     <div class="flex items-center gap-1.5 min-w-0">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': matchCase }"
-            aria-label="Match case"
-            data-testid="http-find-match-case"
-            @click="matchCase = !matchCase"
-          >
-            <CodiconIcon name="case-sensitive" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Match case</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': wholeWord }"
-            aria-label="Whole word"
-            data-testid="http-find-whole-word"
-            @click="wholeWord = !wholeWord"
-          >
-            <CodiconIcon name="whole-word" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Whole word</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :class="{ 'bg-field text-fg': regex }"
-            aria-label="Regular expression"
-            data-testid="http-find-regex"
-            @click="regex = !regex"
-          >
-            <CodiconIcon name="regex" :size="13" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Regular expression</TooltipContent>
-      </Tooltip>
+      <TooltipIconButton
+        icon="case-sensitive"
+        label="Match case"
+        :class="{ 'bg-field text-fg': matchCase }"
+        data-testid="http-find-match-case"
+        @click="matchCase = !matchCase"
+      />
+      <TooltipIconButton
+        icon="whole-word"
+        label="Whole word"
+        :class="{ 'bg-field text-fg': wholeWord }"
+        data-testid="http-find-whole-word"
+        @click="wholeWord = !wholeWord"
+      />
+      <TooltipIconButton
+        icon="regex"
+        label="Regular expression"
+        :class="{ 'bg-field text-fg': regex }"
+        data-testid="http-find-regex"
+        @click="regex = !regex"
+      />
     </div>
     <span class="text-kira-sm text-muted-foreground whitespace-nowrap" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
     </span>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" aria-label="Previous match" data-testid="http-find-prev" @click="goPrev">
-          <CodiconIcon name="chevron-up" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Previous match</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" aria-label="Next match" data-testid="http-find-next" @click="goNext">
-          <CodiconIcon name="chevron-down" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Next match</TooltipContent>
-    </Tooltip>
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="toolbar" size="kira-icon" class="ml-auto" aria-label="Close" data-testid="http-find-close" @click="close">
-          <CodiconIcon name="close" :size="13" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Close</TooltipContent>
-    </Tooltip>
+    <TooltipIconButton
+      icon="chevron-up"
+      label="Previous match"
+      data-testid="http-find-prev"
+      @click="goPrev"
+    />
+    <TooltipIconButton
+      icon="chevron-down"
+      label="Next match"
+      data-testid="http-find-next"
+      @click="goNext"
+    />
+    <TooltipIconButton
+      icon="close"
+      label="Close"
+      class="ml-auto"
+      data-testid="http-find-close"
+      @click="close"
+    />
   </ViewToolbar>
 </template>
