@@ -3,7 +3,6 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // mysql.go ports planParsers/mysql.ts verbatim: MySQL's `EXPLAIN FORMAT=JSON` — one row, one
@@ -71,20 +70,6 @@ func mysqlTableMetrics(rawMap map[string]json.RawMessage) []Metric {
 	return sortMetricsByLabel(out)
 }
 
-func mysqlTableLabel(table mysqlRawTable) string {
-	name := "?"
-	if table.TableName != nil {
-		name = *table.TableName
-	}
-	if table.AccessType != nil && *table.AccessType == "ALL" {
-		return fmt.Sprintf("Full scan on %s", name)
-	}
-	if table.AccessType != nil {
-		return fmt.Sprintf("%s access on %s", *table.AccessType, name)
-	}
-	return name
-}
-
 func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) Node {
 	var table mysqlRawTable
 	_ = json.Unmarshal(raw, &table)
@@ -102,7 +87,7 @@ func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) No
 	}
 
 	node := Node{
-		Label:         mysqlTableLabel(table),
+		Label:         tableLabel(table.TableName, table.AccessType),
 		EstimatedRows: table.RowsExaminedPerScan,
 		Cost:          cost,
 		Metrics:       mysqlTableMetrics(rawMap),
@@ -121,20 +106,8 @@ func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) No
 		relationOrPlaceholder = *table.TableName
 	}
 
-	// D15: full scan.
-	if table.AccessType != nil && *table.AccessType == "ALL" {
-		node.Issues = append(node.Issues, Issue{
-			Severity: "warn", Code: "full-scan",
-			Message: fmt.Sprintf("full table scan on %q — no index was used", relationOrPlaceholder),
-		})
-	}
-	// D15: an index existed and was not chosen.
-	if len(table.PossibleKeys) > 0 && table.Key == nil {
-		node.Issues = append(node.Issues, Issue{
-			Severity: "warn", Code: "unused-index",
-			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, strings.Join(table.PossibleKeys, ", ")),
-		})
-	}
+	// D15: full scan / unused index.
+	pushIndexIssues(&node, relationOrPlaceholder, table.AccessType, table.PossibleKeys, table.Key)
 	// D15: filesort, when the flag sits on the table itself rather than an ordering_operation
 	// wrapper (both are real shapes).
 	if table.UsingFilesort != nil && *table.UsingFilesort {

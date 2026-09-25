@@ -3,6 +3,7 @@ package queryplan
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // commaFormat renders n the way planIssues.ts's toLocaleString() does for a plain integer-valued
@@ -49,6 +50,43 @@ func pushWideScanIssueTo(issues *[]Issue, label string, rows float64, thresholdR
 // roll-up alone) so the tree view can point at exactly which node is the expensive one.
 func pushWideScanIssue(node *Node, rows float64, thresholdRows int) {
 	pushWideScanIssueTo(&node.Issues, node.Label, rows, thresholdRows)
+}
+
+// tableLabel mirrors mysqlTableLabel/mariadbTableLabel (P113 G14) — MySQL and MariaDB's own EXPLAIN
+// JSON name a table-level node identically ("Full scan on t" / "ref access on t" / bare name),
+// even though the two engines' raw table structs otherwise stay separate (F13: genuinely different
+// schemas beyond this shared name/access_type pair).
+func tableLabel(name, accessType *string) string {
+	label := "?"
+	if name != nil {
+		label = *name
+	}
+	if accessType != nil && *accessType == "ALL" {
+		return fmt.Sprintf("Full scan on %s", label)
+	}
+	if accessType != nil {
+		return fmt.Sprintf("%s access on %s", *accessType, label)
+	}
+	return label
+}
+
+// pushIndexIssues mirrors the D15 full-scan/unused-index issue pair MySQL and MariaDB's own
+// per-table node builders push identically (P113 G14): relation is the resolved "?"-placeholder
+// name already used for the node's other messages; accessType/possibleKeys/key are that engine's
+// own raw table fields, read verbatim.
+func pushIndexIssues(node *Node, relation string, accessType *string, possibleKeys []string, key *string) {
+	if accessType != nil && *accessType == "ALL" {
+		node.Issues = append(node.Issues, Issue{
+			Severity: "warn", Code: "full-scan",
+			Message: fmt.Sprintf("full table scan on %q — no index was used", relation),
+		})
+	}
+	if len(possibleKeys) > 0 && key == nil {
+		node.Issues = append(node.Issues, Issue{
+			Severity: "warn", Code: "unused-index",
+			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relation, strings.Join(possibleKeys, ", ")),
+		})
+	}
 }
 
 // maxEstimatedRows mirrors planIssues.ts's own — the widest single read among the dialect's own

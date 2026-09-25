@@ -3,7 +3,6 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 // mariadb.go ports planParsers/mariadb.ts verbatim: MariaDB's `EXPLAIN FORMAT=JSON` — same
@@ -52,20 +51,6 @@ func mariadbTableMetrics(rawMap map[string]json.RawMessage) []Metric {
 	return collectMetrics(rawMap, mariadbTableTypedKeys)
 }
 
-func mariadbTableLabel(table mariadbRawTable) string {
-	name := "?"
-	if table.TableName != nil {
-		name = *table.TableName
-	}
-	if table.AccessType != nil && *table.AccessType == "ALL" {
-		return fmt.Sprintf("Full scan on %s", name)
-	}
-	if table.AccessType != nil {
-		return fmt.Sprintf("%s access on %s", *table.AccessType, name)
-	}
-	return name
-}
-
 func mariadbTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) Node {
 	var table mariadbRawTable
 	_ = json.Unmarshal(raw, &table)
@@ -77,7 +62,7 @@ func mariadbTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) 
 	}
 
 	node := Node{
-		Label:         mariadbTableLabel(table),
+		Label:         tableLabel(table.TableName, table.AccessType),
 		EstimatedRows: table.Rows,
 		Cost:          cost,
 		Metrics:       mariadbTableMetrics(rawMap),
@@ -96,20 +81,8 @@ func mariadbTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) 
 		relationOrPlaceholder = *table.TableName
 	}
 
-	// D15: full scan.
-	if table.AccessType != nil && *table.AccessType == "ALL" {
-		node.Issues = append(node.Issues, Issue{
-			Severity: "warn", Code: "full-scan",
-			Message: fmt.Sprintf("full table scan on %q — no index was used", relationOrPlaceholder),
-		})
-	}
-	// D15: an index existed and was not chosen.
-	if len(table.PossibleKeys) > 0 && table.Key == nil {
-		node.Issues = append(node.Issues, Issue{
-			Severity: "warn", Code: "unused-index",
-			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, strings.Join(table.PossibleKeys, ", ")),
-		})
-	}
+	// D15: full scan / unused index.
+	pushIndexIssues(&node, relationOrPlaceholder, table.AccessType, table.PossibleKeys, table.Key)
 
 	if table.Rows != nil {
 		*scans = append(*scans, *table.Rows)
