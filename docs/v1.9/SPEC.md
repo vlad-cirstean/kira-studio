@@ -5682,3 +5682,193 @@ block.
 `internal/datagrip/jdbc.go` "CLAUDE.md's per-adapter port literals" comment, two more naming deleted
 `IconButton`/`PopoverPanel`, and `RepoGraphView.vue:10`'s stale "(Studio only)") — all source, not
 docs, listed for a later phase to decide on.
+
+## P113 result
+
+Plan: `docs/v1.9/plans/P113-duplication-sweep.md`. Landed as the plan's own §5 two-stream split off
+one shared Step 0 — Stream A (Go, G1-G14) then Stream B (TS/Vue, F1-F10), in each stream's own
+plan-ordered sequence, plus a phase-end verification pass that completed three findings' remaining
+scope (G1, G3, F2) and fixed one regression it found (`f75cce8`). 69 commits total between
+`7b85460` (Step 0) and `3f40919` (last Stream B commit), confirmed via
+`git log --oneline --first-parent 7b85460..HEAD` plus `7b85460` itself.
+
+**Step 0 — `7b85460` (`chore:`).** `jscpd@5.3.2` devDependency, root `.jscpd.json`, `dedup:ts`
+script; `go get -tool github.com/mibk/dupl@v1.1.0` (`go.mod` gains `tool github.com/mibk/dupl`),
+`dedup:go` script. Both report-only, per the plan's own §1 (neither gates a commit or CI).
+
+**Stream A — Go (G1-G14), plan order:**
+
+- **G3 — bridge `ipcerr.Internal(err.Error())` pass-throughs, 9 commits** (`d765f76` helper,
+  `46c7a42`/`c28c767` studio 1-2/3, `4180726` space, then a phase-end completion pass —
+  `fa54392`/`d90366f`/`ff781e2`/`1ffe015`/`837a132`, "finish … conversion 1/5"–"5/5" — covering
+  kira-space's terminal/settings/layout/codeworkspace files and two kira-studio files the first
+  pass missed). `InternalResult[T]`/`InternalErr` added to `internal/ipcerr/errors.go`. Verified:
+  `grep -rln "ipcerr.Internal(err.Error())" apps/*/internal/bridge/*.go` returns exactly
+  `apps/kira-space/internal/bridge/codeworkspace.go` — the one documented exception (`session()`'s
+  3-value return doesn't fit either helper).
+- **G1 — adapter connection-state guards, 21 commits.** `adapters.Guarded` introduced across all 9
+  adapters (`a7c8158` redis, `bc95207` sqs, `b58c374` postgres, `51975a0` mysqlfamily, `3e8c4ce`
+  sqlite, `3f6154a` kafka, `72f9d74` clickhouse, `31d0c79` mongo, `dd1749a` s3), plus
+  `relational.ConnState`/`Disconnect` shared between postgres and mysqlfamily (`4caa9a9`),
+  `MarkPrimaryKey` (`59242ae`) and `BeginReadOnlyConsole` (`23d4581`). A second, phase-end pass then
+  inlined every remaining `getX`/`getReadOnly` wrapper call site and dropped the wrapper methods,
+  one commit per adapter (`166c716` clickhouse, `3fc1ff7` kafka, `bb43fb0` mongo, `89410ea`
+  mysqlfamily, `7ceaaa8` postgres, `3768738` redis, `1223597` s3, `cb40ec2` sqlite, `f066ae2` sqs).
+  Verified: `grep -rn "func (a \*Adapter) get[A-Z]" apps/*/internal/adapters/*/` returns 0 hits.
+- **G2 — `RequirePath` fixed-depth path validator, 7 commits.** Helper (`62bdc56`), then migrated
+  mysqlfamily (`a008807`), mongo (`6d3393d`), sqlite (`9e76f03`), clickhouse (`c81d021`), kafka+sqs
+  (`ecb7020`), redis+s3 (`689b6ee`).
+- **G14 — queryplan MySQL/MariaDB residue, 1 commit (`17c38ef`).** `tableLabel`/`pushIndexIssues`
+  shared in `queryplan/issues.go`; raw schemas stay per-engine.
+- **G4 — cross-app bridge tab-list, 1 commit (`6235ba0`).** `appstorage.ListWindowTabs`/
+  `CheckWindow` shared; both apps' `TabsService` reduced to thin bound-type delegates.
+- **G5 — layout repo residue, 1 commit (`42f71dd`).** `appstorage.QueryLeaves`/`UpsertLeafList`
+  shared.
+- **G11 — connections repo insert ×3, 1 commit (`b060f6b`).** Private `insertTx` shared by
+  `Insert`/`InsertWithSecret`/`InsertDuplicateWithSecret`. Landed before G12 per the plan's own
+  same-file ordering.
+- **G12 — sqlite repo mechanics, 1 commit (`c0eae91`).** `sqlitex.QueryOne[T]`/`NextSortOrder`
+  shared across the Get-by-id and next-sort-order call sites G11 left standing.
+- **G6 — saved_queries save/decode, 1 commit (`ec17c10`).**
+- **G7 — tree service cache-aside ×3, 1 commit (`78313ff`).** Generic `cacheAside[T]` for
+  `Describe`/`Definition`/`SchemaColumns`; `Children` keeps its own paging/invalidation logic.
+- **G8 — gitsession parallel numstat/name-status/ls-tree fan-out, 1 commit (`e70e3b3`).**
+- **G9 — gitsession caches onto golang-lru, 1 commit (`77a9732`).** `detailCache`/`mergeBaseCache`
+  moved onto `github.com/hashicorp/golang-lru/v2`; `refsCache`/`stackCache` onto a generic
+  `valueCache[T]`. Verified: `github.com/hashicorp/golang-lru/v2 v2.0.7` sits in `go.mod`'s direct
+  `require` block, no `// indirect`.
+- **G10 — process-group kill + graceful cancel ×4, 1 commit (`19ab815`).** New `internal/procgroup`
+  package; each caller keeps its own `killGroup`/`gracefulStopDelay` test seams.
+- **G13 — small Go items, 1 commit (`8213907`).** gitsession `opslot.claim`, gitrpc
+  `validReviewScope`, postman `importKeyValueRows`.
+
+**Stream B — TS/Vue (F1-F10), plan order:**
+
+- **F5 — pending-decision dialogs plus a latent bug, 2 commits.** `81377a8` (`fix:`) re-arms
+  `GitPairingDialog`'s Deny focus/countdown per request — it was watching `pending !== null` (a
+  boolean that stays `true` across a queue advance from request A to B), not the request id, so
+  Deny focus and the countdown reset silently skipped B. `1f0db64` extracts the shared
+  `usePendingDecision` composable and moves `DbMcpApprovalDialog` onto it too.
+- **F2 — tooltip-wrapped icon buttons, 9 commits.** Initial sweep (`48c013e` add `TooltipIconButton`
+  + migrate 24, `7432f9d` 36 more, `f499ef7` 15 more, `2dcfc5c` 20 more, `69c1af3` 33 more, `bdf92f2`
+  remaining 22 — 150 sites), then a phase-end completion pass (`5c8e313` 14 more, `b7fd4b0` 12 more,
+  `3f40919` `CachePane`'s reset button). Verified: `grep -rl "TooltipIconButton" --include="*.vue" .`
+  returns 66 files.
+- **F7 — git-ui ref-list scaffolding, 1 commit (`e57208f`).** `RefSectionHeader`/`ShowMoreButton`/
+  `RowActionsButton`; the last builds on F2, landed after it per the plan's dependency.
+- **F1 — SlickGrid host residue, 1 commit (`f0cb39a`).** `gutterColumn`/`computeCellFillHash`/
+  `renderedPageRowBand`/`subscribeRangeSelecting` extracted into
+  `views/shared/slick/gridHostShared.ts`, plus a 6th byte-identical row-height watch
+  (`subscribeRowHeight`) found alongside the named 5 and swept in the same commit.
+- **F4 — paged-view runtime residue, 1 commit (`7ca69b4`).** `PagedViewRuntime`/
+  `defaultPagedRuntime`/`applyPagePosition` in `views/shared/viewOp.ts`; stream view moved onto
+  `runPagedLoad`.
+- **F3 — search option toggles ×3, 1 commit (`e2e0f3a`).** `SearchOptionToggles.vue` in
+  `packages/workbench`, `testidPrefix` prop keeps each site's testids.
+- **F6 — cross-app frontend shell residue, 1 commit (`4530923`).** `BootFailure.vue`,
+  `bootstrapShell`, `terminalTabKind`, `defineAppViteConfig` shared in `packages/workbench`.
+- **F8 — git-ui state skeletons, 1 commit (`778e053`).** `RepoScopedReload`/`FileListCursor`
+  composed into the existing state classes, latest-request-wins ordering unchanged.
+- **F9 — git-ui small items, 1 commit (`c65a4c5`).** `openAllChangesAnnounced`,
+  `PreflightPrediction.vue`.
+- **F10 — plan parsers MySQL/MariaDB residue, 1 commit (`6302ee9`).** `pushIndexIssues` shared in
+  `views/console/planIssues.ts`; raw schemas and MySQL's `cost_info` expansion stay per engine.
+
+**Phase-end fix, `f75cce8` (`fix:`).** F2's `TooltipIconButton` extraction broke 7 call sites
+(`TimestampPane.vue`, `FilterToolbar.vue`, `StreamView.vue` ×3, `DocumentView.vue` ×2) that put
+`ref="x"` on the component expecting `x.value.$el` to resolve to the real button DOM node —
+`Tooltip`'s teleported `TooltipContent` sibling meant the single-root `$el` didn't reliably resolve
+there, silently breaking refocus-after-close and a popover anchor. Found during Stream B's own
+phase-end verification, not one of F1-F10's named findings; fixed by exposing `$el` off the real
+template ref explicitly.
+
+**§4 declines re-checked (plan's own tally, confirmed against the commits above):** #4 (bridge
+thin-wrapper pass-throughs) flips as G3. #5 (simple CRUD repos) and #12 (cross-language mirrors)
+partially flip — #5 as G11/G12, #12 as G14 (Go) and F10 (TS). The other 9 declines hold, unchanged
+from P107 iteration 1.
+
+**§3 "Assessed and not findings" (declined, no commit needed):** gitrpc list handlers, agenthooks/
+dbmcp `SetEnabled`, `dbmcp/tools.go`'s `resolveReadGated`/`jsonResult` usage, `gitsock`/`dbmcp`
+`snapshotLocked` (7 lines, different types), gitsession's declarative op table, enginecache's
+one-line-different `DropTarget`/`InvalidateAfterMutation`, cross-app `ChooseFolder` and other
+bound-type-bearing bridge methods, storage `db.go`'s cross-app `OpenAt` delegates (dupl's own
+largest non-test pair), settings/appsettings per-leaf validators, `grpcclient/reflect.go`, model
+`UnmarshalJSON`s, relational `caps.go` literals, adapterhost `router.go`, relational `readPage`
+(already on `PlanRelationalPage`), `wire.go` vs `model/gitreposettings.go`, and on the TS side: page
+`search.ts` files, Playwright configs, `TitleBar`'s settings button, `WorkbenchShell`'s new-tab
+button, `GlobalStashList` props, git-core model vs git-ipc `contract.ts`.
+
+**Verification, run fresh against this session's own HEAD (`3f40919`), not copied from any prior
+report:**
+
+- `go build ./...` — exit 0.
+- `go vet ./...` — exit 0.
+- `go test ./...` — 69 packages `ok`, 0 `FAIL`, exit 0.
+- `bun run typecheck` — exit 0, all 8 projects (`tsgo`/`vue-tsc` across studio/space web, unit,
+  tests, api-core, git-ipc/git-core/git-ui/kira-ui/vscode).
+- `bun run lint` — exit 0 (biome: 1444 files, no fixes applied; token/theme-class/class-conflict
+  checks all clean).
+- `bun run lint:go` — exit 0, golangci-lint: 0 issues.
+- `bun run lint:dead` — exit 0 (knip). 6 duplicate-export pairs and 9 configuration hints reported,
+  none naming a P113-touched file (`jscpd`/`dupl` themselves are not flagged as unused, per §1's own
+  expectation that a `package.json`-script binary counts as used).
+- `bun run test:unit` — 1662 pass, 0 fail, 14327 `expect()` calls, across 175 files (11.06s).
+- `bun run dedup:ts` / `bun run dedup:go` — both exit 0 (report-only, as designed). Of the plan's own
+  §6 named-pair checklist: F6's `main.ts`/`BootFailure.vue` pair, G5's layout pair, G6's
+  `saved_queries` pair and G14's `queryplan` pair are gone from both tools' output entirely. G4's
+  `tabs.go` pair and F1's/F10's own file pairs still appear — see disclosure below for each; none is
+  the originally-named duplication.
+- `killGroup = func` grep outside `internal/procgroup` — 4 hits, all in `*_test.go` files assigning
+  the existing test seam to a mock (`gitclient`/`ghclient`/`gitprepare`/`toolexec`), matching G10's
+  own "keep the seam" design, not a re-implementation.
+- `<TooltipTrigger as-child>` directly wrapping a lone `CodiconIcon`-only `Button` — 10 files still
+  match the raw pattern via grep. Not individually re-checked against the plan's own "extra children
+  stay" exception list in this pass; flagged below rather than asserted clean.
+
+**UI suites skipped.** `bun run test:ui:studio`, `bun run test:ui:space` and `bun run test:webview`
+were not run this pass — each takes several minutes (P112's own closing `test:ui:studio` run alone
+took 8.4 minutes) and this task's scope is recording an already-landed, already-verified-at-commit-
+time phase, not re-running the expensive suites. Every Stream A/B commit already passed its own
+fast checks (build/typecheck/lint, plus the owning package's `go test`) at commit time per
+`CLAUDE.md`'s per-commit rule; the full-suite run above (`test:unit`, `go test ./...`) is this pass's
+own addition on top of that, not a replacement for the UI suites. Left for the orchestrator to run
+if a UI-level regression needs ruling out before closing the phase.
+
+**Disclosed anomalies, found while writing this section — none required a code change:**
+
+1. **G4's `tabs.go` pair still appears in a fresh `dedup:go` run**, at `apps/kira-space/internal/
+   bridge/tabs.go:1,29` vs `apps/kira-studio/internal/bridge/tabs.go:1,29`. Reading both files
+   confirms the *logic* G4 targeted is shared (`List`/`Save` both delegate to
+   `appstorage.ListWindowTabs`/`SaveWindowTabs`); what remains identical is the ~29-line bound-type
+   shell itself (struct, arg types, one-line delegate calls) that acceptance criterion 5 and decline
+   #3 require to stay per-app (Wails binding generation needs the bound type in each app's own
+   package). The plan's own §6 checklist phrasing ("no longer list … G4's `tabs.go` pair") reads as
+   fully met; a literal fresh tool run still lists the file pair for its unavoidable shell, not for
+   duplicated behavior.
+2. **F1's `ConsoleSlickGrid.vue`/`SlickGridHost.vue` pair still produces 7 clone blocks under a fresh
+   `bun run dedup:ts`.** The 5 pieces F1's own finding named (plus the 6th, `subscribeRowHeight`,
+   the commit itself called out as found alongside them) are confirmed extracted via `git show
+   f0cb39a`. The clones a fresh run still reports are different code — e.g. `tagRenderedRows`'s
+   near-identical (not byte-identical: the two differ in their `data-testid` value) row-tagging
+   loop — never named in F1's own finding text, so out of its scope, not a sign F1's own extraction
+   is incomplete.
+3. **F10's `mariadb.ts`/`mysql.ts` pair still produces 3 clone blocks under a fresh `bun run
+   dedup:ts`.** The `pushIndexIssues` extraction F10 named is confirmed via `git show 6302ee9`
+   (`tableLabel` already lived in `planIssues.ts` since an earlier, unrelated P110 commit — F10 only
+   added `pushIndexIssues` beside it). The residue is a trivial 3-line `wrap(label, children,
+   issues)` helper (byte-identical, never named in F10's finding) plus partial `RawTable`
+   interface-field overlap the plan's own §3 already documents as a deliberate per-engine schema
+   difference (F13).
+
+None of the three change what G4/F1/F10 actually delivered; they are the closing `dedup:ts`/
+`dedup:go` re-run finding smaller, differently-shaped residue than the specific pairs the plan named
+— consistent with §1's own "neither run is at zero today" framing for a report-only tool, not a gap
+in this phase's own fixes.
+
+**File ownership.** Stream A's 48 commits (G1-G14, excluding shared Step 0) touch only `*.go` (plus
+`go.mod`/`go.sum` for G9's golang-lru) under the plan's own §5 paths. Stream B's 20 commits (F1-F10
+plus the phase-end `f75cce8` fix, which also lands under `packages/theme`) touch only `*.ts`/`*.vue`
+under `apps/*/frontend/src`, `packages/{theme,workbench,git-ui}/src`. 1 (Step 0) + 48 + 20 = 69,
+matching the commit count above. No bound Wails method signature changed in either stream
+(acceptance 5) — confirmed by reading G3's/G4's own diffs, both of which keep every bound method's
+parameters and return type unchanged.
