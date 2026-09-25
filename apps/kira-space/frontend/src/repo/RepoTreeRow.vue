@@ -23,8 +23,24 @@ const emit = defineEmits<{
 const dirIcon = computed(() => (props.row.expanded ? 'folder-opened' : 'folder'));
 
 // §7.1's four-value status glyph — 'M'/'A' amber-ish/green-ish, 'D' struck, '?' muted, matching
-// the connection tree's own status-color convention (a data attribute the stylesheet keys off).
+// the connection tree's own status-color convention. data-status stays on the row for tests/
+// styling hooks; the label's own colour is now a direct computed class rather than an
+// attribute-selector CSS rule keyed off it.
 const statusAttr = computed(() => props.row.status);
+
+const labelStatusClass = computed(() => {
+  switch (statusAttr.value) {
+    case 'M':
+    case 'A':
+      return 'text-warn';
+    case 'D':
+      return 'text-error line-through';
+    case '?':
+      return 'text-muted-foreground';
+    default:
+      return '';
+  }
+});
 
 function onClick(): void {
   emit('select', props.row);
@@ -63,7 +79,7 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="repo-tree-row"
+    class="flex items-center relative cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pr-2 repo-tree-row"
     :class="{ selected }"
     :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
     :data-testid="sticky ? 'repo-tree-sticky-row' : 'repo-tree-row'"
@@ -88,11 +104,21 @@ function onKeydown(e: KeyboardEvent): void {
     >
       <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
-    <CodiconIcon v-if="row.isDir" :name="dirIcon" :size="16" class="node-icon" />
-    <span v-else class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
+    <CodiconIcon
+      v-if="row.isDir"
+      :name="dirIcon"
+      :size="16"
+      class="node-icon shrink-0 w-4 h-4 text-muted-foreground mask-contain mask-no-repeat mask-center"
+    />
+    <span
+      v-else
+      class="node-icon shrink-0 w-4 h-4 text-muted-foreground mask-contain mask-no-repeat mask-center"
+      :style="fileIconStyle(row.path)"
+      aria-hidden="true"
+    ></span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span class="label">{{ row.name }}</span>
+        <span class="overflow-hidden text-ellipsis min-w-0" :class="labelStatusClass">{{ row.name }}</span>
       </TooltipTrigger>
       <TooltipContent>{{ row.name }}</TooltipContent>
     </Tooltip>
@@ -102,50 +128,21 @@ function onKeydown(e: KeyboardEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.repo-tree-row {
-  @apply flex items-center relative cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pr-2;
-}
-
+/* P110 B37: only the live :hover state plus its cascade order against the JS-toggled .selected
+   class stays here -- both scoped rules share equal specificity, so source order (selected after
+   hover) is what makes a selected row's own background win over hover; moving .selected onto a
+   plain utility class would drop below the scoped :hover rule's specificity instead (scoped styles
+   add an attribute selector) and invert that. Everything else moved onto the template as inline
+   utility classes -- .node-icon's own mask-size/mask-repeat/mask-position (+ -webkit- prefixed)
+   became Tailwind's own mask-contain/mask-no-repeat/mask-center (confirmed via compile check to
+   emit both prefixed and unprefixed forms); the three data-status attribute-selector rules became
+   labelStatusClass, a computed bound directly onto the label span (data-status itself stays on the
+   row, for tests/other styling hooks). */
 .repo-tree-row:hover {
   @apply bg-hover;
 }
 
 .repo-tree-row.selected {
   @apply bg-select;
-}
-
-/* P110 B34: `.twisty` moved to base.css's own `@utility twisty` (same set as CollectionRow.vue's
-   own rule). `.twisty.invisible` dropped: it applied nothing beyond Tailwind's own bare
-   `.invisible` utility already does on the same element (:class="{ invisible: !row.hasChildren
-   }"). */
-
-/* P67b §6.2: 16x16, matching VS Code's own explorer icon box (FileTree.vue's own
-   .kv-file-tree-icon, ported verbatim) — was a bare 13px codicon glyph with no box at all. The
-   mask-* rules are inert for the directory glyph (a codicon <i>, not a CSS mask) but harmless. */
-.node-icon {
-  @apply shrink-0 w-4 h-4 text-muted-foreground;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-}
-
-.label {
-  @apply overflow-hidden text-ellipsis min-w-0;
-}
-
-.repo-tree-row[data-status='M'] .label,
-.repo-tree-row[data-status='A'] .label {
-  @apply text-warn;
-}
-
-.repo-tree-row[data-status='D'] .label {
-  @apply text-error line-through;
-}
-
-.repo-tree-row[data-status='?'] .label {
-  @apply text-muted-foreground;
 }
 </style>

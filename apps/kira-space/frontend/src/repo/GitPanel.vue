@@ -699,9 +699,10 @@ onUnmounted(() => {
 }
 
 .worktree-row {
-  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground;
-  /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap. */
-  padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
+  /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap.
+     pl-6 (24px) is --kira-s-3 (6px) + the twisty's own 14px + --kira-s-2 (4px); pr-1.5 is
+     --kira-s-3 alone, the row's own right padding. */
+  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted-foreground pr-1.5 pl-6;
 }
 .worktree-row:hover {
   @apply bg-hover;
@@ -737,8 +738,8 @@ onUnmounted(() => {
 }
 
 .worktree-note {
-  @apply text-kira-sm text-subtle;
-  padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
+  /* Same indent as .worktree-row above -- pl-6/pr-1.5. */
+  @apply text-kira-sm text-subtle pr-1.5 pl-6;
 }
 .worktree-note.error {
   @apply text-error;

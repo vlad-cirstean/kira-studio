@@ -66,7 +66,7 @@ function onKeydown(e: KeyboardEvent): void {
 <template>
   <div
     v-if="row.kind === 'file'"
-    class="repo-search-row"
+    class="flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-1 pr-2 repo-search-row"
     :class="{ selected }"
     data-testid="repo-search-file-row"
     :data-path="row.path"
@@ -78,20 +78,24 @@ function onKeydown(e: KeyboardEvent): void {
   >
     <button
       type="button"
-      class="twisty"
+      class="flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 w-3.5 h-3.5"
       tabindex="-1"
       :aria-label="row.collapsed ? 'Expand' : 'Collapse'"
     >
       <CodiconIcon :name="row.collapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
     </button>
-    <span class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
+    <span
+      class="shrink-0 w-4 h-4 mask-contain mask-no-repeat mask-center"
+      :style="fileIconStyle(row.path)"
+      aria-hidden="true"
+    ></span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <span class="label">{{ fileName }}</span>
+        <span class="overflow-hidden text-ellipsis flex-1 min-w-0">{{ fileName }}</span>
       </TooltipTrigger>
       <TooltipContent>{{ row.path }}</TooltipContent>
     </Tooltip>
-    <span class="text-kira-xs text-subtle match-count" data-testid="repo-search-match-count">{{
+    <span class="text-kira-xs text-subtle shrink-0" data-testid="repo-search-match-count">{{
       row.matchCount
     }}</span>
     <Tooltip v-if="row.fileTruncated">
@@ -103,7 +107,7 @@ function onKeydown(e: KeyboardEvent): void {
   </div>
   <div
     v-else
-    class="repo-search-row match-row font-data"
+    class="flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-6 pr-2 font-data repo-search-row"
     :class="{ selected }"
     data-testid="repo-search-match-row"
     :data-path="row.path"
@@ -115,10 +119,10 @@ function onKeydown(e: KeyboardEvent): void {
     @dblclick="onDblClick"
     @keydown="onKeydown"
   >
-    <span class="text-kira-xs text-subtle match-line">{{ row.line }}:{{ row.column }}</span>
-    <span class="preview"
+    <span class="text-kira-xs text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
+    <span class="overflow-hidden text-ellipsis"
       >{{ previewParts.before
-      }}<span class="preview-match">{{ previewParts.match }}</span
+      }}<span class="rounded-sm bg-search-match">{{ previewParts.match }}</span
       >{{ previewParts.after }}</span
     >
   </div>
@@ -127,56 +131,17 @@ function onKeydown(e: KeyboardEvent): void {
 <style scoped>
 @reference "@theme/base.css";
 
-.repo-search-row {
-  @apply flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-1 pr-2;
-}
-
+/* P110 B37: only the live :hover state plus its cascade order against the JS-toggled .selected
+   class stays here -- both scoped rules share equal specificity, so source order (selected after
+   hover) is what makes a selected row's own background win over hover; moving .selected onto a
+   plain utility class would drop below the scoped :hover rule's specificity instead (scoped styles
+   add an attribute selector) and invert that. Everything else moved onto the template as inline
+   utility classes. */
 .repo-search-row:hover {
   @apply bg-hover;
 }
 
 .repo-search-row.selected {
   @apply bg-select;
-}
-
-.match-row {
-  padding-left: calc(var(--kira-s-2) + 20px);
-}
-
-.twisty {
-  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted-foreground p-0 w-3.5 h-3.5;
-}
-
-/* P67b §6.2: matches RepoTreeRow.vue's own rule — a real per-language icon here too, rather than
-   the tree gaining per-language icons while search keeps one generic glyph. */
-.node-icon {
-  @apply shrink-0 w-4 h-4;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-}
-
-.label {
-  @apply overflow-hidden text-ellipsis flex-1 min-w-0;
-}
-
-.match-count {
-  @apply shrink-0;
-}
-
-.match-line {
-  @apply shrink-0 min-w-10;
-}
-
-.preview {
-  @apply overflow-hidden text-ellipsis;
-}
-
-.preview-match {
-  @apply rounded-sm;
-  background: var(--kira-search-match);
 }
 </style>
