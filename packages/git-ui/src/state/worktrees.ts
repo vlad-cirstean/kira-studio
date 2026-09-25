@@ -7,6 +7,7 @@ import type {
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createLatestRequest } from './latestRequest.ts';
+import { RepoScopedReload } from './repoScopedReload.ts';
 
 /** P76 §9.1: what a "Create worktree here…" row action pre-fills `WorktreeDialog.vue`'s create
  *  phase with. Every field optional: the toolbar/palette entry point opens with `{}` and keeps
@@ -29,18 +30,16 @@ export class WorktreeState {
   readonly entries: ShallowRef<readonly WorktreeEntry[]> = shallowRef([]);
 
   readonly #bridge: BridgeClient;
-  #repoId: string | undefined;
-  readonly #unsubscribe: () => void;
+  readonly #repo: RepoScopedReload;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
   readonly #reloadRequest = createLatestRequest<ResultOf<'worktree.list'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
-    this.#unsubscribe = bridge.on('repo.changed', (event) => {
-      if (this.#repoId !== event.repoId) return;
-      if (event.kind !== 'refsChanged') return;
-      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+    this.#repo = new RepoScopedReload(bridge, 'WorktreeState', {
+      kind: 'refsChanged',
+      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
     });
   }
 
@@ -48,31 +47,23 @@ export class WorktreeState {
    *  worktree list immediately rather than waiting on a `repo.changed` event a freshly opened repo
    *  has no reason to ever emit. */
   setRepoId(repoId: string | undefined): void {
-    this.#repoId = repoId;
+    this.#repo.setRepoId(repoId);
     if (repoId === undefined) {
       this.entries.value = [];
       return;
     }
-    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-  }
-
-  /** F10: a `void this.reload()`-shaped call (every call site in this class is one) has no caller
-   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
-   *  error and a silent unhandled rejection with the view left showing stale worktrees forever.
-   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
-  #logBackgroundError(context: string, error: unknown): void {
-    console.error(`WorktreeState: ${context} failed`, error);
+    this.#repo.fireAndForget('reload', () => this.reload());
   }
 
   async reload(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     // A repo switch (or close) that lands while this request was in flight must not let a stale
     // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes — and
     // F5: two `refsChanged` events in quick succession must not let the older one land last.
     const outcome = await this.#reloadRequest.run(
       (signal) => this.#bridge.request('worktree.list', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.isCurrent(repoId),
     );
     if (outcome.status === 'error') throw new Error(outcome.message);
     if (outcome.status !== 'ok') return;
@@ -88,7 +79,7 @@ export class WorktreeState {
     readonly branch?: string;
     readonly startPoint?: string;
   }): Promise<WorktreeAddPreflight | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     return this.#bridge.request('preflight.worktreeAdd', { repoId, ...params });
   }
@@ -96,13 +87,13 @@ export class WorktreeState {
   /** The Remove action's own confirm-step read (D8) — shows the blocker/dirty verdict, and the
    *  exact confirmation token to type, before the destructive `op.run` call ever fires. */
   async previewRemove(path: string): Promise<WorktreeRemovePreflight | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     return this.#bridge.request('preflight.worktreeRemove', { repoId, path });
   }
 
   dispose(): void {
-    this.#unsubscribe();
+    this.#repo.dispose();
     this.#reloadRequest.abort();
   }
 }

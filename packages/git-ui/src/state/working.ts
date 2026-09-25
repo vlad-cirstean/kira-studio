@@ -1,11 +1,10 @@
 import type { ResultOf } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { FileListCursor, type FileListMode } from './fileListCursor.ts';
 import { createLatestRequest } from './latestRequest.ts';
 
 export type FileChange = ResultOf<'working.detail'>['files'][number];
-
-export type FileListMode = 'tree' | 'flat';
 
 /**
  * P7 (item 2): the uncommitted-changes strip's own click-through selection — independent of
@@ -20,12 +19,12 @@ export class WorkingDetailState {
   readonly files: ShallowRef<readonly FileChange[]> = shallowRef([]);
   readonly error: ShallowRef<string | undefined> = shallowRef(undefined);
 
+  readonly #fileList = new FileListCursor();
   /** An index into `files.value`, or `-1` when no file is selected — mirrors `DetailState.
    *  selectedFile` exactly. */
-  readonly selectedFile: ShallowRef<number> = shallowRef(-1);
-
-  readonly listMode: ShallowRef<FileListMode> = shallowRef('tree');
-  readonly filter: ShallowRef<string> = shallowRef('');
+  readonly selectedFile = this.#fileList.selectedFile;
+  readonly listMode = this.#fileList.listMode;
+  readonly filter = this.#fileList.filter;
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
@@ -48,20 +47,20 @@ export class WorkingDetailState {
     this.selected.value = selected;
     this.files.value = [];
     this.error.value = undefined;
-    this.selectedFile.value = -1;
+    this.#fileList.reset();
     if (selected) void this.#requestDetail();
   }
 
   selectFile(index: number): void {
-    this.selectedFile.value = index;
+    this.#fileList.selectFile(index);
   }
 
   setListMode(mode: FileListMode): void {
-    this.listMode.value = mode;
+    this.#fileList.setListMode(mode);
   }
 
   setFilter(text: string): void {
-    this.filter.value = text;
+    this.#fileList.setFilter(text);
   }
 
   /** Re-fetches without changing `selected` — the strip's own count already updates live off

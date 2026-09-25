@@ -1,11 +1,12 @@
 import type { ResultOf } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { FileListCursor, type FileListMode } from './fileListCursor.ts';
 import { createLatestRequest } from './latestRequest.ts';
 
 export type CommitDetail = ResultOf<'commit.detail'>;
 
-export type FileListMode = 'tree' | 'flat';
+export type { FileListMode } from './fileListCursor.ts';
 
 /**
  * `docs/plans/P5.md` W7: the detail pane's state machine, kept out of any SFC so W13 can test
@@ -32,11 +33,11 @@ export class DetailState {
   readonly detail: ShallowRef<CommitDetail | undefined> = shallowRef(undefined);
   readonly error: ShallowRef<string | undefined> = shallowRef(undefined);
 
+  readonly #fileList = new FileListCursor();
   /** An index into `detail.value.files`, or `-1` when no file is selected. */
-  readonly selectedFile: ShallowRef<number> = shallowRef(-1);
-
-  readonly listMode: ShallowRef<FileListMode> = shallowRef('tree');
-  readonly filter: ShallowRef<string> = shallowRef('');
+  readonly selectedFile = this.#fileList.selectedFile;
+  readonly listMode = this.#fileList.listMode;
+  readonly filter = this.#fileList.filter;
 
   /** W10's copy/"Go to file" outcome text — fed into `App.vue`'s single shared live region
    *  alongside the load-more/refresh announcements it already carries. A plain string, not a
@@ -71,7 +72,7 @@ export class DetailState {
     this.parentIndex.value = 0;
     this.detail.value = undefined;
     this.error.value = undefined;
-    this.selectedFile.value = -1;
+    this.#fileList.reset();
     if (sha !== null) void this.#requestDetail();
   }
 
@@ -81,7 +82,7 @@ export class DetailState {
   setParentIndex(index: number): void {
     if (this.parentIndex.value === index) return;
     this.parentIndex.value = index;
-    this.selectedFile.value = -1;
+    this.#fileList.reset();
     void this.#requestDetail();
   }
 
@@ -90,15 +91,15 @@ export class DetailState {
    *  a native diff (`DetailPane.vue`'s own `actions.openInEditor` call, driven by the tree's
    *  `openFile` emit, G21 D13). */
   selectFile(index: number): void {
-    this.selectedFile.value = index;
+    this.#fileList.selectFile(index);
   }
 
   setListMode(mode: FileListMode): void {
-    this.listMode.value = mode;
+    this.#fileList.setListMode(mode);
   }
 
   setFilter(text: string): void {
-    this.filter.value = text;
+    this.#fileList.setFilter(text);
   }
 
   announce(text: string): void {

@@ -50,6 +50,7 @@ import {
 } from './liveAnnouncements.ts';
 import { createPendingSlot, type PendingSlot } from './pendingSlot.ts';
 import type { RefsState } from './refs.ts';
+import { RepoScopedReload } from './repoScopedReload.ts';
 import type { RepoSettingsState } from './repoSettings.ts';
 import type { StackState } from './stack.ts';
 
@@ -290,10 +291,9 @@ export class OpsState {
    *  resolves to the setting's own default (`true`, the fail-safe direction: a stale/absent
    *  value can only ever produce the OLD dialog, never an unexpected write, D16). */
   readonly #repoSettings: RepoSettingsState | undefined;
-  #repoId: string | undefined;
+  readonly #repo: RepoScopedReload;
   #resolvePull: ((proceed: boolean) => void) | undefined;
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
-  readonly #unsubscribe: () => void;
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
   /** F5: the server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
@@ -315,23 +315,24 @@ export class OpsState {
     this.#repoSettings = repoSettings;
     // Any change at all (a ref write OR a worktree/index touch) can move `inProgress`,
     // `dirtyPaths` or the upstream ahead/behind counts — unlike `RefsState`, which only cares
-    // about `refsChanged`, this refreshes on both event kinds.
-    this.#unsubscribe = bridge.on('repo.changed', (event) => {
-      if (this.#repoId !== event.repoId) return;
-      void this.refreshStatus().catch((error) => this.#logBackgroundError('refreshStatus', error));
-      // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
-      // repo (another webview, the native app, a review view). An op run from one of those
-      // replaces the slot; without this, this surface kept showing its own stale slot and got
-      // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
-      // switch), which never observes another surface's write.
-      void this.refreshUndo().catch((error) => this.#logBackgroundError('refreshUndo', error));
+    // about `refsChanged`, this refreshes on both event kinds (no `kind` filter below).
+    this.#repo = new RepoScopedReload(bridge, 'OpsState', {
+      onChanged: () => {
+        this.#repo.fireAndForget('refreshStatus', () => this.refreshStatus());
+        // F4: the server's undo slot is per `RepoEntry`, shared by every surface holding this
+        // repo (another webview, the native app, a review view). An op run from one of those
+        // replaces the slot; without this, this surface kept showing its own stale slot and got
+        // NotFound on click. Previously refreshed only from `setRepoId` (this surface's own repo
+        // switch), which never observes another surface's write.
+        this.#repo.fireAndForget('refreshUndo', () => this.refreshUndo());
+      },
     });
     this.#unsubscribeProgress = bridge.on('remote.progress', (event) => {
-      if (this.#repoId !== event.repoId) return;
+      if (this.#repo.repoId !== event.repoId) return;
       this.remoteProgress.value = event;
     });
     this.#unsubscribeWorktreeProgress = bridge.on('worktree.progress', (event) => {
-      if (this.#repoId !== event.repoId) return;
+      if (this.#repo.repoId !== event.repoId) return;
       if (this.activeWorktreePreparePath.value === undefined) return;
       // F7: appended and trimmed in place — a full `[...prev, ...batch]` spread per batch (every
       // ~100ms, for up to `PrepareTimeout`) is itself O(n) per batch and, with no cap, unbounded
@@ -354,7 +355,7 @@ export class OpsState {
   }
 
   setRepoId(repoId: string | undefined): void {
-    this.#repoId = repoId;
+    this.#repo.setRepoId(repoId);
     this.activeRemoteOp.value = undefined;
     this.remoteProgress.value = undefined;
     this.pullStrategy.value = undefined;
@@ -366,7 +367,7 @@ export class OpsState {
     // switch mid-dialog leaves the OLD repo's dialog open over the new repo, and `busy` stuck true
     // (every op button disabled) until the user dismisses it — confirming then does nothing (the
     // post-`ask()` repo guard each of those methods already has returns), which reads as a silent
-    // failure. `this.#repoId` is already the NEW repoId above, so each guard sees the mismatch and
+    // failure. `this.#repo.repoId` is already the NEW repoId above, so each guard sees the mismatch and
     // its own `finally` clears `busy` the same way a real cancel would.
     this.#abandonPending();
     if (repoId === undefined) {
@@ -374,17 +375,8 @@ export class OpsState {
       this.undoSlot.value = null;
       return;
     }
-    void this.refreshStatus().catch((error) => this.#logBackgroundError('refreshStatus', error));
-    void this.refreshUndo().catch((error) => this.#logBackgroundError('refreshUndo', error));
-  }
-
-  /** F10: a `void this.refreshX()`-shaped call (every call site in this class is one — nothing
-   *  external ever awaits these directly) has no caller left to hand a rejection to; logging once
-   *  here is what stands between a disconnect/git error and a silent unhandled rejection with the
-   *  view left showing stale data forever. The methods themselves are unchanged and still throw
-   *  for any future caller that does await them directly. */
-  #logBackgroundError(context: string, error: unknown): void {
-    console.error(`OpsState: ${context} failed`, error);
+    this.#repo.fireAndForget('refreshStatus', () => this.refreshStatus());
+    this.#repo.fireAndForget('refreshUndo', () => this.refreshUndo());
   }
 
   /** F6: settles every pending confirm dialog and pull prompt with its own cancel value — shared
@@ -407,23 +399,23 @@ export class OpsState {
   }
 
   async refreshStatus(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     const outcome = await this.#statusRequest.run(
       (signal) => this.#bridge.request('status.get', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.repoId === repoId,
     );
     if (outcome.status === 'ok') this.statusSummary.value = outcome.value;
     else if (outcome.status === 'error') throw new Error(outcome.message);
   }
 
   async refreshUndo(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     const outcome = await this.#undoRequest.run(
       (signal) =>
         this.#bridge.request('undo.peek', { repoId }, signal).then((result) => result.slot),
-      () => this.#repoId === repoId,
+      () => this.#repo.repoId === repoId,
     );
     if (outcome.status === 'ok') this.undoSlot.value = outcome.value;
     else if (outcome.status === 'error') throw new Error(outcome.message);
@@ -437,7 +429,7 @@ export class OpsState {
    *  cold resolve or pushes `review.target` to an already-open one, host-side — this class does
    *  not wait on, or need to know, which). */
   async openReview(branch: string): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     await this.#bridge.request('review.open', { repoId, branch });
   }
@@ -488,7 +480,7 @@ export class OpsState {
   }
 
   async runCheckout(target: string, mode: 'switch' | 'detach'): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
     // G-UX (item 3): captured here, before ANY write below, so the post-checkout pull prompt
@@ -552,7 +544,7 @@ export class OpsState {
         // (#applyResult's own guard would in fact refuse that), so the honest outcome is to
         // abandon the route rather than silently completing an action the user has since
         // navigated away from.
-        if (this.#repoId !== repoId) return;
+        if (this.#repo.repoId !== repoId) return;
         if (route === null) {
           this.announcement.value = 'Checkout cancelled.';
           return;
@@ -627,7 +619,7 @@ export class OpsState {
     // G32 round-3 functional-correctness review, finding #7: unlike the other #confirm* dialogs
     // above, this method never captures its own `repoId` and needs no re-check here — its only
     // effect after the dialog resolves is `runPull(remote, target)`, which independently
-    // re-validates identity via its own fresh `this.#repoId` capture at entry. If the active repo
+    // re-validates identity via its own fresh `this.#repo.repoId` capture at entry. If the active repo
     // changed while this dialog was open, `runPull` simply pulls (or no-ops) against whatever repo
     // is active now, exactly as if the user had triggered it directly from the toolbar.
     if (!proceed) return;
@@ -687,7 +679,7 @@ export class OpsState {
       const route = await opts.slot.ask(opts.preflight);
       // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
-      if (this.#repoId !== repoId) return;
+      if (this.#repo.repoId !== repoId) return;
       if (route === null) {
         this.announcement.value = opts.cancelText;
         return;
@@ -704,7 +696,7 @@ export class OpsState {
   }
 
   async runRevert(shas: readonly string[]): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value || shas.length === 0) return;
     this.busy.value = true;
     try {
@@ -731,7 +723,7 @@ export class OpsState {
    *  decides on `--no-commit` — the *same* pending promise stays open; only the displayed
    *  `pendingRevert` snapshot changes. */
   async previewRevertMainline(mainline: number): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     const shas = this.pendingRevert.value?.shas;
     if (repoId === undefined || shas === undefined) return;
     const preflight = await this.#bridge.request('preflight.revert', { repoId, shas, mainline });
@@ -756,7 +748,7 @@ export class OpsState {
    *  `unknownTarget` cannot happen for a sha taken from a real graph row) — handled defensively,
    *  with no dialog, rather than assumed unreachable. */
   async runReset(target: string, mode: ResetMode): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
     try {
@@ -770,7 +762,7 @@ export class OpsState {
       const route = await this.#resetSlot.ask(preflight);
       // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
-      if (this.#repoId !== repoId) return;
+      if (this.#repo.repoId !== repoId) return;
       if (route === null) {
         this.announcement.value = 'Reset cancelled.';
         return;
@@ -855,7 +847,7 @@ export class OpsState {
    *  one `classifyCherryPick` folds into `verdict`/`blockers` (it never blocks anything, judgment
    *  call 9's own "guessing is not honest" reasoning applied to the dialog's own trigger). */
   async runCherryPick(sha: string): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
     try {
@@ -887,7 +879,7 @@ export class OpsState {
    *  `pendingCherryPick` snapshot changes, re-predicted against the newly-known mainline before
    *  the user decides on `--no-commit`. */
   async previewCherryPickMainline(mainline: number): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     const sha = this.pendingCherryPick.value?.sha;
     if (repoId === undefined || sha === undefined) return;
     const preflight = await this.#bridge.request('preflight.cherryPick', {
@@ -938,7 +930,7 @@ export class OpsState {
     readonly keepIndex: boolean;
     readonly paths: readonly string[];
   }): Promise<OpResult> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) throw new Error('ops: no repo open');
     if (this.busy.value) throw new Error('ops: another operation is already running');
     this.busy.value = true;
@@ -983,7 +975,7 @@ export class OpsState {
     entry: StashEntry,
     restoreIndex: boolean,
   ): Promise<OpResult | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return undefined;
     this.busy.value = true;
     try {
@@ -1001,7 +993,7 @@ export class OpsState {
         const proceed = await this.#stashPopSlot.ask({ verb, preflight });
         // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
         // #checkoutSlot.ask above — the active repo can change while this dialog is open.
-        if (this.#repoId !== repoId) return undefined;
+        if (this.#repo.repoId !== repoId) return undefined;
         if (!proceed) {
           this.announcement.value = `Stash ${verb} cancelled.`;
           return undefined;
@@ -1083,7 +1075,7 @@ export class OpsState {
     entry: StashEntry,
     name: string,
   ): Promise<StashBranchPreflight | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     return this.#bridge.request('preflight.stashBranch', {
       repoId,
@@ -1183,7 +1175,7 @@ export class OpsState {
     path: string,
     scriptSha256: string,
   ): Promise<WorktreePrepareResult | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.activeWorktreePreparePath.value !== undefined) {
       return undefined;
     }
@@ -1196,7 +1188,7 @@ export class OpsState {
         path,
         scriptSha256,
       });
-      if (this.#repoId !== repoId) return result;
+      if (this.#repo.repoId !== repoId) return result;
       // The final, capped/sanitized transcript always wins over whatever partial view streamed
       // in (this method's own doc comment on worktreePrepareOutput's field).
       this.#setWorktreePrepareOutput(result.output);
@@ -1240,7 +1232,7 @@ export class OpsState {
     // F3: captured for the same reason `#applyResult`'s own doc comment gives every other
     // caller's identity guard — `#stack.runRestack` awaits real git work (one rebase per
     // branch), long enough for the active repo to have changed underneath it.
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     this.busy.value = true;
     try {
       const result = await this.#stack.runRestack(branch);
@@ -1278,7 +1270,7 @@ export class OpsState {
   /** `worktree.cancelPrepare` — always safe to call, mirroring `cancelRemote`'s own doc comment
    *  exactly: `false` (never an error) when there was nothing to cancel. */
   async cancelWorktreePrepare(): Promise<boolean> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return false;
     const { cancelled } = await this.#bridge.request('worktree.cancelPrepare', { repoId });
     return cancelled;
@@ -1310,7 +1302,7 @@ export class OpsState {
    * literal reading — see `docs/plans/P9.md`'s own Findings.
    */
   /** `repoId` is the CALLER's own captured repo id (`runCheckout`/`runPull`), a required
-   *  parameter rather than a fresh `this.#repoId` read (G32 round-3 functional-correctness
+   *  parameter rather than a fresh `this.#repo.repoId` read (G32 round-3 functional-correctness
    *  review, finding #7): reading it fresh here used to let this whole sequence — stash push,
    *  the caller's own `runMiddle` (checkout/pull), stash pop — silently disagree with the
    *  identity `runMiddle`'s own closure was built against, if the active repo changed between
@@ -1355,7 +1347,7 @@ export class OpsState {
     // Same identity guard as #applyResult's own (this write isn't routed through it, since
     // CarryMiddleResult isn't an OpResult) — a repo switch during runMiddle must not land its
     // head/inProgress on whatever repo is displayed now.
-    if (this.#repoId === repoId) {
+    if (this.#repo.repoId === repoId) {
       this.#refs.applyHead(middle.head);
       const current = this.statusSummary.value;
       if (current)
@@ -1496,7 +1488,7 @@ export class OpsState {
   }
 
   async undo(): Promise<OpResult | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     const slot = this.undoSlot.value;
     if (repoId === undefined || slot === null || this.busy.value) return undefined;
     this.busy.value = true;
@@ -1521,7 +1513,7 @@ export class OpsState {
    *  so the popover can show "follow your configuration (would run: rebase)" before the user
    *  commits to an override. */
   async previewPullStrategy(branch: string): Promise<PullPreflight | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     return this.#bridge.request('remote.pullPreflight', { repoId, branch });
   }
@@ -1573,13 +1565,13 @@ export class OpsState {
    * derived here from `strategy === 'rebase'` or from `source`.
    */
   async runPull(remote: string, branch: string, explicitStrategy?: PullStrategy): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PullPreflight = await this.#bridge.request('remote.pullPreflight', {
       repoId,
       branch,
     });
-    if (this.#repoId !== repoId) return;
+    if (this.#repo.repoId !== repoId) return;
     const strategy = explicitStrategy ?? preflight.strategy;
     const source: PullStrategySource =
       explicitStrategy !== undefined ? 'explicit' : preflight.source;
@@ -1591,7 +1583,7 @@ export class OpsState {
       const proceed = await this.#confirmPull(preflight);
       // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
       // #checkoutSlot.ask above — the active repo can change while this dialog is open.
-      if (this.#repoId !== repoId) return;
+      if (this.#repo.repoId !== repoId) return;
       if (!proceed) {
         this.announcement.value = 'Pull cancelled.';
         return;
@@ -1662,14 +1654,14 @@ export class OpsState {
   /** Plain push is never gated (D52) — no confirm step here, only the upstream question a
    *  preflight already answers: §7.2's "offered, not silent" for `--set-upstream`. */
   async runPush(remote: string, branch: string): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PushPreflight = await this.#bridge.request('remote.pushPreflight', {
       repoId,
       branch,
       remote,
     });
-    if (this.#repoId !== repoId) return;
+    if (this.#repo.repoId !== repoId) return;
     await this.#runRemote(
       {
         kind: 'push',
@@ -1699,18 +1691,18 @@ export class OpsState {
    * dialog showed.
    */
   async runForcePush(remote: string, branch: string): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PushPreflight = await this.#bridge.request('remote.pushPreflight', {
       repoId,
       branch,
       remote,
     });
-    if (this.#repoId !== repoId) return;
+    if (this.#repo.repoId !== repoId) return;
     const route = await this.#forcePushSlot.ask({ remote, branch, preflight });
     // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
     // #checkoutSlot.ask above — the active repo can change while this dialog is open.
-    if (this.#repoId !== repoId) return;
+    if (this.#repo.repoId !== repoId) return;
     if (route === null) {
       this.announcement.value = 'Force push cancelled.';
       return;
@@ -1747,7 +1739,7 @@ export class OpsState {
    *  those the moment `remote.run` actually settles, whether that is `Cancelled` or, for an
    *  unkillable op, its ordinary result. */
   async cancelRemote(): Promise<boolean> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return false;
     const { cancelled } = await this.#bridge.request('remote.cancel', { repoId });
     return cancelled;
@@ -1758,14 +1750,14 @@ export class OpsState {
     announceOk: (result: RemoteOpResult) => string | undefined,
     actionLabel: string,
   ): Promise<RemoteOpResult | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return undefined;
     this.busy.value = true;
     this.activeRemoteOp.value = op.kind;
     this.remoteProgress.value = undefined;
     try {
       const result = await this.#bridge.request('remote.run', { repoId, ...op });
-      if (this.#repoId !== repoId) return result;
+      if (this.#repo.repoId !== repoId) return result;
       this.#applyRemoteResult(result);
       this.announcement.value = result.ok
         ? (announceOk(result) ?? `${actionLabel} succeeded`)
@@ -1804,7 +1796,7 @@ export class OpsState {
     announceOk: (ok: true) => string | undefined,
     actionLabel: string,
   ): Promise<OpResult> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) throw new Error('ops: no repo open');
     if (this.busy.value) throw new Error('ops: another operation is already running');
     this.busy.value = true;
@@ -1833,7 +1825,7 @@ export class OpsState {
    *  result — the same identity check `refreshStatus`/`refreshUndo`/`#runRemote`/
    *  `runWorktreePrepare` already apply to their own writes. */
   #applyResult(repoId: string, result: OpResult): void {
-    if (this.#repoId !== repoId) return;
+    if (this.#repo.repoId !== repoId) return;
     this.#refs.applyHead(result.head);
     const current = this.statusSummary.value;
     this.statusSummary.value = current
@@ -1851,7 +1843,7 @@ export class OpsState {
   }
 
   dispose(): void {
-    this.#unsubscribe();
+    this.#repo.dispose();
     this.#unsubscribeProgress();
     this.#unsubscribeWorktreeProgress();
     this.#statusRequest.abort();

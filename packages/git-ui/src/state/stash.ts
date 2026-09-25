@@ -2,8 +2,9 @@ import type { FileChange, ResultOf, StashEntry } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import type { FileListMode } from './detail.ts';
+import { FileListCursor, type FileListMode } from './fileListCursor.ts';
 import { createLatestRequest } from './latestRequest.ts';
+import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
  * `docs/plans/P9.md` W13: the stash stack as reactive state, mirroring `RefsState`'s own shape
@@ -51,14 +52,14 @@ export class StashState {
   // exactly like `DetailState` since the same phase. `selectedFile` survives: it still drives the
   // tree's own selected-row highlight and file cursor.
   // -------------------------------------------------------------------------------------
-  readonly selectedFile: ShallowRef<number> = shallowRef(-1);
-  readonly listMode: ShallowRef<FileListMode> = shallowRef('tree');
-  readonly filter: ShallowRef<string> = shallowRef('');
+  readonly #fileList = new FileListCursor();
+  readonly selectedFile = this.#fileList.selectedFile;
+  readonly listMode = this.#fileList.listMode;
+  readonly filter = this.#fileList.filter;
 
   readonly #bridge: BridgeClient;
-  #repoId: string | undefined;
+  readonly #repo: RepoScopedReload;
   #showController: AbortController | undefined;
-  readonly #unsubscribe: () => void;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — separate
    *  trackers so `reload()`'s own ordering never interferes with `reloadGlobal()`'s. */
   readonly #reloadRequest = createLatestRequest<ResultOf<'stash.list'>>();
@@ -74,11 +75,12 @@ export class StashState {
         this.globalEntries.value.find((entry) => entry.sha === sha)
       );
     });
-    this.#unsubscribe = bridge.on('repo.changed', (event) => {
-      if (this.#repoId !== event.repoId) return;
-      if (event.kind !== 'refsChanged') return;
-      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-      void this.reloadGlobal().catch((error) => this.#logBackgroundError('reloadGlobal', error));
+    this.#repo = new RepoScopedReload(bridge, 'StashState', {
+      kind: 'refsChanged',
+      onChanged: () => {
+        this.#repo.fireAndForget('reload', () => this.reload());
+        this.#repo.fireAndForget('reloadGlobal', () => this.reloadGlobal());
+      },
     });
   }
 
@@ -86,7 +88,7 @@ export class StashState {
    *  — loads the new repo's stash stack immediately rather than waiting on a `repo.changed` event
    *  that a freshly opened repo has no reason to ever emit. */
   setRepoId(repoId: string | undefined): void {
-    this.#repoId = repoId;
+    this.#repo.setRepoId(repoId);
     if (repoId === undefined) {
       this.#clear();
       return;
@@ -94,28 +96,19 @@ export class StashState {
     this.selectedSha.value = null;
     this.changes.value = undefined;
     this.error.value = undefined;
-    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-    void this.reloadGlobal().catch((error) => this.#logBackgroundError('reloadGlobal', error));
-  }
-
-  /** F10: a `void this.reload()`/`reloadGlobal()`-shaped call (every call site in this class is
-   *  one) has no caller left to hand a rejection to — logging once here is what stands between a
-   *  disconnect/git error and a silent unhandled rejection with the view left showing a stale
-   *  stash stack forever. Neither method itself is changed — still throws for any future caller
-   *  that awaits it directly. */
-  #logBackgroundError(context: string, error: unknown): void {
-    console.error(`StashState: ${context} failed`, error);
+    this.#repo.fireAndForget('reload', () => this.reload());
+    this.#repo.fireAndForget('reloadGlobal', () => this.reloadGlobal());
   }
 
   async reload(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     // A repo switch (or close) that lands while this request was in flight must not let a stale
     // reply overwrite the newer repo's own state — the same guard `RefsState.reload` makes — and
     // F5: two `refsChanged` events in quick succession must not let the older one land last.
     const outcome = await this.#reloadRequest.run(
       (signal) => this.#bridge.request('stash.list', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.isCurrent(repoId),
     );
     if (outcome.status === 'error') throw new Error(outcome.message);
     if (outcome.status !== 'ok') return;
@@ -124,11 +117,11 @@ export class StashState {
 
   /** G28 D13: the global bucket's own reload — same shape as `reload()`, same stale-reply guard. */
   async reloadGlobal(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     const outcome = await this.#reloadGlobalRequest.run(
       (signal) => this.#bridge.request('globalStash.list', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.isCurrent(repoId),
     );
     if (outcome.status === 'error') throw new Error(outcome.message);
     if (outcome.status !== 'ok') return;
@@ -145,7 +138,7 @@ export class StashState {
     this.selectedSha.value = sha;
     this.changes.value = undefined;
     this.error.value = undefined;
-    this.selectedFile.value = -1;
+    this.#fileList.reset();
     if (sha !== null) void this.#requestShow(sha, this.#scopeFor(sha));
   }
 
@@ -162,19 +155,19 @@ export class StashState {
    *  W8's own convention): purely the cursor/selection now (G21 D12), no diff to open from here —
    *  the tree's own `openFile` emit (D13) opens directly through `actions.openInEditor`. */
   selectFile(index: number): void {
-    this.selectedFile.value = index;
+    this.#fileList.selectFile(index);
   }
 
   setListMode(mode: FileListMode): void {
-    this.listMode.value = mode;
+    this.#fileList.setListMode(mode);
   }
 
   setFilter(text: string): void {
-    this.filter.value = text;
+    this.#fileList.setFilter(text);
   }
 
   async #requestShow(sha: string, scope: 'stack' | 'global'): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     const controller = new AbortController();
     this.#showController = controller;
@@ -202,11 +195,11 @@ export class StashState {
     this.selectedSha.value = null;
     this.changes.value = undefined;
     this.error.value = undefined;
-    this.selectedFile.value = -1;
+    this.#fileList.reset();
   }
 
   dispose(): void {
-    this.#unsubscribe();
+    this.#repo.dispose();
     this.#showController?.abort();
     this.#reloadRequest.abort();
     this.#reloadGlobalRequest.abort();

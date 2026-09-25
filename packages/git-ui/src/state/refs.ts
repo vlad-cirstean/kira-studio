@@ -2,6 +2,7 @@ import type { HeadState, RefRow, ResultOf } from '@kira/git-ipc';
 import { type ComputedRef, computed, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createLatestRequest } from './latestRequest.ts';
+import { RepoScopedReload } from './repoScopedReload.ts';
 
 /**
  * `docs/plans/P6.md` W12: the ref list as reactive state. Loads once a repo is open, reloads on
@@ -30,8 +31,7 @@ export class RefsState {
   readonly worktreeBranches: ComputedRef<ReadonlySet<string>>;
 
   readonly #bridge: BridgeClient;
-  #repoId: string | undefined;
-  readonly #unsubscribe: () => void;
+  readonly #repo: RepoScopedReload;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
   readonly #reloadRequest = createLatestRequest<ResultOf<'refs.list'>>();
@@ -62,10 +62,9 @@ export class RefsState {
             .map((row) => row.shortName),
         ),
     );
-    this.#unsubscribe = bridge.on('repo.changed', (event) => {
-      if (this.#repoId !== event.repoId) return;
-      if (event.kind !== 'refsChanged') return;
-      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+    this.#repo = new RepoScopedReload(bridge, 'RefsState', {
+      kind: 'refsChanged',
+      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
     });
   }
 
@@ -73,24 +72,16 @@ export class RefsState {
    *  new repo's refs immediately rather than waiting on a `repo.changed` event that may never
    *  come (a freshly opened repo's refs are not "changed", they are simply not loaded yet). */
   setRepoId(repoId: string | undefined): void {
-    this.#repoId = repoId;
+    this.#repo.setRepoId(repoId);
     if (repoId === undefined) {
       this.#clear();
       return;
     }
-    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-  }
-
-  /** F10: a `void this.reload()`-shaped call (every call site in this class is one) has no caller
-   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
-   *  error and a silent unhandled rejection with the view left showing stale refs forever.
-   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
-  #logBackgroundError(context: string, error: unknown): void {
-    console.error(`RefsState: ${context} failed`, error);
+    this.#repo.fireAndForget('reload', () => this.reload());
   }
 
   async reload(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     // A repo switch (or close) that lands while this request was in flight must not let a
     // stale reply overwrite the newer repo's own state — the same "does this answer still apply"
@@ -98,7 +89,7 @@ export class RefsState {
     // `refsChanged` events in quick succession must not let the older one's reply land last.
     const outcome = await this.#reloadRequest.run(
       (signal) => this.#bridge.request('refs.list', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.isCurrent(repoId),
     );
     if (outcome.status === 'error') throw new Error(outcome.message);
     if (outcome.status !== 'ok') return;
@@ -126,7 +117,7 @@ export class RefsState {
   }
 
   dispose(): void {
-    this.#unsubscribe();
+    this.#repo.dispose();
     this.#reloadRequest.abort();
   }
 }

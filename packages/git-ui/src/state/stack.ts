@@ -10,6 +10,7 @@ import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { createLatestRequest } from './latestRequest.ts';
 import type { PrState } from './pr.ts';
+import { RepoScopedReload } from './repoScopedReload.ts';
 
 /** Every branch name across a `stack.list` result — `StackList.vue`'s own row set, and F13's own
  *  "warm `PrState.byBranch` for the whole stack view in one call" input. */
@@ -53,8 +54,7 @@ export class StackState {
 
   readonly #bridge: BridgeClient;
   readonly #pr: PrState | undefined;
-  #repoId: string | undefined;
-  readonly #unsubscribeChanged: () => void;
+  readonly #repo: RepoScopedReload;
   readonly #unsubscribeProgress: () => void;
   /** F5: a `refsChanged` event fired twice in quick succession can reply out of order — only the
    *  latest issued `reload()` is ever allowed to apply. */
@@ -63,13 +63,12 @@ export class StackState {
   constructor(bridge: BridgeClient, pr?: PrState) {
     this.#bridge = bridge;
     this.#pr = pr;
-    this.#unsubscribeChanged = bridge.on('repo.changed', (event) => {
-      if (this.#repoId !== event.repoId) return;
-      if (event.kind !== 'refsChanged') return;
-      void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+    this.#repo = new RepoScopedReload(bridge, 'StackState', {
+      kind: 'refsChanged',
+      onChanged: () => this.#repo.fireAndForget('reload', () => this.reload()),
     });
     this.#unsubscribeProgress = bridge.on('stack.progress', (event) => {
-      if (this.#repoId !== event.repoId) return;
+      if (this.#repo.repoId !== event.repoId) return;
       this.progress.value = [...this.progress.value, event];
     });
   }
@@ -78,7 +77,7 @@ export class StackState {
    *  repo's own stack forest immediately rather than waiting on a `repo.changed` event a freshly
    *  opened repo has no reason to ever emit. */
   setRepoId(repoId: string | undefined): void {
-    this.#repoId = repoId;
+    this.#repo.setRepoId(repoId);
     this.restacking.value = false;
     this.progress.value = [];
     if (repoId === undefined) {
@@ -87,23 +86,15 @@ export class StackState {
       this.generation.value++;
       return;
     }
-    void this.reload().catch((error) => this.#logBackgroundError('reload', error));
-  }
-
-  /** F10: a `void this.reload()`-shaped call (every call site in this class is one) has no caller
-   *  left to hand a rejection to — logging once here is what stands between a disconnect/git
-   *  error and a silent unhandled rejection with the view left showing stale data forever.
-   *  `reload()` itself is unchanged and still throws for any future caller that awaits it. */
-  #logBackgroundError(context: string, error: unknown): void {
-    console.error(`StackState: ${context} failed`, error);
+    this.#repo.fireAndForget('reload', () => this.reload());
   }
 
   async reload(): Promise<void> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return;
     const outcome = await this.#reloadRequest.run(
       (signal) => this.#bridge.request('stack.list', { repoId }, signal),
-      () => this.#repoId === repoId,
+      () => this.#repo.isCurrent(repoId),
     );
     if (outcome.status === 'error') throw new Error(outcome.message);
     if (outcome.status !== 'ok') return;
@@ -120,7 +111,7 @@ export class StackState {
    *  branch it targets — a read, like `WorktreeState.previewAdd`, never gated by `restacking` and
    *  never itself mutating anything. */
   async previewRestack(branch: string): Promise<RestackPreflight | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     return this.#bridge.request('preflight.restack', { repoId, branch });
   }
@@ -131,7 +122,7 @@ export class StackState {
    *  `remote.run` settles). `progress` is cleared at the start of THIS run, never accumulating
    *  across two restacks. */
   async runRestack(branch: string): Promise<RestackResult | undefined> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return undefined;
     this.restacking.value = true;
     this.progress.value = [];
@@ -139,8 +130,8 @@ export class StackState {
       return await this.#bridge.request('stack.restack', { repoId, branch });
     } finally {
       this.restacking.value = false;
-      if (this.#repoId === repoId) {
-        void this.reload().catch((error) => this.#logBackgroundError('reload', error));
+      if (this.#repo.isCurrent(repoId)) {
+        this.#repo.fireAndForget('reload', () => this.reload());
       }
     }
   }
@@ -149,14 +140,14 @@ export class StackState {
    *  is an ordinary outcome (the same `{cancelled: boolean}` shape `remote.cancel`/
    *  `worktree.cancelPrepare` already use). */
   async cancelRestack(): Promise<boolean> {
-    const repoId = this.#repoId;
+    const repoId = this.#repo.repoId;
     if (repoId === undefined) return false;
     const result = await this.#bridge.request('stack.cancelRestack', { repoId });
     return result.cancelled;
   }
 
   dispose(): void {
-    this.#unsubscribeChanged();
+    this.#repo.dispose();
     this.#unsubscribeProgress();
     this.#reloadRequest.abort();
   }
