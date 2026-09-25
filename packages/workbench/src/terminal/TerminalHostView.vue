@@ -48,33 +48,16 @@ const { session, footerText } = useTerminalMount({
 </script>
 
 <template>
-  <div class="repo-terminal">
+  <div class="flex flex-col h-full bg-bg p-1">
     <slot />
-    <div ref="container" class="terminal-host" data-testid="repo-terminal-host" />
+    <div ref="container" class="flex-1 min-h-0" data-testid="repo-terminal-host" />
     <div
       v-if="session && (session.status === 'exited' || session.status === 'failed')"
-      class="terminal-footer"
-      :class="{ 'terminal-footer-error': session.status === 'failed' }"
+      class="shrink-0 text-muted-foreground text-kira-sm bg-chrome py-0.5 px-1"
+      :class="{ 'text-error': session.status === 'failed' }"
       data-testid="repo-terminal-footer"
     >
       {{ footerText }}
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.repo-terminal {
-  @apply flex flex-col h-full bg-bg p-1;
-}
-.terminal-host {
-  @apply flex-1 min-h-0;
-}
-.terminal-footer {
-  @apply shrink-0 text-muted-foreground text-kira-sm bg-chrome py-0.5 px-1;
-}
-.terminal-footer-error {
-  @apply text-error;
-}
-</style>

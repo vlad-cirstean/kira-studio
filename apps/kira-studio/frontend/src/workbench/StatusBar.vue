@@ -134,9 +134,11 @@ const agentTooltip = computed(() =>
         <TooltipTrigger as-child>
           <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="app-metrics">
             <CodiconIcon name="pulse" :size="13" />
-            <span class="metric-value font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
-            <span class="metric-sep">·</span>
-            <span class="metric-value metric-mem font-data" data-testid="app-metrics-mem">{{
+            <!-- "100%" -->
+            <span class="inline-block text-right min-w-[4ch] font-data" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
+            <span class="text-subtle">·</span>
+            <!-- "1234.5 MB" -->
+            <span class="inline-block text-right min-w-[9ch] font-data" data-testid="app-metrics-mem">{{
               memLabel
             }}</span>
           </span>
@@ -172,24 +174,13 @@ const agentTooltip = computed(() =>
 <style scoped>
 @reference "@theme/base.css";
 
-/* Fixed, right-aligned slots (monospace, so `ch` is an exact character width) — as the CPU%/
-   memory readouts gain digits they grow into their own reserved space instead of pushing
-   cache-size/engine-status sideways. */
-.metric-value {
-  @apply inline-block text-right;
-}
-.metric-value:not(.metric-mem) {
-  @apply min-w-[4ch]; /* "100%" */
-}
-.metric-mem {
-  @apply min-w-[9ch]; /* "1234.5 MB" */
-}
-.metric-sep {
-  /* P110 B37: color: var(--kira-fg-subtle) -> text-subtle. */
-  @apply text-subtle;
-}
+/* P110 B39: .metric-value/.metric-value:not(.metric-mem)/.metric-mem/.metric-sep were pure
+   @apply-only and moved onto the template directly -- unlike TabStrip.vue's hover/is-active
+   opacity toggle, `:not(.metric-mem)` here resolves statically per template call site (the CPU
+   span never carries .metric-mem, the mem span always does), not a runtime pointer/selection
+   state, so there is no real cascade-order question to preserve.
 
-/* .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
+   .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
    and Enter/Space come free. Its own template class list (P110 B29) already supplies
    height/padding/border-radius/cursor/border-reset. */
 .update {

@@ -33,8 +33,17 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
 </script>
 
 <template>
-  <div ref="scrimEl" class="text-prompt-scrim" data-testid="text-prompt">
-    <div class="text-prompt-box bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden">
+  <!-- P28 D17(c)'s own dialog rung, not a bare z-30 — strictly higher, so unifying every call site
+       on it (including GitPanel.vue, raised directly from the panel with no popover backdrop of its
+       own to clear) is a safe superset, never a visible change at any of the three.
+       P110 B37/B39: z-index: var(--kira-z-dialog) -> z-(--kira-z-dialog), section 1.2's own
+       var-based z-index allowlist entry. -->
+  <div
+    ref="scrimEl"
+    class="fixed inset-0 flex items-center justify-center bg-black/50 z-(--kira-z-dialog)"
+    data-testid="text-prompt"
+  >
+    <div class="w-72 flex flex-col gap-1.5 p-2 bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden">
       <div class="text-prompt-title text-kira-sm text-muted-foreground">{{ title }}</div>
       <Input
         ref="inputRef"
@@ -46,7 +55,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
         @keydown.enter="emit('submit')"
         @keydown.escape="emit('cancel')"
       />
-      <div class="text-prompt-actions">
+      <div class="flex justify-end gap-1.5">
         <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="emit('cancel')"
           >Cancel</Button
         >
@@ -57,24 +66,3 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.text-prompt-scrim {
-  /* P28 D17(c)'s own dialog rung, not a bare z-30 — strictly higher, so unifying every call site
-     on it (including GitPanel.vue, raised directly from the panel with no popover backdrop of its
-     own to clear) is a safe superset, never a visible change at any of the three.
-     P110 B37: z-index: var(--kira-z-dialog) -> z-(--kira-z-dialog), section 1.2's own var-based
-     z-index allowlist entry. */
-  @apply fixed inset-0 flex items-center justify-center bg-black/50 z-(--kira-z-dialog);
-}
-
-.text-prompt-box {
-  @apply w-72 flex flex-col gap-1.5 p-2;
-}
-
-.text-prompt-actions {
-  @apply flex justify-end gap-1.5;
-}
-</style>
