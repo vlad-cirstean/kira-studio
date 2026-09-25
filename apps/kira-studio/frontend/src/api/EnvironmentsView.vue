@@ -225,7 +225,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
 </script>
 
 <template>
-  <div class="environments-view" data-testid="environments-dialog">
+  <div class="flex h-full min-h-0 flex-col" data-testid="environments-dialog">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
@@ -291,8 +291,8 @@ useEventListener(listEl, 'dragend', onDragEnd);
         <div
           v-for="(env, i) in displayEnvironments"
           :key="env.id"
-          class="environment-row"
-          :class="{ 'is-dragging': dragIndex === i }"
+          class="flex items-center gap-1 px-1.5 py-1"
+          :class="{ 'opacity-50': dragIndex === i }"
           :draggable="!isFiltered"
           data-testid="environment-row"
           :data-id="env.id"
@@ -305,13 +305,13 @@ useEventListener(listEl, 'dragend', onDragEnd);
           />
           <Tooltip v-if="isFiltered">
             <TooltipTrigger as-child>
-              <span class="drag-handle" aria-hidden="true" data-testid="environment-grip">
+              <span class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="environment-grip">
                 <CodiconIcon name="gripper" :size="13" />
               </span>
             </TooltipTrigger>
             <TooltipContent>Clear the filter to reorder</TooltipContent>
           </Tooltip>
-          <span v-else class="drag-handle" aria-hidden="true" data-testid="environment-grip">
+          <span v-else class="flex cursor-grab items-center text-subtle" aria-hidden="true" data-testid="environment-grip">
             <CodiconIcon name="gripper" :size="13" />
           </span>
           <Tooltip>
@@ -326,14 +326,14 @@ useEventListener(listEl, 'dragend', onDragEnd);
             </TooltipTrigger>
             <TooltipContent>Active</TooltipContent>
           </Tooltip>
-          <div class="name-field">
+          <div class="min-w-0 flex-1">
             <Input
               v-model="nameDrafts[env.id]"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
           </div>
-          <div class="description-field">
+          <div class="min-w-0 flex-1">
             <Input
               v-model="descriptionDrafts[env.id]"
               placeholder="description"
@@ -393,34 +393,3 @@ useEventListener(listEl, 'dragend', onDragEnd);
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.environments-view {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-.list {
-  @apply flex-1 min-h-0 overflow-y-auto;
-}
-
-.environment-row {
-  @apply flex items-center gap-1 px-1.5 py-1;
-}
-
-.environment-row.is-dragging {
-  @apply opacity-50;
-}
-
-.drag-handle {
-  @apply flex cursor-grab items-center text-subtle;
-}
-
-.name-field,
-.description-field {
-  @apply min-w-0 flex-1;
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
-</style>

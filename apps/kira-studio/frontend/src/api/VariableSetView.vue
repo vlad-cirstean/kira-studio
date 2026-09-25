@@ -464,7 +464,7 @@ function onBulkClose(): void {
 </script>
 
 <template>
-  <div class="variable-set-view" data-testid="variables-dialog" :data-scope="scope">
+  <div class="flex h-full min-h-0 flex-col" data-testid="variables-dialog" :data-scope="scope">
     <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
     <div class="h-bar shrink-0 flex items-center gap-1.5 px-2 border-b border-border">
       <span
@@ -557,13 +557,19 @@ function onBulkClose(): void {
         <AlertDescription>{{ connectionsStore.secretStorage.reason }}</AlertDescription>
       </Alert>
 
-      <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
+      <!-- P28 D16(b): flex-end, not center -- each labelled field is now a two-row column, and
+           centering would misalign the inputs against the colour picker and Duplicate button
+           beside them. -->
+      <div
+        v-if="scope === 'environment' && owningEnvironment"
+        class="flex items-end gap-1 border-b border-border px-1.5 py-1"
+      >
         <!-- P28 D16(b): real labels. Both fields carried a placeholder and nothing else, so a
              populated environment showed two unlabelled text boxes — the placeholder is gone the
              moment either has a value, which is most of the time. Same .cell label convention
              the variable table's own header row below uses. -->
-        <Label class="env-field">
-          <span class="env-field-label text-kira-xs text-subtle">Name</span>
+        <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="pl-0.5 text-kira-xs text-subtle">Name</span>
           <Input
             v-model="envNameDraft"
             placeholder="name"
@@ -571,8 +577,8 @@ function onBulkClose(): void {
             @blur="onEnvFieldBlur"
           />
         </Label>
-        <Label class="env-field">
-          <span class="env-field-label text-kira-xs text-subtle">Description</span>
+        <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="pl-0.5 text-kira-xs text-subtle">Description</span>
           <Input
             v-model="envDescriptionDraft"
             placeholder="description"
@@ -630,7 +636,13 @@ function onBulkClose(): void {
         </Button>
       </div>
 
-      <div class="header-row">
+      <!-- P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
+           description, secret, history, remove) so the labels sit above their columns; the four
+           non-labelled cells are blank placeholders for the columns that carry no header text.
+           grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2 allowlist
+           gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue) --
+           a pre-existing value relocated, not a new one. -->
+      <div class="grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto]">
         <span class="cell"></span>
         <span class="cell">Name</span>
         <span class="cell">Value</span>
@@ -665,41 +677,3 @@ function onBulkClose(): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.variable-set-view {
-  @apply flex h-full min-h-0 flex-col;
-}
-
-/* P110 B34: the "none" swatch's diagonal-slash rule moved to base.css's own `@utility swatch-none`
-   (built at B6, wired up here) -- shared byte-for-byte across this file/ConnectionDialog.vue/
-   ScriptsPane.vue, no per-file copy left. */
-
-.env-fields {
-  /* P28 D16(b): flex-end, not center — each labelled field is now a two-row column, and centering
-     would misalign the inputs against the colour picker and Duplicate button beside them. */
-  @apply flex items-end gap-1 border-b border-border px-1.5 py-1;
-}
-
-.env-field {
-  @apply flex min-w-0 flex-1 flex-col gap-0.5;
-}
-
-.env-field-label {
-  @apply pl-0.5;
-}
-
-/* P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
-   description, secret, history, remove) so the labels sit above their columns; the four
-   non-labelled cells are blank placeholders for the columns that carry no header text. */
-.header-row {
-  /* P110 B37: grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] -- same disclosed section 1.2
-     allowlist gap as .overview-row (VariablesOverviewPanel.vue) and .variable-row (VariableRow.vue)
-     below -- a pre-existing value relocated, not a new one. */
-  @apply grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto];
-}
-
-/* P110 B34: `.empty-state` moved to base.css's own @utility empty-state (15-file duplicate). */
-</style>
