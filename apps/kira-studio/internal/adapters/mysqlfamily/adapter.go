@@ -194,20 +194,16 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 var leafObjectKinds = map[string]bool{"sequence": true, "function": true, "table": true, "view": true}
 
-func requireTwoSegmentPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 2 || segments[0].Kind != "database" {
-		return model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got depth "+strconv.Itoa(len(segments)), nil)
-	}
-	return segments[0], segments[1], nil
-}
-
 // Describe is index.ts's describe.
 func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectMeta, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(path.Segments, "describe")
+	// P113 G2: adapters.RequirePath carries the depth+kind check requireTwoSegmentPath used to spell
+	// out by hand — the object segment stays kind-unconstrained here, same as before, since Describe
+	// reports back whatever Kind it was given rather than filtering on it.
+	segs, err := adapters.RequirePath(path, "describe", adapters.Seg("database"), adapters.AnySeg("table"))
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return model.ObjectMeta{}, err
@@ -264,10 +260,11 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 // SchemaColumns is P22c D1's schema-wide sibling of Describe: every relation in the database
 // together with its columns, in one round trip.
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
-	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got depth "+strconv.Itoa(len(path.Segments)), nil)
+	segs, err := adapters.RequirePath(path, "schemaColumns", adapters.Seg("database"))
+	if err != nil {
+		return nil, err
 	}
-	databaseSegment := path.Segments[0]
+	databaseSegment := segs[0]
 	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return nil, err
@@ -281,10 +278,13 @@ var definitionSupportedKinds = map[string]bool{"table": true, "view": true}
 
 // Definition is index.ts's definition.
 func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapters.OpCtx) (model.ObjectDefinition, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentPath(path.Segments, "definition")
+	// P113 G2: same depth/kind shape as Describe above — the object segment stays unconstrained
+	// here too; definitionSupportedKinds below is a separate, narrower filter applied on top.
+	segs, err := adapters.RequirePath(path, "definition", adapters.Seg("database"), adapters.AnySeg("table"))
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	if !definitionSupportedKinds[objectSegment.Kind] {
 		return model.ObjectDefinition{}, adapters.Unsupported(a.Kind(), "definition for "+objectSegment.Kind)
 	}
@@ -297,21 +297,15 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 	return buildDefinition(ctx, exec, path.Segments, databaseSegment.Name, objectSegment.Kind, objectSegment.Name)
 }
 
-func requireTwoSegmentDataPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
-	if len(segments) != 2 || segments[0].Kind != "database" ||
-		(segments[1].Kind != "table" && segments[1].Kind != "view") {
-		return model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got: "+model.EncodePath(segments), nil)
-	}
-	return segments[0], segments[1], nil
-}
-
 // Read is index.ts's read.
 func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapters.OpCtx) (page.Page, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentDataPath(req.Path.Segments, "read")
+	// P113 G2: unlike Describe/Definition above, the object segment is kind-checked here — Read only
+	// ever targets a table/view, never a bare function/sequence.
+	segs, err := adapters.RequirePath(req.Path, "read", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return nil, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return nil, err
@@ -328,10 +322,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 
 // Count is index.ts's count.
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
-	databaseSegment, objectSegment, err := requireTwoSegmentDataPath(req.Path.Segments, "count")
+	segs, err := adapters.RequirePath(req.Path, "count", adapters.Seg("database"), adapters.Seg("table", "table", "view"))
 	if err != nil {
 		return adapters.CountResult{}, err
 	}
+	databaseSegment, objectSegment := segs[0], segs[1]
 	entry, release, err := a.requireEntry(ctx, databaseSegment.Name)
 	if err != nil {
 		return adapters.CountResult{}, err
