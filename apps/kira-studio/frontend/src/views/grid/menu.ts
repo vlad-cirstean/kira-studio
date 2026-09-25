@@ -242,12 +242,15 @@ export interface CellMenuContext {
   /** F3 (P108 Part 10): the server computes a generated column's value — Edit/Set NULL must
    *  refuse it the same way onBeforeEditCell does, not just the insert paths. */
   isGenerated: boolean;
-  /** F6 (P108 Part 10): this exact cell's own raw value is truncated (the engine's 64 KiB cap) or
-   *  has a staged, uncommitted edit — either makes "Filter by this value" build a predicate that
-   *  either matches nothing (a truncated prefix) or describes a value that isn't stored yet (a
-   *  staged edit, which setFilter's own reload then clears anyway). */
+  /** F6 (P108 Part 10): this exact cell's own raw value is truncated (the engine's 64 KiB cap) —
+   *  "Filter by this value" would then build a predicate against only the stored prefix, matching
+   *  nothing real. A staged, uncommitted edit does NOT get this treatment (interaction.spec.ts's
+   *  own "stage NULL, then filter by it" scenario): `rowValues` below already comes from
+   *  `displayCell`'s staged-over-real merge (rowValues.ts), so a staged value here is exactly the
+   *  value that would land on commit, unmasked and precise — not an unreliable guess. Filtering
+   *  by it is a well-defined `IS NULL`/`= <literal>` query; that it may currently match 0 committed
+   *  rows is the correct, expected answer, not a symptom of an unknowable raw value. */
   truncated: boolean;
-  staged: boolean;
   startEdit: () => void;
   /** P21 D12: DataGrid.vue's own onPaste — an existing, guarded handler this menu had no row for. */
   onPaste: () => void;
@@ -272,9 +275,10 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
     rawValue === null
       ? `${quoteIdent(ctx.dialect, ctx.columnName)} IS NULL`
       : `${quoteIdent(ctx.dialect, ctx.columnName)} = ${quoteLiteral(ctx.dialect, rawValue)}`;
-  // F6: a truncated or staged cell has no reliable raw value to filter on — refuse rather than
-  // build a predicate that either matches nothing or describes a value not yet committed.
-  const filterDisabled = ctx.truncated || ctx.staged;
+  // F6: a truncated cell has no reliable raw value to filter on — refuse rather than build a
+  // predicate against only the stored prefix. A staged cell is NOT included here — see the
+  // `truncated` field doc above.
+  const filterDisabled = ctx.truncated;
   const fkCtx: FkNavContext = {
     connectionId: ctx.connectionId,
     dialect: ctx.dialect,

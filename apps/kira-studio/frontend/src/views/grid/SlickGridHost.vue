@@ -1730,7 +1730,6 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
       isDeleted: isDeleted(row),
       isGenerated: pageCol >= 0 ? (p?.columns[pageCol]?.generated ?? false) : false,
       truncated: rawDc.truncated,
-      staged: rawDc.staged,
       startEdit: () => startEditCell(row, displayCol),
       onPaste: () => void onPaste(),
       meta: rt()?.meta ?? null,
@@ -1893,10 +1892,16 @@ function onKeydown(e: SlickEventData): void {
     return;
   }
 
-  // shortcutFor reads a real KeyboardEvent's own modifier/key fields — SlickEventData copies
-  // exactly that subset onto itself from the native event it wraps (slick.core.ts's own
-  // constructor), so this is a safe reinterpretation, not an unsafe cast to a different shape.
-  const nativeLike = e as unknown as KeyboardEvent;
+  // shortcutFor's own matchesShortcut (keys.ts) reads `.code` for any single-letter chord (F12:
+  // Option+letter on macOS composes a different `.key`, so a letter binding matches on the
+  // physical `.code` instead) — SlickEventData's constructor copies `key`/`ctrlKey`/`metaKey`/etc.
+  // off the wrapped native event onto itself (slick.core.ts), but `code` is not in that copied
+  // list, so a plain field reinterpretation of `e` leaves `.code` `undefined` and every
+  // letter-keyed shortcut reached through this path (grid.duplicateRows, the only one — copy/paste
+  // above are matched on `.key` directly, never routed through shortcutFor) silently never matches.
+  // `getNativeEvent()` is SlickEventData's own accessor for the real, unmodified KeyboardEvent it
+  // wraps, `.code` included.
+  const nativeLike = e.getNativeEvent<KeyboardEvent>();
 
   // P21 D5: dispatched through rowMenu() itself (the same builder the row/gutter context menu
   // will call, C7) so the printed shortcut and the executed action can't drift, and
