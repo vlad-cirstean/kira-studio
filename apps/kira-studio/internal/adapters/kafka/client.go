@@ -34,21 +34,11 @@ const connectTimeout = 10 * time.Second // client.ts's CONNECT_TIMEOUT_MS
 // round 1 added it to redis/mongo but missed kafka, leaving a broker with a self-signed or
 // internal-CA certificate — the case the escape hatch exists for — unable to connect at all).
 func resolveTLSOpt(cfg model.ResolvedConnectionConfig) (ssl bool, skipVerify bool, err error) {
-	sslmode, ok := cfg.Options["sslmode"].(string)
-	if !ok || sslmode == "" || sslmode == "disable" {
-		return false, false, nil
+	sslmode, sslEnabled, err := adapters.ParseSSLMode(cfg.Options, "kafka", "require", "prefer", "verify-full", "verify-none", "insecure")
+	if err != nil || !sslEnabled {
+		return false, false, err
 	}
-	switch sslmode {
-	case "require", "prefer", "verify-full":
-		return true, false, nil
-	case "verify-none", "insecure":
-		return true, true, nil
-	default:
-		// An unrecognized sslmode must fail loudly rather than silently fall back to a plaintext
-		// connection — a typo here would otherwise send credentials and data unencrypted while
-		// the user believes TLS is configured.
-		return false, false, adapters.New(adapters.CodeConnect, `kafka: unknown sslmode "`+sslmode+`"`, nil)
-	}
+	return true, adapters.SkipsVerification(sslmode), nil
 }
 
 func connect(ctx context.Context, cfg model.ResolvedConnectionConfig, log func(level, message string)) (*kgo.Client, *kadm.Client, []kgo.Opt, error) {

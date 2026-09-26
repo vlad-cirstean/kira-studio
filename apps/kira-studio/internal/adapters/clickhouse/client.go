@@ -96,11 +96,6 @@ func targetFromFields(cfg model.ResolvedConnectionConfig) (host, database, usern
 // is http vs https; require/verify-full/prefer all just mean "speak https", the same collapsed
 // distinction client.ts's own comment already committed to for this driver.
 func resolveScheme(options map[string]any) (string, error) {
-	sslmode, ok := options["sslmode"].(string)
-	if !ok || sslmode == "" || sslmode == "disable" {
-		return "http", nil
-	}
-	switch sslmode {
 	// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for
 	// every other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse rejecting it
 	// was the one adapter out of step, and since Options only ever comes from a connection
@@ -108,14 +103,14 @@ func resolveScheme(options map[string]any) (string, error) {
 	// connection-string style across engines hit this immediately. ClickHouse has no
 	// plaintext-with-opportunistic-upgrade transport, so `prefer` means the same as `require`
 	// here, same as it already does for postgres/mysqlfamily.
-	case "require", "prefer", "verify-full":
-		return "https", nil
-	default:
-		// An unrecognized sslmode must fail loudly rather than silently fall back to a
-		// plaintext connection — a typo here would otherwise send credentials and data
-		// unencrypted while the user believes TLS is configured.
-		return "", adapters.New(adapters.CodeConnect, "clickhouse: unknown sslmode \""+sslmode+"\"", nil)
+	_, sslEnabled, err := adapters.ParseSSLMode(options, "clickhouse", "require", "prefer", "verify-full")
+	if err != nil {
+		return "", err
 	}
+	if sslEnabled {
+		return "https", nil
+	}
+	return "http", nil
 }
 
 // resolveTarget is client.ts's own.

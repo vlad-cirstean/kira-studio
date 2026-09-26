@@ -88,7 +88,11 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 	// would make the stop button's contract a lie.
 	connConfig.RuntimeParams["statement_timeout"] = "0"
 
-	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
+	sslmode, sslEnabled, err := adapters.ParseSSLMode(cfg.Options, "postgres", "require", "prefer", "verify-full", "verify-ca")
+	if err != nil {
+		return nil, err
+	}
+	if sslEnabled {
 		switch sslmode {
 		case "require", "prefer":
 			connConfig.TLSConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
@@ -111,11 +115,6 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 				},
 			}
 			overrode = true
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return nil, adapters.New(adapters.CodeConnect, "postgres: unknown sslmode \""+sslmode+"\"", nil)
 		}
 	}
 

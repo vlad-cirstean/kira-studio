@@ -142,8 +142,11 @@ func resolveOptions(mc *mysql.Config, cfg model.ResolvedConnectionConfig, databa
 // under a fixed name per mode (P21 round 2 architecture/security finding 8: never a fresh registry
 // entry per connection id, which would never be deregistered).
 func applyTLS(mc *mysql.Config, options map[string]any) error {
-	sslmode, ok := options["sslmode"].(string)
-	if !ok || sslmode == "" || sslmode == "disable" {
+	sslmode, sslEnabled, err := adapters.ParseSSLMode(options, "mysql-family", "require", "prefer", "verify-full")
+	if err != nil {
+		return err
+	}
+	if !sslEnabled {
 		return nil
 	}
 	switch sslmode {
@@ -169,11 +172,6 @@ func applyTLS(mc *mysql.Config, options map[string]any) error {
 			return err
 		}
 		mc.TLSConfig = tlsName
-	default:
-		// An unrecognized sslmode must fail loudly rather than silently fall back to a plaintext
-		// connection — a typo here would otherwise send credentials and data unencrypted while the
-		// user believes TLS is configured.
-		return adapters.New(adapters.CodeConnect, "mysql-family: unknown sslmode \""+sslmode+"\"", nil)
 	}
 	return nil
 }

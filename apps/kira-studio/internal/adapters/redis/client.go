@@ -80,24 +80,19 @@ func resolveFields(cfg model.ResolvedConnectionConfig, log func(level, message s
 	}
 
 	var tlsConfig *tls.Config
-	sslmode, hasSslmode := cfg.Options["sslmode"].(string)
+	sslmode, sslEnabled, err := adapters.ParseSSLMode(cfg.Options, "redis", "require", "prefer", "verify-full", "verify-none", "insecure")
+	if err != nil {
+		return connectFields{}, 0, err
+	}
 	switch {
-	case hasSslmode && sslmode != "" && sslmode != "disable":
-		switch sslmode {
-		// Unlike Postgres's "require" (encrypt only, no verification — a libpq convention this
-		// app has no reason to inherit for Redis), require/prefer/verify-full all verify here,
-		// matching the Kafka adapter's own reasoning: "require" without verification accepts any
-		// certificate, including an attacker's, with no indication anywhere in the UI.
-		case "require", "prefer", "verify-full":
-			tlsConfig = &tls.Config{ServerName: host}
-		case "verify-none", "insecure":
-			tlsConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // explicit opt-out, not the default
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return connectFields{}, 0, adapters.New(adapters.CodeConnect, `redis: unknown sslmode "`+sslmode+`"`, nil)
-		}
+	// Unlike Postgres's "require" (encrypt only, no verification — a libpq convention this app
+	// has no reason to inherit for Redis), require/prefer/verify-full all verify here, matching
+	// the Kafka adapter's own reasoning: "require" without verification accepts any certificate,
+	// including an attacker's, with no indication anywhere in the UI.
+	case sslEnabled && adapters.SkipsVerification(sslmode):
+		tlsConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // explicit opt-out, not the default
+	case sslEnabled:
+		tlsConfig = &tls.Config{ServerName: host}
 	case uriWantsTLS:
 		tlsConfig = &tls.Config{ServerName: host}
 	}

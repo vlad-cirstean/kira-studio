@@ -433,8 +433,11 @@ drops with a `warn` log rather than forwarding to the driver (go-sql-driver's `P
 executes as a literal `SET <k> = <v>` statement at connect time, not a bag of DSN options).
 
 **P21 round 2** closed the one place this vocabulary had drifted from its own stated
-rules, without unifying the six independent switches into one shared helper (left for a later
-round — see `docs/v1.2/SPEC.md`'s P21 row). Kafka's own `default:` branch used to reject
+rules; **P115 Part 2's H1** later unified the shared half of the six switches —
+`adapters.ParseSSLMode` reads `Options["sslmode"]`, applies the empty/`disable` convention, and
+fails loudly on a value outside that adapter's own accepted set — while each adapter keeps its own
+`tls.Config` construction (the mysql-family TLS registry, pg `verify-ca`'s hostname-skipping chain
+check, ClickHouse's scheme choice, redis's `rediss://` implying TLS). Kafka's own `default:` branch used to reject
 `verify-none`/`insecure` outright, even though the paragraph above already documented it as Kafka's
 own escape hatch alongside Redis and MongoDB — a broker with a self-signed or internal-CA
 certificate (the case the escape hatch exists for) could not be connected to at all; it now accepts
