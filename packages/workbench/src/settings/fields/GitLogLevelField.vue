@@ -28,7 +28,7 @@ const fieldId = useId();
 <template>
   <Field>
     <div class="flex items-center justify-between gap-1">
-      <Label :for="fieldId">Git log level</Label>
+      <Label :for="fieldId" class="text-kira-sm">Git log level</Label>
       <TooltipIconButton
         icon="discard"
         label="Reset to default"
