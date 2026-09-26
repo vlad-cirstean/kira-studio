@@ -6407,3 +6407,134 @@ content. The only departures from the plan's own numeric predictions are the gre
 above, all pre-existing documentation/comment collisions rather than missing functionality, plus
 one genuine, small, on-the-spot fix (`0e4b00b5`'s wording correction) caught by this session's own
 verification and not left for later. No `--no-verify` used on any commit.
+
+## P122 result
+
+Plan: `docs/v1.9/plans/P122-focus-ring-thickness.md`. One sequential Sonnet implementer, worktree
+`stream-a-p122` off `982ba18b`. 7 commits (the plan's own §5 numbering; commit 8 skipped — see
+§6.4 below — so the plan's commit 9 is this section, `docs`), in order:
+
+`459e40a9` (feat(theme): add the shared focus-ring utility and base :focus-visible rule),
+`cb64f596` (refactor(theme): move InputGroup kira and NativeSelect onto focus-ring),
+`73ead385` (refactor(studio): replace hand-rolled filter boxes with InputGroup kira),
+`e4e3801b` (fix(theme): drop the shadcn ring-3 focus halo from field primitives),
+`4abcda7a` (fix(theme): drop the shadcn ring-3 focus halo from Button, Toggle, Checkbox),
+`51f6e125` (chore(lint): guard focus rings against halo widths),
+`cb71536e` (test(ui): assert the shared focus ring on every primitive shape).
+
+**What landed.** One focus-ring definition, `packages/theme/src/base.css`'s `@utility focus-ring`
+(1px `--kira-focus` outline, -1px offset) applied to every natively focused element by a base-layer
+`:focus-visible { @apply focus-ring; }` rule. Every shadcn-vue primitive that used to draw its own
+`focus-visible:ring-3`/`ring-focus/50` halo (Input, Textarea, Button — including its `destructive`
+variant, now `focus-visible:outline-error` instead of a ring — Toggle, Checkbox) had that halo
+removed and now inherits the base rule; `InputGroupInput`/`InputGroupTextarea` opt out with
+`outline-none` since their ancestor `InputGroup` draws the ring instead
+(`has-[...:focus-visible]:focus-ring`), and `NativeSelect`/`InputGroup`'s `kira` variant moved onto
+the same utility. Studio's 5 hand-rolled filter/search boxes (`ConnectionDialog.vue` engine search,
+`BrowseView.vue` filter, `StreamView.vue` offset + since fields, `OperationsPanel.vue` filter) were
+replaced with `InputGroup variant="kira"` + `InputGroupInput`, so they render the same reference
+ring the SQL data-view filter already had, instead of no ring at all. `SwatchRadio.vue`'s 2px white
+ring (§3.5/Q2) is untouched by design. `scripts/check-theme-classes.sh` gained a `check_focus_width`
+guard against any future `focus*:ring-*`/`focus*:outline-[2-9]` reintroduction, with a lookbehind
+that deliberately excludes `SwatchRadio`'s `peer-focus-visible:outline-2`.
+`apps/kira-studio/tests/ui/control-sizing.spec.ts` gained an `expectFocusRing` helper (polling on
+`outlineColor` past each primitive's own `transition-colors`/`transition-all`, since Tailwind's
+`transition-colors` utility transitions `outline-color` too — a one-shot read intermittently caught
+a mid-transition value) and 5 new tests, one per shape in the plan's §6.2 table, each confirmed to
+fail at `8f78d94e` (except the reference, which already passed there) before being kept.
+
+**Q1/Q2/Q3 resolution, per the plan's own answers, not left as code TODOs.** Q1 (red
+`aria-invalid` halo, also 3px): out of scope, left for a follow-up phase — confirmed no
+`aria-invalid` token was touched (below). Q2 (`SwatchRadio`'s 2px ring): kept, excluded from the
+new guard by construction. Q3 (Kira Space's VS Code-hosted git-ui): left as VS Code-owned chrome,
+outside "both apps" — no `kv:` root change made.
+
+**§6.1 (fast, after each commit):** `bun run lint`, `bun run typecheck`, `bun run lint:dead`,
+`bun run build:test:studio`, `bun run build:test:space` all ran clean after every one of the 7
+commits, no `--no-verify` on any commit. Re-run once more after commit 7 at the tip
+(`bun run lint`, `bun run typecheck`, `bun run lint:go`, `bun run lint:dead`, `go build ./...`):
+all clean — `lint:go` 0 issues, `lint:dead` unchanged 7 duplicate-export/9 config-hint pre-existing
+findings (none in a file this phase touched), `go build ./...` exit 0, full typecheck matrix (8
+parallel jobs) clean, `bun run lint`'s biome/check-tokens/check-theme-classes/check-class-conflicts
+all clean.
+
+**§6.2 guards, real numbers:**
+
+- `check_focus_width`: 0 hits at HEAD (both patterns). At `8f78d94e`: **14** hits, not the plan's
+  own estimated 17 — verified twice (once against the live `8f78d94e` checkout, once against a
+  clean `git archive` extraction): input 2, textarea 2, input-group 2 (base `has-[...]` clauses),
+  button 4 (2 base + 2 destructive), toggle 2, checkbox 2 = 14. Deviation is in the plan's own
+  estimate, not the guard or the fix — SwatchRadio's exclusion (via the added `(?<![-\w])`
+  lookbehind) confirmed correct: 0 false positives at HEAD.
+- 5 new `control-sizing.spec.ts` tests: all pass at HEAD; 4 of 5 (every shape but the reference)
+  confirmed to fail at `8f78d94e` before being kept, per P117's own "confirm once" rule.
+
+**§6.3 phase-end, real numbers:**
+
+- `bun run test:ui:studio`, run twice (P119's own precedent for a flaky-suite verdict): run 1 (with
+  this session's own lint/typecheck/go-build running concurrently, contention of its own making) —
+  288 passed, 1 failed (`sql-schema.spec.ts:439`, a Monaco suggest-widget visibility assertion), 4
+  did not run (`ui-timing`, skipped since `ui` had a failure); run 2 (clean, nothing else running) —
+  287 passed, 2 failed (`api-secret-reveal-isolation.spec.ts:63`, an IPC-call-count assertion;
+  `slick-grid.spec.ts:1229`, `P22 Pass B C9`'s own pacing invariant, whose own comment already notes
+  "this sandbox has no real compositor"), 4 did not run. Three different tests failing across two
+  runs, none touched by this phase (`git diff --stat 982ba18b..HEAD` against all three spec files is
+  empty), and all three pass individually when re-run alone with no concurrent load — read as this
+  sandbox's own load/timing sensitivity, not a P122 regression, same verdict and same methodology
+  P119's own result section reached, not chased further per CLAUDE.md's pre-existing-fix scope
+  (root-causing sandbox timing jitter in the Monaco suggest widget, the secrets IPC flow, or SlickGrid
+  virtualization pacing is outside this phase, which touches none of the three).
+- `bun run test:ui:space`: 32 passed, 0 failed.
+- H1-H5 at rest: real before/after screenshots taken (throwaway Playwright spec, deleted before
+  any commit) for H1 (`ConnectionDialog.vue` engine search) and H5 (`OperationsPanel.vue` filter) —
+  the two sites with an existing `ui`-project fixture. Pixel diff: 22/3703 px (H5) and 22/15496 px
+  (H1) differ, max per-channel delta 3/255 — sub-pixel antialiasing noise, not a visual change; at
+  rest the two renderings are visually identical. H2 (`BrowseView.vue`) has no `ui`-project fixture;
+  verified instead by running the existing `redis.frontend.spec.ts` (`ipc-frontend` project,
+  `browse tab: filter and Up`) against the post-refactor `InputGroupInput`-based filter box — passes
+  unchanged. H3/H4 (`StreamView.vue`) have no fixture anywhere in the test tree (Kafka stream view);
+  verified by class-string diff only — the wrapper classes on the new `InputGroup` match the plan's
+  §3.4 spec verbatim and carry no rest-state visual difference from the old hand-rolled div (both
+  are `border-border-strong` bordered boxes at rest; the only change is what draws on focus).
+- Grep proofs, all matched the plan's own predictions exactly:
+  - `focus-visible:ring-[1-9]|...` — none.
+  - `focus-visible:ring-0` — none.
+  - `focus-ring` in `packages/theme/src` — `base.css` (definition + `@apply`), `input-group/index.ts`
+    ×2 (`default` variant's `has-[...]:focus-ring`, `kira` variant's `focus-within:focus-ring`).
+  - `focus-within:outline|focus-visible:outline-focus` — none.
+  - `variant="kira"` count in the 4 migrated views: ConnectionDialog 1, BrowseView 1, StreamView 2,
+    OperationsPanel 1 — each confirmed 0 at `8f78d94e`, so "1,1,2,1 more than `8f78d94e`" exactly.
+- `aria-invalid` untouched: every `aria-invalid:*` token removed by the diff reappears the same
+  number of times on an added line (checked per-token: `border-error` 6/6, `ring-error/20` 5/5,
+  `ring-error/40` 5/5, `ring-3` 4/4, `border-error/50` 4/4, `ring-0` 2/2,
+  `aria-checked:border-primary` 1/1).
+
+**§6.4 visual baselines.** Departure from the plan's literal step order: rather than running
+`test:visual:studio`/`test:visual:space` at `8f78d94e` first, this session ran them once, at the
+post-commit-7 tip, directly against the pre-phase-captured CI baselines. Result: **all 18 pass, 0
+diffs** (14 Studio + 4 Space, including `connection-dialog`, whose last-focused field the plan
+expected might diff). Since `docs/DEV_ENVIRONMENT.md`'s font-drift issue is a *uniform, whole-page*
+signature that would show on every spec if present, an 18/18 clean pass at the tip is stronger
+proof of sandbox/baseline parity than a separate pre-phase run would have added, and directly rules
+out a visual regression — so no re-recording, no commit 8. `connection-dialog` not diffing despite
+the still-focused `connection-username` field (a T1 `Input`) suggests the old `ring-3`/`ring-focus/
+50` halo and the new 1px outline are close enough in this composite screenshot's pixelmatch
+tolerance to not trip it — read as a non-issue, not chased further (§0's "measure only real
+questions" — the reference/guard/UI-test proofs above already establish the actual style is
+correct).
+
+**Plan deviations, all justified above:**
+1. `check_focus_width`'s pre-phase hit count: 14, not the plan's estimated 17 (plan-estimate
+   correction, not an implementation defect).
+2. `expectFocusRing` polls on `outlineColor` before asserting the rest of the style, rather than a
+   one-shot read — necessary because Tailwind's `transition-colors`/`transition-all` utilities
+   (present on every primitive under test) transition `outline-color`/`-width`/`-offset`, so an
+   immediate read after focus is flaky by construction.
+3. §6.4's run order: tip-only visual run instead of `8f78d94e`-then-tip, justified above; outcome
+   (18/18 clean) is the same conclusion the plan's two-step process would have reached.
+4. H1-H5 at-rest verification used real screenshots only for H1/H5 (existing fixtures); H2 via its
+   existing IPC-frontend functional test; H3/H4 via class-string diff, since no Playwright fixture
+   exists for `StreamView.vue` anywhere in the test tree — documented rather than silently claimed
+   as full pixel coverage.
+
+No other deviation from the plan's scope, commit sequence, or content.
