@@ -36,3 +36,110 @@ changes first.
 - **`plans/`** — one implementation plan per phase, committed before that phase's implementation
   starts, written by an Opus subagent per `CLAUDE.md`'s own process, never edited afterward.
 - **`design/`** — P129's user-supplied design spec and approved mockup.
+
+## P127 result
+
+Plan: `docs/v2.0/plans/P127-agent-monitor-extraction.md`. One Opus planning pass, one sequential
+Sonnet implementer, no stream split (the plan's own §3: one continuous, order-dependent chain).
+11 commits, `4a8ec2b9`..`29240de1` plus this result commit (`git log --oneline
+21cd546e..29240de1`); two unrelated docs commits from a concurrent background task
+(`4d75e78f`/`c6af1850`) land interleaved and touch none of this phase's files.
+
+**Commits, in the plan's own §4 order, plus one unplanned fixup:**
+
+1. `4a8ec2b9` — move the hook listener to repo-root `internal/agenthooks` (`git mv`, import fixes
+   in `bridge/agenthooks.go`/`bridge/terminal.go`, app-neutral package/shim comments).
+2. `d3271a1f` — add `agenthooks.Manager` (start/stop/status, `ComposeLaunch` for the `--settings`
+   flag and hook env), `New` now quotes the settings path once so `ComposeLaunch` has no error
+   path; Studio's `AgentHooksService` rewired onto it, behaviour unchanged.
+3. `6c12720d` — split `agentActivity.ts` (the reducer) out of `createAgentSessionsStore.ts` (the
+   store), both moved from Studio's `state/agentSessions.ts` to `packages/workbench/src/state/`;
+   the reducer spec moved with it (`git mv`), a `biome.json` rule bans `@bindings*` imports from
+   `packages/workbench`.
+4. `2370dbee` — pre-existing bug fix folded in per the task: `Stop` now clears `toolName` too (P86
+   §13 rule 4, "clears everything"), with the missing assertion added to the reducer spec.
+5. `c2dc2a14` — every Kira Studio UI/state consumer removed: `StatusBar.vue`'s agent widget,
+   `ClaudeCodePane.vue`'s hooks toggle, `host.ts`'s tab-attention wiring, `TerminalView.vue`'s
+   hooks banner, `state/agentHooks.ts`/`state/agentSessions.ts` deleted, `main.ts`'s boot call
+   removed, matching UI/IPC test fixtures updated.
+6. `d20bc970` — the Go bridge surface dropped: `bridge/agenthooks.go` deleted,
+   `TerminalService` loses `AgentHooks`/the sessions projection/`AgentSessions()`/
+   `TerminalAgentSessionsChanged`, the two channel constants hoist to `internal/appevent`,
+   `main.go` rewired; bindings regenerated (28 → 27 services). Kira Space's own comments touched
+   only to stop describing Studio as still having hooks.
+7. `a3dcce73` — `claudeCode.hooksEnabled`/`hooksPromptDismissed` dropped from
+   `ClaudeCodeSettings`/`ClaudeCodePatch` (Go) and `claudeCodeSettingsSchema` (TS); migration
+   `0029` deletes both rows from an existing `settings` table.
+8. `309f5b45` — `settings-claude-code-visual-linux.png` re-recorded (only the keep-awake checkbox
+   remains), confirmed against an untouched `P127_START` run first.
+9. `5fe34502` — `docs/ARCHITECTURE.md`: bound-service count 28 → 27 with the terminal surface's
+   own count now two (`AgentHooksService` gone); the stale "nineteen"
+   `appcore.Deps`-embedding claim corrected to a re-measured twenty-one; a new paragraph on the
+   shared `internal/agenthooks` package and what a host still supplies; one sentence on repo-root
+   `internal/` sitting outside both `layering_test.go` scopes.
+10. `29240de1` — **unplanned fixup**, found running the closing audit below: six explanatory
+    comments (in `settings.go`, `settingsDomain.ts`, `events.go`, `keepawake.go`, `embedded.go`,
+    `StatusBar.vue`) named the moved-out feature using the exact identifiers §6's own audit greps
+    for (`agenthooks`, `AgentHooksService`, `hooksEnabled`, `hooksPromptDismissed`,
+    `ChannelAgent*`, `agent-sessions`) — reworded to describe it generically; meaning unchanged.
+
+**What landed**, matching the plan's own §1/§2 scope. `internal/agenthooks` (`Manager`, `Event`,
+the socket protocol, its documented bounds unchanged) is a shared, host-neutral Go package now,
+importable from either app under Go's own `internal/` visibility rule without importing anything
+back from `apps/`. The reducer and Pinia-store factory live at
+`packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts`. Wire types stayed put
+at `packages/shared/domain/agent.ts` — already shared since P86, nothing to move. The two
+event-channel strings hoisted to `internal/appevent`. Kira Studio consumes none of it: no settings
+leaf, no bound service, no store, no UI reference anywhere. Keep-awake's own agent-aware reason
+(`ClaudeCode.KeepAwakeWithAgents`, `KeepAwakeAgentSessionsChanged`) is untouched and confirmed to
+read only `internal/terminal`'s own registry count (`OpenParams.Agent`), never the session
+monitor — exactly the §2.5 call the plan asked for. Nothing wires the shared package into Kira
+Space's UI yet, by design; that is P129's job.
+
+**Closing audit (plan §6), final state, all 7 checks:**
+
+| Check | Result |
+|---|---|
+| Kira Studio references none of the moved/removed code | Only `internal/storage/migrations/0029_*.sql`'s own literal settings keys, as expected. (First pass also matched six explanatory comments; fixed in commit 10 above, re-run clean.) |
+| Shared Go imports nothing from `apps/` | Empty |
+| Shared TS imports nothing from `apps/` or bindings | Empty |
+| Channel strings: one Go, one TS copy | `internal/appevent/appevent.go` and `packages/shared/protocol/events.ts` only |
+| No dead binding import | Empty |
+| Kira Space: comments only | One legitimate exception: both apps' `tsconfig.tests.json` gained the same `"../../packages/workbench/src/**/*.spec.ts"` exclude line — needed because the moved reducer spec is a `bun:test` file under a `types: ["node"]` project (same precedent as the existing `testing/unit/**` exclude), not a comment and not a behavior change |
+| Keep-awake intact | `main.go`'s `OnChange`, `bridge/keepawake.go`, `bridge/terminal.go`'s `Agent:` field — exactly the three named |
+
+**Verification (plan §5), run once near phase end, against the phase's own final commit:**
+
+- `go build ./...`, `go vet ./...` — clean.
+- `bun run lint:go` — 0 issues.
+- `go test ./internal/agenthooks/ ./internal/terminal/ ./internal/appevent/
+  ./apps/kira-studio/internal/... ./apps/kira-space/internal/...` — all pass, both
+  `layering_test.go` packages included, no exemption-set change.
+- `bun run typecheck`, `bun run lint` — clean.
+- `bun run lint:dead` — 7 pre-existing duplicate-export findings (6 as of P117's own result), none
+  in a file this phase touched.
+- `bun run build:studio`, `bun run build:space` — clean.
+- `bun run test:unit` — 1662 pass, 0 fail — the 7 reducer tests moved, not added, so the total is
+  unchanged.
+- `bun run test:ui:studio` — 299 tests, matching the baseline exactly: `settings-claude-code.spec.ts`
+  dropped from 4 tests (confirmed against `21cd546e`) to 1, the minus-3 the plan predicted, no
+  other count change. Two full-suite runs each hit a different, unrelated failure
+  (`data-view.spec.ts`'s page crash, then `console-format.spec.ts`/`sql-schema.spec.ts`), each
+  passing cleanly alone — the same worker-contention flake pattern P117's own result documented,
+  not caused by this phase.
+- `bun run test:ui:space` — 34/34 pass, unchanged.
+- `bun run test:ipc:fe:studio` — 7/7 pass, unchanged.
+- `bun run test:visual:studio` — 14/14 pass. Confirmed against an untouched `P127_START`
+  (`21cd546e`) run in this same sandbox first, also 14/14 including the old Claude Code pane, so
+  the sandbox renders like the checked-in baselines and the one re-recorded snapshot (commit 8) is
+  the real UI change, not drift. One run mid-verification showed a transient 26px diff on
+  `schema-dialog.png` (Monaco's own scrollbar rendering), gone on a clean re-run — confirmed a
+  flake, not a regression, since `git diff --stat 21cd546e..HEAD` touches no file under that spec,
+  its snapshot, or the editor package.
+- `bun run test:visual:space` — 4/4 pass, unchanged.
+
+**§5.2 live run: not checked.** No Wails runtime or display in this sandbox — stated plainly here
+rather than implied as verified, per the plan's own instruction for exactly this case.
+
+**Known open item, not this phase's to close.** The shared package is unwired from every app until
+P129 wires it into Kira Space's `ade` module.
