@@ -6958,3 +6958,41 @@ since both are one fix.
    proof already closes the question the runtime probe exists to answer.
 
 No other deviation from the plan's scope, commit sequence, or content.
+
+## P123 landing note
+
+P123 was implemented concurrently with P121 (by user override, see above) and landed second, onto
+`claude/unimplemented-items-xjrz4c` post-P121 (`2cb6e9d8`) plus two direct user commits (`822a2603`,
+`51dcf716`). Per the plan's own §4 landing rule ("keep P121's structure, apply §1.2 to the resulting
+class string"), the orchestrating session rebased `p123-font-size-normalization` onto trunk itself
+(git conflict resolution during landing is orchestration-level work, not a subagent's, per this
+file's own standing exception) — real conflicts beyond the binary snapshot ones (`toggle/index.ts`,
+`ConnectionDialog.vue` ×2 hunks split across 2 commits, `ConsoleView.vue`, `TitleBar.vue`,
+`TabStrip.vue`, `control-sizing.spec.ts`, `check-theme-classes.sh`, `docs/ARCHITECTURE.md`,
+`docs/v1.9/SPEC.md`), every one resolved by keeping P121's structure and re-applying P123's text-size
+fix on top, plus 8 binary snapshot conflicts (resolved by regenerating, not hand-merging — see
+below).
+
+**One real gap found and fixed post-rebase:** `packages/theme/src/components/ui/tabs/index.ts`
+(`tabChipVariants`) is a P121-only file, added after P123 branched at `367a3ac1` — no P123 commit
+ever touches it, so the rebase carried its base `text-kira-sm` straight through with no conflict to
+flag it. Plan §4's own post-rebase check (`rg -n 'text-kira-(xs|sm)' packages/theme/src/components/
+ui/tabs`) catches exactly this — fixed to `text-kira-md` (control-text role), which bumped every tab
+chip 11px → 12px. Updated the two `control-sizing.spec.ts` literal-11px assertions this broke (P121's
+own S5/S6 and T4 tests, now 12px) and re-recorded the 5 visual baselines a tab chip appears in
+(connection-dialog, console, data-view, schema-dialog, workbench).
+
+**Visual baselines:** every P121/P123 binary snapshot conflict was resolved by keeping one side as a
+placeholder, then regenerating for real (`test:visual:update:studio`/`:space`) against the fully
+merged tree once the rebase finished — 8 specs from P123's own re-record commits, then those same 5
+again after the tabs/index.ts fix above. Both visual suites (18 tests) pass clean at the final tip.
+
+**Post-rebase verification** (mirroring P121's own landing rigor): `bun run lint`, the full 8-way
+`bun run typecheck` matrix, and `go build ./...` all clean. `bun run test:ui:space`: 34/34 pass,
+including the P121 T1/S1 tab tests this rebase touches. `bun run test:ui:studio`: 297 passed, 1
+failed (`slick-grid.spec.ts:551`, `git diff --stat 907c8204` empty, passes alone in isolation), 4
+did not run (`ui-timing`, gated on the `ui` failure) — re-run with `--no-deps`: 3 passed, 1 failed
+(`budgets.spec.ts:356`, `git diff --stat 907c8204` also empty). Both are the exact file:line P121's
+own result section already named and disposed of (pacing/rebuild-probe timing under load; strict
+wall-clock latency budget under cross-worker contention) — not a new regression, not re-litigated
+further here.
