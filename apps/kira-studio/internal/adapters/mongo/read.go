@@ -42,13 +42,7 @@ func ejsonStringify(v any, canonical bool) (string, error) {
 
 // readReq is the field subset of adapters.ReadRequest readPage needs, minus Path (already
 // resolved by the caller into db/collection).
-type readReq struct {
-	Projection []string
-	Filter     *string
-	Sort       *model.SortSpec
-	PageSize   int
-	Cursor     model.PageCursor
-}
+type readReq = adapters.ReadReq
 
 // readSortPlan is readPage's sort/keyset eligibility resolution — the two directions (mongoDirection,
 // the sort's own; scanDirection, what the find() itself issues) diverge only for a "before" keyset

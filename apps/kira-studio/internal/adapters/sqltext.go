@@ -454,15 +454,16 @@ type EffectiveOrder struct {
 	KeysetDirection string
 }
 
-// validateRequestedTerms is ComputeEffectiveOrder's own column-existence and direction check, split
-// out to keep that function's own cognitive complexity down (golangci-lint's gocognit). F11:
-// BuildOrderBy uppercases Direction for the ORDER BY text itself (so "ASC"/"Asc" still produce
-// correct SQL there), but the keyset comparison further down the pipeline (BuildKeysetPredicate)
-// compares the lowercase literal "asc" — an upper-case direction would build the ORDER BY correctly
-// while silently mismatching the keyset operator/reversal logic, mispaging. Rejecting anything but
-// the exact lowercase spelling here closes that gap at the source, before
-// EffectiveOrder.KeysetDirection is ever set from it.
-func validateRequestedTerms(terms []OrderTerm, columnByName map[string]model.ColumnMeta) error {
+// ValidateRequestedTerms is ComputeEffectiveOrder's own column-existence and direction check, split
+// out to keep that function's own cognitive complexity down (golangci-lint's gocognit), and shared
+// with ClickHouse's own sort validation (H3, P115 Part 2), which has no keyset pipeline of its own
+// but needs the identical column-exists/direction check. F11: BuildOrderBy uppercases Direction for
+// the ORDER BY text itself (so "ASC"/"Asc" still produce correct SQL there), but the keyset
+// comparison further down the pipeline (BuildKeysetPredicate) compares the lowercase literal "asc"
+// — an upper-case direction would build the ORDER BY correctly while silently mismatching the
+// keyset operator/reversal logic, mispaging. Rejecting anything but the exact lowercase spelling
+// here closes that gap at the source, before EffectiveOrder.KeysetDirection is ever set from it.
+func ValidateRequestedTerms(terms []OrderTerm, columnByName map[string]model.ColumnMeta) error {
 	for _, t := range terms {
 		if _, ok := columnByName[t.Column]; !ok {
 			return New(CodeNotFound, "unknown column in sort: "+t.Column, nil)
@@ -491,7 +492,7 @@ func ComputeEffectiveOrder(sort_ *model.SortSpec, columns []model.ColumnMeta, ti
 		columnByName[c.Name] = c
 	}
 	if len(requestedTerms) > 0 {
-		if err := validateRequestedTerms(requestedTerms, columnByName); err != nil {
+		if err := ValidateRequestedTerms(requestedTerms, columnByName); err != nil {
 			return EffectiveOrder{}, err
 		}
 	}

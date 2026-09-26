@@ -101,23 +101,19 @@ func computeOrderBySql(sort *model.SortSpec, target ReadTarget) (string, error) 
 		return sort.Text, nil
 	}
 	if sort != nil && sort.Kind == "structured" && len(sort.Terms) > 0 {
-		byName := make(map[string]bool, len(target.Columns))
-		for _, c := range target.Columns {
-			byName[c.Name] = true
-		}
 		terms := make([]adapters.OrderTerm, len(sort.Terms))
 		for i, t := range sort.Terms {
-			if !byName[t.Column] {
-				return "", adapters.New(adapters.CodeNotFound, "unknown column in sort: "+t.Column, nil)
-			}
-			// F11: reject anything but the exact lowercase "asc"/"desc" — adapters.BuildOrderBy
-			// below uppercases Direction straight into the ORDER BY text with no validation of its
-			// own, the same gap ComputeEffectiveOrder's own identical check closes for the other
-			// three relational adapters.
-			if t.Direction != "asc" && t.Direction != "desc" {
-				return "", adapters.New(adapters.CodeQuery, "invalid sort direction: "+t.Direction, nil)
-			}
 			terms[i] = adapters.OrderTerm{Column: t.Column, Direction: t.Direction}
+		}
+		columnByName := make(map[string]model.ColumnMeta, len(target.Columns))
+		for _, c := range target.Columns {
+			columnByName[c.Name] = c
+		}
+		// F11: reject anything but the exact lowercase "asc"/"desc" — adapters.BuildOrderBy below
+		// uppercases Direction straight into the ORDER BY text with no validation of its own, the
+		// same gap adapters.ValidateRequestedTerms closes for the other three relational adapters.
+		if err := adapters.ValidateRequestedTerms(terms, columnByName); err != nil {
+			return "", err
 		}
 		return adapters.BuildOrderBy(terms, quoteIdent), nil
 	}
@@ -146,13 +142,7 @@ const noKeysetMessage = "keyset pagination is unavailable for ClickHouse: a Merg
 	"not a unique key, so there is no total order to build a keyset cursor on — use an offset cursor."
 
 // readReq is adapter.ts's ReadRequest minus Path.
-type readReq struct {
-	Projection []string
-	Filter     *string
-	Sort       *model.SortSpec
-	PageSize   int
-	Cursor     model.PageCursor
-}
+type readReq = adapters.ReadReq
 
 // readPage is read.ts's own — D20: caps.Pagination is offset, unconditionally; a cursor in
 // after/before mode is refused outright rather than silently falling back to offset, since a
