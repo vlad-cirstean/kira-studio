@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 import {
   ORDER_ITEMS_PATH,
@@ -191,4 +192,52 @@ test('the view-head band and the toolbar beneath it report the same height (F2(c
     .locator('[data-testid="data-toolbar"]')
     .evaluate((el) => el.getBoundingClientRect().height);
   expect(toolbarHeight).toBeCloseTo(barH, 0);
+});
+
+// P117 A1/S5: every pane-switcher ToggleGroup moved to size="kira" so it renders at
+// --kira-control-h alongside its bar's other controls, instead of the shorter stock toggle size.
+test('the HTTP request pane toggle sits at --kira-control-h (P117 A1)', async ({ relaunch }) => {
+  const { window: page } = await relaunch();
+  await openHttpModeAndNewRequest(page);
+  await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
+
+  const controlH = await rootVar(page, '--kira-control-h');
+  expect(controlH).toBeGreaterThan(0);
+
+  const height = await page
+    .locator('[data-testid="http-request-pane-params"]')
+    .evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeCloseTo(controlH, 0);
+});
+
+// P117 A2: EnvironmentsView's filter InputGroup moved to variant="kira" -- stock rendered at 32px
+// under this view's 22px row chrome.
+test('the environments filter sits at --kira-control-h, and New environment never clips (P117 A2)', async ({
+  relaunch,
+}) => {
+  const ENVIRONMENTS = [
+    { id: 'env-1', name: 'Prod', sortOrder: 0, isActive: true, color: 'green' },
+  ];
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: { collections: [], items: [] } },
+    { channel: IPC.variablesListEnvironments, response: ENVIRONMENTS },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await modeTab(page, 'api').click();
+  await page.click('[data-testid="api-environments"]');
+  await expect(page.locator('[data-testid="environments-dialog"]')).toBeVisible();
+
+  const controlH = await rootVar(page, '--kira-control-h');
+  const filterHeight = await page
+    .locator('[data-testid="environments-filter"]')
+    .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]')
+    .evaluate((el) => el.getBoundingClientRect().height);
+  expect(filterHeight).toBeCloseTo(controlH, 0);
+
+  const newEnvBox = await page.locator('[data-testid="new-environment"]').boundingBox();
+  const dialogBox = await page.locator('[data-testid="environments-dialog"]').boundingBox();
+  if (newEnvBox === null || dialogBox === null) {
+    throw new Error('expected both boxes to be measurable');
+  }
+  expect(newEnvBox.x + newEnvBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width + 1);
 });

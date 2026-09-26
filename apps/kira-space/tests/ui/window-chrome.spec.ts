@@ -144,6 +144,16 @@ test('kira:open-settings opens the Settings dialog', async ({ relaunch }) => {
   await expect(window.locator('[data-testid="settings-dialog"]')).toBeVisible();
 });
 
+// P117 S2: same NativeSelect binding fix as Kira Studio's own settings-apply-on-save.spec.ts --
+// DateFormatField is shared via packages/workbench, so the regression and its guard both apply here.
+test('the date-format select shows its real value on open (P117 S2)', async ({ relaunch }) => {
+  const { window } = await relaunch();
+  await window.click('[data-testid="open-settings"]');
+  await expect(window.locator('[data-testid="settings-dialog"]')).toBeVisible();
+
+  await expect(window.locator('[data-testid="settings-date-format"]')).toHaveValue('relative');
+});
+
 test('kira:menu:toggle-project-panel toggles the project panel', async ({ relaunch }) => {
   const { window } = await relaunch();
   const panel = window.locator('[data-testid="project-panel"]');
