@@ -379,8 +379,9 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	windowsSvc := &bridge.WindowsService{Deps: deps}
 
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
-	// service plus ChannelTerminal's push channel.
-	terminalSvc := &bridge.TerminalService{Emit: deps.Events, Registry: terminal.NewRegistry()}
+	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in
+	// internal/terminal.BoundService; this app's own TerminalService only embeds it.
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: deps.Events, Registry: terminal.NewRegistry()}}
 	// P87 §1.1: the agent reason's own input — every claude-code launch still increments
 	// internal/terminal's own registry count (P127 dropped only the hook-reporting side, not
 	// OpenParams.Agent). AgentSessions() is safe to call from here — session.go documents OnChange

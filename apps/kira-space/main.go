@@ -130,10 +130,9 @@ func main() {
 	settingsSvc := &bridge.SettingsService{Deps: deps}
 	layoutSvc := &bridge.LayoutService{Deps: deps}
 	tabsSvc := &bridge.TabsService{Deps: deps}
-	// P100 Part 2: bridge.TerminalService is duplicated (not hoisted — Go's internal/ rule) from
-	// Kira Studio's own package (bridge/terminal.go's own doc comment) — this app has no Claude
-	// Code hook-reporting toggle in scope, and (P127) neither does Studio's own copy any more.
-	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry()}
+	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
+	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: emitter, Registry: terminal.NewRegistry()}}
 
 	// keepAwakeCtl/keepAwakeSvc are P116 G5's own addition — the title bar's keep-awake toggle,
 	// Kira Studio's own titlebar half (internal/keepawake.Toggle, shared since H3) with no

@@ -7,19 +7,21 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// OpenArgs is the subset of each app's own bound TerminalOpenArgs that Open's validation chain
-// reads — the bound struct itself stays per app (P103 §2.3); each bridge converts to this before
-// calling ValidateOpen (P107 I2-5). Field order matches both apps' own TerminalOpenArgs exactly
-// (H7, P115 Part 2), so each bridge's Open builds one with a plain conversion,
-// terminal.OpenArgs(args), instead of copying every field by hand.
+// OpenArgs is Open's own wire type (P128 §2.1) — both apps' bridge.TerminalService embed
+// *BoundService, so this is the one arg shape Wails binds for Open in either app.
 type OpenArgs struct {
-	TerminalID string
-	Cwd        string
-	Cols       int
-	Rows       int
-	WindowKey  string
-	Command    string
-	LaunchKind string
+	TerminalID string `json:"terminalId"`
+	Cwd        string `json:"cwd"`
+	Cols       int    `json:"cols"`
+	Rows       int    `json:"rows"`
+	WindowKey  string `json:"windowKey"`
+	// Command, when non-empty, runs as `$SHELL -l -i -c Command` instead of a plain login shell
+	// (P85 §2.1) — the initial command a Claude Code or custom-script launch seeds the tab with.
+	Command string `json:"command"`
+	// LaunchKind is P86 §4's own discriminator — one of LaunchKindShell/ClaudeCode/Script, never
+	// inferred from Command (P85 OQ-3's "no heuristic" rule, carried forward). "" is accepted and
+	// treated as LaunchKindShell, so an older caller keeps working.
+	LaunchKind string `json:"launchKind"`
 }
 
 // ValidateOpen is both apps' own TerminalService.Open — identical up to whatever each app's own

@@ -52,12 +52,10 @@ func DefaultCwd() string {
 	return home
 }
 
-// Service is bridge.TerminalService's shared "generic half" (P107 T2-7): Write/Resize/Close and
-// the coalescing output pump, over a Registry and an Emitter. Each app's own bound TerminalService
-// stays a concrete, per-app Wails-bound type (P103 §2.3: bound service types drive binding
-// generation) and holds one of these to delegate to, rather than being one itself — Open stays
-// per-app, since building the rest of OpenParams (Command, LaunchKind-derived Agent) is each app's
-// own concern.
+// Service is BoundService's own "generic half" (P107 T2-7, P128 §2.1): Write/Resize/Close and the
+// coalescing output pump, over a Registry and an Emitter. A separate type from BoundService, not
+// methods on it directly, since Service also exports OpenWithCoalescedOutput and positional
+// Write/Resize/Close — embedding it into BoundService would bind those too.
 type Service struct {
 	Emit     appevent.Emitter
 	Registry *Registry
