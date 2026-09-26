@@ -2,9 +2,8 @@
 import type { AppMode } from '@shared/domain/mode';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
-import { Button } from '@theme/components/ui/button';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
-import { computed } from 'vue';
+import TitleBarWindowActions from '@workbench/components/TitleBarWindowActions.vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { useLayoutStore } from '../state/layout';
@@ -15,8 +14,9 @@ import SettingsDialog from './SettingsDialog.vue';
 
 // P103 Part 2 (§5.4): Kira Studio's own TitleBar.vue, now a thin composition over the shared bar
 // chrome (height/insets/background/Teleport, packages/workbench/src/components/TitleBar.vue) —
-// this file keeps exactly the per-app content: the mode switcher, the panel-toggle/keep-awake/
-// new-window action buttons, and the SettingsDialog it teleports.
+// this file keeps exactly the per-app content: the mode switcher, the panel toggles, and the
+// SettingsDialog it teleports. P116 H7: the keep-awake/new-window buttons moved to
+// TitleBarWindowActions.vue, shared with Kira Space's own copy of this file.
 const keepAwakeStore = useKeepAwakeStore();
 const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
@@ -44,16 +44,6 @@ function onToggleKeepAwake(): void {
     console.error('toggle keep-awake', err);
   });
 }
-
-// §8.3: aria-pressed plus this state-naming tooltip carry what a missing coffee-off glyph would
-// have — @vscode/codicons ships no such glyph, so the button can't also swap its icon the way the
-// Connections/Operations toggles do.
-const keepAwakeTooltip = computed(() => {
-  if (keepAwakeStore.status.error) return `Keep awake failed: ${keepAwakeStore.status.error}`;
-  return keepAwakeStore.status.manual
-    ? 'Keeping this Mac awake — click to stop'
-    : 'Keep this Mac awake';
-});
 </script>
 
 <template>
@@ -126,27 +116,11 @@ const keepAwakeTooltip = computed(() => {
         data-testid="open-settings"
         @click="settingsStore.settingsOpen = true"
       />
-      <TooltipIconButton
-        v-if="keepAwakeStore.status.supported"
-        icon="coffee"
-        :label="keepAwakeTooltip"
-        aria-label="Keep this Mac awake"
-        :icon-size="15"
-        variant="title"
-        size="title"
-        :aria-pressed="keepAwakeStore.status.manual"
-        data-testid="toggle-keep-awake"
-        @click="onToggleKeepAwake"
+      <TitleBarWindowActions
+        :keep-awake="keepAwakeStore.status"
+        @toggle-keep-awake="onToggleKeepAwake"
+        @new-window="onNewWindow"
       />
-      <Button
-        variant="title"
-        size="title-labelled"
-        data-testid="new-window"
-        @click="onNewWindow"
-      >
-        <CodiconIcon name="empty-window" :size="15" />
-        <span>New window</span>
-      </Button>
     </div>
 
     <template #settings>
