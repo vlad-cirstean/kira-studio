@@ -6134,3 +6134,146 @@ practice of never rewriting history, the first 12 stay as committed rather than 
 `apps/kira-space/frontend/src`, `packages/{theme,workbench}/src`, and the two apps' `tests/ui`/
 `tests/visual` trees) — confirmed via `git show --stat` on each commit above. No `.go` file, no
 bound Wails method signature, and no file outside those trees changed.
+
+## P118 result
+
+Plan: `docs/v1.9/plans/P115-fingerprint-dimensions.md` (P115's own findings doc doubles as this
+phase's plan, per the SPEC row). Two independent git worktrees off base `1a57e420` (P117's own
+result commit), per the plan's own §3 "Call: two streams" — zero file overlap (Stream A `*.go`
+only, Stream B `*.ts`/`*.vue` only) confirmed both by the plan's own ownership table and by clean,
+conflict-free rebases. Stream A rebased onto the chapter branch first, landing at `6e01a804`;
+Stream B rebased on top of it second, landing at `0af5340c`. 19 commits total,
+`1a57e420..0af5340c` (8 Stream A, 11 Stream B), confirmed via `git log --oneline 1a57e420..0af5340c`.
+
+**Stream A — Go (H1, H2, H3, H7, H8, H10), plan order, 8 commits:**
+
+- **H2 — depth-0 Children path-kind errors, 1 commit (`cf4bbf0c`).** Redis, kafka, mongo,
+  clickhouse and s3 each hand-wrote the same depth-0 "unexpected root path segment kind" check
+  `adapters.UnexpectedPathKind` already covers; routed through it, error text byte-identical.
+  Variable-depth loop checks in redis/s3 stay hand-written (threading a depth through them would
+  change their text, and no test pins either shape).
+- **H3 — clickhouse/mongo `readReq`/sort validation, 1 commit (`2bc3ee4b`).** clickhouse and mongo's
+  hand-declared `readReq` become aliases of `adapters.ReadReq` (postgres/mysqlfamily/sqlite already
+  alias it); ClickHouse's `computeOrderBySql` column-exists/direction checks now call the newly
+  exported `adapters.ValidateRequestedTerms` instead of a verbatim re-implementation.
+- **H1 — six sslmode switches, 1 commit (`ff3f2e1a`).** New `adapters.ParseSSLMode(options, engine,
+  accepted...)`; postgres, mysql-family, redis, mongo, kafka and clickhouse all route through it,
+  same "<engine>: unknown sslmode "x"" refusal text.
+- **H7 — field-identical structs via conversion, 1 commit (`793ecbc9`).** `toWireAgentEvent`'s
+  manual copy becomes `AgentEventWire(ev)`. `internal/terminal.OpenArgs`'s fields reordered to
+  match both apps' `TerminalOpenArgs` exactly (a conversion needs identical field order, unlike a
+  keyed literal), so both apps' Terminal-Open bridges now pass `terminal.OpenArgs(args)` directly —
+  confirmed via `grep -rn "terminal.OpenArgs(" apps/*/internal/bridge/terminal.go`, exactly 2 hits.
+  `ApprovalPlanIssue`/`DbMcpApprovalPlanIssue` element copies in `dbmcp/explain.go` and
+  `bridge/dbmcp.go` become conversions too. The `OpenArgs` field reorder sits outside the plan's
+  literal file list (`internal/terminal/validate.go`) but is a necessary, risk-free consequence of
+  the conversion, confirmed via the grep above finding only 2 call sites, both updated in this
+  commit. No wire shape, JSON tag, or error text changed.
+- **H8 — shared `HeadState` builder, 1 commit (`788ad4ea`).** `gitsession`'s
+  `headStateFromStatusBranch` mirrored `gitpreflight`'s own unexported `headStateFromBranch` line
+  for line; exported `HeadStateFromBranch`, gitsession converts at its own boundary with
+  `gitclient.HeadState(...)`.
+- **H10 — `logBaseArgs` parametrized, 1 commit (`7c6595be`).** `LogScanArgs` repeated
+  `logBaseArgs`' fixed argv line for line, only the format string differing; `logBaseArgs(format
+  string)` now takes it as a parameter, all three callers pass their own format. Argv order and
+  content unchanged.
+- **Mechanical, not a named finding: 1 commit (`f583789a`).** Regenerated 5 stale `.fixture.ts`
+  frontend mock files (clickhouse/kafka/mariadb/mysql/sqs) missing `caps.keyTypes`, found during
+  this stream's own final verification. Fixed on the spot per the working agreement, not one of
+  H1-H10.
+- **Docs, 1 commit (`6e01a804`).** Extends `docs/ARCHITECTURE.md`'s existing "Known open items"
+  entry for the on-demand-only `ipcfixture` golden-fixture suite with a second, distinct issue
+  found alongside it: `TestFixture_Redis` also fails because `689b6eea` (P113 G2, already landed
+  before this phase) narrowed `redis/mutate.go`'s `resolveDatabaseSegment` from "any database-
+  rooted path" to `RequirePath`'s exact-one-segment match, so the fixture's own namespaced-key
+  delete now fails path validation before it ever reaches the stale-fixture diff. Real regression
+  from a prior phase (not from P118), needing a design call on `RequirePath`'s own contract — out
+  of Stream A's scope (not one of H1/H2/H3/H7/H8/H10, and `redis/mutate.go` isn't in Stream A's
+  file-ownership table); written up in both `docs/ARCHITECTURE.md` and
+  `docs/v1.9/plans/P118-stream-a-findings.md`, with a recommended fix (revert to the pre-G2
+  rooted-path check, or add a rooted-path variant to `RequirePath`).
+
+**Stream A verification, run fresh by the orchestrating session:** `go build ./...` clean, `go vet
+./...` clean, `bun run lint:go` (golangci-lint) 0 issues, full `go test ./...` including the
+real-container adapter suites all pass. File-scope diff matches Stream A's Go-only ownership table
+exactly, plus the justified `internal/terminal/validate.go` field-order change.
+
+**Stream B — TS/Vue (H4, H5, H6, H9), plan order, 11 commits:**
+
+- **H4 — shared `KuiColumnResizeHandle`, plus a bug fix, 1 commit (`280c520d`, `fix:`).** `App.vue`
+  hand-rolled a third copy of the detail-pane resize drag/keyboard logic and lacked the shared
+  component's primary-button guard (P108 Part 11 F10), so right-clicking the handle started a
+  drag. Added a `direction: 'normal' | 'reverse'` prop to `KuiColumnResizeHandle` so the
+  right-docked pane (which widens as the handle moves left) can reuse it, plus its own
+  unmount-mid-drag cleanup the shared component previously lacked.
+- **H9 (rowMenuModel item) — `buildReadOnlyRowMenu` dedupe, 1 commit (`d31846a5`).**
+  `buildReadOnlyRowMenu` is now a plain alias of `buildReviewRowMenu` (verbatim duplicate
+  copy-sha/copy-message-only menus); both call sites keep their own name.
+- **H6 — review's row actions via `createDetailActions`, 1 commit (`2159031b`).**
+  `ReviewSessionState#createRowActions` hand-built the identical `DetailActions` bundle
+  `createDetailActions` already builds; parametrized `createDetailActions`'s announce step as
+  `(text) => void` so both call sites can share it.
+- **H5 — SQL lex option types/projections/literals, 1 commit (`352edea1`).** Collapsed three
+  layers of copies into `sql-lex.ts`'s own `SqlLexOptions`: `LintSqlOptions`/`SplitSqlOptions` are
+  now aliases of a new `SqlScanOptions`, `SqlTokenOptions` extends `SqlLexOptions` directly, and
+  `sql-split.ts`/`sql-lint.ts`'s rebuilt resolved-options objects route through one shared
+  resolver.
+- **H9 (copyNameItems item) — copy-name menu items, 1 commit (`69f389e2`).** `connectionMenu`,
+  `containerMenu` and `simpleObjectMenu` each hand-copied the Copy name / Copy qualified name pair
+  `menuItems.ts`'s `copyNameItems` already builds; `simpleObjectMenu` (exactly
+  `copyNameItems(row, true)`) is gone, callers use `copyNameItems` directly.
+- **H9 (Crockford item) — shared `crockfordBase32`, 1 commit (`79dda519`).** `celleditor/
+  generate.ts`'s `toCrockford` was byte-for-byte identical to `mask.ts`'s `crockfordBase32`;
+  exported and shared. `encodeUlidTime` stays local (its own left-padding is a different
+  operation).
+- **H9 (repoIdOfTab item) — repo-view mount ternary, 1 commit (`8b9f23a9`).**
+  `RepoGraphView`/`RepoDiffView`/`RepoFileView`/`RepoMultiDiffView` each rebuilt the same
+  workspace-tab-to-repo-id ternary and no-repository message; new `repoIdOfTab`/
+  `NO_REPOSITORY_MESSAGE` in `state/workspace.ts`, called at all four sites.
+- **H9 (ServerAppInitResult item) — git-ipc export, 1 commit (`463d697c`).** `extension.ts`,
+  `proxyHandlers.ts` and `hostHandlers.ts` each declared the identical `ServerAppInitResult`
+  interface locally; exported once from git-ipc's `contract.ts` instead.
+- **H9 (SettingsPaneProps item) — generalized settings props, 1 commit (`732cc0b7`).** Both apps'
+  `workbench/settings/types.ts` declared the identical `SettingsPaneProps` interface; a generic
+  `SettingsPaneProps<S>` now lives beside `SettingsShell.vue`, each app instantiates it with its
+  own `SettingsSections`.
+- **H9 (JSON/shell scanner item) — shared cursor/parse/beautify, 1 commit (`49882410`), last of
+  H9's 7 sub-items.** `beautify.ts`'s `Cursor`/`isJsonWs`/`skipJsonWs` and `ejson.ts`'s
+  `ShellCursor`/`isShellWs`/`skipShellWs` were byte-for-byte copies of the same cursor/whitespace-
+  skipper shape, and `tryParseJson`/`beautifyJson`/`tryParseShellText`/`beautifyShellText` the same
+  two functions with a different grammar/error-class/keyText slotted in. Moved to `rawTree.ts`
+  (next to the `RawNode`/`parseContainer`/`render` pair it already shared, P107 I2-17 precedent),
+  generalized as `Cursor`/`skipWs`/`tryParse`/`BeautifyMode`/`BeautifyResult`/`beautifyWith`.
+- **Not a plan-named item — dead-export cleanup, 1 commit (`0af5340c`).** `lint:dead` (knip)
+  flagged `qualifiedNameFor`, `renderIndented`, `renderCompact` and 5 of `sqlIdent.ts`'s per-dialect
+  lookups as unused once the H5/H9 dedups above gave each a shared entry point instead of an
+  external caller; dropped `export`, module-private now. Fixed on the spot per this repo's own
+  standing rule for a fresh lint finding, not held for later.
+
+**Stream B verification, run fresh by the orchestrating session:** `bun run lint` clean, `bun run
+typecheck` clean across all 8 projects, `bun run test:unit` exact match at 1662 pass / 0 fail /
+14327 `expect()` calls, `bun run lint:dead` now shows 7 duplicate-export findings (was 6
+pre-phase) — the +1 is the `buildReviewRowMenu`/`buildReadOnlyRowMenu` alias, intentional and
+matching the plan's own "one body" verification grep, not a defect. Spot-checked H4's
+primary-button guard and `direction` prop directly in `KuiColumnResizeHandle.vue`, and the
+`rowMenuModel` alias directly in source — both exactly as claimed.
+
+**Disclosed reporting-accuracy gap, not a code defect.** Stream B's implementer reported one
+pre-existing UI test (`api-ui-consistency.spec.ts`'s request-body `{{variable}}` hover z-index test,
+G20 D7) as "failed even alone" and called it pre-existing/unrelated. The conclusion holds (zero
+diff overlap with that test's files or the Monaco-hover source it exercises), but the orchestrating
+session re-ran that exact test in isolation 4 times and it passed cleanly every time —
+contradicting the specific "failed even alone" claim, whether from flakiness or a one-off
+environment blip when the implementer saw it fail. Noted here rather than papered over; no code
+change follows from it.
+
+**Combined integration verification**, after rebasing both streams onto the chapter branch on top
+of P117's own already-landed commits: `go build ./...` clean and `bun run typecheck` clean with
+both streams' changes combined, confirming no cross-stream breakage despite the plan's own
+zero-file-overlap claim never having been exercised together until this step.
+
+**File ownership.** Stream A's 8 commits touch only `*.go` (plus the 5 regenerated `.fixture.ts`
+mocks and `docs/ARCHITECTURE.md`/`docs/v1.9/plans/P118-stream-a-findings.md` for its own docs
+commit) — confirmed against the plan's own Stream A ownership table. Stream B's 11 commits touch
+only `*.ts`/`*.vue` under the plan's own Stream B paths. Zero overlap between the two streams,
+confirmed both by the plan's own ownership table and by two clean, conflict-free rebases.
