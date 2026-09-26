@@ -183,6 +183,19 @@
    `overflow-y-auto p-0.5`, `px-1.5 pb-1.5`. Guarded in check-theme-classes.sh. `.columns-menu-item`
    (ColumnsMenu.vue's own local scoped marker, never a `@utility` here) is unaffected. */
 
+/* P122: the one focus ring — the SQL filter field's own value (FilterToolbar/AutocompleteField):
+   1px of --kira-focus laid over the element's own 1px edge. */
+@utility focus-ring {
+  outline: var(--kira-border-width) solid var(--kira-focus);
+  outline-offset: calc(var(--kira-border-width) * -1);
+}
+
+@layer base {
+  :focus-visible {
+    @apply focus-ring;
+  }
+}
+
 html,
 body,
 #app {
