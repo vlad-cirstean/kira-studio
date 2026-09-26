@@ -45,7 +45,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       data: defaultSettings.data,
       cache: defaultSettings.cache,
       advanced: defaultSettings.advanced,
-      git: defaultSettings.git,
       api: defaultSettings.api,
     }"
     :current="{
@@ -53,7 +52,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       data: settingsStore.data,
       cache: settingsStore.cache,
       advanced: settingsStore.advanced,
-      git: settingsStore.git,
       api: settingsStore.api,
     }"
     :save="save"

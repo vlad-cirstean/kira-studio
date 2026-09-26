@@ -42,7 +42,6 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 
 	result := model.DefaultSettings()
 	result.Appearance = appsettings.ReadAppearance(stored)
-	result.Git = appsettings.ReadGit(stored)
 	appsettings.LeafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
 	appsettings.LeafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, appsettings.InRange(8, 1024))
 	appsettings.LeafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, appsettings.InRange(1, 365))
@@ -152,9 +151,6 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 			return err
 		}
 		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
-			return err
-		}
-		if err := appsettings.UpsertGit(tx, patch.Git); err != nil {
 			return err
 		}
 		if err := upsertApiSection(tx, patch.Api); err != nil {

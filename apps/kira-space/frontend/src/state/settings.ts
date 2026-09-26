@@ -17,4 +17,15 @@ export type Section = (typeof sections)[number];
 // shape, not one shared @shared/domain/settings type.
 export const useSettingsStore = createSettingsStore<Section, Settings, SettingsPatch>(
   defaultSettings,
-)(control, () => ({ extra: {} }));
+)(control, ({ settingsState }) => ({
+  extra: {},
+  // P92 item 9: 0 = follow appearance.fontSize — vscode-bridge.css's own fallback
+  // (var(--kira-graph-font-size, var(--kira-t-md))) is what "follow" actually means, so removing
+  // the property (not writing 0px) is what lets that fallback apply.
+  onApplyAppearance(): void {
+    const root = document.documentElement.style;
+    const graph = settingsState.git.graphFontSize;
+    if (graph > 0) root.setProperty('--kira-graph-font-size', `${graph}px`);
+    else root.removeProperty('--kira-graph-font-size');
+  },
+}));

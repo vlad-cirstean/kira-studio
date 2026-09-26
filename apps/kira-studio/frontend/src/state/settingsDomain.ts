@@ -1,21 +1,20 @@
 import {
   appearanceSettingsSchema,
   gitLogLevelSchema,
-  gitSettingsSchema,
   HTTP_VERSIONS,
   httpVersionSchema,
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
-// P103 Part 4 (§7.3): this app's own eight-section settingsSchema/settingsPatchSchema/
+// P103 Part 4 (§7.3): this app's own seven-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` (which Kira Space's
 // own three-section store carried five dead sections of — data/cache/api/dbMcp/claudeCode — the
-// same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/git/gitLogLevel
+// same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/gitLogLevel
 // stay genuinely shared; this file imports `appearanceSettingsSchema`/`gitLogLevelSchema`/
-// `gitSettingsSchema`/`HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed
-// schema below — nothing outside this file references those specific names directly (`HTTP_VERSIONS`
-// is the one exception, re-exported for ApiPane/RequestSettingsPane; `httpVersionSchema` itself
-// stays import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
+// `HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed schema below —
+// nothing outside this file references those specific names directly (`HTTP_VERSIONS` is the one
+// exception, re-exported for ApiPane/RequestSettingsPane; `httpVersionSchema` itself stays
+// import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
 // never through here). `FONT_SIZE_RANGE`/`AppearanceSettings`/`GitLogLevel`/`RowDensity` used to
 // re-export here for AppearancePane/AdvancedPane; both now read them straight from
 // `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
@@ -123,7 +122,7 @@ export type ApiSettings = z.infer<typeof apiSettingsSchema>;
 // M1 §6.2: one leaf, default false. The embedded DB MCP server instance's own on/off switch
 // (internal/bridge/dbmcp.go owns the actual start/stop side effect; this leaf is only the
 // persisted, cross-restart record of "should it be on"). A section on its own, not folded into
-// `advanced` or `git`.
+// `advanced`.
 const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
 });
@@ -142,7 +141,7 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
 });
 
 // `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
-// row with no `data`/`cache`/`advanced`/`git`/`dbMcp` keys, and that row must still parse on
+// row with no `data`/`cache`/`advanced`/`dbMcp` keys, and that row must still parse on
 // next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appearanceSettingsSchema,
@@ -152,12 +151,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
     gitLogLevel: 'info',
-  }),
-  git: gitSettingsSchema.default({
-    protectedBranches: ['main', 'master', 'release/*'],
-    fetchAutoIntervalMinutes: 0,
-    gitPath: '',
-    graphFontSize: 0,
   }),
   api: apiSettingsSchema.default({
     httpVersion: '2',
@@ -182,7 +175,6 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   data: dataSettingsSchema.partial().optional(),
   cache: cacheSettingsSchema.partial().optional(),
   advanced: advancedSettingsSchema.partial().optional(),
-  git: gitSettingsSchema.partial().optional(),
   api: apiSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
@@ -209,12 +201,6 @@ export const defaultSettings: Settings = {
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
     gitLogLevel: 'info',
-  },
-  git: {
-    protectedBranches: ['main', 'master', 'release/*'],
-    fetchAutoIntervalMinutes: 0,
-    gitPath: '',
-    graphFontSize: 0,
   },
   api: {
     httpVersion: '2',

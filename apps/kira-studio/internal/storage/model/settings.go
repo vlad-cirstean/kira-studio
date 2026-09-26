@@ -66,7 +66,6 @@ type Settings struct {
 	Data       DataSettings           `json:"data"`
 	Cache      CacheSettings          `json:"cache"`
 	Advanced   AdvancedSettings       `json:"advanced"`
-	Git        appsettings.Git        `json:"git"`
 	Api        ApiSettings            `json:"api"`
 	DbMcp      DbMcpSettings          `json:"dbMcp"`
 	ClaudeCode ClaudeCodeSettings     `json:"claudeCode"`
@@ -83,7 +82,6 @@ func DefaultSettings() Settings {
 			ExpensiveQueryRows: 100_000,
 			AdvancedCore:       appsettings.AdvancedCore{GitLogLevel: "info"},
 		},
-		Git: appsettings.DefaultGit(),
 		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
 		// 30s -> none, max response 10 MiB -> 50 MB, max redirects unchanged at 10.
 		Api: ApiSettings{
@@ -102,8 +100,8 @@ func DefaultSettings() Settings {
 
 // DataPatch and CachePatch mirror settings.ts's `.partial()` per-section patch shapes — every leaf
 // is optional, present only when the caller means to change it (D15: SettingsRepo.Set writes only
-// the leaves actually patched). Appearance/Git's own patch shapes are appsettings.AppearancePatch/
-// appsettings.GitPatch (P103 Part 4 §7.1).
+// the leaves actually patched). Appearance's own patch shape is appsettings.AppearancePatch
+// (P103 Part 4 §7.1).
 type DataPatch struct {
 	DefaultPageSize *int `json:"defaultPageSize,omitempty"`
 }
@@ -148,7 +146,6 @@ type SettingsPatch struct {
 	Data       *DataPatch                   `json:"data,omitempty"`
 	Cache      *CachePatch                  `json:"cache,omitempty"`
 	Advanced   *AdvancedPatch               `json:"advanced,omitempty"`
-	Git        *appsettings.GitPatch        `json:"git,omitempty"`
 	Api        *ApiPatch                    `json:"api,omitempty"`
 	DbMcp      *DbMcpPatch                  `json:"dbMcp,omitempty"`
 	ClaudeCode *ClaudeCodePatch             `json:"claudeCode,omitempty"`
@@ -248,9 +245,6 @@ func (p SettingsPatch) Validate() error {
 		return err
 	}
 	if err := validateAdvancedSection(p.Advanced); err != nil {
-		return err
-	}
-	if err := appsettings.ValidateGit(p.Git); err != nil {
 		return err
 	}
 	if err := validateApiSection(p.Api); err != nil {

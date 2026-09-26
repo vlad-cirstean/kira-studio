@@ -6,16 +6,13 @@ import type { Settings } from '../../state/settingsDomain';
 // exact shape SettingsShell.vue's own `#pane` scoped slot hands each pane, plus `active` (this
 // app's own `workbench/SettingsDialog.vue` wrapper binds it per pane, `activeSection === '<Section>'`).
 //
-// `SettingsSections` — this dialog's own six sections of the full shared `Settings` (everything
+// `SettingsSections` — this dialog's own five sections of the full shared `Settings` (everything
 // except `dbMcp`/`claudeCode`, which this dialog edits through their own instant-action controls,
 // never through the draft) — is what SettingsShell.vue's own `T` generic is actually instantiated
 // with at this app's `<SettingsShell>` call site (`workbench/SettingsDialog.vue`'s own `:current`/
 // `:defaults`), so every pane's prop types must match that same narrowed shape, not the full
 // `Settings` type, or Vue's generic prop inference rejects the binding.
-type SettingsSections = Pick<
-  Settings,
-  'appearance' | 'data' | 'cache' | 'advanced' | 'git' | 'api'
->;
+type SettingsSections = Pick<Settings, 'appearance' | 'data' | 'cache' | 'advanced' | 'api'>;
 
 // P115 H9: this app and Kira Space each declared the identical SettingsPaneProps interface,
 // differing only in SettingsSections' own Pick — both now instantiate the shared generic instead.

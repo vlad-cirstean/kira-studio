@@ -1,4 +1,4 @@
-import type { AppearanceSettings, GitSettings } from '@shared/domain/settings';
+import type { AppearanceSettings } from '@shared/domain/settings';
 import { defineStore } from 'pinia';
 import { reactive, ref, toRefs } from 'vue';
 
@@ -10,19 +10,18 @@ import { reactive, ref, toRefs } from 'vue';
 // P103 Part 4 (§7.3): `Se`/`SeP`, the app's own Settings/SettingsPatch shape, join `S` as explicit
 // type parameters — each app now has its own `state/settingsDomain.ts` schema (no more one shared
 // `@shared/domain/settings` shape both stores hardcoded). `Se` is bound to
-// `{ appearance: AppearanceSettings; git: GitSettings } & Record<string, Record<string, unknown>>`
-// — the two sections applyAppearance() below reads directly, genuinely shared by both apps
-// (§7.1/§7.3) — plus "every section is an object", which is what applySettings' generic
-// Object.assign loop needs to stay type-safe without listing each app's own section names here.
+// `{ appearance: AppearanceSettings } & Record<string, Record<string, unknown>>` — the one section
+// applyAppearance() below reads directly, genuinely shared by both apps (§7.1/§7.3) — plus "every
+// section is an object", which is what applySettings' generic Object.assign loop needs to stay
+// type-safe without listing each app's own section names here.
 //
 // Kira Studio's own appearanceVersion bump (measured-text re-measure signal, columns.ts) has no
 // equivalent in Kira Space (no data grid) — `extend`'s `onApplyAppearance` hook reproduces it
-// without Kira Space's applyAppearance() carrying a counter nothing observes.
+// without Kira Space's applyAppearance() carrying a counter nothing observes. Kira Space's own
+// `--kira-graph-font-size` CSS variable is the same idiom, the other way round: real only for
+// Space, so it lives in Space's own `onApplyAppearance` instead of this shared function.
 
-type SettingsShape = { appearance: AppearanceSettings; git: GitSettings } & Record<
-  string,
-  Record<string, unknown>
->;
+type SettingsShape = { appearance: AppearanceSettings } & Record<string, Record<string, unknown>>;
 
 export interface SettingsControl<Se, SeP> {
   settingsGetAll(): Promise<Se>;
@@ -87,12 +86,6 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
           '--kira-row-height',
           settingsState.appearance.rowDensity === 'compact' ? '22px' : '28px',
         );
-        // P92 item 9: 0 = follow appearance.fontSize — vscode-bridge.css's own fallback
-        // (var(--kira-graph-font-size, var(--kira-t-md))) is what "follow" actually means, so
-        // removing the property (not writing 0px) is what lets that fallback apply.
-        const graph = settingsState.git.graphFontSize;
-        if (graph > 0) root.setProperty('--kira-graph-font-size', `${graph}px`);
-        else root.removeProperty('--kira-graph-font-size');
         onApplyAppearance?.();
       }
 
