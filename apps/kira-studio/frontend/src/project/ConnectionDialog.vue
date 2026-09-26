@@ -25,6 +25,7 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
+import { Tabs, TabsContent, TabsList, TabsTrigger, tabChipVariants } from '@theme/components/ui/tabs';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -139,6 +140,14 @@ const activeTab = ref<DetailTab>('General');
 watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
 });
+
+const DETAIL_TABS: readonly { value: DetailTab; testid: string }[] = [
+  { value: 'General', testid: 'connection-tab-general' },
+  { value: 'Advanced', testid: 'connection-tab-advanced' },
+  { value: 'Pre-connect', testid: 'connection-tab-preconnect' },
+  { value: 'MCP', testid: 'connection-tab-mcp' },
+  { value: 'Privacy', testid: 'connection-tab-privacy' },
+];
 
 const showPassword = ref(false);
 // P14 D1: a brand-new connection has no stored secret to reveal at all — whatever's typed is
@@ -701,66 +710,20 @@ const preconnectText = computed({
       </div>
     </template>
     <template v-else>
-      <div class="flex flex-col gap-2 p-3">
-          <div class="flex gap-1 border-b border-border pb-1.5" role="tablist" aria-label="Connection detail tabs">
-            <button
-              type="button"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-              role="tab"
-              :class="(activeTab === 'General') ? 'is-active bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
-              :aria-selected="activeTab === 'General'"
-              data-testid="connection-tab-general"
-              @click="activeTab = 'General'"
+      <Tabs :model-value="activeTab" class="flex flex-col gap-2 p-3" @update:model-value="(v) => (activeTab = v as DetailTab)">
+          <TabsList class="w-full border-b border-border pb-1.5" aria-label="Connection detail tabs">
+            <TabsTrigger
+              v-for="t in DETAIL_TABS"
+              :key="t.value"
+              :value="t.value"
+              :class="tabChipVariants({ active: activeTab === t.value })"
+              :data-testid="t.testid"
             >
-              General
-            </button>
-            <button
-              type="button"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-              role="tab"
-              :class="(activeTab === 'Advanced') ? 'is-active bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
-              :aria-selected="activeTab === 'Advanced'"
-              data-testid="connection-tab-advanced"
-              @click="activeTab = 'Advanced'"
-            >
-              Advanced
-            </button>
-            <button
-              type="button"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-              role="tab"
-              :class="(activeTab === 'Pre-connect') ? 'is-active bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
-              :aria-selected="activeTab === 'Pre-connect'"
-              data-testid="connection-tab-preconnect"
-              @click="activeTab = 'Pre-connect'"
-            >
-              Pre-connect
-            </button>
-            <button
-              type="button"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-              role="tab"
-              :class="(activeTab === 'MCP') ? 'is-active bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
-              :aria-selected="activeTab === 'MCP'"
-              data-testid="connection-tab-mcp"
-              @click="activeTab = 'MCP'"
-            >
-              MCP
-            </button>
-            <button
-              type="button"
-              class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-              role="tab"
-              :class="(activeTab === 'Privacy') ? 'is-active bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground'"
-              :aria-selected="activeTab === 'Privacy'"
-              data-testid="connection-tab-privacy"
-              @click="activeTab = 'Privacy'"
-            >
-              Privacy
-            </button>
-          </div>
+              {{ t.value }}
+            </TabsTrigger>
+          </TabsList>
 
-          <div v-if="activeTab === 'General'" class="flex flex-col gap-2" role="tabpanel">
+          <TabsContent value="General" class="flex flex-col gap-2">
           <div class="flex gap-2 items-start">
             <div class="flex flex-col gap-1 flex-2 text-kira-sm">
               <Label class="text-kira-sm leading-none text-muted-foreground">Name</Label>
@@ -927,9 +890,9 @@ const preconnectText = computed({
             </div>
             <p class="font-data uri-note text-muted-foreground text-kira-xs">{{ uriNote }}</p>
           </template>
-          </div>
+          </TabsContent>
 
-          <div v-else-if="activeTab === 'Advanced'" class="flex flex-col gap-2" role="tabpanel">
+          <TabsContent value="Advanced" class="flex flex-col gap-2">
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
             <Checkbox
               :model-value="draft.readOnly"
@@ -982,9 +945,9 @@ const preconnectText = computed({
               never throttled. Applies immediately to a connected connection.
             </span>
           </div>
-          </div>
+          </TabsContent>
 
-          <div v-else-if="activeTab === 'Pre-connect'" class="flex flex-col gap-2" role="tabpanel">
+          <TabsContent value="Pre-connect" class="flex flex-col gap-2">
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
             <Label class="text-kira-sm leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
             <Textarea
@@ -1022,9 +985,9 @@ const preconnectText = computed({
               script.
             </span>
           </Label>
-          </div>
+          </TabsContent>
 
-          <div v-else-if="activeTab === 'MCP'" class="flex flex-col gap-2" role="tabpanel">
+          <TabsContent value="MCP" class="flex flex-col gap-2">
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
             <Checkbox
               :model-value="draft.mcpEnabled"
@@ -1140,9 +1103,9 @@ const preconnectText = computed({
             These govern the MCP server only — the Read-only flag on the Advanced tab is what
             governs this app's own console.
           </p>
-          </div>
+          </TabsContent>
 
-          <div v-else class="flex flex-col gap-2" role="tabpanel">
+          <TabsContent value="Privacy" class="flex flex-col gap-2">
           <p class="text-subtle text-kira-xs leading-normal w-full">
             Rules redact values for this connection's MCP clients and for the data viewer's
             masking preview. They never change stored data.
@@ -1239,7 +1202,7 @@ const preconnectText = computed({
               </Alert>
             </template>
           </template>
-          </div>
+          </TabsContent>
 
           <span
             v-if="connectionDialogStore.error"
@@ -1283,7 +1246,7 @@ const preconnectText = computed({
               </AlertDescription>
             </Alert>
           </template>
-      </div>
+      </Tabs>
     </template>
       </div>
 
