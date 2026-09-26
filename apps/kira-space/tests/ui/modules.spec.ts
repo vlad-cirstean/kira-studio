@@ -1,0 +1,133 @@
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
+import type { ControlSnapshot } from './support/types';
+
+// P128 §5.2: module switching is multi-step, cross-store state (the mode store, the workspace
+// store, and the tabs store's own per-workspace filtering all shift together) — the one thing this
+// new surface (P128 §2.6-§2.8) has no other coverage for. Mirrors Kira Studio's own
+// mode-switch.spec.ts, trimmed to the three properties genuinely new here: boot honours a
+// persisted mode, a click eventually (never synchronously) reaches windowsSetMode, and a full
+// round trip across all three modules leaves the right tabs showing in each.
+
+function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
+  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
+}
+
+test('a window boots into whatever mode windowsEnsure answers with, with no Git panel mounted alongside it', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.windowsEnsure, response: { mode: 'terminal' } }],
+  });
+
+  await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="terminal-panel"]')).toBeVisible();
+  await expect(page.locator('[data-testid="terminal-start"]')).toBeVisible();
+  // The Git module's own left panel never mounts alongside another module's (WorkbenchShell.vue's
+  // own `<component :is="activeModePanel">` — one panel at a time, P128 §2.6).
+  await expect(page.locator('[data-testid="git-panel-tab-repos"]')).toHaveCount(0);
+});
+
+test('clicking a mode tab schedules exactly one debounced windowsSetMode, never a synchronous one (P22 D12/F20, shared)', async ({
+  relaunch,
+}) => {
+  // state/mode.ts's own re-export of packages/workbench/src/state/createModeStore.ts's own
+  // constant — restated here rather than imported across the web/node tsconfig boundary, same
+  // convention Kira Studio's own mode-switch.spec.ts already follows.
+  const MODE_WRITE_DEBOUNCE_MS = 150;
+  const { window: page, control } = await relaunch({ control: [] });
+  // Playwright's fake clock, paused — installed after boot (relaunch() already waited on the
+  // status bar), the same precaution apps/kira-studio/tests/ui/support/clock.ts's own
+  // installFakeTimers documents: a bare install() alone still ticks on real time until paused.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 10_000);
+
+  const setModeCalls = () => control.log().filter((e) => e.channel === IPC.windowsSetMode);
+
+  await modeTab(page, 'terminal').click();
+  // Nothing yet — the click itself must not fire a synchronous IPC (F20's own invariant, shared
+  // with Kira Studio's mode store since P128 §2.3).
+  expect(setModeCalls()).toHaveLength(0);
+  await page.clock.runFor(MODE_WRITE_DEBOUNCE_MS - 1);
+  expect(setModeCalls()).toHaveLength(0);
+  await page.clock.runFor(2);
+  await expect.poll(() => setModeCalls().length).toBe(1);
+  expect(setModeCalls()[0]?.args).toMatchObject({ mode: 'terminal' });
+});
+
+const REPO = {
+  id: 'repo-1',
+  name: 'demo-repo',
+  root: '/tmp/demo-repo',
+  repoId: '/tmp/demo-repo',
+  sortOrder: 1,
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+function repoRow(page: Page) {
+  return page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`);
+}
+
+function tab(page: Page, kind?: string) {
+  return kind
+    ? page.locator(`[data-testid="tab-strip-wrapper"] [data-testid="tab"][data-tab-kind="${kind}"]`)
+    : page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
+}
+
+const TERMINAL_OPEN_OK: ControlSnapshot = {
+  channel: IPC.terminalOpen,
+  response: { shell: '/bin/zsh' },
+};
+
+test('round trip: a repo\'s tabs hide behind Terminal, a Terminal-module tab opens and closes out of view in Git, and Agents shows no "+"', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: REPO.id },
+        response: { paths: [], status: {}, truncated: false },
+      },
+      TERMINAL_OPEN_OK,
+    ],
+  });
+
+  // Git is active by default (this app's own boot mode, mockRuntime.ts's own WILDCARD_DEFAULTS) —
+  // opening the repo shows its pinned graph tab, alone.
+  await repoRow(page).click();
+  await expect(tab(page)).toHaveCount(1);
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+
+  // Switching to Terminal hides the repo's own tab strip entirely — visibleWorkspace()
+  // (state/workspace.ts) now reads the mode store's own `'terminal'` id, not the still-active repo
+  // workspace underneath it.
+  await modeTab(page, 'terminal').click();
+  await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="terminal-start"]')).toBeVisible();
+  await expect(tab(page)).toHaveCount(0);
+
+  // Opening one there (terminal-start's own "New terminal") is the only tab visible while
+  // Terminal stays active.
+  await page.click('[data-testid="terminal-start-new"]');
+  await expect(tab(page, 'terminal')).toHaveCount(1);
+  await expect(tab(page)).toHaveCount(1);
+
+  // Switching back to Git brings the repo's own tab (and only it) back — the Terminal-module tab
+  // still exists (createTabsStore never dropped it), but is out of view: git's own workspace never
+  // reaches a module key (state/workspace.ts's own header comment).
+  await modeTab(page, 'git').click();
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(tab(page)).toHaveCount(1);
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+  await expect(tab(page, 'terminal')).toHaveCount(0);
+
+  // Agents (P128 §2.7's placeholder) has no `newTab` — the tab strip's own "+" slot stays empty.
+  await modeTab(page, 'ade').click();
+  await expect(modeTab(page, 'ade')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="ade-start"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab-strip-new"]')).toHaveCount(0);
+});
