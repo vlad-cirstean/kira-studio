@@ -593,10 +593,13 @@ const preconnectText = computed({
 
 <template>
   <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
+    <!-- h-138 (was h-136): P123 moved every label/description here onto text-kira-md, which grew
+         the MCP tab -- this dialog's tallest -- past the old fixed height by ~6px
+         (connection-dialog-tabs.spec.ts's own "box never moves" test caught it). -->
     <DialogContent
       :show-close-button="false"
       data-testid="connection-dialog"
-      class="flex flex-col p-0 gap-0 w-155 h-136"
+      class="flex flex-col p-0 gap-0 w-155 h-138"
     >
       <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
       <DialogHeader v-if="step === 'engine'">
