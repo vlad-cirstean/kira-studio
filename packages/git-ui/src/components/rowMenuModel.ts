@@ -292,23 +292,12 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
 
 /**
  * C10 §4.3/§6 (S6): the native read-only graph's own per-commit menu — copy sha and copy message
- * *only*, the exact `buildReviewRowMenu` precedent above, verbatim, kept as its own function for
- * the same reason that doc comment gives (a reader never has to check a table of conditions
- * against `buildRowMenu`, there is just a second, smaller function). Every mutating item
- * (checkout/create branch/create tag/revert/reset/cherry-pick) is a write; C10's native surface
- * hides them rather than disabling them (`docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3).
+ * only. Every mutating item (checkout/create branch/create tag/revert/reset/cherry-pick) is a
+ * write; C10's native surface hides them rather than disabling them
+ * (`docs/v1.5/plans/C10-git-graph-native.md` §4.2 layer 3). Identical shape to `buildReviewRowMenu`
+ * above — this is App.vue's own name for it at its read-only-graph call site (P115 H9).
  */
-export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
-  if (!clipboardEnabled) return [];
-  return [
-    {
-      items: [
-        plainItem('copySha', 'Copy SHA', 'codicon-copy'),
-        plainItem('copyMessage', 'Copy commit message', 'codicon-copy'),
-      ],
-    },
-  ];
-}
+export const buildReadOnlyRowMenu = buildReviewRowMenu;
 
 /**
  * C10 §4.3 (S6), C11 §12 (S12): the native read-only graph's own ref-badge menu (branch,
