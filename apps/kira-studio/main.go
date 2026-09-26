@@ -122,7 +122,6 @@ func main() {
 	deps.Events = emitter
 	rawDialogs, attachDialogs := shell.NewDeferredDialogs()
 	dialogs := appshell.NewDialogs(rawDialogs)
-	browserOpener, attachBrowser := shell.NewDeferredBrowser()
 
 	// P66: the update-availability checker — no network call at all from a dev/test build
 	// (appupdate's own isReleaseBuild guard); owns no goroutine, no ticker, no file handle, so
@@ -179,7 +178,6 @@ func main() {
 			application.NewService(&bridge.UpdateService{
 				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,
 			}),
-			application.NewService(&bridge.LinkService{Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
@@ -196,7 +194,6 @@ func main() {
 	})
 
 	attachEmitter(app)
-	attachBrowser(app)
 	quitter.Attach(app)
 
 	wireWindowsAndMenu(postAppDeps{

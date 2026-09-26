@@ -7,8 +7,8 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // Studio's own studioControl object (bridge/index.ts) and Kira Space's control object (§1.6/§1.7's
 // own "confirmed shared" survey, re-verified here by manually counting both files rather than
 // trusting either's own stale internal comment) — settings/layout get-all-and-set-plus-changed,
-// the quit and close-window flush handshakes, the folder picker, tabsList/tabsSave, the five
-// terminal methods, and linkOpenExternal. Everything else (94 more methods in Kira Studio's own
+// the quit and close-window flush handshakes, the folder picker, tabsList/tabsSave, and the five
+// terminal methods. Everything else (94 more methods in Kira Studio's own
 // studioControl, 24 more in Kira Space's) stays app-side, unmoved, in each app's own bridge/index.ts.
 //
 // P116 H5 adds ten more, moved out of Kira Studio's own studioControl once Kira Space grew the
@@ -26,7 +26,7 @@ import { on, trust, unwrap, windowKey } from './rpc';
 //
 // `CoreBindings` is a **structural** interface, not an adapter: each app's own generated
 // `@bindings/*` service modules (SettingsService, LayoutService, TabsService, LifecycleService,
-// TerminalService, FilesService, LinkService) already satisfy it by shape — no per-app glue code,
+// TerminalService, FilesService) already satisfy it by shape — no per-app glue code,
 // no change to Wails' own binding generation. Every method here is typed against `unknown`
 // deliberately (the plan's own §5.6 sketch): a shared package can't import either app's own
 // `@bindings/*` alias (it resolves to a different generated module per app, and CLAUDE.md's "a
@@ -72,9 +72,6 @@ export interface CoreBindings {
   };
   files: {
     ChooseFolder(a: { title: string }): Promise<unknown>;
-  };
-  link: {
-    OpenExternal(a: { url: string }): Promise<void>;
   };
   windows: {
     OpenNew(): Promise<void>;
@@ -126,8 +123,6 @@ export interface AppUpdateStatus {
 // generic, matching the plan's own `createCoreControl<Settings, Layout, TabRecord, SettingsPatch>
 // (...)` call-site shape, rather than only genericizing the ones that must be.
 export interface CoreControl<S, L, T, P> {
-  linkOpenExternal: (url: string) => Promise<void>;
-
   settingsGetAll: () => Promise<S>;
   settingsSet: (patch: P) => Promise<S>;
   onSettingsChanged: (cb: (settings: S) => void) => () => void;
@@ -185,8 +180,6 @@ export interface CoreControl<S, L, T, P> {
 
 export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L, T, P> {
   return {
-    linkOpenExternal: (url: string): Promise<void> => unwrap(b.link.OpenExternal({ url })),
-
     settingsGetAll: (): Promise<S> => unwrap(b.settings.GetAll()).then((r) => trust<S>(r)),
     settingsSet: (patch: P): Promise<S> =>
       unwrap(b.settings.Set({ patch })).then((r) => trust<S>(r)),

@@ -10,7 +10,6 @@ import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
-import * as LinkService from '@bindings/linkservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
@@ -402,12 +401,12 @@ const studioControl = {
     on(CHANNEL.customScriptsChanged, cb),
 };
 
-// P103 Part 2 (§5.6): one exported object, composed from the 20 methods shared with Kira Space
+// P103 Part 2 (§5.6): one exported object, composed from the methods shared with Kira Space
 // (createCoreControl.ts), Studio's own 94 remaining methods (studioControl, above) and the module's
 // own 40 (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is
 // unchanged, and mockRuntime.ts's channel map is unchanged, since neither the method names nor
 // their bound-call FQNs moved. Spread order matters not at all here (the three objects' key sets
-// are disjoint by construction — §5.6's own 20-method survey), but studioControl last keeps this
+// are disjoint by construction — §5.6's own survey), but studioControl last keeps this
 // line's own diff-history the smallest against the pre-§5.6 file.
 export const control = {
   ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
@@ -417,7 +416,6 @@ export const control = {
     lifecycle: LifecycleService,
     terminal: TerminalService,
     files: FilesService,
-    link: LinkService,
     windows: WindowsService,
     keepAwake: KeepAwakeService,
     update: UpdateService,

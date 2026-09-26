@@ -47,6 +47,11 @@ import type { TabRecord } from '../state/tabDomain';
 // (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
+  // P120: linkOpenExternal moved off createCoreControl.ts's now-deleted shared `link` binding —
+  // Kira Studio never had a real use for it, so this app's own LinkService.OpenExternal call
+  // stays here instead.
+  linkOpenExternal: (url: string): Promise<void> => unwrap(LinkService.OpenExternal({ url })),
+
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),
 
@@ -131,7 +136,6 @@ export const control = {
     lifecycle: LifecycleService,
     terminal: TerminalService,
     files: FilesService,
-    link: LinkService,
     windows: WindowsService,
     keepAwake: KeepAwakeService,
     update: UpdateService,
