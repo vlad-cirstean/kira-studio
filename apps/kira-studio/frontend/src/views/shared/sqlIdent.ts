@@ -63,8 +63,9 @@ const BACKSLASH_ESCAPE_DIALECTS = new Set<SqlDialect>(['mysql', 'clickhouse']);
 
 /** true when `dialect`'s string literals treat a backslash as an escape character — undefined
  *  (no SQL dialect, e.g. a Mongo/Redis console) keeps the pre-P2-R2 default of `true` since
- *  nothing about that case was in scope for this fix. */
-export function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
+ *  nothing about that case was in scope for this fix.
+ *  P115 H5/P118 cleanup: module-private since lexOptionsFor below became the only caller. */
+function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || BACKSLASH_ESCAPE_DIALECTS.has(dialect);
 }
 
@@ -75,7 +76,7 @@ export function backslashEscapesFor(dialect: SqlDialect | undefined): boolean {
 // document into one statement — "Run all" silently runs one statement instead of two. Only
 // Postgres gets dollar-quoting; undefined (dialect unknown) keeps the pre-fix universal behaviour,
 // matching backslashEscapesFor's own "unknown defaults to the more permissive reading" choice.
-export function dollarQuotingFor(dialect: SqlDialect | undefined): boolean {
+function dollarQuotingFor(dialect: SqlDialect | undefined): boolean {
   return dialect === undefined || dialect === 'postgres';
 }
 
@@ -91,17 +92,17 @@ export function hashCommentsFor(dialect: SqlDialect | undefined): boolean {
 }
 
 /** Postgres nests its block comments; no other dialect here does. */
-export function nestedBlockCommentsFor(dialect: SqlDialect | undefined): boolean {
+function nestedBlockCommentsFor(dialect: SqlDialect | undefined): boolean {
   return dialect === 'postgres';
 }
 
 /** SQLite (and SQL Server) accept a `[bracket]`-quoted identifier. */
-export function bracketIdentifiersFor(dialect: SqlDialect | undefined): boolean {
+function bracketIdentifiersFor(dialect: SqlDialect | undefined): boolean {
   return dialect === 'sqlite';
 }
 
 /** Postgres's `E'...'`/`e'...'` escape-string syntax. */
-export function postgresEscapeStringsFor(dialect: SqlDialect | undefined): boolean {
+function postgresEscapeStringsFor(dialect: SqlDialect | undefined): boolean {
   return dialect === 'postgres';
 }
 

@@ -119,7 +119,7 @@ export function parseContainer<C extends { text: string; i: number }>(
 
 /** Reindented, one member/item per line. `keyText` formats an object member's raw key text —
  *  verbatim for JSON, JSON.stringify-normalized for the shell grammar. */
-export function renderIndented(node: RawNode, keyText: (raw: string) => string): string {
+function renderIndented(node: RawNode, keyText: (raw: string) => string): string {
   const out: string[] = [];
   build(node, 0);
   return out.join('');
@@ -162,7 +162,7 @@ export function renderIndented(node: RawNode, keyText: (raw: string) => string):
 }
 
 /** Single line, no whitespace. Same `keyText` contract as renderIndented. */
-export function renderCompact(node: RawNode, keyText: (raw: string) => string): string {
+function renderCompact(node: RawNode, keyText: (raw: string) => string): string {
   const out: string[] = [];
   build(node);
   return out.join('');

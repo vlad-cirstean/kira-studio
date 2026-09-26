@@ -30,7 +30,8 @@ const QUALIFIED_KINDS = new Set([
 ]);
 
 // Produced locally from the path — never round-trips to the engine for a string join (§9b).
-export function qualifiedNameFor(row: MenuRowLike): string {
+// P115 H9: module-private since copyNameItems below became menus.ts's only caller (P118 cleanup).
+function qualifiedNameFor(row: MenuRowLike): string {
   const decoded = decodePath(row.connectionId, row.path);
   return decoded.segments
     .filter((s) => QUALIFIED_KINDS.has(s.kind))
