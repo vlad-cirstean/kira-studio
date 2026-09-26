@@ -128,6 +128,9 @@ func main() {
 	// (appupdate's own isReleaseBuild guard); owns no goroutine, no ticker, no file handle, so
 	// nothing is added to the quit teardown below.
 	updateChecker := appupdate.NewChecker(appupdate.Studio.Name, buildinfo.Version)
+	// P119: the detached installer. It owns a child process only while staging — teardown below
+	// cancels it so a Cmd+Q mid-download aborts the install rather than orphaning a bundle swap.
+	updateInstaller := appupdate.NewInstaller(appupdate.Studio, buildinfo.Version)
 
 	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc
@@ -136,7 +139,7 @@ func main() {
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		dbMcpSvc, agentHooksSvc, keepAwakeSvc, terminalSvc, repositories, db)
+		dbMcpSvc, agentHooksSvc, keepAwakeSvc, terminalSvc, updateInstaller, repositories, db)
 	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
 
 	app := application.New(application.Options{
@@ -173,7 +176,10 @@ func main() {
 			application.NewService(keepAwakeSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
-			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
+			application.NewService(&bridge.UpdateService{
+				Checker: updateChecker, Installer: updateInstaller, Browser: browserOpener,
+				Quit: quitter.RequestQuit,
+			}),
 			application.NewService(&bridge.LinkService{Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
@@ -422,7 +428,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -441,6 +447,9 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		windows.DetachAll()
 	})
 	teardown := sync.OnceFunc(func() {
+		// P119: a Cmd+Q mid-download aborts the install rather than leaving an orphan that later
+		// swaps a bundle the user quit away from. After hand-off this is a no-op.
+		updateInstaller.Cancel()
 		eventsDetach()
 		oplogWiring.Stop()
 		// F13 (P108 Part 7): DB MCP and agenthooks stop before connectionsSvc.Shutdown(), not
