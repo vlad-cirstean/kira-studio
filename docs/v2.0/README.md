@@ -4,7 +4,10 @@ v1.9 continued the running `P` sequence (P96-P125). This chapter continues it fr
 Space data-font-size bug (P126), then a three-phase shift of Claude Code agent work from Kira Studio
 to Kira Space — agent-activity monitoring extracted into a shared package (P127), a module system
 for Kira Space with a terminal module both apps share (P128), and Kira Space's `ade` module, an
-agent merge queue across git worktrees (P129).
+agent merge queue across git worktrees (P129). P130-P133 came later from four user requests: a
+focus-ring colour flash on inputs (P130), the git graph and review view moved onto shadcn-vue
+(P131), the Operations panel extracted, fixed to span the full width and brought to Kira Space
+(P132), and custom-script configuration moved from Settings into the terminal module (P133).
 
 - **`SPEC.md`** — the phases this chapter is built against, one row per phase, plus each phase's
   own result section.
