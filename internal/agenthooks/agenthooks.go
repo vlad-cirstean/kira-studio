@@ -1,10 +1,12 @@
-// Package agenthooks is P86's own hook-transport layer: a per-process HTTP-over-unix-socket
-// listener that a launched `claude` process's own lifecycle hooks report into (§5.1). It is a
-// domain package — it must not import internal/bridge (internal/layering_test.go's
-// TestDomainPackagesDoNotImportBridge picks this package up automatically from `go list`, the
-// same rule internal/terminal's own package comment records); internal/bridge/agenthooks.go is
-// the one place that turns Options.OnEvent's callback into a push-channel event and this
-// package's plain error into an ipcerr response.
+// Package agenthooks is a repo-root shared package (P127; originally P86, inside
+// apps/kira-studio): a per-process HTTP-over-unix-socket listener that a launched `claude`
+// process's own lifecycle hooks report into (§5.1). Go's internal/ visibility rule makes this
+// importable from any app under apps/ but never the reverse, so it must not (and, structurally,
+// cannot) import an apps/<app>/internal/... package such as internal/bridge — a host's own bridge
+// package is the one place that turns Options.OnEvent's callback into a push-channel event and
+// this package's plain error into an ipcerr response. Manager (manager.go) is the host's own
+// entry point for lifecycle and launch composition; nothing here reads settings or knows which
+// app is hosting it.
 package agenthooks
 
 import (

@@ -3,10 +3,10 @@ package bridge
 import (
 	"log/slog"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // AgentHooksService is the Claude Code settings section's whole surface (P86 §7/§9.3): Status,

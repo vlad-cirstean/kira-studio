@@ -22,9 +22,9 @@ func buildShim(curlPath, sockPath string) (string, error) {
 		}
 	}
 	return fmt.Sprintf(`#!/bin/sh
-# Kira Studio agent hook (P86). Always exits 0: a non-zero exit from a PreToolUse hook blocks the
-# agent's own tool call, and this shim only reports. stderr is discarded for the same reason — a
-# stale socket must not print into the agent's transcript on every tool call.
+# Kira agent hook. Always exits 0: a non-zero exit from a PreToolUse hook blocks the agent's own
+# tool call, and this shim only reports. stderr is discarded for the same reason — a stale socket
+# must not print into the agent's transcript on every tool call.
 exec 2>/dev/null
 "%s" --silent --max-time 2 --output /dev/null \
   --unix-socket "%s" \
