@@ -120,7 +120,6 @@ export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
 export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
 export type RepoDiffTabRecord = Extract<TabRecord, { kind: 'repo-diff' }>;
 export type RepoMultiDiffTabRecord = Extract<TabRecord, { kind: 'repo-multi-diff' }>;
-export type TerminalTabRecord = Extract<TabRecord, { kind: 'terminal' }>;
 
 export function asRepoGraphTab(tab: TabRecord | null | undefined): RepoGraphTabRecord | null {
   return tab && tab.kind === 'repo-graph' ? tab : null;

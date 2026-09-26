@@ -234,7 +234,6 @@ export type HttpRequestTabRecord = Extract<TabRecord, { kind: 'http-request' }>;
 export type GrpcRequestTabRecord = Extract<TabRecord, { kind: 'grpc-request' }>;
 export type VariableSetTabRecord = Extract<TabRecord, { kind: 'variable-set' }>;
 export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>;
-export type TerminalTabRecord = Extract<TabRecord, { kind: 'terminal' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;
