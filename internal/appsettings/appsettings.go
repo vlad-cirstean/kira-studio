@@ -1,10 +1,10 @@
 // Package appsettings is P103 Part 4 (§7.1)'s hoist of the settings sections that were
 // byte-identical, field for field and tag for tag, in both apps' own storage/model/settings.go:
-// AppearanceSettings and the one leaf AdvancedSettings shares, GitLogLevel. Each app's own
-// Settings composes Appearance here alongside its own per-app sections (Kira Studio's
-// Data/Cache/Api/DbMcp/ClaudeCode; Kira Space's own GitSettings/InlineBlame/DateFormat, P120: the
-// two leaves only Kira Space's git module used), and each app's own AdvancedSettings embeds
-// AdvancedCore for the one leaf that's genuinely shared.
+// AppearanceSettings. Each app's own Settings composes Appearance here alongside its own per-app
+// sections (Kira Studio's Data/Cache/Api/DbMcp/ClaudeCode/own advanced.logLevel key;
+// Kira Space's own GitSettings/InlineBlame/DateFormat/advanced.gitLogLevel key — P120: each app's
+// own diagnostic-log leaf has its own name/key now, so ValidLogLevel is the one thing genuinely
+// shared between them, not a common AdvancedCore struct).
 package appsettings
 
 import "fmt"
@@ -20,15 +20,6 @@ type Appearance struct {
 	RowColoring bool   `json:"rowColoring"`
 }
 
-// AdvancedCore is the one Advanced leaf both apps share — GitLogLevel is P72 §9.2's genuinely
-// app-wide replacement for the per-repo kiraSpace.log.level (renamed from kiraVersion.log.level,
-// P100 Part 3); internal/logging.SetLevel is its actual mechanism. Each app's own AdvancedSettings
-// embeds this for the leaf, alongside whatever other leaves are genuinely per-app (Kira Studio's
-// OpLogRetentionDays/ExpensiveQueryRows; Kira Space has none).
-type AdvancedCore struct {
-	GitLogLevel string `json:"gitLogLevel"`
-}
-
 // AppearancePatch mirrors Appearance's own `.partial()` shape — every leaf optional, present only
 // when the caller means to change it (D15: SettingsRepo.Set writes only the leaves actually
 // patched).
@@ -38,12 +29,6 @@ type AppearancePatch struct {
 	RowDensity  *string `json:"rowDensity,omitempty"`
 	WordWrap    *bool   `json:"wordWrap,omitempty"`
 	RowColoring *bool   `json:"rowColoring,omitempty"`
-}
-
-// AdvancedCorePatch mirrors AdvancedCore's own `.partial()` shape — each app's own AdvancedPatch
-// embeds this for the one leaf it patches through the shared mechanism.
-type AdvancedCorePatch struct {
-	GitLogLevel *string `json:"gitLogLevel,omitempty"`
 }
 
 // DefaultAppearance mirrors packages/shared/domain/settings.ts's defaultSettings.appearance.
@@ -62,9 +47,10 @@ func ValidRowDensity(v string) bool {
 	return v == "compact" || v == "comfortable"
 }
 
-// ValidLogLevel mirrors settings.ts's gitLogLevelSchema enum (kiraSpace.log.level before P100
-// Part 3's rename to advanced.gitLogLevel). Also the validator behind Kira Space's own per-repo
-// GitRepoSettings.LogLevel leaf — the same enum, genuinely reused, not merely parallel.
+// ValidLogLevel mirrors settings.ts's logLevelSchema enum — genuinely shared, not merely parallel:
+// Kira Studio's own advanced.logLevel, Kira Space's own advanced.gitLogLevel (kiraSpace.log.level
+// before P100 Part 3's rename), and Kira Space's own per-repo GitRepoSettings.LogLevel leaf all
+// validate against this one enum.
 func ValidLogLevel(v string) bool {
 	switch v {
 	case "off", "error", "warn", "info", "debug":

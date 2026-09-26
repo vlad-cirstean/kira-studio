@@ -6,23 +6,26 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
-// Kira Space's own trimmed Settings model (P100 Part 1). Advanced embeds appsettings.AdvancedCore
-// for the one leaf this app owns, GitLogLevel — Kira Studio's own OpLogRetentionDays/
-// ExpensiveQueryRows are query-log concerns this app has none of. Data/Cache/Api/DbMcp/ClaudeCode
-// are dropped entirely: all five are DB-client-only concerns (page sizes, the query cache budget,
-// HTTP client tuning, the embedded DB MCP server, Claude Code hooks) Kira Space has no use for.
-// Appearance/Git are this app's own (P120): the only app with a git module, so the two leaves only
-// the git module uses (InlineBlame/DateFormat) and the server-owned git leaves (G7 D16) live here
-// rather than in the shared appsettings package.
+// Kira Space's own trimmed Settings model (P100 Part 1). Data/Cache/Api/DbMcp/ClaudeCode are
+// dropped entirely: all five are DB-client-only concerns (page sizes, the query cache budget, HTTP
+// client tuning, the embedded DB MCP server, Claude Code hooks) Kira Space has no use for.
+// Appearance/Advanced/Git are this app's own (P120): the only app with a git module, so the two
+// appearance leaves only the git module uses (InlineBlame/DateFormat), its own diagnostic-log leaf
+// (GitLogLevel — Kira Studio's own is a same-shaped but separately named/keyed advanced.logLevel,
+// not a shared struct any more) and the server-owned git leaves (G7 D16) all live here rather than
+// in the shared appsettings package.
 type AdvancedSettings struct {
-	appsettings.AdvancedCore
+	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo kiraSpace.log.level
+	// (renamed from kiraVersion.log.level, P100 Part 3); internal/logging.SetLevel is its actual
+	// mechanism. Validated against the shared appsettings.ValidLogLevel enum.
+	GitLogLevel string `json:"gitLogLevel"`
 }
 
 // Appearance embeds appsettings.Appearance for the five leaves both apps share, plus the two only
 // this app's git module uses: InlineBlame (P62's git-blame annotation toggle in the repo file
 // viewer) and DateFormat (P72 §9.1's relative-vs-absolute commit timestamp preference). The
-// embedding flattens on the wire the same way AdvancedSettings' own AdvancedCore embed already
-// does — encoding/json promotes an embedded struct's fields on both marshal and unmarshal.
+// embedding flattens on the wire — encoding/json promotes an embedded struct's fields on both
+// marshal and unmarshal.
 type Appearance struct {
 	appsettings.Appearance
 	InlineBlame bool   `json:"inlineBlame"`
@@ -74,15 +77,14 @@ func DefaultSettings() Settings {
 			InlineBlame: true,
 			DateFormat:  "relative",
 		},
-		Advanced: AdvancedSettings{AdvancedCore: appsettings.AdvancedCore{GitLogLevel: "info"}},
+		Advanced: AdvancedSettings{GitLogLevel: "info"},
 		Git:      DefaultGitSettings(),
 	}
 }
 
-// AdvancedPatch embeds appsettings.AdvancedCorePatch for the one leaf this app patches through the
-// shared mechanism (GitLogLevel).
+// AdvancedPatch mirrors AdvancedSettings' own `.partial()` shape.
 type AdvancedPatch struct {
-	appsettings.AdvancedCorePatch
+	GitLogLevel *string `json:"gitLogLevel,omitempty"`
 }
 
 // AppearancePatch embeds appsettings.AppearancePatch for the five leaves both apps share, plus this

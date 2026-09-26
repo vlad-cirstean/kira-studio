@@ -3,7 +3,7 @@ import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription, FieldError } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
-import GitLogLevelField from '@workbench/settings/fields/GitLogLevelField.vue';
+import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
 import { computed, useId } from 'vue';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
@@ -112,8 +112,15 @@ const expensiveQueryRowsId = useId();
       >
     </Field>
 
-    <GitLogLevelField :advanced="draft.advanced" :is-at-default="isAtDefault" :reset-leaf="resetLeaf">
-      <FieldDescription>Verbosity of kira-space's own diagnostic log, for every repository.</FieldDescription>
-    </GitLogLevelField>
+    <LogLevelField
+      :advanced="draft.advanced"
+      leaf="logLevel"
+      label="Log level"
+      select-test-id="settings-log-level"
+      :is-at-default="isAtDefault"
+      :reset-leaf="resetLeaf"
+    >
+      <FieldDescription>Verbosity of Kira Studio's own diagnostic log.</FieldDescription>
+    </LogLevelField>
   </div>
 </template>

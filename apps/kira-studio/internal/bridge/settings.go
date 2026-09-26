@@ -32,10 +32,10 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	if args.Patch.Cache != nil && args.Patch.Cache.L2BudgetMb != nil {
 		s.Deps.Router.PushCacheConfig(merged)
 	}
-	// P72 §9.2: advanced.gitLogLevel's own actual mechanism — apply the new verbosity immediately
+	// P72 §9.2: advanced.logLevel's own actual mechanism — apply the new verbosity immediately
 	// rather than only on next launch.
-	if args.Patch.Advanced != nil && args.Patch.Advanced.GitLogLevel != nil {
-		logging.SetLevel(*args.Patch.Advanced.GitLogLevel)
+	if args.Patch.Advanced != nil && args.Patch.Advanced.LogLevel != nil {
+		logging.SetLevel(*args.Patch.Advanced.LogLevel)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 	return merged, nil

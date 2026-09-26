@@ -107,8 +107,8 @@ func main() {
 	if err != nil {
 		reporter.Fatal(startupfail.StepSettings, err)
 	}
-	// P72 §9.2: match the stored advanced.gitLogLevel rather than always booting at Info.
-	logging.SetLevel(settings.Advanced.GitLogLevel)
+	// P72 §9.2: match the stored advanced.logLevel rather than always booting at Info.
+	logging.SetLevel(settings.Advanced.LogLevel)
 
 	adaptersW := wireAdapters(&deps, settings, repositories, secretsRepo, cipher, authorizer, db)
 	router, connectionsSvc := adaptersW.router, adaptersW.connectionsSvc

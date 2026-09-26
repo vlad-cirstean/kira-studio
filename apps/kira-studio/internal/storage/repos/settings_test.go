@@ -5,34 +5,33 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
 func newSettingsRepo(t *testing.T) *repos.SettingsRepo {
 	return &repos.SettingsRepo{DB: newRepos(t).DB}
 }
 
-// TestSettingsRepo_GitLogLevelDefault is the code review's own regression guard (finding 1):
-// advanced.gitLogLevel was added to the zod schema and the Settings dialog but never wired into
-// GetAll/Set/DefaultSettings — a patch silently dropped the write. Unset, it must read back
-// settings.ts's own default. dateFormat's own case moved to Kira Space (P120: appearance.dateFormat
-// is that app's own git-module leaf now, not Studio's).
-func TestSettingsRepo_GitLogLevelDefault(t *testing.T) {
+// TestSettingsRepo_LogLevelDefault is the code review's own regression guard (finding 1):
+// advanced.gitLogLevel (P120: renamed advanced.logLevel, Studio's own leaf — see migration 0028)
+// was added to the zod schema and the Settings dialog but never wired into GetAll/Set/
+// DefaultSettings — a patch silently dropped the write. Unset, it must read back settings.ts's own
+// default.
+func TestSettingsRepo_LogLevelDefault(t *testing.T) {
 	r := newSettingsRepo(t)
 	got, err := r.GetAll()
 	if err != nil {
 		t.Fatalf("GetAll: %v", err)
 	}
-	if got.Advanced.GitLogLevel != "info" {
-		t.Fatalf("Advanced.GitLogLevel = %q, want %q", got.Advanced.GitLogLevel, "info")
+	if got.Advanced.LogLevel != "info" {
+		t.Fatalf("Advanced.LogLevel = %q, want %q", got.Advanced.LogLevel, "info")
 	}
 }
 
-func TestSettingsRepo_GitLogLevelRoundTrip(t *testing.T) {
+func TestSettingsRepo_LogLevelRoundTrip(t *testing.T) {
 	r := newSettingsRepo(t)
-	gitLogLevel := "debug"
+	logLevel := "debug"
 	if _, err := r.Set(model.SettingsPatch{
-		Advanced: &model.AdvancedPatch{AdvancedCorePatch: appsettings.AdvancedCorePatch{GitLogLevel: &gitLogLevel}},
+		Advanced: &model.AdvancedPatch{LogLevel: &logLevel},
 	}); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -41,15 +40,15 @@ func TestSettingsRepo_GitLogLevelRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAll: %v", err)
 	}
-	if got.Advanced.GitLogLevel != "debug" {
-		t.Fatalf("Advanced.GitLogLevel = %q, want %q", got.Advanced.GitLogLevel, "debug")
+	if got.Advanced.LogLevel != "debug" {
+		t.Fatalf("Advanced.LogLevel = %q, want %q", got.Advanced.LogLevel, "debug")
 	}
 }
 
-func TestSettingsRepo_GitLogLevelRejectInvalid(t *testing.T) {
+func TestSettingsRepo_LogLevelRejectInvalid(t *testing.T) {
 	r := newSettingsRepo(t)
 	bad := "sideways"
-	if _, err := r.Set(model.SettingsPatch{Advanced: &model.AdvancedPatch{AdvancedCorePatch: appsettings.AdvancedCorePatch{GitLogLevel: &bad}}}); err == nil {
-		t.Fatal("Set(gitLogLevel: \"sideways\") = nil error, want a validation error")
+	if _, err := r.Set(model.SettingsPatch{Advanced: &model.AdvancedPatch{LogLevel: &bad}}); err == nil {
+		t.Fatal("Set(logLevel: \"sideways\") = nil error, want a validation error")
 	}
 }

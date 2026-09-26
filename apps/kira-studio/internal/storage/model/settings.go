@@ -14,16 +14,17 @@ type CacheSettings struct {
 	L2BudgetMb int `json:"l2BudgetMb"`
 }
 
-// AdvancedSettings embeds appsettings.AdvancedCore for the one leaf both apps share
-// (GitLogLevel) — P103 Part 4 (§7.1/§7.2). encoding/json promotes an embedded struct's fields on
-// both marshal and unmarshal, so the wire shape (and every `s.Advanced.GitLogLevel` read) is
-// unchanged; a composite literal must now name AdvancedCore explicitly (DefaultSettings below).
+// AdvancedSettings' own LogLevel is P120: Studio's own diagnostic-log verbosity, its own name/key
+// (`advanced.logLevel`), no longer the shared appsettings.AdvancedCore embed both apps used to
+// share under the git-era name `gitLogLevel` — Studio has no git module, so that name never fit.
+// internal/logging.SetLevel is its actual mechanism; appsettings.ValidLogLevel is its validator,
+// genuinely shared with Kira Space's own advanced.gitLogLevel.
 type AdvancedSettings struct {
 	OpLogRetentionDays int `json:"opLogRetentionDays"`
 	// P18 D14/D20: an estimated-rows-read threshold, never a cost unit — settings.ts's own
 	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
-	ExpensiveQueryRows int `json:"expensiveQueryRows"`
-	appsettings.AdvancedCore
+	ExpensiveQueryRows int    `json:"expensiveQueryRows"`
+	LogLevel           string `json:"logLevel"`
 }
 
 // DbMcpSettings is the embedded DB MCP server instance's persisted on/off record
@@ -80,7 +81,7 @@ func DefaultSettings() Settings {
 		Advanced: AdvancedSettings{
 			OpLogRetentionDays: 30,
 			ExpensiveQueryRows: 100_000,
-			AdvancedCore:       appsettings.AdvancedCore{GitLogLevel: "info"},
+			LogLevel:           "info",
 		},
 		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
 		// 30s -> none, max response 10 MiB -> 50 MB, max redirects unchanged at 10.
@@ -110,12 +111,11 @@ type CachePatch struct {
 	L2BudgetMb *int `json:"l2BudgetMb,omitempty"`
 }
 
-// AdvancedPatch embeds appsettings.AdvancedCorePatch for the one leaf both apps share
-// (GitLogLevel) — same embedding AdvancedSettings uses, and for the same reason (§7.2).
+// AdvancedPatch mirrors AdvancedSettings' own `.partial()` shape.
 type AdvancedPatch struct {
-	OpLogRetentionDays *int `json:"opLogRetentionDays,omitempty"`
-	ExpensiveQueryRows *int `json:"expensiveQueryRows,omitempty"`
-	appsettings.AdvancedCorePatch
+	OpLogRetentionDays *int    `json:"opLogRetentionDays,omitempty"`
+	ExpensiveQueryRows *int    `json:"expensiveQueryRows,omitempty"`
+	LogLevel           *string `json:"logLevel,omitempty"`
 }
 
 // ApiPatch mirrors ApiSettings' own `.partial()` shape (P90 item 1).
@@ -167,8 +167,8 @@ func ValidPageSize(v int) bool {
 	}
 }
 
-// InRange (settings.ts's z.number().int().min(lo).max(hi)), ValidRowDensity, ValidDateFormat and
-// ValidLogLevel moved to appsettings (P103 Part 4 §7.1) — this file's own remaining bounds
+// InRange (settings.ts's z.number().int().min(lo).max(hi)), ValidRowDensity and ValidLogLevel
+// moved to appsettings (P103 Part 4 §7.1) — this file's own remaining bounds
 // (Data/Cache/Advanced/Api are all per-app-only sections) are built on appsettings.InRange
 // directly rather than a redundant local copy.
 var (
@@ -205,8 +205,8 @@ func validateAdvancedSection(a *AdvancedPatch) error {
 	if a.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*a.ExpensiveQueryRows) {
 		return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *a.ExpensiveQueryRows)
 	}
-	if a.GitLogLevel != nil && !appsettings.ValidLogLevel(*a.GitLogLevel) {
-		return fmt.Errorf("model: advanced.gitLogLevel: invalid value %q", *a.GitLogLevel)
+	if a.LogLevel != nil && !appsettings.ValidLogLevel(*a.LogLevel) {
+		return fmt.Errorf("model: advanced.logLevel: invalid value %q", *a.LogLevel)
 	}
 	return nil
 }

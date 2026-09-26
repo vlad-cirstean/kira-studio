@@ -202,15 +202,11 @@ test('the Api section round-trips a single changed leaf through Save', async ({ 
 
 // P117 S2: a `:value`/`@change` NativeSelect bound alongside `useVModel({ passive: true })` shows
 // blank on open -- the passive vModel's own internal state overwrites the prop-driven value before
-// paint. Both fields now bind through `model-value`/`update:model-value` instead.
-test('the date-format and git-log-level selects show their real value on open (P117 S2)', async ({
-  relaunch,
-}) => {
+// paint. The log-level field binds through `model-value`/`update:model-value` instead.
+test('the log-level select shows its real value on open (P117 S2)', async ({ relaunch }) => {
   const { window: page } = await relaunch();
   await openSettings(page);
 
-  await expect(page.locator('[data-testid="settings-date-format"]')).toHaveValue('relative');
-
   await page.click('[data-testid="settings-section-Advanced"]');
-  await expect(page.locator('[data-testid="settings-git-log-level"]')).toHaveValue('info');
+  await expect(page.locator('[data-testid="settings-log-level"]')).toHaveValue('info');
 });

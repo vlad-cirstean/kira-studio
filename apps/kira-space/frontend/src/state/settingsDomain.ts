@@ -1,21 +1,18 @@
-import {
-  appearanceSettingsSchema,
-  FONT_SIZE_RANGE,
-  gitLogLevelSchema,
-} from '@shared/domain/settings';
+import { appearanceSettingsSchema, FONT_SIZE_RANGE, logLevelSchema } from '@shared/domain/settings';
 import { z } from 'zod';
 
 // P103 Part 4 (§7.3): this app's own three-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` — this store used
 // to carry Kira Studio's own data/cache/api/dbMcp/claudeCode sections dead (never populated by this
 // app's own Go backend, apps/kira-space/internal/storage/model/settings.go), the same "tab-kind
-// vocabulary" defect P103 Part 2 already fixed for tabs. appearance/gitLogLevel stay genuinely
-// shared; FONT_SIZE_RANGE is the one this app's own GitPane reads directly, so it re-exports; git
-// is this app's own (P120: Kira Space is the only app with a git module) — its schema and
-// `FETCH_AUTO_INTERVAL_MINUTES_RANGE` are defined below, not imported. The raw schema objects
-// (appearanceSettingsSchema/gitLogLevelSchema/rowDensitySchema) stay import-only: nothing outside
+// vocabulary" defect P103 Part 2 already fixed for tabs. appearance/logLevel enum stay genuinely
+// shared (this app's own leaf name stays `advanced.gitLogLevel`, P120); FONT_SIZE_RANGE is the one
+// this app's own GitPane reads directly, so it re-exports; git is this app's own (P120: Kira Space
+// is the only app with a git module) — its schema and `FETCH_AUTO_INTERVAL_MINUTES_RANGE` are
+// defined below, not imported. The raw schema objects
+// (appearanceSettingsSchema/logLevelSchema/rowDensitySchema) stay import-only: nothing outside
 // this file references them directly, every real consumer reads through the composed
-// `Settings`/`SettingsPatch`/`defaultSettings` below. `AppearanceSettings`/`GitLogLevel`/
+// `Settings`/`SettingsPatch`/`defaultSettings` below. `AppearanceSettings`/`LogLevel`/
 // `RowDensity` used to re-export here too; every pane now reads them straight from
 // `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
 export { FONT_SIZE_RANGE };
@@ -50,9 +47,9 @@ const gitSettingsSchema = /*#__PURE__*/ z.object({
 // `advanced` section (apps/kira-space/internal/storage/model/settings.go's own AdvancedSettings
 // embeds appsettings.AdvancedCore for the same one leaf, P103 Part 4 §7.1). Not exported — nothing
 // outside this file references the raw schema object or its own inferred type; AdvancedPane.vue
-// reads the leaf's type through the shared `GitLogLevel` above instead.
+// reads the leaf's type through the shared `LogLevel` above instead.
 const advancedSettingsSchema = /*#__PURE__*/ z.object({
-  gitLogLevel: gitLogLevelSchema.default('info'),
+  gitLogLevel: logLevelSchema.default('info'),
 });
 
 // P120: inlineBlame/dateFormat are this app's own — the only app with a git module to show either

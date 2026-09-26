@@ -1,21 +1,21 @@
 import {
   appearanceSettingsSchema,
-  gitLogLevelSchema,
   HTTP_VERSIONS,
   httpVersionSchema,
+  logLevelSchema,
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
 // P103 Part 4 (§7.3): this app's own seven-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` (which Kira Space's
 // own three-section store carried five dead sections of — data/cache/api/dbMcp/claudeCode — the
-// same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/gitLogLevel
-// stay genuinely shared; this file imports `appearanceSettingsSchema`/`gitLogLevelSchema`/
+// same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/logLevel
+// stay genuinely shared; this file imports `appearanceSettingsSchema`/`logLevelSchema`/
 // `HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed schema below —
 // nothing outside this file references those specific names directly (`HTTP_VERSIONS` is the one
 // exception, re-exported for ApiPane/RequestSettingsPane; `httpVersionSchema` itself stays
 // import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
-// never through here). `FONT_SIZE_RANGE`/`AppearanceSettings`/`GitLogLevel`/`RowDensity` used to
+// never through here). `FONT_SIZE_RANGE`/`AppearanceSettings`/`LogLevel`/`RowDensity` used to
 // re-export here for AppearancePane/AdvancedPane; both now read them straight from
 // `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
 export { HTTP_VERSIONS };
@@ -69,13 +69,11 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
     .min(EXPENSIVE_QUERY_ROWS_RANGE.min)
     .max(EXPENSIVE_QUERY_ROWS_RANGE.max)
     .default(100_000),
-  // P72 §9.2: the git graph's own diagnostic log verbosity — moved here from the per-repo
-  // RepoSettingsDialog.vue's `kiraSpace.log.level` (`instanceWide: true` there was a label, not
-  // a mechanism; this is where installation-wide settings actually live). `.default('info')`
-  // matches that leaf's own pre-existing default (schema.ts). gitLogLevelSchema is the shared
-  // enum (P103 Part 4 §7.1/§7.3) — Kira Space's own `advanced` section validates the same leaf
-  // against it.
-  gitLogLevel: gitLogLevelSchema.default('info'),
+  // Studio's own diagnostic log verbosity (internal/logging, applied immediately by
+  // bridge/settings.go's Set on every patch). `.default('info')` matches that leaf's own
+  // pre-existing default. logLevelSchema is the shared enum (P103 Part 4 §7.1/§7.3, P120) — Kira
+  // Space's own `advanced.gitLogLevel` validates the same leaf against it under its own name.
+  logLevel: logLevelSchema.default('info'),
 });
 
 // P90 §2.1: the seven request-settings leaves that used to be internal/httpclient package
@@ -150,7 +148,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.default({
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
-    gitLogLevel: 'info',
+    logLevel: 'info',
   }),
   api: apiSettingsSchema.default({
     httpVersion: '2',
@@ -198,7 +196,7 @@ export const defaultSettings: Settings = {
   advanced: {
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
-    gitLogLevel: 'info',
+    logLevel: 'info',
   },
   api: {
     httpVersion: '2',
