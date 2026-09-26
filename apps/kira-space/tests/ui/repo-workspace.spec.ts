@@ -777,7 +777,8 @@ const TERMINAL_OPEN_OK: ControlSnapshot = {
 // P100 Part 2: the "+" opens a terminal directly, no dropdown — TabStrip.vue's own onNewTab calls
 // openRepoTerminalTab unconditionally; Studio's own launch-kind menu (Terminal/Claude Code/a
 // configured script) was never ported (no AgentSessions/CustomScripts store here, main.ts's own
-// doc comment).
+// doc comment; P127 dropped Studio's own AgentSessions store too, so that particular gap has since
+// closed on its own).
 test("the tab strip's + opens a terminal tab at the active repository's root", async ({
   relaunch,
 }) => {

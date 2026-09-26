@@ -10,9 +10,9 @@ import (
 )
 
 // P86 §4: the three wire values a LaunchKind arg accepts (packages/shared/domain/tabs.ts's
-// terminalLaunchKindSchema, field for field). Only LaunchKindClaudeCode ever gets Studio's own
-// AgentHooks treatment; a custom script that happens to run `claude` counts as a script,
-// deliberately (§4: "so the implementation does not 'fix' it into a heuristic").
+// terminalLaunchKindSchema, field for field). Only LaunchKindClaudeCode counts toward
+// OpenParams.Agent; a custom script that happens to run `claude` counts as a script, deliberately
+// (§4: "so the implementation does not 'fix' it into a heuristic").
 const (
 	LaunchKindShell      = "shell"
 	LaunchKindClaudeCode = "claude-code"
@@ -56,8 +56,8 @@ func DefaultCwd() string {
 // the coalescing output pump, over a Registry and an Emitter. Each app's own bound TerminalService
 // stays a concrete, per-app Wails-bound type (P103 §2.3: bound service types drive binding
 // generation) and holds one of these to delegate to, rather than being one itself — Open stays
-// per-app too, since Studio's own AgentHooks `--settings` flag/env composition has no Space
-// equivalent.
+// per-app, since building the rest of OpenParams (Command, LaunchKind-derived Agent) is each app's
+// own concern.
 type Service struct {
 	Emit     appevent.Emitter
 	Registry *Registry
@@ -108,9 +108,8 @@ func (s *Service) Close(terminalID string) error {
 
 // OpenWithCoalescedOutput wires p's OnData/OnExit to a fresh coalescing output pump addressed at
 // windowKey/terminalID, then calls Registry.Open — the "output pump" half of Open that is
-// byte-identical between apps. Each app's own Open builds everything else about p (crucially,
-// Command/Env — Studio's own AgentHooks composition is the one thing left out of this shared
-// half) and calls this instead of Registry.Open directly.
+// byte-identical between apps. Each app's own Open builds everything else about p (Command, Agent)
+// and calls this instead of Registry.Open directly.
 func (s *Service) OpenWithCoalescedOutput(p OpenParams, windowKey, terminalID string) (*Session, error) {
 	coalescer := newOutputCoalescer(s.Emit, windowKey, terminalID)
 	p.OnData = coalescer.push

@@ -152,7 +152,7 @@ func (s *Service) Start() {
 
 // Shutdown refuses every Connect from here on, cancels and waits out every attempt already
 // in-flight, then kills every live pre-connect process. Called from main's before-quit (F13,
-// P108 Part 7, ordered after DB MCP/agenthooks are already stopped there).
+// P108 Part 7, ordered after DB MCP is already stopped there).
 //
 // Preconnect.StopAll only kills what is already tracked in its own entries map — an attempt whose
 // Preconnect.Start call is still inside the settle window is not tracked yet at all (supervisor.go's

@@ -8,12 +8,12 @@
 // wrap @workbench/terminal/TerminalHostView.vue, which owns the template/style/composable call
 // genuinely identical between them. This file's own remaining job: build `deps` from this app's
 // stores. Kira Studio's own Claude Code session-reporting banner (P86 §9.4, passed there as
-// TerminalHostView's default slot) is dropped here, not ported: this app's own TerminalService has
-// no AgentHooks integration (bridge/terminal.go's own doc comment — a plain `claude` launch, no
-// `--settings` flag, no hook env, no status-bar session count), and model.Settings carries no
-// `claudeCode` leaf to back a dismiss/enable toggle with. A `claude-code` LaunchKind still runs (it
-// is still a valid wire value, still just a shell command), it simply never gets Studio's own hook
-// plumbing.
+// TerminalHostView's default slot) was never ported here — and P127 removed it from Studio's own
+// copy too, so both apps agree on this point now. This app's own TerminalService has no AgentHooks
+// integration (bridge/terminal.go's own doc comment — a plain `claude` launch, no `--settings`
+// flag, no hook env, no status-bar session count), and model.Settings carries no `claudeCode` leaf
+// to back a dismiss/enable toggle with. A `claude-code` LaunchKind still runs (it is still a valid
+// wire value, still just a shell command); neither app wires it to hook plumbing any more.
 import TerminalHostView, { type TerminalHostDeps } from '@workbench/terminal/TerminalHostView.vue';
 import { useSettingsStore } from '../../state/settings';
 import type { TerminalTabRecord } from '../../state/tabDomain';

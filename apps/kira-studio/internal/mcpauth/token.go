@@ -127,8 +127,9 @@ func PathNamed(home, name string) string {
 // before showing Command/Install, never for any other purpose — narrowing the exposure from D8's
 // original threat (nothing on disk, anywhere) to "readable by
 // this OS user account, same as every other local process already running as it", which is the
-// same posture agenthooks' own 0700 socket directory already takes, and strictly better than the
-// argv exposure it replaces (readable by every local uid via /proc, and by exec-event EDR logging).
+// same posture internal/localsock's own 0700 socket directory already takes, and strictly better
+// than the argv exposure it replaces (readable by every local uid via /proc, and by exec-event EDR
+// logging).
 func HelperTokenPathNamed(home, name string) string {
 	return filepath.Join(home, name+"-header.token")
 }

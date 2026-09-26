@@ -22,11 +22,11 @@ type OpenArgs struct {
 	LaunchKind string
 }
 
-// ValidateOpen is both apps' own TerminalService.Open — identical up to the AgentHooks
-// composition that follows it in Kira Studio only, which stays in that bridge (P107 I2-5). The
-// cwd check is not a trust boundary and must not be read as one: the shell it starts is the
-// user's own and can `cd` anywhere on its first line. It exists so a stale path fails with a
-// clear E_INVALID instead of a confusing exec error.
+// ValidateOpen is both apps' own TerminalService.Open — identical up to whatever each app's own
+// Open builds into OpenParams past this call (P107 I2-5). The cwd check is not a trust boundary and
+// must not be read as one: the shell it starts is the user's own and can `cd` anywhere on its
+// first line. It exists so a stale path fails with a clear E_INVALID instead of a confusing exec
+// error.
 func ValidateOpen(args OpenArgs) error {
 	if args.TerminalID == "" {
 		return ipcerr.New("E_INVALID", "terminalId is required")

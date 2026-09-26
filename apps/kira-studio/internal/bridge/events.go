@@ -63,21 +63,14 @@ const (
 	// second window's Privacy tab / grid header menu / grid preview stay in sync with a rule changed
 	// elsewhere.
 	ChannelMaskRulesChanged = "kira:maskRules:changed"
-	// ChannelAgentSessions is P86 §11's own app-wide broadcast — every live Claude Code session
-	// across every window, Emit'd (not EmitTo) whenever terminal.Registry.OnChange fires, so the
-	// status-bar widget in every window agrees on the same count.
-	ChannelAgentSessions = "kira:agent:sessions"
-	// ChannelAgentEvent is P86 §8.4's own per-hook broadcast — one Claude Code hook firing for one
-	// tab, Emit'd (not EmitTo, unlike ChannelTerminal) since AgentHooksService.onEvent has no
-	// window to address: a hook event is filtered by the receiving window against terminals it
-	// owns instead (state/agentSessions.ts's own reducer, keyed by terminalId).
-	ChannelAgentEvent = "kira:agent:event"
 	// ChannelKeepAwake is P87 §3.2's own app-wide broadcast — the titlebar toggle's state, Emit'd
-	// (not EmitTo) exactly like ChannelAgentSessions: one machine, one assertion, so every window's
-	// titlebar button must agree. Process-scoped, never persisted: an OS power assertion that
-	// outlives the reason a user made it is a surprise, and the persistent half of this feature is
-	// the Settings toggle. P116: byte-identical to Kira Space's own channel of the same name,
-	// hoisted to repo-root internal/appevent.
+	// (not EmitTo): one machine, one assertion, so every window's titlebar button must agree.
+	// Process-scoped, never persisted: an OS power assertion that outlives the reason a user made
+	// it is a surprise, and the persistent half of this feature is the Settings toggle. P116:
+	// byte-identical to Kira Space's own channel of the same name, hoisted to repo-root
+	// internal/appevent. P127: ChannelAgentSessions/ChannelAgentEvent, once defined right below
+	// this, hoisted there too, alongside the rest of agent-activity monitoring — no longer
+	// re-exported here since Studio no longer emits either.
 	ChannelKeepAwake = appevent.ChannelKeepAwake
 	// ChannelApiDataChanged is P112's own broadcast — every API-client mutation (collections,
 	// saved requests, variables, environments) Emits it with the scopes that mutation touched, so

@@ -8,9 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
-// TerminalService is Kira Studio's own TerminalService (internal/bridge/terminal.go), trimmed: no
-// AgentHooks field and no AgentSessions/ChannelAgentSessions machinery. P100 Part 2's own
-// duplicated internal/terminal package (not hoisted — Go's internal/ rule, this file's own
+// TerminalService is Kira Studio's own TerminalService (internal/bridge/terminal.go), trimmed of
+// the AgentSessions/ChannelAgentSessions machinery Studio's own copy carried through P86-P126 (P127
+// dropped that from Studio's own copy too, so the two are now identical on this point). P100 Part
+// 2's own duplicated internal/terminal package (not hoisted — Go's internal/ rule, this file's own
 // package doc comment) has no Claude Code hook integration in scope for this app, so `Open` never
 // composes a `--settings` flag or extra env — LaunchKind is still accepted and validated (the
 // wire vocabulary a ported RepoTerminalView.vue/terminals.ts tab still sends), it simply never
@@ -79,7 +80,8 @@ type TerminalCloseArgs struct {
 }
 
 // Open validates args, spawns a new session and returns its resolved shell path — Kira Studio's
-// own Open, minus the AgentHooks command/env composition.
+// own Open, minus the keep-awake `Agent: agent` field its own copy sets on OpenParams (P127 §2.5;
+// this app has no agent-aware keep-awake reason).
 func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error) {
 	if err := terminal.ValidateOpen(terminal.OpenArgs(args)); err != nil {
 		return TerminalOpenResult{}, err

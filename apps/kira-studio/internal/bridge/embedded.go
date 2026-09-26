@@ -5,16 +5,17 @@ import (
 	"sync"
 )
 
-// embeddedService is the settings-gated start-once/stop-and-clear lifecycle AgentHooksService and
-// DbMcpService each rebuilt around their own embedded server (T2-13): a mutex-guarded instance
-// (the zero value when stopped), a status snapshot built from it, start-once/stop-and-clear
-// guards, and the boot-time "read the setting, start if it says so, log rather than fail"
-// sequence. Wiring — which setting gates it, how the instance is actually constructed/closed, what
-// its wire status looks like — stays in each owning service's own start/stop/status closures (set
-// once, in that service's own New constructor, since they close over the owning service's own
-// fields): DbMcp's own status layers in Installer.Status() even while stopped and its own start
-// takes a mint flag agenthooks has no equivalent of — differences a shared struct cannot
-// generalize away.
+// embeddedService is the settings-gated start-once/stop-and-clear lifecycle DbMcpService rebuilt
+// around its own embedded server (T2-13; P127: AgentHooksService, its own co-tenant here, moved
+// onto agenthooks.Manager instead — a mutex-guarded start/stop/status of its own kept host-side,
+// same shape, without this generic type): a mutex-guarded instance (the zero value when stopped),
+// a status snapshot built from it, start-once/stop-and-clear guards, and the boot-time "read the
+// setting, start if it says so, log rather than fail" sequence. Wiring — which setting gates it,
+// how the instance is actually constructed/closed, what its wire status looks like — stays in the
+// owning service's own start/stop/status closures (set once, in its own New constructor, since
+// they close over the owning service's own fields): DbMcp's own status layers in
+// Installer.Status() even while stopped and its own start takes a mint flag nothing else here has
+// an equivalent of.
 type embeddedService[S comparable, ST any] struct {
 	mu     sync.Mutex
 	server S // the zero value (nil, for every S this package uses — a pointer) means "not running"

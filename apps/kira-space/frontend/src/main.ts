@@ -22,8 +22,10 @@ import '@workbench/workbench.css';
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
 // specific: grid/documents/keyvalue/stream/console page stores, none of which exist here) and no
-// agentHooks/agentSessions/ops/dbMcp/customScripts stores (none of those subsystems exist in this
-// app — apps/kira-space/main.go's own Services list has no counterpart for any of them).
+// ops/dbMcp/customScripts stores (none of those subsystems exist in this app — apps/kira-space/
+// main.go's own Services list has no counterpart for any of them). P127: Studio's own
+// agentHooks/agentSessions stores left too (agent-activity monitoring moved to a shared home, used
+// by no app as of this phase), so that gap has since closed on its own.
 // P116 G5/G7 add appMetrics/keepAwake back — this app now has its own metrics ticker and
 // keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New). P119 adds appUpdate back
 // too — this app now has its own update checker/installer.

@@ -14,10 +14,6 @@ import (
 type TerminalService struct {
 	Emit     appcore.Emitter
 	Registry *terminal.Registry
-	// AgentHooks is P86 §8.3's own optional collaborator — nil in any test that constructs
-	// TerminalService directly without it, in which case Open behaves exactly as P85 left it (no
-	// `--settings` flag, no extra env, ever).
-	AgentHooks *AgentHooksService
 }
 
 // svc is the internal/terminal.Service this bound type delegates its generic half to (P107 T2-7)
@@ -30,48 +26,6 @@ func (s *TerminalService) svc() *terminal.Service {
 // Shutdown closes every live session — called from main.go's own teardown.
 func (s *TerminalService) Shutdown() {
 	s.Registry.CloseAll()
-}
-
-// AgentSessionWire is terminal.AgentSession's own wire projection — AgentSessionsEvent's own
-// per-session shape (P86 §11), field for field.
-type AgentSessionWire struct {
-	TerminalID string `json:"terminalId"`
-	Cwd        string `json:"cwd"`
-}
-
-// AgentSessionsEvent is ChannelAgentSessions' own payload — a list, not a bare count (§11): a bare
-// number would leave the widget's own tooltip unable to say *which* sessions are running.
-type AgentSessionsEvent struct {
-	Sessions []AgentSessionWire `json:"sessions"`
-}
-
-func toWireAgentSessions(sessions []terminal.AgentSession) []AgentSessionWire {
-	out := make([]AgentSessionWire, len(sessions))
-	for i, s := range sessions {
-		out[i] = AgentSessionWire{TerminalID: s.ID, Cwd: s.Cwd}
-	}
-	return out
-}
-
-// AgentSessions is the boot-time hydrate (§12) — a window opened after every currently-live
-// session already started needs a snapshot, since ChannelAgentSessions only fires on change.
-func (s *TerminalService) AgentSessions() AgentSessionsEvent {
-	return AgentSessionsEvent{Sessions: toWireAgentSessions(s.Registry.AgentSessions())}
-}
-
-// emitAgentSessions is terminal.Registry.OnChange's own callback body — Emit, not EmitTo: the
-// count is app-wide by definition (§11), so every window's widget sees the same list.
-func (s *TerminalService) emitAgentSessions() {
-	s.Emit.Emit(ChannelAgentSessions, s.AgentSessions())
-}
-
-// TerminalAgentSessionsChanged is main.go's own Registry.OnChange target — a package-level
-// function rather than a call to the exported method a Wails-bound Registry.OnChange closure
-// would need, because every exported method of a registered service is bound to the wire:
-// emitAgentSessions itself stays unexported so it can never become a renderer-triggerable
-// broadcast, and this function is the one place outside this package allowed to reach it.
-func TerminalAgentSessionsChanged(s *TerminalService) {
-	s.emitAgentSessions()
 }
 
 // TerminalDefaultCwdResult is DefaultCwd's own wire shape — Path is "" when $HOME can't be
@@ -103,9 +57,10 @@ type TerminalOpenArgs struct {
 }
 
 // P86 §4: TerminalOpenArgs.LaunchKind's three wire values are internal/terminal's own
-// LaunchKindShell/ClaudeCode/Script (P107 T2-7). Only LaunchKindClaudeCode ever gets hooks (§8.3)
-// or counts toward the agent widget (§11); a custom script that happens to run `claude` counts as
-// a script, deliberately (§4: "so the implementation does not 'fix' it into a heuristic").
+// LaunchKindShell/ClaudeCode/Script (P107 T2-7). Only LaunchKindClaudeCode counts toward
+// OpenParams.Agent (P87's own keep-awake input, §2.5); a custom script that happens to run `claude`
+// counts as a script, deliberately (§4: "so the implementation does not 'fix' it into a
+// heuristic").
 
 type TerminalOpenResult struct {
 	Shell string `json:"shell"`
@@ -137,16 +92,10 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	if err := terminal.ValidateOpen(terminal.OpenArgs(args)); err != nil {
 		return TerminalOpenResult{}, err
 	}
+	// P127: agent-activity monitoring (the `--settings` flag, the hook env vars) left Kira Studio;
+	// agent stays — it is P87's own keep-awake input (§2.5), read from internal/terminal's registry
+	// count, no dependency on the hooks.
 	agent := args.LaunchKind == terminal.LaunchKindClaudeCode
-
-	// P86 §8.3/§9.1: the setting is read at every launch — only a claude-code launch with the
-	// listener actually running gets the `--settings` flag and the three hook env vars; a plain
-	// terminal or a custom script gets neither, and hooks off leaves the command the literal
-	// `claude`, byte for byte (§2.1).
-	command, env := args.Command, []string(nil)
-	if agent && s.AgentHooks != nil {
-		command, env = s.AgentHooks.composeLaunch(args.TerminalID, command)
-	}
 
 	sess, err := s.svc().OpenWithCoalescedOutput(terminal.OpenParams{
 		ID:        args.TerminalID,
@@ -154,8 +103,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 		Cwd:       args.Cwd,
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
-		Command:   command,
-		Env:       env,
+		Command:   args.Command,
 		Agent:     agent,
 	}, args.WindowKey, args.TerminalID)
 	if err != nil {

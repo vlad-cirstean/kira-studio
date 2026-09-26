@@ -67,4 +67,13 @@ const (
 	ChannelTabClose           = "kira:menu:tab-close"
 	ChannelKeepAwake          = "kira:keepAwake:changed"
 	ChannelAppMetrics         = "kira:app:metrics"
+	// ChannelAgentSessions/ChannelAgentEvent are P127's own hoist — Claude Code agent-activity
+	// monitoring's two wire channels moved here with internal/agenthooks and its Manager (P86 was
+	// Kira Studio-only; no app wires either channel as of P127, TS's own CHANNEL.agentSessions/
+	// agentEvent in packages/shared/protocol/events.ts). ChannelAgentSessions is every live Claude
+	// Code session across every window; ChannelAgentEvent is one hook firing for one tab. Both
+	// Emit'd (not EmitTo), ChannelKeepAwake's own shape: one process-wide fact, not
+	// window-addressed.
+	ChannelAgentSessions = "kira:agent:sessions"
+	ChannelAgentEvent    = "kira:agent:event"
 )

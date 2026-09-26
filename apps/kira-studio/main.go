@@ -133,12 +133,12 @@ func main() {
 
 	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc
-	agentHooksSvc, keepAwakeSvc := embedded.agentHooksSvc, embedded.keepAwakeSvc
+	keepAwakeSvc := embedded.keepAwakeSvc
 	windowsSvc, terminalSvc := embedded.windowsSvc, embedded.terminalSvc
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		dbMcpSvc, agentHooksSvc, keepAwakeSvc, terminalSvc, updateInstaller, repositories, db)
+		dbMcpSvc, keepAwakeSvc, terminalSvc, updateInstaller, repositories, db)
 	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
 
 	app := application.New(application.Options{
@@ -171,7 +171,6 @@ func main() {
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(dbMcpSvc),
-			application.NewService(agentHooksSvc),
 			application.NewService(keepAwakeSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
@@ -342,23 +341,20 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 // blocks (the Services list, teardown, the window-closing terminal cleanup) still reach past this
 // function's own return.
 type embeddedWired struct {
-	dbMcpSvc      *bridge.DbMcpService
-	agentHooksSvc *bridge.AgentHooksService
-	keepAwakeSvc  *bridge.KeepAwakeService
-	windowsSvc    *bridge.WindowsService
-	terminalSvc   *bridge.TerminalService
-	events        *bridge.Events
-	eventsDetach  func()
+	dbMcpSvc     *bridge.DbMcpService
+	keepAwakeSvc *bridge.KeepAwakeService
+	windowsSvc   *bridge.WindowsService
+	terminalSvc  *bridge.TerminalService
+	events       *bridge.Events
+	eventsDetach func()
 }
 
 // wireEmbeddedServices runs main's own embedded-service block: DB MCP (with its own approval
-// broker) -> code workspace (native code-viewing) -> Claude Code hook reporting -> keep-awake ->
-// the windows service handle -> the embedded terminal (its own OnChange republishing both the
-// status-bar widget and keep-awake's agent-session count) -> the app-wide event bus, attached to
-// every producer built so far. deps is taken by value, since every call site here is at or after
-// the point main's own deps.Events assignment (the emitter) has already run — each
-// bridge.XxxService{Deps: deps} literal below is exactly the same value copy the original
-// sequential code made in place.
+// broker) -> keep-awake -> the windows service handle -> the embedded terminal -> the app-wide
+// event bus, attached to every producer built so far. deps is taken by value, since every call
+// site here is at or after the point main's own deps.Events assignment (the emitter) has already
+// run — each bridge.XxxService{Deps: deps} literal below is exactly the same value copy the
+// original sequential code made in place.
 func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
 	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
 	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
@@ -368,12 +364,6 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
 	dbMcpSvc := bridge.NewDbMcpService(deps, mcpinstall.New(mcpinstall.Deps{}), dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
-
-	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
-	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
-	// leaf is already on).
-	agentHooksSvc := bridge.NewAgentHooksService(deps)
-	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
 
 	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
 	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
@@ -390,14 +380,12 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
 	// service plus ChannelTerminal's push channel.
-	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
-	terminalSvc := &bridge.TerminalService{Emit: deps.Events, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
-	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,
-	// republished whenever a Claude Code session's own liveness changes anywhere.
+	terminalSvc := &bridge.TerminalService{Emit: deps.Events, Registry: terminal.NewRegistry()}
+	// P87 §1.1: the agent reason's own input — every claude-code launch still increments
+	// internal/terminal's own registry count (P127 dropped only the hook-reporting side, not
+	// OpenParams.Agent). AgentSessions() is safe to call from here — session.go documents OnChange
+	// as fired outside the registry mutex for exactly this reason.
 	terminalSvc.Registry.OnChange = func() {
-		bridge.TerminalAgentSessionsChanged(terminalSvc)
-		// P87 §1.1: the agent reason's other input. AgentSessions() is safe to call from here —
-		// session.go documents OnChange as fired outside the registry mutex for exactly this reason.
 		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, len(terminalSvc.Registry.AgentSessions()))
 	}
 
@@ -405,7 +393,7 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
-		dbMcpSvc: dbMcpSvc, agentHooksSvc: agentHooksSvc, keepAwakeSvc: keepAwakeSvc,
+		dbMcpSvc: dbMcpSvc, keepAwakeSvc: keepAwakeSvc,
 		windowsSvc: windowsSvc, terminalSvc: terminalSvc,
 		events: events, eventsDetach: eventsDetach,
 	}
@@ -424,7 +412,7 @@ type lifecycleWired struct {
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
 // -> the quitter built over both.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, updateInstaller *appupdate.Installer, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -448,13 +436,11 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		updateInstaller.Cancel()
 		eventsDetach()
 		oplogWiring.Stop()
-		// F13 (P108 Part 7): DB MCP and agenthooks stop before connectionsSvc.Shutdown(), not
-		// after — each stop blocks until its own in-flight handlers return (DbMcpService's stopFn
-		// abandons parked approvals then waits out closeHTTP's graceful drain), so no run_query (or
-		// hook) can still be mid-flight, dialing a preconnect target on demand, once Shutdown below
-		// starts tearing preconnect down.
+		// F13 (P108 Part 7): DB MCP stops before connectionsSvc.Shutdown(), not after — its stopFn
+		// abandons parked approvals then waits out closeHTTP's graceful drain, so no run_query can
+		// still be mid-flight, dialing a preconnect target on demand, once Shutdown below starts
+		// tearing preconnect down.
 		bridge.StopDbMcp(dbMcpSvc)
-		bridge.StopAgentHooks(agentHooksSvc)
 		connectionsSvc.Shutdown()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the

@@ -10,11 +10,13 @@ import (
 )
 
 // KeepAwakeService composes P87's two keep-awake reasons — the titlebar toggle and the agent-aware
-// Settings leaf — onto one internal/keepawake.Controller. Modelled on AgentHooksService line for
-// line: the renderer-facing methods are exported, the app-internal triggers (agent-session-count
-// changes, system wake, boot/teardown) are package-level functions, since Wails binds every
-// exported method of a registered service and none of those may be renderer-callable. P116: the
-// manual half (Toggle) is now shared with Kira Space's own KeepAwakeService.
+// Settings leaf — onto one internal/keepawake.Controller. DbMcpService's own shape: the
+// renderer-facing methods are exported, the app-internal triggers (agent-session-count changes,
+// system wake, boot/teardown) are package-level functions, since Wails binds every exported method
+// of a registered service and none of those may be renderer-callable. P116: the manual half
+// (Toggle) is now shared with Kira Space's own KeepAwakeService. P127: agentCount is fed by
+// internal/terminal's own registry count directly (terminal.Registry.OnChange), no dependency on
+// the hooks agenthooks/Manager provide.
 type KeepAwakeService struct {
 	Deps appcore.Deps
 	// Ctl and Toggle are exported so main.go can inject the platform driver and the shared manual
@@ -47,7 +49,7 @@ func (s *KeepAwakeService) statusLocked() KeepAwakeStatus {
 }
 
 // Status reads the service's current state — never starts or stops anything. The boot-time
-// hydrate, AgentHooksService.Status's own role.
+// hydrate.
 func (s *KeepAwakeService) Status() KeepAwakeStatus {
 	return s.statusLocked()
 }
@@ -74,7 +76,8 @@ type KeepAwakeSetAgentAwareArgs struct {
 // SetAgentAware patches claudeCode.keepAwakeWithAgents, broadcasts the merged settings
 // (SettingsService.Set's own contract), recomputes the agent reason against the setting's new
 // value and the currently-tracked session count, and broadcasts the resulting keep-awake status —
-// AgentHooksService.SetEnabled's own instant-action shape, with a different side effect.
+// an instant action, bypassing the Settings dialog's draft/Save flow entirely (dbmcp.ts's own D7
+// posture on the frontend side).
 func (s *KeepAwakeService) SetAgentAware(args KeepAwakeSetAgentAwareArgs) (KeepAwakeStatus, error) {
 	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{
 		ClaudeCode: &model.ClaudeCodePatch{KeepAwakeWithAgents: &args.Enabled},
@@ -90,11 +93,10 @@ func (s *KeepAwakeService) SetAgentAware(args KeepAwakeSetAgentAwareArgs) (KeepA
 	return st, nil
 }
 
-// recomputeAgent reads claudeCode.keepAwakeWithAgents fresh from settings on every call — P86's
-// own stated convention for this section ("read fresh at every launch, never cached"). The read is
+// recomputeAgent reads claudeCode.keepAwakeWithAgents fresh from settings on every call — never
+// cached, since the setting can change independently of a session starting or ending. The read is
 // local SQLite and happens at most once per PTY open/close, settings toggle, or boot. A read
-// failure is silently skipped (StartAgentHooksIfEnabled's own posture: never fatal), leaving the
-// agent reason at whatever it already was.
+// failure is silently skipped, never fatal, leaving the agent reason at whatever it already was.
 func (s *KeepAwakeService) recomputeAgent() {
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {
@@ -122,9 +124,9 @@ func KeepAwakeSystemDidWake(s *KeepAwakeService) {
 	s.Ctl.Rearm()
 }
 
-// StartKeepAwake is main.go's own boot-time call — AgentHooksService's own startIfEnabled posture,
-// recomputing the agent reason against whatever the setting already is (the session count starts
-// at zero, so this is a no-op unless a later AgentSessionsChanged call raises it).
+// StartKeepAwake is main.go's own boot-time call — recomputing the agent reason against whatever
+// the setting already is (the session count starts at zero, so this is a no-op unless a later
+// AgentSessionsChanged call raises it).
 func StartKeepAwake(s *KeepAwakeService) {
 	s.recomputeAgent()
 }
