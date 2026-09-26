@@ -5874,3 +5874,139 @@ under `apps/*/frontend/src`, `packages/{theme,workbench,git-ui}/src`. 1 (Step 0)
 matching the commit count above. No bound Wails method signature changed in either stream
 (acceptance 5) — confirmed by reading G3's/G4's own diffs, both of which keep every bound method's
 parameters and return type unchanged.
+
+## P116 result
+
+Plan: `docs/v1.9/plans/P116-window-chrome-parity.md`. One Opus planning pass (inventory + §2-§5,
+committed pre-implementation), one sequential Sonnet implementer, no stream split — the plan's own
+§4 call (real file overlap plus an ordering dependency between the hoists and G5-G7). 16 commits,
+`14a47bf`..`de78749`, base `b16ebf9` (the plan commit itself).
+
+**B1 (row 3 of §3) landed first, as its own SPEC row, not a result-section line** — `14a47bf`
+`docs(v1.9): add P119 Kira Space release feed and update notifier row`. P119 is appended after
+P118 in this file's own table; it stays unimplemented, blocked on a release job and per-app tag
+scheme that are real design decisions outside this phase's own scope, per the plan's own §3 and
+acceptance 3.
+
+**Hoists (H1-H7), each moving a Kira-Studio-only primitive to repo-root or `packages/workbench` so
+both apps bind the same implementation — never a Space-only reimplementation:**
+
+- `a274ed3` **H1** — menu, keep-awake and metrics channel constants hoisted to `internal/appevent`.
+- `bd786f7` **H2** — `internal/keepawake` hoisted repo-root, `Toggle` added; Studio delegates.
+- `fffacb7` **H3** — `AttachSystemWake` hoisted to `internal/shell`; both apps' own `main.go` now
+  call it (previously Studio-only).
+- `753a596` **H4** — `internal/metrics` hoisted repo-root, `NewAppTicker(appName)` added so the
+  anchor needle is each app's own shipping executable name rather than a hardcoded `AnchorNeedles`.
+  Includes the `g1measure` cmd's import-path update and the (later found corrupted, see below)
+  `pr.yml` patch edit.
+- `c5dae46` **H5** — `windows`/`keepAwake` bound-call methods added to `createCoreControl`'s
+  `CoreBindings`/`CoreControl` interfaces (`packages/workbench`).
+- `53e5d2d` **H6** — `createKeepAwakeStore`/`createAppMetricsStore` Pinia store factories hoisted to
+  `packages/workbench/src/state`; both apps' own `state/{keepAwake,appMetrics}.ts` now call them.
+- `f5babe4` **H7** — `TitleBarWindowActions.vue`/`AppMetricsItem.vue` hoisted to
+  `packages/workbench/src/components`, moved verbatim from Studio's own `TitleBar.vue`/
+  `StatusBar.vue`; both now thin callers.
+
+**Gaps (G1-G7), each wired into Kira Space through the hoisted primitive above:**
+
+- `ce4cb3b` **G1 Settings… (⌘,)**, **G2 View › Toggle Project Panel (⌘B)**, **G3 dev-only
+  Reload/Open DevTools**, and half of **G4** — Space's `BuildTemplate` grown from the P103 Part 1
+  App/Edit/Window stub to a View section plus Window-menu tab navigation, using the H1 channel
+  constants. **G4's Close Window accelerator moves from ⌘W to ⇧⌘W, and ⌘W now closes the active
+  tab instead** — matching Kira Studio's own long-standing scheme exactly. This is the one
+  user-visible behavior change this phase made, and it is Space-only: Studio's own `menu.go` was
+  never touched (`git diff a274ed3 HEAD -- apps/kira-studio/internal/appshell/menu.go` is empty),
+  so its ⌘W=Close Tab/⇧⌘W=Close Window scheme was already exactly this before P116.
+- `8070421` **G5 keep-awake title-bar toggle with system-wake re-arm**, **G6 New window title-bar
+  button**, **G7 app CPU/memory status-bar item** — Space's Go backend: `KeepAwakeService`,
+  `WindowsService.OpenNewWindow` wired to `shell.OpenNewWindow`, and the metrics ticker via H4.
+  Space composes keep-awake's held-reason set with the titlebar toggle alone — no agent-hooks/
+  Settings leaf (P100's own design), unlike Studio's two composed reasons (toggle plus
+  `claudeCode.keepAwakeWithAgents`).
+- `f0b28db` **G1-G7 frontend**: `App.vue` subscribes `onOpenSettings`/`onToggleProjectPanel`/
+  `onTabNext`/`onTabPrev`/`onTabClose`; `state/tabs.ts` gains `activateNextTab`/`activatePrevTab`/
+  `closeActiveTab` keyed on `useWorkspaceStore().active` (Space's analogue of Studio's
+  `useModeStore().active`); `state/{keepAwake,appMetrics}.ts` call the H6 factories;
+  `TitleBar.vue`/`StatusBar.vue` render the H7 components. `main.ts`'s `initAppMetrics()` joins the
+  critical boot `Promise.all` (Studio's own precedent); `initKeepAwake()` joins the optional
+  `Promise.allSettled` group instead, not the critical path — an intentional divergence from
+  Studio's own `main.ts` (which puts it in the critical group), because a stuck/erroring OS
+  power-assertion call must not block this app's boot the way it's allowed to gate Studio's.
+
+**Self-introduced regression found and fixed in this same pass, not pre-existing:**
+`f0b28db`'s new direct `import { useTabsStore } from './state/tabs'` in `App.vue` sits, once
+biome's `assist/source/organizeImports` sorts it, before the pre-existing `./workbench/host`
+import — a second, differently-ordered static entry point into the three-way
+`state/tabs.ts`/`state/workspace.ts`/`state/repoTabs.ts` import cycle that `tabs.ts`'s own header
+comment already documents as safe only via the one existing entry point's ordering. That left
+`useTabsStore` transiently unbound the first time a repo-row click reached `ensureWorkspaceShell`,
+throwing (caught, logged, not crashing visibly) and breaking that click's own render path —
+reproduced via a non-minified debug build (`KIRA_DEBUG_HOOKS=1 npx vite build --minify false`),
+bisected against `b16ebf9` to confirm it was this phase's own `App.vue` change and nothing else,
+and fixed in `5fe5695` by re-exporting `useTabsStore` from `workbench/host.ts` (which already
+imports it safely) instead of adding a second import edge — durable under biome's own
+alphabetical-sort lint rule, unlike an import-reordering fix that was tried first and rejected.
+
+**Deviation from the plan's literal wording, deliberate:** the plan's own §2 text for the new UI
+spec's `keepAwakeStatus` mock default names `bootSnapshots.ts` and `{manual: false, supported:
+false, error: ''}`. Landed instead in `mockRuntime.ts`'s `WILDCARD_DEFAULTS` with `supported: true`
+— `bootSnapshots.ts`'s own doc comment says an entry with a `WILDCARD_DEFAULTS` default never also
+needs one there, and Studio's own identical entry uses `supported: true` specifically so the
+titlebar button renders by default in every spec (the UI suite runs against a static server, never
+a real Go build); the same reasoning applies unchanged to Space.
+
+**Commits:**
+
+| Commit | Closes |
+| --- | --- |
+| `14a47bf` | B1 (P119 SPEC row) |
+| `a274ed3` | H1 |
+| `bd786f7` | H2 |
+| `fffacb7` | H3 |
+| `753a596` | H4 |
+| `c5dae46` | H5 |
+| `53e5d2d` | H6 |
+| `f5babe4` | H7 |
+| `ce4cb3b` | G1, G2, G3, G4 (backend) |
+| `8070421` | G5, G6, G7 (backend) |
+| `f0b28db` | G1, G2, G4, G5, G6, G7 (frontend) |
+| `5fe5695` | fix: this phase's own circular-import regression |
+| `81ff33d` | test coverage for G1, G2, G4, G5, G6, G7 |
+| `2b9258c` | fix: `pr.yml` CI patch corruption (H4's own stale hunk header) |
+| `de78749` | docs |
+
+**§5.3 manual macOS checklist: not run.** This implementer's session has no macOS display (a Linux
+sandbox) — per the plan's own §5.3 instruction, the phase stops after §5.2 and says so here. The
+phase stays open on this one point until someone runs the 9-step checklist on a Mac; every other
+acceptance criterion (§0 1-3, 5, 6) is met.
+
+**Verification, all run for real:**
+1. `go build ./...`, `go vet ./...` — clean.
+2. `bun run test:go` — full adapter suite, all pass (grepped for FAIL/panic — none).
+3. `bun run typecheck`, `bun run lint`, `bun run lint:go`, `bun run lint:dead` — all clean, via the
+   pre-commit hook on every commit above, no `--no-verify` on any.
+4. `bun run test:unit` — 1662 pass, 0 fail, 175 files.
+5. `bun run test:ui:space` — 28/28 pass (20 pre-existing plus the new `window-chrome.spec.ts`'s 8),
+   0 failed, run clean after `5fe5695`'s fix landed.
+6. `bun run test:ui:studio` (acceptance 5 — Studio unchanged) — run 3 times in full after this
+   phase's last commit. Each run: exactly 1 failure plus (in 2 of 3 runs) 4 tests not run, never
+   the same test twice (`budgets.spec.ts`'s scroll-frame p50 timing, `http-request.spec.ts`'s
+   incognito/tabsSave assertion, `sql-schema.spec.ts`'s suggest-widget visibility), all three in
+   files this phase never touched (`git diff --stat b16ebf9 HEAD --
+   apps/kira-studio/tests/ui/{budgets,http-request,sql-schema}.spec.ts` and the surrounding
+   `frontend/src/{api,sql}` trees: empty). `budgets.spec.ts`'s own comment already documents this
+   category as "cross-file worker contention" flakiness under a shared, CPU-constrained sandbox
+   runner — not a deterministic regression, and not this phase's own scope to fix (a test-infra/
+   timing-tuning decision, a different subsystem). No spec file's own test content or import paths
+   changed for Studio.
+7. The plan's own §5.2 orchestrator greps, all as expected: 0 remaining
+   `apps/kira-studio/internal/(keepawake|metrics)` references; `apps/kira-studio/internal/appshell/
+   wake.go` gone, `shell.AttachSystemWake` called from both apps' `main.go` (2 hits);
+   `WindowsService.OpenNewWindow` wired in Space's `main.go`; `createKeepAwakeStore`/
+   `createAppMetricsStore` and `TitleBarWindowActions`/`AppMetricsItem` each used in both apps (4
+   hits apiece); `OnEmit`/`IsDev` both set in Space's `main.go`; `ChannelOpenSettings`/
+   `ChannelTabClose`/`Reload` present in Space's `menu.go`; the pending `pr.yml` patch names
+   `./internal/metrics/...`.
+
+Touched exactly the plan's own §4 file-ownership table, plus the CI patch fix (`2b9258c`, the same
+file H4 already owned) and this result section.
