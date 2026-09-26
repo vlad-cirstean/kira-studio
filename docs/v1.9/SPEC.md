@@ -6316,3 +6316,94 @@ pre-fix. No UI spec: the fix is server-side, and a mocked payload can't exercise
 
 **Checks.** `bun run lint`, `bun run typecheck` clean; `golangci-lint` 0 issues on
 `gitsession`/`gitsock`; `go test` for `gitsession`, `gitsock`, `gitrpc` pass.
+
+## P119 result
+
+Plan: `docs/v1.9/plans/P119-space-release-notifier.md`. One sequential Sonnet implementer, per the
+plan's own §10 call (script and `Installer` share a live hand-off contract — an ordering
+dependency, not independence). 12 commits, `e324c027..0e4b00b5` (interleaved with unrelated P124
+and SPEC-row commits landing in the same branch window; P119's own commits, in order):
+`e324c027` (hoist `appupdate` to repo-root `internal/`), `7bfda31b` (detached `Installer`, staged
+fd-3 hand-off), `3240d29a` (`scripts/install.sh`), `ec97d3c6` (Kira Space `UpdateService`),
+`131f195e` (Kira Studio `InstallUpdate`/`CancelInstall`), `8a9fe1f5` (shared update dialog, both
+apps), `40f478f9` (UI specs), `54c139c7` (drop `OpenReleasePage`/release-URL validation),
+`09dc0155` (S10 rescope, new S11), `7c35ac0c` (release workflow patch rewrite), `7b4ad845` (docs),
+`0e4b00b5` (follow-up fix, below).
+
+**What landed.** `internal/appupdate` now lives at repo root, parameterized by app name/version
+only (no asset matching, no download-link validation — that stayed exclusively the checker's job
+of comparing semver tags). A new `Installer` (`internal/appupdate/install.go`) spawns
+`scripts/install.sh` detached (`Setsid: true`), fetches it once from
+`raw.githubusercontent.com/vlad-cirstean/kira-studio/main/scripts/install.sh` — the single
+sanctioned occurrence of that host across `apps/`, `packages/`, `internal/`, enforced by S11 — and
+awaits a `staged <tag>\n` line over fd 3 before the app quits so the script can safely replace the
+running bundle. `scripts/install.sh` (POSIX `sh`, contract marker `# kira-install-contract: 1` on
+line 2, kept in sync with the Go side by S11's own grep) handles both `curl -fsSL ... | sh -s --
+app=studio` and the app-spawned form; both install and update are the same script. Both apps'
+`UpdateService` (`Status`/`InstallUpdate`/`CancelInstall`) sit behind one shared
+`createAppUpdateStore` (TanStack Query for status polling and the install mutation, VueUse
+`useLocalStorage` for per-version dismissal shared across windows) and one shared
+`UpdateDialog`/`UpdateAvailableItem` pair — nothing installs without an explicit Update click.
+Kira Studio's old `OpenReleasePage`/`Browser`/release-URL-validation path is gone entirely (§4.6);
+the click-to-browser affordance is replaced by the click-to-install dialog. `.github/workflows/
+release.yml`'s pending patch (`docs/pending-changes/.github__workflows__release.yml.patch`, still
+unapplied — this session cannot push workflow files) now stages one `release` job building,
+stamping and releasing both apps' DMGs under one shared tag, naming the curl installer as the
+supported install path in the generated release notes. `scripts/verify-packaging.sh` gained S11
+(installer/contract pin) and rescoped S10 from `apps/ packages/` to `apps/ packages/ internal/`.
+Docs (`ARCHITECTURE.md`, `PACKAGING.md`, both `README.md`s) rewritten to describe the curl
+installer and the shared update mechanism in place of "no auto-update."
+
+**Follow-up fix, same discipline as any other (`0e4b00b5`).** Found during this session's own
+verification pass: the patch's own header note said "supersedes P100 Part 3's separate
+release-space job" — no such job exists (P100 Part 3 built a per-app job, not one named
+`release-space`); reworded. Everything else the patch asserts about itself (`git apply --check`,
+round-trip via `patch`+`cmp`, valid YAML with jobs `[test-matrix, db-compat, release]`, `git diff
+--stat 7cc1c16a -- .github/workflows` empty) still holds after the edit.
+
+**§11.2 verification, run in full by this session after all 12 commits:**
+
+- `bun run test:go`: 69 packages ok, 0 FAIL. `go test ./internal/appupdate/ -run TestInstaller -v`:
+  3/3 `--- PASS`.
+- `bun run test:unit`: 1662 pass, 0 fail, 14328 `expect()` calls.
+- `bun run test:ui:studio`, run twice, full suite each time: run 1 — 283 passed, 1 failed
+  (`http-request.spec.ts`'s incognito-tab test), 4 did not run (the `ui-timing` project's own
+  tests, skipped because `playwright.config.ts` declares `dependencies: ['ui']` and `ui` had a
+  failure); run 2 — 287 passed, 1 failed (`budgets.spec.ts`'s interaction-budget timing test,
+  `ui-timing` itself, a `page.evaluate` timeout waiting on a grid header cell), 0 did not run. Two
+  different tests failing across two runs, neither touched by this phase
+  (`git diff --stat 586c4f4d..HEAD` against `http-request.spec.ts`/`state/tabs.ts`/
+  `views/httprequest` and against `budgets.spec.ts`/`support/measure.ts` is empty both times), both
+  timing/debounce-sensitive specs — read as this sandbox's own load-sensitivity, not a P119
+  regression, not chased further per CLAUDE.md's pre-existing-fix scope (root-causing sandbox
+  timing jitter in an unrelated grid/HTTP subsystem is outside this phase).
+- `bun run test:ui:space`: 32 passed, 0 failed, including all 3 new `update-dialog.spec.ts` cases.
+- `bun run verify:packaging`: "all checks passed" (S1-S11; A/N mac-bundle checks skip, no Mac
+  packaging in this Linux sandbox) — one stale, gitignored `frontend/dist` artifact from an earlier
+  test run tripped S6 mid-phase; cleared with `bun run build:studio`, not a code defect.
+- `bun run lint:dead`: exit 0; 7 duplicate-export findings and 9 config hints, all pre-existing and
+  in files this phase never touched (`git diff --stat 586c4f4d..HEAD` against each is empty).
+- Every named grep/count check from the plan's own §11.2 list ran and matches, with the following
+  harmless deviations, each individually traced to a real cause and confirmed not a defect: the
+  `internal/buildinfo` grep (1 not 0 — a comment explaining why it's *not* imported), the
+  `ReleaseURL|...` grep (5 not 0 — 3 historical comments plus 2 hits of the unrelated pre-existing
+  `latestReleaseURL` constant, substring collision), `createAppUpdateStore` (6 not 4 — 2 are
+  documentary comments), `UpdateAvailableItem` in both `StatusBar.vue`s (6 not 4 — same, 2
+  documentary comments, one per app), `setInterval` (1 not 0 — a comment describing the mechanism
+  being replaced), the installer's `curl .*|` grep (2 not 0 — a comment and an alert string, not an
+  actual pipe-to-shell), `xattr` in the patch (2, both in removed `-` diff lines, 0 on added
+  lines), `kira-space-macos-arm64.dmg` in the patch (3, plan estimated "≥4" — all 3 legitimate, one
+  fewer than guessed). Every other check matched exactly, including `git diff --stat 7cc1c16a --
+  .github/workflows` (empty, confirmed after `0e4b00b5`).
+
+**§11.3 (manual, on a Mac): not run.** This session has no Mac and no published shared release —
+both are prerequisites the plan itself names. All 8 steps stay open, including §2.6's own "App
+Management" TCC-prompt question for an ad-hoc-signed self-replacing install, which remains
+genuinely unverified. Whoever applies the pending workflow patch, cuts the first shared-tag
+release, and runs §11.3 on real hardware should record the outcome here or in a follow-up phase.
+
+**Plan deviations.** None in scope or design — every §10 commit landed in its planned order and
+content. The only departures from the plan's own numeric predictions are the grep-count mismatches
+above, all pre-existing documentation/comment collisions rather than missing functionality, plus
+one genuine, small, on-the-spot fix (`0e4b00b5`'s wording correction) caught by this session's own
+verification and not left for later. No `--no-verify` used on any commit.
