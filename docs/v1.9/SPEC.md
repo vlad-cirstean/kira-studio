@@ -4934,6 +4934,91 @@ finding:
   checked against its intended file set — no cross-contamination with any sibling subagent's work in
   either direction.
 
+## P110 result
+
+Written retroactively at chapter close: P110 landed without a result section. Every fact below
+comes from the commit log and the three plan documents, not from memory of the run.
+
+Plans: `docs/v1.9/plans/P110-css-tailwind-migration.md` (iteration 1, `24504d0`, tree `771512b`),
+`P110-tailwind-quality-audit.md` (`18c4170`, audit of iteration 1 at `621c6f6`),
+`P110-css-tailwind-migration-iter2.md` (`e009dba`, user decisions folded in at `ac411b5`). Row
+widened to the full migration at `75caae5`.
+
+**Iteration 1** (`24504d0`..`e0bd15c`), two parallel streams plus closing step C:
+
+- **Stream A** (`b459f01`..`1636bc1`, 20 commits, A1-A19 plus one A-fix). git-ui gets its own
+  prefixed, `kv:`-scoped Tailwind v4 root (A1). kira-ui gets `cn()` and a theme partial (A2).
+  Every `Kui*` component moves onto cva variants or `kv:` utilities (A3-A7), and
+  `packages/kira-ui/src/theme/controls.css` is deleted with its export (A8). git-ui's dialogs,
+  banners, toolbar, shell, `CommitGrid`, detail pane, file tree, review and list rows convert
+  (A9-A19). A-fix restores 20-odd `kv-*` marker classes that specs and scripts still query, plus
+  the commit-meta harness's Tailwind chain. `test:webview` went from 0/60 to 60/60 on that fix.
+- **Stream B** (`aee6cd0`..`f2d8187`, 77 commits, B1-B40 with lettered sub-commits). `cn()`
+  registers the kira scales (B1). The collision fix: legacy `bg-input` becomes `bg-field` (B2),
+  `text-muted` becomes `text-muted-foreground` (B3), and `base.css`'s duplicate
+  `--color-muted`/`--color-input`/`--color-border` go, guarded by `check-theme-classes.sh` (B5).
+  Live bugs: five dead `text-fg-muted` labels (B4), the run-state ring's colour and size (B7), the
+  `h-bar` panel heads (B8). New tokens and spin keyframes (B6). Dialog widths become utilities and
+  `DialogContent` loses shadcn's `sm:max-w-sm` cap (B9). Static inline styles become classes (B10).
+  shadcn Field components are fetched and adopted in the settings panes (B11-B12). Every
+  `primitives.css` family retires onto utilities or shadcn components (`Badge`, `Alert`,
+  `NativeSelect`, `InputGroup`, `Button`, `ToggleGroup`, `Resizable`) (B13-B33). Repeated scoped
+  CSS is de-duplicated (B34), then remaining raw declarations and `@apply`-only style blocks across
+  both apps fold onto templates (B35-B40).
+- **Test fixes** (7 commits tagged `P110 test-fix`). One cascade regression: B34's shared
+  `@utility` `virtual-row`/`sticky-row` lost to an unlayered scoped `position: relative`, which
+  collapsed virtualized rows (bisected, `a797e65`). One real bug: `NativeSelect`'s own `v-model`
+  overrode a raw `:value` at 9 call sites (`3a6dc02`). The rest restore marker classes or update
+  stale locators.
+- **Closing step C.** `1aec8ad` un-exports `cellClass` for knip. C1 (`621c6f6`) guards the 29
+  retired `kui-*` names. C2 (`6792c76`) re-records the 5 Studio visual baselines, then re-runs
+  `test:visual:studio` clean. C3 (`e0bd15c`) records the escape-hatch rule and the
+  one-definition-per-`@theme`-name rule in `docs/ARCHITECTURE.md`. `primitives.css` went from 1013
+  lines to 75, and `workbench.css` is down to 2 non-comment lines.
+
+**Iteration 2** (`e009dba`..`0491dae`, 47 commits tagged `P110 I2-n` plus 7 untagged commits in
+the same pass: `61be6e0`, `ed5037d`, `c745249`, `c21ad5f`, `290b2ff` and `d466cd0` are I2-16..I2-20
+style-block conversions, `85992c8` is I2-29). It fixed the audit's findings that still held, plus
+4 user-approved amendments:
+
+- **Merge and conflict tooling.** Missing tailwind-merge groups are registered (I2-2). New
+  `scripts/check-class-conflicts.ts` (I2-3) runs inside `bun run lint` (I2-9).
+- **Live bugs.** Run-state label colour, through a new `RunState` component (I2-4). Current
+  search-match text colour (I2-5). Terminal failed-footer colour (I2-6). Pre-phase values lost to
+  utility sort order, M3/M4 (I2-7).
+- **Shared components replace pasted class strings.** `Empty` (I2-10/11), `TreeTwisty` (I2-13),
+  shared virtual/sticky row classes (I2-15), `NumberStepperInput` (14 sites, I2-22), `ViewToolbar`
+  (36 sites, I2-23), `SwatchRadio` (I2-24), settings fields on `Field`/`Label` (32 sites, I2-26).
+  Dialog header/footer/title bases are restyled, dropping 50 per-site overrides (I2-21).
+- **Arbitrary values and tokens.** Arbitrary values move to scale or token utilities (I2-27/28).
+  The kui spacing scale is dropped (I2-29). Orphaned seam tokens are deleted (I2-32).
+- **Amendments.** One 1s spinner (I2-35). `Alert`'s `err` variant folds onto `destructive`
+  (I2-36). One colour name and one radius name per value, repo-wide (I2-37/I2-38, both `!`). Every
+  splitter goes onto the `Resizable` wrappers (I2-39).
+- **Close.** ConsoleResultGrid's last `<style>` block goes (I2-33). `ARCHITECTURE.md`'s Stack
+  table and the P110 row are updated (I2-34).
+
+End state at `0491dae`:
+- `packages/theme/src/base.css` holds exactly 4 `@utility` blocks.
+- Exactly 5 `.vue` files keep a `<style>` block (iteration 2's §0.5 list), down from 149 before
+  the phase: `MonacoHost`, `OperationsPanel`, `ResponseDiffDialog`, `RepoFileView`, `CommitGrid`.
+
+**Checks.**
+- Every commit passed the pre-commit hook (lint plus typecheck).
+- `bun run lint` now includes `check-theme-classes.sh` and `check-class-conflicts.ts`.
+- `test:webview`: 60/60 after A-fix.
+- `test:visual:studio`: re-recorded at C2, then clean on a second run. I2-1b added settings
+  baselines for both apps, and I2-26 was checked against them.
+- I2-23's own run: `test:ui:studio` 277/281 (2 flakes, both green when re-run alone) and
+  `test:ui:space` 19/20 (`repo-workspace.spec.ts:444`, then open as P114). Both visual suites
+  (13/13 and 4/4) were pixel-identical.
+
+**Known gap: no full-suite end-state total.** No commit body records a full-suite total for either
+iteration's end state. Iteration 1's §0.7 and iteration 2's §9.2 require every suite to pass, but
+only these partial runs are on record. Later phases ran the full UI suites on top of this tree
+(P117, P121 and P123 result sections). Each failure there traced to a flake unrelated to P110. So
+no P110 item is open; only the end-state totals are missing.
+
 ## P111 result
 
 Landed as 5 commits against `2f6b61b` (the plan's own survey commit) / plan `7649c72`
