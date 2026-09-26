@@ -94,7 +94,7 @@ const rawLanguage = computed(() =>
 </script>
 
 <template>
-  <div class="h-full overflow-auto flex flex-col text-kira-sm gap-1.5 p-2" data-testid="explain-result-view">
+  <div class="h-full overflow-auto flex flex-col text-kira-md gap-1.5 p-2" data-testid="explain-result-view">
     <template v-if="plan && result">
       <div class="flex items-center flex-wrap gap-2">
         <div
@@ -108,12 +108,12 @@ const rawLanguage = computed(() =>
         </div>
         <Tooltip v-if="nativeCostLabel">
           <TooltipTrigger as-child>
-            <span class="text-muted-foreground text-kira-xs cursor-default" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
+            <span class="text-muted-foreground text-kira-sm cursor-default" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
           </TooltipTrigger>
           <TooltipContent>Not comparable to another engine’s own cost figure — see the plan doc’s F17.</TooltipContent>
         </Tooltip>
       </div>
-      <p class="text-muted-foreground text-kira-xs whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
+      <p class="text-muted-foreground text-kira-sm whitespace-pre-wrap break-words font-data" data-testid="explain-statement">{{ result.statement }}</p>
 
       <ul v-if="plan.issues.length > 0" class="flex flex-col list-none m-0 p-0 gap-1" data-testid="explain-issues">
         <li
@@ -148,12 +148,12 @@ const rawLanguage = computed(() =>
           </button>
           <span v-else class="inline-flex items-center w-3 shrink-0 cursor-pointer"></span>
           <span class="font-data">{{ row.node.label }}</span>
-          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-xs"
+          <span v-if="row.node.estimatedRows !== undefined" class="plan-meta text-muted-foreground text-kira-sm"
             >~{{ row.node.estimatedRows.toLocaleString() }} rows</span
           >
-          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-xs">cost {{ row.node.cost.total.toLocaleString() }}</span>
-          <span v-if="row.node.detail" class="text-subtle text-kira-xs font-data">{{ row.node.detail }}</span>
-          <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-xs">{{ metricsLine(row.node) }}</span>
+          <span v-if="row.node.cost" class="plan-meta text-muted-foreground text-kira-sm">cost {{ row.node.cost.total.toLocaleString() }}</span>
+          <span v-if="row.node.detail" class="text-subtle text-kira-sm font-data">{{ row.node.detail }}</span>
+          <span v-if="row.node.metrics.length" class="plan-metrics text-muted-foreground text-kira-sm">{{ metricsLine(row.node) }}</span>
         </div>
       </div>
 
@@ -166,13 +166,13 @@ const rawLanguage = computed(() =>
           data-testid="explain-raw-toggle"
           @click="showRaw = !showRaw"
         />
-        <span class="text-muted-foreground text-kira-xs">Raw</span>
+        <span class="text-muted-foreground text-kira-sm">Raw</span>
       </div>
       <div v-if="showRaw" class="h-64 border border-border rounded-kira-sm overflow-hidden" data-testid="explain-raw">
         <MonacoHost :doc="plan.raw" :language="rawLanguage" :read-only="true" :autocomplete="false" />
       </div>
     </template>
-    <p v-else class="text-muted-foreground text-kira-xs m-0">No plan.</p>
+    <p v-else class="text-muted-foreground text-kira-sm m-0">No plan.</p>
   </div>
   <!-- P110 I2-16: `.verdict.warn`/`.issue-list li[.warn/.info]`/`.plan-row:hover` all moved onto
        the template as ternaries/utilities -- `issue.severity` is exhaustively 'warn'/'info'

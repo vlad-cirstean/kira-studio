@@ -332,7 +332,7 @@ function onSequenceStartChange(index: number, start: number): void {
       <div class="preview-section">
         <button
           type="button"
-          class="bg-none border-none cursor-pointer p-0 text-primary disabled:cursor-not-allowed disabled:text-muted-foreground text-kira-sm"
+          class="bg-none border-none cursor-pointer p-0 text-primary disabled:cursor-not-allowed disabled:text-muted-foreground text-kira-md"
           data-testid="generate-data-preview-toggle"
           :disabled="noUsableColumns"
           @click="onTogglePreview"
@@ -367,7 +367,7 @@ function onSequenceStartChange(index: number, start: number): void {
                null, so the label is always the em dash RunState's own computed would give it). -->
           <Tooltip v-if="running">
             <TooltipTrigger as-child>
-              <span class="inline-flex items-center gap-1 font-data text-kira-xs text-info">
+              <span class="inline-flex items-center gap-1 font-data text-kira-sm text-info">
                 <span class="min-w-[7ch] text-right">—</span>
                 <span
                   class="h-3 w-3 shrink-0 rounded-full border-2 border-t-primary border-r-transparent border-b-primary border-l-primary animate-spin"

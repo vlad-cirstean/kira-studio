@@ -237,7 +237,7 @@ function setHostRef(key: RawSection['key'], instance: unknown): void {
       <template v-for="section in rawSections" :key="section.key">
         <div class="flex min-h-52 flex-col gap-0.5">
           <div class="flex items-center gap-1">
-            <span class="text-kira-xs text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap" :data-testid="section.captionTestid">
+            <span class="text-kira-sm text-subtle font-data overflow-hidden text-ellipsis whitespace-nowrap" :data-testid="section.captionTestid">
               {{ section.caption }}
             </span>
             <span class="ml-auto" />

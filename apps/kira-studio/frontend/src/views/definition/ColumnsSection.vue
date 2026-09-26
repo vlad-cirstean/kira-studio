@@ -77,8 +77,8 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           </td>
           <td :class="DEF_TD" class="def-col-name">{{ col.name }}</td>
           <td :class="DEF_TD" class="w-6">
-            <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-xs">PK</span>
-            <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-xs">FK</span>
+            <span v-if="keyLabel(col) === 'PK'" class="text-warn text-kira-sm">PK</span>
+            <span v-else-if="keyLabel(col) === 'FK'" class="text-info text-kira-sm">FK</span>
           </td>
           <td :class="DEF_TD" class="whitespace-nowrap text-muted-foreground font-data">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>

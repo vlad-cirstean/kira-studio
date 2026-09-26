@@ -827,7 +827,7 @@ const statusLine = computed(() => {
         <button
           v-if="canShowAutoExplainPlan"
           type="button"
-          class="border-0 bg-none p-0 text-inherit underline cursor-pointer text-[length:inherit] shrink-0"
+          class="border-0 bg-none p-0 text-inherit underline cursor-pointer shrink-0"
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >
@@ -881,7 +881,7 @@ const statusLine = computed(() => {
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="group/tab inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 max-w-36 h-5.5 text-kira-xs"
+              class="group/tab inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 max-w-36 h-5.5 text-kira-md"
               :class="
                 result.key === rt.activeKey
                   ? 'is-active bg-elevated border-border-strong text-fg'

@@ -166,7 +166,7 @@ function selectMethod(service: string, method: string): void {
         <div v-for="(p, i) in tab.state.importPaths" :key="i" class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ p }}</span>
+              <span class="text-kira-sm font-data min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ p }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ p }}</TooltipContent>
           </Tooltip>
@@ -177,7 +177,7 @@ function selectMethod(service: string, method: string): void {
             @click="removeImportPath(i)"
           />
         </div>
-        <div v-if="tab.state.importPaths.length === 0" class="text-kira-xs text-subtle">
+        <div v-if="tab.state.importPaths.length === 0" class="text-kira-sm text-subtle">
           No import paths — the .proto file's own directory is used
         </div>
       </div>
@@ -230,7 +230,7 @@ function selectMethod(service: string, method: string): void {
             data-testid="grpc-method-row"
             @click="selectMethod(svc.name, m.name)"
           >
-            <span class="text-kira-sm font-data">{{ m.name }}</span>
+            <span class="text-kira-md font-data">{{ m.name }}</span>
             <Badge
               v-if="m.serverStreaming || m.clientStreaming"
               variant="ok"

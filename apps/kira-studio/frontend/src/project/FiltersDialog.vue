@@ -168,17 +168,17 @@ const connectionName = computed(
 
       <div class="overflow-auto">
     <div class="flex flex-col gap-2 p-3">
-      <span class="help text-kira-xs leading-normal text-subtle">
+      <span class="help text-kira-sm leading-normal text-subtle">
         Ticked types and objects are shown; unticking one hides it and everything under it.
         Nothing you have not unticked is ever hidden — an object created later shows up too.
       </span>
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-kira-sm text-fg">Object types</span>
+          <span class="font-semibold text-kira-lg text-fg">Object types</span>
           <span class="flex gap-1">
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="allKinds">All</button>
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="noneKinds">None</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="allKinds">All</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="noneKinds">None</button>
           </span>
         </div>
         <div class="flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm border border-border p-1" data-testid="filter-kind-list">
@@ -196,19 +196,19 @@ const connectionName = computed(
             >
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
-            <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm">{{ row.label }}</span>
-            <span class="text-kira-xs text-subtle">{{ row.count }}</span>
+            <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.label }}</span>
+            <span class="text-kira-sm text-subtle">{{ row.count }}</span>
           </Label>
-          <span v-if="kinds.length === 0" class="text-kira-xs text-subtle p-1">Nothing cached yet.</span>
+          <span v-if="kinds.length === 0" class="text-kira-sm text-subtle p-1">Nothing cached yet.</span>
         </div>
       </section>
 
       <section class="flex flex-col gap-1">
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-kira-sm text-fg">Objects</span>
+          <span class="font-semibold text-kira-lg text-fg">Objects</span>
           <span class="flex gap-1">
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="allObjects">All</button>
-            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-xs text-primary hover:underline" @click="noneObjects">None</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="allObjects">All</button>
+            <button type="button" class="bg-none border-none p-0 cursor-pointer text-kira-md text-primary hover:underline" @click="noneObjects">None</button>
           </span>
         </div>
         <div class="w-full">
@@ -252,15 +252,15 @@ const connectionName = computed(
                       <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="10" />
                     </template>
                   </Checkbox>
-                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm">{{ row.name }}</span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-kira-md">{{ row.name }}</span>
                 </Label>
               </TooltipTrigger>
               <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
             </Tooltip>
-            <span v-if="row.hasChildren" class="text-kira-xs text-subtle">{{ row.childCount }}</span>
+            <span v-if="row.hasChildren" class="text-kira-sm text-subtle">{{ row.childCount }}</span>
           </div>
-          <span v-if="objects.rows.length === 0" class="text-kira-xs text-subtle p-1">Nothing cached yet.</span>
-          <span v-if="objects.truncated" class="text-kira-xs text-subtle p-1 italic" data-testid="filter-object-truncated">
+          <span v-if="objects.rows.length === 0" class="text-kira-sm text-subtle p-1">Nothing cached yet.</span>
+          <span v-if="objects.truncated" class="text-kira-sm text-subtle p-1 italic" data-testid="filter-object-truncated">
             Showing the first 500 rows — type to narrow.
           </span>
         </div>
@@ -275,14 +275,14 @@ const connectionName = computed(
         </AlertDescription>
       </Alert>
 
-      <span class="help cached-note text-kira-xs leading-normal text-subtle self-start">
+      <span class="help cached-note text-kira-sm leading-normal text-subtle self-start">
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
     </div>
       </div>
 
       <DialogFooter>
-        <span class="help text-kira-xs leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span class="help text-kira-sm leading-normal text-subtle">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>

@@ -155,7 +155,7 @@ function onKeydown(e: KeyboardEvent): void {
          at all. -->
     <Badge
       v-if="row.kind === 'request' && row.protocol === 'grpc'"
-      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs"
+      class="w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-sm"
       :variant="grpcMethodClass(row.method)"
       data-testid="grpc-collection-chip"
     >
@@ -164,7 +164,7 @@ function onKeydown(e: KeyboardEvent): void {
     <Badge
       v-else-if="row.kind === 'request'"
       variant="chip"
-      class="method w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-xs"
+      class="method w-14 shrink-0 overflow-hidden text-center text-ellipsis tracking-wide text-kira-sm"
       :class="methodTextClass(httpMethodToken(row.method))"
       >{{ row.method }}</Badge
     >

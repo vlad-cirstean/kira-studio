@@ -90,7 +90,7 @@ function onEditGlobalDefaults(): void {
 
 // P110 B40: `.inherit`'s own shared class string, repeated 7 times in this file's template --
 // the DEF_TH/DEF_TD const idiom views/definition/*.vue already uses.
-const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-xs';
+const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-sm';
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
@@ -303,7 +303,7 @@ const disableCookieJarId = useId();
     </FieldGroup>
     <FieldDescription>Global: {{ global.disableCookieJar ? 'off' : 'on' }}</FieldDescription>
 
-    <button type="button" class="self-start cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
+    <button type="button" class="self-start cursor-pointer border-0 bg-none p-0 text-kira-md text-primary" data-testid="http-settings-edit-global" @click="onEditGlobalDefaults">
       Edit global defaults…
     </button>
   </div>

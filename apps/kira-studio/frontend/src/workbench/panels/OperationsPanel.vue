@@ -220,7 +220,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="h-full flex flex-col min-h-0 text-kira-sm">
+  <div class="h-full flex flex-col min-h-0 text-kira-md">
     <div class="shrink-0 flex items-center gap-2 py-1 px-2 border-b border-border">
       <InputGroup variant="kira" class="flex-none flex w-40">
         <CodiconIcon name="filter" :size="13" class="shrink-0 text-muted-foreground" />

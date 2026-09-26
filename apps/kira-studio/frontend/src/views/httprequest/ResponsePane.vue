@@ -323,7 +323,7 @@ onUnmounted(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="text-kira-xs text-subtle cursor-pointer border-0 bg-none p-0 hover:text-fg"
+              class="text-kira-md text-subtle cursor-pointer border-0 bg-none p-0 hover:text-fg"
               data-testid="http-elapsed"
               @click="viewTimeline"
             >
@@ -332,7 +332,7 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>See where the time went</TooltipContent>
         </Tooltip>
-        <span class="text-kira-xs text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
+        <span class="text-kira-sm text-subtle" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
         <ToggleGroup
           v-if="tab.state.responsePane === 'body' && prettyFormat"
           type="single"
@@ -427,7 +427,7 @@ onUnmounted(() => {
       <TooltipTrigger as-child>
         <button
           type="button"
-          class="text-kira-xs text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 hover:text-fg"
+          class="text-kira-md text-subtle block w-full text-left cursor-pointer border-0 bg-none p-0 hover:text-fg"
           data-testid="http-redirects"
           @click="viewTimeline"
         >
@@ -455,13 +455,13 @@ onUnmounted(() => {
         </InputGroup>
         <span
           v-if="headerFilter.trim()"
-          class="text-kira-xs subtle px-1.5 pt-1 pb-0"
+          class="text-kira-sm subtle px-1.5 pt-1 pb-0"
           data-testid="http-response-headers-count"
         >
           {{ filteredHeaders.length }} of {{ response.headers.length }} headers
         </span>
         <div class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-          <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-xs" data-testid="response-header-row">
+          <div v-for="(h, i) in filteredHeaders" :key="i" class="flex gap-1.5 text-kira-sm" data-testid="response-header-row">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
             <span class="wrap-anywhere font-data">{{ h.value }}</span>
           </div>
@@ -505,7 +505,7 @@ onUnmounted(() => {
         <button
           v-if="hasHistory"
           type="button"
-          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary"
+          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
           data-testid="http-history-hint"
           @click="viewHistory"
         >

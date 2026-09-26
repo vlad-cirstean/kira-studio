@@ -62,7 +62,7 @@ function onToggleKeepAwake(): void {
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm wails-no-drag"
+        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-md wails-no-drag"
         :class="[
           modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
           { 'is-active': modeStore.active === mode },

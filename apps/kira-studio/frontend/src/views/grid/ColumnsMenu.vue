@@ -146,7 +146,7 @@ onBeforeUnmount(() => {
         </Label>
       </div>
       <Separator class="my-1" />
-      <div class="px-1.5 pb-1.5 text-kira-xs text-subtle" data-testid="columns-menu-footer">
+      <div class="px-1.5 pb-1.5 text-kira-sm text-subtle" data-testid="columns-menu-footer">
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>

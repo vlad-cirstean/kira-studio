@@ -669,7 +669,7 @@ watch(
 }
 
 :global(.monaco-hover .hover-contents p) {
-  @apply font-ui text-kira-xs text-muted-foreground;
+  @apply font-ui text-kira-md text-muted-foreground;
 }
 
 :global(.suggest-widget) {

@@ -214,10 +214,10 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </Alert>
 
       <div v-if="!failedTimeline" class="flex items-center justify-between gap-1.5">
-        <div class="text-kira-xs text-subtle px-0.5" data-testid="http-timeline-summary">
+        <div class="text-kira-sm text-subtle px-0.5" data-testid="http-timeline-summary">
           {{ summary }}
         </div>
-        <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-xs text-subtle" data-testid="http-timeline-legend">
+        <div class="flex flex-wrap gap-1.5 px-0.5 text-kira-sm text-subtle" data-testid="http-timeline-legend">
           <span v-for="seg in PHASE_SEGMENTS" :key="seg.key" class="inline-flex items-center gap-0.5">
             <span class="inline-block h-2 w-2 rounded-kira-sm" :style="{ backgroundColor: seg.colorVar }" />{{ seg.label }}
           </span>
@@ -234,7 +234,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
           class="flex flex-col gap-0.5 rounded-kira border border-border p-1"
           data-testid="http-timeline-hop"
         >
-          <div class="flex items-center gap-1 text-kira-xs font-data" data-testid="http-timeline-hop-caption">
+          <div class="flex items-center gap-1 text-kira-sm font-data" data-testid="http-timeline-hop-caption">
             <span class="text-muted-foreground">{{ hop.index + 1 }}</span>
             <span>{{ hop.method }}</span>
             <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{ hop.url }}</span>
@@ -261,7 +261,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-1.5 text-kira-xs text-subtle">
+          <div class="flex flex-wrap gap-1.5 text-kira-sm text-subtle">
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
               <Tooltip v-if="!hop[seg.key]">
                 <TooltipTrigger as-child>
@@ -277,17 +277,17 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             </template>
           </div>
 
-          <div v-if="hopNotes(hop).length > 0" class="flex flex-col gap-0.5 text-kira-xs text-subtle">
+          <div v-if="hopNotes(hop).length > 0" class="flex flex-col gap-0.5 text-kira-sm text-subtle">
             <div v-for="n in hopNotes(hop)" :key="n.testid" :data-testid="n.testid">{{ n.text }}</div>
           </div>
 
           <details v-if="hop.headers && hop.headers.length > 0" class="group mt-0.5">
             <summary
-              class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+              class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
               Response headers
             </summary>
-            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-xs py-0.5">
+            <div v-for="(h, i) in hop.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
@@ -297,11 +297,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             class="group mt-0.5"
           >
             <summary
-              class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+              class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
             >
               Response headers
             </summary>
-            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-xs py-0.5">
+            <div v-for="(h, i) in response!.headers" :key="i" class="flex gap-1.5 text-kira-sm py-0.5">
               <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
               <span class="wrap-anywhere font-data">{{ h.value }}</span>
             </div>
