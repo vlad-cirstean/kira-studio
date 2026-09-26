@@ -379,8 +379,8 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/apps/**", "@/*"],
-                    "message": "P103 §10: packages/workbench is shared between both apps — it must not import either app's own code."
+                    "group": ["**/apps/**", "@/*", "@bindings*/**"],
+                    "message": "P103 §10/P127: packages/workbench is shared between both apps — it must not import either app's own code or a Wails binding directly, only through an injected control seam."
                   }
                 ]
               }

@@ -2,19 +2,13 @@
 // decision structure fed by an out-of-order external producer (each hook is its own `curl`
 // process, so a PostToolUse can legitimately arrive before its own PreToolUse), with several
 // interacting rules — exactly what CLAUDE.md's narrow unit-test bar names. Pure: (prev, event) =>
-// next; the store (state/agentSessions.ts) applies it, this spec calls it directly.
+// next; createAgentSessionsStore applies it, this spec calls it directly.
 //
-// state/agentSessions.ts transitively reaches bridge/control.ts -> '/wails/runtime.js' at module
-// scope (bridge/index.ts imports every generated *service.js binding), so this needs the same
-// dynamic-import-after-mock pattern document-console-row-menu-lazy-snapshot.spec.ts already uses.
-import '@workbench/testing/unit/window';
-
+// P127: moved here, colocated with the reducer (packages/git-core/src's own precedent) — a plain
+// static import now, since agentActivity.ts reaches no bridge binding at all.
 import { describe, expect, test } from 'bun:test';
 import type { AgentEvent } from '@shared/domain/agent';
-
-const { MAX_RUNNING_TOOLS, reduceAgentActivity } = await import(
-  '../../frontend/src/state/agentSessions'
-);
+import { MAX_RUNNING_TOOLS, reduceAgentActivity } from './agentActivity';
 
 function event(partial: Partial<AgentEvent> & { event: string }): AgentEvent {
   return {
@@ -31,7 +25,7 @@ function event(partial: Partial<AgentEvent> & { event: string }): AgentEvent {
   };
 }
 
-describe('state/agentSessions — reduceAgentActivity (P86 §13)', () => {
+describe('agentActivity — reduceAgentActivity (P86 §13)', () => {
   test('1. SessionStart on an existing entry resets rather than merges', () => {
     const busy = reduceAgentActivity(undefined, event({ event: 'PreToolUse', toolUseId: 'a' }));
     expect(busy.runningTools).toEqual(['a']);
