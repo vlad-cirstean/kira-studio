@@ -201,7 +201,7 @@ async function onAddScript(): Promise<void> {
         <div class="flex flex-col w-full">
           <Input
             v-model="scriptDrafts[script.id].workingDir"
-            placeholder="Active repository"
+            placeholder="Home directory"
             class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
             data-testid="custom-script-workingdir"
             @blur="onScriptFieldBlur(script)"
@@ -260,7 +260,7 @@ async function onAddScript(): Promise<void> {
       <div class="flex flex-col w-full">
         <Input
           v-model="newScriptWorkingDir"
-          placeholder="Active repository"
+          placeholder="Home directory"
           class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
           data-testid="custom-script-add-workingdir"
         />

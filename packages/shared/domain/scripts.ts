@@ -10,7 +10,10 @@ import { paletteColorSchema } from './color';
 export const customScriptFieldsSchema = /*#__PURE__*/ z.object({
   name: z.string(),
   command: z.string(),
-  // '' means "the active repo workspace's own worktree directory" (plan §7).
+  // '' means the host app's own default directory — Kira Studio's own $HOME
+  // (internal/bridge/terminal.go's DefaultCwd), its only real consumer today; this schema lives
+  // here, not in Kira Studio's own settingsDomain.ts, in case Kira Space ever grows the same
+  // custom-scripts feature.
   workingDir: z.string(),
   color: paletteColorSchema,
 });
