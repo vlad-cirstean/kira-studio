@@ -20,7 +20,6 @@ export const IPC = {
   toggleProjectPanel: 'kira:menu:toggle-project-panel',
   toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
   commandPalette: 'kira:menu:command-palette',
-  quickOpen: 'kira:menu:quick-open',
   tabNext: 'kira:menu:tab-next',
   tabPrev: 'kira:menu:tab-prev',
   tabClose: 'kira:menu:tab-close',
@@ -147,24 +146,6 @@ export const IPC = {
   updateInstall: 'kira:update:install',
   updateCancelInstall: 'kira:update:cancelInstall',
 
-  codeWorkspaceListRepos: 'kira:codeWorkspace:listRepos',
-  codeWorkspaceImportRepo: 'kira:codeWorkspace:importRepo',
-  codeWorkspaceRenameRepo: 'kira:codeWorkspace:renameRepo',
-  codeWorkspaceRemoveRepo: 'kira:codeWorkspace:removeRepo',
-  codeWorkspaceListFiles: 'kira:codeWorkspace:listFiles',
-  codeWorkspaceReadFile: 'kira:codeWorkspace:readFile',
-  codeWorkspaceOpenWorkspace: 'kira:codeWorkspace:openWorkspace',
-  codeWorkspaceCloseWorkspace: 'kira:codeWorkspace:closeWorkspace',
-  codeWorkspaceReadDiff: 'kira:codeWorkspace:readDiff',
-  codeWorkspaceStartSearch: 'kira:codeWorkspace:startSearch',
-  codeWorkspaceCancelSearch: 'kira:codeWorkspace:cancelSearch',
-  // C7 D7: the coalesced search-results push channel, EmitTo'd to one window — grpcCall's own
-  // shape just above.
-  codeSearch: 'kira:code:search',
-  // P83 §12.2: every imported repository's checked-out branch in one batched call.
-  codeWorkspaceRepoHeads: 'kira:codeWorkspace:repoHeads',
-  codeWorkspaceRepoWorktreeLinks: 'kira:codeWorkspace:repoWorktreeLinks',
-
   // P83 §3.2: the embedded terminal's own bound surface.
   terminalOpen: 'kira:terminal:open',
   terminalWrite: 'kira:terminal:write',
@@ -198,9 +179,9 @@ export const IPC = {
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
   dbMcpApproval: 'kira:dbmcp:approval',
-  // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — codeSearch's
+  // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — grpcCall's
   // own shape, restated for a byte payload. No FQN_SUFFIX_BY_IPC_KEY entry (it's a push channel,
-  // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), codeSearch's own
+  // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), grpcCall's own
   // precedent above.
   terminal: 'kira:terminal:data',
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape, EmitTo every

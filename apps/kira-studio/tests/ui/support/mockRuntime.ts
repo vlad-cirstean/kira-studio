@@ -153,20 +153,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
 
-  codeWorkspaceListRepos: 'CodeWorkspaceService.ListRepos',
-  codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
-  codeWorkspaceRenameRepo: 'CodeWorkspaceService.RenameRepo',
-  codeWorkspaceRemoveRepo: 'CodeWorkspaceService.RemoveRepo',
-  codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
-  codeWorkspaceReadFile: 'CodeWorkspaceService.ReadFile',
-  codeWorkspaceOpenWorkspace: 'CodeWorkspaceService.OpenWorkspace',
-  codeWorkspaceCloseWorkspace: 'CodeWorkspaceService.CloseWorkspace',
-  codeWorkspaceReadDiff: 'CodeWorkspaceService.ReadDiff',
-  codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
-  codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
-  codeWorkspaceRepoHeads: 'CodeWorkspaceService.RepoHeads',
-  codeWorkspaceRepoWorktreeLinks: 'CodeWorkspaceService.RepoWorktreeLinks',
-
   terminalOpen: 'TerminalService.Open',
   terminalWrite: 'TerminalService.Write',
   terminalResize: 'TerminalService.Resize',
@@ -311,11 +297,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // hydrate* call in main.ts's bootstrap() does — nothing in tests/ui/ exercises a prompt-mode
   // approval queue, so "nothing pending" is the correct empty answer for a spec with no fixture of
   // its own, the same reasoning every other unawaited-by-a-spec boot call above already gets.
-  //
-  // P100: the sibling git*/dbMcp entries this comment block used to cover (gitClientsList,
-  // gitPairingPending, gitVsixStatus) are gone -- hydrateGitClients() and the whole git module it
-  // hydrated moved to Kira Space; confirmed via grep, apps/kira-studio/frontend/src has no
-  // hydrateGitClients call left to answer for.
   [IPC.dbMcpPendingApprovals]: JSON.stringify({ pending: null, queued: 0 }),
   // M1 §6.2: hydrateDbMcp() joins the same unconditional-every-boot Promise.all as
   // dbMcpPendingApprovals above, same reasoning — nothing in tests/ui/ seeds a dbmcp fixture, so
@@ -338,21 +319,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     latestVersion: '',
     installLogPath: '',
   }),
-  // C5: main.ts's bootstrap() joins hydrateCodeRepos() to the same unconditional-every-boot
-  // Promise.all as hydrateGitClients() above, same reasoning — a spec that never imports a
-  // repository gets "nothing imported yet", not a fixture miss.
-  [IPC.codeWorkspaceListRepos]: '[]',
-  // P83 §12.3 trigger 1: GitPanel.vue's own onMounted calls refreshRepoHeads() unconditionally,
-  // fire-and-forget, every time the Git module is opened — the same "every repo-workspace spec
-  // hits this, most don't care" reasoning codeWorkspaceListRepos just above already carries. A
-  // spec that DOES care (repo-workspace.spec.ts's own branch-label test) still wins with its own
-  // snapshot, same as every other wildcard here.
-  [IPC.codeWorkspaceRepoHeads]: '[]',
-  // P84 §13.4: GitPanel.vue's onMounted calls this unconditionally too, same reasoning as
-  // codeWorkspaceRepoHeads just above — most specs never care which repository nests under which.
-  [IPC.codeWorkspaceRepoWorktreeLinks]: '[]',
   // P85: main.ts's bootstrap() joins hydrateCustomScripts() to the same unconditional-every-boot
-  // Promise.all as hydrateCodeRepos() above, same reasoning — a spec that never configures a
+  // Promise.all as updateStatus above, same reasoning — a spec that never configures a
   // script gets "no scripts yet", not a fixture miss.
   [IPC.customScriptsList]: '[]',
   // P91: main.ts's bootstrap() joins hydrateTerminalDefaults() to the same unconditional-every-boot
@@ -372,16 +340,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // cares about keep-awake should still see the titlebar it will ship with. A spec that DOES care
   // (workbench.spec.ts's own keep-awake cases) still wins with its own snapshot.
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
-  // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
-  // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
-  // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard
-  // above carries.
-  [IPC.codeWorkspaceOpenWorkspace]: 'null',
-  [IPC.codeWorkspaceCloseWorkspace]: 'null',
-  // C7: CancelSearch is fire-and-forget from the renderer's own point of view (the panel's own
-  // Stop button awaits it but never asserts on its echo) — void, the same reasoning
-  // codeWorkspaceCloseWorkspace's own wildcard just above carries.
-  [IPC.codeWorkspaceCancelSearch]: 'null',
 });
 
 // Structured clone (what ipcRenderer.invoke actually used, pre-P57) preserves a key whose value
