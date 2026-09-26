@@ -2,15 +2,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import { beautifyShellText } from '../shared/document/ejson';
-import {
-  backslashEscapesFor,
-  bracketIdentifiersFor,
-  dollarQuotingFor,
-  hashCommentsFor,
-  nestedBlockCommentsFor,
-  postgresEscapeStringsFor,
-  sqlDialectFor,
-} from '../shared/sqlIdent';
+import { hashCommentsFor, lexOptionsFor, sqlDialectFor } from '../shared/sqlIdent';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 
 /** true for the five SQL kinds and MongoDB — the only consoles with a real formatter behind
@@ -186,12 +178,7 @@ export async function formatConsoleText(kind: ConnectionKind, text: string): Pro
   // pairs for Run all — Format must never split a document differently than the run it formats
   // for, or the caret-by-index mapping below (D12) points at the wrong statement.
   const statements = splitSqlStatements(text, {
-    backslashEscapes: backslashEscapesFor(dialect),
-    dollarQuoting: dollarQuotingFor(dialect),
-    hashComments: hashCommentsFor(dialect),
-    nestedBlockComments: nestedBlockCommentsFor(dialect),
-    bracketIdentifiers: bracketIdentifiersFor(dialect),
-    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+    ...lexOptionsFor(dialect),
     slashSlashComments: kind === 'mongodb',
   });
   if (statements.length === 0) return { text, ok: true, failures: [] };

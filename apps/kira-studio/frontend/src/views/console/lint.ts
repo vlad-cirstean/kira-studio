@@ -3,16 +3,7 @@ import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
 import { tryParseShellText } from '../shared/document/ejson';
-import {
-  backslashEscapesFor,
-  bracketIdentifiersFor,
-  dollarQuotingFor,
-  hashCommentsFor,
-  nestedBlockCommentsFor,
-  postgresEscapeStringsFor,
-  type SqlDialect,
-  sqlDialectFor,
-} from '../shared/sqlIdent';
+import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
 import type { DdlSchema } from './ddl';
 import { findMatchingParen, MONGO_STATEMENT_RE, splitTopLevelArgs } from './mongoStatement';
 import { ddlDiagnostics } from './sqlDiagnostics';
@@ -28,14 +19,7 @@ function lintSqlConsole(
   // P108 Part 11 F4: same per-dialect lexical options every other lintSql/splitSqlStatements/
   // tokenizeSql call site now passes (format.ts, sql-split.ts callers, sqlNodes.ts) — a diagnostic
   // must never disagree with what Run/Format/hover consider one statement's own lexical shape.
-  const lexOptions = {
-    backslashEscapes: backslashEscapesFor(dialect),
-    dollarQuoting: dollarQuotingFor(dialect),
-    hashComments: hashCommentsFor(dialect),
-    nestedBlockComments: nestedBlockCommentsFor(dialect),
-    bracketIdentifiers: bracketIdentifiersFor(dialect),
-    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
-  };
+  const lexOptions = lexOptionsFor(dialect);
   return (text) => {
     const lexical = lintSql(text, lexOptions);
     if (!dialect || !schema || schema.tables.length === 0) return lexical;

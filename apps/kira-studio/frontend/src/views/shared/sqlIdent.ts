@@ -14,6 +14,7 @@
 // generated *Filter by this value* and FK-navigation predicates (P34 F22). sqlDialectFor is the
 // one place that decision is made now.
 import type { ConnectionKind } from '@shared/domain/connection';
+import type { SqlLexOptions } from '@shared/domain/sql-lex';
 
 // P35 D28: SQLite is its own member, not folded into 'mysql' — it double-quotes identifiers
 // (already quoteIdent's own default branch below) but is a genuinely different grammar with its
@@ -102,6 +103,23 @@ export function bracketIdentifiersFor(dialect: SqlDialect | undefined): boolean 
 /** Postgres's `E'...'`/`e'...'` escape-string syntax. */
 export function postgresEscapeStringsFor(dialect: SqlDialect | undefined): boolean {
   return dialect === 'postgres';
+}
+
+/** P115 H5: the six lookups above, gathered into the one per-dialect lexical-options literal
+ *  every split/lint/format/tokenize call site here used to build by hand. Every field here is a
+ *  real, resolved boolean (never `undefined`) — `SqlLexOptions`, not the all-optional
+ *  `SqlScanOptions` `resolveLexOptions` fills defaults into. A caller whose own console adds a
+ *  dialect-independent option on top (OperationsPanel.vue/format.ts/ConsoleView.vue's own
+ *  `slashSlashComments` for a MongoDB console) spreads this, then adds it. */
+export function lexOptionsFor(dialect: SqlDialect | undefined): SqlLexOptions {
+  return {
+    backslashEscapes: backslashEscapesFor(dialect),
+    dollarQuoting: dollarQuotingFor(dialect),
+    hashComments: hashCommentsFor(dialect),
+    nestedBlockComments: nestedBlockCommentsFor(dialect),
+    bracketIdentifiers: bracketIdentifiersFor(dialect),
+    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+  };
 }
 
 // F3/P21 round 1: every generated string literal (Filter by this value, FK navigation, Copy as

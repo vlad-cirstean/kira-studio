@@ -17,17 +17,10 @@ export interface LNode {
   readonly nextSibling: LNode | null;
 }
 
-export interface SqlTokenOptions {
-  /** See sql-split.ts's own SplitSqlOptions.backslashEscapes — mirrors it exactly. */
-  backslashEscapes: boolean;
-  /** See sql-split.ts's own SplitSqlOptions.dollarQuoting — mirrors it exactly. */
-  dollarQuoting: boolean;
-  /** P108 Part 11 F4: see sql-lex.ts's SqlLexOptions — mirrored exactly. */
-  hashComments?: boolean;
-  slashSlashComments?: boolean;
-  nestedBlockComments?: boolean;
-  bracketIdentifiers?: boolean;
-  postgresEscapeStrings?: boolean;
+// P115 H5: was its own field-by-field copy of SqlLexOptions (a fifth copy of that shape, past
+// SqlLexOptions/LintSqlOptions/SplitSqlOptions's own three) — extending it directly also lets
+// scanLevel below hand `opts` itself to scanSpanNode, no projected subset object needed.
+export interface SqlTokenOptions extends SqlLexOptions {
   /** Case-insensitive; a word in this set tokenises as `Keyword` rather than `Identifier` —
    *  `sql-keywords.ts`'s `keywordsFor(dialect)`. */
   keywords: ReadonlySet<string>;
@@ -320,15 +313,6 @@ function scanLevel(
 ): { nodes: MNode[]; next: number } {
   const nodes: MNode[] = [];
   let i = start;
-  const lexOptions = {
-    backslashEscapes: opts.backslashEscapes,
-    dollarQuoting: opts.dollarQuoting,
-    hashComments: opts.hashComments,
-    slashSlashComments: opts.slashSlashComments,
-    nestedBlockComments: opts.nestedBlockComments,
-    bracketIdentifiers: opts.bracketIdentifiers,
-    postgresEscapeStrings: opts.postgresEscapeStrings,
-  };
 
   while (i < n) {
     const c = source[i] as string;
@@ -340,7 +324,7 @@ function scanLevel(
       continue;
     }
 
-    const spanToken = scanSpanNode(source, i, lexOptions, opts.identifierQuotes);
+    const spanToken = scanSpanNode(source, i, opts, opts.identifierQuotes);
     if (spanToken) {
       if (spanToken.node) nodes.push(spanToken.node);
       i = spanToken.next;

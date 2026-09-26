@@ -9,7 +9,7 @@
 // P60b §3.1: the quote/comment/dollar-quote scanning itself is `sql-lex.ts`'s `scanSqlSpan` —
 // hoisted out of here (and `sql-split.ts`) into one shared scanner both now call. No behaviour
 // change: this file keeps its own paren-balance/issue-reporting logic exactly.
-import { scanSqlSpan } from './sql-lex';
+import { resolveLexOptions, type SqlScanOptions, scanSqlSpan } from './sql-lex';
 
 export interface LintIssue {
   from: number;
@@ -18,24 +18,9 @@ export interface LintIssue {
   message: string;
 }
 
-export interface LintSqlOptions {
-  /** Whether a backslash escapes the next character inside a quoted run — see sql-split.ts's
-   *  SplitSqlOptions.backslashEscapes (P2 R2); mirrors it exactly since these two lexers share the
-   *  same quote-scanning rules. Defaults to true, the pre-P2-R2 universal behaviour. */
-  backslashEscapes?: boolean;
-  /** Whether `$$.../$tag$...$tag$` opens a Postgres-style dollar-quoted string — see
-   *  sql-split.ts's SplitSqlOptions.dollarQuoting (F10/P21 round 1); mirrors it exactly for the
-   *  same reason (a MySQL identifier containing two `$` is not a dollar-quote open tag). Defaults
-   *  to true, the pre-fix universal behaviour. */
-  dollarQuoting?: boolean;
-  /** P108 Part 11 F4: see sql-lex.ts's SqlLexOptions — mirrored exactly, all default off/undefined
-   *  (no pre-existing universal behaviour to preserve for any of these, unlike the two above). */
-  hashComments?: boolean;
-  slashSlashComments?: boolean;
-  nestedBlockComments?: boolean;
-  bracketIdentifiers?: boolean;
-  postgresEscapeStrings?: boolean;
-}
+/** See `sql-lex.ts`'s own `SqlLexOptions` field doc comments (P115 H5: this used to carry its own
+ *  copy of them) — kept under this file's historical name for its own callers. */
+export type LintSqlOptions = SqlScanOptions;
 
 function spanMessage(
   kind: 'blockComment' | 'quote' | 'dollarQuote' | 'bracketIdent',
@@ -48,15 +33,7 @@ function spanMessage(
 }
 
 export function lintSql(source: string, options?: LintSqlOptions): LintIssue[] {
-  const lexOptions = {
-    backslashEscapes: options?.backslashEscapes ?? true,
-    dollarQuoting: options?.dollarQuoting ?? true,
-    hashComments: options?.hashComments,
-    slashSlashComments: options?.slashSlashComments,
-    nestedBlockComments: options?.nestedBlockComments,
-    bracketIdentifiers: options?.bracketIdentifiers,
-    postgresEscapeStrings: options?.postgresEscapeStrings,
-  };
+  const lexOptions = resolveLexOptions(options);
   const issues: LintIssue[] = [];
   const n = source.length;
   let i = 0;

@@ -19,15 +19,7 @@ import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
 import { useConsoleViewStore } from '../../views/console/state';
-import {
-  backslashEscapesFor,
-  bracketIdentifiersFor,
-  dollarQuotingFor,
-  hashCommentsFor,
-  nestedBlockCommentsFor,
-  postgresEscapeStringsFor,
-  sqlDialectFor,
-} from '../../views/shared/sqlIdent';
+import { lexOptionsFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 import { ensureConnectedOnce } from '../../views/shared/useConnectionGate';
 
 const contextMenuStore = useContextMenuStore();
@@ -163,12 +155,7 @@ async function onRerun(record: OpRecord): Promise<void> {
   if (!record.connectionId || !record.command || record.commandTruncated) return;
   const dialect = opSqlDialect(record);
   const statements = splitSqlStatements(record.command, {
-    backslashEscapes: backslashEscapesFor(dialect),
-    dollarQuoting: dollarQuotingFor(dialect),
-    hashComments: hashCommentsFor(dialect),
-    nestedBlockComments: nestedBlockCommentsFor(dialect),
-    bracketIdentifiers: bracketIdentifiersFor(dialect),
-    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+    ...lexOptionsFor(dialect),
     slashSlashComments: connectionFor(record)?.kind === 'mongodb',
   }).map((s) => s.text);
   if (statements.length === 0) return;

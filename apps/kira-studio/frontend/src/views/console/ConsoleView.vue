@@ -33,16 +33,7 @@ import type { ConsoleTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import {
-  backslashEscapesFor,
-  bracketIdentifiersFor,
-  dollarQuotingFor,
-  hashCommentsFor,
-  nestedBlockCommentsFor,
-  postgresEscapeStringsFor,
-  type SqlDialect,
-  sqlDialectFor,
-} from '../shared/sqlIdent';
+import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
 import { useConnectionGate } from '../shared/useConnectionGate';
 import ConsoleResultGrid from './ConsoleResultGrid.vue';
 import ConsoleSavedMenu from './ConsoleSavedMenu.vue';
@@ -105,12 +96,7 @@ const dialect = computed(() => sqlDialectFor(connectionKind.value));
 // connectionKind.value directly rather than through the per-SqlDialect helpers above it.
 function splitOptionsFor(d: SqlDialect | undefined) {
   return {
-    backslashEscapes: backslashEscapesFor(d),
-    dollarQuoting: dollarQuotingFor(d),
-    hashComments: hashCommentsFor(d),
-    nestedBlockComments: nestedBlockCommentsFor(d),
-    bracketIdentifiers: bracketIdentifiersFor(d),
-    postgresEscapeStrings: postgresEscapeStringsFor(d),
+    ...lexOptionsFor(d),
     slashSlashComments: connectionKind.value === 'mongodb',
   };
 }

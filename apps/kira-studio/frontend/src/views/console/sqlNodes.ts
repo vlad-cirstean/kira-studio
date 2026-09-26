@@ -6,15 +6,7 @@
 // survey), so every helper below — and every consumer's own `LNode`-typed code — is unchanged.
 import { keywordsFor } from '@shared/domain/sql-keywords';
 import { type LNode, tokenizeSql } from '@shared/domain/sql-tokens';
-import {
-  backslashEscapesFor,
-  bracketIdentifiersFor,
-  dollarQuotingFor,
-  hashCommentsFor,
-  nestedBlockCommentsFor,
-  postgresEscapeStringsFor,
-  type SqlDialect,
-} from '../shared/sqlIdent';
+import { lexOptionsFor, type SqlDialect } from '../shared/sqlIdent';
 
 export type { LNode } from '@shared/domain/sql-tokens';
 
@@ -127,12 +119,7 @@ const optionsCache = new Map<SqlDialect, ReturnType<typeof buildTokenOptions>>()
 
 function buildTokenOptions(dialect: SqlDialect) {
   return {
-    backslashEscapes: backslashEscapesFor(dialect),
-    dollarQuoting: dollarQuotingFor(dialect),
-    hashComments: hashCommentsFor(dialect),
-    nestedBlockComments: nestedBlockCommentsFor(dialect),
-    bracketIdentifiers: bracketIdentifiersFor(dialect),
-    postgresEscapeStrings: postgresEscapeStringsFor(dialect),
+    ...lexOptionsFor(dialect),
     keywords: keywordsFor(dialect),
     identifierQuotes: IDENTIFIER_QUOTES[dialect],
   };

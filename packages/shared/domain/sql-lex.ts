@@ -4,9 +4,17 @@
 // shared scanner both now call — closing that duplication, and giving `sql-tokens.ts` a third,
 // identical caller rather than a third independent copy (D1's own reasoning).
 export interface SqlLexOptions {
-  /** See `sql-split.ts`'s own `SplitSqlOptions.backslashEscapes` doc comment — mirrored exactly. */
+  /** Whether a backslash escapes the next character inside a '...'/"..."/`...` run — true for
+   *  MySQL/MariaDB/ClickHouse, false for standard-SQL dialects (Postgres, SQLite) where a bare
+   *  backslash is not special and only a doubled quote escapes (P2 R2). `resolveLexOptions`
+   *  defaults this to true, the pre-P2-R2 universal behaviour, for a caller that doesn't know its
+   *  dialect. */
   backslashEscapes: boolean;
-  /** See `sql-split.ts`'s own `SplitSqlOptions.dollarQuoting` doc comment — mirrored exactly. */
+  /** Whether `$$.../$tag$...$tag$` opens a Postgres-style dollar-quoted string — a Postgres-only
+   *  convention. `$` is a legal (if unusual) identifier character on MySQL/MariaDB, so an
+   *  identifier containing two of them reads as an unterminated dollar-quote open tag there and
+   *  swallows the rest of the document into one statement. `resolveLexOptions` defaults this to
+   *  true, the pre-fix universal behaviour, for a caller that doesn't know its dialect. */
   dollarQuoting: boolean;
   /** P108 Part 11 F4: MySQL, MariaDB and ClickHouse also start a line comment with `#` — undefined/
    *  false leaves `#` an ordinary character (every other dialect here, and the unknown-dialect
@@ -28,6 +36,27 @@ export interface SqlLexOptions {
    *  in. Only examined for a single-quoted run whose `E`/`e` is itself a standalone token (not the
    *  tail of a longer identifier). */
   postgresEscapeStrings?: boolean;
+}
+
+/** The public, all-optional shape `lintSql`/`splitSqlStatements`/`tokenizeSql`'s own callers pass
+ *  in — `resolveLexOptions` below fills in the two defaulted fields. */
+export type SqlScanOptions = Partial<SqlLexOptions>;
+
+/**
+ * P115 H5: `sql-lint.ts` and `sql-split.ts` each rebuilt this identical object from their own
+ * optional options param, one default-application each — hoisted once, alongside `scanSqlSpan`
+ * itself (P60b §3.1's own header comment above, the first hoist these fields went through).
+ */
+export function resolveLexOptions(options?: SqlScanOptions): SqlLexOptions {
+  return {
+    backslashEscapes: options?.backslashEscapes ?? true,
+    dollarQuoting: options?.dollarQuoting ?? true,
+    hashComments: options?.hashComments,
+    slashSlashComments: options?.slashSlashComments,
+    nestedBlockComments: options?.nestedBlockComments,
+    bracketIdentifiers: options?.bracketIdentifiers,
+    postgresEscapeStrings: options?.postgresEscapeStrings,
+  };
 }
 
 export type SqlLexSpanKind =
