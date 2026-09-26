@@ -237,7 +237,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
     </ViewToolbar>
     <div class="h-0.5 shrink-0 bg-(--kira-rail)" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <ViewToolbar border="none">
-      <InputGroup v-if="variablesStore.environments.length > 0">
+      <InputGroup v-if="variablesStore.environments.length > 0" variant="kira" class="w-64">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
@@ -248,7 +248,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
       </InputGroup>
       <span class="ml-auto" />
       <RunState :state="runState" />
-      <div class="flex items-center gap-1.5 min-w-0">
+      <div class="flex items-center gap-1.5 shrink-0">
         <Button variant="toolbar-primary" size="kira" data-testid="new-environment" @click="onNewEnvironment">
           New environment
         </Button>
@@ -313,6 +313,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
           <div class="min-w-0 flex-1">
             <Input
               v-model="nameDrafts[env.id]"
+              size="kira"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
@@ -321,6 +322,7 @@ useEventListener(listEl, 'dragend', onDragEnd);
             <Input
               v-model="descriptionDrafts[env.id]"
               placeholder="description"
+              size="kira"
               data-testid="environment-description"
               @blur="onFieldBlur(env.id)"
             />

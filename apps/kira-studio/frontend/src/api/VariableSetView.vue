@@ -483,7 +483,7 @@ function onBulkClose(): void {
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
     <ViewToolbar border="none">
-      <InputGroup v-if="!bulkMode">
+      <InputGroup v-if="!bulkMode" variant="kira" class="w-64">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
         <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
@@ -494,7 +494,7 @@ function onBulkClose(): void {
       </InputGroup>
       <span class="ml-auto" />
       <RunState :state="runState" />
-      <div class="flex items-center gap-1.5 min-w-0">
+      <div class="flex items-center gap-1.5 shrink-0">
         <TooltipIconButton
           v-if="ownerExists"
           icon="code"
@@ -551,6 +551,7 @@ function onBulkClose(): void {
           <Input
             v-model="envNameDraft"
             placeholder="name"
+            size="kira"
             data-testid="environment-name"
             @blur="onEnvFieldBlur"
           />
@@ -560,6 +561,7 @@ function onBulkClose(): void {
           <Input
             v-model="envDescriptionDraft"
             placeholder="description"
+            size="kira"
             data-testid="environment-description"
             @blur="onEnvFieldBlur"
           />
