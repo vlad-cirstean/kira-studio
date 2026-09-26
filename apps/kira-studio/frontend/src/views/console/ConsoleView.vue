@@ -207,7 +207,7 @@ const hoverSource = computed(() => {
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
 // P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+// established `.$el` idiom).
 const savedMenuTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 // D9: the console runtime has no actionError field (rt.status === 'error' means the last *run*
 // failed, F11) — a format failure is a client-side text operation with nowhere else to go, so it

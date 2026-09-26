@@ -6,10 +6,8 @@ import { control } from '../bridge/control';
 import { STUDIO_TAB_KIND_MODE, type TabRecord } from './tabDomain';
 import { useTabsStore } from './tabs';
 
-// P100 Part 2: WorkspaceKey (packages/shared/domain/workspace.ts) collapsed into AppMode — 'git'
-// (the only mode that ever hosted a repo-prefixed workspace) moved to apps/kira-space wholesale,
-// so this app's own "which workspace" is always exactly "which mode" now, the one-dimensional
-// state useWorkspaceStore (deleted this phase) used to layer a second dimension on top of.
+// AppMode is this app's one-dimensional "which workspace" state — there is no second dimension
+// layered on top of it.
 
 // P22 D12: which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
 // own persistence (internal/shell/window.go's Attach) is entirely native-event-driven
@@ -59,10 +57,8 @@ export const useModeStore = defineStore('mode', () => {
     state.active = mode;
   }
 
-  // P67b §4.2: persistence only — modeState/windows.mode. P100 Part 2: setMode/setModule collapsed
-  // into one function — the split existed only so a repo-workspace activation (state/workspace.ts's
-  // old activateWorkspace, deleted this phase) could persist 'git' as the window's module without
-  // also clobbering a second, now-nonexistent "which workspace inside git" dimension.
+  // P67b §4.2: persistence only — modeState/windows.mode. setMode/setModule stay one function: no
+  // second "which workspace inside the mode" dimension exists to clobber.
   function setMode(mode: AppMode): void {
     state.active = mode;
     void scheduleModeWrite();

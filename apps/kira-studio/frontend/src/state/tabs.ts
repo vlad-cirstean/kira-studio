@@ -44,7 +44,7 @@ import { TAB_KINDS } from './tabKinds';
 
 // P103 Part 2 (§5.2): the shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see
 // that file's own header) now lives in packages/workbench/src/state/createTabsStore.ts. This file
-// is what's left: per-kind typed sugar (openDataTab, patchRepoFileTabState-shaped patchers, …) and
+// is what's left: per-kind typed sugar (openDataTab, openDocumentTab-shaped patchers, …) and
 // every Studio-only feature — incognito filtering (persistable), the `hydrated` reconnect gate
 // (module-local now, no longer part of the store's own reactive state — a genuinely separate
 // concern, CLAUDE.md's one-store-one-concern rule), and the
@@ -120,7 +120,7 @@ export const useTabsStore = createTabsStore({
   control,
   fallbackWorkspaceKey: (kind) => STUDIO_TAB_KIND_MODE[kind] as AppMode,
   // 'studio'/'api' are always seeded (even at zero tabs, matching the old per-mode behavior
-  // exactly) — this app's own two fixed modes, unlike Kira Space's dynamic per-repo workspaces.
+  // exactly) — this app's own two fixed modes.
   seedWorkspaceKeys: ['studio', 'api'],
   // P71 §3.1: an incognito tab is never written — left out of the snapshot entirely, and
   // TabsService.Save replaces the window's whole tab set, so a tab switched to incognito

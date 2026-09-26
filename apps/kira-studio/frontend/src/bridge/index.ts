@@ -73,11 +73,6 @@ const studioControl = {
   onImportDataGrip: (cb: () => void): (() => void) => on(CHANNEL.importDataGrip, cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleOperationsPanel, cb),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
-  // P100 Part 2: onQuickOpen (CHANNEL.quickOpen) dropped — the repo workspace's Quick Open feature
-  // (repo/QuickOpen.vue, repo/state/quickOpen.ts) moved to apps/kira-space wholesale, and this app's
-  // own Go menu no longer emits the channel (internal/shell/menutemplate.go's own "Quick Open…"
-  // item removed alongside it). CHANNEL.quickOpen itself stays in the shared protocol constants —
-  // apps/kira-space's own copy of this bridge still binds it.
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
   onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
   onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),

@@ -24,8 +24,8 @@ import {
 import { monacoLanguageIdFor } from './monacoLanguages';
 import type { RangeHighlight } from './ranges';
 
-// `import('monaco-editor').X` inline type references, not a static `import type {...}` — matches
-// `views/repo/editors.ts`/`monaco.ts`'s own established style for this ambient module's types.
+// `import('monaco-editor').X` inline type references, not a static `import type {...}` — this
+// ambient module's own established style for its types.
 type StandaloneCodeEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type TextModel = import('monaco-editor').editor.ITextModel;
 type DecorationsCollection = import('monaco-editor').editor.IEditorDecorationsCollection;

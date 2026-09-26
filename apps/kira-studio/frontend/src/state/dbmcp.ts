@@ -19,8 +19,8 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
   const state = reactive({
     status: DEFAULT_STATUS as DbMcpStatus,
     installResult: null as DbMcpInstallResult | null,
-    // M2 §5: the prompt-mode approval queue — state/gitClients.ts's own pending/queued shape,
-    // applied to run_query's approval broker instead of git pairing.
+    // M2 §5: the prompt-mode approval queue — run_query's approval broker's own pending/queued
+    // shape.
     approval: { pending: null, queued: 0 } as DbMcpApprovalSnapshot,
   });
 
@@ -36,8 +36,8 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
   let unsubscribeApproval: (() => void) | null = null;
 
   // M2 §5.3: PendingApprovals() is what implements "held with no Kira Studio window open yet" from
-  // the renderer's side, gitPairingPending's own precedent — the request already exists server-side;
-  // this is only the first render of it.
+  // the renderer's side — the request already exists server-side; this is only the first render of
+  // it.
   async function hydrateDbMcpApprovals(): Promise<void> {
     applyApprovalSnapshot(await control.dbMcpPendingApprovals());
     unsubscribeApproval?.();

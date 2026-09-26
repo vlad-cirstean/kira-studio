@@ -38,7 +38,7 @@ const keepAwakeAgentAwareId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <!-- P86 §9.3: instant-action only, same posture as Connected editors/Database MCP —
+    <!-- P86 §9.3: instant-action only, same posture as Database MCP —
          this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
          hook listener in one call, so it belongs on the action side of the draft/Save
          line, never mixed with it. -->

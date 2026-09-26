@@ -15,8 +15,7 @@ import { useSettingsStore } from '../../state/settings';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
-// `v-else-if="activeSection === 'Database MCP'"` branch. Bypasses draft/Save entirely (same
-// instant-action posture as 'Connected editors' before it moved to apps/kira-space, P100 Part 2) —
+// `v-else-if="activeSection === 'Database MCP'"` branch. Bypasses draft/Save entirely —
 // dbMcp.serverEnabled both persists and starts/stops the embedded DB MCP server in one call.
 defineProps<SettingsPaneProps>();
 
@@ -81,12 +80,10 @@ const dbMcpEnabledId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <!-- M1 §6.2: the same instant-action posture the 'Connected editors' section's own
-         revoke/install actions used before it moved to apps/kira-space (P100 Part 2) — this leaf
-         (dbMcp.serverEnabled) both persists and starts/stops the embedded DB MCP server in
-         one call, so it belongs on the action side of the draft/Save line, never mixed with
-         it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
-         "enabling is never a silent action"). -->
+    <!-- M1 §6.2: this leaf (dbMcp.serverEnabled) both persists and starts/stops the embedded
+         DB MCP server in one call, so it belongs on the action side of the draft/Save line,
+         never mixed with it. Toggle, then command, then button, strictly in that DOM order
+         (§11.4/SPEC's own "enabling is never a silent action"). -->
     <Field orientation="horizontal" class="items-start">
       <Checkbox
         :id="dbMcpEnabledId"

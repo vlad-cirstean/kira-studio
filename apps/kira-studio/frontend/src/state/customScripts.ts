@@ -11,7 +11,7 @@ export const useCustomScriptsStore = defineStore('customScripts', () => {
 
   let unsubscribeChanged: (() => void) | null = null;
 
-  // main.ts's boot Promise.all, beside hydrateCodeRepos(). Installs a control.onCustomScriptsChanged
+  // main.ts's boot Promise.all, beside every other hydrate* call. Installs a control.onCustomScriptsChanged
   // subscription that replaces records wholesale — state/settings.ts's hydrateSettings/
   // onSettingsChanged pair, verbatim in shape, and connections.ts's own onConnectionsChanged is the
   // precedent for why this is needed at all: without it, a script added in one window never appears

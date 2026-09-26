@@ -115,7 +115,7 @@ function onOrderByEscape(): void {
 
 const historyOpen = ref(false);
 // P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+// established `.$el` idiom, e.g. ConsoleView.vue's savedMenuTriggerEl).
 const historyTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 function applyFromHistory(where: string | null, orderBy: SortSpec | null): void {

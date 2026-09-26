@@ -152,7 +152,7 @@ function equalDraft(a: Draft, b: Draft): boolean {
   );
 }
 
-// P108 F3: every `rows` reload (any row's edit/add/reorder, a Git restore of another row's history
+// P108 F3: every `rows` reload (any row's edit/add/reorder, a restore of another row's history
 // entry, or — P112 — a cross-window refetch) used to reset every draft to the row's own stored
 // `value` — '' for a secret (D4/D5's list projection). A revealed secret's plaintext survives in
 // `revealedValues[id]` untouched, but a fresh draft object starts blank; the reveal-mirror watch

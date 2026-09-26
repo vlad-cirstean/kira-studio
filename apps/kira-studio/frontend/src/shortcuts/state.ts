@@ -72,10 +72,6 @@ export const usePaletteStore = defineStore('palette', () => {
       run: () => layoutStore.toggleOperationsPanel(),
     },
     { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
-    // P100 Part 2: repo.search (GitPanel.vue), repo.quickOpen (repo/state/quickOpen.ts) and
-    // repo.goToFileFromDiff (RepoDiffView.vue) used to live here — all three registered by, or
-    // gated on, the repo workspace, which moved to apps/kira-space wholesale. Removed rather than
-    // kept as permanently-no-op palette entries with nothing left to register or gate them.
     { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
     { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
     { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },

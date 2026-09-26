@@ -22,8 +22,7 @@ const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
 const modeStore = useModeStore();
 
-// P100 Part 2: two peer modules again — Studio, Api — Git (P67b §4.3's third) moved to
-// apps/kira-space wholesale. P91 OQ-1: Terminal still joins last, the plan's own stated default.
+// P91 OQ-1: Terminal joins Studio/Api last, the plan's own stated default.
 const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal'];
 
 function onClick(mode: AppMode): void {

@@ -18,7 +18,7 @@ const scriptColors = PALETTE_COLOR_CHOICES;
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Scripts'"` branch — P85 §10.2's own section. Bypasses
-// draft/pendingPatch entirely (same posture as 'Connected editors'/'Database MCP' before it): the
+// draft/pendingPatch entirely (same posture as 'Database MCP'): the
 // custom scripts store is a Pinia store, not a settings leaf, and a script edited here must apply
 // immediately so the tab strip's own dropdown reflects it without a Save.
 defineProps<SettingsPaneProps>();

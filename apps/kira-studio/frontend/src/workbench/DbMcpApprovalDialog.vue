@@ -8,15 +8,15 @@ import { useDbMcpStore } from '../state/dbmcp';
 
 const dbMcpStore = useDbMcpStore();
 
-// M2 §5.4/§7.4: a separate, always-mounted dialog at App.vue's root — GitPairingDialog.vue's own
-// precedent applied to run_query's prompt-mode gate. An AI client is blocked while the human
-// decides, the same semantics pairing's own trust prompt has, so this reuses that answer rather
-// than a dock or a notification queue. Renders nothing while dbMcpStore.approval.pending is null.
+// M2 §5.4/§7.4: a separate, always-mounted dialog at App.vue's root, gating run_query in
+// prompt mode. An AI client is blocked while the human decides on the one pending approval the
+// FIFO queue presents at a time, with a timeout — a dock or a notification queue would let more
+// than one sit unresolved. Renders nothing while dbMcpStore.approval.pending is null.
 //
 // P108 Part 12 F2 fixed this to key on requestId, not a `pending !== null` boolean — a queue
 // advance (A approved/denied while B is already queued) swaps pending from A straight to B with no
 // null in between, and the old boolean source never re-fired for that swap. P113 F5 extracts that
-// fix into usePendingDecision, shared with GitPairingDialog.vue (which had the same bug).
+// fix into usePendingDecision.
 const { remainingSeconds } = usePendingDecision({
   pendingId: () => dbMcpStore.approval.pending?.requestId,
   expiresAtMs: () => dbMcpStore.approval.pending?.expiresAtMs,

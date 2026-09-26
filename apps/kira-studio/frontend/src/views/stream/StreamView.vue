@@ -390,7 +390,7 @@ function onApplyFromHistory(
 // Date.parse.
 const timestampCalendarOpen = ref(false);
 // P104 §3: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, GitPanel.vue's promptInput) -- one ref per popover's own trigger.
+// established `.$el` idiom, ConsoleView.vue's savedMenuTriggerEl) -- one ref per popover's own trigger.
 const timestampCalendarTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const timestampPickerDate = computed(() => {
   if (timestampText.value.trim() === '') return new Date();

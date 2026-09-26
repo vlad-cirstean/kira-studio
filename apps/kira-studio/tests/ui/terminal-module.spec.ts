@@ -3,11 +3,11 @@ import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
-// P91 §17.2: modelled on repo-workspace.spec.ts's terminal cases (TERMINAL_OPEN_OK's shape,
-// control.log() polling rather than call-count assertions) and settings-scripts.spec.ts for the
-// script fixtures. The mocked DefaultCwd below is '/home/test' — mockRuntime.ts's own boot
-// default (IPC.terminalDefaultCwd) — so an unscoped terminal's title falls out of its basename,
-// 'test' (tabKinds.ts's terminal kind: `s.label || basename(s.cwd) || 'Terminal'`).
+// P91 §17.2: TERMINAL_OPEN_OK's shape uses control.log() polling rather than call-count
+// assertions, and settings-scripts.spec.ts for the script fixtures. The mocked DefaultCwd below is
+// '/home/test' — mockRuntime.ts's own boot default (IPC.terminalDefaultCwd) — so an unscoped
+// terminal's title falls out of its basename, 'test' (tabKinds.ts's terminal kind: `s.label ||
+// basename(s.cwd) || 'Terminal'`).
 
 const SCRIPT = {
   id: 'script-1',
@@ -20,8 +20,8 @@ const SCRIPT = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-// terminalId is a client-generated UUID (repo-workspace.spec.ts's own note, :1034) — no `args`
-// here, relying on mockRuntime.ts's single-snapshot shortcut so any terminalOpen call resolves.
+// terminalId is a client-generated UUID — no `args` here, relying on mockRuntime.ts's
+// single-snapshot shortcut so any terminalOpen call resolves.
 const TERMINAL_OPEN_OK: ControlSnapshot = {
   channel: IPC.terminalOpen,
   response: { shell: '/bin/zsh' },
@@ -39,7 +39,6 @@ async function openTerminalModule(page: import('@playwright/test').Page): Promis
 test('the module exists and opens', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
 
-  // Studio/Api/Terminal — P100 Part 1 dropped Git, the former fourth mode tab.
   await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
   await openTerminalModule(page);
 
@@ -83,13 +82,6 @@ test('an unscoped terminal opens from the tab strip at the resolved home directo
   // Staying in the Terminal module's own workspace the whole time.
   await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
 });
-
-// P100 Part 1 dropped both the per-repo terminal-menu entries (a repo-scoped terminal's own "+"
-// item) and the git-workspace "+" menu's own script section — TabStrip.vue's "+" menu now lists
-// only the plain Terminal launch (dd3ec62's own commit message). The two tests that used to cover
-// those — "a repo-scoped terminal opens at that repo root..." and "one store, two surfaces:..." —
-// are dropped with them; "running a quick command..." below still covers the one surface that
-// remains (the Terminal panel's own quick-command list).
 
 test('running a quick command opens a terminal titled with its name, at its own working dir', async ({
   relaunch,

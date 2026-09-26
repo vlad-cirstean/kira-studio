@@ -17,15 +17,11 @@ export interface ModeDef {
 
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
-//
-// P100 Part 2: 'git' (P67b §4.1's third peer module — GitPanel.vue/GitStart.vue and everything
-// they pulled in, RepoFileTree/RepoTreeRow/RepoSearchView/RepoReviewView included) moved to
-// apps/kira-space wholesale — this registry is back to the two-plus-terminal shape P91 found it in
-// before P67b, `Component` already covering `defineAsyncComponent`'s return either way.
+// `Component` already covers `defineAsyncComponent`'s return either way.
 export const MODES: Record<AppMode, ModeDef> = {
   studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
   api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
-  // P91 §2: a peer module, lazy the same reason git's own two used to be (§1.1, now gone) — nothing
+  // P91 §2: a peer module, lazy the same reason Studio/Api's entries are — nothing
   // in a Studio-only session should pay for the terminal panel's own launch chunk.
   terminal: {
     label: 'Terminal',

@@ -266,7 +266,7 @@ function onClearFilter(): void {
 
 const filterHistoryOpen = ref(false);
 // P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+// established `.$el` idiom, e.g. ConsoleView.vue's savedMenuTriggerEl).
 const filterHistoryTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
@@ -288,7 +288,7 @@ function onJump(pageIndex: number): void {
 const projectionOpen = ref(false);
 // P104 §3: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (its own
 // rendered anchor position is irrelevant once `reference` is given) -- the established `.$el`
-// idiom (GitPanel.vue's promptInput) rather than a dedicated forwardRef/exposed handle.
+// idiom (ConsoleView.vue's savedMenuTriggerEl) rather than a dedicated forwardRef/exposed handle.
 const projectionTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 // P16 design system's count Badge on the Columns button (DataToolbar.vue's own
@@ -504,7 +504,7 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
 // a fling never prunes a row about to be re-rendered. Derived from `virtualItems` (no more
 // `@visible-range` emit to receive a `{start, end}` pair from) since useVirtualRows exposes no
 // visible-range equivalent of its own -- every VirtualList caller computed this bound differently
-// (a plain window here, a sticky-band-aware one in ProjectTree/RepoFileTree), so it stays local
+// (a plain window here, a sticky-band-aware one in ProjectTree), so it stays local
 // rather than folded into the shared composable.
 watch(virtualItems, (items) => {
   if (items.length === 0) return;

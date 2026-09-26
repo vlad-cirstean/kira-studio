@@ -195,8 +195,8 @@ function keyType(path: string): string | undefined {
 // 7c (P68 review): VirtualList's own `visible-range` emit fires up to once per animation frame
 // during a scroll fling — each distinct window used to issue its own IPC round trip even though
 // path-level dedup (ensureKeyTypes' own pending/keyTypes checks) only prevents REPEATING work, not
-// the round trip itself. Debounced by the same 150ms blameAnnotation.ts's own DEBOUNCE_MS already
-// uses, so a fling settles on one ensureKeyTypes call for its final window instead of one per frame.
+// the round trip itself. Debounced by the same 150ms already used elsewhere, so a fling settles on
+// one ensureKeyTypes call for its final window instead of one per frame.
 const KEY_TYPES_DEBOUNCE_MS = 150;
 const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: number }) => {
   const nodes = filteredNodes.value;

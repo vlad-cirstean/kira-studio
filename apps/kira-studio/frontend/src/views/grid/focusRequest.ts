@@ -1,9 +1,7 @@
-// P67 §5.2: a direct port of views/repo/reveal.ts's own pending-request pattern — "act on a tab
-// whose view may not be mounted yet" is the same problem there (a search-result jump into a file
-// tab) and here (editReferencedRow's own new tab landing its caret before that tab's SlickGridHost
-// has necessarily mounted, or before its first filtered page has loaded). This module imports
-// nothing (a Map and five plain functions), so it closes no cycle with menu.ts, state.ts or the
-// host.
+// P67 §5.2: "act on a tab whose view may not be mounted yet" (editReferencedRow's own new tab
+// landing its caret before that tab's SlickGridHost has necessarily mounted, or before its first
+// filtered page has loaded) needs a pending-request pattern. This module imports nothing (a Map
+// and five plain functions), so it closes no cycle with menu.ts, state.ts or the host.
 
 export interface CellFocusRequest {
   /** Page row index. Always 0 today (the filtered page holds the one record). */

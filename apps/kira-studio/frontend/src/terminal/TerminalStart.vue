@@ -14,7 +14,7 @@ import { openTerminalTab } from '../state/terminalTabs';
 const terminalsStore = useTerminalsStore();
 
 // P91 §12: MainView.vue's own fallback when the Terminal module has no active tab — the state a
-// fresh install always opens in. GitStart.vue verbatim in shape: an EmptyState with one primary
+// fresh install always opens in. StudioStart.vue verbatim in shape: an EmptyState with one primary
 // action, disabled while the resolved home directory (§7.2) isn't known yet.
 function onNewTerminal(): void {
   if (terminalsStore.terminalDefaults.cwd === '') return;

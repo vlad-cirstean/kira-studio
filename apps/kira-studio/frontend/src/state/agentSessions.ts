@@ -52,9 +52,8 @@ export function reduceAgentActivity(
 }
 
 // P86 §12: the running-agent-sessions widget's own store — state/cacheStats.ts's pushed-from-Go
-// shape (a reactive store, one subscription, nothing else), not state/blameStatus.ts's owner
-// token: the only writer here is Go, pushing over ChannelAgentSessions, so nothing needs
-// arbitrating between two same-window writers.
+// shape (a reactive store, one subscription, nothing else): the only writer here is Go, pushing
+// over ChannelAgentSessions, so nothing needs arbitrating between two same-window writers.
 export const useAgentSessionsStore = defineStore('agentSessions', () => {
   const state = reactive({
     sessions: [] as AgentSession[],

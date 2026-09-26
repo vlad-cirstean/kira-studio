@@ -9,9 +9,6 @@ import { defaultSettings, type Settings, type SettingsPatch } from './settingsDo
 // list is unchanged: 'Database MCP' bypasses draft/Save for its own stated reason; 'Scripts' joins
 // it for the same reason (§10.1: a CRUD section, not a staged leaf); P86 §9.3's 'Claude Code' joins
 // them too, an instant on/off switch exactly like 'Database MCP'.
-// P100 Part 2: 'Connected editors' (git.sock VS Code pairing, state/gitClients.ts) and 'Git' (git
-// remote-op/graph settings) both moved to apps/kira-space wholesale along with the repo workspace
-// they configured.
 export const sections = [
   'Appearance',
   'Data',

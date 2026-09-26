@@ -3,7 +3,7 @@ import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { openSettings } from './support/settings';
 
-// P85 §10: the Scripts section is instant-effect like Connected editors and Database MCP — a CRUD
+// P85 §10: the Scripts section is instant-effect like Database MCP — a CRUD
 // section, not a staged draft/Save leaf.
 
 function dialog(page: Page) {

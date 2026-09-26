@@ -17,10 +17,8 @@ import TerminalTabView from '../views/terminal/TerminalView.vue';
 // state/ -> workbench/ is a lint-forbidden edge (F19), while workbench/ -> views/ is not. STATIC
 // imports, deliberately: this is a registry lookup, not a lazy-load boundary, so the bundle keeps
 // exactly the two dynamic chunks docs/ARCHITECTURE.md:28 records (sql-formatter, @faker-js/faker).
-// P103 Part 2 (§5.1): the repo-graph/repo-file/repo-diff/repo-multi-diff entries this map used to
-// carry as `NeverRenderedTabView` stubs are gone along with `unreachableTabKind` in
-// state/tabKinds.ts — `StudioTabKind` no longer includes those four kinds, so this is a total
-// function over this app's own real vocabulary again.
+// P103 Part 2 (§5.1): `StudioTabKind` covers this app's own real vocabulary only, so this is a
+// total function over it with no unreachable member to keep total against a wider union.
 export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   data: DataTabView,
   definition: DefinitionTabView,
@@ -34,8 +32,8 @@ export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   'variable-set': VariableSetTabView,
   environments: EnvironmentsTabView,
   // P83 §6.2: the embedded terminal — a static entry like every kind above; @xterm/xterm itself
-  // stays behind terminalRenderer.ts's own dynamic import(). P100 Part 2: this app's own standalone
-  // Terminal module's renderer, duplicated from (not shared with) apps/kira-space's repo-worktree
-  // one — views/terminal/TerminalView.vue's own doc comment.
+  // stays behind terminalRenderer.ts's own dynamic import(). This app's own standalone Terminal
+  // module's renderer, duplicated from (not shared with) apps/kira-space's own one —
+  // views/terminal/TerminalView.vue's own doc comment.
   terminal: TerminalTabView,
 };

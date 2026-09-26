@@ -93,7 +93,7 @@ function onDescriptionInput(v: string): void {
 
 const showHistory = ref(false);
 // P105: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
-// established `.$el` idiom, e.g. GitPanel.vue's promptInput / ConsoleView.vue's savedMenuTriggerEl).
+// established `.$el` idiom, e.g. ConsoleView.vue's savedMenuTriggerEl).
 const historyAnchorRef = ref<{ $el: HTMLElement } | null>(null);
 function onHistoryClick(): void {
   showHistory.value = true;

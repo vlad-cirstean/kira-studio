@@ -358,11 +358,6 @@ async function mountShell(): Promise<void> {
     opsStore.hydrateOps(),
     tabsStore.hydrateTabs(),
   ]);
-  // P100 Part 2: this used to also reconcile workspaceStore.openRepos (hydrateTabs' own derived
-  // set, C5 §4.2) against codeReposStore.records once both resolved — dropping an orphaned repo
-  // workspace outright and giving every surviving one its pinned graph tab (ensureWorkspaceShell,
-  // §6.1). The repo workspace, code-repos state, and git-clients state all moved to apps/kira-space
-  // wholesale, so there is nothing left here for this app's own boot sequence to reconcile.
   const app = createApp(App);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });

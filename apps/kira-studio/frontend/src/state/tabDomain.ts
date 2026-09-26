@@ -35,7 +35,7 @@ const studioTabKindSchema = /*#__PURE__*/ z.enum([
   'variable-set',
   // P28 D16(c): the fourth kind inside the 'api' mode — the environment *list*.
   'environments',
-  // P83 §7.1: an embedded shell at one worktree's directory, rendered with @xterm/xterm.
+  // P83 §7.1: an embedded shell at a working directory, rendered with @xterm/xterm.
   'terminal',
 ]);
 export type StudioTabKind = z.infer<typeof studioTabKindSchema>;

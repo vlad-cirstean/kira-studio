@@ -73,10 +73,8 @@ import { useTerminalsStore } from './terminals';
 // (F19). Every entry below carries Studio's existing per-kind behaviour verbatim: TabStrip.vue's
 // old iconFor body, tabTitle (F10), connectionRecord(tab.connectionId)?.color, and the "Reveal in
 // project panel" menu item (F11) — nothing here changes what Studio does, only where it lives.
-// P100 Part 2: this used to also allow `{ readonly filePath: string }` (a seti-set file icon,
-// `repo/fileIcon.ts`) for 'repo-file' tabs — Kira Space's own kind, never this app's. Kept as a
-// plain string alias rather than deleted outright, since TabStrip.vue's own `icon(tab)` call
-// sites still read through this type name.
+// TabIcon stays a plain string alias (not inlined as `string` directly) since TabStrip.vue's own
+// `icon(tab)` call sites read through this type name.
 // P103 Part 2 (§5.1): `TabKindDef` itself is now `@workbench/tabs/types`'s generic contract,
 // instantiated once below (via `TabKindRegistry`) with this app's own icon/rail-colour/menu-item
 // types.
@@ -329,12 +327,9 @@ export const TAB_KINDS: TabKindRegistry<
     menuExtras: () => [],
     parseState: parseStateWith(environmentsTabStateSchema),
   },
-  // P103 Part 2 (§5.1): the repo-graph/repo-file/repo-diff/repo-multi-diff entries this registry
-  // used to carry as `unreachableTabKind` stubs are gone — `StudioTabKind` (state/tabDomain.ts) no
-  // longer includes them at all, so `TAB_KINDS` is a total function over this app's own real
-  // vocabulary again, with no unreachable member to keep total against a wider union that
-  // included Kira Space's kinds too.
-  // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm. P85
+  // P103 Part 2 (§5.1): `TAB_KINDS` is a total function over this app's own real vocabulary — no
+  // unreachable member to keep total against a wider union.
+  // P83 §7.2: an embedded shell at a working directory, rendered with @xterm/xterm. P85
   // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
   // P113 F6: the descriptor itself moved to workbench's own terminalTabKind, shared with
   // kira-space's identical copy — only the mode constant and dropResources' own store differ.

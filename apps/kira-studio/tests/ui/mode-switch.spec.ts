@@ -78,8 +78,8 @@ test('mode switch — three mode tabs, an empty Http mode, and Studio state that
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. three mode tabs (P91 §2: Terminal joins Studio/Api as a third peer — P100 Part 1 dropped
-  // Git, the former fourth), Studio active by default.
+  // 1. three mode tabs (P91 §2: Terminal joins Studio/Api as a third peer), Studio active by
+  // default.
   await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
@@ -299,8 +299,8 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
 
   const studio = await modeTabInk(page, 'studio');
   const api = await modeTabInk(page, 'api');
-  // P91 §17.3: Terminal is a third real .mode-tab (Git, the former third, dropped in P100 Part 1)
-  // — same ink guard extended to it as it was to Studio/Api.
+  // P91 §17.3: Terminal is a third real .mode-tab — same ink guard extended to it as it was to
+  // Studio/Api.
   const terminal = await modeTabInk(page, 'terminal');
 
   // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
