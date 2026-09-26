@@ -6010,3 +6010,127 @@ acceptance criterion (§0 1-3, 5, 6) is met.
 
 Touched exactly the plan's own §4 file-ownership table, plus the CI patch fix (`2b9258c`, the same
 file H4 already owned) and this result section.
+
+## P117 result
+
+Plan: `docs/v1.9/plans/P117-visual-misalignment-sweep.md`. One Opus planning pass (§0-§4,
+committed pre-implementation), one sequential Sonnet implementer, no stream split — the plan's own
+§0 call (S1/S6/S7 share settings-pane files, A1/A2 share `UI/toggle`/`UI/input` primitives with
+Settings' own steppers/selects). 19 commits, `8f08bf8e`..`ac85373a`, confirmed via
+`git log --oneline 4202f754..ac85373a`. The implementer's own summary line said "18"; its own
+itemized commit list actually totals 19 — a self-inconsistency in its report, not a real ambiguity,
+caught by counting the list rather than trusting the summary number.
+
+**S1-S8, A1-A2, plan order:**
+
+- **S2 — NativeSelect blank, 1 commit (`8f08bf8e`).** `DateFormatField.vue`/`GitLogLevelField.vue`
+  switched from `:value`/`@change` to `:model-value`/`@update:model-value`, ApiPane's own already-
+  correct shape.
+- **S3 — active item loses fill on hover, 2 commits.** `26e225e4` moves `SettingsShell.vue`'s
+  static `hover:bg-hover` into the inactive branch. `11720d5e` does the same for
+  `DateTimePicker.vue`'s day/month/year cell grids, GitPanel's own precedent both times.
+- **S1 — vertical Field centred, 1 commit (`c1a8f8d4`).** Drops `items-center` at every site, adds
+  `self-start` to the selects that must stay narrow, updates 6 stale comments naming the class.
+  **Real site count: 19 across 7 files**, not the plan's own estimated 21 across 8 —
+  `GitPane.vue`, `RequestSettingsPane.vue`, `AdvancedPane.vue`, `ApiPane.vue`, `AppearancePane.vue`,
+  `CachePane.vue`, `DataPane.vue` (`git show --stat c1a8f8d4` confirms exactly these 7 files, 29
+  insertions/25 deletions). The implementer fixed every real site the plan's finding described;
+  the plan's own count was an overestimate from its `codegraph_explore` pass, not a scope miss.
+- **S6 — 14px settings labels, 1 commit (`deb26e0d`).** `text-kira-sm` added at the 3 named sites
+  (`FontSizeField.vue`, `DateFormatField.vue`, `GitLogLevelField.vue`), `WordWrapField.vue`'s own
+  precedent. Label primitive untouched.
+- **S7 — checkbox + description rows, 1 commit (`2fd13cc9`).** Label plus `FieldDescription`
+  wrapped in `FieldContent` (shadcn's own recipe), `items-start` on the Field.
+- **S8 — native spinner inside every stepper, 1 commit (`1ec00ae5`).** `NumberStepperInput.vue`'s
+  inner input gains AutocompleteField's already-allowlisted spin-button-hiding utilities.
+- **S4 — data font size stepper full width, 1 commit (`a57c383a`).** `FontSizeField.vue` passes
+  `group-class="w-24"` back to the one caller that needs it narrow; every other stepper stays
+  `w-full`, matching pre-P110.
+- **A1 — ToggleGroup stock size, 2 commits.** `20f399ad` adds a `kira` size token to
+  `toggleVariants` (Button's own precedent). `c39724cf` applies `size="kira"` across every
+  pane/tab ToggleGroup root named in the plan's two site lists, plus `RowDensityField.vue` — **S5**
+  is the same root cause and lands in this commit rather than its own.
+- **A2 — stock Input/InputGroup in Api views, 3 commits.** `78a25778` adds a `kira`/`kira-lg` size
+  axis to `Input` (`inputVariants`, `default` stays byte-identical, P110 B25's own InputGroup rule).
+  `7eec2b7b` sizes `EnvironmentsView`/`VariableSetView`'s filter InputGroups (bounded width, `kira`
+  variant) and their per-row name/description inputs, and gives the trailing action group
+  `shrink-0` so "New environment" stops clipping. `8e4e2f3f` sizes the measured remainder found
+  against the running app (`grpc-request.spec.ts` fixture, before/after screenshot):
+  `VariableRow.vue` name/value/description (a site the plan's own finding text named, not just
+  blast radius — missed in the first A2 pass, caught here before the phase closed), `SchemaBrowser`
+  target/proto-path plus new-import-path, `RequestSettingsPane`'s 3 timeout/limit fields,
+  `ResponseFindBar`'s find input, `TimestampPane`'s field input, `DateTimePicker`'s hour/minute/
+  second, `KeyValuePane`'s add/edit popover inputs at `kira-lg`. Checked and left alone (already
+  correct or a genuinely different pattern): `CollectionsPanel`/`ProjectPanel`/`GitPanel` tree-
+  search, `DynamicValuesDialog`/`VariablesOverviewPanel` filters, `DefinitionView` structure filter,
+  `CallHistoryList`/`ResponseHistoryList`/`GrpcRequestView`/`CookiesPane`/`ResponsePane` filters,
+  `FormDataTable` content-type input, `SaveRequestDialog` name field, `FieldRowsTable`'s deliberate
+  auto-height textarea rows, `PagerControls`/`SearchToolbar` (already asserted at
+  `--kira-control-h` by `control-sizing.spec.ts`).
+
+**Guards and baselines:**
+
+- `2eda7650` **new UI-tier guards** (plan §4.1): `control-sizing.spec.ts` asserts the HTTP request
+  pane's `toggle-group-item` height at `--kira-control-h` (A1) and `environments-filter`'s
+  input-group fieldset at the same height plus New-environment never clipping past the view's right
+  edge (A2); `settings-apply-on-save.spec.ts` asserts `settings-date-format`/`settings-git-log-level`
+  report a real value on open, not blank (S2); Space's `window-chrome.spec.ts` gets the same S2
+  guard. Each assertion was confirmed to fail against the pre-fix code before restoring it.
+- `ac85373a` **new visual baseline**: `http-request-view.spec.ts`, the Api module's first
+  `test:visual` coverage — method/URL bar, pane-switcher ToggleGroup, response headers/body chrome
+  on a sent 200 response. The module had none before this phase and broke silently, per the SPEC
+  row's own allowance.
+- Re-recorded baselines, each its own commit and named: `c7187a35` (Studio settings panes),
+  `32c361ed` (Studio data-view, S5's toggle height), `01fb4fdb` (Space settings panes). `ed295b3d`
+  **re-records Studio's connection-dialog baseline** — the plan expected it unchanged (§4.2), but it
+  diffed because `ConnectionDialog`'s Port field shares `NumberStepperInput` with S8's spin-button
+  fix. A real, legitimate ripple through a shared primitive, not a bug and not a scope gap; the
+  commit message names S8 as the cause per the plan's own instruction for this case.
+
+**Verification, independently re-run against the phase's own final commit (`ac85373a`), not
+copied from the implementer's own report:**
+
+- `go build ./...` — correctly skipped: `git diff --stat 4202f754..ac85373a` touches zero `.go`
+  files, confirmed by grep.
+- `bun run lint` — clean.
+- `bun run typecheck` — clean, all 8 parallel projects.
+- `bun run lint:dead` — same 6 pre-existing duplicate-export findings as before this phase, none
+  naming a P117-touched file.
+- `bun run test:unit` — 1662 pass, 0 fail, 14327 `expect()` calls.
+- `bun run test:visual:studio` — 14/14 pass, one more than the implementer's own count of 13,
+  because its final commit (`ac85373a`) added the 14th baseline after the implementer had already
+  recorded that number in its report — not a defect.
+- `bun run test:visual:space` — 4/4 pass.
+- `bun run test:ui:space` — 29/29 pass.
+- `bun run test:ui:studio` full suite — ran once at 285/1: one flaky failure, `budgets.spec.ts`, a
+  pre-existing documented flake (that file's own comments describe cross-file worker contention),
+  unrelated to this phase. Re-ran the full ui+ui-timing suite a second time (283 tests, via a
+  filter that ended up running everything) and got 2 *different* failures that run —
+  `http-history.spec.ts` (browser closed mid-test) and `slick-grid.spec.ts` (pacing invariant
+  off-by-one under load) — both confirmed to pass cleanly in isolation on a third run. This
+  confirms a real, environment-specific pattern in this sandbox: a full-suite Playwright run
+  produces a different flaky failure each time under worker contention, never the same test twice,
+  always passing alone — not caused by P117's own changes (settings/input/toggle sizing has no
+  relation to grid pacing or history-browsing timing).
+
+**Disclosed deviations from the plan, none requiring a plan/SPEC correction:**
+
+1. S1's real site count is 19 across 7 files, not the plan's own estimated 21 across 8 (above).
+2. The implementer's own summary line miscounted 18 commits; its own itemized list totals 19 (above).
+3. The connection-dialog `test:visual` baseline needed re-recording though the plan expected it
+   unchanged — a legitimate S8 ripple through the shared `NumberStepperInput`, not a bug.
+4. `VariableRow.vue`, a site the plan's own A2 finding text explicitly named (not just blast
+   radius), was missed in the first A2 pass (`7eec2b7b`) and caught in the follow-up (`8e4e2f3f`)
+   before the phase closed — no site went unfixed at hand-off.
+
+**Known process gap, not a defect.** Commits 1-12 (`8f08bf8e` through `78a25778`) carry no
+`Co-Authored-By`/`Claude-Session` trailer — confirmed by `git show -s --format='%b'` on each; the
+attribution instruction reached the implementer mid-task, after those 12 had already landed.
+Commits 13 onward (`c7187a35` through `ac85373a`) all carry the full trailer. Per this repo's own
+practice of never rewriting history, the first 12 stay as committed rather than amended.
+
+**File ownership.** Every commit touches only files under the plan's own §1 site lists plus their
+`tests/ui`/`tests/visual` counterparts (`apps/kira-studio/frontend/src`,
+`apps/kira-space/frontend/src`, `packages/{theme,workbench}/src`, and the two apps' `tests/ui`/
+`tests/visual` trees) — confirmed via `git show --stat` on each commit above. No `.go` file, no
+bound Wails method signature, and no file outside those trees changed.
