@@ -1037,6 +1037,56 @@ test('a repo workspace: "Open all changes" on a commit opens one multi-diff tab 
   expect(paths).toEqual(['a.ts', 'b.ts']);
 });
 
+// P121 §6.2: T1's own `pt-0.5` removal applies through the shared TabStrip.vue -- both the pinned
+// graph tab and a promoted file tab should centre in the 34px `h-tabbar` bar, same as Studio's own
+// T1 assertion.
+test('the pinned graph tab and a promoted file tab sit vertically centred in the tab-strip bar (P121 T1)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
+
+  const bar = page.locator('[data-testid="tab-strip"]');
+
+  async function assertCentred(tabLocator: import('@playwright/test').Locator) {
+    const [barBox, tabBox] = await Promise.all([bar.boundingBox(), tabLocator.boundingBox()]);
+    if (!barBox || !tabBox) throw new Error('expected both the bar and its tab to be measurable');
+    const barBottomInterior = barBox.y + barBox.height - 1; // 1px border-b
+    const topGap = tabBox.y - barBox.y;
+    const bottomGap = barBottomInterior - (tabBox.y + tabBox.height);
+    expect(Math.abs(topGap - bottomGap)).toBeLessThanOrEqual(0.5);
+  }
+
+  await assertCentred(tab(page, 'repo-graph'));
+
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+  await treeRow(page, 'a.ts').click();
+  await assertCentred(tab(page, 'repo-file'));
+});
+
+// P121 §6.2: the Git panel's own top-level tabs (S1, a default-variant ToggleGroup) get the same
+// 4px full-corner radius as every other default-variant instance; its label keeps normal letter
+// spacing, same as the Files/Search segmented control beside it (S2, unaffected by this phase).
+test('the Git panel top-level tabs render at 4px radius with normal letter spacing (P121 S1)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  await repoRow(page).click();
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
+
+  const repos = page.locator('[data-testid="git-panel-tab-repos"]');
+  expect(await repos.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('4px');
+  const reposSpacing = await repos.evaluate((el) => getComputedStyle(el).letterSpacing);
+
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+  const filesView = page.locator('[data-testid="repo-view-files"]');
+  const filesSpacing = await filesView.evaluate((el) => getComputedStyle(el).letterSpacing);
+
+  expect(reposSpacing).toBe('normal');
+  expect(filesSpacing).toBe('normal');
+});
+
 // P93 §8.4: the desktop app's own DOM-level check for the collapse/branch-order feature —
 // `graph-branch-order.spec.ts` (webview-interaction) already covers the toolbar toggle, the
 // dashed fork stubs and the no-overlap/no-scrollbar cases in detail; this only exercises what is
