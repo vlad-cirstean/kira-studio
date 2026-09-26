@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import NumberStepperInput from '@theme/NumberStepperInput.vue';
@@ -258,7 +258,7 @@ const disableCookieJarId = useId();
     </Field>
 
     <FieldGroup>
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" class="items-start">
         <Checkbox
           :id="disableCookieJarId"
           class="size-3.5"
@@ -268,11 +268,13 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
-        <FieldDescription
-          >Off keeps a session cookie a server sets and replays it on later requests to
-          the same host.</FieldDescription
-        >
+        <FieldContent>
+          <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
+          <FieldDescription
+            >Off keeps a session cookie a server sets and replays it on later requests to
+            the same host.</FieldDescription
+          >
+        </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"

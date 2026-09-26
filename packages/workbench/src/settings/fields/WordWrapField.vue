@@ -3,7 +3,7 @@ import type { AppearanceSettings } from '@shared/domain/settings';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldGroup } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldGroup } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useId } from 'vue';
 
@@ -27,7 +27,7 @@ const wordWrapId = useId();
 
 <template>
   <FieldGroup>
-    <Field orientation="horizontal">
+    <Field orientation="horizontal" class="items-start">
       <Checkbox
         :id="wordWrapId"
         class="size-3.5"
@@ -37,8 +37,10 @@ const wordWrapId = useId();
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <Label :for="wordWrapId" class="text-kira-sm">Word wrap</Label>
-      <slot />
+      <FieldContent>
+        <Label :for="wordWrapId" class="text-kira-sm">Word wrap</Label>
+        <slot />
+      </FieldContent>
     </Field>
     <TooltipIconButton
       icon="discard"

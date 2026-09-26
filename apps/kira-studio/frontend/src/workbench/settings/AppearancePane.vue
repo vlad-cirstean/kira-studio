@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import DateFormatField from '@workbench/settings/fields/DateFormatField.vue';
@@ -186,7 +186,7 @@ const inlineBlameId = useId();
     </WordWrapField>
 
     <FieldGroup>
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" class="items-start">
         <Checkbox
           :id="rowColoringId"
           class="size-3.5"
@@ -196,11 +196,13 @@ const inlineBlameId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="rowColoringId" class="text-kira-sm">Row colouring</Label>
-        <FieldDescription
-          >Colour grid values by their column's data type. Off renders every row in the
-          plain text colour.</FieldDescription
-        >
+        <FieldContent>
+          <Label :for="rowColoringId" class="text-kira-sm">Row colouring</Label>
+          <FieldDescription
+            >Colour grid values by their column's data type. Off renders every row in the
+            plain text colour.</FieldDescription
+          >
+        </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"
@@ -214,7 +216,7 @@ const inlineBlameId = useId();
     </FieldGroup>
 
     <FieldGroup>
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" class="items-start">
         <Checkbox
           :id="inlineBlameId"
           class="size-3.5"
@@ -224,11 +226,13 @@ const inlineBlameId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
-        <FieldDescription
-          >Show who last changed the current line, at the end of that line, in the
-          repository file viewer.</FieldDescription
-        >
+        <FieldContent>
+          <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
+          <FieldDescription
+            >Show who last changed the current line, at the end of that line, in the
+            repository file viewer.</FieldDescription
+          >
+        </FieldContent>
       </Field>
       <TooltipIconButton
         icon="discard"

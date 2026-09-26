@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldDescription } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { useId } from 'vue';
@@ -42,7 +42,7 @@ const keepAwakeAgentAwareId = useId();
          this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
          hook listener in one call, so it belongs on the action side of the draft/Save
          line, never mixed with it. -->
-    <Field orientation="horizontal">
+    <Field orientation="horizontal" class="items-start">
       <Checkbox
         :id="hooksEnabledId"
         class="size-3.5"
@@ -53,12 +53,14 @@ const keepAwakeAgentAwareId = useId();
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <Label :for="hooksEnabledId" class="text-kira-sm">Report session activity to Kira Studio</Label>
-      <FieldDescription
-        >A Claude Code tab launches with a `--settings` flag pointing at a file this app
-        owns — no project file is written. Turning this off affects only the next launch;
-        a session already running simply stops reporting.</FieldDescription
-      >
+      <FieldContent>
+        <Label :for="hooksEnabledId" class="text-kira-sm">Report session activity to Kira Studio</Label>
+        <FieldDescription
+          >A Claude Code tab launches with a `--settings` flag pointing at a file this app
+          owns — no project file is written. Turning this off affects only the next launch;
+          a session already running simply stops reporting.</FieldDescription
+        >
+      </FieldContent>
     </Field>
 
     <template v-if="settingsStore.claudeCode.hooksEnabled">
@@ -81,7 +83,7 @@ const keepAwakeAgentAwareId = useId();
     <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
          enough to hold the assertion, and this leaf's own instant-action posture mirrors
          the hooks toggle just above. -->
-    <Field orientation="horizontal">
+    <Field orientation="horizontal" class="items-start">
       <Checkbox
         :id="keepAwakeAgentAwareId"
         class="size-3.5"
@@ -92,12 +94,14 @@ const keepAwakeAgentAwareId = useId();
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <Label :for="keepAwakeAgentAwareId" class="text-kira-sm">Keep this Mac awake while a Claude Code session is running</Label>
-      <FieldDescription
-        >Prevents idle sleep, and system sleep on AC power, for as long as at least one
-        Claude Code tab is live. Independent of the title bar's own keep-awake button —
-        either one is enough to keep the machine awake.</FieldDescription
-      >
+      <FieldContent>
+        <Label :for="keepAwakeAgentAwareId" class="text-kira-sm">Keep this Mac awake while a Claude Code session is running</Label>
+        <FieldDescription
+          >Prevents idle sleep, and system sleep on AC power, for as long as at least one
+          Claude Code tab is live. Independent of the title bar's own keep-awake button —
+          either one is enough to keep the machine awake.</FieldDescription
+        >
+      </FieldContent>
     </Field>
   </div>
 </template>

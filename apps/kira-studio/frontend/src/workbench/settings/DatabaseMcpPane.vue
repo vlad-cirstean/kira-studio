@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Field, FieldDescription, FieldLegend } from '@theme/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { useBusyAction } from '@workbench/util/useBusyAction';
 import { computed, useId } from 'vue';
@@ -87,7 +87,7 @@ const dbMcpEnabledId = useId();
          one call, so it belongs on the action side of the draft/Save line, never mixed with
          it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
          "enabling is never a silent action"). -->
-    <Field orientation="horizontal">
+    <Field orientation="horizontal" class="items-start">
       <Checkbox
         :id="dbMcpEnabledId"
         class="size-3.5"
@@ -98,12 +98,14 @@ const dbMcpEnabledId = useId();
       >
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
-      <Label :for="dbMcpEnabledId" class="text-kira-sm">Enable the database MCP server</Label>
-      <FieldDescription
-        >Lets an AI client list, browse and query the connections exposed below, through
-        the same path this app's own SQL console uses. Starts and stops with this
-        toggle.</FieldDescription
-      >
+      <FieldContent>
+        <Label :for="dbMcpEnabledId" class="text-kira-sm">Enable the database MCP server</Label>
+        <FieldDescription
+          >Lets an AI client list, browse and query the connections exposed below, through
+          the same path this app's own SQL console uses. Starts and stops with this
+          toggle.</FieldDescription
+        >
+      </FieldContent>
     </Field>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
