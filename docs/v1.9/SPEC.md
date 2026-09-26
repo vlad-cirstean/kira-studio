@@ -6679,3 +6679,23 @@ explains a coincidental substring (`buildinfo.go`'s `github.com` module path, `d
 
 **Plan deviations.** Scope and design otherwise unchanged — every §4 commit landed in its planned
 order and content, only split or extended as detailed above. No `--no-verify` used on any commit.
+
+## P125 result
+
+Plan: `docs/v1.9/plans/P125-readme-refresh.md`. One Opus pass, plan and rewrite together (user
+authorized skipping the split for this phase). 3 commits: `dfc16b52` (README rewrite), `1aad59c6`
+(row + plan), plus this result commit.
+
+**What landed.** Root `README.md` 450 lines to 214. Cut: chapter history in Status (v1.1-v1.9),
+9-column engine matrix's footnotes on driver internals, 22-row script table, separate Tests
+section, 21-line directory listing, v1-v1.9 Documentation walk-through (ARCHITECTURE listed twice).
+Kept, tightened: intro plus Kira Space pointer, Status (4 bullets), Install and build-from-source,
+4-column engine table, Studio/Api/Database MCP feature lists, Requirements, Development (2 commands
+plus 5 scripts), short Architecture, 5-entry Documentation, Not shipped, License. Fixed stale:
+Settings' "commit date format"/"git log level" (P120 moved/renamed); added DataGrip import
+(shipped, unmentioned). Dropped "SSH tunneling (planned for v2)" future claim — no spec backs it.
+Requirements and Development kept because `apps/kira-space/README.md` cites both.
+
+**Checks.** `bun run lint` clean; pre-commit (lint + typecheck) passed on every commit, no
+`--no-verify`; every relative README link resolves; `git diff --stat 88943a7a` touches only
+`README.md`, `docs/v1.9/SPEC.md`, `docs/v1.9/plans/P125-readme-refresh.md`.
