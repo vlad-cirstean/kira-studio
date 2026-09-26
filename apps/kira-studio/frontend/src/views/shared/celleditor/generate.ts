@@ -1,3 +1,4 @@
+import { CROCKFORD_ALPHABET, crockfordBase32 } from '@shared/domain/mask';
 import type { CellFormat } from './formats';
 
 // P42 D29: four values a developer routinely needs to type into a column by hand — pure and
@@ -7,41 +8,24 @@ import type { CellFormat } from './formats';
 // entry that is format-aware, because the right *text* for "the current moment" genuinely differs
 // between an ISO timestamp and an epoch count.
 
-const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-
-// Reads 5-bit groups out of a byte array, MSB-first — correct only for a bit length that is an
-// exact multiple of 5 (P43 iter2 D31: the 80-bit random half below, 16 groups exactly). Used to
-// carry a trailing-pad branch for a partial final group, which made it look reusable for the
-// 48-bit timestamp half too — it is not: ULID's timestamp field is 50 bits (10 Crockford chars),
-// left-padded with 2 zero bits at the *top*, read MSB-first; padding the *last* group instead (as
-// this function's own trailing branch did) shifts every bit up by 2, decoding to a timestamp four
-// times too large (F22). encodeUlidTime below is the correct, separate encoder for that half.
-function toCrockford(bytes: Uint8Array): string {
-  let value = 0;
-  let bits = 0;
-  let out = '';
-  for (const byte of bytes) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      out += CROCKFORD[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-  return out;
-}
-
 // ULID's timestamp field: the 48-bit millisecond value written into a 50-bit, 10-character
 // Crockford field, MSB-first — i.e. left-padded with two zero bits, not right-padded. Repeated
 // division by 32, prepending each digit, produces exactly that: 10 base-32 digits (50 bits of
 // room) can only ever need the top two digits for padding when the value fits in 48 bits, and
 // division naturally leaves them as leading zeros rather than appending anything at the tail.
+//
+// P115 H9: this file used to carry its own byte-for-byte copy of mask.ts's crockfordBase32 (as
+// toCrockford, used for the random half below) — reusing the shared one instead. Kept as a
+// *separate* function from crockfordBase32 rather than folded into it (F22): crockfordBase32's own
+// trailing-pad branch pads a partial *last* group, which for this 50-bit, 10-character field would
+// pad at the wrong end — ULID's timestamp is left-padded with 2 zero bits at the *top*, not
+// right-padded — and would decode to a timestamp four times too large.
 function encodeUlidTime(ms: number): string {
   let n = ms;
   let out = '';
   for (let i = 0; i < 10; i++) {
     const mod = n % 32;
-    out = CROCKFORD[mod] + out;
+    out = CROCKFORD_ALPHABET[mod] + out;
     n = (n - mod) / 32;
   }
   return out;
@@ -49,9 +33,12 @@ function encodeUlidTime(ms: number): string {
 
 // 48-bit timestamp (10 Crockford chars) + 80 random bits (16 chars) = 26 chars, sortable by
 // creation time unlike a v4 UUID — the second most-requested "give me an id" shape after UUID.
+// The random half is an exact multiple of 5 bits (16 groups), so crockfordBase32's own
+// trailing-pad branch never fires for it — byte-for-byte the same output the old local
+// toCrockford produced (P115 H9).
 function generateUlid(): string {
   const time = encodeUlidTime(Date.now());
-  const random = toCrockford(crypto.getRandomValues(new Uint8Array(10)));
+  const random = crockfordBase32(crypto.getRandomValues(new Uint8Array(10)));
   return time + random;
 }
 

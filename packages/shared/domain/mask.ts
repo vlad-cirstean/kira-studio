@@ -292,13 +292,20 @@ export function applyVisible(rule: MaskingRule, value: string): string {
 }
 
 // CROCKFORD_ALPHABET excludes I, L, O, U so a tag never reads as a word and never confuses 0/O
-// when a human retypes it — the same alphabet internal/mask's crockfordEncoding uses.
-const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+// when a human retypes it — the same alphabet internal/mask's crockfordEncoding uses. Exported
+// (P115 H9): celleditor/generate.ts's ULID generator used to carry an identical copy for its own
+// timestamp-half encoder.
+export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 // crockfordBase32 mirrors Go's encoding/base32 standard bit-packing (5 bits per character, MSB
 // first across the byte stream, no padding) — verified byte-for-byte against
-// internal/mask.tag's own output via the parity fixtures' fixed-key-tag-vector case.
-function crockfordBase32(bytes: Uint8Array): string {
+// internal/mask.tag's own output via the parity fixtures' fixed-key-tag-vector case. Exported
+// (P115 H9): celleditor/generate.ts's own ULID random-half encoder was a duplicate of this exact
+// bit-packing (the only difference was an unreachable trailing-pad branch there had already been
+// stripped — see this function's own trailing `if (bitCount > 0)` below, which only fires for a
+// non-multiple-of-5 bit length; the ULID caller always feeds it 80 bits, so it never fires there
+// either, making the two byte-for-byte interchangeable for that input).
+export function crockfordBase32(bytes: Uint8Array): string {
   let bitBuffer = 0;
   let bitCount = 0;
   let out = '';
