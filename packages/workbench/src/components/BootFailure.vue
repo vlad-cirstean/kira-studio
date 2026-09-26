@@ -20,7 +20,7 @@ const emit = defineEmits<{ retry: [] }>();
       <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
         <CodiconIcon name="warning" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ appName }} failed to start</AlertTitle>
-        <p class="text-kira-xs text-subtle whitespace-pre-wrap">{{ message }}</p>
+        <p class="text-kira-sm text-subtle whitespace-pre-wrap">{{ message }}</p>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button
             variant="dialog-primary"

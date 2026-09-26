@@ -229,7 +229,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
+            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-md"
             :class="[
               tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
               { 'is-active': tab.active },
@@ -270,7 +270,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm group/tab"
+        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-md group/tab"
         :class="[
           tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
           isAttention(tab) ? ATTENTION_CLASS : '',
