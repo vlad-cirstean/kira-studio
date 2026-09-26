@@ -16,7 +16,7 @@ export type { ControlLogEntry, ControlMockHandle } from '@workbench/testing/ui/m
 
 // The real Wails runtime, served under /wails/ — Kira Studio's own tests/ui/support/mockRuntime.ts,
 // ported and trimmed to this app's own bound surface (bridge/index.ts's `control` object,
-// apps/kira-space/main.go's 10 services). See @workbench/testing/ui/mockRuntime's own header for
+// apps/kira-space/main.go's 12 services). See @workbench/testing/ui/mockRuntime's own header for
 // why this is the real runtime.js bundle, not a hand-rolled stand-in, and why `go list` resolves
 // its path rather than a hand-written GOPATH-shaped one.
 const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../'));
@@ -63,6 +63,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   terminalWrite: 'TerminalService.Write',
   terminalResize: 'TerminalService.Resize',
   terminalClose: 'TerminalService.Close',
+
+  // P116 G5/G6: the two new bound methods window-chrome parity adds.
+  windowsOpenNew: 'WindowsService.OpenNew',
+  keepAwakeStatus: 'KeepAwakeService.Status',
+  keepAwakeSetManual: 'KeepAwakeService.SetManual',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -99,6 +104,15 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.codeWorkspaceOpenWorkspace]: 'null',
   [IPC.codeWorkspaceCloseWorkspace]: 'null',
   [IPC.codeWorkspaceCancelSearch]: 'null',
+  // P116 G5: main.ts's bootstrap() joins keepAwakeStore.initKeepAwake() into the optional
+  // Promise.allSettled group, same reasoning as the rest of this table's every-boot calls. The
+  // plan (docs/v1.9/plans/P116-window-chrome-parity.md §2) names `supported: false` here, but this
+  // deliberately follows Kira Studio's own WILDCARD_DEFAULTS value instead (`supported: true`) —
+  // Studio's own comment explains why: the UI suite runs against a static server, not a real Go
+  // build, and a spec that never cares about keep-awake should still see the titlebar button it
+  // will ship with. A spec that DOES care (window-chrome.spec.ts's own keep-awake cases) still wins
+  // with its own snapshot.
+  [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at

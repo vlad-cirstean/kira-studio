@@ -1,6 +1,6 @@
 // The test-owned fixture-key namespace this tier mocks against (Kira Studio's own
 // tests/ui/support/ipcChannels.ts, ported and trimmed to this app's own bound surface —
-// bridge/index.ts's own `control` object, apps/kira-space/main.go's 10 services). Nothing under
+// bridge/index.ts's own `control` object, apps/kira-space/main.go's 12 services). Nothing under
 // apps/kira-space/frontend/src imports this: the real wire protocol is the generated Wails
 // bindings under apps/kira-space/frontend/bindings/. See mockRuntime.ts's CHANNEL_TO_FQN for the
 // other half of this mapping.
@@ -22,6 +22,19 @@ export const IPC = {
   windowFlushed: 'kira:window:flushed',
 
   filesChooseFolder: 'kira:files:chooseFolder',
+
+  // P116 G1-G7: the menu-pushed commands, keep-awake and new-window bound calls, and the app-metrics
+  // push — same values as Kira Studio's own ipcChannels.ts.
+  openSettings: 'kira:open-settings',
+  toggleProjectPanel: 'kira:menu:toggle-project-panel',
+  tabNext: 'kira:menu:tab-next',
+  tabPrev: 'kira:menu:tab-prev',
+  tabClose: 'kira:menu:tab-close',
+  windowsOpenNew: 'kira:windows:openNew',
+  keepAwakeStatus: 'kira:keepAwake:status',
+  keepAwakeSetManual: 'kira:keepAwake:setManual',
+  keepAwake: 'kira:keepAwake:changed',
+  appMetrics: 'kira:app:metrics',
 
   gitClientsList: 'kira:git:clients:list',
   gitClientsRevoke: 'kira:git:clients:revoke',
