@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
@@ -84,6 +84,62 @@ function rootVar(page: Page, name: string): Promise<number> {
   return page.evaluate(
     (n) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)),
     name,
+  );
+}
+
+// P122: the one shared focus ring (packages/theme/src/base.css's `focus-ring`) -- 1px solid
+// --kira-focus, laid inset over the element's own 1px edge, no box-shadow halo. Asserted on the
+// actual computed style rather than the class string: the value must render identically whether
+// the base `:focus-visible` rule, a `has-[...]:focus-visible:focus-ring` box, or an explicit
+// `focus-within:focus-ring` painted it.
+async function expectFocusRing(el: Locator): Promise<void> {
+  const readStyle = () =>
+    el.evaluate((node) => {
+      const cs = getComputedStyle(node);
+      return {
+        outlineStyle: cs.outlineStyle,
+        outlineWidth: cs.outlineWidth,
+        outlineOffset: cs.outlineOffset,
+        outlineColor: cs.outlineColor,
+        boxShadow: cs.boxShadow,
+      };
+    });
+  // Every shadcn primitive carries its own transition-colors/transition-all -- which animates
+  // outline-width/-color/-offset along with everything else -- so a one-shot read right after
+  // focus can catch it mid-transition. Poll past the (150ms default) transition instead of
+  // sleeping a fixed amount.
+  await expect.poll(async () => (await readStyle()).outlineColor).toBe('rgb(0, 120, 212)');
+  const style = await readStyle();
+  expect(style.outlineStyle).toBe('solid');
+  expect(style.outlineWidth).toBe('1px');
+  expect(style.outlineOffset).toBe('-1px');
+  expect(style.boxShadow).toBe('none');
+}
+
+// Clicks `anchorTestid` (a mouse click, which never itself triggers :focus-visible on a button --
+// P122 plan §2.1) when given, then presses Tab until the next tabbable element is `targetTestid`
+// -- a real keyboard focus, the only way a button's own :focus-visible rule ever paints. Disabled
+// controls in between are skipped by the browser's own native Tab order, so this is robust to
+// which of the toolbar's own buttons happen to be enabled in the fixture. `anchorTestid: null`
+// starts tabbing from whatever already has focus (e.g. a just-opened dialog's own initial focus).
+async function focusViaTabFrom(
+  page: Page,
+  anchorTestid: string | null,
+  targetTestid: string,
+  maxTabs = 8,
+): Promise<void> {
+  if (anchorTestid !== null) {
+    await page.locator(`[data-testid="${anchorTestid}"]`).click();
+  }
+  for (let i = 0; i < maxTabs; i++) {
+    await page.keyboard.press('Tab');
+    const active = await page.evaluate(
+      () => document.activeElement?.getAttribute('data-testid') ?? null,
+    );
+    if (active === targetTestid) return;
+  }
+  throw new Error(
+    `could not reach [data-testid="${targetTestid}"] via Tab from [data-testid="${anchorTestid}"] within ${maxTabs} presses`,
   );
 }
 
@@ -240,4 +296,76 @@ test('the environments filter sits at --kira-control-h, and New environment neve
     throw new Error('expected both boxes to be measurable');
   }
   expect(newEnvBox.x + newEnvBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width + 1);
+});
+
+// P122 §6.2: the reference value itself -- the SQL data view's WHERE filter, `InputGroup
+// variant="kira"`'s own `focus-within:focus-ring`. Unchanged by this phase; asserted here as the
+// baseline every other row below is measured against.
+test('the SQL filter input renders the reference 1px focus ring (P122)', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await connectAndOpenGrid(page);
+
+  await page.click('[data-testid="filter-where-input"]');
+  await expectFocusRing(
+    page
+      .locator('[data-testid="filter-where-input"]')
+      .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]'),
+  );
+});
+
+// P122 §6.2: stock `Input` (T1) -- used to paint a 3px 50%-alpha box-shadow halo on top of its own
+// border; now inherits the shared base `:focus-visible` rule instead.
+test('a stock Input renders the shared 1px focus ring, not the old halo (P122)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await connectAndOpenGrid(page);
+
+  await page.click('[data-testid="pager-page-input"]');
+  await expectFocusRing(page.locator('[data-testid="pager-page-input"]'));
+});
+
+// P122 §6.2: InputGroup `default` (T3) -- the number-stepper box's own `has-[...]:focus-visible:
+// ring-3` halo, now `has-[...]:focus-visible:focus-ring`.
+test('the InputGroup default box renders the shared 1px focus ring, not the old halo (P122)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch();
+  await page.click('[data-testid="open-settings"]');
+  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
+
+  await page.click('[data-testid="settings-font-size"]');
+  await expectFocusRing(
+    page
+      .locator('[data-testid="settings-font-size"]')
+      .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]'),
+  );
+});
+
+// P122 §6.2: `Button` (T4) -- keyboard-focus only (a mouse click never matches :focus-visible on a
+// button), the shadcn registry's own ring-3 halo replaced by the shared base rule.
+test('a Button renders the shared 1px focus ring on keyboard focus, not the old halo (P122)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await connectAndOpenGrid(page);
+
+  await focusViaTabFrom(page, 'toolbar-add-row', 'toolbar-search');
+  await expectFocusRing(page.locator('[data-testid="toolbar-search"]'));
+});
+
+// P122 §6.2/U1: a raw <button> (SettingsShell.vue's own section nav) carried no outline utility at
+// all, so it fell back to the browser's own UA focus ring (WebKit: outline: auto 5px
+// -webkit-focus-ring-color) -- now painted by the same shared base rule, no template edit needed.
+test('a raw <button> with no outline utility renders the shared 1px focus ring (P122)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch();
+  await page.click('[data-testid="open-settings"]');
+  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
+
+  // Reka UI's own dialog auto-focus lands on the content itself, so the first Tab already reaches
+  // the section nav's first button -- no anchor to click first.
+  await focusViaTabFrom(page, null, 'settings-section-Appearance');
+  await expectFocusRing(page.locator('[data-testid="settings-section-Appearance"]'));
 });
