@@ -10,24 +10,26 @@ import { provide } from 'vue'
 
 type ToggleGroupVariants = VariantProps<typeof toggleVariants>
 
-const props = withDefaults(defineProps<ToggleGroupRootProps & {
+const props = defineProps<ToggleGroupRootProps & {
   class?: HTMLAttributes['class']
   variant?: ToggleGroupVariants['variant']
   size?: ToggleGroupVariants['size']
   spacing?: number
-}>(), {
-  spacing: 0,
-})
+}>()
 
 const emits = defineEmits<ToggleGroupRootEmits>()
+
+// Outline groups stay connected (K1 KuiSegmented precedent); default-variant
+// groups become separate chips 2px apart (TabStrip's own gap-0.5).
+const resolvedSpacing = props.spacing ?? (props.variant === 'outline' ? 0 : 0.5)
 
 provide('toggleGroup', {
   variant: props.variant,
   size: props.size,
-  spacing: props.spacing,
+  spacing: resolvedSpacing,
 })
 
-const delegatedProps = reactiveOmit(props, 'class', 'size', 'variant')
+const delegatedProps = reactiveOmit(props, 'class', 'size', 'variant', 'spacing')
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
@@ -37,12 +39,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     data-slot="toggle-group"
     :data-size="size"
     :data-variant="variant"
-    :data-spacing="spacing"
+    :data-spacing="resolvedSpacing"
     :style="{
-      '--gap': spacing,
+      '--gap': resolvedSpacing,
     }"
     v-bind="forwarded"
-    :class="cn('rounded-kira data-[size=sm]:rounded-kira-sm group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch', props.class)"
+    :class="cn('rounded-kira-sm group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch', props.class)"
   >
     <slot v-bind="slotProps" />
   </ToggleGroupRoot>
