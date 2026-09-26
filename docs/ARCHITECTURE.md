@@ -2198,7 +2198,7 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **29** bound services under `apps/kira-studio/internal/bridge/`
+options, registering **28** bound services under `apps/kira-studio/internal/bridge/`
 (`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
@@ -2210,8 +2210,8 @@ module's (`HttpService` — P2: `Send`, the outbound HTTP path, see the op-log p
 Stack, above — `GrpcService` (P11), `CollectionsService` and `VariablesService` (P4/P5),
 `ResponseHistoryService` (P8), `GrpcHistoryService` (P11), `DataGripService`, P25's connection
 import); one Database MCP's (`DbMcpService`, M1); and three the terminal/agent surface's
-(`AgentHooksService`, `KeepAwakeService`, `TerminalService`, P83). `UpdateService`/`LinkService`
-(P66) round it out. **One used to be the git module's — `GitClientsService`, gone as of P100.** It
+(`AgentHooksService`, `KeepAwakeService`, `TerminalService`, P83). `UpdateService` (P66) rounds it
+out. **One used to be the git module's — `GitClientsService`, gone as of P100.** It
 was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
 the only bound service the headless git module had, since everything else it did crossed its own
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
@@ -3586,12 +3586,11 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 
 **As of P100, the next paragraph describes Kira Space's renderer, not Kira Studio's** —
 `packages/git-ui` moved there in full, and `apps/kira-studio/frontend` no longer depends on it at
-all. Kira Studio's own `LinkService`/`link.go` is still bound (`main.go`), but with no git-ui
-commit-body link left to open, it still has no live caller in Kira Studio's own frontend (Known
-open items, below). The `linkOpenExternal` wrapper this paragraph used to describe moved to the
-shared `packages/workbench/src/bridge/createCoreControl.ts` — Kira Space is its real, live caller
-now (`repo/git/hostHandlers.ts:433`), binding its own `apps/kira-space/internal/bridge/link.go`
-rather than reaching back into Kira Studio's copy.
+all. As of P120, `LinkService`/`link.go` is Kira Space's own too — Kira Studio's copy had no live
+caller (no git-ui commit-body link left to open) and is gone. The `linkOpenExternal` wrapper this
+paragraph used to describe lives in the shared `packages/workbench/src/bridge/createCoreControl.ts`
+— Kira Space is its only caller (`repo/git/hostHandlers.ts:433`), binding its own
+`apps/kira-space/internal/bridge/link.go`.
 
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
@@ -4107,16 +4106,6 @@ Performance:
   `review.comment.list` re-anchoring passes** (a server-side cost) — C13-12 fixed the diff-reload
   fan-out (C14-2 fixed a regression in that same split) but not the comment-reload fan-out.
 
-- **Kira Studio's own `LinkService`/`link.openExternal` bind has no live caller** (found during
-  P100 Part 4's docs sweep, still true). `packages/git-ui`'s commit-body link opening was the only
-  consumer; it moved to Kira Space with the rest of the git module. The `linkOpenExternal` wrapper
-  itself moved on to shared `packages/workbench/src/bridge/createCoreControl.ts` and is very much
-  live — just for Kira Space (`repo/git/hostHandlers.ts:433`, binding its own
-  `apps/kira-space/internal/bridge/link.go`), not Kira Studio. Kira Studio's own copy of the bind
-  (Go service, `main.go` registration) is still what has nothing calling it. Harmless — it is still a
-  well-formed, tested bound method, just unreachable from Kira Studio's own UI — and removing that
-  one app's now-unused bind is left for a future pass rather than attempted here, out of this phase's
-  own icon/docs/audit scope.
 - **`.github/workflows/pr.yml` still has no Kira Space coverage in what's actually live, and a
   staged fix for part of it sits unapplied.** As shipped, its `checks`/`container-tests` jobs run
   `bun run build:studio` (Kira Studio's frontend only), `go build ./...` (covers Kira Space's Go,
