@@ -228,10 +228,11 @@ historical prose.
 - **No package under either app's `internal/` needs a C compiler on Linux any more** (v1.9 P97
   removed `internal/codeparse`, this repo's one unconditionally-cgo package). Every remaining cgo
   call either app makes (a handful of darwin-only files in Kira Studio's own `internal/secrets`,
-  `internal/metrics`, `internal/localauth`, and Kira Space's own `internal/gitclient`'s FSEvents
-  watcher) is behind a `darwin && cgo` build tag with a real, working `!darwin || !cgo` companion,
-  invisible to a Linux build; `modernc.org/sqlite` (the sqlite adapter and each app's own storage)
-  stays cgo-free on every platform. `go test ./apps/kira-studio/internal/...` /
+  `internal/localauth`, repo-root `internal/metrics` (P116 H4: shared between both apps' own
+  metrics tickers), and Kira Space's own `internal/gitclient`'s FSEvents watcher) is behind a
+  `darwin && cgo` build tag with a real, working `!darwin || !cgo` companion, invisible to a Linux
+  build; `modernc.org/sqlite` (the sqlite adapter and each app's own storage) stays cgo-free on
+  every platform. `go test ./apps/kira-studio/internal/...` /
   `go build ./apps/kira-studio/internal/...` (and the `apps/kira-space` equivalents) need no C
   compiler in this container as a result. Only each app's own `main` package imports Wails and
   needs the GTK/WebKit headers, so prefer `./apps/kira-studio/internal/...` or

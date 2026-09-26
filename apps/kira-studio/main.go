@@ -32,7 +32,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
@@ -42,6 +41,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -328,11 +328,7 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 		slog.Warn("reclaim freed pages", "scope", "startup", "err", err)
 	}
 
-	processSet := metrics.NewCachedPIDs(
-		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
-		metrics.RescanEvery,
-	)
-	metricsTicker := metrics.NewTicker(processSet.PIDs, metrics.Interval)
+	metricsTicker := metrics.NewAppTicker("Kira Studio")
 	metricsTicker.Start()
 
 	return adaptersWired{

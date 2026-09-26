@@ -8,6 +8,9 @@
 #   - F4: neither job builds Kira Space's frontend, so both apps' `//go:embed all:frontend/dist`
 #     never compile in CI (checks' own `go build ./...`, container-tests' `go test ./...`) — a
 #     `bun run build:space` step now sits beside every `build:studio` step in both jobs.
+# P116 H4 — the darwin-only `go test` list still names apps/kira-studio/internal/metrics, which
+#   this phase moved to repo-root internal/metrics (Kira Space's own metrics ticker needs it too) —
+#   retargeted, same fix shape as P108 Part 2's F3 above.
 # Apply with `git apply docs/pending-changes/.github__workflows__pr.yml.patch` then delete this file.
 
 diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
@@ -40,9 +43,10 @@ index 02dc277..2d58b04 100644
        - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
          run: go build ./...
        - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
-@@ -58,7 +66,7 @@
+@@ -58,8 +66,8 @@
              ./apps/kira-studio/internal/secrets/... \
-             ./apps/kira-studio/internal/metrics/... \
+-            ./apps/kira-studio/internal/metrics/... \
++            ./internal/metrics/... \
              ./apps/kira-studio/internal/localauth/... \
 -            ./apps/kira-studio/internal/gitclient \
 +            ./apps/kira-space/internal/gitclient \

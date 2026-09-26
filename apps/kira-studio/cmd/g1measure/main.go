@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
+	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -25,7 +25,10 @@ func main() {
 	var anchorFlag, helperFlag string
 	var samples int
 	var intervalSec int
-	flag.StringVar(&anchorFlag, "anchor", strings.Join(metrics.AnchorNeedles, ","),
+	// "Kira Studio" is this app's own shipping executable name (apps/kira-studio/Taskfile.yml's
+	// APP_NAME) — P116 H4 moved the shared AppProcessSet/HelperNeedles machinery to repo-root
+	// internal/metrics, which no longer carries a Studio-specific anchor default of its own.
+	flag.StringVar(&anchorFlag, "anchor", "Kira Studio",
 		"comma-separated executable-path substrings identifying this app's own executable (the Go binary)")
 	flag.StringVar(&helperFlag, "helper", strings.Join(metrics.HelperNeedles, ","),
 		"comma-separated executable-path substrings identifying native-webview helper processes — filtered to this app's own on darwin, see AppProcessSet")

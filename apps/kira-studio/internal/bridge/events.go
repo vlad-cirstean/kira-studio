@@ -3,9 +3,9 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/metrics"
 )
 
 // Channel holds today's exact IPC channel strings (packages/shared/protocol/ipc.ts's IPC const), which

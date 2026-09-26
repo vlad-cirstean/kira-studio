@@ -8,18 +8,12 @@ import (
 	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
-// AnchorNeedles/HelperNeedles are AppProcessSet's own needles, given one home both main.go's
-// metrics ticker and cmd/g1measure's flag defaults read instead of each duplicating them as
-// string literals (P52 §15: a bad needle match was one of the three real bugs found getting G1
-// measured).
-var (
-	// "Kira Studio" is the shipping executable name (P57 D11: apps/kira-studio/Taskfile.yml's APP_NAME,
-	// matched here since AppProcessSet finds this app's own process by executable path substring,
-	// not by pid tree — see sampler.go's header comment). P58f: no vendored Node child needle any
-	// more — every adapter is served in-process by this binary.
-	AnchorNeedles = []string{"Kira Studio"}
-	HelperNeedles = []string{"com.apple.WebKit", "webkitgtk", "bwrap"}
-)
+// HelperNeedles is AppProcessSet's own second needle set — the native-webview helper processes
+// macOS itself attributes to one of a running app's own executables (P58f: no vendored Node child
+// needle any more — every adapter is served in-process by the app's own binary). Shared by every
+// app's own metrics ticker; the anchor needle (the app's own executable name) is not shared — see
+// NewAppTicker.
+var HelperNeedles = []string{"com.apple.WebKit", "webkitgtk", "bwrap"}
 
 const Interval = 5 * time.Second
 
@@ -59,7 +53,8 @@ type Ticker struct {
 }
 
 // NewTicker takes a pid-discovery function, exactly as NewSampler does — the caller decides how
-// the process set is found (AppProcessSet(AnchorNeedles, HelperNeedles), in production).
+// the process set is found (AppProcessSet([]string{appName}, HelperNeedles), in production —
+// NewAppTicker below does exactly that).
 func NewTicker(pids func() ([]int32, map[int32]procSample, error), interval time.Duration) *Ticker {
 	return &Ticker{
 		sampler:  NewSampler(pids),
@@ -67,6 +62,19 @@ func NewTicker(pids func() ([]int32, map[int32]procSample, error), interval time
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),
 	}
+}
+
+// NewAppTicker builds a Ticker sampling appName's own process set — CachedPIDs + AppProcessSet +
+// NewTicker wired together the same way every app's own main.go used to duplicate inline (P116
+// H4). appName is the anchor needle: the app's own shipping executable name (its own
+// Taskfile.yml's APP_NAME), matched since AppProcessSet finds an app's own process by executable
+// path substring, not by pid tree — see sampler.go's header comment. Call Start() on the result.
+func NewAppTicker(appName string) *Ticker {
+	processSet := NewCachedPIDs(
+		func() ([]int32, error) { return AppProcessSet([]string{appName}, HelperNeedles) },
+		RescanEvery,
+	)
+	return NewTicker(processSet.PIDs, Interval)
 }
 
 // OnSample registers fn for every sample. It returns an unsubscribe func.
