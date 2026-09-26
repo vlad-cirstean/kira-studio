@@ -42,7 +42,7 @@ function stepBy(dir: 1 | -1): void {
         type="number"
         :model-value="props.modelValue"
         v-bind="attrs"
-        :class="cn('h-full font-data', props.inputClass)"
+        :class="cn('h-full font-data [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none', props.inputClass)"
       />
       <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
         <Tooltip>
