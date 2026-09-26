@@ -1,6 +1,9 @@
 package bridge
 
-import "github.com/kirathecat/kira-studio/internal/appevent"
+import (
+	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/metrics"
+)
 
 // ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
 // groups, delivered with EmitTo (one window only). P103 Part 3: byte-identical to Kira Studio's
@@ -51,13 +54,23 @@ const (
 
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
 // Studio's own bridge.Events (internal/bridge/events.go), trimmed: this app has no
-// Connections/Oplog/Metrics/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely
-// from the embedded *appevent.Events core (P103 Part 3) — this app has no per-service wrapper
-// method that needs a raw Emit of its own, unlike Kira Studio's SettingsChanged.
+// Connections/Oplog/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely from the
+// embedded *appevent.Events core (P103 Part 3); emit is kept alongside it for AttachMetrics below
+// (P116 G7), the one raw-Emit producer this app has.
 type Events struct {
 	*appevent.Events
+	emit appevent.Emitter
 }
 
 func NewEvents(e appevent.Emitter) *Events {
-	return &Events{Events: appevent.NewEvents(e)}
+	return &Events{Events: appevent.NewEvents(e), emit: e}
+}
+
+// AttachMetrics subscribes m's own OnSample and forwards each sample to ChannelAppMetrics — Kira
+// Studio's own Events.Attach's Metrics producer (internal/bridge/events.go), the one producer this
+// app needs.
+func (ev *Events) AttachMetrics(m *metrics.Ticker) (detach func()) {
+	return m.OnSample(func(sample metrics.Sample) {
+		ev.emit.Emit(ChannelAppMetrics, sample)
+	})
 }

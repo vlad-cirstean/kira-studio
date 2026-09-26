@@ -2,12 +2,14 @@ import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as GitHubService from '@bindings/githubservice.js';
+import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
+import * as WindowsService from '@bindings/windowsservice.js';
 import type { HeadState } from '@kira/git-ipc';
 import type {
   GitClient,
@@ -38,11 +40,12 @@ import type { TabRecord } from '../state/tabDomain';
 // apiControl.ts equivalent: this app has exactly one bound-call surface, not two composed halves.
 // P103 Part 2 (§5.6): 20 of that surface's own methods — the ones byte-for-byte identical with
 // Kira Studio's own studioControl — now come from createCoreControl.ts, shared with Kira Studio's
-// own copy of this file; this app's own 24 remaining methods are defined right here.
+// own copy of this file; this app's own 24 remaining methods are defined right here. P116 H5 moved
+// ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
+// windowsOpenNew) into that same shared factory once this app grew its own window-chrome parity
+// (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
+// keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
 const spaceControl = {
-  // P100 Part 2: onAppMetrics (CHANNEL.appMetrics) is Kira Studio's own status-bar readout —
-  // this app has no adapterhost/metrics ticker (no database connections to sample), so it is not
-  // wired here. CHANNEL.appMetrics itself stays in the shared protocol constants for Studio's use.
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),
 
@@ -128,6 +131,8 @@ export const control = {
     terminal: TerminalService,
     files: FilesService,
     link: LinkService,
+    windows: WindowsService,
+    keepAwake: KeepAwakeService,
   }),
   ...spaceControl,
 };

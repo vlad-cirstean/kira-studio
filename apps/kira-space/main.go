@@ -25,7 +25,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
@@ -127,6 +129,22 @@ func main() {
 	// comment) — this app has no Claude Code hook-reporting toggle in scope.
 	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry()}
 
+	// keepAwakeCtl/keepAwakeSvc are P116 G5's own addition — the title bar's keep-awake toggle,
+	// Kira Studio's own titlebar half (internal/keepawake.Toggle, shared since H3) with no
+	// agent-aware reason of this app's own to layer on top.
+	keepAwakeCtl := keepawake.New(keepawake.NewPlatformDriver())
+	keepAwakeSvc := &bridge.KeepAwakeService{Emit: emitter, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
+
+	// windowsSvc is P116 G6's own addition — OpenNewWindow is assigned once `openNew` exists,
+	// below, the same two-step Kira Studio's own main.go uses (that closure needs `app`).
+	windowsSvc := &bridge.WindowsService{}
+
+	// metricsTicker is P116 G7's own addition — the status bar's CPU/memory readout, Kira Studio's
+	// own metrics.NewAppTicker wired to this app's own executable name.
+	metricsTicker := metrics.NewAppTicker("Kira Space")
+	metricsTicker.Start()
+	detachMetrics := events.AttachMetrics(metricsTicker)
+
 	// windows/closeFlush are P100 Part 2's own addition — Part 1 had no per-window flush to
 	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
 	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
@@ -134,9 +152,17 @@ func main() {
 	closeFlush := shell.NewCloseFlushCoordinator(events)
 
 	beforeFlush := sync.OnceFunc(func() {
+		// Kira Studio's own wireLifecycle: the ticker stops before the flush wait rather than after
+		// it (P56 D3).
+		metricsTicker.Stop()
 		windows.DetachAll()
 	})
 	teardown := sync.OnceFunc(func() {
+		detachMetrics()
+		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
+		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
+		// here since this app's own KeepAwakeService has no agent-reason recompute to also stop.
+		keepAwakeCtl.Close()
 		terminalSvc.Shutdown()
 		detachGitPush()
 		if err := gitSock.Close(); err != nil {
@@ -179,6 +205,8 @@ func main() {
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
+			application.NewService(keepAwakeSvc),
+			application.NewService(windowsSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -226,11 +254,17 @@ func main() {
 		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 	}
 	openNew := func() { shell.OpenNewWindow(winDeps) }
+	// windowsSvc.OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action
+	// the ⇧⌘N menu command below ties to.
+	windowsSvc.OpenNewWindow = openNew
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
+	// P116 G5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
+	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(keepAwakeSvc) })
 
+	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
-		AppName: "Kira Space", Template: appshell.BuildTemplate("Kira Space"),
-		Quit: quitter.RequestQuit, NewWindow: openNew,
+		AppName: "Kira Space", IsDev: isDev, Template: appshell.BuildTemplate("Kira Space", isDev),
+		OnEmit: events.Signal, Quit: quitter.RequestQuit, NewWindow: openNew,
 	}))
 
 	records, err := repositories.Windows.List()
