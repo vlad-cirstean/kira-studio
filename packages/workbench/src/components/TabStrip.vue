@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useEventListener } from '@vueuse/core';
@@ -222,18 +223,14 @@ useEventListener(stripRef, 'dragend', onDragEnd);
          never has a close button, so neither is wired here at all rather than guarded per-tab. -->
     <div
       v-if="pinnedTabs.length > 0"
-      class="h-full flex items-center gap-0.5 shrink-0 pt-0.5 pl-1"
+      class="h-full flex items-center gap-0.5 shrink-0 pl-1"
       data-testid="tab-strip-pinned"
     >
       <Tooltip v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
         <TooltipTrigger as-child>
           <button
             type="button"
-            class="h-control-lg inline-flex items-center gap-1 px-1 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm"
-            :class="[
-              tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
-              { 'is-active': tab.active },
-            ]"
+            :class="tabChipVariants({ active: tab.active, size: 'icon' })"
             data-testid="tab"
             :data-tab-id="tab.id"
             :data-tab-kind="tab.kind"
@@ -259,7 +256,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
     </div>
     <div
       ref="stripRef"
-      class="h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 scrollbar-none pt-0.5 px-1"
+      class="h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 scrollbar-none px-1"
       data-testid="tab-strip-row"
       @wheel="onWheel"
     >
@@ -270,14 +267,11 @@ useEventListener(stripRef, 'dragend', onDragEnd);
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        class="h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm group/tab"
+        class="group/tab"
         :class="[
-          tab.active ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
+          tabChipVariants({ active: tab.active }),
           isAttention(tab) ? ATTENTION_CLASS : '',
-          {
-            'is-active': tab.active,
-            'opacity-50': dragId === tab.id,
-          },
+          { 'opacity-50': dragId === tab.id },
         ]"
         data-testid="tab"
         :data-tab-id="tab.id"

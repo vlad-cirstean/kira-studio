@@ -68,7 +68,7 @@ function onNewTab(): void {
         <template #new-tab>
           <div
             v-if="showNewTab"
-            class="h-full flex items-center shrink-0 pt-0.5 pr-1 pl-0.5"
+            class="h-full flex items-center shrink-0 pr-1 pl-0.5"
             data-testid="tab-strip-actions"
           >
             <Tooltip>
