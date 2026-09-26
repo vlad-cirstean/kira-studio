@@ -58,8 +58,12 @@ type Options struct {
 // one each time the setting toggles on, mirroring internal/dbmcp.Server's own start/stop shape.
 type Server struct {
 	hooksPath string
-	shimPath  string
-	onEvent   func(Event)
+	// quotedHooksPath is hooksPath, single-quoted once here so Manager.ComposeLaunch has no error
+	// path of its own (§2.1's own design note): hooks.json shares ln.Dir with the shim, whose
+	// quoting New already succeeds on above, so quoting this path can never fail either.
+	quotedHooksPath string
+	shimPath        string
+	onEvent         func(Event)
 
 	ln   *localsock.Listener
 	http *http.Server
@@ -93,7 +97,7 @@ func New(opts Options) (*Server, error) {
 		return nil, fmt.Errorf("agenthooks: write shim: %w", err)
 	}
 
-	quotedShim, err := ShellSingleQuote(shimPath)
+	quotedShim, err := shellSingleQuote(shimPath)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
@@ -108,9 +112,14 @@ func New(opts Options) (*Server, error) {
 		_ = ln.Close()
 		return nil, fmt.Errorf("agenthooks: write hooks.json: %w", err)
 	}
+	quotedHooksPath, err := shellSingleQuote(hooksPath)
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
 
 	s := &Server{
-		hooksPath: hooksPath, shimPath: shimPath,
+		hooksPath: hooksPath, quotedHooksPath: quotedHooksPath, shimPath: shimPath,
 		onEvent: opts.OnEvent,
 		ln:      ln,
 	}

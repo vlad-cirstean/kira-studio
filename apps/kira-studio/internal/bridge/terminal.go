@@ -2,10 +2,8 @@ package bridge
 
 import (
 	"errors"
-	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
@@ -147,15 +145,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	// `claude`, byte for byte (§2.1).
 	command, env := args.Command, []string(nil)
 	if agent && s.AgentHooks != nil {
-		if path, hookEnv, ok := s.AgentHooks.launchFor(args.TerminalID); ok {
-			quoted, err := agenthooks.ShellSingleQuote(path)
-			if err != nil {
-				slog.Warn("terminal: quote agent hooks settings path", "scope", "terminal", "err", err)
-			} else {
-				command += " --settings " + quoted
-				env = hookEnv
-			}
-		}
+		command, env = s.AgentHooks.composeLaunch(args.TerminalID, command)
 	}
 
 	sess, err := s.svc().OpenWithCoalescedOutput(terminal.OpenParams{

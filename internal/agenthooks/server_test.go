@@ -223,16 +223,16 @@ func TestCloseRemovesDirectoryAndSocket(t *testing.T) {
 }
 
 // TestShellSingleQuoteRefusesUnquotable is config.go's own non-HTTP case (§19.2's closing note):
-// ShellSingleQuote refuses a path holding a single quote or a newline, a hard error rather than a
+// shellSingleQuote refuses a path holding a single quote or a newline, a hard error rather than a
 // best-effort escape.
 func TestShellSingleQuoteRefusesUnquotable(t *testing.T) {
-	if _, err := ShellSingleQuote("/tmp/kira-agent-abc/hook"); err != nil {
+	if _, err := shellSingleQuote("/tmp/kira-agent-abc/hook"); err != nil {
 		t.Fatalf("ordinary path should not be refused: %v", err)
 	}
-	if _, err := ShellSingleQuote("/tmp/kira-agent-'abc/hook"); err == nil {
+	if _, err := shellSingleQuote("/tmp/kira-agent-'abc/hook"); err == nil {
 		t.Fatalf("a path with a single quote should be refused")
 	}
-	if _, err := ShellSingleQuote("/tmp/kira-agent-\nabc/hook"); err == nil {
+	if _, err := shellSingleQuote("/tmp/kira-agent-\nabc/hook"); err == nil {
 		t.Fatalf("a path with a newline should be refused")
 	}
 }
