@@ -143,3 +143,197 @@ rather than implied as verified, per the plan's own instruction for exactly this
 
 **Known open item, not this phase's to close.** The shared package is unwired from every app until
 P129 wires it into Kira Space's `ade` module.
+
+## P128 result
+
+Plan: `docs/v2.0/plans/P128-space-module-system-shared-terminal.md`. One Opus planning pass, one
+sequential Sonnet implementer, no stream split (the plan's own §3: steps regenerate bindings later
+steps typecheck against, no zero-overlap ownership table). 13 commits, `3be4969e`..`74b27231`, plus
+this result commit (`git log --oneline 195815f2..HEAD`); `f18900cb` (the plan doc) lands first,
+outside the count below.
+
+**Commits, in the plan's own §4 order, plus three unplanned fixups:**
+
+1. `3be4969e` — `refactor(terminal): one shared bound terminal surface`. `internal/terminal/bound.go`
+   (§2.1); both `bridge/terminal.go` to embedding-only; `OpenArgs` gains json tags and becomes the
+   wire type directly. FQN gate confirmed (below).
+2. `69bd15b1` — `refactor(storage): hoist window mode read/write to appstorage`. `WindowModes`,
+   `GetMode`, `SetMode` land in `internal/appstorage/window.go`; Studio's model/repo delegate,
+   behaviour unchanged.
+3. `f816e3f5` — `refactor(windows): one shared bound windows surface; Kira Space persists per-window
+   mode`. `internal/windowsvc`, both `bridge/windows.go` to embedding, Space migration `0003` (no
+   new test — an `ALTER TABLE` default, covered by Studio's existing migration-pattern test), both
+   `main.go`.
+4. `617e5032` — `refactor(workbench): shared mode registry, store and switcher`. §2.3 files land in
+   `packages/workbench`; Studio's `state/mode.ts` onto the factory, `TitleBar.vue` renders
+   `ModeSwitcher`.
+5. `790f3b39` — `refactor(workbench): shared terminal module`. §2.4 files; `git mv` of Studio's
+   panel/start into the shared package; Studio's `terminal/`, `views/terminal/TerminalView.vue`
+   deleted.
+6. `f6df8e24` — `feat(space): module registry with the git module`. §2.6: `state/mode.ts`,
+   `workbench/modes.ts` (git only), `GitNewTab.vue`, `visibleWorkspace()`, `host.ts`/`tabs.ts` read
+   it. **Unplanned, same commit:** `createModeStore.ts`'s default type parameter changed from
+   `Record<string, never>` to `Record<never, never>` — a real TypeScript bug the plan's own factory
+   design didn't anticipate: spreading an `E` with a `[key: string]: never` index signature last in
+   the store's return object literal resolved every key (`hydrateMode`, `setMode`, `active`
+   included) to `never`, breaking every reader. Needed for Kira Space's call (the first with nothing
+   to `extend`) to compile at all; doc comment on the type parameter records why.
+7. `cd5246eb` — `feat(space): register the shared terminal module`. `workbench/terminalModule.ts`
+   (no `scripts`), `App.vue` provides it, `MODES.terminal`, `tabViews.ts` to `TerminalTabView`;
+   `views/repo/RepoTerminalView.vue` deleted.
+8. `c2c4873a` — `feat(space): ade module placeholder`. §2.7: `AdePanel.vue`/`AdeStart.vue`, no Go,
+   no store, no bridge.
+9. `3f8addd9` — `test(space): module switching`. §5.2's `modules.spec.ts`, 3 tests.
+10. `3a089c0b` — `docs: ARCHITECTURE records the shared module system and terminal module (P128)`.
+    §4.2's five bullets, plus two pre-existing staleness fixes found while writing it (below).
+11. `44757c34` — **unplanned fixup**, found running the closing audit's `rg -l 'TerminalHostView'
+    apps` (expected empty): one comment in `repo-workspace.spec.ts` named the shared component and
+    the already-deleted `RepoTerminalView.vue` directly. Reworded generically, no behavior change.
+12. `74b27231` — **unplanned fixup**, found running `bun run lint:dead`: both apps' `TerminalTabRecord`
+    (`state/tabDomain.ts`) went unused the moment `TerminalTabView.vue` (step 5/7) started typing its
+    `tab` prop against `TerminalHostView`'s own shape instead (plan §2.4's own reasoning) — the type's
+    only reader in each app was the now-deleted `TerminalView.vue`/`RepoTerminalView.vue`. Removed in
+    both apps; `lint:dead` clean again.
+13. This result commit.
+
+**What landed**, matching the plan's own §1/§2 scope. `packages/workbench` now carries the whole
+mode system (`modes.ts`, `state/createModeStore.ts`, `components/{ModeSwitcher,
+TabStripNewButton}.vue`) and the whole terminal module (`terminal/{module.ts, TerminalPanel,
+TerminalStart, TerminalNewTab, TerminalTabView}.vue`, beside the already-shared
+`TerminalHostView.vue`). Repo-root `internal/terminal.BoundService` and `internal/windowsvc.Service`
+carry the one bound method set each; both apps' `bridge.{Terminal,Windows}Service` are one-line
+embeddings, keeping each app's own FQN (§1.7's promoted-method rule, confirmed live by the FQN gate
+below). Kira Space has three registered modules — `git` (the existing workspace, unchanged
+behavior), `terminal` (the same five shared components Studio uses, no `scripts` seam), `ade` (a
+placeholder, no functionality) — a persisted per-window mode (`windows.mode`, migration `0003`), and
+`visibleWorkspace()` as the one function reading across the mode and workspace stores.
+`openRepoWorkspace` forces the mode to `git`; `activateWorkspace` deliberately does not (deviation
+from the plan's own §2.6 wording, disclosed below). Kira Studio's own terminal module is
+byte-identical in rendered behavior; its custom-scripts coupling is now the optional `scripts` seam
+on `TerminalModuleContext`, injected only by Studio's own `workbench/terminalModule.ts`.
+
+**Deviations from the plan, disclosed:**
+
+- **`state/modeDomain.ts` (Kira Space), a leaf file not named in the plan's own §4.1 inventory.**
+  `SpaceMode` moved into its own zero-import file rather than living directly in `state/mode.ts`,
+  mirroring `tabDomain.ts`/`settingsDomain.ts`'s existing precedent and Kira Studio's own
+  `@shared/domain/mode.ts` header comment for `AppMode` — needed because `bridge/index.ts`'s
+  `createCoreControl<…, SpaceMode>` call needs the type without importing `state/mode.ts` itself
+  (which imports `control` from `bridge/index.ts`). Same shape the plan's own inventory would have
+  named had it gone one file deeper; every non-bridge importer keeps reading `SpaceMode` from
+  `state/mode.ts` unchanged via its re-export.
+- **`openRepoWorkspace` forces the mode to `git`; `activateWorkspace` does not.** The plan's own
+  §2.6 text reads "`openRepoWorkspace`/`activateWorkspace` switch mode to `git`" — both. The
+  implementation (see `state/workspace.ts`'s own comment on `openRepoWorkspace`) deliberately
+  narrows this to `openRepoWorkspace` alone: `activateWorkspace`'s own callers are already
+  git-mode-only UI (`GitPanel`'s row click, `closeRepoWorkspace`'s own fallback) or the boot-time
+  fall-forward onto the first restored repo (`main.ts`), which must honour whatever mode
+  `windowsEnsure` persisted rather than silently overriding it back to `git` on every relaunch.
+  Widening `activateWorkspace` itself to force `git` would make a relaunch into a persisted
+  `terminal`/`ade` mode snap back to `git` the moment a restored repo activates — the opposite of
+  what per-window mode persistence (§2.2) is for. Covered by `modules.spec.ts`'s round-trip test
+  (switch to `terminal`, open a tab, switch back to `git` — the repo's own tabs return without a
+  forced mode change on the way).
+- **`createModeStore`'s call signature is positional `(control, defaultMode, extend)`, `extend`
+  required**, not the plan's own sketched `{control, defaultMode, extend?}` options object with
+  `extend` optional. `extend` stays required even for a caller with nothing to add (Kira Space
+  passes `() => ({})`) because leaving it optional/uninferred broke Pinia's own action/state
+  extraction for the whole store — same constraint `createKeepAwakeStore.ts`'s own existing pattern
+  already worked around, cited directly in the new file's doc comment. The `Record<string, never>`
+  → `Record<never, never>` default-type-parameter fix (commit 6, above) is the other half of making
+  this shape actually sound.
+- **The saved `P128_START` FQN snapshot (`terminal_fqn_before.txt`/`windows_fqn_before.txt`,
+  taken before step 1 per the plan's own §4 instruction) came back empty** — found this session,
+  cause not established (bindings are gitignored build output; the capture likely ran before a
+  generate step, or the command silently produced nothing). Reconstructed the same comparison a
+  different way instead of skipping it: checked out `f18900cb` (`P127` landed, plan committed, no
+  code touched yet) in a throwaway worktree and diffed the **Go source's own bound-method receivers**
+  against today's — Wails' FQN is `package path + type + promoted method name` (plan §1.7's own
+  citation of the generator/runtime source), so a source-level diff proves the same fact the
+  generated-bindings diff would have. Result: Studio's `TerminalService`
+  (`Shutdown`/`DefaultCwd`/`Open`/`Write`/`Resize`/`Close`) and Space's own copy are byte-identical
+  before and after; Studio's `WindowsService` (`Ensure`/`SetMode`/`OpenNew`) is unchanged; Space's
+  `WindowsService` had only `OpenNew` before and has `Ensure`/`OpenNew`/`SetMode` now — exactly the
+  plan's own predicted "Windows: Space adds `Ensure`, `SetMode`; nothing else changes." Current
+  generated bindings (`rg -o 'ByName\("[^"]+'` on both apps' `terminalservice.ts`/`windowsservice.ts`)
+  confirm the same six/three method sets land in the actual FQNs.
+
+**Closing audit (plan §6), final state, all 12 checks:**
+
+| Check | Result |
+|---|---|
+| Studio terminal module gone from the app | `apps/kira-studio/frontend/src/terminal`, `.../views/terminal`, `apps/kira-space/frontend/src/views/repo/RepoTerminalView.vue` all absent |
+| One terminal tab view | Empty on re-run. First pass hit one comment in `repo-workspace.spec.ts` naming `TerminalHostView` directly; fixed in commit 11 above |
+| No per-app terminal/windows bound methods | Empty |
+| Per-app bridge files embedding only | `terminal.go`/`windows.go`: empty diff for both, each file one struct embedding one field |
+| Mode SQL in one place | `internal/appstorage/window.go` (`GetMode`/`SetMode`) plus Studio's `List` column list (`SELECT key, "order", bounds_json, mode`, not matched by the check's own literal grep but confirmed present, exactly as the plan predicted); test files' own literal SQL strings are assertions, not a second implementation |
+| No app-side mode plumbing | Empty |
+| No per-module branches | Two hits, both expected: a comment stating no such branch exists, and `visibleWorkspace()`'s own single `git`-mode check — the plan's own named exception ("the one reader that sees module keys") |
+| `ade` isolated | `workbench/modes.ts` only |
+| Shared TS code imports no app | Empty |
+| Shared Go imports no app | Empty |
+| Scripts only behind the seam | Empty |
+| Existing specs untouched | Empty for Studio. Space: `modules.spec.ts` new (expected); `repo-workspace.spec.ts` comment-only (`git diff -U0 … \| rg '^[+-][^+-]' \| rg -v '^[+-]\s*//'` empty) |
+| Stale biome override | Empty |
+
+**Verification (plan §5), run once near phase end, against the phase's own final commit:**
+
+- `go build ./...`, `go vet ./...` — clean.
+- `bun run lint:go` — 0 issues.
+- `go test ./internal/terminal/ ./internal/appstorage/ ./internal/windowsvc/
+  ./apps/kira-studio/internal/... ./apps/kira-space/internal/...` — all pass, both `layering_test.go`
+  packages included (`git diff --stat` against them empty — exemption sets unchanged).
+- FQN gate — confirmed via source-level reconstruction, not the literal saved-file diff; see the
+  deviations note above for method.
+- `bun run typecheck`, `bun run lint` — clean.
+- `bun run lint:dead` — clean after commit 12 above (the phase's own `TerminalTabRecord` regression,
+  found and fixed same-phase); 7 pre-existing duplicate-export findings remain, none in a file this
+  phase touched (same 7 P127's own result documented).
+- `bun run build:studio`, `bun run build:space` — clean; both apps' `TerminalPanel-*.js` chunk still
+  splits on its own (the plan's own §7 chunking risk, confirmed not triggered).
+- `bun run test:unit` — 1662 pass, 0 fail — unchanged from P127's own baseline.
+- `bun run test:ui:studio` — 299 tests total, matching P127's own baseline exactly; no spec file
+  edited. One full-parallel run hit 3 failures plus 4 not-run in `data-view.spec.ts`/
+  `sql-schema.spec.ts` (neither touched by this phase — `git diff --stat` against them empty); all
+  13 of those tests passed cleanly re-run together in isolation. Same cross-file worker-contention
+  flake class this sandbox's own history documents extensively (`docs/v1.9/SPEC.md`, P117/P127's own
+  results) — not a regression.
+- `bun run test:ui:space` — 37/37 (34 baseline + the 3 new `modules.spec.ts` tests). One
+  full-parallel run flaked once on `repo-workspace.spec.ts`'s own pre-existing search test (unrelated
+  subsystem, untouched by this phase); passed 3/3 repeated in isolation and 37/37 with `--workers=1`
+  — the same worker-contention class, confirmed directly this time by removing the contention.
+- `bun run test:ipc:fe:studio` — 7/7 pass, unchanged.
+- `bun run test:visual:studio` — 14/14 pass, no re-record needed: `ModeSwitcher`/
+  `TabStripNewButton` render Studio's exact prior markup, confirming the plan's own §5.1
+  byte-identical-markup claim.
+- `bun run test:visual:space` — 4/4 pass, unchanged (Settings-only coverage, untouched by this
+  phase).
+
+**§5.3 live run: not checked.** No Wails runtime or display in this sandbox — stated plainly here
+rather than implied as verified, per the plan's own instruction for exactly this case.
+
+**Pre-existing staleness found and fixed while documenting this phase (`docs/ARCHITECTURE.md`,
+commit 10), not caused by it:** Kira Space's bound-service count was documented as **10**; the real
+count (`grep -c application.NewService apps/kira-space/main.go`) is **13**, and was already 13
+before this phase touched `main.go` — P116 G6 had already added `WindowsService` without the doc
+being updated; P128 added zero new services, only two new methods to an existing one. Corrected in
+place. Separately: the per-window mode persistence mechanism (P22) and the entire Terminal module
+(P83/P91) had no prior documentation anywhere in the file — confirmed by exhaustive grep for their
+own identifiers before writing commit 10's new paragraphs, which fill both gaps as part of
+documenting this phase's own changes to the same mechanisms.
+
+**Known open item, not this phase's to close, carried from P127.** The shared agent-monitoring
+package P127 extracted is still unwired from Kira Space's UI; P129 wires it into the `ade` module
+this phase only placeholders.
+
+**Candidate follow-up, found during this phase's regression testing, out of this phase's scope.**
+`apps/kira-studio/tests/ui/api-secret-reveal-isolation.spec.ts:63` ("a secret revealed via Copy as
+curl does not skip re-auth in the later-opened Variables dialog") failed intermittently
+(`locator.uncheck: Clicking the checkbox did not change its state`) in earlier runs during this
+phase's work, in a subsystem (the Api client's Variables dialog secret-reveal UI) this phase never
+touches. Confirmed via `git stash` against the pre-phase base commit that it reproduces identically
+with none of this phase's changes applied, and via `--repeat-each=3` that it fails roughly 2 times in
+3 — a real, pre-existing flake, not a one-off. Per `CLAUDE.md`'s own exception clause (root-causing
+this belongs to a different subsystem, not a design decision this phase can make), left unfixed here
+and named as a candidate for its own follow-up `P` phase rather than folded into this result section
+as a footnote.
