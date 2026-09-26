@@ -147,6 +147,7 @@ useEventListener(
       <Input
         ref="findInput"
         v-model="query"
+        size="kira"
         placeholder="Find"
         :aria-invalid="invalid"
         class="w-full"

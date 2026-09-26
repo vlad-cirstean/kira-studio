@@ -151,6 +151,7 @@ const disableCookieJarId = useId();
       <Input
         :id="requestTimeoutMsId"
         type="number"
+        size="kira"
         :min="REQUEST_TIMEOUT_MS_RANGE.min"
         :max="REQUEST_TIMEOUT_MS_RANGE.max"
         :disabled="settings.requestTimeoutMs === null"
@@ -180,6 +181,7 @@ const disableCookieJarId = useId();
       <Input
         :id="maxResponseMbId"
         type="number"
+        size="kira"
         :min="MAX_RESPONSE_MB_RANGE.min"
         :max="MAX_RESPONSE_MB_RANGE.max"
         :disabled="settings.maxResponseMb === null"
@@ -261,6 +263,7 @@ const disableCookieJarId = useId();
       <Input
         :id="maxRedirectsId"
         type="number"
+        size="kira"
         :min="MAX_REDIRECTS_RANGE.min"
         :max="MAX_REDIRECTS_RANGE.max"
         :disabled="settings.maxRedirects === null || !effectiveFollowRedirects"

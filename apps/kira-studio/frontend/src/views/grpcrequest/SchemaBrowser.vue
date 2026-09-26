@@ -125,6 +125,7 @@ function selectMethod(service: string, method: string): void {
       </ToggleGroup>
       <template v-if="tab.state.descriptorMode === 'reflection'">
         <Input
+          size="kira"
           :model-value="tab.state.target"
           placeholder="api.example.com:443"
           class="flex-1"
@@ -134,6 +135,7 @@ function selectMethod(service: string, method: string): void {
       </template>
       <template v-else>
         <Input
+          size="kira"
           :model-value="tab.state.protoPath"
           placeholder="No .proto file chosen"
           readonly
@@ -182,6 +184,7 @@ function selectMethod(service: string, method: string): void {
       <div class="flex items-center gap-1">
         <Input
           v-model="newImportPath"
+          size="kira"
           placeholder="Add an import path…"
           data-testid="grpc-new-import-path"
           @keydown.enter="addImportPath"

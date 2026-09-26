@@ -331,6 +331,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="23"
+        size="kira"
         class="w-14"
         data-testid="datetime-picker-hour"
       />
@@ -340,6 +341,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="59"
+        size="kira"
         class="w-14"
         data-testid="datetime-picker-minute"
       />
@@ -349,6 +351,7 @@ const secondText = computed<string>({
         type="number"
         min="0"
         max="59"
+        size="kira"
         class="w-14"
         data-testid="datetime-picker-second"
       />

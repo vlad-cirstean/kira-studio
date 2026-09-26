@@ -134,6 +134,7 @@ watch(calendarOpen, (open) => {
               <Input
                 :model-value="fieldText"
                 :disabled="readOnly"
+                size="kira"
                 class="w-full"
                 data-testid="cell-editor-timestamp-field"
                 @update:model-value="onFieldInput(String($event))"

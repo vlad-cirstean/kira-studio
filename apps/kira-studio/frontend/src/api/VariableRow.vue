@@ -165,6 +165,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
     </span>
     <div class="flex min-w-0 items-center gap-1 name-cell">
       <Input
+        size="kira"
         :model-value="row.name"
         placeholder="name"
         data-testid="variable-name"
@@ -180,6 +181,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
       <span v-if="notYetRevealed()" class="flex-1 text-subtle tracking-widest" data-testid="variable-value-masked">••••••••</span>
       <Input
         v-else
+        size="kira"
         :type="row.isSecret && !visible ? 'password' : 'text'"
         :model-value="row.value"
         placeholder="value"
@@ -199,6 +201,7 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
     </div>
     <div class="flex min-w-0 items-center gap-1 description-cell">
       <Input
+        size="kira"
         :model-value="row.description"
         placeholder="description"
         data-testid="variable-description"

@@ -870,9 +870,10 @@ onUnmounted(() => {
             <PopoverContent align="start" class="w-80" data-testid="keyvalue-add-popover">
               <div class="flex flex-col gap-1.5 p-1.5">
                 <div class="p-0 text-kira-sm text-muted-foreground">Add key (string value)</div>
-                <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
+                <Input v-model="addName" size="kira-lg" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
                 <Input
                   v-model="addValue"
+                  size="kira-lg"
                   placeholder="Initial value"
                   class="w-full"
                   data-testid="keyvalue-add-value"
@@ -914,6 +915,7 @@ onUnmounted(() => {
                 <div class="p-0 text-kira-sm text-muted-foreground">Edit value</div>
                 <Input
                   v-model="editDraft"
+                  size="kira-lg"
                   class="w-full"
                   data-testid="keyvalue-edit-input"
                   @keydown.enter="saveEdit"
