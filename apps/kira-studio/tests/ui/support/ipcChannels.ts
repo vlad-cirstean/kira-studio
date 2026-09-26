@@ -144,7 +144,8 @@ export const IPC = {
   dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
 
   updateStatus: 'kira:update:status',
-  updateOpenReleasePage: 'kira:update:openReleasePage',
+  updateInstall: 'kira:update:install',
+  updateCancelInstall: 'kira:update:cancelInstall',
 
   codeWorkspaceListRepos: 'kira:codeWorkspace:listRepos',
   codeWorkspaceImportRepo: 'kira:codeWorkspace:importRepo',

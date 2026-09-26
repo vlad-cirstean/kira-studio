@@ -1,6 +1,6 @@
 // The test-owned fixture-key namespace this tier mocks against (Kira Studio's own
 // tests/ui/support/ipcChannels.ts, ported and trimmed to this app's own bound surface —
-// bridge/index.ts's own `control` object, apps/kira-space/main.go's 12 services). Nothing under
+// bridge/index.ts's own `control` object, apps/kira-space/main.go's 13 services). Nothing under
 // apps/kira-space/frontend/src imports this: the real wire protocol is the generated Wails
 // bindings under apps/kira-space/frontend/bindings/. See mockRuntime.ts's CHANNEL_TO_FQN for the
 // other half of this mapping.
@@ -35,6 +35,11 @@ export const IPC = {
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',
   appMetrics: 'kira:app:metrics',
+
+  // P119: Kira Studio's own three update channels — same values as its own ipcChannels.ts.
+  updateStatus: 'kira:update:status',
+  updateInstall: 'kira:update:install',
+  updateCancelInstall: 'kira:update:cancelInstall',
 
   gitClientsList: 'kira:git:clients:list',
   gitClientsRevoke: 'kira:git:clients:revoke',

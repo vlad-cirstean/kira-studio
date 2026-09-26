@@ -16,7 +16,7 @@ export type { ControlLogEntry, ControlMockHandle } from '@workbench/testing/ui/m
 
 // The real Wails runtime, served under /wails/ — Kira Studio's own tests/ui/support/mockRuntime.ts,
 // ported and trimmed to this app's own bound surface (bridge/index.ts's `control` object,
-// apps/kira-space/main.go's 12 services). See @workbench/testing/ui/mockRuntime's own header for
+// apps/kira-space/main.go's 13 services). See @workbench/testing/ui/mockRuntime's own header for
 // why this is the real runtime.js bundle, not a hand-rolled stand-in, and why `go list` resolves
 // its path rather than a hand-written GOPATH-shaped one.
 const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../'));
@@ -68,6 +68,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   windowsOpenNew: 'WindowsService.OpenNew',
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
+
+  // P119: the in-app update dialog's three bound calls.
+  updateStatus: 'UpdateService.Status',
+  updateInstall: 'UpdateService.InstallUpdate',
+  updateCancelInstall: 'UpdateService.CancelInstall',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -113,6 +118,14 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // will ship with. A spec that DOES care (window-chrome.spec.ts's own keep-awake cases) still wins
   // with its own snapshot.
   [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
+  // P119: no update available by default — same shape as Kira Studio's own WILDCARD_DEFAULTS
+  // entry, so every other existing Space spec keeps booting unchanged.
+  [IPC.updateStatus]: JSON.stringify({
+    updateAvailable: false,
+    currentVersion: '0.0.0-dev',
+    latestVersion: '',
+    installLogPath: '',
+  }),
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at

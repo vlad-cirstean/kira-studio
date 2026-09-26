@@ -150,7 +150,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpDenyQuery: 'DbMcpService.DenyQuery',
 
   updateStatus: 'UpdateService.Status',
-  updateOpenReleasePage: 'UpdateService.OpenReleasePage',
+  updateInstall: 'UpdateService.InstallUpdate',
+  updateCancelInstall: 'UpdateService.CancelInstall',
 
   codeWorkspaceListRepos: 'CodeWorkspaceService.ListRepos',
   codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
@@ -335,8 +336,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     updateAvailable: false,
     currentVersion: '0.0.0-dev',
     latestVersion: '',
+    installLogPath: '',
   }),
-  [IPC.updateOpenReleasePage]: 'null',
   // C5: main.ts's bootstrap() joins hydrateCodeRepos() to the same unconditional-every-boot
   // Promise.all as hydrateGitClients() above, same reasoning — a spec that never imports a
   // repository gets "nothing imported yet", not a fixture miss.
