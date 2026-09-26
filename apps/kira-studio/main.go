@@ -22,7 +22,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appshell"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
@@ -39,6 +38,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/metrics"
@@ -127,7 +127,7 @@ func main() {
 	// P66: the update-availability checker — no network call at all from a dev/test build
 	// (appupdate's own isReleaseBuild guard); owns no goroutine, no ticker, no file handle, so
 	// nothing is added to the quit teardown below.
-	updateChecker := appupdate.NewChecker(buildinfo.Version)
+	updateChecker := appupdate.NewChecker(appupdate.Studio.Name, buildinfo.Version)
 
 	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc

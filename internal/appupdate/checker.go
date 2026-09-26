@@ -1,7 +1,10 @@
-// Package appupdate is the whole update-availability check: one plain net/http GET against
-// GitHub's public releases/latest endpoint, self-contained and dependency-free (no ghclient, no
-// httpclient, no Wails import — drivable from a plain httptest server, matching the same
-// self-contained shape internal/httpclient states as its own contract).
+// Package appupdate is the whole update-availability check plus the detached self-update
+// installer (install.go), shared by both Kira Studio and Kira Space (P119) — a repo-root package,
+// so it imports nothing under either app's own internal/ (Go's internal/ visibility rule enforces
+// this at compile time). The check itself is one plain net/http GET against GitHub's public
+// releases/latest endpoint, self-contained and dependency-free (no ghclient, no httpclient, no
+// Wails import — drivable from a plain httptest server, matching the same self-contained shape
+// internal/httpclient states as its own contract).
 //
 // internal/ghclient is deliberately not reused: every ghclient call is gated on a working,
 // authenticated `gh` CLI (ghclient/discovery.go), and an update check that only runs for users
@@ -22,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -67,9 +69,10 @@ type Result struct {
 
 // Checker owns one cached answer per app process. Safe for concurrent use.
 type Checker struct {
-	running string
-	fetch   func(ctx context.Context) (release, error) // seam; the real one is httpFetch
-	now     func() time.Time
+	running   string
+	userAgent string
+	fetch     func(ctx context.Context, userAgent string) (release, error) // seam; the real one is httpFetch
+	now       func() time.Time
 
 	group singleflight.Group
 
@@ -79,12 +82,16 @@ type Checker struct {
 	result    Result
 }
 
-// NewChecker builds a Checker over the real network fetch, for runningVersion (buildinfo.Version).
-func NewChecker(runningVersion string) *Checker {
+// NewChecker builds a Checker over the real network fetch, parameterized only by appName (the
+// calling app's own display name — App.Name, app.go) and runningVersion (that app's own
+// buildinfo.Version, passed in rather than imported: a repo-root package cannot import either
+// app's own internal/buildinfo, Go's internal/ rule).
+func NewChecker(appName, runningVersion string) *Checker {
 	return &Checker{
-		running: runningVersion,
-		fetch:   httpFetch,
-		now:     time.Now,
+		running:   runningVersion,
+		userAgent: appName + "/" + runningVersion,
+		fetch:     httpFetch,
+		now:       time.Now,
 	}
 }
 
@@ -126,7 +133,7 @@ func (c *Checker) dueForCheck() bool {
 // place — only checkedAt and lastOK move — so a transient failure never blanks out a result a
 // prior successful check already produced.
 func (c *Checker) refresh(ctx context.Context) Result {
-	rel, err := c.fetch(ctx)
+	rel, err := c.fetch(ctx, c.userAgent)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -199,7 +206,7 @@ var httpClient = &http.Client{
 // httpFetch is the real network call behind Checker.fetch. Any status other than 200 is an error
 // — 404 (no published release yet) and 403 (rate-limited) included, which is exactly what makes
 // them mean silence rather than a surfaced failure.
-func httpFetch(ctx context.Context) (release, error) {
+func httpFetch(ctx context.Context, userAgent string) (release, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
@@ -209,7 +216,7 @@ func httpFetch(ctx context.Context) (release, error) {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", apiVersionHeader)
-	req.Header.Set("User-Agent", "Kira Studio/"+buildinfo.Version)
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

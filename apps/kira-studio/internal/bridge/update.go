@@ -3,7 +3,7 @@ package bridge
 import (
 	"context"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
+	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 

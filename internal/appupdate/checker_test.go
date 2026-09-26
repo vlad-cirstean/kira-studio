@@ -26,7 +26,7 @@ func TestChecker_Status_SingleFlight(t *testing.T) {
 	c := &Checker{
 		running: "1.0.0",
 		now:     time.Now,
-		fetch: func(ctx context.Context) (release, error) {
+		fetch: func(ctx context.Context, userAgent string) (release, error) {
 			atomic.AddInt32(&calls, 1)
 			time.Sleep(20 * time.Millisecond) // widen the window so concurrent callers actually overlap
 			return testRelease(), nil
@@ -60,7 +60,7 @@ func TestChecker_Status_CacheIntervals(t *testing.T) {
 	c := &Checker{
 		running: "1.0.0",
 		now:     func() time.Time { return clock },
-		fetch: func(ctx context.Context) (release, error) {
+		fetch: func(ctx context.Context, userAgent string) (release, error) {
 			atomic.AddInt32(&calls, 1)
 			if failing {
 				return release{}, errors.New("boom")
