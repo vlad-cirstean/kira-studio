@@ -6996,3 +6996,10 @@ did not run (`ui-timing`, gated on the `ui` failure) — re-run with `--no-deps`
 own result section already named and disposed of (pacing/rebuild-probe timing under load; strict
 wall-clock latency budget under cross-worker contention) — not a new regression, not re-litigated
 further here.
+
+## Chapter close
+
+v1.9 closed with `P125` (root `README.md` rewritten as a user-facing entry point). Every row
+P96-P125 landed; none is still open. `P101` never took a row: `P99`'s plan reserved it for the a11y
+pass, which landed as `P105`. `P115` has no result section of its own — findings-only by design,
+its fixes landed as `P118`. `docs/v2.0/` continues `P` numbering at `P126`.
