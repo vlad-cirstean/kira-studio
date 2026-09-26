@@ -49,7 +49,7 @@ import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree'
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
-import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import { on, trust, unwrap } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
@@ -290,20 +290,6 @@ const studioControl = {
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
 
-  // windowsEnsure registers this page's own windowKey with a `windows` row if it doesn't already
-  // have one — always a no-op on the native shell (main.go's own window-creation paths already
-  // created it before this page's URL ever loaded, D2), and the only thing that ever does on a
-  // `-tags server` build, which has no shell managing window creation at all. bootstrap() in
-  // main.ts awaits this before hydrateTabs() (or anything else window-scoped) runs.
-  // P22 D12: also returns this window's own persisted mode — the boot-time seam
-  // state/mode.ts's hydrateMode reads, rather than a second round trip.
-  windowsEnsure: (): Promise<AppMode> =>
-    unwrap(WindowsService.Ensure({ windowKey })).then((r) =>
-      trust<AppMode>(trust<{ mode: string }>(r).mode),
-    ),
-  windowsSetMode: (mode: AppMode): Promise<void> =>
-    unwrap(WindowsService.SetMode({ windowKey, mode })),
-
   // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
   // `any` in the bindings) rather than the domain's real discriminated union — Go has no sum
   // types, so the polymorphic body is opaque JSON on the wire and the discriminant is a plain
@@ -382,7 +368,7 @@ const studioControl = {
 // are disjoint by construction — §5.6's own survey), but studioControl last keeps this
 // line's own diff-history the smallest against the pre-§5.6 file.
 export const control = {
-  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
+  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch, AppMode>({
     settings: SettingsService,
     layout: LayoutService,
     tabs: TabsService,

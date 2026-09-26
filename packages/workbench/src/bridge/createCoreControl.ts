@@ -16,13 +16,16 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // toggle-project-panel, tab-next/prev/close), the keep-awake toggle's read/write/broadcast, the
 // app-metrics broadcast, and the title bar's "New window" button. Kira Studio's own
 // keepAwakeSetAgentAware (the Settings leaf, not the titlebar button) stays app-side — Kira Space
-// has no agent-aware reason to set. Likewise windowsEnsure/windowsSetMode stay app-side — they are
-// Kira Studio's own AppMode plumbing, which Kira Space has none of.
+// has no agent-aware reason to set.
 //
 // P119 adds three more: updateStatus/updateInstall/updateCancelInstall — both apps' own
 // UpdateService is now byte-identical (Status/InstallUpdate/CancelInstall over the shared
 // internal/appupdate), so the update dialog's whole control surface moves here rather than staying
 // duplicated per app the way studioControl's updateStatus/updateOpenReleasePage used to be.
+//
+// P128 §2.3 adds windowsEnsure/windowsSetMode — both apps now persist a per-window module mode
+// (internal/windowsvc.Service, shared since that phase), so the fifth generic `M` is each app's own
+// mode union (Studio's AppMode, Kira Space's SpaceMode).
 //
 // `CoreBindings` is a **structural** interface, not an adapter: each app's own generated
 // `@bindings/*` service modules (SettingsService, LayoutService, TabsService, LifecycleService,
@@ -75,6 +78,8 @@ export interface CoreBindings {
   };
   windows: {
     OpenNew(): Promise<void>;
+    Ensure(a: { windowKey: string }): Promise<unknown>;
+    SetMode(a: { windowKey: string; mode: string }): Promise<void>;
   };
   keepAwake: {
     Status(): Promise<unknown>;
@@ -122,7 +127,7 @@ export interface AppUpdateStatus {
 // `state/settingsDomain.ts`, not one shared `@shared/domain/settings` shape) — so all four stay
 // generic, matching the plan's own `createCoreControl<Settings, Layout, TabRecord, SettingsPatch>
 // (...)` call-site shape, rather than only genericizing the ones that must be.
-export interface CoreControl<S, L, T, P> {
+export interface CoreControl<S, L, T, P, M> {
   settingsGetAll: () => Promise<S>;
   settingsSet: (patch: P) => Promise<S>;
   onSettingsChanged: (cb: (settings: S) => void) => () => void;
@@ -168,6 +173,12 @@ export interface CoreControl<S, L, T, P> {
 
   windowsOpenNew: () => Promise<void>;
 
+  // P22 D12/P128 §2.2: this window's own persisted module mode — the boot-time seam each app's own
+  // state/mode.ts hydrateMode reads without a second round trip, and the debounced writer
+  // state/mode.ts's setMode schedules.
+  windowsEnsure: () => Promise<M>;
+  windowsSetMode: (mode: M) => Promise<void>;
+
   keepAwakeStatus: () => Promise<KeepAwakeStatus>;
   keepAwakeSetManual: (enabled: boolean) => Promise<KeepAwakeStatus>;
   onKeepAwakeChanged: (cb: (status: KeepAwakeStatus) => void) => () => void;
@@ -178,7 +189,7 @@ export interface CoreControl<S, L, T, P> {
   updateCancelInstall: () => Promise<void>;
 }
 
-export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L, T, P> {
+export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S, L, T, P, M> {
   return {
     settingsGetAll: (): Promise<S> => unwrap(b.settings.GetAll()).then((r) => trust<S>(r)),
     settingsSet: (patch: P): Promise<S> =>
@@ -245,6 +256,13 @@ export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L
       on(CHANNEL.appMetrics, cb),
 
     windowsOpenNew: (): Promise<void> => unwrap(b.windows.OpenNew()),
+
+    windowsEnsure: (): Promise<M> =>
+      unwrap(b.windows.Ensure({ windowKey })).then((r) =>
+        trust<M>(trust<{ mode: string }>(r).mode),
+      ),
+    windowsSetMode: (mode: M): Promise<void> =>
+      unwrap(b.windows.SetMode({ windowKey, mode: mode as string })),
 
     keepAwakeStatus: (): Promise<KeepAwakeStatus> =>
       unwrap(b.keepAwake.Status()).then((r) => trust<KeepAwakeStatus>(r)),

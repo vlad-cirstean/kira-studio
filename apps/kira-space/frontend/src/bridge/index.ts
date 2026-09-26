@@ -129,7 +129,8 @@ const spaceControl = {
 // this app's own remaining ones (spaceControl, above) — every `control.xxx()` call site in the app
 // is unchanged, since neither the method names nor their bound-call FQNs moved.
 export const control = {
-  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
+  // M narrows to SpaceMode once this app's own module registry lands (P128 §2.6).
+  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch, string>({
     settings: SettingsService,
     layout: LayoutService,
     tabs: TabsService,
