@@ -56,6 +56,7 @@ const fieldId = useId();
       :min="FONT_SIZE_RANGE.min"
       :max="FONT_SIZE_RANGE.max"
       :aria-invalid="!!fontSizeError || undefined"
+      group-class="w-24"
       data-testid="settings-font-size"
       :model-value="String(appearance.fontSize)"
       @input="onFontSizeInput"
