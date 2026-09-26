@@ -56,7 +56,7 @@ const inlineBlameId = useId();
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <FieldContent>
-          <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
+          <Label :for="inlineBlameId">Inline blame</Label>
           <FieldDescription
             >Show who last changed the current line, at the end of that line, in the
             repository file viewer.</FieldDescription

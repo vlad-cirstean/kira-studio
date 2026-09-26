@@ -107,7 +107,7 @@ const disableCookieJarId = useId();
   <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
+        <Label :for="httpVersionId">HTTP version</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.httpVersion === null"
@@ -136,7 +136,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
+        <Label :for="requestTimeoutMsId">Request timeout (ms)</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
@@ -166,7 +166,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
+        <Label :for="maxResponseMbId">Max response size (MB)</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxResponseMb === null"
@@ -205,7 +205,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="sslVerifyId" class="text-kira-sm">Verify SSL certificates</Label>
+        <Label :for="sslVerifyId">Verify SSL certificates</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -231,7 +231,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="followRedirectsId" class="text-kira-sm">Follow redirects</Label>
+        <Label :for="followRedirectsId">Follow redirects</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox
@@ -248,7 +248,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
+        <Label :for="maxRedirectsId">Max redirects</Label>
         <Label :class="INHERIT_LABEL">
           <Checkbox
             :model-value="settings.maxRedirects === null"
@@ -288,7 +288,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
+        <Label :for="disableCookieJarId">Disable cookie jar</Label>
       </Field>
       <Label :class="INHERIT_LABEL">
         <Checkbox

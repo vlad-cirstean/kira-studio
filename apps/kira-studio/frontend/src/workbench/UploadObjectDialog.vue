@@ -129,10 +129,10 @@ watch(
         </div>
 
         <template v-if="chosenFile">
-          <Label class="text-kira-sm text-muted-foreground p-0">Key</Label>
+          <Label class="text-muted-foreground p-0">Key</Label>
           <Input v-model="key" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-key" />
 
-          <Label class="text-kira-sm text-muted-foreground p-0">Content type</Label>
+          <Label class="text-muted-foreground p-0">Content type</Label>
           <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="upload-content-type" />
         </template>
 

@@ -54,7 +54,7 @@ const keepAwakeAgentAwareId = useId();
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <FieldContent>
-        <Label :for="hooksEnabledId" class="text-kira-sm">Report session activity to Kira Studio</Label>
+        <Label :for="hooksEnabledId">Report session activity to Kira Studio</Label>
         <FieldDescription
           >A Claude Code tab launches with a `--settings` flag pointing at a file this app
           owns — no project file is written. Turning this off affects only the next launch;
@@ -95,7 +95,7 @@ const keepAwakeAgentAwareId = useId();
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <FieldContent>
-        <Label :for="keepAwakeAgentAwareId" class="text-kira-sm">Keep this Mac awake while a Claude Code session is running</Label>
+        <Label :for="keepAwakeAgentAwareId">Keep this Mac awake while a Claude Code session is running</Label>
         <FieldDescription
           >Prevents idle sleep, and system sleep on AC power, for as long as at least one
           Claude Code tab is live. Independent of the title bar's own keep-awake button —

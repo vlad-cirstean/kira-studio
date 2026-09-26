@@ -233,7 +233,7 @@ function onSequenceStartChange(index: number, start: number): void {
       <div class="overflow-auto">
     <div class="flex flex-col gap-2 py-2 px-3">
       <div class="flex items-center gap-1.5">
-        <Label class="p-0 text-kira-sm text-muted-foreground">Rows</Label>
+        <Label class="p-0 text-muted-foreground">Rows</Label>
         <NumberStepperInput
           :model-value="String(rowCount)"
           group-class="h-control"
@@ -241,7 +241,7 @@ function onSequenceStartChange(index: number, start: number): void {
           :disabled="running"
           @update:model-value="(v: string | number) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
         />
-        <Label class="p-0 text-kira-sm text-muted-foreground">Seed</Label>
+        <Label class="p-0 text-muted-foreground">Seed</Label>
         <NumberStepperInput
           :model-value="String(seed)"
           group-class="h-control"

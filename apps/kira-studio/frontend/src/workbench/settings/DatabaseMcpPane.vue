@@ -96,7 +96,7 @@ const dbMcpEnabledId = useId();
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <FieldContent>
-        <Label :for="dbMcpEnabledId" class="text-kira-sm">Enable the database MCP server</Label>
+        <Label :for="dbMcpEnabledId">Enable the database MCP server</Label>
         <FieldDescription
           >Lets an AI client list, browse and query the connections exposed below, through
           the same path this app's own SQL console uses. Starts and stops with this

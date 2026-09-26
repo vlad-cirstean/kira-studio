@@ -89,7 +89,7 @@ const graphFontSizeId = useId();
     </p>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="protectedBranchesId" class="text-kira-sm">Protected branch patterns (one per line)</Label>
+        <Label :for="protectedBranchesId">Protected branch patterns (one per line)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -114,7 +114,7 @@ const graphFontSizeId = useId();
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="fetchAutoIntervalMinutesId" class="text-kira-sm">Auto-fetch interval (minutes)</Label>
+        <Label :for="fetchAutoIntervalMinutesId">Auto-fetch interval (minutes)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -147,7 +147,7 @@ const graphFontSizeId = useId();
     </Field>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="gitPathId" class="text-kira-sm">Git executable path</Label>
+        <Label :for="gitPathId">Git executable path</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -172,7 +172,7 @@ const graphFontSizeId = useId();
     <h3>Graph</h3>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="graphFontSizeId" class="text-kira-sm">Font size</Label>
+        <Label :for="graphFontSizeId">Font size</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
