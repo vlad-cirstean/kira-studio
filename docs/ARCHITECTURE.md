@@ -1363,7 +1363,7 @@ resolved (P12 D17) — this is an audit, not a restructuring.**
 | Coupling | Verdict |
 |---|---|
 | `internal/bridge` is one Go package holding both modules' services | Accepted. Already one file per service, and the six Api files import nothing from the thirteen Studio ones — splitting the package would rewrite every bound method's FQN (`apps/kira-studio/tests/ui/support/mockRuntime.ts`'s own `BRIDGE_PKG` plus its 136 `FQN_SUFFIX_BY_IPC_KEY` entries) for no compile-time boundary Go's own `internal/` visibility rule doesn't already give |
-| `appcore.Deps` carries Studio's `Connections`/`Tree`/`Router` into Api services, and Api's `ApiVars` into Studio's (`ConnectionsService`) | Accepted, documented. One struct embedded by value into nineteen bound services; a standalone Api app needs only `Deps{DB, Repos, ApiVars, Events}` from it |
+| `appcore.Deps` carries Studio's `Connections`/`Tree`/`Router` into Api services, and Api's `ApiVars` into Studio's (`ConnectionsService`) | Accepted, documented. One struct embedded by value into twenty-one bound services (`grep -rl 'Deps appcore.Deps' apps/kira-studio/internal/bridge \| wc -l`, re-measured at P127 — `AgentHooksService` was one of them); a standalone Api app needs only `Deps{DB, Repos, ApiVars, Events}` from it |
 | `internal/storage/{model,repos}` carries both modules' tables and imports `httpclient`/`postman` (`model.ResponseHistorySnapshot` embeds `httpclient.Response` by value; `repos.CollectionsRepo` speaks `postman.Tree`/`postman.Item`) | **The real blocker, named.** Splitting it is a five-constructor, every-repo-test change for zero behaviour delta — worth doing only once a second host genuinely exists. The shape, so it need not be rediscovered: `model/{collections,variables,grpc,responsehistory}.go` and `repos/{collections,variables,response_history,grpc_history}.go` move to an `internal/apistore` package; `repos.Repos` keeps its four Api fields as an embedded `*apistore.Repos`; `postman` imports `apistore` instead of `model`, and `model` stops importing `httpclient` |
 | `adapterhost.Host.RunOp` is the Api module's op scheduler | Accepted **by design**, not neglect — one op log beats a second dead ring on every request tab or a second `useRunState`/ops store, and both `bridge/http.go` and `bridge/grpc.go` pass `ConnectionID: nil` into the same scheduler every DB adapter uses |
 | `ConnectionsService.SecretsStatus` is the Api module's only call into a Studio service (`api/VariableSetView.vue`'s own OS-keychain check) | Accepted, documented. It reports a *process-wide platform fact*, not a connection fact, and lives on `ConnectionsService` only because Studio's connections needed it first; the honest fix is a `SecretsService` of its own — a new bound method, out of scope for a phase whose row forbids adding one |
@@ -1378,7 +1378,10 @@ import path asserting a dependency on the IPC transport layer from three package
 `TestDomainPackagesDoNotImportBridge` runs `go list -deps` against the named domain packages so a
 future import back into `internal/bridge/...` fails a test rather than drifting in unnoticed.
 Kira Space carries its own `apps/kira-space/internal/layering_test.go` for the same rule against its
-own domain packages, both built on a shared helper, repo-root `internal/layeringtest`.
+own domain packages, both built on a shared helper, repo-root `internal/layeringtest`. Neither
+test's own domain-package list reaches repo-root `internal/` (e.g. `internal/agenthooks`,
+`internal/terminal`) — Go's own `internal/` visibility rule already keeps a repo-root package from
+importing anything under either app's `internal/bridge`, so no test needs to police it there too.
 
 **Three duplications P11 (and earlier phases) wrote down as P12's to unpick are unpicked; a fourth,
 proposed, is declined with a reason.**
@@ -2065,6 +2068,23 @@ no-op while nothing is held. Every non-darwin build gets a documented no-op driv
 titlebar hides its button outright rather than offering a control that does nothing, and Kira
 Studio's own agent-aware Settings leaf still persists but never spawns anything.
 
+**Claude Code hook monitoring is a shared, host-wired package (P127).** What was Kira Studio's own
+`internal/agenthooks` (P86-P126: the local HTTP listener a Claude Code hook shells out to, plus the
+bridge glue that started it, composed a tab's launch and projected running sessions to the
+renderer) moved to repo-root `internal/agenthooks` — `Manager` (start/stop/status, plus
+`ComposeLaunch` for the `--settings` flag and hook env a launcher adds to a terminal command), the
+socket protocol and its documented bounds (one connection at a time, bounded event size). The
+renderer-side reducer and store hoisted the same way, to
+`packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts`; the wire types both
+sides share stayed at `packages/shared/domain/agent.ts` (unmoved — already shared, P86); the two
+event-channel strings hoisted to `internal/appevent`. What a host app still supplies itself: the
+on/off setting (if any), the bound service surface a hook's own launch reaches, and wiring
+`Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
+map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **No app wires any of this as of
+P127** — Kira Studio dropped its own bridge/UI/settings leaves in this phase and kept only the
+plain registry-count keep-awake reason above (`OpenParams.Agent`, no hook dependency); Kira Space
+wires it in next (P129).
+
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
 TypeScript bindings under `apps/kira-studio/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
 `wails3 task common:generate:bindings`, which `scripts/setup.sh` calls), which `apps/kira-studio/frontend/src/bridge/control.ts` calls as plain
@@ -2198,7 +2218,7 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **28** bound services under `apps/kira-studio/internal/bridge/`
+options, registering **27** bound services under `apps/kira-studio/internal/bridge/`
 (`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
@@ -2209,9 +2229,11 @@ service described below — `CustomScriptsService`, P85's launchable-scripts fea
 module's (`HttpService` — P2: `Send`, the outbound HTTP path, see the op-log paragraph below and
 Stack, above — `GrpcService` (P11), `CollectionsService` and `VariablesService` (P4/P5),
 `ResponseHistoryService` (P8), `GrpcHistoryService` (P11), `DataGripService`, P25's connection
-import); one Database MCP's (`DbMcpService`, M1); and three the terminal/agent surface's
-(`AgentHooksService`, `KeepAwakeService`, `TerminalService`, P83). `UpdateService` (P66) rounds it
-out. **One used to be the git module's — `GitClientsService`, gone as of P100.** It
+import); one Database MCP's (`DbMcpService`, M1); and two the terminal surface's
+(`KeepAwakeService`, `TerminalService`, P83 — `AgentHooksService` left this list at P127, its
+listener moved to a shared, currently-unwired package; see the keep-awake paragraph below).
+`UpdateService` (P66) rounds it out. **One used to be the git module's — `GitClientsService`, gone
+as of P100.** It
 was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
 the only bound service the headless git module had, since everything else it did crossed its own
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
