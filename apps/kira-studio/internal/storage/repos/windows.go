@@ -3,7 +3,6 @@ package repos
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -38,7 +37,7 @@ func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 		if err := rows.Scan(&key, &order, &boundsJSON, &mode); err != nil {
 			return model.WindowRecord{}, false, err
 		}
-		rec := model.WindowRecord{Key: key, Order: order, Mode: model.NormalizeMode(mode)}
+		rec := model.WindowRecord{Key: key, Order: order, Mode: model.WindowModes.Normalize(mode)}
 		if boundsJSON.Valid && boundsJSON.String != "" {
 			var b model.WindowBounds
 			if err := json.Unmarshal([]byte(boundsJSON.String), &b); err == nil {
@@ -85,34 +84,20 @@ func (r *WindowsRepo) EnsureExists(key string) error {
 	return r.shared().EnsureExists(key)
 }
 
-// GetMode reads one window's stored mode (P22 D12), normalised the same way List does. Used by
-// bridge.WindowsService.Ensure — the one call the renderer already makes before it asks for
-// anything window-scoped, so this is the boot-time seam that carries `mode` to the frontend
-// without a second round trip.
+// GetMode reads one window's stored mode (P22 D12), normalised the same way List does — a thin
+// delegate to appstorage.WindowRepo.GetMode (P128 §2.2), this app's own vocabulary supplied. Used
+// by windowsvc.Service's bound Ensure — the one call the renderer already makes before it asks for
+// anything window-scoped, so this is the boot-time seam that carries `mode` to the frontend without
+// a second round trip.
 func (r *WindowsRepo) GetMode(key string) (string, error) {
-	var mode string
-	err := r.DB.QueryRow(`SELECT mode FROM windows WHERE key = ?`, key).Scan(&mode)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("repos/windows: %s: no such window", key)
-	}
-	if err != nil {
-		return "", fmt.Errorf("repos/windows: get mode %s: %w", key, err)
-	}
-	return model.NormalizeMode(mode), nil
+	return r.shared().GetMode(key, model.WindowModes)
 }
 
-// SetMode persists one window's app mode (P22 D12) — the per-window analogue of SetBounds below,
-// written on shutdown/mode-debounce rather than on every mode click (F20's own invariant: a mode
-// switch itself schedules no write).
+// SetMode persists one window's app mode (P22 D12) — the per-window analogue of SetBounds below, a
+// thin delegate to appstorage.WindowRepo.SetMode, written on shutdown/mode-debounce rather than on
+// every mode click (F20's own invariant: a mode switch itself schedules no write).
 func (r *WindowsRepo) SetMode(key string, mode string) error {
-	res, err := r.DB.Exec(`UPDATE windows SET mode = ? WHERE key = ?`, model.NormalizeMode(mode), key)
-	if err != nil {
-		return fmt.Errorf("repos/windows: update mode %s: %w", key, err)
-	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return fmt.Errorf("repos/windows: %s: no such window", key)
-	}
-	return nil
+	return r.shared().SetMode(key, mode, model.WindowModes)
 }
 
 // SetBounds persists one window's rectangle — the per-window analogue of the single

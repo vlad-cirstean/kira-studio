@@ -32,13 +32,12 @@ func ValidateWindowBounds(key string, order int) error {
 	return nil
 }
 
-// WindowRecord is one row of the `windows` table's identity/geometry columns, minus `mode` —
-// Kira Space's own storage/model.WindowRecord is a plain alias of this (P107 I2-3: the two were
-// already field-for-field identical); Kira Studio's own storage/model.WindowRecord stays its own
-// type, since Studio alone carries an extra Mode field (0014_p22_window_mode.sql; Space's schema
-// has no `mode` column at all — the doc's "the mode column both apps carry" turned out not to
-// hold, so List/Delete below move, but the mode-aware read/write stays in Studio's own repo) —
-// internal/shell's own WindowRecord (no per-app fields at all) also aliases this.
+// WindowRecord is one row of the `windows` table's identity/geometry columns, minus `mode` — both
+// apps' own storage/model.WindowRecord carry Mode themselves instead (Studio's own
+// 0014_p22_window_mode.sql; Space's own 0003_p128_window_mode.sql, P128 §2.2), so List/Delete below
+// move here while GetMode/SetMode below stay separate, vocabulary-parametrised calls each app's own
+// WindowsRepo delegates into — internal/shell's own WindowRecord (no per-app fields at all) also
+// aliases this.
 type WindowRecord struct {
 	Key    string        `json:"key"`
 	Order  int           `json:"order"`
@@ -50,13 +49,61 @@ func (w WindowRecord) Validate() error {
 	return ValidateWindowBounds(w.Key, w.Order)
 }
 
-// WindowRepo reads and writes the `windows` table's identity/geometry columns. Each app's own
-// WindowsRepo embeds one of these (constructed against its own DB) for Exists/Create/
-// EnsureExists/SetBounds, and keeps its own List/Delete (and Studio's own GetMode/SetMode) on top
-// — those touch the `mode` column and app-specific model types this package deliberately stays
-// clear of.
+// WindowRepo reads and writes the `windows` table's identity/geometry columns, plus the shared,
+// vocabulary-parametrised GetMode/SetMode below (P128 §2.2: both apps now carry a `mode` column).
+// Each app's own WindowsRepo embeds one of these (constructed against its own DB) for Exists/
+// Create/EnsureExists/SetBounds/GetMode/SetMode, and keeps its own List/Delete on top since those
+// touch app-specific model types this package deliberately stays clear of.
 type WindowRepo struct {
 	DB *sql.DB
+}
+
+// WindowModes is one app's own mode vocabulary — its default and every value Normalize below
+// accepts. Supplied by the caller (each app's own storage/model package) rather than owned here,
+// so the vocabulary itself stays where each app's module registry does.
+type WindowModes struct {
+	Default string
+	Valid   []string
+}
+
+// Normalize returns mode unchanged if it's one of m.Valid, else m.Default — the same drop-and-
+// default posture an unrecognised enum gets elsewhere: a hand-edited database, or a value written
+// by a since-removed module, should never make a window fail to open.
+func (m WindowModes) Normalize(mode string) string {
+	for _, v := range m.Valid {
+		if v == mode {
+			return mode
+		}
+	}
+	return m.Default
+}
+
+// GetMode reads one window's stored mode, normalised against modes. Used by windowsvc.Service's
+// bound Ensure — the one call the renderer already makes before it asks for anything window-scoped,
+// so this is the boot-time seam that carries `mode` to the frontend without a second round trip.
+func (r *WindowRepo) GetMode(key string, modes WindowModes) (string, error) {
+	var mode string
+	err := r.DB.QueryRow(`SELECT mode FROM windows WHERE key = ?`, key).Scan(&mode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("appstorage/windows: %s: no such window", key)
+	}
+	if err != nil {
+		return "", fmt.Errorf("appstorage/windows: get mode %s: %w", key, err)
+	}
+	return modes.Normalize(mode), nil
+}
+
+// SetMode persists one window's app mode — written on shutdown/mode-debounce rather than on every
+// mode click (a mode switch itself schedules no write).
+func (r *WindowRepo) SetMode(key, mode string, modes WindowModes) error {
+	res, err := r.DB.Exec(`UPDATE windows SET mode = ? WHERE key = ?`, modes.Normalize(mode), key)
+	if err != nil {
+		return fmt.Errorf("appstorage/windows: update mode %s: %w", key, err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("appstorage/windows: %s: no such window", key)
+	}
+	return nil
 }
 
 // Exists reports whether key names a live `windows` row.

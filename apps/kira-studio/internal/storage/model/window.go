@@ -22,13 +22,14 @@ type WindowRecord struct {
 	Mode   string        `json:"mode"`
 }
 
-// validWindowModes are the only values AppMode (packages/shared/domain/mode.ts) can be.
-// P91 §3: 'terminal' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint,
-// no migration needed), so an older binary reading an unrecognised mode still degrades cleanly
-// through NormalizeMode below; without an entry here, a window closed in the Terminal module
+// WindowModes is this app's own mode vocabulary (packages/shared/domain/mode.ts's AppMode) — P91
+// §3: 'terminal' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint, no
+// migration needed), so an older binary reading an unrecognised mode still degrades cleanly through
+// appstorage.WindowModes.Normalize; without an entry here, a window closed in the Terminal module
 // would silently reopen in Studio. A mode value stored by a since-removed module degrades to
-// DefaultWindowMode the same way, no migration needed for the same reason.
-var validWindowModes = map[string]bool{"studio": true, "api": true, "terminal": true}
+// DefaultWindowMode the same way, no migration needed for the same reason (P128 §2.2: the
+// vocabulary stays here, GetMode/SetMode's own bodies hoisted to appstorage.WindowRepo).
+var WindowModes = appstorage.WindowModes{Default: DefaultWindowMode, Valid: []string{"studio", "api", "terminal"}}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
 // constant deliberately agree, so there is exactly one place the default lives on each side.
@@ -39,10 +40,7 @@ const DefaultWindowMode = "studio"
 // (ValidateObjectDefinition's own callers) rather than refusing to read or write the row: a
 // hand-edited database or a future removed mode should never make a window fail to open.
 func NormalizeMode(mode string) string {
-	if validWindowModes[mode] {
-		return mode
-	}
-	return DefaultWindowMode
+	return WindowModes.Normalize(mode)
 }
 
 // Validate is the same non-empty-identity envelope TabRecord.Validate enforces (P2 R2's
