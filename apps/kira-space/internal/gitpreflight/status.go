@@ -43,11 +43,13 @@ type StatusSummary struct {
 	InProgress     *InProgressOperation `json:"inProgress"`
 }
 
-// headStateFromBranch derives HeadState from status --branch's own header — free, since
+// HeadStateFromBranch derives HeadState from status --branch's own header — free, since
 // statusAndInProgress already has this on hand, versus a third rev-parse/symbolic-ref spawn
 // (gitclient.ResolveHead's own route). Unborn is exactly probe P11's rule: a named branch with no
-// commit behind it yet ("(initial)").
-func headStateFromBranch(b porcelain.StatusBranchInfo) HeadState {
+// commit behind it yet ("(initial)"). Exported so gitsession's own headStateFromStatusBranch (H8,
+// P115 Part 2) can call this instead of duplicating it, converting the result at its own boundary
+// (this type's own doc comment).
+func HeadStateFromBranch(b porcelain.StatusBranchInfo) HeadState {
 	if b.Detached {
 		return HeadState{Kind: "detached", SHA: b.OID}
 	}
@@ -94,7 +96,7 @@ func SummarizeStatus(result porcelain.StatusResult, inProgress *InProgressOperat
 	}
 
 	return StatusSummary{
-		Head:           headStateFromBranch(result.Branch),
+		Head:           HeadStateFromBranch(result.Branch),
 		Upstream:       upstream,
 		Counts:         StatusCounts{Staged: staged, Unstaged: unstaged, Untracked: untracked, Unmerged: unmerged},
 		IsClean:        staged == 0 && unstaged == 0 && untracked == 0 && unmerged == 0,

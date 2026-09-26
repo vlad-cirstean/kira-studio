@@ -10,17 +10,12 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
 
-// headStateFromStatusBranch mirrors gitpreflight's own (unexported) headStateFromBranch — status
+// headStateFromStatusBranch calls gitpreflight's own HeadStateFromBranch (H8, P115 Part 2) — status
 // --branch's header already carries HEAD's identity for free, so statusAndInProgress can refresh
-// the entry's live head without a third rev-parse/symbolic-ref spawn.
+// the entry's live head without a third rev-parse/symbolic-ref spawn. Converted at this package's
+// own boundary, per gitpreflight.HeadState's own doc comment.
 func headStateFromStatusBranch(b porcelain.StatusBranchInfo) gitclient.HeadState {
-	if b.Detached {
-		return gitclient.HeadState{Kind: "detached", SHA: b.OID}
-	}
-	if b.Unborn {
-		return gitclient.HeadState{Kind: "unborn", Name: b.HeadName}
-	}
-	return gitclient.HeadState{Kind: "branch", Name: b.HeadName}
+	return gitclient.HeadState(gitpreflight.HeadStateFromBranch(b))
 }
 
 // statusAndInProgress is §7.11's join point (D16): the one place ParseStatus,
