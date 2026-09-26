@@ -44,7 +44,6 @@
   --kui-font-ui: var(--kira-font-ui);
   --kui-font-size: var(--kira-t-md);
   --kui-font-size-sm: var(--kira-t-sm);
-  --kui-font-size-xs: var(--kira-t-xs);
   --kui-shadow-float: var(--kira-shadow-dialog);
   /* G20 D6: mapped from this app's own real `--kira-z-*` ladder — inert today, same as every
      other token above (nothing in this app consumes a `packages/kira-ui` floating surface yet).

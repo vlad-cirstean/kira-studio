@@ -47,7 +47,7 @@
   padding: 0 12px;
   background-color: color-mix(in srgb, var(--kira-error) 12%, transparent);
   color: var(--kira-error);
-  font-size: 12px;
+  font-size: var(--kira-t-md);
 }
 
 .kira-review-load-error-retry {
@@ -55,7 +55,7 @@
   border-radius: 3px;
   background: transparent;
   color: var(--kira-error);
-  font-size: 12px;
+  font-size: var(--kira-t-md);
   padding: 1px 8px;
   cursor: pointer;
 }
