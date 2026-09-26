@@ -250,13 +250,6 @@ func (e *RepoEntry) wasForced(ctx context.Context, before, after string) (bool, 
 	return res.ExitCode != 0, nil
 }
 
-func nonNilUpdates(u []gitops.RefUpdate) []gitops.RefUpdate {
-	if u == nil {
-		return []gitops.RefUpdate{}
-	}
-	return u
-}
-
 // remoteResultNoSpawn answers a refusal that never reaches a write at all (step 1/2/3's own early
 // returns, D11) — still reads back head/in-progress (G5's own rule, applied again: always, success
 // or failure), so the UI's banner can never go stale because of a refused op.
@@ -397,7 +390,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		return RemoteOpResult{}, herr
 	}
 
-	return RemoteOpResult{OK: opErr == nil, Error: opErr, Updates: nonNilUpdates(updates), Head: head, InProgress: inProgress}, nil
+	return RemoteOpResult{OK: opErr == nil, Error: opErr, Updates: nonNil(updates), Head: head, InProgress: inProgress}, nil
 }
 
 // runFetch executes a plain fetch — killable (D19), no gate (D11). roCtx (never cancelled by

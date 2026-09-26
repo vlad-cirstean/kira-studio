@@ -6282,3 +6282,37 @@ mocks and `docs/ARCHITECTURE.md`/`docs/v1.9/plans/P118-stream-a-findings.md` for
 commit) — confirmed against the plan's own Stream A ownership table. Stream B's 11 commits touch
 only `*.ts`/`*.vue` under the plan's own Stream B paths. Zero overlap between the two streams,
 confirmed both by the plan's own ownership table and by two clean, conflict-free rebases.
+
+## P124 result
+
+Plan: `docs/v1.9/plans/P124-space-show-more-fix.md` (plan and fix in one pass — one bug, one root
+cause). 2 commits: `b8887a02` (plan), `71301923` (fix + regression assertion).
+
+**Bug.** Not the toggle. `commit.detail`'s Go server sent `"decoration": null` for every commit
+with no ref pointing at it (and `"parents": null` for a root commit, `"trailers": null` with no
+trailers): `porcelain.parseDecoration`/`parseParents`/`ParseTrailerBlock` return nil for "none",
+and `encoding/json` marshals nil as `null`. The wire contract declares all three non-null arrays.
+`CommitMeta.vue:210`'s `hasDetails` reads `props.detail?.decoration.length`, evaluated only once
+`expanded` flips, so the click's re-render threw a `TypeError` and Vue aborted the patch — label
+stayed "Show more". Commits carrying a ref (HEAD, branch tip, tag) expanded fine, hence
+"intermittent". Second symptom, same cause: a root commit's `parents: null` threw in
+`FileTree.vue:358`, so its file tree never rendered.
+
+**Reproduction.** 24 hand-fixture variations (body length, file count, 4 viewports, mouse/Enter/
+Space) all expanded — every existing fixture types `decoration: []`. Reproduced by capturing the
+real server's `commit.detail` JSON over a real socket (`gitsock` detail fixture) and replaying it
+through `tests/ui/`'s mock: TypeError on every run, mouse and Enter alike.
+
+**Fix.** `gitsession/queries.go:263-266` wraps `Parents`/`Trailers`/`Decoration` in a generic
+`nonNil` (`incremental.go:96-103`), which also replaces the package's two per-type copies
+(`nonNilRanges`, `nonNilUpdates`). Server-side, so both hosts (desktop, VS Code extension) are
+covered. Re-running the same replay against post-fix payloads: "Show less", `.kv-meta-expanded`
+mounted, file tree rendered, no console errors.
+
+**Test.** One raw-JSON assertion added to existing `TestIntegration_CommitDetailAndFileTree`
+(`gitsock/detail_test.go:248-256`): root commit's `parents`/`trailers`/`decoration` must be `[]`.
+Only layer that can see the bug — a Go struct decode can't tell `null` from `[]`. Confirmed failing
+pre-fix. No UI spec: the fix is server-side, and a mocked payload can't exercise it.
+
+**Checks.** `bun run lint`, `bun run typecheck` clean; `golangci-lint` 0 issues on
+`gitsession`/`gitsock`; `go test` for `gitsession`, `gitsock`, `gitrpc` pass.

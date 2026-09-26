@@ -93,13 +93,13 @@ func ReviewFileStatusFor(rec gitreview.FileRecord) ReviewFileStatus {
 	return reviewFileStatus(rec, true, false)
 }
 
-// nonNilRanges guarantees the wire's `readonly LineRange[]` is `[]`, never `null` — ProjectRanges
-// returns a nil slice for "nothing survived", which encoding/json marshals as `null`.
-func nonNilRanges(ranges []gitreview.LineRange) []gitreview.LineRange {
-	if ranges == nil {
-		return []gitreview.LineRange{}
+// nonNil guarantees a wire `readonly T[]` is `[]`, never `null` — encoding/json marshals a nil
+// slice as `null`.
+func nonNil[T any](s []T) []T {
+	if s == nil {
+		return []T{}
 	}
-	return ranges
+	return s
 }
 
 // mergeBase is `merge-base <base> <branch>` (D6) — exit 0 the shared ancestor sha, exit 1
@@ -609,7 +609,7 @@ func (e *RepoEntry) ReviewFileDiff(ctx context.Context, base, branch, path, mode
 	if err != nil {
 		return ReviewFileDiffResult{}, err
 	}
-	reviewedRanges := nonNilRanges(gitreview.ProjectRanges(recordRanges(rec), delta.Hunks, delta.CurrentLineCount))
+	reviewedRanges := nonNil(gitreview.ProjectRanges(recordRanges(rec), delta.Hunks, delta.CurrentLineCount))
 
 	body := delta.Body
 	if mode == "range" {
