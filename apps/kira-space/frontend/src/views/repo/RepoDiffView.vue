@@ -20,7 +20,7 @@ import { gitTransportFor } from '../../repo/git/transport';
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '../../state/tabDomain';
-import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
+import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 import { useDiffEditor } from './useDiffEditor';
@@ -42,12 +42,10 @@ function onGoToFile(): void {
 let diffEditor: ReturnType<typeof useDiffEditor> | null = null;
 
 async function mount(): Promise<void> {
-  const repoId = props.tab.workspaceId
-    ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
-    : null;
+  const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     state.value = 'error';
-    errorMessage.value = 'This tab has no repository.';
+    errorMessage.value = NO_REPOSITORY_MESSAGE;
     return;
   }
 

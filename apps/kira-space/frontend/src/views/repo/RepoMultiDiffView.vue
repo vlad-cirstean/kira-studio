@@ -21,7 +21,7 @@ import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive
 // actually reads — `expanded`, and each section's own copied-out state/error strings — need to be
 // reactive.
 import type { RepoMultiDiffTabRecord } from '../../state/tabDomain';
-import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
+import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
 import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoMultiDiffTabRecord }>();
@@ -33,9 +33,7 @@ interface SectionMeta {
   expanded: boolean;
 }
 
-const repoId = props.tab.workspaceId
-  ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
-  : null;
+const repoId = repoIdOfTab(props.tab);
 
 // Plan §7.3: first section expanded on mount, the rest collapsed.
 const sections = reactive<SectionMeta[]>(
@@ -122,7 +120,7 @@ onUnmounted(() => {
   <div v-if="!repoId" class="h-full overflow-y-auto flex flex-col">
     <Alert class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
       <CodiconIcon name="warning" :size="24" class="text-subtle" />
-      <AlertTitle class="text-kira-md font-normal text-muted-foreground">This tab has no repository.</AlertTitle>
+      <AlertTitle class="text-kira-md font-normal text-muted-foreground">{{ NO_REPOSITORY_MESSAGE }}</AlertTitle>
     </Alert>
   </div>
   <div v-else class="h-full overflow-y-auto flex flex-col" data-testid="repo-multi-diff-view">

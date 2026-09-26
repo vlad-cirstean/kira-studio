@@ -38,7 +38,7 @@ import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import { useSettingsStore } from '../../state/settings';
 import type { RepoGraphTabRecord } from '../../state/tabDomain';
-import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
+import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
 
 defineOptions({ name: 'RepoGraphView' });
 
@@ -50,11 +50,9 @@ let handle: MountHandle | null = null;
 
 async function mountGraph(): Promise<void> {
   const settingsStore = useSettingsStore();
-  const repoId = props.tab.workspaceId
-    ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
-    : null;
+  const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
-    errorMessage.value = 'This tab has no repository.';
+    errorMessage.value = NO_REPOSITORY_MESSAGE;
     return;
   }
   if (!container.value) return; // unmounted (tab closed/switched away) before this ran.

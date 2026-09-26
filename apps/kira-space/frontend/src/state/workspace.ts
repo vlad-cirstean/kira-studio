@@ -31,6 +31,17 @@ export function repoIdOfWorkspace(key: WorkspaceKey): string | null {
   return key === GENERAL_WORKSPACE ? null : key;
 }
 
+/** `repoIdOfWorkspace` applied to a tab's own `workspaceId` — every repo view's own mount() rebuilt
+ *  this exact `tab.workspaceId ? repoIdOfWorkspace(tab.workspaceId as WorkspaceKey) : null` ternary
+ *  (P115 H9). `null` for a tab with no workspace at all, same as `repoIdOfWorkspace`. */
+export function repoIdOfTab(tab: { workspaceId: string | null }): string | null {
+  return tab.workspaceId ? repoIdOfWorkspace(tab.workspaceId as WorkspaceKey) : null;
+}
+
+/** The message every repo view's own "no repository" error/empty state showed, hand-copied ×4
+ *  (P115 H9) — moved beside `repoIdOfTab` since it always accompanies a null result from it. */
+export const NO_REPOSITORY_MESSAGE = 'This tab has no repository.';
+
 // The active workspace, the Git panel's repo switcher (`openRepos`), and which repo was last
 // active (`lastRepoKey`, session-only) — Kira Studio's own useWorkspaceStore (state/workspace.ts),
 // minus the AppMode dimension (moduleOfWorkspace/useModeStore/setModule all had no work left to do

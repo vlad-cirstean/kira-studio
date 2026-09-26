@@ -13,7 +13,7 @@ import { useSettingsStore } from '../../state/settings';
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
-import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
+import { NO_REPOSITORY_MESSAGE, repoIdOfTab } from '../../state/workspace';
 import { registerEditor, unmountEditor } from './editors';
 import { loadFileContent } from './fileContent';
 import { monacoLanguageFor } from './language';
@@ -132,12 +132,10 @@ const inlineBlame = useInlineBlame();
 // mutate a model. The rest of the option set mirrors §9.3 verbatim (no minimap/suggestions/
 // codeLens/validation decorations — this is a viewer, not an editing surface).
 async function mount(): Promise<void> {
-  const repoId = props.tab.workspaceId
-    ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
-    : null;
+  const repoId = repoIdOfTab(props.tab);
   if (!repoId) {
     state.value = 'error';
-    errorMessage.value = 'This tab has no repository.';
+    errorMessage.value = NO_REPOSITORY_MESSAGE;
     return;
   }
 
