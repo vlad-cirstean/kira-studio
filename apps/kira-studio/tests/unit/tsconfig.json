@@ -6,8 +6,8 @@
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    // C10: this project now transitively compiles git-ipc/git-ui source too (state/workspace.ts's
-    // own new import of repo/git/transport.ts) — see frontend/tsconfig.json's identical comment.
+    // packages/kira-ui uses ".ts" import specifiers — see frontend/tsconfig.json's identical
+    // comment.
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],

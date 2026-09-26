@@ -6,17 +6,12 @@
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    // C10: git-ui/git-ipc source is now compiled from this project too (S9's workspace deps) —
-    // both packages' own .ts files use explicit ".ts" import specifiers (their own tsconfig.json
-    // already sets this), so this project needs the identical flag to follow those imports.
+    // packages/kira-ui uses ".ts" import specifiers, reached from this app directly and via
+    // packages/workbench/src/util/floatingPosition.ts.
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    // C10: git-core's own tsconfig.json already sets "types": ["bun-types"] for exactly one
-    // reason -- ports/processRunner.ts's NodeJS.Signals field, needed to type a cross-platform
-    // process-signal shape even though nothing here runs under Node. git-ui (S9's workspace dep)
-    // imports git-core internally, so this project now compiles that file too and needs the same
-    // ambient declaration, not a second, different fix for an identical need.
+    // bun-types: packages/workbench/src/viteAppConfig.ts reads process.env.
     "types": ["vite/client", "bun-types"],
     "paths": {
       "@/*": ["./src/*"],
