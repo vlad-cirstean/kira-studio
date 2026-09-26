@@ -11,6 +11,13 @@
 # P116 H4 — the darwin-only `go test` list still names apps/kira-studio/internal/metrics, which
 #   this phase moved to repo-root internal/metrics (Kira Space's own metrics ticker needs it too) —
 #   retargeted, same fix shape as P108 Part 2's F3 above.
+# P116 (phase-end audit) — the hunk above (P116 H4's own edit) had a stale `@@ -58,8 +66,8 @@`
+#   header: it added a second removed/added line pair to a hunk that already had one from P108 Part
+#   2's F3, without recounting the header's old/new line totals (real count is 5/5, not 8/8), so
+#   `git apply` rejected the whole file with "corrupt patch at line 56". Regenerated from a fresh
+#   diff against the current, still-unpatched `.github/workflows/pr.yml` (verified via
+#   `git apply --check`) rather than hand-editing the broken hunk; content unchanged from intent
+#   above, only the header math is fixed.
 # Apply with `git apply docs/pending-changes/.github__workflows__pr.yml.patch` then delete this file.
 
 diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
@@ -26,7 +33,7 @@ index 02dc277..2d58b04 100644
      steps:
        - uses: actions/checkout@v7
        - uses: oven-sh/setup-bun@v2
-@@ -49,7 +49,15 @@
+@@ -49,16 +49,24 @@
          run: sh scripts/setup.sh
        - run: bun run lint
        - run: bun run typecheck
@@ -43,7 +50,8 @@ index 02dc277..2d58b04 100644
        - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
          run: go build ./...
        - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
-@@ -58,8 +66,8 @@
+         run: |
+           go test \
              ./apps/kira-studio/internal/secrets/... \
 -            ./apps/kira-studio/internal/metrics/... \
 +            ./internal/metrics/... \
