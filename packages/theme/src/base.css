@@ -105,9 +105,9 @@
      --kira-z-autocomplete's existing precedent for this same, single popup. */
   --spacing-completion-max-w: var(--kira-completion-max-w);
 
-  /* P123: removes Tailwind's stock text-xs...text-9xl from the host root, as GU/theme/tailwind.css
-     already does for kv -- chrome speaks only the four kira sizes below. text-kira-xs stays: the
-     data anchors (§3.8) still use it. */
+  /* P123: removes Tailwind's stock text-xs...text-9xl from the host root (GU/theme/tailwind.css
+     already does this for kv) -- chrome speaks only the four sizes below. The retired xs step,
+     right below, stays: the data anchors (§3.8) still use it. */
   --text-*: initial;
   --text-kira-xs: var(--kira-t-xs);
   --text-kira-sm: var(--kira-t-sm);

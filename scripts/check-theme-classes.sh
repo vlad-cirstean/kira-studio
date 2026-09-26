@@ -214,6 +214,94 @@ check_focus_width() {
   fi
 }
 
+# _font_scale_anchor <hits> <file> <expected-count>
+# P123 §6.2's counted anchors: a handful of data-view sites keep a font-size value the chrome scale
+# no longer carries (a fixed glyph/tabular size, not something the Appearance setting should
+# touch). While a file's hit count here matches its known, checked-in count, those lines are that
+# known site, not a regression, and are dropped from $hits; a mismatch keeps every hit in that file
+# so the guard reports it. Kept full-line (not match-only) so the per-file line count is exact.
+_font_scale_anchor() {
+  hits="$1"
+  file="$2"
+  expected="$3"
+  file_hits=$(printf '%s\n' "$hits" | grep -c "^${file}:" || true)
+  if [ "$file_hits" = "$expected" ]; then
+    printf '%s\n' "$hits" | grep -v "^${file}:" || true
+  else
+    printf '%s\n' "$hits"
+  fi
+}
+
+# check_font_scale
+# P123 §6.2: chrome speaks only text-kira-sm/md/lg/xl (kv: text-sm/base/lg, kv: text-kui-sm/base) --
+# commit 7 reset both @theme roots (`--text-*: initial`) so every stock Tailwind size and the
+# retired xs step is gone from chrome's own resolution path. Host pass: full-line (not -o) so the
+# comment-marker filter -- which only recognizes a line that itself STARTS with a marker, never a
+# block comment's own continuation line -- works the same way _gu_ku_hits already relies on for the
+# kv passes below; SCAN_DIRS already recurses through components/ui, where P123 §3.2 moved every
+# shadcn primitive onto the scale too, so no separate directory is added the way check_focus_width
+# does for itself. kv pass: GU/KU's own class-attribute/`.ts`-file convention (_gu_ku_hits'
+# shape, not the helper itself -- KV_CSS also needs `.css` files, which _gu_ku_hits never scans).
+check_font_scale() {
+  host_class='(?<![-\w])text-(?:xs|sm|base|lg|[2-9]?xl|kira-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\]|\(length:[^)\s]+\))(?![-\w])'
+  host_css='(?<![-\w])font-size\s*:(?!\s*var\(--kira-t-(?:sm|md|lg|xl)\)\s*[;}])'
+  kv_class='(?<![-\w])kv:text-(?:xs|kui-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\])(?![-\w])'
+  kv_css='(?<![-\w])font-size\s*:(?!\s*var\(--kv-t-(?:sm|md|lg)\)\s*[;}])'
+  hint='text-kira-sm/md/lg/xl (kv: text-sm/base/lg) per docs/v1.9/plans/P123-font-size-normalization.md §1.2'
+  slick_theme="${FRONTEND_SRC}/views/shared/slick/slickTheme.css"
+  commit_grid="${GIT_UI_SRC}/components/CommitGrid.vue"
+
+  host_hits=$(grep -rnP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "$host_class" $SCAN_DIRS 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
+    grep -v "^${slick_theme}:" || true)
+  host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/workbench/settings/AppearancePane.vue" 2)
+  host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/views/shared/keyvalue/KeyValuePane.vue" 1)
+  host_hits=$(_font_scale_anchor "$host_hits" "${FRONTEND_SRC}/views/stream/StreamView.vue" 2)
+  host_hits=$(_font_scale_anchor "$host_hits" "${SPACE_SRC}/views/repo/RepoFileView.vue" 5)
+  if [ -n "$host_hits" ]; then
+    echo "check-theme-classes: chrome font size off the four-value scale -- replace with $hint:" >&2
+    echo "$host_hits" >&2
+    STATUS=1
+  fi
+
+  host_css_hits=$(grep -rnP --include='*.vue' --include='*.css' \
+    -- "$host_css" $SCAN_DIRS 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
+    grep -v "^${slick_theme}:" || true)
+  if [ -n "$host_css_hits" ]; then
+    echo "check-theme-classes: chrome font-size: not on the four-value scale -- replace with $hint:" >&2
+    echo "$host_css_hits" >&2
+    STATUS=1
+  fi
+
+  kv_vue_hits=$(grep -rnP --include='*.vue' \
+    -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+    grep -P "$kv_class" || true)
+  kv_ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -v "^${KIRA_UI_SRC}/cn.ts:" |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
+    grep -P "$kv_class" || true)
+  kv_hits=$(printf '%s\n%s\n' "$kv_vue_hits" "$kv_ts_hits" | grep -v '^$' | grep -v codicon || true)
+  if [ -n "$kv_hits" ]; then
+    echo "check-theme-classes: kv chrome font size off the four-value scale -- replace with $hint:" >&2
+    echo "$kv_hits" >&2
+    STATUS=1
+  fi
+
+  kv_css_hits=$(grep -rnP --include='*.vue' --include='*.css' \
+    -- "$kv_css" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
+    grep -v "^${commit_grid}:" || true)
+  kv_css_hits=$(_font_scale_anchor "$kv_css_hits" "${GIT_UI_SRC}/theme/app-shell.css" 1)
+  if [ -n "$kv_css_hits" ]; then
+    echo "check-theme-classes: kv chrome font-size: not on the four-value scale -- replace with $hint:" >&2
+    echo "$kv_css_hits" >&2
+    STATUS=1
+  fi
+}
+
 # P110 B3/B4: base.css's @theme used to shadow shadcn-bridge.css's own --color-muted; app code's
 # text-muted/text-fg-muted are both renamed to shadcn's own text-muted-foreground.
 check_class_all 'text-muted' 'text-muted-foreground'
@@ -263,7 +351,7 @@ check_class_in_attrs_all 'dim' 'text-subtle'
 # P110 B17: `p-sm` is not common prose, so the plain check_class call is enough.
 check_class_all 'p-sm' 'text-kira-sm'
 # P110 B18: same reasoning as B17 -- `p-xs` is not common prose.
-check_class_all 'p-xs' 'text-kira-xs'
+check_class_all 'p-xs' 'text-kira-sm'
 # P110 B19: `p-push` is not common prose.
 check_class_all 'p-push' 'ml-auto'
 # P110 B20: `icon-box` is not common prose.
@@ -308,7 +396,7 @@ check_class_all 'p-float' 'bg-elevated border border-border-strong rounded-kira 
 check_class_all 'p-panel' 'border border-border rounded-kira bg-bg overflow-hidden flex flex-col min-h-0'
 # P110 B29: the list/table family, folded into plain utilities (and, for method colour, a small
 # literal-class-map helper -- a template literal can never resolve at scan time). Not common prose.
-check_class_all 'p-tab' 'h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm (plus a local tab-chip hook class where a scoped selector needs one)'
+check_class_all 'p-tab' 'h-control-lg inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-md (plus a local tab-chip hook class where a scoped selector needs one)'
 check_class_all 'p-row' 'h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer (plus hover:bg-hover or a selection ternary)'
 check_class_all 'p-method' 'methodTextClass() (packages/theme/src/methodColor.ts)'
 check_class_all 'p-conn-dot' 'size-1.25 rounded-full shrink-0 (plus bg-(--kira-rail) or bg-none border border-disabled)'
@@ -541,6 +629,11 @@ check_alias 'var\(--radius(-sm|-md|-lg|-xl)?\)' 'var(--kira-radius) (or the matc
 # no component may bypass it with its own halo or a wider/coloured outline.
 check_focus_width "(?<![-\\w])(?:focus-visible|focus-within|focus|has-\[[^\s\"']*focus-visible\]):ring-(?:[1-9][0-9]*|focus|error)"
 check_focus_width '(?<![-\w])(?:focus-visible|focus-within|focus|group-focus-within):outline-[2-9]'
+
+# P123: the four-value chrome type scale (§1.1) -- commit 7 reset both @theme roots, so a stock
+# Tailwind size or the retired xs step reaching chrome is always a regression, never a legitimate
+# alternative. Data-view sites keep their own sizes via the exemptions inside check_font_scale.
+check_font_scale
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
