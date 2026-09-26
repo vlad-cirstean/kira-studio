@@ -798,7 +798,7 @@ const preconnectText = computed({
             <ToggleGroup
               type="single"
               variant="outline"
-              size="sm"
+              size="kira-lg"
               :model-value="draft.mode"
               @update:model-value="(v) => v && setMode(v as 'fields' | 'uri')"
             >
@@ -1079,6 +1079,7 @@ const preconnectText = computed({
             <Label class="text-kira-sm leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
             <ToggleGroup
               type="single"
+              size="kira-lg"
               :model-value="draft.mcpReadMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-read"
@@ -1098,6 +1099,7 @@ const preconnectText = computed({
             <Label class="text-kira-sm leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
             <ToggleGroup
               type="single"
+              size="kira-lg"
               :model-value="draft.mcpWriteMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-write"
@@ -1117,6 +1119,7 @@ const preconnectText = computed({
             <Label class="text-kira-sm leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
             <ToggleGroup
               type="single"
+              size="kira-lg"
               :model-value="draft.mcpDdlMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-ddl"
