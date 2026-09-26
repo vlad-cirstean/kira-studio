@@ -50,8 +50,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="text-subtle text-kira-sm">{{ formatRelative(entry.recordedAt) }}</span>
           <!-- tracking-widest (0.1em) is the widest step Tailwind's default scale has; at this
-               span's inherited font-size (PopoverContent's own text-sm, 14px) that is 1.4px, not
-               the original flat 2px, but nothing further out exists on the scale. -->
+               span's inherited font-size (text-kira-md, 12px) that is 1.2px. -->
           <span
             v-if="notYetRevealed(entry)"
             class="overflow-hidden text-ellipsis whitespace-nowrap text-subtle tracking-widest"
