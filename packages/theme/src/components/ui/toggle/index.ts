@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority';
 export { default as Toggle } from '@theme/components/ui/toggle/Toggle.vue';
 
 export const toggleVariants = cva(
-  'hover:text-fg aria-pressed:bg-field focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error data-[state=on]:bg-field gap-1 rounded-kira text-sm font-medium transition-all [&_svg:not([class*=size-])]:size-4 group/toggle hover:bg-field inline-flex items-center justify-center whitespace-nowrap disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'hover:text-fg aria-pressed:bg-field focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error data-[state=on]:bg-field gap-1 rounded-kira text-kira-md font-medium transition-all [&_svg:not([class*=size-])]:size-4 group/toggle hover:bg-field inline-flex items-center justify-center whitespace-nowrap disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -14,12 +14,12 @@ export const toggleVariants = cva(
       size: {
         default:
           'h-8 min-w-8 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
-        sm: 'h-7 min-w-7 rounded-[min(var(--kira-radius-sm),12px)] px-2.5 text-[0.8rem] has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=size-])]:size-3.5',
+        sm: 'h-7 min-w-7 rounded-[min(var(--kira-radius-sm),12px)] px-2.5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*=size-])]:size-3.5',
         lg: 'h-9 min-w-9 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
         // P117 A1: the control-scale token size (Button's own kira precedent) — every pane/tab
         // ToggleGroup previously rendered at this cva's stock default (14px/32px) beside 11px/22px
         // toolbar chrome.
-        kira: 'h-control min-w-control px-2 text-kira-sm [&_svg:not([class*=size-])]:size-3.5',
+        kira: 'h-control min-w-control px-2 [&_svg:not([class*=size-])]:size-3.5',
       },
     },
     defaultVariants: {

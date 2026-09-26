@@ -10,7 +10,7 @@ const props = defineProps<{
 <template>
   <p
     data-slot="field-description"
-    :class="cn('leading-normal text-subtle text-kira-xs', props.class)"
+    :class="cn('leading-normal text-subtle text-kira-sm', props.class)"
   >
     <slot />
   </p>

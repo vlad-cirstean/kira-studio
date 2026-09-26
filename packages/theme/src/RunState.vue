@@ -38,7 +38,7 @@ const label = computed(() => {
 <template>
   <span
     data-testid="run-state"
-    :class="['inline-flex items-center gap-1 font-data text-kira-xs', TONE[state.status]]"
+    :class="['inline-flex items-center gap-1 font-data text-kira-sm', TONE[state.status]]"
   >
     <span data-testid="run-state-label" class="min-w-[7ch] text-right">{{ label }}</span>
     <span :class="['h-3 w-3 shrink-0 rounded-full border-2', RING[state.status]]" />

@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 
 // P110 B11: replaces workbench.css's own `.field`/`.field.checkbox` pair (`.field` -> vertical,
 // `.field.checkbox` -> horizontal). gap-1/gap-1.5 are --kira-s-2/--kira-s-3 (4px/6px).
-export const fieldVariants = cva('flex text-kira-sm', {
+export const fieldVariants = cva('flex text-kira-md', {
   variants: {
     orientation: {
       vertical: 'flex-col gap-1',

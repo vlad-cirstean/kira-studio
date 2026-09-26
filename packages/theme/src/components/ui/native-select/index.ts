@@ -19,7 +19,7 @@ export const nativeSelectVariants = cva(
   // above --kira-control-h and breaks the height match with every other control. min-h-0 removes
   // the floor so the authored height governs again, on every appearance: base-select engine, not
   // just the newer one.
-  'min-h-0 inline-flex shrink-0 items-center gap-1 pr-1 pl-1.5 rounded-kira-sm text-muted-foreground text-kira-sm cursor-pointer [appearance:base-select] [&::picker-icon]:text-muted-foreground [&::picker(select)]:[appearance:base-select] [&::picker(select)]:mt-0.5 [&::picker(select)]:p-0.5 [&::picker(select)]:bg-elevated [&::picker(select)]:border [&::picker(select)]:border-border-strong [&::picker(select)]:rounded-kira-sm [&::picker(select)]:shadow-kira [&_option]:py-1 [&_option]:px-1.5 [&_option]:rounded-kira-sm [&_option]:text-fg [&_option]:bg-transparent [&_option:hover]:bg-hover [&_option:checked]:bg-select [&_option:checked]:text-fg focus-visible:border-focus disabled:text-disabled disabled:cursor-default',
+  'min-h-0 inline-flex shrink-0 items-center gap-1 pr-1 pl-1.5 rounded-kira-sm text-muted-foreground text-kira-md cursor-pointer [appearance:base-select] [&::picker-icon]:text-muted-foreground [&::picker(select)]:[appearance:base-select] [&::picker(select)]:mt-0.5 [&::picker(select)]:p-0.5 [&::picker(select)]:bg-elevated [&::picker(select)]:border [&::picker(select)]:border-border-strong [&::picker(select)]:rounded-kira-sm [&::picker(select)]:shadow-kira [&_option]:py-1 [&_option]:px-1.5 [&_option]:rounded-kira-sm [&_option]:text-fg [&_option]:bg-transparent [&_option:hover]:bg-hover [&_option:checked]:bg-select [&_option:checked]:text-fg focus-visible:border-focus disabled:text-disabled disabled:cursor-default',
   {
     variants: {
       variant: {

@@ -11,7 +11,7 @@ defineProps<{
   <p
     data-slot="empty-description"
     :class="cn(
-      'text-kira-xs text-subtle leading-normal',
+      'text-kira-sm text-subtle leading-normal',
       $attrs.class ?? '',
     )"
   >
