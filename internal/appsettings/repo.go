@@ -60,24 +60,6 @@ func UpsertAppearance(tx *sql.Tx, a *AppearancePatch) error {
 	return UpsertOptional(tx, "appearance.dateFormat", a.DateFormat)
 }
 
-// UpsertGit mirrors both apps' own former upsertGitSection verbatim — "git.path" (not
-// "git.gitPath") is the stored key for GitPath, matching both apps' own pre-existing row shape.
-func UpsertGit(tx *sql.Tx, g *GitPatch) error {
-	if g == nil {
-		return nil
-	}
-	if err := UpsertOptional(tx, "git.protectedBranches", g.ProtectedBranches); err != nil {
-		return err
-	}
-	if err := UpsertOptional(tx, "git.fetchAutoIntervalMinutes", g.FetchAutoIntervalMinutes); err != nil {
-		return err
-	}
-	if err := UpsertOptional(tx, "git.path", g.GitPath); err != nil {
-		return err
-	}
-	return UpsertOptional(tx, "git.graphFontSize", g.GraphFontSize)
-}
-
 // Leaf mirrors both apps' own former leaf[T] verbatim: overwrites *dst with the stored value for
 // key if present, leaving the caller's default in place otherwise. An unparseable stored value is
 // a hand-edited or stale-shape row; it is left at its default rather than propagated, the same
@@ -126,16 +108,5 @@ func ReadAppearance(stored map[string]json.RawMessage) Appearance {
 	Leaf(stored, "appearance.rowColoring", &result.RowColoring)
 	Leaf(stored, "appearance.inlineBlame", &result.InlineBlame)
 	LeafValid(stored, "appearance.dateFormat", &result.DateFormat, ValidDateFormat)
-	return result
-}
-
-// ReadGit reads every git.* leaf from stored on top of DefaultGit(), mirroring both apps' own
-// former GetAll's git.* block verbatim.
-func ReadGit(stored map[string]json.RawMessage) Git {
-	result := DefaultGit()
-	Leaf(stored, "git.protectedBranches", &result.ProtectedBranches)
-	LeafValid(stored, "git.fetchAutoIntervalMinutes", &result.FetchAutoIntervalMinutes, validFetchAutoIntervalMinutes)
-	Leaf(stored, "git.path", &result.GitPath)
-	LeafValid(stored, "git.graphFontSize", &result.GraphFontSize, validGraphFontSize)
 	return result
 }

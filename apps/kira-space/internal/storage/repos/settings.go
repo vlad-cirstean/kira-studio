@@ -42,9 +42,39 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 
 	result := model.DefaultSettings()
 	result.Appearance = appsettings.ReadAppearance(stored)
-	result.Git = appsettings.ReadGit(stored)
+	result.Git = readGit(stored)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
+}
+
+// readGit reads every git.* leaf from stored on top of model.DefaultGitSettings(), mirroring the
+// former appsettings.ReadGit verbatim (P120: Git is this app's own model, the only app with a git
+// module).
+func readGit(stored map[string]json.RawMessage) model.GitSettings {
+	result := model.DefaultGitSettings()
+	appsettings.Leaf(stored, "git.protectedBranches", &result.ProtectedBranches)
+	appsettings.LeafValid(stored, "git.fetchAutoIntervalMinutes", &result.FetchAutoIntervalMinutes, model.ValidFetchAutoIntervalMinutes)
+	appsettings.Leaf(stored, "git.path", &result.GitPath)
+	appsettings.LeafValid(stored, "git.graphFontSize", &result.GraphFontSize, model.ValidGraphFontSize)
+	return result
+}
+
+// upsertGit mirrors the former appsettings.UpsertGit verbatim — "git.path" (not "git.gitPath") is
+// the stored key for GitPath, matching this app's pre-existing row shape.
+func upsertGit(tx *sql.Tx, g *model.GitPatch) error {
+	if g == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "git.protectedBranches", g.ProtectedBranches); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "git.fetchAutoIntervalMinutes", g.FetchAutoIntervalMinutes); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "git.path", g.GitPath); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "git.graphFontSize", g.GraphFontSize)
 }
 
 func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
@@ -68,7 +98,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
 			return err
 		}
-		return appsettings.UpsertGit(tx, patch.Git)
+		return upsertGit(tx, patch.Git)
 	})
 	if err != nil {
 		return model.Settings{}, err

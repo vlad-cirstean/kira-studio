@@ -1,9 +1,7 @@
 import {
   appearanceSettingsSchema,
-  FETCH_AUTO_INTERVAL_MINUTES_RANGE,
   FONT_SIZE_RANGE,
   gitLogLevelSchema,
-  gitSettingsSchema,
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
@@ -11,15 +9,42 @@ import { z } from 'zod';
 // defaultSettings, split out of the former one shared `@shared/domain/settings` — this store used
 // to carry Kira Studio's own data/cache/api/dbMcp/claudeCode sections dead (never populated by this
 // app's own Go backend, apps/kira-space/internal/storage/model/settings.go), the same "tab-kind
-// vocabulary" defect P103 Part 2 already fixed for tabs. appearance/git/gitLogLevel stay genuinely
-// shared; FONT_SIZE_RANGE/FETCH_AUTO_INTERVAL_MINUTES_RANGE are the two this app's own GitPane
-// reads directly, so those two re-export — the raw schema objects (appearanceSettingsSchema/
-// gitLogLevelSchema/gitSettingsSchema/rowDensitySchema) and `GitSettings` stay import-only: nothing
-// outside this file references them directly, every real consumer reads through the composed
+// vocabulary" defect P103 Part 2 already fixed for tabs. appearance/gitLogLevel stay genuinely
+// shared; FONT_SIZE_RANGE is the one this app's own GitPane reads directly, so it re-exports; git
+// is this app's own (P120: Kira Space is the only app with a git module) — its schema and
+// `FETCH_AUTO_INTERVAL_MINUTES_RANGE` are defined below, not imported. The raw schema objects
+// (appearanceSettingsSchema/gitLogLevelSchema/rowDensitySchema) stay import-only: nothing outside
+// this file references them directly, every real consumer reads through the composed
 // `Settings`/`SettingsPatch`/`defaultSettings` below. `AppearanceSettings`/`GitLogLevel`/
 // `RowDensity` used to re-export here too; every pane now reads them straight from
 // `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
-export { FETCH_AUTO_INTERVAL_MINUTES_RANGE, FONT_SIZE_RANGE };
+export { FONT_SIZE_RANGE };
+
+// G7 D16: minutes between automatic background fetches; 0 disables it.
+export const FETCH_AUTO_INTERVAL_MINUTES_RANGE = { min: 0, max: 1440 } as const;
+
+// G7 D16: server-owned — two windows disagreeing about either is a correctness/safety issue (a
+// force-push confirmation only one window enforces, an auto-fetch cadence that differs per
+// viewer), edited only in this dialog, never as a per-window VS Code setting. Not exported —
+// nothing outside this file references the raw schema object; `Settings['git']` covers real
+// consumers.
+const gitSettingsSchema = /*#__PURE__*/ z.object({
+  protectedBranches: z.array(z.string()).default(['main', 'master', 'release/*']),
+  fetchAutoIntervalMinutes: z
+    .number()
+    .int()
+    .min(FETCH_AUTO_INTERVAL_MINUTES_RANGE.min)
+    .max(FETCH_AUTO_INTERVAL_MINUTES_RANGE.max)
+    .default(0),
+  // G18 D15: git.path was already classified server-owned (it answers "where is the git binary
+  // on this machine", not a per-repo or per-window preference) but its wiring was dead until that
+  // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
+  // discover" (VS Code's own git.path, then PATH) — gitclient.Discovery's own existing contract.
+  gitPath: z.string().default(''),
+  // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
+  // diff, review) through --vscode-font-size, which nothing else in this app consumes.
+  graphFontSize: z.number().int().min(0).max(FONT_SIZE_RANGE.max).default(0),
+});
 
 // advanced carries just gitLogLevel here — this app's own diagnostic log verbosity, its entire
 // `advanced` section (apps/kira-space/internal/storage/model/settings.go's own AdvancedSettings

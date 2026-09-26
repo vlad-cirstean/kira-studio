@@ -24,7 +24,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/appsettings"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
@@ -370,7 +369,7 @@ func wireGit(repositories *repos.Repos) gitWired {
 		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
 		Askpass: askpassBroker,
 		SetGitPath: func(gitPath string) error {
-			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &appsettings.GitPatch{GitPath: &gitPath}})
+			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
 			return err
 		},
 	})

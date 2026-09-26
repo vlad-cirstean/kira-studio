@@ -1,22 +1,21 @@
 import { z } from 'zod';
 
 // P103 Part 4 (§7.3): trimmed to the sections genuinely shared between both apps' own
-// settingsSchema — appearance, the gitLogLevel enum (both apps' own `advanced` section embeds it,
-// alongside whatever else is app-only) and git. Everything app-only (data/cache/api/dbMcp/
-// claudeCode, Kira Studio only) moved to each app's own frontend/src/state/settingsDomain.ts,
-// which composes its own settingsSchema/settingsPatchSchema/defaultSettings out of this file's
-// exports plus its own sections — the same split apps/*/internal/storage/model/settings.go already
-// follows against internal/appsettings (§7.1).
+// settingsSchema — appearance and the gitLogLevel enum (both apps' own `advanced` section embeds
+// it, alongside whatever else is app-only). Everything app-only (data/cache/api/dbMcp/claudeCode,
+// Kira Studio only; git, Kira Space only — P120: Kira Space is the only app with a git module)
+// moved to each app's own frontend/src/state/settingsDomain.ts, which composes its own
+// settingsSchema/settingsPatchSchema/defaultSettings out of this file's exports plus its own
+// sections — the same split apps/*/internal/storage/model/settings.go already follows against
+// internal/appsettings (§7.1).
 
 export const rowDensitySchema = /*#__PURE__*/ z.enum(['compact', 'comfortable']);
 export type RowDensity = z.infer<typeof rowDensitySchema>;
 
-// P17 D6: the one numeric bound both apps' appearance/git panes read (input min/max attributes,
-// the settings dialog's own validity check), as an exported constant so it's one number, not two
+// P17 D6: the one numeric bound both apps' appearance panes read (input min/max attributes, the
+// settings dialog's own validity check), as an exported constant so it's one number, not two
 // hard-coded copies.
 export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
-// G7 D16: minutes between automatic background fetches; 0 disables it.
-export const FETCH_AUTO_INTERVAL_MINUTES_RANGE = { min: 0, max: 1440 } as const;
 
 // P90 §2.1: genuinely shared, not merely parallel — domain/http.ts's own HttpRequestSettingsWire
 // (Kira Studio's HTTP request builder, the only consumer of either) needs this enum from a shared
@@ -62,25 +61,3 @@ export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 // leaf, its entire content). Go's own appsettings.ValidLogLevel mirrors this same enum.
 export const gitLogLevelSchema = /*#__PURE__*/ z.enum(['off', 'error', 'warn', 'info', 'debug']);
 export type GitLogLevel = z.infer<typeof gitLogLevelSchema>;
-
-// G7 D16: server-owned — two windows disagreeing about either is a correctness/safety issue (a
-// force-push confirmation only one window enforces, an auto-fetch cadence that differs per
-// viewer), edited only in this dialog, never as a per-window VS Code setting.
-export const gitSettingsSchema = /*#__PURE__*/ z.object({
-  protectedBranches: z.array(z.string()).default(['main', 'master', 'release/*']),
-  fetchAutoIntervalMinutes: z
-    .number()
-    .int()
-    .min(FETCH_AUTO_INTERVAL_MINUTES_RANGE.min)
-    .max(FETCH_AUTO_INTERVAL_MINUTES_RANGE.max)
-    .default(0),
-  // G18 D15: git.path was already classified server-owned (it answers "where is the git binary
-  // on this machine", not a per-repo or per-window preference) but its wiring was dead until this
-  // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
-  // discover" (VS Code's own git.path, then PATH) — gitclient.Discovery's own existing contract.
-  gitPath: z.string().default(''),
-  // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
-  // diff, review) through --vscode-font-size, which nothing else in this app consumes.
-  graphFontSize: z.number().int().min(0).max(FONT_SIZE_RANGE.max).default(0),
-});
-export type GitSettings = z.infer<typeof gitSettingsSchema>;
