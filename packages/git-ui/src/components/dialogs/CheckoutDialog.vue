@@ -82,7 +82,7 @@ function stashAndCarry(): void {
 
     <template v-else-if="headline?.kind === 'blockedByUntracked'">
       <p>These untracked files would be overwritten by the checkout:</p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
         <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
       </ul>
       <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
@@ -90,7 +90,7 @@ function stashAndCarry(): void {
 
     <template v-else-if="trackedBlocker">
       <p>These local changes would be overwritten by the checkout:</p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
         <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
       </ul>
       <p v-if="canDiscard" class="kv:text-diff-deleted">

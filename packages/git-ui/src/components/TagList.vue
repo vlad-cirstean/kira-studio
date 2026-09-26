@@ -121,15 +121,15 @@ async function onRefMenuSelect(id: string): Promise<void> {
           aria-hidden="true"
         ></span>
         <span class="kv:truncate">{{ row.shortName }}</span>
-        <span class="kv:text-xs kv:text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
+        <span class="kv:text-sm kv:text-muted-foreground">{{ row.annotation ? "annotated" : "lightweight" }}</span>
         <span
           v-if="row.annotation"
-          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted-foreground"
+          class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground"
           v-kui-tooltip="row.annotation.subject"
         >
           {{ row.annotation.subject }}
         </span>
-        <span class="kv:font-data kv:text-xs kv:text-muted-foreground">{{ targetCommit(row) }}</span>
+        <span class="kv:font-data kv:text-sm kv:text-muted-foreground">{{ targetCommit(row) }}</span>
       </KuiButton>
       <RowActionsButton
         @click="openRefMenuFromButton(row, $event)"
@@ -137,7 +137,7 @@ async function onRefMenuSelect(id: string): Promise<void> {
       />
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No tags</div>
+    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No tags</div>
 
     <RowContextMenu
       v-if="refMenu"

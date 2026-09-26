@@ -93,7 +93,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
-      <div v-else class="kv:flex kv:items-center kv:gap-1 kv:ml-auto kv:text-sm">
+      <div v-else class="kv:flex kv:items-center kv:gap-1 kv:ml-auto kv:text-base">
         <KuiButton @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
         </KuiButton>
@@ -148,7 +148,7 @@ function anchorTitle(c: ReviewComment): string | undefined {
                 @click.stop="reviewComments.remove(c.id)"
               />
             </div>
-            <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-sm">{{ c.body }}</p>
+            <p class="kv:m-0 kv:pl-2.5 kv:whitespace-pre-wrap kv:text-row-fg kv:text-base">{{ c.body }}</p>
           </div>
         </div>
       </div>

@@ -92,14 +92,14 @@ function optionClass(option: SearchOption): string {
     <div :id="SEARCH_LISTBOX_ID" role="listbox" aria-label="Search results">
       <div
         v-if="searching"
-        class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs"
+        class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
         data-testid="search-status"
       >
         Searching…
       </div>
 
       <template v-for="section in model.sections" :key="section.title">
-        <div class="kv:py-0.5 kv:px-2 kv:text-xs kv:font-semibold kv:text-muted-foreground">
+        <div class="kv:py-0.5 kv:px-2 kv:text-sm kv:font-semibold kv:text-muted-foreground">
           {{ section.title }} <span class="kv:font-normal">({{ section.options.length }})</span>
         </div>
 
@@ -127,7 +127,7 @@ function optionClass(option: SearchOption): string {
               <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.ref.shortName }}</span>
               <span
                 v-if="fieldLabel(option.hit.fields)"
-                class="kv:px-0.5 kv:text-muted-foreground kv:text-xs kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+                class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
               >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
@@ -135,41 +135,41 @@ function optionClass(option: SearchOption): string {
             <template v-else>
               <span class="kv:font-data kv:text-muted-foreground">{{ option.hit.sha.slice(0, 7) }}</span>
               <span class="kv:flex-1 kv:min-w-0 kv:truncate">{{ option.hit.subject }}</span>
-              <span class="kv:text-muted-foreground kv:text-xs">{{ option.hit.authorName }}</span>
-              <span class="kv:text-muted-foreground kv:text-xs">{{ formatRelativeDate(option.hit.authorTime) }}</span>
+              <span class="kv:text-muted-foreground kv:text-sm">{{ option.hit.authorName }}</span>
+              <span class="kv:text-muted-foreground kv:text-sm">{{ formatRelativeDate(option.hit.authorTime) }}</span>
               <span
                 v-if="fieldLabel(option.hit.fields)"
-                class="kv:px-0.5 kv:text-muted-foreground kv:text-xs kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
+                class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm"
               >
                 {{ fieldLabel(option.hit.fields) }}
               </span>
             </template>
           </div>
         </template>
-        <div v-if="section.hiddenCount > 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">
+        <div v-if="section.hiddenCount > 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
           {{ section.hiddenCount }} more — refine your search
         </div>
       </template>
 
-      <div v-if="isEmpty" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No results</div>
+      <div v-if="isEmpty" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No results</div>
     </div>
 
     <div
       v-if="tailStale"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs"
+      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
       data-testid="search-tail-stale"
     >
       Refs changed since this search ran
     </div>
-    <div v-if="model.loadedFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">
+    <div v-if="model.loadedFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
       {{ model.loadedFooter }}
     </div>
-    <div v-if="model.tailFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">
+    <div v-if="model.tailFooter" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
       {{ model.tailFooter }}
     </div>
     <div
       v-if="model.tailNotice"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs"
+      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
       data-testid="search-tail-notice"
     >
       {{ model.tailNotice }}

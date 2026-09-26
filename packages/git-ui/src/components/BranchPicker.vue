@@ -678,12 +678,12 @@ watch(visibleBranchNames, (names) => {
                 >
                 <span
                   v-if="row.checkedOutIn"
-                  class="kv:text-xs kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted-foreground"
+                  class="kv:text-sm kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted-foreground"
                   v-kui-tooltip="`Checked out in ${row.checkedOutIn}`"
                 >
                   worktree
                 </span>
-                <span v-if="formatTrack(row.track)" class="kv:text-xs kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
+                <span v-if="formatTrack(row.track)" class="kv:text-sm kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
               </KuiButton>
               <RowActionsButton
                 @click="openRefMenuFromButton(row, $event)"
@@ -693,14 +693,14 @@ watch(visibleBranchNames, (names) => {
           </div>
           <div
             v-if="forceDeleteCandidate"
-            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-xs"
+            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-base"
           >
             <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
             <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
             <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
           </div>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
-          <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No branches</div>
         </section>
 
         <section aria-label="Remote branches">
@@ -718,7 +718,7 @@ watch(visibleBranchNames, (names) => {
               @click="checkoutRemote(row)"
             >
               <span class="kv:truncate">{{ row.shortName }}</span>
-              <span class="kv:text-xs kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
+              <span class="kv:text-sm kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
             </KuiButton>
             <RowActionsButton
               @click="openRefMenuFromButton(row, $event)"
@@ -726,7 +726,7 @@ watch(visibleBranchNames, (names) => {
             />
           </div>
           <ShowMoreButton :hidden-count="model.branchesRemote.hiddenCount" @click="showMore('branchesRemote')" />
-          <div v-if="model.branchesRemote.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">
+          <div v-if="model.branchesRemote.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">
             No remote branches
           </div>
         </section>

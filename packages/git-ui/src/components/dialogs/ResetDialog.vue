@@ -90,7 +90,7 @@ function confirm(): void {
         <template v-if="preflight.branch"><code>{{ preflight.branch }}</code></template>
         <template v-else>HEAD</template>:
       </p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
         <li v-for="c in preflight.leavingCommits" :key="c.sha">
           <code>{{ c.sha.slice(0, 7) }}</code> {{ c.subject }}
         </li>
@@ -153,7 +153,7 @@ function confirm(): void {
 
     <template v-if="mode === 'hard' && destroys.length > 0">
       <p class="kv:text-diff-deleted">This will permanently discard these uncommitted changes:</p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
         <li v-for="path in destroys" :key="path"><code>{{ path }}</code></li>
       </ul>
       <p class="kv:text-muted-foreground kv:italic">

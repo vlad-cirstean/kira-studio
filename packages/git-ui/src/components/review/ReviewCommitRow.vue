@@ -227,7 +227,7 @@ function onOpenFile(index: number, pinned: boolean): void {
            below it. GitLens's own commit-node anatomy. -->
       <span class="kv:flex kv:flex-col kv:gap-0.5 kv:flex-1 kv:min-w-0">
         <span class="kv:truncate">{{ commit.subject }}</span>
-        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-xs kv:whitespace-nowrap kv:overflow-hidden">
+        <span class="kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap kv:overflow-hidden">
           <span class="kv:overflow-hidden kv:text-ellipsis">{{ commit.author.name }}</span>
           <span class="kv:shrink-0" aria-hidden="true">·</span>
           <span class="kv:overflow-hidden kv:text-ellipsis">{{ dateText }}</span>

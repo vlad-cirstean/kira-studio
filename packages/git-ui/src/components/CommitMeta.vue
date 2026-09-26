@@ -311,7 +311,7 @@ const prIcon = computed(() => {
     data-testid="commit-meta"
   >
     <div class="kv:flex kv:items-start kv:justify-between kv:gap-1">
-      <h2 class="kv-meta-subject kv:m-0 kv:text-base kv:font-semibold">{{ detail.subject }}</h2>
+      <h2 class="kv-meta-subject kv:m-0 kv:text-lg kv:font-semibold">{{ detail.subject }}</h2>
       <KuiButton
         variant="icon"
         icon="codicon-diff-multiple"
@@ -322,7 +322,7 @@ const prIcon = computed(() => {
       />
     </div>
 
-    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-xs">
+    <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-sm">
       <span v-kui-tooltip="formatAbsoluteDate(detail.committer.timestamp)">{{
         formatRelativeDate(detail.committer.timestamp)
       }}</span>
@@ -371,7 +371,7 @@ const prIcon = computed(() => {
       </p>
       <p v-if="committerDiffersFromAuthor" class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
         {{ detail.committer.name }} &lt;{{ detail.committer.email }}&gt;
-        <span class="kv:text-xs">committer</span>
+        <span class="kv:text-sm">committer</span>
       </p>
       <dl
         v-if="trailerRows.length > 0"

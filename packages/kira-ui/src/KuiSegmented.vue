@@ -23,7 +23,7 @@ import { cva } from 'class-variance-authority';
 import type { KuiSegmentedOption } from './optionTypes.ts';
 
 const kuiSegmentedButtonVariants = cva(
-  'kv:flex kv:items-center kv:justify-center kv:gap-0.5 kv:px-1.5 kv:border-0 kv:bg-transparent kv:text-kui-sm kv:cursor-pointer kv:whitespace-nowrap',
+  'kv:flex kv:items-center kv:justify-center kv:gap-0.5 kv:px-1.5 kv:border-0 kv:bg-transparent kv:text-kui-base kv:cursor-pointer kv:whitespace-nowrap',
   {
     variants: {
       active: {
@@ -69,7 +69,7 @@ const emit = defineEmits<(e: 'update:modelValue', value: string) => void>();
       <span class="codicon" :class="option.icon" aria-hidden="true"></span>
       <span
         v-if="option.badge !== undefined"
-        class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-hover kv:text-kui-xs kv:leading-kui-control-sm"
+        class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-hover kv:text-kui-sm kv:leading-kui-control-sm"
         data-testid="kui-segmented-badge"
         >{{ option.badge }}</span
       >

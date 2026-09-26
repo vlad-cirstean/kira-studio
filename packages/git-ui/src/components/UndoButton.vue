@@ -45,13 +45,13 @@ async function undo(): Promise<void> {
          default, the same call the "Show more"/"Show less" toggle gets for the identical reason. -->
     <KuiButton
       v-if="clipboardEnabled"
-      class="kv:font-data kv:text-xs kv:text-muted-foreground kv:cursor-copy"
+      class="kv:font-data kv:text-sm kv:text-muted-foreground kv:cursor-copy"
       v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
       @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
     >
       {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
     </KuiButton>
-    <span v-else class="kv:font-data kv:text-xs kv:text-muted-foreground kv:cursor-copy">{{
+    <span v-else class="kv:font-data kv:text-sm kv:text-muted-foreground kv:cursor-copy">{{
       ops.undoSlot.value.recoverySha.slice(0, 7)
     }}</span>
   </div>

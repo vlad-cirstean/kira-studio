@@ -368,7 +368,7 @@ function onClose(): void {
       <p class="kv:text-diff-deleted">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
       <template v-if="!started">
         <p>This repository has a prepare script:</p>
-        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-xs kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
+        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
         <p v-if="!runPrepareScriptCapability" class="kv:text-diff-deleted kv:my-0.5">
           Running scripts is disabled here.
         </p>
@@ -378,7 +378,7 @@ function onClose(): void {
         </label>
       </template>
       <template v-else>
-        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-xs kv:whitespace-pre-wrap kv:break-all"><span
+        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all"><span
           v-for="(line, i) in ops.worktreePrepareOutput.value"
           :key="i"
           :class="line.stream === 'stderr' ? 'kv:text-diff-deleted' : ''"

@@ -29,7 +29,7 @@ const noCommitModel = computed({
   </div>
   <div v-else-if="prediction.kind === 'conflicts'" class="kv:my-2">
     <p>This will likely conflict in:</p>
-    <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+    <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
       <li v-for="path in prediction.paths" :key="path"><code>{{ path }}</code></li>
     </ul>
     <label class="kv:block kv:mt-1">

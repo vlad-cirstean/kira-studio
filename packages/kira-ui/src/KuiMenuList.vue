@@ -135,7 +135,7 @@ defineExpose({
   >
     <div
       v-if="title"
-      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-1.5 kv:text-kui-xs kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-wider kv:truncate"
+      class="kv:flex kv:items-center kv:h-kui-control-sm kv:px-1.5 kv:text-kui-sm kv:font-semibold kv:text-kui-fg-subtle kv:uppercase kv:tracking-wider kv:truncate"
       aria-hidden="true"
     >
       {{ title }}
@@ -167,7 +167,7 @@ defineExpose({
         />
         <span class="kv:flex kv:flex-col kv:min-w-0">
           <span>{{ item.label }}</span>
-          <span v-if="item.detail" class="kv:text-kui-xs kv:text-kui-fg-muted">{{ item.detail }}</span>
+          <span v-if="item.detail" class="kv:text-kui-sm kv:text-kui-fg-muted">{{ item.detail }}</span>
         </span>
         <span
           v-if="item.disabled && item.disabledReason"

@@ -142,7 +142,7 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground"
+      class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
@@ -152,19 +152,19 @@ const PATH_DISPLAY_CAP = 20;
     <p
       v-else-if="inProgress.unmergedCount > 0"
       :id="CONTINUE_REASON_ID"
-      class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground"
+      class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground"
     >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
       then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
     </p>
-    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-xs kv:text-muted-foreground">
+    <p v-else-if="inProgress.canSkip" class="kv:mt-0.5 kv:text-sm kv:text-muted-foreground">
       No conflicts remain. Continue to commit this change, or Skip if it is already present.
     </p>
 
     <ul
       v-if="inProgress.conflictedPaths.length > 0"
-      class="kv:mt-0.5 kv:pl-3 kv:max-h-20 kv:overflow-y-auto kv:font-data kv:text-xs"
+      class="kv:mt-0.5 kv:pl-3 kv:max-h-20 kv:overflow-y-auto kv:font-data kv:text-sm"
     >
       <li v-for="path in inProgress.conflictedPaths.slice(0, PATH_DISPLAY_CAP)" :key="path">
         <code>{{ path }}</code>

@@ -89,19 +89,19 @@ function confirm(): void {
         </template>
         <template v-else-if="blocker.kind === 'stagedChanges'">
           <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
         <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
           <p>These local changes would be overwritten by this pick:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
         <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
           <p>These untracked files would be overwritten by this pick:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
         </template>
