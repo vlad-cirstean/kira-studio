@@ -94,6 +94,7 @@ describe('agentActivity — reduceAgentActivity (P86 §13)', () => {
     expect(stopped.phase).toBe('idle');
     expect(stopped.runningTools).toEqual([]);
     expect(stopped.message).toBeNull();
+    expect(stopped.toolName).toBeNull();
   });
 
   test('7. runningTools past MAX_RUNNING_TOOLS drops the oldest, not the newest', () => {

@@ -35,9 +35,9 @@ export function reduceAgentActivity(
       // the set here would leave the following PostToolUse unmatched too.
       return { ...base, phase: 'attention', message: event.message || null };
     case 'Stop':
-      // Clears everything, which is what heals a session that lost a PostToolUse to the
-      // listener's own bounds (internal/agenthooks/http.go §6.1).
-      return { ...base, phase: 'idle', runningTools: [], message: null };
+      // Clears everything (P86 §13 rule 4), which is what heals a session that lost a
+      // PostToolUse to the listener's own bounds (internal/agenthooks/http.go §6.1).
+      return { ...base, phase: 'idle', runningTools: [], toolName: null, message: null };
     default:
       return base;
   }
