@@ -18,11 +18,11 @@ import type {
   EventKey,
   EventPayload,
   FileChange,
-  GitStatus,
   ParamsOf,
   RequestKey,
   ResultOf,
   ReviewSessionSnapshot,
+  ServerAppInitResult,
   Transport,
 } from '@kira/git-ipc';
 import { copyText } from '@workbench/util/clipboard';
@@ -110,14 +110,9 @@ function codeRepoIdFor(gitRepoId: string): string | undefined {
 // D11's own shape, ported: the Go server's real app.init result is only these three fields
 // (handlers.go's handleAppInit) — host/settings/capabilities are composed entirely host-side
 // (S3's own doc comment: neither crosses the Go wire). Contract['app.init']['result'] describes
-// the *client-visible* shape after that composition, which is why this is its own narrower local
-// type rather than trusting ResultOf<'app.init'> for what the raw stream actually returns — the
-// exact same move proxyHandlers.ts's own ServerAppInitResult makes for the identical reason.
-interface ServerAppInitResult {
-  readonly contractVersion: number;
-  readonly serverVersion: string;
-  readonly git: GitStatus;
-}
+// the *client-visible* shape after that composition, which is why every caller of this cast (this
+// file, proxyHandlers.ts, extension.ts) uses git-ipc's own ServerAppInitResult (P115 H9) rather
+// than trusting ResultOf<'app.init'> for what the raw stream actually returns.
 
 async function findChangeInDetail(
   remoteRequest: Transport['request'],

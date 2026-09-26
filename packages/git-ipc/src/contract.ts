@@ -1165,6 +1165,18 @@ export type GitStatus =
     }
   | { readonly kind: 'unusable'; readonly path: string; readonly reason: string };
 
+// P115 H9: `extension.ts`, `proxyHandlers.ts` and `hostHandlers.ts` each declared this exact
+// interface locally (byte-for-byte) — the Go server's real `app.init` result before host/settings/
+// capabilities are composed host-side (S3's own doc comment: neither crosses the Go wire), so a
+// caller reading the raw stream casts to this narrower shape rather than trusting `ResultOf<
+// 'app.init'>`, which describes the *client-visible* shape after that composition. Mirrors
+// internal/gitrpc/wire.go's AppInitResult field for field.
+export interface ServerAppInitResult {
+  readonly contractVersion: number;
+  readonly serverVersion: string;
+  readonly git: GitStatus;
+}
+
 // ---------------------------------------------------------------------------------------
 // G24: GitHub PR links (D1/D5/D14) — a structural copy of internal/ghclient.Status/PR, kept honest
 // by hand (this repo carries no wireConformance.test.ts — see G24's own commit message for why).

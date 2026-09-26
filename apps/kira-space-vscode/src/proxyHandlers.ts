@@ -35,10 +35,10 @@ import type {
 } from '@kira/git-core';
 import { findChangeInDetail as lookupChangeInDetail } from '@kira/git-core';
 import type {
-  GitStatus,
   RequestHandler,
   RequestKey,
   ReviewSessionSnapshot,
+  ServerAppInitResult,
   ServerHandlers,
   SettingsSnapshot,
 } from '@kira/git-ipc';
@@ -49,14 +49,9 @@ import { isValidPrBrowserUrl } from './prUrl.ts';
 import { virtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
-// settings/capabilities (SPEC §5 item 3 assigns those to the extension) — mirrors
-// internal/gitrpc/wire.go's AppInitResult field for field, cast rather than trusted at the
-// webview contract's own type the way extension.ts's own probe call already does.
-interface ServerAppInitResult {
-  readonly contractVersion: number;
-  readonly serverVersion: string;
-  readonly git: GitStatus;
-}
+// settings/capabilities (SPEC §5 item 3 assigns those to the extension) — cast to ServerAppInitResult
+// (P115 H9) rather than trusted at the webview contract's own type, the way extension.ts's own
+// probe call already does.
 
 /**
  * G19 D11b: the minimal shape this file needs from `context.workspaceState` — never

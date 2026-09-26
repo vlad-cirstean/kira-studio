@@ -25,7 +25,7 @@ import {
   type SettingKey,
   type VirtualDocumentSource,
 } from '@kira/git-core';
-import type { GitStatus, RepoSettingsPatch } from '@kira/git-ipc';
+import type { RepoSettingsPatch, ServerAppInitResult } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import {
   type BlameDisplayState,
@@ -63,13 +63,8 @@ import { parseVirtualKey } from './virtualKey.ts';
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
 // settings/capabilities (SPEC §5 item 3 assigns those to the extension, which has no webview to
 // compose them for yet, D13) — genuinely a different wire shape than RequestKey's own ResultOf<
-// 'app.init'>, so this call is cast to gitrpc's real shape rather than trusted at its contract
-// type. Mirrors internal/gitrpc/wire.go's AppInitResult field for field.
-interface ServerAppInitResult {
-  readonly contractVersion: number;
-  readonly serverVersion: string;
-  readonly git: GitStatus;
-}
+// 'app.init'>, so this call is cast to gitrpc's real shape (ServerAppInitResult, P115 H9) rather
+// than trusted at its contract type.
 
 // G10 D19: command ids themselves now live in commands.ts's tables (the only place activate()
 // reads them from to register) — STATUS_COMMAND/OPEN_REPO_COMMAND/REVIEW_BRANCH_COMMAND are gone

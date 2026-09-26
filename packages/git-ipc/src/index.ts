@@ -83,6 +83,7 @@ export type {
   SearchMatchField,
   SearchQueryParams,
   SearchRunResult,
+  ServerAppInitResult,
   SettingsSnapshot,
   SignatureStatus,
   StackBranch,
