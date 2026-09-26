@@ -245,6 +245,16 @@ func TestIntegration_CommitDetailAndFileTree(t *testing.T) {
 		t.Fatal("signature status is empty")
 	}
 
+	// P124: a root commit with no ref and no trailer — every "none" must reach the wire as `[]`,
+	// not `null`. Read raw: decoding into Go slices can't tell the two apart.
+	respRoot := requestOK(t, client, "commit.detail", gitrpc.CommitDetailParams{RepoID: repoID, SHA: f.root})
+	rootFields := unmarshalResult[map[string]json.RawMessage](t, respRoot.Result)
+	for _, field := range []string{"parents", "trailers", "decoration"} {
+		if got := string(rootFields[field]); got != "[]" {
+			t.Fatalf("root commit %s = %s, want []", field, got)
+		}
+	}
+
 	if f.signed != "" {
 		respSigned := requestOK(t, client, "commit.detail", gitrpc.CommitDetailParams{RepoID: repoID, SHA: f.signed})
 		signedDetail := unmarshalResult[porcelain.CommitDetail](t, respSigned.Result)

@@ -257,10 +257,13 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		return porcelain.CommitDetail{}, err
 	}
 
+	// P124: the parsers return nil for "none" (a root commit, no trailers, no ref); the wire
+	// contract declares all three non-null arrays, and CommitMeta.vue's "Show more" render threw on
+	// `decoration: null`.
 	detail := porcelain.CommitDetail{
-		SHA: meta.SHA, Parents: meta.Parents, Author: meta.Author, Committer: meta.Committer,
-		Subject: meta.Subject, Body: body, Trailers: trailers, Signature: sig,
-		Decoration: meta.Decoration, ParentIndex: parentIndex,
+		SHA: meta.SHA, Parents: nonNil(meta.Parents), Author: meta.Author, Committer: meta.Committer,
+		Subject: meta.Subject, Body: body, Trailers: nonNil(trailers), Signature: sig,
+		Decoration: nonNil(meta.Decoration), ParentIndex: parentIndex,
 		Files: porcelain.CombineFileChanges(numstat, nameStatus),
 	}
 	if e.cacheGeneration() == gen {
