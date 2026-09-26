@@ -51,6 +51,7 @@ export const controlSnapshots: ControlSnapshot[] = [
         keyValue: false,
         stream: false,
         keyBrowser: false,
+        keyTypes: false,
         defaultPageKind: 'tabular',
         sql: true,
         definition: true,
