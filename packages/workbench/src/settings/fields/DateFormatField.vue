@@ -14,8 +14,8 @@ const props = defineProps<{
   resetLeaf: (section: 'appearance', key: 'dateFormat') => void;
 }>();
 
-function onDateFormatChange(e: Event): void {
-  props.appearance.dateFormat = (e.target as HTMLSelectElement).value as AppearanceSettings['dateFormat'];
+function onDateFormatChange(value: unknown): void {
+  props.appearance.dateFormat = String(value) as AppearanceSettings['dateFormat'];
 }
 
 // F3: a native `<label>` delegates its click to its first labelable descendant -- with the Reset
@@ -43,8 +43,8 @@ const fieldId = useId();
       variant="bordered"
       size="kira-lg"
       data-testid="settings-date-format"
-      :value="appearance.dateFormat"
-      @change="onDateFormatChange"
+      :model-value="appearance.dateFormat"
+      @update:model-value="onDateFormatChange"
     >
       <option value="relative">Relative (3 days ago)</option>
       <option value="absolute">Absolute (2024-12-30 22:48)</option>

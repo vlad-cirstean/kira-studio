@@ -15,8 +15,8 @@ const props = defineProps<{
   resetLeaf: (section: 'advanced', key: 'gitLogLevel') => void;
 }>();
 
-function onGitLogLevelChange(e: Event): void {
-  props.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
+function onGitLogLevelChange(value: unknown): void {
+  props.advanced.gitLogLevel = String(value) as GitLogLevel;
 }
 
 // F3: see DateFormatField.vue's own comment -- `for` + `id` ties the label to the select
@@ -43,8 +43,8 @@ const fieldId = useId();
       variant="bordered"
       size="kira-lg"
       data-testid="settings-git-log-level"
-      :value="advanced.gitLogLevel"
-      @change="onGitLogLevelChange"
+      :model-value="advanced.gitLogLevel"
+      @update:model-value="onGitLogLevelChange"
     >
       <option value="off">Off</option>
       <option value="error">Error</option>
