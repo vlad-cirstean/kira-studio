@@ -211,7 +211,19 @@ A couple of things worth knowing up front:
 
 ## Install
 
-There's no release yet, so installing means building it yourself:
+Run in Terminal — installs a fresh copy or replaces an older one, then opens the app:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vlad-cirstean/kira-studio/main/scripts/install.sh | sh -s -- --app=studio
+```
+
+This downloads the latest release's signed (ad-hoc) disk image, moves the app into `/Applications`
+and opens it — no Gatekeeper prompt, unlike a DMG downloaded through a browser. The same script with
+`--app=space` installs Kira Space instead (see
+[`apps/kira-space/README.md`](apps/kira-space/README.md)). Once installed, each app checks for a
+newer release itself and offers to install it — see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7.
+
+**Building from source** is the developer path, not required just to run the app:
 
 ```sh
 git clone <repo-url>
@@ -228,16 +240,15 @@ The built, signed (ad-hoc) app lands at `apps/kira-studio/bin/Kira Studio.app`, 
 that ships it — the app plus an `/Applications` shortcut to drag it onto — at
 `apps/kira-studio/bin/Kira Studio.dmg`. Nothing is written to `dist/`.
 
-Since the build is unsigned (ad-hoc), the first launch needs a Gatekeeper workaround:
-right-click → Open, or:
+Since a locally built image is unsigned (ad-hoc) and never passed through the installer, its first
+launch needs a Gatekeeper workaround: right-click → Open, or:
 
 ```sh
 xattr -dr com.apple.quarantine "apps/kira-studio/bin/Kira Studio.app"
 ```
 
 See [`docs/PACKAGING.md`](docs/PACKAGING.md) for the Wails bundle layout and the full
-verification checklist. To build Kira Space instead (the git tooling that used to live here), see
-[`apps/kira-space/README.md`](apps/kira-space/README.md).
+verification checklist.
 
 ## Development
 
@@ -266,7 +277,7 @@ bun run dev:studio  # installs everything needed, then `wails3 task dev` — nat
 | `bun run test:matrix` | `scripts/test-matrix.sh` — each adapter's full auth/config permutation matrix, on demand, not part of CI |
 | `bun run generate:wire` | `scripts/generate-wire.sh` — regenerates the Go and TypeScript FlatBuffers code from both `packages/shared/protocol/wire.fbs` and `packages/git-ipc/schema/gitwire.fbs`; not part of a normal build |
 | `bun run package:studio` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage:studio` runs `bun run setup` first, same as `dev:studio`). Carries no `.vsix` — see [`apps/kira-space/README.md`](apps/kira-space/README.md) for `package:space`, which does |
-| `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior, for both apps' bundles |
+| `bun run verify:packaging` | Confirms the packaged bundle still ships no *silent* auto-update behavior, for both apps' bundles |
 
 **App data:** the app keeps `kira.db`, `logs/`, and the database MCP server's own token
 `mcp-db-token.json`, all under `~/.kira-studio/`. The `KIRA_HOME` environment variable relocates
@@ -422,9 +433,10 @@ rework, code navigation) — all completed (`docs/v1/SPEC.md` is the v1 record �
 
 Light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; SSH tunneling (planned for
-v2); code signing/notarization. **Auto-update is deliberately absent and verified as such** — see
-[`docs/PACKAGING.md`](docs/PACKAGING.md) §7; the app does check GitHub for a newer release and
-shows a status-bar banner linking to the releases page, but downloads and installs nothing. SQL-table
+v2); code signing/notarization. **Silent auto-update is deliberately absent and verified as such** —
+see [`docs/PACKAGING.md`](docs/PACKAGING.md) §7; the app checks GitHub for a newer release, shows a
+status-bar item, and offers to install it, but nothing installs without that explicit **Update**
+click. SQL-table
 writes (add-row, delete-row, cell-edit) are staged as pending changes with a preview;
 MongoDB/Redis/Kafka/SQS/S3 writes are capability-gated per engine (see the table above) and execute
 immediately, with no staging or preview; S3 additionally gets upload/download of a whole object via

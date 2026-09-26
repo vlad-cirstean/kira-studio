@@ -119,8 +119,8 @@ Two limits worth knowing up front:
 - **Git 2.38 or newer is required** — `git merge-tree --write-tree`, which conflict prediction
   needs. Below that the extension shows a blocked state rather than degrading silently.
 - **Kira Space and the extension are hard-locked to the same contract version.** A mismatch is a
-  blocking panel naming both versions, not a reduced feature set — there is no auto-update here and
-  the two install separately, so "run an older method set" has no honest meaning.
+  blocking panel naming both versions, not a reduced feature set — the app's own update never
+  touches the separately-installed extension, so "run an older method set" has no honest meaning.
 
 ## Requirements
 
@@ -138,7 +138,18 @@ Two limits worth knowing up front:
 
 ## Install
 
-There's no release yet, so installing means building it from the repo root:
+Run in Terminal — installs a fresh copy or replaces an older one, then opens the app:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vlad-cirstean/kira-studio/main/scripts/install.sh | sh -s -- --app=space
+```
+
+This downloads the latest release's signed (ad-hoc) disk image, moves the app into `/Applications`
+and opens it — no Gatekeeper prompt, unlike a DMG downloaded through a browser. The same script with
+`--app=studio` installs Kira Studio instead (see the root [`README.md`](../../README.md)). Once
+installed, the app checks for a newer release itself and offers to install it.
+
+**Building from source** is the developer path, not required just to run the app:
 
 ```sh
 git clone <repo-url>
@@ -150,8 +161,8 @@ The built, signed (ad-hoc) app lands at `apps/kira-space/bin/Kira Space.app`, an
 that ships it at `apps/kira-space/bin/Kira Space.dmg`. `apps/kira-space/bin/kira-space.vsix` is the
 packaged VS Code extension, copied into the bundle before signing.
 
-Since the build is unsigned (ad-hoc), the first launch needs a Gatekeeper workaround:
-right-click → Open, or:
+Since a locally built image is unsigned (ad-hoc) and never passed through the installer, its first
+launch needs a Gatekeeper workaround: right-click → Open, or:
 
 ```sh
 xattr -dr com.apple.quarantine "apps/kira-space/bin/Kira Space.app"

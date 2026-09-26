@@ -42,7 +42,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome (TS/Vue, incl. its `performance` rule group as of P94 pass 1 and `complexity/noExcessiveCognitiveComplexity` at `maxAllowedComplexity: 30` as of P94 pass 3), `golangci-lint` (Go — `bodyclose`, `copyloopvar`, `gocognit`, `gocritic`'s performance tag, `gocyclo`, `govet`, `ineffassign`, `makezero`, `prealloc`, `unconvert`, `unused`; `gocognit`/`gocyclo` at `min-complexity: 30` as of P94 pass 2), `knip` (TS/Vue dead files/dependencies/duplicate exports, plus unused exports/types/binaries as of P94 pass 3) | Biome for TS/Vue formatting stays the single tool there, no ESLint/Prettier; `bun run lint` also runs `scripts/check-tokens.sh`, `scripts/check-theme-classes.sh` and `scripts/check-class-conflicts.ts` (the theme/Tailwind guards above); `golangci-lint`/`knip` are pre-push-hook/CI-only (`.githooks/pre-push`, `docs/DEV_ENVIRONMENT.md`), not per-commit |
 | Storage | SQLite at `~/.kira-studio/kira.db`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
-| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f). **As of P100, this DMG carries no `.vsix` at all** — the packaged VS Code extension (`@vscode/vsce`, G10) and its "Install VS Code Integration" button (`internal/gitvsix`) both moved to Kira Space's own DMG, since the extension is Kira Space's frontend now, not a companion to this app |
+| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no *silent* auto-update (P119 adds a user-initiated one, `scripts/install.sh`), no notarization; no `runtime/` tree to vendor or sign any more (P58f). **As of P100, this DMG carries no `.vsix` at all** — the packaged VS Code extension (`@vscode/vsce`, G10) and its "Install VS Code Integration" button (`internal/gitvsix`) both moved to Kira Space's own DMG, since the extension is Kira Space's frontend now, not a companion to this app |
 | DB tests | Testcontainers, driven from Go (`testcontainers-go`) | Real-container adapter coverage is Go (`apps/kira-studio/internal/adapters/testsupport/`, `bun run test:go`), not Bun — `packages/db-fixtures/` no longer holds per-engine specs (P58f D1); it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from, Bun driving only that `e2e-real` seeding; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
@@ -75,9 +75,11 @@ process itself, its build/vendoring machinery, and everything that supervised it
 App identity: organisation **kirathecat**, app name **Kira Studio**, bundle ID
 `com.kirathecat.kira-studio` (the `-shell` suffix carried during the P52–P56 coexistence window is
 gone). The bundle's executable is literally `Contents/MacOS/Kira Studio`, space included. No
-auto-update. **Kira Space** (P100) ships as its own DMG under the same organisation: app name
-**Kira Space**, bundle ID `com.kirathecat.kira-space` (`apps/kira-space/build/config.yml`, mirrored
-in `apps/kira-space/build/darwin/Info.plist`), executable `Contents/MacOS/Kira Space`. No auto-update.
+*silent* auto-update: P119 adds a real one, user-initiated only, through
+`scripts/install.sh` (see below). **Kira Space** (P100) ships as its own DMG under the same
+organisation: app name **Kira Space**, bundle ID `com.kirathecat.kira-space`
+(`apps/kira-space/build/config.yml`, mirrored in `apps/kira-space/build/darwin/Info.plist`),
+executable `Contents/MacOS/Kira Space`. Same install/update path.
 
 ## Invariants
 
@@ -109,10 +111,11 @@ footprint. The budget numbers (and what's measured) live in
   window — *Window → New Window*, ⇧⌘N (P8) — but only from a Go-side menu command, never from a
   renderer-initiated call: `JavaScriptCanOpenWindowsAutomatically: Disabled` (Renderer security
   surface, below) is unchanged, and the renderer never calls `window.open` or its own equivalent.
-  P66's update-availability check is a Go-side request for exactly this reason: `internal/
-  appupdate` fetches GitHub's release metadata itself, and the status-bar banner's click opens the
-  OS browser through repo-root `internal/shell`'s own seam (`NewDeferredBrowser`) — the renderer calls a
-  nullary `OpenReleasePage()` and neither sends nor receives a URL (UI architecture, below).
+  P66/P119's update-availability check and install are both Go-side requests for exactly this
+  reason: repo-root `internal/appupdate` fetches GitHub's release metadata itself, and
+  `InstallUpdate` stages the update through its own detached installer — the renderer calls two
+  nullary methods (`Status`, `InstallUpdate`) and neither sends nor receives a URL (UI
+  architecture, below).
 
 ## Adapter contract
 
@@ -2338,40 +2341,67 @@ is not what any kind uses today: P11 replaced it with a FlatBuffers frame decode
 array views, landing at +0.01–1.7% over raw buffer bytes with no transient heap copy on decode at all
 (`docs/PERF.md` §2.7).
 
-**Update-availability banner (P66, v1.6).** The status bar's right-hand group can show one more
-item, `[data-testid="update-available"]`, first in that group so the three existing readouts
-(`app-metrics`, `cache-size`, `engine-status`) keep their positions. `StatusBar.vue`'s left readout
-is unaffected — LAW 14 governs it, not this feature.
+**Update check and in-app install (P66, P119), shared by both apps.** The status bar's right-hand
+group can show one more item, `[data-testid="update-available"]`, first in that group so the three
+existing readouts (`app-metrics`, `cache-size`, `engine-status`) keep their positions.
+`StatusBar.vue`'s left readout is unaffected — LAW 14 governs it, not this feature. Clicking the
+item, or a new version becoming available while the app is open, opens a modal dialog
+(`UpdateDialog.vue`) with an **Update** button — P119 replaced Kira Studio's own click-opens-the-
+release-page behavior with this dialog, the deliberate behavior change P119's own plan names.
 
-- **What is checked.** `internal/appupdate.Checker` makes one plain `net/http` GET against
-  `https://api.github.com/repos/vlad-cirstean/kira-studio/releases/latest` — no dependency on
-  `internal/ghclient` (gated on a working, authenticated `gh` CLI — wrong precondition for a check
-  that should run for every user) or `internal/httpclient` (the user-facing request builder,
+- **What is checked.** Repo-root `internal/appupdate.Checker` (moved out of Kira Studio's own
+  `internal/` at P119 so Kira Space can share it — a repo-root package importing nothing under
+  either app's own `internal/`, Go's own `internal/` visibility rule) makes one plain `net/http` GET
+  against `https://api.github.com/repos/vlad-cirstean/kira-studio/releases/latest` — no dependency
+  on `internal/ghclient` (gated on a working, authenticated `gh` CLI — wrong precondition for a
+  check that should run for every user) or `internal/httpclient` (the user-facing request builder,
   answering a different question). The two are reused only for their GitHub API version header
   value, restated rather than imported.
 - **An untagged build never checks.** `buildinfo.Version` being one of the three dev sentinels
   (`0.0.0`, `0.0.0-dev`, `0.0.0-unknown` — every `go run`/`go test`/local `wails3 task` build)
-  suppresses the check entirely: no request, no cache write, no goroutine. Only a tagged release
-  build (the version `release.yml` writes from the git tag) ever reaches the network.
-- **Cadence.** The renderer (`state/appUpdate.ts`) polls hourly after the first window mounts, off
-  the boot critical path; the Go side caches the real answer for 6 hours after a successful check
-  and 30 minutes after a failed one (`singleflight.Group` collapses concurrent callers — multiple
-  windows share one in-flight request), so the actual network cadence is Go's, not the renderer's.
+  suppresses the check entirely: no request, no cache write, no goroutine, and `InstallUpdate`
+  refuses outright. Only a tagged release build (the version `release.yml` writes from the git tag)
+  ever reaches the network or can install anything.
+- **Cadence.** Each app's own renderer (`state/appUpdate.ts`, `createAppUpdateStore` factory shared
+  by both) polls hourly after the first window mounts, off the boot critical path; the Go side
+  caches the real answer for 6 hours after a successful check and 30 minutes after a failed one
+  (`singleflight.Group` collapses concurrent callers — multiple windows share one in-flight
+  request), so the actual network cadence is Go's, not the renderer's.
 - **A failed check is silence, not a surface.** A network error, a `404` (no published release —
   `release.yml` creates every release as a draft a human publishes by hand; a draft is invisible to
   `/releases/latest` by construction), and a `403` (rate-limited) are all the same outcome: no
-  banner, no error dialog, no console output, logged at debug level and nothing more.
-- **Nothing is ever downloaded or installed.** The banner is availability-only; clicking it opens
-  the release's GitHub page in the OS browser. `scripts/verify-packaging.sh`'s S10 enforces this
-  statically (no `browser_download_url`/`releases/download` reference under `apps/` or `packages/`).
-- **The renderer never sends or receives a URL.** `internal/bridge.UpdateService.OpenReleasePage()`
-  is nullary; Go decides the URL (`Checker.ReleaseURL()`, validated by `safeReleaseURL` — https,
-  `github.com`, this repository's own `/releases/` path, or the constant `/releases` page
-  otherwise) and opens it through `internal/shell`'s `NewDeferredBrowser` seam, the same
-  deferred-adapter shape `NewDeferredDialogs` already uses. Only `internal/shell`, each app's own
-  `internal/appshell`, and each app's own `main.go` import `pkg/application`. This matters because Wails' `BrowserManager.OpenURL`
-  validates nothing itself and macOS `open` will act on any scheme it recognises — `safeReleaseURL`
-  is the only check that ever runs before a URL reaches it.
+  item, no error dialog, no console output, logged at debug level and nothing more.
+- **The install itself: a detached, staged hand-off (`internal/appupdate.Installer`).** Clicking
+  **Update** re-checks availability (cached, no forced fetch), then `Stage` fetches
+  `scripts/install.sh` fresh from `main` (never bundled — an installer bugfix this way reaches
+  every installed version at once), validates its first two lines against a byte-exact contract
+  marker (`# kira-install-contract: 1`, guarding against both a captive-portal HTML page and a
+  future incompatible script), writes it to a `0700` temp file, and spawns it detached
+  (`SysProcAttr{Setsid: true}` — its own session and process group, survives the app's own exit)
+  with `--app=studio|space`, `--wait-pid=<this process>`, and `--notify-fd=3`. The two sides hand
+  off over that fd: the script prints `staged <dmg path>\n` to fd 3 and closes it the moment the
+  disk image is mounted and copying has started, `Stage` reads that one line and returns, and the
+  app quits — only past that point, since the swap into `/Applications` still has the app's own
+  bundle open until the process actually exits. The script waits for the pid to disappear, replaces
+  the bundle, relaunches it, and cleans up; everything after the app's own exit is invisible to it
+  by construction. **Cancel** (idle before hand-off only; a no-op after) and a 15-minute backstop
+  timeout both signal the whole process group, never just the script's own pid — `internal/
+  procgroup.Kill` covers a child the script itself started (`hdiutil`, `cp`) that a lone `SIGTERM`
+  to the script would leave orphaned. Every run appends to `~/Library/Logs/<app name>/install.log`
+  (truncated once past 1 MiB), the path `UpdateStatus.installLogPath` hands the dialog to show on a
+  failed install.
+- **The renderer never sends or receives a URL.** `UpdateService.Status`/`InstallUpdate`/
+  `CancelInstall` are all nullary; Go decides everything about where the script comes from and what
+  it does. `scripts/verify-packaging.sh`'s S10 (rescoped to `apps/`, `packages/`, `internal/`) still
+  enforces "no app code downloads a release asset itself" — only `scripts/install.sh` may — and S11
+  pins the one `raw.githubusercontent.com` reference and the two sides' shared contract marker.
+- **Security note, normal prose on purpose.** Self-update executes a shell script downloaded at
+  click time, with the user's own privileges, from the `main` branch of a public repository. The
+  trust is exactly that of the documented `curl | sh` install and of the DMGs themselves, which are
+  built from the same repository: anyone who can push to `main` can change what every user's
+  **Update** click runs. Branch protection on `main` is therefore a real security boundary for this
+  feature. TLS to the fetch host and the contract-marker check guard transport and compatibility,
+  not authorship.
 
 ## Git module (v1.3), Kira Space's own app as of P100
 
@@ -2400,7 +2430,9 @@ Toggle Project Panel, Window › Next/Previous/Close Tab plus New Window, dev-on
 DevTools), a keep-awake toggle and New window button in the title bar, and a CPU/memory item in the
 status bar — every one of them the same shared primitive Kira Studio's own copy uses (`internal/
 keepawake`, `internal/metrics`, `packages/workbench/src/components/{TitleBarWindowActions,
-AppMetricsItem}.vue`), not a Space-only reimplementation. Space's own Window menu now matches Kira
+AppMetricsItem}.vue`), not a Space-only reimplementation. P119 added a fourth: Kira Space has the
+same status-bar update item and in-app update dialog Kira Studio does, over its own `UpdateService`
+sharing the same repo-root `internal/appupdate`. Space's own Window menu now matches Kira
 Studio's own long-standing scheme exactly: Close Tab claims ⌘W, Close Window moved to ⇧⌘W — the one
 user-visible behavior change this phase made (Space's ⌘W used to close the window). The primary
 frontend is still a separately-installed VS Code extension (`apps/kira-space-vscode`, renamed from
@@ -2483,8 +2515,8 @@ human approval always re-admits.
 (**41** today, since P111's pull `rebaseMerges` field bumped it from 40), asserted equal by tests
 on both sides, and it is the *sole* compatibility authority — not the
 app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
-never a degraded mode: this app has no auto-update and the extension installs separately, so "run
-an older method set" has no honest meaning here.
+never a degraded mode: the app's own P119 update never touches the separately-installed extension,
+so "run an older method set" has no honest meaning here.
 
 **Two frame shapes over that one socket — the same split the `studio` data plane already uses, not
 a second design.** Control frames (the whole `rpcstream` envelope, every request, and every small
@@ -3036,13 +3068,13 @@ placed it in; a repository is an instance inside the Git module, not a sibling o
   heading (`markdownReading.ts`'s own `heading_open` renderer override assigns each heading a
   GitHub-style slug id, numbered on collision), anything else is left inert with its target
   surfaced through the link's own `title` attribute (a `link_open` renderer override) instead of
-  ever being followed. **Opening an external link is explicitly out of scope** — `internal/bridge/
-  update.go`'s `OpenReleasePage()` is nullary specifically because `OpenURL` (`pkg/application`)
-  validates nothing at all, and a markdown file's own link is exactly as untrusted as any other
-  renderer-supplied string; reversing that needs its own vetted bridge method (a scheme allow-list
-  at minimum), not a sub-feature of a reading view. That method now exists (`bridge/link.go`,
-  "Renderer security surface" below) — the reading pane still deliberately does not use it, and
-  every anchor click here stays `preventDefault()`ed.
+  ever being followed. **Opening an external link is explicitly out of scope** — `OpenURL`
+  (`pkg/application`) validates nothing at all, and a markdown file's own link is exactly as
+  untrusted as any other renderer-supplied string; reversing that needs its own vetted bridge
+  method (a scheme allow-list at minimum), not a sub-feature of a reading view. That method now
+  exists (`bridge/link.go`'s `LinkService.OpenExternal`, "Renderer security surface" below) — the
+  reading pane still deliberately does not use it, and every anchor click here stays
+  `preventDefault()`ed.
 - **No syntax highlighting inside a fenced code block** — `markdown-it`'s `highlight` hook plus
   Monaco's `editor.colorize()` would do it, but `colorize` is async per block and this is a reading
   view, not a second editor; a fenced block renders as themed monospace instead.

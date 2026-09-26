@@ -260,6 +260,31 @@ human to launch the packaged app and use it.
     VS Code Integration button, and `kira-*.vsix` bundling all now belong to Kira Space's own
     checklist. See "Kira Space packaging" below.
 
+**P119's curl installer and in-app update, items 13-20 — none of these can run in this Linux
+sandbox.** They need a published release with both DMGs, which only the first real run of the
+patched `release.yml` produces; §11.3 in `docs/v1.9/plans/P119-space-release-notifier.md` has the
+full step-by-step. All *not yet run*.
+
+13. Fresh machine, no app installed: the Studio curl command installs and opens the app with **no**
+    Gatekeeper prompt (`xattr -p com.apple.quarantine` on the installed `.app` reports no such
+    attribute). Repeat for Space.
+14. Running the same command again while the app is open fails with "Quit Kira Studio first" —
+    nothing changed, no disk image left mounted, no stale `/Applications/.studio-install.*`.
+15. An older stamped build, launched, auto-opens the update dialog naming both versions; **Later**
+    closes it without re-opening on the next launch for that same version; clicking the status-bar
+    item reopens it on demand.
+16. **Update** shows an installing state, quits the app once staged, reopens the new version within
+    about a minute, and the About dialog and `install.log` both show the new version. Repeat for
+    Space.
+17. **Cancel** during install returns to idle with no leftover `kira-install` process, mount, or
+    staging directory.
+18. A failure after hand-off (bundle made immutable before the swap) relaunches the old version and
+    shows an alert naming the install log.
+19. Whether any macOS App Management privacy prompt appeared during the self-replace, in which
+    mode, and what the user had to grant (§2.6's own open risk).
+20. A dev build makes no request to `api.github.com` at all (no update item, no dialog) — checked
+    with Little Snitch or `nettop` during a `bun run dev:studio` session.
+
 ## 5. Off-macOS: what this environment could actually check
 
 Unlike the electron-builder pipeline this replaced — which assembled a complete, inspectable `.app` on
@@ -276,8 +301,8 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/A6/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
 and even with a bundle it would skip A1/A3/A5/A6/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10), not that any
-bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10/S11), not that
+any bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
 `info.version`) is a pure string comparison over two committed files, so it runs — and means
 something — even without a bundle; A6 (the bundled `.vsix` exists, is non-empty and `PK`-prefixed)
 needs the real `.app` and so shares A1/A3/A5/N2's fate here.
@@ -334,7 +359,7 @@ the renderer build, typecheck, lint, the Go unit tests, and the static half of `
   with a 1.0-scale, unrecolored, non-specular single layer. That JSON is still unverified beyond
   `wails3 generate icons` accepting it; whoever builds the catalog should eyeball the result.
 
-## 7. CI, releases, and auto-update
+## 7. CI, releases, install and update
 
 **Status:** applied. `.github/workflows/` holds the two workflows described below (`pr.yml`,
 `release.yml` — `db-compat.yml` and `test-matrix.yml` existed at one point but were folded into
@@ -366,30 +391,35 @@ the ones needing Docker-on-Linux (Electron-hosted macOS runners have neither Doc
 virtualization); P58f D1 moved that coverage into `apps/kira-studio/internal/adapters/*/*_test.go`
 (`docs/ARCHITECTURE.md`'s Testing section) without changing which runner exercises it.
 
-**Cutting a release** (`release.yml`, on tags matching `v*.*.*`):
+**Cutting a release** (`release.yml`, on tags matching `v*.*.*`, P119: one job, both apps):
 
 1. `git tag vX.Y.Z && git push origin vX.Y.Z`. The workflow writes the tag (minus its `v`) into
-   `build/config.yml`'s `info.version` in its own checkout — no pre-tag version-bump commit is
-   needed — and from there it reaches the binary, the About dialog and the bundle's `Info.plist`
-   (see "Where the version comes from"). It asserts the write landed before building.
-2. It generates bindings, runs `lint`/`typecheck`, then `bun run package:studio` unmodified.
-3. It copies the already-signed `apps/kira-studio/bin/Kira Studio.dmg` to
-   `kira-studio-macos-arm64.dmg` (the platform-qualified asset name — the image itself is built and
-   signed by step 2's `bun run package:studio`, not here), re-runs `verify:packaging`, and opens a **draft**
-   GitHub Release with that disk image attached plus an artifact upload.
-4. A human runs §4 against the draft's artifact on real hardware, fills in the rows, then publishes.
-   The workflow never publishes automatically.
+   both apps' `build/config.yml`'s `info.version` in its own checkout — no pre-tag version-bump
+   commit is needed — and from there each reaches its own binary, About dialog and bundle
+   `Info.plist` (see "Where the version comes from"); it asserts both writes landed before building.
+2. It generates bindings for both apps, runs `lint`/`typecheck`, then `bun run package:studio` and
+   `bun run package:space` in turn.
+3. It copies each app's already-signed `.dmg` to its own platform-qualified asset name
+   (`kira-studio-macos-arm64.dmg`, `kira-space-macos-arm64.dmg` — each image itself built and signed
+   by step 2's `package:*`, not here), re-runs `verify:packaging` (both bundles present, so every
+   artifact check runs), and opens one **draft** GitHub Release carrying both disk images plus an
+   artifact upload per app.
+4. A human runs §4 against the draft's artifacts on real hardware, fills in the rows, then
+   publishes. The workflow never publishes automatically.
 
-**No auto-update — unchanged, not newly removed.** SPEC.md defers auto-update past v1 (§1's deferred
-list, §3's app-identity line), and that was already true under Electron. macOS auto-update also requires
-a signed and notarized app, which §6 defers. `verify-packaging.sh` keeps re-asserting the absence:
+**No *silent* auto-update — P119 adds a real one, gated on an explicit click.** SPEC.md defers
+*silent* auto-update past v1 (§1's deferred list, §3's app-identity line); a user-initiated
+install/update, run through `scripts/install.sh`, is not that. macOS's own silent auto-update
+also requires a signed and notarized app, which §6 still defers. `verify-packaging.sh` keeps
+re-asserting the absence of the silent kind:
 
 - **S1** — no `electron-updater`/`update-electron-app` dependency in `package.json`.
 - **S2** — no updater code in `apps/` or `packages/` (there has been no `src/` since P3's
   restructure and P58f's `src/engine/` deletion).
-- **S5** — `package.json`'s `package` script still runs `wails3 task darwin:package:dmg` (P10 moved
-  this from the plain `.app`-only task, so the shipped `.dmg` always has something to upload); this
-  check fails loudly if the packaging entry point is swapped for something that could publish.
+- **S5** — `package.json`'s `package:studio`/`package:space` scripts still run
+  `wails3 task darwin:package:dmg` (P10 moved this from the plain `.app`-only task, so the shipped
+  `.dmg` always has something to upload); this check fails loudly if either packaging entry point
+  is swapped for something that could publish.
 
 P29 added three more static checks, guarding §2.1/§2.2's own findings against regressing:
 
@@ -406,28 +436,42 @@ P29 added three more static checks, guarding §2.1/§2.2's own findings against 
   `window.__kiraGridEngine` shipping unconditionally, and catches the next hook added the same way.
 - **S8** — `apps/kira-studio/main.go` calls no `os.Getenv` at all — true since `KIRA_G1_BLANK` was
   deleted. A precise, low-false-positive invariant for the app's own entry point.
-- **S10** — no reference under `apps/` or `packages/` to `browser_download_url` or
-  `releases/download` — see P66 below, the guard that stops a later phase quietly turning the
-  availability banner into a downloader.
+- **S10** — no reference under `apps/`, `packages/` or `internal/` to `browser_download_url` or
+  `releases/download` — rescoped by P119 to include `internal/` (`appupdate` now lives there).
+  `scripts/` is deliberately excluded: `scripts/install.sh` is the one sanctioned downloader, see
+  below.
+- **S11** (P119) — the curl installer and its Go counterpart agree on their one shared contract:
+  `scripts/install.sh` exists and passes `sh -n`; its line-2 contract marker
+  (`# kira-install-contract: 1`) matches `internal/appupdate/install.go`'s own constant;
+  `raw.githubusercontent.com` appears exactly once across `apps/`, `packages/`, `internal/`
+  (`InstallScriptURL`); `shellcheck` runs against the script when it's on `PATH`.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
 by construction rather than deleted per build.
 
-**P66 (v1.6) added an update-*availability* check — still not auto-update.** A tagged release build
-polls `GET https://api.github.com/repos/vlad-cirstean/kira-studio/releases/latest` (`internal/
-appupdate`, no `gh` CLI dependency — public metadata needs no per-user credential) and, when the
-tag is newer than the running build, shows a status-bar banner (`internal/bridge/update.go`,
-`frontend/src/workbench/StatusBar.vue`). Clicking it opens that release's GitHub page in the OS
-browser. It downloads nothing and installs nothing — S10 above is what keeps that true. A dev/test
-build (`buildinfo.Version` one of `0.0.0`/`0.0.0-dev`/`0.0.0-unknown`) makes no request at all. And
+**P66 (v1.6) added an update-*availability* check; P119 (v1.9) added the install itself, still only
+on an explicit click.** A tagged release build polls `GET https://api.github.com/repos/
+vlad-cirstean/kira-studio/releases/latest` (repo-root `internal/appupdate`, shared by both apps, no
+`gh` CLI dependency — public metadata needs no per-user credential) and, when the tag is newer than
+the running build, shows a status-bar item (`internal/bridge/update.go`,
+`packages/workbench/src/components/{UpdateAvailableItem,UpdateDialog}.vue`) that opens a modal
+dialog with an **Update** button. Clicking it re-checks availability, then `internal/
+appupdate.Installer` fetches `scripts/install.sh` fresh from `main` (never bundled), validates its
+contract marker, and spawns it detached with `--app=studio|space`; the script and the app hand off
+over an fd once the disk image is staged, the app quits, and the script swaps the bundle into
+`/Applications` and reopens it. **Nothing downloads or installs without that click** — S10/S11
+above are what keep the app-code half of that true; `scripts/install.sh` itself is the one
+sanctioned exception, run by the user's own action. A dev/test build (`buildinfo.Version` one of
+`0.0.0`/`0.0.0-dev`/`0.0.0-unknown`) makes no request and refuses `InstallUpdate` outright. And
 because `release.yml`'s own release is created as a **draft** (step 3 above) that a human publishes
 by hand (step 4), **a draft release is invisible to the check** — `/releases/latest` excludes drafts
 and prereleases by construction, so nothing shows up until a human actually publishes.
 
-**What a future real auto-update (download + install) would require, in order:** code signing and
-notarization (SPEC.md §1/§3), then a SPEC.md scope change reversing "no auto-update", then an update
-feed and updater wiring.
+**What a future *silent* auto-update (no click at all) would require, in order:** code signing and
+notarization (SPEC.md §1/§3), then a SPEC.md scope change reversing "no silent auto-update", then an
+update feed and background-updater wiring — P119's click-triggered install is a deliberately
+different, smaller thing than this.
 
 **Whether the release workflow has actually run:** *no — the first tag pushed will be the first real
 exercise of `release.yml`.*
@@ -463,7 +507,9 @@ apps/kira-space && wails3 task darwin:package:dmg`, then `sh scripts/sign-bundle
 of P100 Part 2, so this one script signs both apps' bundles rather than a near-identical copy per
 app. Expected artifacts: `apps/kira-space/bin/Kira Space.dmg`/`.app`/`Kira Space` (the DMG, the
 bundle, and the bare binary), plus `apps/kira-space/bin/kira-space.vsix` — the one artifact with no
-Kira Studio equivalent.
+Kira Studio equivalent. **As of P119, `Kira Space.dmg` ships as `kira-space-macos-arm64.dmg` on the
+same draft release as Kira Studio's own disk image** — one `release.yml` job, one tag, one release
+(§7) — rather than a separate release or a separate `release-space` job.
 
 **The `.vsix` chain — this is where G10's whole packaged-extension story now lives.**
 `scripts/build-vscode.ts` builds the extension's two outputs (the webview UI, from
