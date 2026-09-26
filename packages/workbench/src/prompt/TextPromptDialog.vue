@@ -44,7 +44,7 @@ useEventListener(scrimEl, 'click', (e) => e.stopPropagation());
     data-testid="text-prompt"
   >
     <div class="w-72 flex flex-col gap-1.5 p-2 bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden">
-      <div class="text-kira-sm text-muted-foreground">{{ title }}</div>
+      <div class="text-kira-md text-muted-foreground">{{ title }}</div>
       <Input
         ref="inputRef"
         :model-value="modelValue"
