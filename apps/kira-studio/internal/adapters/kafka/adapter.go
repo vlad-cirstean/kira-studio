@@ -120,8 +120,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		return adapters.TreeChildren{Nodes: []model.TreeNode{}}, nil
 	}
 	if root.Kind != "topic" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound,
-			"unexpected root path segment kind: "+root.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, root.Kind)
 	}
 	if len(segments) == 1 {
 		nodes, err := listPartitions(ctx, adm, root.Name)

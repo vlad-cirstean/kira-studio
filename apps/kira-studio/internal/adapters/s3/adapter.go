@@ -102,7 +102,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	bucketSegment := segments[0]
 	if bucketSegment.Kind != "bucket" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+bucketSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, bucketSegment.Kind)
 	}
 	rest := segments[1:]
 	// Rule 5 (Adapter doc comment): Children returns [] for a leaf, never an error — an 'object'

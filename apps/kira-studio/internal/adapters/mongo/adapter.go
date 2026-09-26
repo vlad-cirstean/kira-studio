@@ -179,8 +179,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	databaseSegment := segments[0]
 	if databaseSegment.Kind != "database" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound,
-			"unexpected root path segment kind: "+databaseSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, databaseSegment.Kind)
 	}
 	db, err := a.dbFor(databaseSegment.Name)
 	if err != nil {

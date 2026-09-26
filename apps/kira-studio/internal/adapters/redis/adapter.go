@@ -118,7 +118,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 
 	dbSegment := segments[0]
 	if dbSegment.Kind != "database" {
-		return adapters.TreeChildren{}, adapters.New(adapters.CodeNotFound, "unexpected root path segment kind: "+dbSegment.Kind, nil)
+		return adapters.TreeChildren{}, adapters.UnexpectedPathKind(0, dbSegment.Kind)
 	}
 	rest := segments[1:]
 	// Rule 5 (Adapter doc comment): Children returns [] for a leaf, never an error — a 'key' node
