@@ -93,7 +93,7 @@ function onEditGlobalDefaults(): void {
 const INHERIT_LABEL = 'flex items-center gap-1 text-muted-foreground text-kira-xs';
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const httpVersionId = useId();
 const requestTimeoutMsId = useId();
 const maxResponseMbId = useId();
@@ -105,7 +105,7 @@ const disableCookieJarId = useId();
 
 <template>
   <div class="flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5" data-testid="http-settings-pane">
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
         <Label :class="INHERIT_LABEL">
@@ -123,6 +123,7 @@ const disableCookieJarId = useId();
         :id="httpVersionId"
         variant="bordered"
         size="kira-lg"
+        class="self-start"
         data-testid="http-settings-httpVersion"
         :disabled="settings.httpVersion === null"
         :model-value="settings.httpVersion ?? global.httpVersion"
@@ -133,7 +134,7 @@ const disableCookieJarId = useId();
       <FieldDescription>Global: HTTP/{{ global.httpVersion }}</FieldDescription>
     </Field>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
         <Label :class="INHERIT_LABEL">
@@ -162,7 +163,7 @@ const disableCookieJarId = useId();
       </FieldDescription>
     </Field>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
         <Label :class="INHERIT_LABEL">
@@ -243,7 +244,7 @@ const disableCookieJarId = useId();
     </FieldGroup>
     <FieldDescription>Global: {{ global.followRedirects ? 'on' : 'off' }}</FieldDescription>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
         <Label :class="INHERIT_LABEL">

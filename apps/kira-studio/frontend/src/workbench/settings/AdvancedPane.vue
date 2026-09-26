@@ -44,14 +44,14 @@ const expensiveQueryRowsError = computed<string | null>(() => {
 props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError);
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const opLogRetentionDaysId = useId();
 const expensiveQueryRowsId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="opLogRetentionDaysId" class="text-kira-sm">Operation log retention (days)</Label>
         <TooltipIconButton
@@ -78,7 +78,7 @@ const expensiveQueryRowsId = useId();
     </Field>
     <p class="text-subtle text-kira-xs">Takes effect after restart.</p>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="expensiveQueryRowsId" class="text-kira-sm">Expensive query threshold (rows)</Label>
         <TooltipIconButton

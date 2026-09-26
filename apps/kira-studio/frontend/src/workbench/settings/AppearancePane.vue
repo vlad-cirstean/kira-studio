@@ -59,7 +59,7 @@ const inlineBlameId = useId();
 <template>
   <div class="contents" v-show="active">
     <FieldLegend class="pt-0">Typography</FieldLegend>
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="fontFamilyId" class="text-kira-sm">Data font</Label>
         <TooltipIconButton
@@ -75,6 +75,7 @@ const inlineBlameId = useId();
         :id="fontFamilyId"
         variant="bordered"
         size="kira-lg"
+        class="self-start"
         data-testid="settings-font-family"
         :model-value="draft.appearance.fontFamily"
         @update:model-value="onFontFamilyChange"

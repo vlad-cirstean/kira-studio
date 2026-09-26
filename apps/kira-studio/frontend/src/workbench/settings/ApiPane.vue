@@ -73,7 +73,7 @@ const maxRedirectsError = computed<string | null>(() => {
 props.registerFieldError('api.maxRedirects', maxRedirectsError);
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const httpVersionId = useId();
 const requestTimeoutMsId = useId();
 const maxResponseMbId = useId();
@@ -85,7 +85,7 @@ const disableCookieJarId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
         <TooltipIconButton
@@ -101,6 +101,7 @@ const disableCookieJarId = useId();
         :id="httpVersionId"
         variant="bordered"
         size="kira-lg"
+        class="self-start"
         data-testid="settings-api-httpVersion"
         :model-value="draft.api.httpVersion"
         @update:model-value="onHttpVersionChange"
@@ -109,7 +110,7 @@ const disableCookieJarId = useId();
       </NativeSelect>
     </Field>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
         <TooltipIconButton
@@ -139,7 +140,7 @@ const disableCookieJarId = useId();
       <FieldDescription v-else>0 = no timeout.</FieldDescription>
     </Field>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
         <TooltipIconButton
@@ -223,7 +224,7 @@ const disableCookieJarId = useId();
       />
     </FieldGroup>
 
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
         <TooltipIconButton

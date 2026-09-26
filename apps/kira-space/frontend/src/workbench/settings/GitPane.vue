@@ -73,7 +73,7 @@ const graphFontSizeError = computed<string | null>(() => {
 props.registerFieldError('git.graphFontSize', graphFontSizeError);
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const protectedBranchesId = useId();
 const fetchAutoIntervalMinutesId = useId();
 const gitPathId = useId();
@@ -87,7 +87,7 @@ const graphFontSizeId = useId();
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="protectedBranchesId" class="text-kira-sm">Protected branch patterns (one per line)</Label>
         <TooltipIconButton
@@ -112,7 +112,7 @@ const graphFontSizeId = useId();
         confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</FieldDescription
       >
     </Field>
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="fetchAutoIntervalMinutesId" class="text-kira-sm">Auto-fetch interval (minutes)</Label>
         <TooltipIconButton
@@ -145,7 +145,7 @@ const graphFontSizeId = useId();
         fetch.</FieldDescription
       >
     </Field>
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="gitPathId" class="text-kira-sm">Git executable path</Label>
         <TooltipIconButton
@@ -170,7 +170,7 @@ const graphFontSizeId = useId();
       >
     </Field>
     <h3>Graph</h3>
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="graphFontSizeId" class="text-kira-sm">Font size</Label>
         <TooltipIconButton

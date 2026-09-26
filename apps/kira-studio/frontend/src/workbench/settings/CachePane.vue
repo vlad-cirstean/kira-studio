@@ -51,7 +51,7 @@ async function onClearCaches(): Promise<void> {
 }
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const cacheBudgetMbId = useId();
 const currentUsageId = useId();
 const hitRateId = useId();
@@ -59,7 +59,7 @@ const hitRateId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="cacheBudgetMbId" class="text-kira-sm">Result page cache budget (MB)</Label>
         <TooltipIconButton
@@ -84,7 +84,7 @@ const hitRateId = useId();
         {{ cacheBudgetError }}
       </FieldError>
     </Field>
-    <Field class="items-center">
+    <Field>
       <Label :for="currentUsageId" class="text-kira-sm text-muted-foreground">Current usage</Label>
       <Input
         :id="currentUsageId"
@@ -94,7 +94,7 @@ const hitRateId = useId();
         disabled
       />
     </Field>
-    <Field class="items-center">
+    <Field>
       <Label :for="hitRateId" class="text-kira-sm text-muted-foreground">Hit rate</Label>
       <Input
         :id="hitRateId"

@@ -20,13 +20,13 @@ function onDefaultPageSizeChange(rawValue: unknown): void {
 }
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
-// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field class="items-center"> div.
+// FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const defaultPageSizeId = useId();
 </script>
 
 <template>
   <div class="contents" v-show="active">
-    <Field class="items-center">
+    <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="defaultPageSizeId" class="text-kira-sm">Default page size</Label>
         <TooltipIconButton
@@ -42,6 +42,7 @@ const defaultPageSizeId = useId();
         :id="defaultPageSizeId"
         variant="bordered"
         size="kira-lg"
+        class="self-start"
         data-testid="settings-default-page-size"
         :model-value="draft.data.defaultPageSize"
         @update:model-value="onDefaultPageSizeChange"
