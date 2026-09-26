@@ -11,14 +11,7 @@ import { schemaDialectFor, useSchemaDialogStore } from '../state/schemas';
 import { useTabsStore } from '../state/tabs';
 import { dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
-import {
-  copyNameItems,
-  countItem,
-  definitionItem,
-  openItems,
-  qualifiedNameFor,
-  refreshItem,
-} from './menuItems';
+import { copyNameItems, countItem, definitionItem, openItems, refreshItem } from './menuItems';
 import {
   groupParentPath,
   rowKey,
@@ -51,7 +44,7 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
       return consumerGroupMenu(row);
     case 'sequence':
     case 'function':
-      return simpleObjectMenu(row);
+      return copyNameItems(row, true);
     default:
       return [];
   }
@@ -120,14 +113,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
         await useConnectionsStore().duplicateConnection(row.connectionId);
       },
     },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
+    ...copyNameItems(row),
     {
       type: 'item',
       id: 'copy-uri',
@@ -268,14 +254,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       icon: 'refresh',
       run: () => useTreeStore().refresh(row.connectionId, row.path),
     },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
+    ...copyNameItems(row),
     {
       type: 'item',
       id: 'filters',
@@ -401,10 +380,11 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   ];
 }
 
-// P23 D7: split out of simpleObjectMenu rather than added to it — simpleObjectMenu is shared with
-// Postgres/MariaDB's sequence/function rows, where caps.definition is true but the adapter still
-// throws E_UNSUPPORTED for those paths (P19 §5); gating on caps there would offer a row that always
-// errors. A consumer group had no definition at all before this phase (F10).
+// P23 D7: kept separate from the sequence/function case (menuForRow's own `copyNameItems(row,
+// true)`, P115 H9) rather than sharing definitionItem's gating — those rows' caps.definition is
+// true but the adapter still throws E_UNSUPPORTED for those paths (P19 §5), so gating on caps there
+// would offer a row that always errors. A consumer group had no definition at all before this phase
+// (F10).
 function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
   return [...definitionItem(row), ...copyNameItems(row, true)];
 }
@@ -436,26 +416,6 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
       await control.queriesTouch(entry.id);
     },
   }));
-}
-
-function simpleObjectMenu(row: TreeRowVm): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-    {
-      type: 'item',
-      id: 'copy-qualified-name',
-      label: 'Copy qualified name',
-      icon: 'copy',
-      run: () => copyText(qualifiedNameFor(row)),
-    },
-  ];
 }
 
 export function emptyBackgroundMenu(): MenuItem[] {
