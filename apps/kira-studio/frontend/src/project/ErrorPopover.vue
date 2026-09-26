@@ -76,7 +76,7 @@ onUnmounted(() => {
     <button
       ref="triggerRef"
       type="button"
-      class="flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer gap-1 text-error text-kira-sm"
+      class="flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer gap-1 text-error text-kira-md"
       data-testid="error-popover-trigger"
       :aria-label="`Error: ${props.message}`"
       @click="toggle"

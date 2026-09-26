@@ -164,7 +164,7 @@ function editEnvironmentVariables(): void {
             data-testid="variables-overview-scope"
             >{{ row.scope }}</Badge
           >
-          <span v-if="row.description" class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-xs" data-testid="variables-overview-description">{{
+          <span v-if="row.description" class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-sm" data-testid="variables-overview-description">{{
             row.description
           }}</span>
         </div>
@@ -174,7 +174,7 @@ function editEnvironmentVariables(): void {
         <button
           v-if="canEdit"
           type="button"
-          class="inline-flex items-center gap-1 text-info text-kira-sm border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
+          class="inline-flex items-center gap-1 text-info text-kira-md border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
           :disabled="!collectionId"
           data-testid="variables-overview-edit-collection"
           @click="editCollectionVariables"
@@ -184,7 +184,7 @@ function editEnvironmentVariables(): void {
         <button
           v-if="canEdit"
           type="button"
-          class="inline-flex items-center gap-1 text-info text-kira-sm border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
+          class="inline-flex items-center gap-1 text-info text-kira-md border-0 bg-transparent cursor-pointer disabled:cursor-default disabled:text-subtle disabled:opacity-60"
           :disabled="!environmentId"
           data-testid="variables-overview-edit-environment"
           @click="editEnvironmentVariables"

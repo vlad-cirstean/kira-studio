@@ -165,7 +165,7 @@ onUnmounted(() => {
              `.slick-grid-host .header-key` rule already applies (the "same header-key style"
              §4.2 asks for), unscoped CSS reaching into any descendant regardless of which
              component rendered it. -->
-        <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-sm">
+        <table v-else-if="state.status === 'ready'" class="w-full border-collapse text-kira-md">
           <tbody>
             <tr v-for="(col, i) in state.columns" :key="col.name">
               <th class="text-left font-medium text-muted-foreground whitespace-nowrap align-top py-0.5 pl-0 pr-1" :style="{ color: typeClassColor(col.typeClass) }">

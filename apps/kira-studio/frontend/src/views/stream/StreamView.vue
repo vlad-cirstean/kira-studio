@@ -824,7 +824,7 @@ onUnmounted(() => {
         <div class="w-40 shrink-0">
           <InputGroup variant="kira" class="flex w-full">
             <span
-              class="shrink-0 text-kira-xs"
+              class="shrink-0 text-kira-sm"
               :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
               >offset</span
             >
@@ -903,7 +903,7 @@ onUnmounted(() => {
                   :aria-invalid="!!timestampError"
                 >
                   <span
-                    class="shrink-0 text-kira-xs"
+                    class="shrink-0 text-kira-sm"
                     :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
                     >since</span
                   >
@@ -942,7 +942,7 @@ onUnmounted(() => {
           </div>
           <span
             v-if="timestampError"
-            class="whitespace-nowrap text-error text-kira-xs"
+            class="whitespace-nowrap text-error text-kira-sm"
             data-testid="stream-filter-timestamp-error"
             >{{ timestampError }}</span
           >

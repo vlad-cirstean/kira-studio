@@ -249,7 +249,7 @@ const secondText = computed<string>({
                reset to look like the <span> it replaces rather than a bordered control. -->
           <button
             type="button"
-            class="border-0 bg-none rounded-kira-sm text-kira-sm text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
+            class="border-0 bg-none rounded-kira-sm text-kira-md text-fg cursor-pointer py-0.5 px-1 hover:bg-hover"
             data-testid="datetime-picker-month"
             @click="cycleMode"
           >
@@ -269,7 +269,7 @@ const secondText = computed<string>({
     <div data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
         <div class="grid grid-cols-7 gap-0.5">
-          <span v-for="w in WEEKDAY_LABELS" :key="w" class="flex items-center justify-center text-subtle text-kira-xs h-4.5">{{ w }}</span>
+          <span v-for="w in WEEKDAY_LABELS" :key="w" class="flex items-center justify-center text-subtle text-kira-sm h-4.5">{{ w }}</span>
         </div>
         <div class="grid grid-cols-7 gap-0.5">
           <button

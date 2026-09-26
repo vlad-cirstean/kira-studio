@@ -248,14 +248,14 @@ onUnmounted(() => {
         </DialogClose>
       </DialogHeader>
       <div class="overflow-auto flex-1 min-h-0">
-    <div v-if="loadingSnapshots" class="p-2 text-kira-xs text-subtle">Loading…</div>
+    <div v-if="loadingSnapshots" class="p-2 text-kira-sm text-subtle">Loading…</div>
     <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5" data-testid="http-diff-summary">
         <div class="flex flex-col gap-0.5">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs text-subtle self-start">{{ formatRelative(snapA.entry.sentAt) }}</span>
+              <span class="text-kira-sm text-subtle self-start">{{ formatRelative(snapA.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapA.entry.sentAt }}</TooltipContent>
           </Tooltip>
@@ -268,15 +268,15 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-xs text-subtle">{{ snapA.entry.elapsedMs }} ms</span>
-            <span class="text-kira-xs text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
+            <span class="text-kira-sm text-subtle">{{ snapA.entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
           </div>
         </div>
         <span class="text-muted-foreground">→</span>
         <div class="flex flex-col gap-0.5">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span class="text-kira-xs text-subtle self-start">{{ formatRelative(snapB.entry.sentAt) }}</span>
+              <span class="text-kira-sm text-subtle self-start">{{ formatRelative(snapB.entry.sentAt) }}</span>
             </TooltipTrigger>
             <TooltipContent>{{ snapB.entry.sentAt }}</TooltipContent>
           </Tooltip>
@@ -289,8 +289,8 @@ onUnmounted(() => {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-xs text-subtle">{{ snapB.entry.elapsedMs }} ms</span>
-            <span class="text-kira-xs text-subtle">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
+            <span class="text-kira-sm text-subtle">{{ snapB.entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
           </div>
         </div>
       </div>
@@ -299,7 +299,7 @@ onUnmounted(() => {
         <!-- P110 B37: grid-cols-[72px_160px_1fr_1fr] -- same disclosed section 1.2 allowlist gap as
              the api/ files' own grid-cols-[...] conversions -- a pre-existing value relocated, not a
              new one. -->
-        <div class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
+        <div class="grid gap-1 py-0.5 text-kira-sm grid-cols-[72px_160px_1fr_1fr] text-subtle uppercase tracking-wider">
           <span></span>
           <span></span>
           <span>before</span>
@@ -308,27 +308,27 @@ onUnmounted(() => {
         <div
           v-for="row in changedHeaderRows"
           :key="row.name"
-          class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
+          class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
           data-testid="http-diff-header-row"
         >
-          <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
+          <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
           <span class="font-data text-muted-foreground">{{ row.name }}</span>
           <span class="font-data wrap-anywhere">{{ row.a ?? '—' }}</span>
           <span class="font-data wrap-anywhere">{{ row.b ?? '—' }}</span>
         </div>
         <details v-if="unchangedHeaderRows.length > 0" class="group">
           <summary
-            class="list-none cursor-pointer flex items-center gap-1 text-kira-xs text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
+            class="list-none cursor-pointer flex items-center gap-1 text-kira-sm text-subtle [&::-webkit-details-marker]:hidden before:content-['\eab6'] before:font-[codicon] before:text-kira-lg group-open:before:content-['\eab4']"
           >
             {{ unchangedHeaderRows.length }} unchanged
           </summary>
           <div
             v-for="row in unchangedHeaderRows"
             :key="row.name"
-            class="grid gap-1 py-0.5 text-kira-xs grid-cols-[72px_160px_1fr_1fr]"
+            class="grid gap-1 py-0.5 text-kira-md grid-cols-[72px_160px_1fr_1fr]"
             data-testid="http-diff-header-row-unchanged"
           >
-            <span class="text-kira-xs" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
+            <span class="text-kira-sm" :class="HEADER_STATUS_CLASS[row.status]">{{ row.status }}</span>
             <span class="font-data text-muted-foreground">{{ row.name }}</span>
             <span class="font-data wrap-anywhere">{{ row.a }}</span>
             <span class="font-data wrap-anywhere">{{ row.b }}</span>
@@ -342,10 +342,10 @@ onUnmounted(() => {
         </AlertDescription>
       </Alert>
       <template v-else>
-        <div v-if="!commonFormat" class="text-kira-xs text-subtle shrink-0 px-2 py-1">
+        <div v-if="!commonFormat" class="text-kira-sm text-subtle shrink-0 px-2 py-1">
           Comparing raw bytes — the two bodies aren't both JSON or both XML.
         </div>
-        <div v-if="mergeLoading" class="p-2 text-kira-xs text-subtle">Loading the compare view…</div>
+        <div v-if="mergeLoading" class="p-2 text-kira-sm text-subtle">Loading the compare view…</div>
         <div ref="mergeHostRef" class="diff-merge-host flex-1 min-h-0 overflow-auto" data-testid="http-diff-merge"></div>
       </template>
     </div>

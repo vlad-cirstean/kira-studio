@@ -117,7 +117,7 @@ async function onClear(): Promise<void> {
 <template>
   <div class="flex flex-1 min-h-0 flex-col" data-testid="http-history-list">
     <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
-      <span class="text-kira-xs text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
+      <span class="text-kira-sm text-subtle">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
       <span class="ml-auto" />
       <Button
         variant="toolbar"
@@ -205,7 +205,7 @@ async function onClear(): Promise<void> {
           <div class="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span class="text-kira-xs text-subtle min-w-16">{{ formatRelative(entry.sentAt) }}</span>
+                <span class="text-kira-sm text-subtle min-w-16">{{ formatRelative(entry.sentAt) }}</span>
               </TooltipTrigger>
               <TooltipContent>{{ entry.sentAt }}</TooltipContent>
             </Tooltip>
@@ -216,9 +216,9 @@ async function onClear(): Promise<void> {
               </TooltipTrigger>
               <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
             </Tooltip>
-            <span class="text-kira-xs text-subtle">{{ entry.elapsedMs }} ms</span>
-            <span class="text-kira-xs text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
-            <span v-if="entry.environment" class="text-kira-xs text-subtle">{{ entry.environment }}</span>
+            <span class="text-kira-sm text-subtle">{{ entry.elapsedMs }} ms</span>
+            <span class="text-kira-sm text-subtle">{{ formatBytes(entry.bodyBytes) }}</span>
+            <span v-if="entry.environment" class="text-kira-sm text-subtle">{{ entry.environment }}</span>
             <span class="ml-auto" />
             <TooltipIconButton
               icon="trash"
@@ -227,12 +227,12 @@ async function onClear(): Promise<void> {
               @click.stop="onDelete(entry.id)"
             />
           </div>
-          <div v-if="showUrl(i)" class="text-kira-xs text-subtle overflow-hidden text-ellipsis whitespace-nowrap">{{ entry.url }}</div>
+          <div v-if="showUrl(i)" class="text-kira-sm text-subtle overflow-hidden text-ellipsis whitespace-nowrap">{{ entry.url }}</div>
         </div>
       </div>
     </div>
 
-    <div v-if="atCap" class="text-kira-xs text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="http-history-cap-note">
+    <div v-if="atCap" class="text-kira-sm text-subtle shrink-0 border-t border-border px-1.5 py-1" data-testid="http-history-cap-note">
       Only the last {{ HISTORY_PER_SCOPE_LIMIT }} are kept — older responses are removed
       automatically.
     </div>

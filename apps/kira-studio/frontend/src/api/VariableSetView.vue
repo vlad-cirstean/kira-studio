@@ -547,7 +547,7 @@ function onBulkClose(): void {
              moment either has a value, which is most of the time. Same .cell label convention
              the variable table's own header row below uses. -->
         <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-xs text-subtle">Name</span>
+          <span class="pl-0.5 text-kira-sm text-subtle">Name</span>
           <Input
             v-model="envNameDraft"
             placeholder="name"
@@ -557,7 +557,7 @@ function onBulkClose(): void {
           />
         </Label>
         <Label class="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span class="pl-0.5 text-kira-xs text-subtle">Description</span>
+          <span class="pl-0.5 text-kira-sm text-subtle">Description</span>
           <Input
             v-model="envDescriptionDraft"
             placeholder="description"

@@ -551,7 +551,7 @@ const fieldAttrs = computed(
         <div
           v-if="showOverlay"
           ref="overlayRootRef"
-          class="highlight-overlay absolute inset-0 pointer-events-none overflow-hidden font-data text-kira-sm bg-transparent"
+          class="highlight-overlay absolute inset-0 pointer-events-none overflow-hidden font-data text-kira-md bg-transparent"
           :class="overlayClass"
           aria-hidden="true"
           v-html="overlayHtml"
@@ -568,7 +568,7 @@ const fieldAttrs = computed(
           ref="inputRef"
           rows="1"
           wrap="soft"
-          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-sm outline-none placeholder:text-muted-foreground"
+          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-md outline-none placeholder:text-muted-foreground"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
         <!-- §1.2 allowlist: the two `::-webkit-*-spin-button` arbitrary utilities are pre-approved
@@ -579,7 +579,7 @@ const fieldAttrs = computed(
         <input
           v-else
           ref="inputRef"
-          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-sm outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+          class="min-w-0 flex-1 border-0 bg-transparent font-data text-kira-md outline-none placeholder:text-muted-foreground [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
           v-bind="{ ...$attrs, ...fieldAttrs }"
         />
         <ComboboxAnchor :reference="inputRef ?? undefined" />
@@ -604,14 +604,14 @@ const fieldAttrs = computed(
             :key="c.label"
             as="li"
             :value="i"
-            class="flex items-center gap-1 py-1 px-1.5 rounded-kira-sm text-kira-sm cursor-pointer whitespace-nowrap"
+            class="flex items-center gap-1 py-1 px-1.5 rounded-kira-sm text-kira-md cursor-pointer whitespace-nowrap"
             :class="i === activeIndex ? 'bg-select text-fg' : ''"
             @mouseenter="activeIndex = i"
             @mousedown.prevent="accept(c)"
           >
             <CodiconIcon v-if="c.icon" :name="c.icon" :size="13" class="shrink-0 text-muted-foreground" />
             <span class="overflow-hidden text-ellipsis">{{ c.label }}</span>
-            <span v-if="c.detail" class="ml-auto pl-1.5 text-muted-foreground text-kira-xs shrink-0">{{ c.detail }}</span>
+            <span v-if="c.detail" class="ml-auto pl-1.5 text-muted-foreground text-kira-sm shrink-0">{{ c.detail }}</span>
           </ComboboxItem>
         </ComboboxViewport>
       </ComboboxContent>
@@ -619,7 +619,7 @@ const fieldAttrs = computed(
     <div
       v-if="hoverLines"
       ref="hoverPanelRef"
-      class="var-hover-panel bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed z-(--kira-z-autocomplete) max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
+      class="var-hover-panel bg-elevated border border-border-strong rounded-kira shadow-kira-dialog overflow-hidden fixed z-(--kira-z-autocomplete) max-w-96 px-1.5 py-1 font-data text-kira-md text-fg pointer-events-none"
       role="tooltip"
       data-testid="autocomplete-hover"
       :style="hoverStyle ?? undefined"

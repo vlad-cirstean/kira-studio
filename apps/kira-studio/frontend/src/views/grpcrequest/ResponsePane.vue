@@ -299,8 +299,8 @@ onUnmounted(() => {
           {{ codeName }} ({{ code }})
         </Badge>
         <span class="ml-auto" />
-        <span class="text-kira-xs text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
-        <span class="text-kira-xs text-subtle" data-testid="grpc-message-summary">
+        <span class="text-kira-sm text-subtle" data-testid="grpc-elapsed">{{ elapsedMs }} ms</span>
+        <span class="text-kira-sm text-subtle" data-testid="grpc-message-summary">
           {{ messageCount }} message{{ messageCount === 1 ? '' : 's' }} · {{ formatBytes(messageBytes) }}
         </span>
       </template>
@@ -335,7 +335,7 @@ onUnmounted(() => {
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->
-    <div v-if="statusMessage" class="text-kira-xs text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
+    <div v-if="statusMessage" class="text-kira-sm text-subtle px-1.5 pt-0 pb-1" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
     <Alert v-if="viewing" variant="note" data-testid="grpc-history-band">
       <AlertDescription class="flex items-center gap-3">
@@ -393,20 +393,20 @@ onUnmounted(() => {
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
     <div v-else-if="tab.state.responsePane === 'metadata'" class="flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5" data-testid="grpc-response-metadata">
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-xs text-muted-foreground">Header</div>
-        <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-xs">
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">Header</div>
+        <div v-for="(h, i) in header" :key="`h${i}`" class="flex gap-1.5 text-kira-sm">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ h.name }}</span>
           <span class="wrap-anywhere font-data">{{ h.value }}</span>
         </div>
-        <div v-if="header.length === 0" class="text-kira-xs text-subtle">No header metadata</div>
+        <div v-if="header.length === 0" class="text-kira-sm text-subtle">No header metadata</div>
       </div>
       <div class="metadata-group">
-        <div class="mb-0.5 text-kira-xs text-muted-foreground">Trailer</div>
-        <div v-for="(t, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-xs">
+        <div class="mb-0.5 text-kira-sm text-muted-foreground">Trailer</div>
+        <div v-for="(t, i) in trailer" :key="`t${i}`" class="flex gap-1.5 text-kira-sm">
           <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ t.name }}</span>
           <span class="wrap-anywhere font-data">{{ t.value }}</span>
         </div>
-        <div v-if="trailer.length === 0" class="text-kira-xs text-subtle">No trailer metadata</div>
+        <div v-if="trailer.length === 0" class="text-kira-sm text-subtle">No trailer metadata</div>
       </div>
     </div>
     <div v-else class="flex flex-1 min-h-0 flex-col" data-testid="grpc-message-list">
@@ -431,8 +431,8 @@ onUnmounted(() => {
                  --kira-h-sm here) — VirtualList positions every row assuming that exact height,
                  border included via box-sizing. -->
             <button type="button" class="box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 text-fg h-5.5 cursor-pointer hover:bg-hover" @click="toggleExpanded(entry.m.seq)">
-              <span class="text-kira-xs text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
-              <span class="text-kira-xs text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
+              <span class="text-kira-sm text-subtle" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
+              <span class="text-kira-sm text-subtle">{{ formatBytes(entry.m.wireBytes) }}</span>
               <Tooltip v-if="entry.m.truncated">
                 <TooltipTrigger as-child>
                   <CodiconIcon
@@ -444,7 +444,7 @@ onUnmounted(() => {
                 <TooltipContent>Stored copy cut at 64 KB — not the full message</TooltipContent>
               </Tooltip>
               <span class="ml-auto" />
-              <span class="text-kira-xs text-subtle">#{{ entry.m.seq }}</span>
+              <span class="text-kira-sm text-subtle">#{{ entry.m.seq }}</span>
             </button>
             <!-- Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay
                  numerically equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON
@@ -468,7 +468,7 @@ onUnmounted(() => {
         <button
           v-if="hasHistory"
           type="button"
-          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary"
+          class="mt-1 cursor-pointer border-0 bg-none p-0 text-kira-md text-primary"
           data-testid="grpc-history-hint"
           @click="viewHistory"
         >

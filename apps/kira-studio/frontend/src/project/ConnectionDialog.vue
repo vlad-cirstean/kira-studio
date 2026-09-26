@@ -701,7 +701,7 @@ const preconnectText = computed({
                 >
                   <EngineIcon :kind="kind" :size="22" />
                 </span>
-                <span class="text-kira-lg text-fg">{{ KIND_LABEL[kind] }}</span>
+                <span class="text-kira-md text-fg">{{ KIND_LABEL[kind] }}</span>
               </label>
             </TooltipTrigger>
             <TooltipContent>{{ KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported') }}</TooltipContent>
@@ -725,11 +725,11 @@ const preconnectText = computed({
 
           <TabsContent value="General" class="flex flex-col gap-2">
           <div class="flex gap-2 items-start">
-            <div class="flex flex-col gap-1 flex-2 text-kira-sm">
+            <div class="flex flex-col gap-1 flex-2 text-kira-md">
               <Label class="leading-none text-muted-foreground">Name</Label>
               <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-ui" data-testid="connection-name" />
             </div>
-            <div class="flex flex-col gap-1 flex-none text-kira-sm">
+            <div class="flex flex-col gap-1 flex-none text-kira-md">
               <Label class="leading-none text-muted-foreground">Color</Label>
               <fieldset
                 class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
@@ -750,13 +750,13 @@ const preconnectText = computed({
               </fieldset>
             </div>
           </div>
-          <span v-if="fieldErrors.name" class="text-error text-kira-xs leading-normal">{{ fieldErrors.name }}</span>
+          <span v-if="fieldErrors.name" class="text-error text-kira-sm leading-normal">{{ fieldErrors.name }}</span>
 
-          <p v-if="minVersionNote" class="m-0 text-muted-foreground text-kira-xs" data-testid="connection-min-version">
+          <p v-if="minVersionNote" class="m-0 text-muted-foreground text-kira-sm" data-testid="connection-min-version">
             {{ minVersionNote }}
           </p>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Mode</Label>
             <ToggleGroup
               type="single"
@@ -775,7 +775,7 @@ const preconnectText = computed({
           </div>
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
-            <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+            <div class="flex flex-col gap-1 flex-1 text-kira-md">
               <Label class="leading-none text-muted-foreground">Database file</Label>
               <div class="flex items-center gap-1">
                 <div class="flex-1 min-w-0">
@@ -791,11 +791,11 @@ const preconnectText = computed({
                 </Button>
               </div>
             </div>
-            <span v-if="fieldErrors.database" class="text-error text-kira-xs leading-normal">{{ fieldErrors.database }}</span>
+            <span v-if="fieldErrors.database" class="text-error text-kira-sm leading-normal">{{ fieldErrors.database }}</span>
           </template>
           <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="flex gap-2 items-start">
-              <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+              <div class="flex flex-col gap-1 flex-1 text-kira-md">
                 <Label class="leading-none text-muted-foreground">Host</Label>
                 <Input
                   :model-value="draft.host ?? ''"
@@ -804,7 +804,7 @@ const preconnectText = computed({
                   @update:model-value="draft.host = String($event)"
                 />
               </div>
-              <div class="flex flex-col gap-1 flex-none basis-24 text-kira-sm">
+              <div class="flex flex-col gap-1 flex-none basis-24 text-kira-md">
                 <Label class="leading-none text-muted-foreground">Port</Label>
                 <NumberStepperInput
                   :model-value="draft.port != null ? String(draft.port) : ''"
@@ -813,9 +813,9 @@ const preconnectText = computed({
                 />
               </div>
             </div>
-            <span v-if="fieldErrors.host" class="text-error text-kira-xs leading-normal">{{ fieldErrors.host }}</span>
+            <span v-if="fieldErrors.host" class="text-error text-kira-sm leading-normal">{{ fieldErrors.host }}</span>
             <div v-if="isAwsStyle" class="flex gap-2 items-start">
-              <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+              <div class="flex flex-col gap-1 flex-1 text-kira-md">
                 <Label class="leading-none text-muted-foreground">Region</Label>
                 <Input
                   :model-value="draft.database ?? ''"
@@ -824,7 +824,7 @@ const preconnectText = computed({
                   @update:model-value="draft.database = String($event)"
                 />
               </div>
-              <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+              <div class="flex flex-col gap-1 flex-1 text-kira-md">
                 <Label class="leading-none text-muted-foreground">AWS profile (optional)</Label>
                 <Input
                   :model-value="draft.username ?? ''"
@@ -835,7 +835,7 @@ const preconnectText = computed({
               </div>
             </div>
             <template v-else>
-              <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+              <div class="flex flex-col gap-1 flex-1 text-kira-md">
                 <Label class="leading-none text-muted-foreground">Database</Label>
                 <Input
                   :model-value="draft.database ?? ''"
@@ -845,7 +845,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="flex gap-2 items-start">
-                <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+                <div class="flex flex-col gap-1 flex-1 text-kira-md">
                   <Label class="leading-none text-muted-foreground">User</Label>
                   <Input
                     :model-value="draft.username ?? ''"
@@ -854,7 +854,7 @@ const preconnectText = computed({
                     @update:model-value="draft.username = String($event)"
                   />
                 </div>
-                <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+                <div class="flex flex-col gap-1 flex-1 text-kira-md">
                   <Label class="leading-none text-muted-foreground">Password</Label>
                   <div class="flex items-center gap-1">
                     <div class="flex-1 min-w-0">
@@ -878,7 +878,7 @@ const preconnectText = computed({
             </template>
           </template>
           <template v-else>
-            <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+            <div class="flex flex-col gap-1 flex-1 text-kira-md">
               <Label class="leading-none text-muted-foreground">Connection URI</Label>
               <Input
                 :model-value="draft.uri ?? ''"
@@ -888,7 +888,7 @@ const preconnectText = computed({
                 @blur="refreshUriNote"
               />
             </div>
-            <p class="font-data uri-note text-muted-foreground text-kira-xs">{{ uriNote }}</p>
+            <p class="font-data uri-note text-muted-foreground text-kira-sm">{{ uriNote }}</p>
           </template>
           </TabsContent>
 
@@ -903,7 +903,7 @@ const preconnectText = computed({
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
             <span>Read-only</span>
-            <span class="text-subtle text-kira-xs leading-normal w-full">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
+            <span class="text-subtle text-kira-sm leading-normal w-full">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
           </Label>
 
           <Label v-if="isSqlKind" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
@@ -916,7 +916,7 @@ const preconnectText = computed({
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
             <span>Auto-explain SELECT queries</span>
-            <span class="text-subtle text-kira-xs leading-normal w-full">
+            <span class="text-subtle text-kira-sm leading-normal w-full">
               Runs the database's own EXPLAIN before each SELECT this connection issues from a
               query console, and warns when a query is estimated to read more than the configured
               row threshold. EXPLAIN only plans the query — it never runs it — so this costs one
@@ -924,7 +924,7 @@ const preconnectText = computed({
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Throttle commands <span class="text-subtle">— per second</span></Label>
             <div class="w-24">
               <NumberStepperInput
@@ -937,10 +937,10 @@ const preconnectText = computed({
                 @update:model-value="(v: string | number) => setThrottlePerSec(String(v))"
               />
             </div>
-            <span v-if="throttlePerSecError" class="text-error text-kira-xs leading-normal" data-testid="connection-throttle-error">
+            <span v-if="throttlePerSecError" class="text-error text-kira-sm leading-normal" data-testid="connection-throttle-error">
               {{ throttlePerSecError }}
             </span>
-            <span v-else class="text-subtle text-kira-xs leading-normal w-full">
+            <span v-else class="text-subtle text-kira-sm leading-normal w-full">
               0 disables the limit. Reads served from cache are never throttled, and connecting is
               never throttled. Applies immediately to a connected connection.
             </span>
@@ -948,7 +948,7 @@ const preconnectText = computed({
           </TabsContent>
 
           <TabsContent value="Pre-connect" class="flex flex-col gap-2">
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
             <Textarea
               v-model="preconnectText"
@@ -958,15 +958,15 @@ const preconnectText = computed({
               data-testid="connection-preconnect"
               @keydown="wrapSelectionOnType"
             />
-            <span class="text-subtle text-kira-xs leading-normal w-full">
+            <span class="text-subtle text-kira-sm leading-normal w-full">
               Runs in your shell before connecting — e.g. a port-forward or an SSO session-keeper.
             </span>
-            <span v-if="preconnectText" class="text-warn text-kira-xs" data-testid="connection-preconnect-warning">
+            <span v-if="preconnectText" class="text-warn text-kira-sm" data-testid="connection-preconnect-warning">
               This command runs on your machine with your permissions every time this connection
               connects.
             </span>
           </div>
-          <span v-if="fieldErrors.preconnect" class="text-error text-kira-xs leading-normal">{{ fieldErrors.preconnect }}</span>
+          <span v-if="fieldErrors.preconnect" class="text-error text-kira-sm leading-normal">{{ fieldErrors.preconnect }}</span>
 
           <Label v-if="preconnectText" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
@@ -978,7 +978,7 @@ const preconnectText = computed({
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
             <span>Keep it running, disconnect if it dies</span>
-            <span class="text-subtle text-kira-xs leading-normal w-full">
+            <span class="text-subtle text-kira-sm leading-normal w-full">
               On: the command stays alive for the whole session — e.g. a port-forward — and this
               connection drops the moment it exits. Off (default): a fresh instance runs each time
               you connect, and its exit is never monitored — the right choice for a one-off prep
@@ -998,13 +998,13 @@ const preconnectText = computed({
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
             <span>Expose to the database MCP server</span>
-            <span class="text-subtle text-kira-xs leading-normal w-full">
+            <span class="text-subtle text-kira-sm leading-normal w-full">
               Nothing is exposed by default. The same switch lives in Settings' Database MCP
               section — either one toggles the other.
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label
               class="leading-none text-muted-foreground"
               >Description
@@ -1019,7 +1019,7 @@ const preconnectText = computed({
               data-testid="connection-mcp-description"
               @keydown="wrapSelectionOnType"
             />
-            <span v-if="fieldErrors.mcpDescription" class="text-error text-kira-xs leading-normal">{{ fieldErrors.mcpDescription }}</span>
+            <span v-if="fieldErrors.mcpDescription" class="text-error text-kira-sm leading-normal">{{ fieldErrors.mcpDescription }}</span>
           </div>
 
           <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
@@ -1033,12 +1033,12 @@ const preconnectText = computed({
               <CodiconIcon name="check" :size="10" />
             </Checkbox>
             <span>Plan queries before running them</span>
-            <span v-if="!mcpExplainSupported" class="text-subtle text-kira-xs leading-normal w-full">
+            <span v-if="!mcpExplainSupported" class="text-subtle text-kira-sm leading-normal w-full">
               This engine has no query plan this app can read.
             </span>
           </Label>
 
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
             <ToggleGroup
               type="single"
@@ -1058,7 +1058,7 @@ const preconnectText = computed({
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
             <ToggleGroup
               type="single"
@@ -1078,7 +1078,7 @@ const preconnectText = computed({
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div class="flex flex-col gap-1 flex-1 text-kira-sm">
+          <div class="flex flex-col gap-1 flex-1 text-kira-md">
             <Label class="leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
             <ToggleGroup
               type="single"
@@ -1098,7 +1098,7 @@ const preconnectText = computed({
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <p class="text-subtle text-kira-xs leading-normal w-full">
+          <p class="text-subtle text-kira-sm leading-normal w-full">
             A statement this app cannot classify is treated as whichever of the three is strictest.
             These govern the MCP server only — the Read-only flag on the Advanced tab is what
             governs this app's own console.
@@ -1106,13 +1106,13 @@ const preconnectText = computed({
           </TabsContent>
 
           <TabsContent value="Privacy" class="flex flex-col gap-2">
-          <p class="text-subtle text-kira-xs leading-normal w-full">
+          <p class="text-subtle text-kira-sm leading-normal w-full">
             Rules redact values for this connection's MCP clients and for the data viewer's
             masking preview. They never change stored data.
           </p>
 
           <template v-if="!editingConnectionId">
-            <p class="text-subtle text-kira-xs leading-normal w-full">Save this connection first to manage masking rules.</p>
+            <p class="text-subtle text-kira-sm leading-normal w-full">Save this connection first to manage masking rules.</p>
           </template>
           <template v-else>
             <div v-if="maskRules.length" class="flex flex-col gap-1 max-h-55 overflow-y-auto" data-testid="mask-rule-list">
@@ -1166,7 +1166,7 @@ const preconnectText = computed({
                 />
               </div>
             </div>
-            <p v-else class="text-subtle text-kira-xs leading-normal w-full">No masking rules yet on this connection.</p>
+            <p v-else class="text-subtle text-kira-sm leading-normal w-full">No masking rules yet on this connection.</p>
 
             <div class="flex gap-2 items-center">
               <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data" data-testid="mask-rule-add-table" />
@@ -1181,8 +1181,8 @@ const preconnectText = computed({
               </NativeSelect>
               <Button variant="dialog" size="kira-lg" data-testid="mask-rule-add" @click="onAddMaskRule">Add</Button>
             </div>
-            <p class="text-subtle text-kira-xs leading-normal w-full">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>
-            <span v-if="maskRuleError" class="text-error text-kira-xs leading-normal" data-testid="mask-rule-error">{{ maskRuleError }}</span>
+            <p class="text-subtle text-kira-sm leading-normal w-full">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>
+            <span v-if="maskRuleError" class="text-error text-kira-sm leading-normal" data-testid="mask-rule-error">{{ maskRuleError }}</span>
 
             <Button variant="dialog" size="kira-lg" class="self-start" data-testid="mask-regenerate-key" @click="onRegenerateMaskKey">
               Regenerate correlation key
@@ -1206,7 +1206,7 @@ const preconnectText = computed({
 
           <span
             v-if="connectionDialogStore.error"
-            class="text-error text-kira-xs leading-normal"
+            class="text-error text-kira-sm leading-normal"
             data-testid="connection-save-error"
             >{{ connectionDialogStore.error }}</span
           >
@@ -1220,7 +1220,7 @@ const preconnectText = computed({
           <template v-if="!isFileStyle">
             <p
               v-if="secretStatus?.available && !secretStatus.insecureFallback"
-              class="text-muted-foreground text-kira-xs"
+              class="text-muted-foreground text-kira-sm"
               data-testid="connection-credential-note"
             >
               Credentials are encrypted with your macOS Keychain.

@@ -106,7 +106,7 @@ const dbMcpEnabledId = useId();
     </Field>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
-      <p v-if="dbMcpStore.status.error" class="text-subtle text-kira-xs" data-testid="db-mcp-error">
+      <p v-if="dbMcpStore.status.error" class="text-subtle text-kira-sm" data-testid="db-mcp-error">
         {{ dbMcpStore.status.error }}
       </p>
       <!-- F9: Regenerate must render whenever the server is running, in both branches below —
@@ -116,7 +116,7 @@ const dbMcpEnabledId = useId();
       <template v-else-if="dbMcpStore.status.running">
         <template v-if="dbMcpStore.status.command">
           <p
-            class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs leading-normal"
+            class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
             data-testid="db-mcp-command"
           >
             {{ dbMcpStore.status.command }}
@@ -134,7 +134,7 @@ const dbMcpEnabledId = useId();
             {{ dbMcpInstallMessage }}
           </FieldDescription>
         </template>
-        <p v-else class="text-subtle text-kira-xs" data-testid="db-mcp-no-token">
+        <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-no-token">
           This server restarted since it was last enabled; its registration command needs a
           fresh token to show again.
         </p>
@@ -166,7 +166,7 @@ const dbMcpEnabledId = useId();
       Deny by default — only connections checked here are visible to an AI client through
       this server.
     </FieldDescription>
-    <p class="text-subtle text-kira-xs">
+    <p class="text-subtle text-kira-sm">
       A newly exposed connection defaults to read allow, write prompt, DDL deny — this
       migration tightened what an already-exposed connection allowed too. Edit a
       connection's own three modes and description in its MCP tab. Newly exposed
@@ -185,7 +185,7 @@ const dbMcpEnabledId = useId();
         :data-testid="`db-mcp-connection-row-${conn.id}`"
       >
         <div class="flex flex-col min-w-0 gap-0.5">
-          <span class="break-words text-fg text-kira-sm">{{ conn.name }}</span>
+          <span class="break-words text-fg text-kira-md">{{ conn.name }}</span>
           <FieldDescription
             >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
             {{ conn.mcpDdlMode }}<template v-if="conn.mcpAutoExplain">
@@ -216,7 +216,7 @@ const dbMcpEnabledId = useId();
         </Checkbox>
       </li>
     </ul>
-    <p v-else class="text-subtle text-kira-xs" data-testid="db-mcp-connections-empty">
+    <p v-else class="text-subtle text-kira-sm" data-testid="db-mcp-connections-empty">
       No connections yet — add one first.
     </p>
   </div>

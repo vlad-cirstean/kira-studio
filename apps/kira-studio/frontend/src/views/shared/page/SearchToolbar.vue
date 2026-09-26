@@ -353,7 +353,7 @@ onUnmounted(() => {
         @click="goNext"
       />
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-      <span class="text-kira-xs text-subtle" :data-testid="`${testidPrefix}search-scope`">
+      <span class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
           showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }}
           loaded {{ rowNoun }}
@@ -363,7 +363,7 @@ onUnmounted(() => {
       <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
            masked ones — a surprising mismatch otherwise ("why did my search for a real name match
            a row showing buckets"), named here rather than left implicit. -->
-      <span v-if="maskPreviewOn" class="text-kira-xs text-subtle" :data-testid="`${testidPrefix}search-mask-note`">
+      <span v-if="maskPreviewOn" class="text-kira-sm text-subtle" :data-testid="`${testidPrefix}search-mask-note`">
         search matches stored values, not displayed ones
       </span>
     </template>

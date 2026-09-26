@@ -66,14 +66,14 @@ const keepAwakeAgentAwareId = useId();
     <template v-if="settingsStore.claudeCode.hooksEnabled">
       <p
         v-if="agentHooksStore.status.error"
-        class="text-subtle text-kira-xs"
+        class="text-subtle text-kira-sm"
         data-testid="claude-code-hooks-error"
       >
         {{ agentHooksStore.status.error }}
       </p>
       <p
         v-else-if="agentHooksStore.status.running"
-        class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs leading-normal"
+        class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
         data-testid="claude-code-hooks-path"
       >
         {{ agentHooksStore.status.settingsPath }}

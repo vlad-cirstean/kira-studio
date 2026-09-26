@@ -148,7 +148,7 @@ onUnmounted(() => {
       />
     </div>
     <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
-    <span class="text-kira-xs text-subtle" data-testid="stream-search-scope">
+    <span class="text-kira-sm text-subtle" data-testid="stream-search-scope">
       <template v-if="filtering && filteredRowCount !== null">
         showing {{ filteredRowCount.toLocaleString() }} of {{ loadedRowCount.toLocaleString() }} loaded rows
       </template>

@@ -76,7 +76,7 @@ const expensiveQueryRowsId = useId();
         {{ opLogRetentionError }}
       </FieldError>
     </Field>
-    <p class="text-subtle text-kira-xs">Takes effect after restart.</p>
+    <p class="text-subtle text-kira-sm">Takes effect after restart.</p>
 
     <Field>
       <div class="flex items-center justify-between gap-1">

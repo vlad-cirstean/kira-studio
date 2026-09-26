@@ -410,7 +410,7 @@ onMounted(() => {
                 <span v-if="i > 0" class="text-subtle">/</span>
                 <button
                   type="button"
-                  class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-sm px-0.5"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-kira-md px-0.5"
                   :class="
                     i === crumbs.length - 1
                       ? 'text-fg cursor-default'
@@ -426,13 +426,13 @@ onMounted(() => {
             <span class="ml-auto text-kira-sm text-muted-foreground" data-testid="browse-count">{{ countText }}</span>
           </ViewToolbar>
           <div class="bg-bg overflow-hidden flex flex-col min-h-0 flex-1 rounded-none border-0">
-            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground">Loading…</div>
-            <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-sm text-muted-foreground" data-testid="browse-empty">
+            <div v-if="!rt || (loading && rt.nodes.length === 0)" class="h-full flex items-center justify-center text-kira-md text-muted-foreground">Loading…</div>
+            <div v-else-if="rt.nodes.length === 0" class="h-full flex items-center justify-center text-kira-md text-muted-foreground" data-testid="browse-empty">
               No items
             </div>
             <div
               v-else-if="filteredNodes.length === 0"
-              class="h-full flex items-center justify-center text-kira-sm text-muted-foreground"
+              class="h-full flex items-center justify-center text-kira-md text-muted-foreground"
               data-testid="browse-empty"
             >
               No matching items
@@ -490,7 +490,7 @@ onMounted(() => {
                     data-testid="browse-key-type"
                     >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</Badge
                   >
-                  <span v-if="filteredNodes[vi.index]?.detail" class="shrink-0 text-kira-xs text-muted-foreground">{{
+                  <span v-if="filteredNodes[vi.index]?.detail" class="shrink-0 text-kira-sm text-muted-foreground">{{
                     filteredNodes[vi.index]?.detail
                   }}</span>
                 </div>

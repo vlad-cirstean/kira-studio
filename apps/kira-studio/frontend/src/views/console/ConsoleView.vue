@@ -829,7 +829,7 @@ const statusLine = computed(() => {
         <button
           v-if="canShowAutoExplainPlan"
           type="button"
-          class="border-0 bg-none p-0 text-inherit underline cursor-pointer text-[length:inherit] shrink-0"
+          class="border-0 bg-none p-0 text-inherit underline cursor-pointer shrink-0"
           data-testid="console-auto-explain-show-plan"
           @click="onShowAutoExplainPlan"
         >

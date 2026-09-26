@@ -73,8 +73,8 @@ const DEF_TD = 'px-1.5 py-1 align-middle text-fg border-r border-border last:bor
         >
           <td :class="DEF_TD" class="def-con-name">{{ c.name }}</td>
           <td :class="DEF_TD" class="def-con-type">
-            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-xs">PK</span>
-            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-xs">FK</span>
+            <span v-if="KEY_LABEL[c.type] === 'PK'" class="text-warn text-kira-sm">PK</span>
+            <span v-else-if="KEY_LABEL[c.type] === 'FK'" class="text-info text-kira-sm">FK</span>
             <Badge v-else>{{ TYPE_LABEL[c.type] }}</Badge>
           </td>
           <td :class="DEF_TD" class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground font-data">{{ c.detail }}</td>

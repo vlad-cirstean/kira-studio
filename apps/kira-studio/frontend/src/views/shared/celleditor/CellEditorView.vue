@@ -680,7 +680,7 @@ const statusLine = computed(() => {
       <!-- Hex/base64: the same bytes as editable plaintext, kept in lockstep with the encoded box
            above in both directions (encode<->decode, see onDecodedInput). -->
       <template v-if="showDecodedPane">
-        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2">
+        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
           <CodiconIcon name="symbol-string" :size="13" />
           <span>Decoded text</span>
         </div>
@@ -707,7 +707,7 @@ const statusLine = computed(() => {
       <!-- The three timestamp formats: TimestampPane owns its own readings, zone switch, editable
            field and calendar entirely — this file only decides whether to show it. -->
       <template v-else-if="isTimestampFormat">
-        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2">
+        <div class="flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-sm py-0.5 px-2">
           <CodiconIcon name="calendar" :size="13" />
           <span>Date &amp; time</span>
         </div>

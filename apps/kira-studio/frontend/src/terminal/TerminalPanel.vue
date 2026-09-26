@@ -203,7 +203,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                   >Add</Button
                 >
               </div>
-              <span v-if="addError" class="text-error text-kira-xs leading-normal">{{ addError }}</span>
+              <span v-if="addError" class="text-error text-kira-sm leading-normal">{{ addError }}</span>
             </div>
 
             <div
@@ -228,7 +228,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                 <CodiconIcon v-else name="play" :size="13" class="shrink-0 text-muted-foreground" />
                 <div class="flex-1 min-w-0 flex flex-col">
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ script.name }}</span>
-                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-xs">{{ script.command }}</span>
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground text-kira-sm">{{ script.command }}</span>
                 </div>
               </button>
             </div>

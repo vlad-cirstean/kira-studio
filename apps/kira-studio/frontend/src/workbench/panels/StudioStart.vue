@@ -96,7 +96,7 @@ function openRecent(entry: RecentTableEntry): void {
   <div v-else class="flex-1 min-h-0 flex items-center justify-center overflow-auto p-4" data-testid="no-tab-open">
     <div class="w-140 max-w-full">
       <div class="tracking-normal text-kira-xl text-fg">Kira Studio</div>
-      <div class="text-kira-lg mt-1.5 text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
+      <div class="text-kira-md mt-1.5 text-muted-foreground">Pick something from the tree on the left, or reopen one of these.</div>
 
       <template v-if="recentTablesStore.entries.length > 0">
         <div class="uppercase tracking-wider text-kira-sm mb-1.5 mt-4 text-subtle">Recent tables</div>
@@ -116,7 +116,7 @@ function openRecent(entry: RecentTableEntry): void {
               <CodiconIcon :name="iconFor(entry)" :size="13" />
             </span>
             <span class="truncate min-w-0">{{ entry.path }}</span>
-            <span class="ml-auto text-kira-xs text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
+            <span class="ml-auto text-kira-sm text-subtle">{{ connectionFor(entry)?.name ?? '—' }} · {{ formatRelative(entry.openedAt) }}</span>
           </button>
         </div>
       </template>

@@ -880,7 +880,7 @@ onUnmounted(() => {
                   @keydown.enter="submitAdd"
                   @keydown.escape="closeAdd"
                 />
-                <div v-if="addError" class="text-kira-xs text-error" data-testid="keyvalue-add-error">
+                <div v-if="addError" class="text-kira-sm text-error" data-testid="keyvalue-add-error">
                   {{ addError }}
                 </div>
                 <div class="flex justify-end gap-1">
@@ -921,7 +921,7 @@ onUnmounted(() => {
                   @keydown.enter="saveEdit"
                   @keydown.escape="closeEdit"
                 />
-                <div v-if="editError" class="text-kira-xs text-error" data-testid="keyvalue-edit-error">
+                <div v-if="editError" class="text-kira-sm text-error" data-testid="keyvalue-edit-error">
                   {{ editError }}
                 </div>
                 <div class="flex justify-end gap-1">

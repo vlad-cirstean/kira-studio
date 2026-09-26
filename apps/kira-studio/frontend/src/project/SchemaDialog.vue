@@ -140,7 +140,7 @@ async function onSave(): Promise<void> {
       </DialogHeader>
 
     <div class="flex flex-col gap-2 p-3 h-[60vh]">
-      <span class="help text-subtle text-kira-xs leading-normal">
+      <span class="help text-subtle text-kira-sm leading-normal">
         Table and column completion for this connection normally fills in on its own from the
         connection's own cached schema metadata — no setup needed. Paste a schema here only to
         override that: a schema that doesn't exist yet, or a connection this app can't introspect.
@@ -164,7 +164,7 @@ async function onSave(): Promise<void> {
       <Alert variant="note" class="self-stretch rounded-kira-sm border border-border" data-testid="schema-parse-summary">
         <AlertDescription>
           <span v-if="parseSummary">{{ parseSummary }}</span>
-          <span v-else class="text-subtle text-kira-xs">
+          <span v-else class="text-subtle text-kira-sm">
             Paste output from <span class="font-data">pg_dump --schema-only</span>,
             <span class="font-data">SHOW CREATE TABLE</span> or <span class="font-data">.schema</span> —
             whichever your connection's own engine gives you.
@@ -174,10 +174,10 @@ async function onSave(): Promise<void> {
     </div>
 
       <DialogFooter>
-        <span v-if="saveError" class="text-kira-xs leading-normal text-error" data-testid="schema-save-error">{{
+        <span v-if="saveError" class="text-kira-sm leading-normal text-error" data-testid="schema-save-error">{{
           saveError
         }}</span>
-        <span v-else class="help text-subtle text-kira-xs leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
+        <span v-else class="help text-subtle text-kira-sm leading-normal">Applies to <span class="font-data">{{ connectionName }}</span> only</span>
         <span class="flex items-center gap-1 ml-auto">
           <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
           <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">

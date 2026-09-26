@@ -77,7 +77,7 @@ const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
       class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
     >
       <span class="text-subtle"><CodiconIcon name="database" :size="24" /></span>
-      <span class="text-kira-xs text-subtle leading-normal">Everything you connect to<br />shows up here.</span>
+      <span class="text-kira-sm text-subtle leading-normal">Everything you connect to<br />shows up here.</span>
     </div>
   </div>
   <FiltersDialog />
