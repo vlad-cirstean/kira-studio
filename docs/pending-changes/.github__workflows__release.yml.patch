@@ -1,130 +1,194 @@
-Note: P100 Part 3 — retargets the version-stamp step off apps/kira-studio-vscode (renamed to kira-space-vscode) and adds a release-space job producing/uploading Kira Space.dmg onto the same draft release. P106 — renames the "release" job's own `bun run package` invocation (Kira Studio's) to `bun run package:studio`, its now-explicit name. Apply with 'git apply' against .github/workflows/release.yml, then delete this file.
+Note: P119 — one release job builds, stamps, verifies and drafts BOTH apps under one shared tag and one release, with release notes naming scripts/install.sh's curl command as the only install method (supersedes P100 Part 3's separate release-space job and the manual-DMG install/Gatekeeper-workaround notes); also restates P106's package -> package:studio rename and P100 Part 3's apps/kira-studio-vscode -> apps/kira-space-vscode stamp retarget, both already live at the current release.yml. Apply with 'git apply' against .github/workflows/release.yml, then delete this file.
 
 --- a/.github/workflows/release.yml
 +++ b/.github/workflows/release.yml
-@@ -94,13 +94,9 @@
-           test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
-           echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
-
+@@ -52,7 +52,8 @@
+   release:
+     needs: [test-matrix, db-compat]
+     runs-on: macos-15
+-    timeout-minutes: 40
++    # P119: packages both apps serially in one job (was 40 for Studio alone).
++    timeout-minutes: 60
+     env:
+       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     steps:
+@@ -74,30 +75,32 @@
+         with:
+           path: ~/go/bin/wails3
+           key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
+-      - name: Cache generated Wails bindings (v1.4 P1 — platform-independent output, shared across OSes)
++      - name: Cache generated Wails bindings, both apps (Wails generates bindings per app)
+         uses: actions/cache@v4
+         with:
+           path: |
+             apps/kira-studio/frontend/bindings
+             apps/kira-studio/.task
++            apps/kira-space/frontend/bindings
++            apps/kira-space/.task
+           key: wails-bindings-${{ hashFiles('go.mod') }}
+ 
+-      # The one place a build reads a version (apps/kira-studio/Taskfile.yml's APP_VERSION): from
+-      # here it is linked into the binary and stamped into the bundle's Info.plist, and
+-      # verify:packaging asserts the packaged bundle came out carrying exactly this string.
+-      - name: Set the app version from the release tag
++      # P119: one tag versions both apps. Each app's build/config.yml info.version is the one place
++      # its build reads a version; from there it is linked into the binary and stamped into
++      # Info.plist, and verify:packaging's A5 asserts both bundles carry it.
++      - name: Set both apps' version from the release tag
+         run: |
+           set -eu
+           TAG="${GITHUB_REF_NAME#v}"
+-          CONFIG=apps/kira-studio/build/config.yml
+-          perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
+-          test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
+-          echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
+-
 -          # G10 D21: the extension manifest's own version, kept in lockstep with config.yml's — S9
 -          # asserts the two agree. Anchored to the top-level "version" key at two-space indent, the
 -          # same idiom as the config.yml rewrite above.
 -          VSCODE_PKG=apps/kira-studio-vscode/package.json
--          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
--          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
--          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
-+          # P100 Part 3: the vscode extension moved to apps/kira-space-vscode and packages into
-+          # Kira Space's own bundle now (apps/kira-space/build/Taskfile.yml's build:vsix) — Kira
-+          # Studio no longer bundles or version-stamps it. See the release-space job below.
-
-       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
-         run: sh scripts/setup.sh
-@@ -108,9 +104,9 @@
++          for CONFIG in apps/kira-studio/build/config.yml apps/kira-space/build/config.yml; do
++            perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
++            test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
++            echo "$CONFIG version set to $TAG (from tag $GITHUB_REF_NAME)"
++          done
++
++          # G10 D21: the extension ships inside Kira Space's bundle (P100 Part 3), so its manifest
++          # version tracks Kira Space's config.yml — S9 asserts the two agree.
++          VSCODE_PKG=apps/kira-space-vscode/package.json
+           perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
+           test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
+           echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
+@@ -108,36 +111,43 @@
        - run: bun run lint
        - run: bun run typecheck
-
+ 
 -      - run: bun run package
 +      - run: bun run package:studio
-
++      - run: bun run package:space
+ 
 -      # P10: `bun run package` already produced and signed the .dmg — this only gives it the
-+      # P10: `bun run package:studio` already produced and signed the .dmg — this only gives it the
-       # platform-qualified name the release asset carries.
-       - name: Name the signed disk image for distribution
-         run: cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
-@@ -185,3 +181,98 @@
+-      # platform-qualified name the release asset carries.
+-      - name: Name the signed disk image for distribution
+-        run: cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
++      # P10: each package:* script already produced and signed its .dmg — this only gives each the
++      # platform-qualified name its release asset carries. scripts/install.sh downloads these exact
++      # names (its own --app table), so renaming one breaks that app's install and update.
++      - name: Name the signed disk images for distribution
++        run: |
++          cp "apps/kira-studio/bin/Kira Studio.dmg" "kira-studio-macos-arm64.dmg"
++          cp "apps/kira-space/bin/Kira Space.dmg" "kira-space-macos-arm64.dmg"
+ 
++      # Both bundles exist now, so every Studio and Space artifact check runs instead of skipping.
+       - name: Verify packaging
+         run: bun run verify:packaging
+ 
+-      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4 — moved here from pr.yml's
+-          former package-smoke job, since removed, so it checks the actual tagged release build,
+-          not a separate merge-to-main run that could sit at a different commit)
++      - name: Assert packaged bundles and disk images (docs/PACKAGING.md §4 — checks the actual tagged release build of each app)
+         run: |
+           set -eu
+-          APP="apps/kira-studio/bin/Kira Studio.app"
+-          DMG="apps/kira-studio/bin/Kira Studio.dmg"
+-          test -d "$APP"
+-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
+-            = 'com.kirathecat.kira-studio'
+-          codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
+-          # P10 ships the .dmg, so this opens the real thing: the image mounts, the app is inside
+-          # it, and so is the /Applications shortcut the install gesture needs.
+-          test -f "$DMG"
+-          codesign -dv --verbose=2 "$DMG" 2>&1 | grep -q 'Signature=adhoc'
+-          hdiutil attach -nobrowse -readonly -mountpoint /tmp/kira-dmg "$DMG"
+-          test -d "/tmp/kira-dmg/Kira Studio.app"
+-          test -L "/tmp/kira-dmg/Applications"
+-          hdiutil detach /tmp/kira-dmg
+-          du -sh "$APP" "$DMG"
++          assert_app() {
++            APP="$1/bin/$2.app"
++            DMG="$1/bin/$2.dmg"
++            MNT="$4"
++            test -d "$APP"
++            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "$3"
++            codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
++            # The installer mounts this image and copies the app out of it, so this opens the real
++            # thing: the image mounts and the app is inside it.
++            test -f "$DMG"
++            codesign -dv --verbose=2 "$DMG" 2>&1 | grep -q 'Signature=adhoc'
++            hdiutil attach -nobrowse -readonly -mountpoint "$MNT" "$DMG"
++            test -d "$MNT/$2.app"
++            test -L "$MNT/Applications"
++            hdiutil detach "$MNT"
++            du -sh "$APP" "$DMG"
++          }
++          assert_app apps/kira-studio "Kira Studio" com.kirathecat.kira-studio /tmp/kira-studio-dmg
++          assert_app apps/kira-space "Kira Space" com.kirathecat.kira-space /tmp/kira-space-dmg
+ 
+       - name: Compose release notes
+         run: |
+@@ -145,43 +155,46 @@
+           Requires macOS 14 or later on Apple Silicon (arm64). Background: docs/PACKAGING.md and
+           README.md.
+ 
+-          ## Install
+-
+-          1. Open the downloaded disk image.
+-          2. Drag **Kira Studio** onto the **Applications** shortcut inside it.
+-
+-          ## First launch: Gatekeeper warning
++          This release carries two apps, versioned together: **Kira Studio** (database and API
++          client) and **Kira Space** (git client).
+ 
+-          This build isn't signed by Apple, so macOS blocks it the first time you open it.
+-          Either of these fixes it:
++          ## Install or update
+ 
+-          - Right-click the app (or the disk image, if it's blocked at that step instead) and
+-            choose **Open**.
+-          - Or run this in Terminal, once for the disk image and once for the installed app:
++          Run in Terminal — the same command installs a fresh copy or replaces an older one, then
++          opens the app:
+ 
+-            ```
+-            xattr -dr com.apple.quarantine ~/Downloads/kira-studio-macos-arm64.dmg
+-            xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+-            ```
++          ```
++          curl -fsSL https://raw.githubusercontent.com/vlad-cirstean/kira-studio/main/scripts/install.sh | sh -s -- --app=studio
++          curl -fsSL https://raw.githubusercontent.com/vlad-cirstean/kira-studio/main/scripts/install.sh | sh -s -- --app=space
++          ```
+ 
+-            (adjust the first path if you saved the disk image somewhere else)
++          This is the only supported install method. These builds aren't signed by Apple; a disk
++          image downloaded through a browser is blocked by Gatekeeper, while the installer's own
++          download is not. The disk images attached below are what the installer downloads.
+ 
+-          ## No auto-update
++          ## Updating from inside the app
+ 
+-          New versions don't install themselves — check back here to download the next one. See
+-          docs/PACKAGING.md §7 for why, and what would need to change first.
++          Each app checks for a newer release and offers an update. Clicking **Update** runs the
++          same installer, quits the app, and reopens the new version. Nothing installs without
++          that click. Installer log: `~/Library/Logs/<app name>/install.log`.
+           EOF
+ 
+       - name: Create draft release
+         run: |
+           gh release create "$GITHUB_REF_NAME" \
+             --draft \
+-            --title "Kira Studio $GITHUB_REF_NAME" \
++            --title "Kira Studio and Kira Space $GITHUB_REF_NAME" \
+             --notes-file release-notes.md \
+-            kira-studio-macos-arm64.dmg
++            kira-studio-macos-arm64.dmg \
++            kira-space-macos-arm64.dmg
+ 
+       - uses: actions/upload-artifact@v7
+         with:
            name: kira-studio-macos-arm64
            path: kira-studio-macos-arm64.dmg
            retention-days: 14
-+
-+  # P100 Part 3: Kira Space's own counterpart to the "release" job above, producing
-+  # "Kira Space.dmg" and uploading it onto the same draft release rather than creating a second
-+  # one — needs: [..., release] so it runs after that draft exists, never racing it for
-+  # `gh release create`. Caches use their own keys/paths since Wails generates bindings per app.
-+  release-space:
-+    name: release (Kira Space)
-+    needs: [test-matrix, db-compat, release]
-+    runs-on: macos-15
-+    timeout-minutes: 40
-+    env:
-+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-+    steps:
-+      - uses: actions/checkout@v7
-+      - uses: oven-sh/setup-bun@v2
-+        with:
-+          bun-version: latest
-+      - uses: actions/setup-go@v7
-+        with:
-+          go-version-file: go.mod
-+      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
-+        uses: actions/cache@v4
-+        with:
-+          path: ~/.bun/install/cache
-+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-+      - run: bun install --frozen-lockfile
-+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
-+        uses: actions/cache@v4
-+        with:
-+          path: ~/go/bin/wails3
-+          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
-+      - name: Cache generated Wails bindings, Kira Space (own path/key — Wails generates bindings per app, not shared with Kira Studio's cache above)
-+        uses: actions/cache@v4
-+        with:
-+          path: |
-+            apps/kira-space/frontend/bindings
-+            apps/kira-space/.task
-+          key: wails-bindings-space-${{ hashFiles('go.mod') }}
-+
-+      # Same idiom as the "release" job's own version-stamp step, retargeted at Kira Space's
-+      # config.yml and at the extension manifest, which now lives under kira-space-vscode and
-+      # packages into this app's own bundle (P100 Part 3).
-+      - name: Set the Kira Space app version from the release tag
-+        run: |
-+          set -eu
-+          TAG="${GITHUB_REF_NAME#v}"
-+          CONFIG=apps/kira-space/build/config.yml
-+          perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
-+          test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
-+          echo "Kira Space app version set to $TAG (from tag $GITHUB_REF_NAME)"
-+
-+          VSCODE_PKG=apps/kira-space-vscode/package.json
-+          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
-+          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
-+          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
-+
-+      - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
-+        run: sh scripts/setup.sh
-+
-+      - run: bun run lint
-+      - run: bun run typecheck
-+
-+      - run: bun run package:space
-+
-+      - name: Name the signed disk image for distribution
-+        run: cp "apps/kira-space/bin/Kira Space.dmg" "kira-space-macos-arm64.dmg"
-+
-+      - name: Verify packaging
-+        run: bun run verify:packaging
-+
-+      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4, Kira Space's own counterpart to the "release" job's assertion above)
-+        run: |
-+          set -eu
-+          APP="apps/kira-space/bin/Kira Space.app"
-+          DMG="apps/kira-space/bin/Kira Space.dmg"
-+          test -d "$APP"
-+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
-+            = 'com.kirathecat.kira-space'
-+          codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
-+          test -f "$DMG"
-+          codesign -dv --verbose=2 "$DMG" 2>&1 | grep -q 'Signature=adhoc'
-+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/kira-space-dmg "$DMG"
-+          test -d "/tmp/kira-space-dmg/Kira Space.app"
-+          test -L "/tmp/kira-space-dmg/Applications"
-+          hdiutil detach /tmp/kira-space-dmg
-+          du -sh "$APP" "$DMG"
-+
-+      - name: Upload the Kira Space disk image onto the draft release the "release" job created
-+        run: gh release upload "$GITHUB_REF_NAME" kira-space-macos-arm64.dmg
-+
 +      - uses: actions/upload-artifact@v7
 +        with:
 +          name: kira-space-macos-arm64
