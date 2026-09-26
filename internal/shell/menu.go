@@ -126,9 +126,10 @@ func AppMenuTail(appName string) []Item {
 // WindowMenuTail is the Window section's own identical closing, after each app's own tab/New-
 // Window items (P107 I2-7): Minimise, Zoom, CloseWindow. closeAccelerator re-accelerates
 // CloseWindow — Kira Studio's own Shift+W remap (menu.ts:120-122): role:'close' defaults to
-// CmdOrCtrl+W, which "Close Tab" already claims there. "" leaves the role default untouched (Kira
-// Space, which has no "Close Tab" to collide with) — the one real divergence in this "identical"
-// tail, so it stays a parameter rather than being silently unified.
+// CmdOrCtrl+W, which "Close Tab" already claims. Kira Space's own menu (P116 G4) grew a "Close Tab"
+// item too, so both apps now pass Shortcuts["window.close"].Accelerator() here — "" (the role
+// default, unaccelerated) stays supported as a parameter for a future app with no "Close Tab" to
+// collide with, rather than hard-coding the remap into this function.
 func WindowMenuTail(closeAccelerator string) []Item {
 	return []Item{
 		{Kind: ItemRole, Role: application.Minimise},
