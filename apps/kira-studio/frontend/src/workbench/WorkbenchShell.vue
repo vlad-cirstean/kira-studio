@@ -1,64 +1,30 @@
 <script setup lang="ts">
-import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
-import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
-import { useTerminalsStore } from '../state/terminals';
-import { openTerminalTab } from '../state/terminalTabs';
 import { MODES } from './modes';
 import OperationsPanel from './panels/OperationsPanel.vue';
 import StatusBar from './StatusBar.vue';
 
 // P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, now a thin composition over the shared
 // grid/splitters/TabStrip/MainView package components — this file keeps exactly the per-app
-// content those components' slots need: the mode-scoped left-panel lookup (D6/C6), the Operations
-// dock, and the Terminal module's own "+" menu (the old panels/TabStrip.vue's own
-// `terminalModuleMenuItems`/`onNewTab`, moved here verbatim — real per-app logic, not the shared
-// strip's own).
+// content those components' slots need: the mode-scoped left-panel lookup (D6/C6) and the
+// Operations dock. P128 §2.3/§2.4: the Terminal module's own "+" menu (`terminalModuleMenuItems`/
+// `onNewTab`) moved into the module itself (packages/workbench/src/terminal/TerminalNewTab.vue) —
+// `#new-tab` now renders whichever mode's own `ModeDef.newTab` is set, with no per-module branch
+// here at all.
 const modeStore = useModeStore();
 const layoutStore = useLayoutStore();
-const terminalsStore = useTerminalsStore();
-const contextMenuStore = useContextMenuStore();
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component.
 const activeModePanel = computed(() => MODES[modeStore.active].panel);
 // P1 D6/C6: MainView.vue's fallback when the active mode has no active tab.
 const modeStart = computed(() => MODES[modeStore.active].start);
-
-// P91 §8: the "+" shows with zero tabs in the Terminal module — its own normal initial state. This
-// app has exactly one mode that ever opens a tab through this button.
-const showNewTab = computed(() => modeStore.active === 'terminal');
-const newTabBtn = ref<HTMLButtonElement | null>(null);
-
-// P91 §8: the Terminal module's own "+" menu — one plain, unscoped session at the resolved home
-// directory.
-function terminalModuleMenuItems(): MenuItem[] {
-  return [
-    {
-      type: 'item',
-      id: 'new-terminal',
-      label: 'Terminal',
-      icon: 'terminal-bash',
-      disabled: terminalsStore.terminalDefaults.cwd === '',
-      run: () => {
-        openTerminalTab({ workspaceId: 'terminal', cwd: terminalsStore.terminalDefaults.cwd });
-      },
-    },
-  ];
-}
-
-// P83 §9: the tab strip's own "+" — a dropdown anchored under the button, not the click point.
-function onNewTab(): void {
-  const btn = newTabBtn.value;
-  if (!btn) return;
-  const rect = btn.getBoundingClientRect();
-  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, terminalModuleMenuItems());
-}
+// P91 §8/P128 §2.3: the tab strip's own "+", when the active mode has one.
+const modeNewTab = computed(() => MODES[modeStore.active].newTab);
 </script>
 
 <template>
@@ -76,28 +42,7 @@ function onNewTab(): void {
     <template #tab-strip>
       <TabStrip>
         <template #new-tab>
-          <div
-            v-if="showNewTab"
-            class="h-full flex items-center shrink-0 pr-1 pl-0.5"
-            data-testid="tab-strip-actions"
-          >
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <button
-                  ref="newTabBtn"
-                  type="button"
-                  class="flex items-center justify-center size-5.5 bg-transparent border-0 cursor-pointer rounded-kira-sm text-muted-foreground hover:bg-hover hover:text-fg"
-                  aria-label="New tab"
-                  aria-haspopup="menu"
-                  data-testid="tab-strip-new"
-                  @click="onNewTab"
-                >
-                  <CodiconIcon name="add" :size="13" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>New tab</TooltipContent>
-            </Tooltip>
-          </div>
+          <component :is="modeNewTab" v-if="modeNewTab" />
         </template>
       </TabStrip>
     </template>

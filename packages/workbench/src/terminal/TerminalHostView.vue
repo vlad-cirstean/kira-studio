@@ -5,30 +5,14 @@
 // each app's own view is now a thin wrapper passing its stores as `deps` and, for Kira Studio's
 // Claude Code hooks banner (the one real difference — Kira Space's TerminalService has no
 // AgentHooks integration), a default slot rendered before the terminal host.
-import type { TerminalTabState } from '@shared/domain/tabs';
+// P128 §2.4: TerminalHostTabState/TerminalHostDeps moved to terminalHost.ts (a plain .ts file
+// module.ts, also non-.vue, can import types from) — re-exported here so existing `.vue`
+// consumers of `./TerminalHostView.vue` keep working unchanged.
 import { ref } from 'vue';
-import type { TerminalRendererDeps } from './terminalRenderer';
-import { type TerminalMountSession, useTerminalMount } from './useTerminalMount';
+import type { TerminalHostDeps, TerminalHostTabState } from './terminalHost';
+import { useTerminalMount } from './useTerminalMount';
 
-export type TerminalHostTabState = Pick<
-  TerminalTabState,
-  'codeRepoId' | 'cwd' | 'command' | 'launchKind'
->;
-
-export interface TerminalHostDeps {
-  rendererDeps: TerminalRendererDeps;
-  terminalSession: (tabId: string) => TerminalMountSession | undefined;
-  openTerminalSession: (
-    tabId: string,
-    codeRepoId: string,
-    cwd: string,
-    cols: number,
-    rows: number,
-    command: string,
-    launchKind: TerminalHostTabState['launchKind'],
-  ) => Promise<void>;
-  resizeTerminal: (tabId: string, cols: number, rows: number) => void;
-}
+export type { TerminalHostDeps, TerminalHostTabState } from './terminalHost';
 
 const props = defineProps<{
   tab: { id: string; state: TerminalHostTabState };

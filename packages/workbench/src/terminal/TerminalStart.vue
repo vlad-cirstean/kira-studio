@@ -8,18 +8,14 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
-import { useTerminalsStore } from '../state/terminals';
-import { openTerminalTab } from '../state/terminalTabs';
-
-const terminalsStore = useTerminalsStore();
+import { useNewTerminal } from './module';
 
 // P91 §12: MainView.vue's own fallback when the Terminal module has no active tab — the state a
 // fresh install always opens in. StudioStart.vue verbatim in shape: an EmptyState with one primary
-// action, disabled while the resolved home directory (§7.2) isn't known yet.
-function onNewTerminal(): void {
-  if (terminalsStore.terminalDefaults.cwd === '') return;
-  openTerminalTab({ workspaceId: 'terminal', cwd: terminalsStore.terminalDefaults.cwd });
-}
+// action, disabled while the resolved home directory (§7.2) isn't known yet. P128 §2.4: moved to
+// the shared terminal module — `useNewTerminal` (module.ts) holds the one cwd-unavailable guard,
+// shared with the tab strip's own "+" menu (TerminalNewTab.vue).
+const { canOpen, open } = useNewTerminal();
 </script>
 
 <template>
@@ -29,15 +25,15 @@ function onNewTerminal(): void {
         <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
         <AlertTitle class="text-kira-md font-normal text-muted-foreground">No terminal open</AlertTitle>
         <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
-          <Tooltip :disabled="terminalsStore.terminalDefaults.cwd !== ''">
+          <Tooltip :disabled="canOpen">
             <TooltipTrigger as-child>
-              <TooltipDisabledTrigger :class="{ 'pointer-events-none': terminalsStore.terminalDefaults.cwd === '' }">
+              <TooltipDisabledTrigger :class="{ 'pointer-events-none': !canOpen }">
                 <Button
                   variant="dialog-primary"
                   size="kira-lg"
                   data-testid="terminal-start-new"
-                  :disabled="terminalsStore.terminalDefaults.cwd === ''"
-                  @click="onNewTerminal"
+                  :disabled="!canOpen"
+                  @click="open"
                 >
                   <CodiconIcon name="terminal-bash" :size="13" />
                   New terminal

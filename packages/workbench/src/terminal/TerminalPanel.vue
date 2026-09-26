@@ -11,24 +11,21 @@ import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
-import { useCustomScriptsStore } from '../state/customScripts';
-import { useSettingsStore } from '../state/settings';
-import { useTerminalsStore } from '../state/terminals';
-import { openTerminalTab } from '../state/terminalTabs';
+import { useNewTerminal, useTerminalModule } from './module';
 
 const confirmDialogStore = useConfirmDialogStore();
-
 const contextMenuStore = useContextMenuStore();
+const ctx = useTerminalModule();
+const { open: openNewTerminal } = useNewTerminal();
 
 // P91 §11: the Terminal module's own left panel — a second *view* over P85's custom_scripts store
 // (§10, decided against a second, module-scoped list), not a second data store. Add/remove are
 // inline; full editing (rename, re-command, working directory, colour) deep-links to the Settings
 // section P85 already built (§11.3) — a 180-480px panel cannot hold four labelled fields legibly,
-// and this stays the one place those rules live.
-
-const customScriptsStore = useCustomScriptsStore();
-const settingsStore = useSettingsStore();
-const terminalsStore = useTerminalsStore();
+// and this stays the one place those rules live. P128 §2.4: moved to the shared terminal module —
+// `ctx.scripts` (module.ts) is the optional custom-scripts seam; Kira Space injects none, so its
+// panel below shows only a header and one "New terminal" action.
+const scripts = computed(() => ctx.scripts);
 
 const search = ref('');
 const adding = ref(false);
@@ -40,14 +37,15 @@ const canAdd = computed(() => newName.value.trim() !== '' && newCommand.value.tr
 
 // §11.1: panel search filters rows by name and command.
 const filteredRecords = computed(() => {
+  const records = scripts.value?.records() ?? [];
   const q = search.value.trim().toLowerCase();
-  if (q === '') return customScriptsStore.records;
-  return customScriptsStore.records.filter(
+  if (q === '') return records;
+  return records.filter(
     (s) => s.name.toLowerCase().includes(q) || s.command.toLowerCase().includes(q),
   );
 });
 
-const empty = computed(() => customScriptsStore.records.length === 0 && !adding.value);
+const empty = computed(() => (scripts.value?.records().length ?? 0) === 0 && !adding.value);
 
 // P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
 // shared usePanelHeaderSearch composable -- this panel is always searchable (PanelShell's own
@@ -72,15 +70,15 @@ function cancelAdd(): void {
   addError.value = null;
 }
 
-// §11.3: staged locally, committed with createCustomScript — SettingsDialog.vue's own posture,
+// §11.3: staged locally, committed with ctx.scripts.create — SettingsDialog.vue's own posture,
 // including trimming both fields before building CustomScriptFields (P85's own late fix). Left at
 // workingDir '' / color 'none' — a quick command added here runs in the module's default cwd
 // until the user sets one in Settings.
 async function onAdd(): Promise<void> {
-  if (!canAdd.value) return;
+  if (!canAdd.value || !scripts.value) return;
   addError.value = null;
   try {
-    await customScriptsStore.createCustomScript({
+    await scripts.value.create({
       name: newName.value.trim(),
       command: newCommand.value.trim(),
       workingDir: '',
@@ -96,20 +94,20 @@ async function onAdd(): Promise<void> {
 // script's colour, through tabKinds.ts's existing title()/railColor() — no new title or colour
 // logic needed here.
 function runScript(script: CustomScript): void {
-  openTerminalTab({
-    workspaceId: 'terminal',
-    cwd: script.workingDir || terminalsStore.terminalDefaults.cwd,
+  ctx.openTerminalTab({
+    cwd: script.workingDir || ctx.defaultCwd(),
     launch: { command: script.command, label: script.name, color: script.color, kind: 'script' },
   });
 }
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
+  if (!scripts.value) return;
   const ok = await confirmDialogStore.confirmDialog(
     `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
     { danger: true },
   );
-  if (ok) await customScriptsStore.removeCustomScript(script.id);
+  if (ok) await scripts.value.remove(script.id);
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {
@@ -120,7 +118,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       id: 'edit',
       label: 'Edit…',
       icon: 'edit',
-      run: () => settingsStore.openSettingsAt('Scripts'),
+      run: () => scripts.value?.openEditor(),
     },
     { type: 'separator' },
     {
@@ -138,7 +136,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 
 <template>
   <div data-testid="terminal-panel">
-    <div ref="rootEl" class="flex h-full flex-col">
+    <div v-if="scripts" ref="rootEl" class="flex h-full flex-col">
       <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
         <span class="font-semibold">Quick commands</span>
         <TooltipIconButton
@@ -160,7 +158,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           label="Manage scripts…"
           aria-label="Manage scripts"
           data-testid="quick-commands-manage"
-          @click="settingsStore.openSettingsAt('Scripts')"
+          @click="scripts.openEditor()"
         />
       </div>
       <template v-if="!empty">
@@ -250,6 +248,29 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
               @click="openAddRow"
             >
               Add a quick command
+            </Button>
+          </AlertAction>
+        </Alert>
+      </div>
+    </div>
+    <!-- P128 §2.4: no scripts seam (Kira Space) — just a header and one "New terminal" action,
+         the same one the tab strip's own "+" menu opens (useNewTerminal). -->
+    <div v-else class="flex h-full flex-col">
+      <div class="flex items-center shrink-0 h-bar gap-1 px-1.5 border-b border-border text-kira-sm text-muted-foreground uppercase tracking-wider">
+        <span class="font-semibold">Terminal</span>
+      </div>
+      <div class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center">
+        <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
+          <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted-foreground">No terminal open</AlertTitle>
+          <AlertAction class="static mt-1">
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              data-testid="terminal-panel-new"
+              @click="openNewTerminal"
+            >
+              New terminal
             </Button>
           </AlertAction>
         </Alert>

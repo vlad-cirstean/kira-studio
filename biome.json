@@ -188,30 +188,6 @@
       }
     },
     {
-      "includes": ["apps/kira-studio/frontend/src/terminal/**"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": {
-              "level": "error",
-              "options": {
-                "patterns": [
-                  {
-                    "group": ["**/views/**"],
-                    "message": "P91 §11: terminal/ must not import views/ directly — dispatch through state/ instead."
-                  },
-                  {
-                    "group": ["**/http/**", "**/api/**"],
-                    "message": "P91 §11: terminal/ must not import http/ or api/ — a terminal tab has no request-builder state to reach into."
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    {
       "includes": ["apps/kira-studio/frontend/src/api/**"],
       "linter": {
         "rules": {

@@ -7,6 +7,7 @@ import ContextMenu from '@workbench/components/ContextMenu.vue';
 import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { runCommand } from '@workbench/shortcuts/commands';
+import { terminalModuleKey } from '@workbench/terminal/module';
 import { onMounted, onUnmounted, provide } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
 import { useCollectionsStore } from './api/state/collections';
@@ -30,12 +31,16 @@ import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
 import { useEngineStore } from './workbench/state/engine';
 import TitleBar from './workbench/TitleBar.vue';
+import { createTerminalModule } from './workbench/terminalModule';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 
 // P103 Part 2 (§5.4): provided once, here, for MainView/TabStrip/WorkbenchShell (via their own
 // per-app workbench/*.vue wrappers) to inject through packages/workbench/src/host.ts.
 provide(workbenchHostKey, createWorkbenchHost());
+// P128 §2.4: the terminal module's own context, for TerminalPanel.vue/TerminalStart.vue/
+// TerminalNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
+provide(terminalModuleKey, createTerminalModule());
 
 const engineStore = useEngineStore();
 const appUpdateStore = useAppUpdateStore();

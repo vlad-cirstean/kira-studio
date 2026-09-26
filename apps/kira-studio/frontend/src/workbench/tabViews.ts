@@ -1,4 +1,5 @@
 import type { TabViewMap } from '@workbench/tabs/types';
+import TerminalTabView from '@workbench/terminal/TerminalTabView.vue';
 import EnvironmentsTabView from '../api/EnvironmentsView.vue';
 import VariableSetTabView from '../api/VariableSetView.vue';
 import type { StudioTabKind } from '../state/tabDomain';
@@ -11,7 +12,6 @@ import GrpcRequestTabView from '../views/grpcrequest/GrpcRequestView.vue';
 import HttpRequestTabView from '../views/httprequest/HttpRequestView.vue';
 import KeyValueTabView from '../views/keyvalue/KeyValueView.vue';
 import StreamTabView from '../views/stream/StreamView.vue';
-import TerminalTabView from '../views/terminal/TerminalView.vue';
 
 // P1 D4: the component half of the tab-kind registry — split from state/tabKinds.ts because
 // state/ -> workbench/ is a lint-forbidden edge (F19), while workbench/ -> views/ is not. STATIC
@@ -32,8 +32,9 @@ export const TAB_VIEWS: TabViewMap<StudioTabKind> = {
   'variable-set': VariableSetTabView,
   environments: EnvironmentsTabView,
   // P83 §6.2: the embedded terminal — a static entry like every kind above; @xterm/xterm itself
-  // stays behind terminalRenderer.ts's own dynamic import(). This app's own standalone Terminal
-  // module's renderer, duplicated from (not shared with) apps/kira-space's own one —
-  // views/terminal/TerminalView.vue's own doc comment.
+  // stays behind terminalRenderer.ts's own dynamic import(). P128 §2.5: the tab view itself is now
+  // one shared component (packages/workbench/src/terminal/TerminalTabView.vue), rendering either a
+  // Terminal-module tab or a repo terminal — the two differ only in workspaceId/codeRepoId, set by
+  // whichever opener built the tab.
   terminal: TerminalTabView,
 };
