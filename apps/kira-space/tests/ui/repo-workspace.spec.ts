@@ -793,9 +793,10 @@ test("the tab strip's + opens a terminal tab at the active repository's root", a
   expect(terminalId).not.toBeNull();
 
   // .xterm-rows appearing proves the dynamic import of terminalRenderer.ts settled and xterm
-  // mounted; the terminalOpen call itself is fire-and-forget from RepoTerminalView.vue's own
-  // mount(), so a plain synchronous check can race its still-in-flight mocked round trip —
-  // expect.poll rather than a fixed wait.
+  // mounted; the terminalOpen call itself is fire-and-forget from TerminalHostView.vue's own
+  // mount() (P128 §2.5: the shared component both RepoTerminalView.vue and the Terminal module's
+  // own tab view rendered through), so a plain synchronous check can race its still-in-flight
+  // mocked round trip — expect.poll rather than a fixed wait.
   await expect(page.locator('.xterm-rows')).toBeVisible();
 
   await expect
