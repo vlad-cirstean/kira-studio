@@ -50,11 +50,7 @@ import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import {
-  type AppMetricsSample,
-  CHANNEL,
-  type MaskRulesChangedEvent,
-} from '@shared/protocol/events';
+import { CHANNEL, type MaskRulesChangedEvent } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -74,12 +70,10 @@ const studioControl = {
   updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
   updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
   engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
-  onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
   onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),
   onNewRequest: (cb: () => void): (() => void) => on(CHANNEL.newRequest, cb),
   onImportPostman: (cb: () => void): (() => void) => on(CHANNEL.importPostman, cb),
   onImportDataGrip: (cb: () => void): (() => void) => on(CHANNEL.importDataGrip, cb),
-  onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
   onToggleOperationsPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleOperationsPanel, cb),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
   // P100 Part 2: onQuickOpen (CHANNEL.quickOpen) dropped — the repo workspace's Quick Open feature
@@ -87,9 +81,6 @@ const studioControl = {
   // own Go menu no longer emits the channel (internal/shell/menutemplate.go's own "Quick Open…"
   // item removed alongside it). CHANNEL.quickOpen itself stays in the shared protocol constants —
   // apps/kira-space's own copy of this bridge still binds it.
-  onTabNext: (cb: () => void): (() => void) => on(CHANNEL.tabNext, cb),
-  onTabPrev: (cb: () => void): (() => void) => on(CHANNEL.tabPrev, cb),
-  onTabClose: (cb: () => void): (() => void) => on(CHANNEL.tabClose, cb),
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
   onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
   onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),
@@ -306,23 +297,16 @@ const studioControl = {
   agentHooksSetEnabled: (enabled: boolean): Promise<WailsModels.AgentHooksStatus> =>
     unwrap(AgentHooksService.SetEnabled({ enabled })),
 
-  // P87 §7.2: the titlebar keep-awake toggle and the agent-aware Settings leaf — agentHooksStatus's
-  // own "just unwrap, no trust()" shape (a bool, a bool and a string, nothing secret).
-  keepAwakeStatus: (): Promise<WailsModels.KeepAwakeStatus> => unwrap(KeepAwakeService.Status()),
-  keepAwakeSetManual: (enabled: boolean): Promise<WailsModels.KeepAwakeStatus> =>
-    unwrap(KeepAwakeService.SetManual({ enabled })),
+  // P87 §7.2: the agent-aware Settings leaf — the titlebar toggle's own read/write/broadcast moved
+  // to createCoreControl.ts (P116 H5); this one stays app-side since Kira Space has no agent-aware
+  // reason to set.
   keepAwakeSetAgentAware: (enabled: boolean): Promise<WailsModels.KeepAwakeStatus> =>
     unwrap(KeepAwakeService.SetAgentAware({ enabled })),
-  onKeepAwakeChanged: (cb: (s: WailsModels.KeepAwakeStatus) => void): (() => void) =>
-    on(CHANNEL.keepAwake, cb),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: OpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
-
-  onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
-    on(CHANNEL.appMetrics, cb),
 
   // windowsEnsure registers this page's own windowKey with a `windows` row if it doesn't already
   // have one — always a no-op on the native shell (main.go's own window-creation paths already
@@ -337,8 +321,6 @@ const studioControl = {
     ),
   windowsSetMode: (mode: AppMode): Promise<void> =>
     unwrap(WindowsService.SetMode({ windowKey, mode })),
-  // P92 item 3: the title bar's "New window" button.
-  windowsOpenNew: (): Promise<void> => unwrap(WindowsService.OpenNew()),
 
   // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
   // `any` in the bindings) rather than the domain's real discriminated union — Go has no sum
@@ -438,6 +420,8 @@ export const control = {
     terminal: TerminalService,
     files: FilesService,
     link: LinkService,
+    windows: WindowsService,
+    keepAwake: KeepAwakeService,
   }),
   ...apiControl,
   ...studioControl,

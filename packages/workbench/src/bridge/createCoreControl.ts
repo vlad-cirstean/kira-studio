@@ -1,6 +1,6 @@
 import type { LayoutPatch } from '@shared/domain/layout';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
-import { CHANNEL, type TerminalEvent } from '@shared/protocol/events';
+import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from './rpc';
 
 // P103 Part 2 (§5.6): the 20 bound-call methods that were byte-for-byte identical between Kira
@@ -10,6 +10,14 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // the quit and close-window flush handshakes, the folder picker, tabsList/tabsSave, the five
 // terminal methods, and linkOpenExternal. Everything else (94 more methods in Kira Studio's own
 // studioControl, 24 more in Kira Space's) stays app-side, unmoved, in each app's own bridge/index.ts.
+//
+// P116 H5 adds ten more, moved out of Kira Studio's own studioControl once Kira Space grew the
+// same window-chrome gaps (G1-G5/G7): the five menu-pushed signal channels (open-settings,
+// toggle-project-panel, tab-next/prev/close), the keep-awake toggle's read/write/broadcast, the
+// app-metrics broadcast, and the title bar's "New window" button. Kira Studio's own
+// keepAwakeSetAgentAware (the Settings leaf, not the titlebar button) stays app-side — Kira Space
+// has no agent-aware reason to set. Likewise windowsEnsure/windowsSetMode stay app-side — they are
+// Kira Studio's own AppMode plumbing, which Kira Space has none of.
 //
 // `CoreBindings` is a **structural** interface, not an adapter: each app's own generated
 // `@bindings/*` service modules (SettingsService, LayoutService, TabsService, LifecycleService,
@@ -63,6 +71,13 @@ export interface CoreBindings {
   link: {
     OpenExternal(a: { url: string }): Promise<void>;
   };
+  windows: {
+    OpenNew(): Promise<void>;
+  };
+  keepAwake: {
+    Status(): Promise<unknown>;
+    SetManual(a: { enabled: boolean }): Promise<unknown>;
+  };
 }
 
 // P25 D13's folder-picker result — identical shape in both apps' own generated
@@ -72,6 +87,14 @@ export interface CoreBindings {
 interface FolderChoice {
   canceled: boolean;
   path: string | null;
+}
+
+// KeepAwakeStatus is both apps' own bound KeepAwakeService wire type, restated here rather than
+// imported from either app's own `@bindings/*` output — FolderChoice's own reasoning applies.
+export interface KeepAwakeStatus {
+  manual: boolean;
+  supported: boolean;
+  error: string;
 }
 
 // `S`/`L`/`T`/`P` are each app's own Settings, Layout, TabRecord and SettingsPatch shape. Layout is
@@ -119,6 +142,21 @@ export interface CoreControl<S, L, T, P> {
   terminalResize: (terminalId: string, cols: number, rows: number) => Promise<void>;
   terminalClose: (terminalId: string) => Promise<void>;
   onTerminal: (cb: (event: TerminalEvent) => void) => () => void;
+
+  // P116 H5's own ten — see this file's header comment.
+  onOpenSettings: (cb: () => void) => () => void;
+  onToggleProjectPanel: (cb: () => void) => () => void;
+  onTabNext: (cb: () => void) => () => void;
+  onTabPrev: (cb: () => void) => () => void;
+  onTabClose: (cb: () => void) => () => void;
+
+  onAppMetrics: (cb: (sample: AppMetricsSample) => void) => () => void;
+
+  windowsOpenNew: () => Promise<void>;
+
+  keepAwakeStatus: () => Promise<KeepAwakeStatus>;
+  keepAwakeSetManual: (enabled: boolean) => Promise<KeepAwakeStatus>;
+  onKeepAwakeChanged: (cb: (status: KeepAwakeStatus) => void) => () => void;
 }
 
 export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L, T, P> {
@@ -179,5 +217,23 @@ export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L
       unwrap(b.terminal.Resize({ terminalId, cols, rows })),
     terminalClose: (terminalId: string): Promise<void> => unwrap(b.terminal.Close({ terminalId })),
     onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
+
+    onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
+    onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
+    onTabNext: (cb: () => void): (() => void) => on(CHANNEL.tabNext, cb),
+    onTabPrev: (cb: () => void): (() => void) => on(CHANNEL.tabPrev, cb),
+    onTabClose: (cb: () => void): (() => void) => on(CHANNEL.tabClose, cb),
+
+    onAppMetrics: (cb: (sample: AppMetricsSample) => void): (() => void) =>
+      on(CHANNEL.appMetrics, cb),
+
+    windowsOpenNew: (): Promise<void> => unwrap(b.windows.OpenNew()),
+
+    keepAwakeStatus: (): Promise<KeepAwakeStatus> =>
+      unwrap(b.keepAwake.Status()).then((r) => trust<KeepAwakeStatus>(r)),
+    keepAwakeSetManual: (enabled: boolean): Promise<KeepAwakeStatus> =>
+      unwrap(b.keepAwake.SetManual({ enabled })).then((r) => trust<KeepAwakeStatus>(r)),
+    onKeepAwakeChanged: (cb: (status: KeepAwakeStatus) => void): (() => void) =>
+      on(CHANNEL.keepAwake, cb),
   };
 }
