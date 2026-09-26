@@ -9,7 +9,7 @@ export { default as Badge } from './Badge.vue';
 // carry their own colour via a sibling class, or a chip with no status yet).
 // `count` keeps `.p-count`'s own pill shape (disclosed: text swaps #f0f0f0 -> text-fg, P110 §1.4).
 export const badgeVariants = cva(
-  'inline-flex h-control-sm shrink-0 items-center gap-1 whitespace-nowrap font-data text-kira-xs [&>svg]:pointer-events-none [&>svg]:size-3',
+  'inline-flex h-control-sm shrink-0 items-center gap-1 whitespace-nowrap font-data text-kira-sm [&>svg]:pointer-events-none [&>svg]:size-3',
   {
     variants: {
       variant: {

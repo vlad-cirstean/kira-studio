@@ -34,7 +34,7 @@ const { filterState } = useCommand()
         v-model="filterState.search"
         data-slot="command-input"
         auto-focus
-        :class="cn('w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50', props.class)"
+        :class="cn('w-full text-kira-md outline-hidden disabled:cursor-not-allowed disabled:opacity-50', props.class)"
       />
       <InputGroupAddon>
         <SearchIcon class="size-4 shrink-0 opacity-50" />

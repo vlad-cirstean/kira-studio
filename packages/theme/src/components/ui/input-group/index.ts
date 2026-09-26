@@ -11,7 +11,7 @@ export { default as InputGroupText } from '@theme/components/ui/input-group/Inpu
 export { default as InputGroupTextarea } from '@theme/components/ui/input-group/InputGroupTextarea.vue';
 
 export const inputGroupAddonVariants = cva(
-  'text-muted-foreground h-auto gap-2 py-1.5 text-sm font-medium group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--kira-radius)-5px)] [&>svg:not([class*=size-])]:size-4 flex cursor-text items-center justify-center select-none',
+  'text-muted-foreground h-auto gap-2 py-1.5 text-kira-md font-medium group-data-[disabled=true]/input-group:opacity-50 [&>kbd]:rounded-[calc(var(--kira-radius)-5px)] [&>svg:not([class*=size-])]:size-4 flex cursor-text items-center justify-center select-none',
   {
     variants: {
       align: {
@@ -47,7 +47,7 @@ export const inputGroupVariants = cva('', {
     variant: {
       default:
         'm-0 min-w-0 border-border-strong dark:bg-border-strong/30 has-[[data-slot=input-group-control]:focus-visible]:border-focus has-[[data-slot][aria-invalid=true]]:ring-error/20 has-[[data-slot][aria-invalid=true]]:border-error dark:has-[[data-slot][aria-invalid=true]]:ring-error/40 has-disabled:bg-border-strong/50 dark:has-disabled:bg-border-strong/80 h-8 rounded-kira border transition-colors has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:focus-ring has-[[data-slot][aria-invalid=true]]:ring-3 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 group/input-group relative flex w-full items-center p-0 outline-none has-[>textarea]:h-auto',
-      kira: 'm-0 min-w-0 inline-flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2 py-0 text-fg font-data text-kira-sm focus-within:border-focus focus-within:focus-ring aria-invalid:border-error',
+      kira: 'm-0 min-w-0 inline-flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2 py-0 text-fg font-data text-kira-md focus-within:border-focus focus-within:focus-ring aria-invalid:border-error',
     },
   },
   defaultVariants: {
@@ -57,7 +57,7 @@ export const inputGroupVariants = cva('', {
 
 export type InputGroupBoxVariants = VariantProps<typeof inputGroupVariants>;
 
-export const inputGroupButtonVariants = cva('gap-2 text-sm flex items-center shadow-none', {
+export const inputGroupButtonVariants = cva('gap-2 text-kira-md flex items-center shadow-none', {
   variants: {
     size: {
       xs: 'h-6 gap-1 rounded-[calc(var(--kira-radius)-3px)] px-1.5 [&>svg:not([class*=size-])]:size-3.5',
