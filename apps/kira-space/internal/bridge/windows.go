@@ -1,23 +1,14 @@
 package bridge
 
-import "github.com/kirathecat/kira-studio/internal/ipcerr"
+import (
+	"github.com/kirathecat/kira-studio/internal/windowsvc"
+)
 
-// WindowsService is the title bar's "New window" button — Kira Studio's own WindowsService
-// (internal/bridge/windows.go), trimmed: no Ensure/SetMode, since this app has no AppMode of its
-// own to persist.
+// WindowsService is Kira Space's own binding-name shim over internal/windowsvc.Service (P128
+// §2.2) — Wails' binding generator builds a call's FQN from the *registered* type's own package,
+// promoted methods included (§1.7), so embedding here keeps this app's binding names app-local
+// while every method body lives once in internal/windowsvc. This app gains Ensure/SetMode here for
+// the first time — the git/terminal/ade module registry's own per-window persisted mode.
 type WindowsService struct {
-	// OpenNewWindow is main.go's own openNew closure (the same action Shift+Cmd+N ties to) —
-	// assigned after the service is constructed, since that closure needs the application this
-	// service is registered on.
-	OpenNewWindow func()
-}
-
-// OpenNew is the title bar's "New window" button — Kira Studio's own WindowsService.OpenNew,
-// unchanged.
-func (s *WindowsService) OpenNew() error {
-	if s.OpenNewWindow == nil {
-		return ipcerr.BadRequest("windows: this build cannot open a window")
-	}
-	s.OpenNewWindow()
-	return nil
+	*windowsvc.Service
 }

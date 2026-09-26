@@ -31,6 +31,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/windowsvc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -141,8 +142,11 @@ func main() {
 	keepAwakeSvc := &bridge.KeepAwakeService{Emit: emitter, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
 
 	// windowsSvc is P116 G6's own addition — OpenNewWindow is assigned once `openNew` exists,
-	// below, the same two-step Kira Studio's own main.go uses (that closure needs `app`).
-	windowsSvc := &bridge.WindowsService{}
+	// below, the same two-step Kira Studio's own main.go uses (that closure needs `app`). P128
+	// §2.2: the bound methods live once in windowsvc.Service; this app's own WindowsService only
+	// embeds it, gaining Ensure/SetMode here for the first time (the module registry's own
+	// per-window persisted mode).
+	windowsSvc := &bridge.WindowsService{Service: &windowsvc.Service{Windows: deps.Repos.Windows}}
 
 	// metricsTicker is P116 G7's own addition — the status bar's CPU/memory readout, Kira Studio's
 	// own metrics.NewAppTicker wired to this app's own executable name.

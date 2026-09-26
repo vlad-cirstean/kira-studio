@@ -1,7 +1,7 @@
-// Package migrations embeds Kira Space's own schema migration(s) — the app has never shipped, so
-// there is no installed base with a partially-applied schema to preserve, the same "one collapsed
-// init migration" shape Kira Studio's own migrations package used (see that package's own doc
-// comment).
+// Package migrations embeds Kira Space's own schema migrations — the app shipped no installed base
+// before P100 Part 2, so 0001/0002 stayed one collapsed init pair the same shape Kira Studio's own
+// migrations package used (see that package's own doc comment); every migration since (P128's own
+// 0003) applies in the ordinary way against whatever schema is already on disk.
 package migrations
 
 import (
@@ -18,6 +18,7 @@ var files embed.FS
 var names = []sqlitex.MigrationSource{
 	{Version: 1, Name: "init", File: "0001_init.sql"},
 	{Version: 2, Name: "p100_tabs_layout", File: "0002_p100_tabs_layout.sql"},
+	{Version: 3, Name: "p128_window_mode", File: "0003_p128_window_mode.sql"},
 }
 
 // All returns every migration in ascending version order.

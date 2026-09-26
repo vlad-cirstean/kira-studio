@@ -45,6 +45,7 @@ import (
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/windowsvc"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -375,8 +376,9 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 
 	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
 	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
-	// menu command already uses.
-	windowsSvc := &bridge.WindowsService{Deps: deps}
+	// menu command already uses. P128 §2.2: the bound methods live once in windowsvc.Service; this
+	// app's own WindowsService only embeds it.
+	windowsSvc := &bridge.WindowsService{Service: &windowsvc.Service{Windows: deps.Repos.Windows}}
 
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
 	// service plus ChannelTerminal's push channel. P128 §2.1: the bound methods live once in

@@ -299,7 +299,7 @@ const studioControl = {
   // state/mode.ts's hydrateMode reads, rather than a second round trip.
   windowsEnsure: (): Promise<AppMode> =>
     unwrap(WindowsService.Ensure({ windowKey })).then((r) =>
-      trust<AppMode>(trust<WailsModels.WindowsEnsureResult>(r).mode),
+      trust<AppMode>(trust<{ mode: string }>(r).mode),
     ),
   windowsSetMode: (mode: AppMode): Promise<void> =>
     unwrap(WindowsService.SetMode({ windowKey, mode })),

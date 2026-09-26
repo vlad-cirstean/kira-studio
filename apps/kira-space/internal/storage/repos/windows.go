@@ -9,20 +9,29 @@ import (
 )
 
 // WindowsRepo reads and writes the `windows` table (P8 D1/D4) — one row per workbench that is
-// either open right now or was the last time the app quit. Kira Studio's own WindowsRepo also
-// carries GetMode/SetMode (P22 D12's per-window app-mode persistence); Kira Space has no such
-// concept (see model.WindowRecord's own doc comment) so both, and the `mode` column they read/
-// write, are dropped here (P100 Part 1).
+// either open right now or was the last time the app quit, plus this app's own per-window module
+// mode (P128 §2.2's migration 0003_p128_window_mode.sql).
 type WindowsRepo struct {
 	DB *sql.DB
 }
 
 // shared is this repo's own row against repo-root internal/appstorage.WindowRepo, which owns
 // every method below directly (P107 T2-10, I2-3) — this app's own WindowRecord/WindowBounds are
-// plain aliases of appstorage's own (unlike Kira Studio's own WindowRecord, which keeps an extra
-// `mode` column this app's schema has no room for), so nothing here needs its own query or
-// conversion any more.
+// plain aliases of appstorage's own, so nothing here needs its own query or conversion any more.
 func (r *WindowsRepo) shared() *appstorage.WindowRepo { return &appstorage.WindowRepo{DB: r.DB} }
+
+// GetMode reads one window's stored mode, normalised against this app's own vocabulary — a thin
+// delegate to appstorage.WindowRepo.GetMode (P128 §2.2). Used by windowsvc.Service's bound Ensure,
+// the one call the renderer already makes before it asks for anything window-scoped.
+func (r *WindowsRepo) GetMode(key string) (string, error) {
+	return r.shared().GetMode(key, model.WindowModes)
+}
+
+// SetMode persists one window's own module mode — a thin delegate to appstorage.WindowRepo.SetMode,
+// written on shutdown/mode-debounce rather than on every mode click.
+func (r *WindowsRepo) SetMode(key string, mode string) error {
+	return r.shared().SetMode(key, mode, model.WindowModes)
+}
 
 // List returns every window record in `order`. Not a hot boot path (read once at startup, per
 // window record), so this has no prepared statement.

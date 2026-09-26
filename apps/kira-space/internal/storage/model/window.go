@@ -9,14 +9,20 @@ import (
 // JSON tags included).
 type WindowBounds = appstorage.WindowBounds
 
-// WindowRecord is one row of the `windows` table (P8 D2/D4) — a durable, shell-minted identity
-// for one workbench. Bounds is nil until the window has been moved or resized at least once
-// (D10: a freshly minted window with no stored rectangle inherits its cascade position instead).
+// WindowRecord is one row of the `windows` table's identity/geometry columns (P8 D2/D4) — a
+// durable, shell-minted identity for one workbench. Bounds is nil until the window has been moved
+// or resized at least once (D10: a freshly minted window with no stored rectangle inherits its
+// cascade position instead).
 //
-// Kira Studio's own WindowRecord also carries a Mode field (the Studio/Api/Git/Terminal app mode a
-// window was last closed in, P22 D12). Kira Space has no such multi-module app-mode concept — one
-// window, one purpose — so this copy drops Mode entirely (P100 Part 1); confirmed safe via
-// internal/shell/window.go, whose Options()/Attach() never read .Mode, only .Key/.Bounds. Without
-// Mode, this shape is field-for-field identical to appstorage.WindowRecord too, so it's a plain
-// alias of that (P107 I2-3), Validate() included.
+// This app's own `windows` table gained a `mode` column at P128 §2.2 (migration
+// 0003_p128_window_mode.sql, the git/terminal/ade module registry) — read and written through
+// WindowsRepo.GetMode/SetMode below, not through this struct, so WindowRecord itself stays
+// field-for-field identical to appstorage.WindowRecord and a plain alias of it (P107 I2-3),
+// Validate() included; internal/shell/window.go's own Options()/Attach() never read a mode, only
+// .Key/.Bounds.
 type WindowRecord = appstorage.WindowRecord
+
+// WindowModes is this app's own mode vocabulary (workbench/modes.ts's SpaceMode) — an unrecognised
+// or since-removed mode degrades to Default via appstorage.WindowModes.Normalize rather than
+// failing to read/write the row.
+var WindowModes = appstorage.WindowModes{Default: "git", Valid: []string{"git", "terminal", "ade"}}
