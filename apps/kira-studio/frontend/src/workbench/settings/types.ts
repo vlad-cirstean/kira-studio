@@ -1,4 +1,4 @@
-import type { ComputedRef, Ref } from 'vue';
+import type { SettingsPaneProps as GenericSettingsPaneProps } from '@workbench/components/settingsPaneProps';
 import type { Settings } from '../../state/settingsDomain';
 
 // P103 Part 2 (§5.5): the one prop contract every one of this app's eight settings panes takes,
@@ -17,16 +17,6 @@ type SettingsSections = Pick<
   'appearance' | 'data' | 'cache' | 'advanced' | 'git' | 'api'
 >;
 
-export interface SettingsPaneProps {
-  active: boolean;
-  draft: SettingsSections;
-  isAtDefault: <S extends keyof SettingsSections, K extends keyof SettingsSections[S]>(
-    s: S,
-    k: K,
-  ) => boolean;
-  resetLeaf: <S extends keyof SettingsSections, K extends keyof SettingsSections[S]>(
-    s: S,
-    k: K,
-  ) => void;
-  registerFieldError: (id: string, error: Ref<string | null> | ComputedRef<string | null>) => void;
-}
+// P115 H9: this app and Kira Space each declared the identical SettingsPaneProps interface,
+// differing only in SettingsSections' own Pick — both now instantiate the shared generic instead.
+export type SettingsPaneProps = GenericSettingsPaneProps<SettingsSections>;
