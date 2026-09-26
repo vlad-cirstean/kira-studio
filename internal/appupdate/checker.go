@@ -20,8 +20,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,7 +31,6 @@ const (
 	repoName  = "kira-studio"
 
 	latestReleaseURL = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
-	releasesPageURL  = "https://github.com/" + repoOwner + "/" + repoName + "/releases"
 
 	requestTimeout = 10 * time.Second // ghclient's own apiTimeout, same reasoning
 	maxBodyBytes   = 1 << 20          // a releases/latest body is tens of KiB; this is headroom
@@ -54,7 +51,6 @@ const (
 // release is the subset of GitHub's release object this package reads.
 type release struct {
 	TagName    string `json:"tag_name"`
-	HTMLURL    string `json:"html_url"`
 	Draft      bool   `json:"draft"`
 	Prerelease bool   `json:"prerelease"`
 }
@@ -64,7 +60,6 @@ type Result struct {
 	UpdateAvailable bool
 	CurrentVersion  string
 	LatestVersion   string
-	releaseURL      string // unexported: never crosses the wire — see internal/bridge/update.go
 }
 
 // Checker owns one cached answer per app process. Safe for concurrent use.
@@ -160,37 +155,7 @@ func buildResult(running string, rel release) Result {
 		return result
 	}
 	result.UpdateAvailable = true
-	result.releaseURL = safeReleaseURL(rel.HTMLURL)
 	return result
-}
-
-// ReleaseURL is what OpenReleasePage opens: the last-checked release's own page when it validated,
-// the repository's /releases page otherwise — including when no check has ever succeeded.
-func (c *Checker) ReleaseURL() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.result.releaseURL == "" {
-		return releasesPageURL
-	}
-	return c.result.releaseURL
-}
-
-// safeReleaseURL returns raw only when it is a github.com https URL under this repository's own
-// /releases/ path — anything else returns releasesPageURL instead. Not defensive theatre:
-// BrowserManager.OpenURL (pkg/application) validates nothing at all, and macOS `open` will act on
-// any scheme it recognises, so this is the only check that ever runs before a URL reaches it.
-func safeReleaseURL(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return releasesPageURL
-	}
-	if u.Scheme != "https" || u.Host != "github.com" {
-		return releasesPageURL
-	}
-	if !strings.HasPrefix(u.Path, "/"+repoOwner+"/"+repoName+"/releases/") {
-		return releasesPageURL
-	}
-	return raw
 }
 
 // httpClient is a package-level *http.Client over one *http.Transport, mirroring

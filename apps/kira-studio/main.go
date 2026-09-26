@@ -177,8 +177,7 @@ func main() {
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
 			application.NewService(&bridge.UpdateService{
-				Checker: updateChecker, Installer: updateInstaller, Browser: browserOpener,
-				Quit: quitter.RequestQuit,
+				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,
 			}),
 			application.NewService(&bridge.LinkService{Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),

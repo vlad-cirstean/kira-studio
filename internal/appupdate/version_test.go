@@ -55,27 +55,3 @@ func TestUpdateAvailable(t *testing.T) {
 		})
 	}
 }
-
-func TestSafeReleaseURL(t *testing.T) {
-	const valid = "https://github.com/" + repoOwner + "/" + repoName + "/releases/tag/v1.3.0"
-	cases := []struct {
-		name string
-		raw  string
-		want string
-	}{
-		{"real shape accepted", valid, valid},
-		{"wrong scheme rejected", "http://github.com/" + repoOwner + "/" + repoName + "/releases/tag/v1.3.0", releasesPageURL},
-		{"wrong host rejected", "https://evil.example.com/" + repoOwner + "/" + repoName + "/releases/tag/v1.3.0", releasesPageURL},
-		{"right host, foreign path rejected", "https://github.com/someone-else/other-repo/releases/tag/v1.3.0", releasesPageURL},
-		{"right host, non-releases path rejected", "https://github.com/" + repoOwner + "/" + repoName + "/issues/1", releasesPageURL},
-		{"unparseable URL rejected", "://not a url", releasesPageURL},
-		{"javascript scheme rejected", "javascript:alert(1)", releasesPageURL},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := safeReleaseURL(tc.raw); got != tc.want {
-				t.Errorf("safeReleaseURL(%q) = %q, want %q", tc.raw, got, tc.want)
-			}
-		})
-	}
-}

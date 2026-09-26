@@ -2142,9 +2142,9 @@ export type Contract = {
     };
     // ---- P74 §3.3: opening a PR in the external browser, never in place -------------------
     /** Server-composed: the renderer names a PR by number, never a URL (the boundary
-     *  `checker.go`'s own `safeReleaseURL` already defends). `null` when GitHub is disabled or
-     *  there is no GitHub remote — the same "disabled collapses to nothing" posture
-     *  `PrLookupResult` already takes. Go-served, never proxied to the extension. */
+     *  `GitHubService.OpenPullRequestURL`'s own host/path check already defends). `null` when
+     *  GitHub is disabled or there is no GitHub remote — the same "disabled collapses to nothing"
+     *  posture `PrLookupResult` already takes. Go-served, never proxied to the extension. */
     'pr.browserUrl': {
       params: { repoId: string; number: number };
       result: { readonly url: string } | { readonly url: null };

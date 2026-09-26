@@ -7,12 +7,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// Browser is the OS-browser seam, declared where it is consumed — the same precedent Dialogs
-// (files.go:52) and McpInstaller (dbmcp.go) already set.
-type Browser interface {
-	OpenURL(url string) error
-}
-
 // UpdateStatus is the whole wire shape. It deliberately carries no URL and no error string: the
 // renderer never supplies or receives a URL (main.go's own security note), and a failed check is
 // silence, not a surface. InstallLogPath is a display path only, read by the in-app dialog on a
@@ -25,12 +19,10 @@ type UpdateStatus struct {
 }
 
 // UpdateService is P66/P119's whole surface: Status (polled by the renderer), InstallUpdate (the
-// dialog's Update button) and CancelInstall (its Cancel button while installing). OpenReleasePage
-// and Browser stay for now — P119 commit 8 removes them once the frontend no longer calls either.
+// dialog's Update button) and CancelInstall (its Cancel button while installing).
 type UpdateService struct {
 	Checker   *appupdate.Checker
 	Installer *appupdate.Installer
-	Browser   Browser
 	// Quit is shell.Quitter.RequestQuit, assigned once that exists (main.go's own ordering knot).
 	Quit func()
 }
@@ -69,14 +61,4 @@ func (s *UpdateService) InstallUpdate(ctx context.Context) error {
 func (s *UpdateService) CancelInstall() error {
 	s.Installer.Cancel()
 	return nil
-}
-
-// OpenReleasePage opens the last-checked release's own page, or the repository's /releases page
-// when none has ever validated — never a renderer-supplied URL (appupdate.Checker.ReleaseURL is
-// nullary; the renderer never sends or receives a URL at all).
-//
-// Deprecated: P119 replaces the release-page banner with an in-app dialog; removed in commit 8
-// once the frontend no longer calls this.
-func (s *UpdateService) OpenReleasePage() error {
-	return ipcerr.InternalErr(s.Browser.OpenURL(s.Checker.ReleaseURL()))
 }

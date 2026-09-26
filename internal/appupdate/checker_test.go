@@ -12,10 +12,7 @@ import (
 const testTag = "v1.1.0"
 
 func testRelease() release {
-	return release{
-		TagName: testTag,
-		HTMLURL: "https://github.com/" + repoOwner + "/" + repoName + "/releases/tag/" + testTag,
-	}
+	return release{TagName: testTag}
 }
 
 // TestChecker_Status_SingleFlight: N concurrent Status calls on a cold cache produce exactly one
