@@ -5,6 +5,6 @@
 // state/mode.ts (which imports `control` from bridge/index.ts itself), and every non-bridge
 // importer keeps reading `SpaceMode` from state/mode.ts unchanged via its re-export below.
 //
-// Widens as each module lands: `git` alone at step 6, `terminal` joins here (step 7), `ade`
-// at step 8 — SPEC.md's own final vocabulary.
-export type SpaceMode = 'git' | 'terminal';
+// Widens as each module lands: `git` alone at step 6, `terminal` at step 7, `ade` joins here
+// (step 8) — SPEC.md's own final vocabulary.
+export type SpaceMode = 'git' | 'terminal' | 'ade';
