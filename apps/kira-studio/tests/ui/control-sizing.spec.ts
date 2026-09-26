@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
@@ -81,10 +82,19 @@ async function connectAndOpenGrid(page: Page): Promise<void> {
 }
 
 function rootVar(page: Page, name: string): Promise<number> {
-  return page.evaluate(
-    (n) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)),
-    name,
-  );
+  return page.evaluate((n) => {
+    // getComputedStyle's own custom-property value keeps a calc() expression literal (only var()
+    // references resolve) -- --kira-t-sm/-lg (calc(var(--kira-font-size) ± 1px)) need a real
+    // property to force calc reduction. A detached, unpainted probe does that without touching
+    // layout: any length-typed property works, `width` chosen to keep it independent of font
+    // metrics.
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;visibility:hidden;width:var(${n})`;
+    document.documentElement.appendChild(probe);
+    const value = Number.parseFloat(getComputedStyle(probe).width);
+    probe.remove();
+    return value;
+  }, name);
 }
 
 // P122: the one shared focus ring (packages/theme/src/base.css's `focus-ring`) -- 1px solid
@@ -368,4 +378,100 @@ test('a raw <button> with no outline utility renders the shared 1px focus ring (
   // the section nav's first button -- no anchor to click first.
   await focusViaTabFrom(page, null, 'settings-section-Appearance');
   await expectFocusRing(page.locator('[data-testid="settings-section-Appearance"]'));
+});
+
+function computedFontSize(el: Locator): Promise<number> {
+  return el.evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
+}
+
+// P123 §6.3: the four-value chrome type scale itself, read from the live --kira-t-sm/md/lg
+// custom properties (not a hard-coded pixel value, since Data font size can move what "12px"
+// means) and asserted on one representative of each §1.2 role. Button/tab/Label are the changed
+// rows -- 11px (sm) before this phase, 12px (md) after; confirmed failing at 907c8204 before
+// landing here. Status-bar item and the dialog title were already on their assigned role and stay
+// unchanged, proving the phase touched only the rows it meant to.
+test('the chrome type scale renders --kira-t-sm/md/lg on their assigned roles (P123)', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
+  await connectAndOpenGrid(page);
+
+  const sm = await rootVar(page, '--kira-t-sm');
+  const md = await rootVar(page, '--kira-t-md');
+  const lg = await rootVar(page, '--kira-t-lg');
+  expect(sm).toBeGreaterThan(0);
+  expect(md).toBeGreaterThan(sm);
+  expect(lg).toBeGreaterThan(md);
+
+  // FilterToolbar's "Clear" button (size="kira") -- control text, §1.2's md role. No testid on the
+  // button itself, so located by role and name as the plan states.
+  const clearSize = await computedFontSize(
+    page.getByRole('button', { name: 'Clear', exact: true }),
+  );
+  expect(clearSize).toBeCloseTo(md, 1);
+
+  // The workbench tab this grid opened -- control text, md.
+  const tabSize = await computedFontSize(page.locator('[data-testid="tab"]').first());
+  expect(tabSize).toBeCloseTo(md, 1);
+
+  await page.click('[data-testid="open-settings"]');
+  const settingsDialog = page.locator('[data-testid="settings-dialog"]');
+  await expect(settingsDialog).toBeVisible();
+
+  // The Label for settings-font-size -- a label, md.
+  const labelSize = await computedFontSize(
+    settingsDialog.locator('label').filter({ hasText: 'Data font size' }),
+  );
+  expect(labelSize).toBeCloseTo(md, 1);
+
+  // The dialog title -- a heading, lg. Already lg before this phase (DialogTitle's base was never
+  // touched, §3.2); asserted here as the "unchanged" half of the proof.
+  const titleSize = await computedFontSize(settingsDialog.locator('[data-slot="dialog-title"]'));
+  expect(titleSize).toBeCloseTo(lg, 1);
+
+  await page.click('[data-testid="settings-dialog-close"]');
+  await expect(settingsDialog).toHaveCount(0);
+
+  // The status bar's engine-status item -- secondary text, sm. Already sm before this phase.
+  const statusSize = await computedFontSize(page.locator('[data-testid="engine-status"]'));
+  expect(statusSize).toBeCloseTo(sm, 1);
+});
+
+// P123 §6.3 Test 2: data stays customizable -- chrome moving onto a fixed four-value scale must
+// not stop the SQL grid from tracking the user's own Data font size setting. Unchanged by this
+// phase; asserted here as the "data views are untouched" proof, expected to pass at both commits.
+test('the SQL grid still tracks Data font size after the chrome scale lands (P123)', async ({
+  relaunch,
+}) => {
+  // mockRuntime.ts echoes IPC.settingsSet back as the untouched default unless a spec scripts its
+  // own response (settings-apply-on-save.spec.ts's own precedent) -- this scripts the one leaf this
+  // test changes.
+  const savedSettings = {
+    ...defaultSettings,
+    appearance: { ...defaultSettings.appearance, fontSize: 16 },
+  };
+  const { window: page } = await relaunch({
+    control: [...CONTROL, { channel: IPC.settingsSet, response: savedSettings }],
+    stream: FIXTURE.port,
+  });
+  await connectAndOpenGrid(page);
+
+  await page.click('[data-testid="open-settings"]');
+  const settingsDialog = page.locator('[data-testid="settings-dialog"]');
+  await expect(settingsDialog).toBeVisible();
+
+  await page.locator('[data-testid="settings-font-size"]').fill('16');
+  await page.click('[data-testid="settings-save"]');
+  await expect(settingsDialog).toHaveCount(0);
+
+  // `.kira-gutter` is also a `.slick-cell` (the row-number column) and keeps its own fixed
+  // `--kira-t-xs` size regardless of Data font size (§3.8) -- excluded so this reads an actual data
+  // cell.
+  const cellSize = await computedFontSize(page.locator('.slick-cell:not(.kira-gutter)').first());
+  expect(cellSize).toBeCloseTo(16, 0);
+
+  // slickTheme.css's own header rule names var(--kira-t-sm) directly -- one step below the 16px
+  // base, same -1 derivation as the chrome scale (§1.3), never a fixed value of its own.
+  const headerSize = await computedFontSize(page.locator('.slick-header-column').first());
+  expect(headerSize).toBeCloseTo(15, 0);
 });
