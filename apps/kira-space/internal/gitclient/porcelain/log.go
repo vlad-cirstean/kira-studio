@@ -31,10 +31,13 @@ const FieldCount = 10
 // `git clone`d repo carries, from %D before parseDecorationToken ever sees it — without this the
 // default branch's graph row carried a duplicate, phantom "origin/HEAD" badge alongside its real
 // tracking badge.
-func logBaseArgs() []string {
+// format is LogFormat for the paged walk (LogSessionArgs/LogSessionSkipArgs) and ScanFormat for
+// the tail scan (LogScanArgs, H10, P115 Part 2) — the two walks' argv otherwise differ in exactly
+// one token, LogScanArgs' own doc comment.
+func logBaseArgs(format string) []string {
 	return []string{
 		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
-		"--topo-order", "-z", "--format=" + LogFormat,
+		"--topo-order", "-z", "--format=" + format,
 	}
 }
 
@@ -83,13 +86,13 @@ func WalkArgs(spec WalkSpec) []string { return RevSetArgs(spec) }
 
 // LogSessionArgs is the paged walk's full argv: the fixed log vocabulary plus spec's rev set.
 func LogSessionArgs(spec WalkSpec) []string {
-	return append(logBaseArgs(), WalkArgs(spec)...)
+	return append(logBaseArgs(LogFormat), WalkArgs(spec)...)
 }
 
 // LogSessionSkipArgs is LogSessionArgs with a `--skip` — the paged walk's resume-by-respawn argv
 // (logsession's own reclaim path, D10).
 func LogSessionSkipArgs(spec WalkSpec, skip int) []string {
-	args := logBaseArgs()
+	args := logBaseArgs(LogFormat)
 	args = append(args, "--skip="+strconv.Itoa(skip))
 	return append(args, WalkArgs(spec)...)
 }
@@ -112,13 +115,7 @@ const ScanFieldCount = 11
 // and the whole point of this function is that its argv differs from LogSessionArgs' in exactly
 // one token (the format string).
 func LogScanArgs(spec WalkSpec) []string {
-	walk := WalkArgs(spec)
-	args := make([]string, 0, 6+len(walk))
-	args = append(args,
-		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
-		"--topo-order", "-z", "--format="+ScanFormat,
-	)
-	return append(args, walk...)
+	return append(logBaseArgs(ScanFormat), WalkArgs(spec)...)
 }
 
 // parseIdentities parses LogFormat/ScanFormat's shared author/committer field block — fields[2:5]
