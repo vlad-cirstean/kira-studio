@@ -15,8 +15,10 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
+import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipDisabledTrigger, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { cn } from '@theme/lib/utils';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -874,19 +876,15 @@ const statusLine = computed(() => {
         <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
           <div
             ref="resultStripRef"
-            class="flex items-center flex-1 min-w-0 overflow-x-auto gap-1 scrollbar-none"
+            class="flex items-center flex-1 min-w-0 overflow-x-auto gap-0.5 scrollbar-none"
             data-testid="console-result-strip"
             @wheel="onResultStripWheel"
           >
             <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              class="group/tab inline-flex items-center gap-1 px-1.5 rounded-kira-sm border cursor-pointer shrink-0 max-w-36 h-5.5 text-kira-xs"
-              :class="
-                result.key === rt.activeKey
-                  ? 'is-active bg-elevated border-border-strong text-fg'
-                  : 'border-transparent text-muted-foreground hover:bg-hover'
-              "
+              class="group/tab"
+              :class="cn(tabChipVariants({ active: result.key === rt.activeKey }), 'max-w-36')"
               data-testid="console-result-tab"
               :data-active="result.key === rt.activeKey"
             >
@@ -905,13 +903,13 @@ const statusLine = computed(() => {
               </button>
               <button
                 type="button"
-                class="inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 hover:bg-hover"
+                class="inline-flex items-center justify-center shrink-0 w-4 h-4 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 hover:bg-hover"
                 :class="result.key === rt.activeKey ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"
                 aria-label="Close result"
                 data-testid="console-result-close"
                 @click="consoleViewStore.closeResult(tab.id, result.key)"
               >
-                <CodiconIcon name="close" :size="11" />
+                <CodiconIcon name="close" :size="13" />
               </button>
             </div>
           </div>
