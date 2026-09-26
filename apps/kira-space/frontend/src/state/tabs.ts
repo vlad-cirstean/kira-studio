@@ -7,7 +7,12 @@ import {
   type TabRecord,
 } from './tabDomain';
 import { TAB_KINDS } from './tabKinds';
-import { GENERAL_WORKSPACE, useWorkspaceStore, type WorkspaceKey } from './workspace';
+import {
+  GENERAL_WORKSPACE,
+  useWorkspaceStore,
+  visibleWorkspace,
+  type WorkspaceKey,
+} from './workspace';
 
 // P103 Part 2 (§5.2): the shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/…, see
 // that file's own header) now lives in packages/workbench/src/state/createTabsStore.ts. This file
@@ -101,19 +106,21 @@ export const useTabsStore = createTabsStore({
     }
 
     // P116 G4: Next/Previous/Close Tab (the Window menu's own three items) — Kira Studio's own
-    // tabs.ts activateNextTab/activatePrevTab/closeActiveTab, scoped to the active *workspace*
-    // (the open repo, or GENERAL_WORKSPACE) rather than Studio's active AppMode — this app's own
-    // analogue of "which tab set is on screen right now".
+    // tabs.ts activateNextTab/activatePrevTab/closeActiveTab, scoped to whichever workspace's own
+    // tab strip is on screen right now. P128 §2.6: that's `visibleWorkspace()` — the open repo (or
+    // GENERAL_WORKSPACE) while `git` mode is active, else the active module's own id — not
+    // `useWorkspaceStore().active` directly, which stays git-only and would keep stepping the
+    // Git module's own tabs even while, say, the Terminal module is on screen.
     function activateNextTab(): void {
-      actions.stepTab(useWorkspaceStore().active, 1);
+      actions.stepTab(visibleWorkspace(), 1);
     }
 
     function activatePrevTab(): void {
-      actions.stepTab(useWorkspaceStore().active, -1);
+      actions.stepTab(visibleWorkspace(), -1);
     }
 
     function closeActiveTab(): void {
-      const id = actions.activeIdByWorkspace.value[useWorkspaceStore().active];
+      const id = actions.activeIdByWorkspace.value[visibleWorkspace()];
       if (id) actions.closeTab(id);
     }
 

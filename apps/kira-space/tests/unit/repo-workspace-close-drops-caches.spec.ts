@@ -54,6 +54,12 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
       }
     ).codeWorkspaceCloseWorkspace = async () => {};
     (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = async () => {};
+    // P128 §2.6: openRepoWorkspace now also schedules a debounced windowsSetMode('git') write
+    // (state/mode.ts's own createModeStore) — mocked for the same reason every other real bound
+    // call this test's call graph reaches already is above: unmocked, it would eventually fire a
+    // real, unmocked bound call once the debounce timer elapses.
+    (control as unknown as { windowsSetMode: typeof control.windowsSetMode }).windowsSetMode =
+      async () => {};
 
     workspaceStore.openRepoWorkspace(repoId);
     expect(workspaceStore.openRepos).toContain(repoId);

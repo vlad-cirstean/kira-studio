@@ -4,7 +4,7 @@ import { fileIconStyle } from '../repo/fileIcon';
 import type { TabRecord } from '../state/tabDomain';
 import { TAB_KINDS } from '../state/tabKinds';
 import { useTabsStore } from '../state/tabs';
-import { useWorkspaceStore, type WorkspaceKey } from '../state/workspace';
+import { visibleWorkspace, type WorkspaceKey } from '../state/workspace';
 import { TAB_VIEWS } from './tabViews';
 
 // P116 G4: re-exported so App.vue's own onMounted (Next/Previous/Close Tab) reaches the tabs store
@@ -23,11 +23,12 @@ export { useTabsStore };
 // Studio-only feature), and no kind of its own declares a `badge()` member, so all three stay
 // unwired, matching today's TabStrip.vue exactly (it renders neither element at all).
 export function createWorkbenchHost(): WorkbenchHost<WorkspaceKey, TabRecord> {
-  const workspaceStore = useWorkspaceStore();
   const tabsStore = useTabsStore();
 
   return {
-    activeWorkspace: computed(() => workspaceStore.active),
+    // P128 §2.6: whichever module is active — the active repo (or GENERAL_WORKSPACE) in `git`
+    // mode, else the module's own id (state/workspace.ts's own `visibleWorkspace`).
+    activeWorkspace: computed(() => visibleWorkspace()),
     tabs: tabsStore,
     kinds: TAB_KINDS,
     views: TAB_VIEWS,

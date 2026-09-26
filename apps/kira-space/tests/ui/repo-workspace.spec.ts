@@ -135,9 +135,9 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, and promotion', as
 }) => {
   const { window: page } = await relaunch({ control: CONTROL });
 
-  // Import a fixture repository (seeded above) — visible in the Git panel's repo list (the sole,
-  // always-shown project panel in this single-module app — Studio's own mode-tab machinery has no
-  // counterpart here).
+  // Import a fixture repository (seeded above) — visible in the Git panel's repo list (the Git
+  // module's own left panel, mounted while `git` mode is active — the app boots into it, and this
+  // suite never switches away, P128 §2.6).
   await expect(repoRow(page)).toBeVisible();
 
   // Opening it activates its own workspace and the row itself. A single click (onRowClick's own
@@ -562,9 +562,8 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
 });
 
 // P67b §4.2/§9: closing the active repo workspace from its row menu falls back to the empty state
-// (GitStart.vue) — this app's Git panel is the whole of its own project panel, so "falls back"
-// just means no workspace is active any more, not a switch to some other module (kira-space has
-// none — Studio's own mode-tab machinery was never ported here).
+// (GitStart.vue) — "falls back" just means no repo is active any more within the Git module, not a
+// switch to another mode: the mode switcher (P128 §2.6) stays on `git` throughout this test.
 test('closing the active repo workspace from its row menu falls back to the empty state', async ({
   relaunch,
 }) => {

@@ -11,11 +11,12 @@ import type { ControlSnapshot } from './types';
  * EMPTY_BOOT_SNAPSHOTS, trimmed to this app's own bootstrap() (no connections/masked
  * columns/ops — none of that exists here).
  *
- * `gitPairingPending`/`gitVsixStatus`/`terminalDefaultCwd` are deliberately absent — every one of
- * them already has a `WILDCARD_DEFAULTS` entry in mockRuntime.ts (nothing here ever needs to
- * override them per-spec the way `tabsList` regularly does), the same "boot call with no
- * committed fixture will ever snapshot it" reasoning that keeps `windowsEnsure` out of Kira
- * Studio's own array.
+ * `gitPairingPending`/`gitVsixStatus`/`terminalDefaultCwd`/`windowsEnsure` are deliberately
+ * absent — every one of them already has a `WILDCARD_DEFAULTS` entry in mockRuntime.ts (nothing
+ * here ever needs to override them per-spec the way `tabsList` regularly does), the same "boot
+ * call with no committed fixture will ever snapshot it" reasoning as Kira Studio's own array.
+ * P128 §2.6: a spec that DOES care which mode boot lands in (modules.spec.ts) still wins by
+ * providing its own `windowsEnsure` snapshot straight to `relaunch()`, same as any other channel.
  */
 export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.layoutGetAll, response: defaultLayout },

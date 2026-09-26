@@ -26,10 +26,18 @@ export interface ModeStoreActions<M extends string> {
 
 // `extend` is required, even for a caller with nothing to add (createKeepAwakeStore.ts's own
 // pattern) — a call that leaves `E` uninferred breaks Pinia's action/state extraction for the whole
-// store. Studio passes `activeTab` through it (state/mode.ts); Kira Space's own copy adds nothing.
+// store. Studio passes `activeTab` through it (state/mode.ts); Kira Space's own copy (P128 §2.6)
+// adds nothing, so `E`'s default matters: `Record<string, never>` carries a `[key: string]: never`
+// index signature, and spreading a value of that type LAST in an object literal
+// (`{ ...toRefs(state), hydrateMode, setMode, ...extra }` below) makes every key the index
+// signature also matches — including `hydrateMode`/`setMode` themselves — resolve to `never` in
+// the object literal's inferred type, since a later spread source can override an earlier
+// property's type for any key its own type claims to have. `Record<never, never>` (mapped over
+// the empty key union) is `{}` with no index signature at all, so it can never do that — the fix
+// for a caller like Kira Space's that provides no real extra fields either.
 export function createModeStore<
   M extends string,
-  E extends Record<string, unknown> = Record<string, never>,
+  E extends Record<string, unknown> = Record<never, never>,
 >(control: ModeControl<M>, defaultMode: M, extend: (actions: ModeStoreActions<M>) => E) {
   return defineStore('mode', () => {
     // `reactive<M>(...)` itself types as `UnwrapNestedRefs<{ active: M }>`, which TS can't prove

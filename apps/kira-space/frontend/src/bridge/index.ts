@@ -31,6 +31,7 @@ import type {
 import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type { SpaceMode } from '../state/modeDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
@@ -129,8 +130,7 @@ const spaceControl = {
 // this app's own remaining ones (spaceControl, above) — every `control.xxx()` call site in the app
 // is unchanged, since neither the method names nor their bound-call FQNs moved.
 export const control = {
-  // M narrows to SpaceMode once this app's own module registry lands (P128 §2.6).
-  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch, string>({
+  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch, SpaceMode>({
     settings: SettingsService,
     layout: LayoutService,
     tabs: TabsService,

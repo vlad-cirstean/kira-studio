@@ -31,6 +31,10 @@ export const IPC = {
   tabPrev: 'kira:menu:tab-prev',
   tabClose: 'kira:menu:tab-close',
   windowsOpenNew: 'kira:windows:openNew',
+  // P128 §2.2/§2.6: this app now persists a per-window module mode too, same channels as Kira
+  // Studio's own ipcChannels.ts.
+  windowsEnsure: 'kira:windows:ensure',
+  windowsSetMode: 'kira:windows:set-mode',
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',

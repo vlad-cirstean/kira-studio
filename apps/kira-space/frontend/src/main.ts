@@ -3,12 +3,14 @@ import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
+import { useModeStore } from './state/mode';
 import { pinia } from './state/pinia';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { useSettingsStore } from './state/settings';
@@ -35,6 +37,7 @@ async function mountShell(): Promise<void> {
   const appMetricsStore = useAppMetricsStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const layoutStore = useLayoutStore(pinia);
+  const modeStore = useModeStore(pinia);
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
   const gitClientsStore = useGitClientsStore(pinia);
@@ -46,11 +49,14 @@ async function mountShell(): Promise<void> {
   // synchronously before the Promise.all below rather than joining it.
   appMetricsStore.initAppMetrics();
 
-  // P100 Part 2: Studio's own boot sequence awaited control.windowsEnsure() here, before
-  // hydrateTabs, so modeStore's persisted-per-window mode was set before the first render. This app
-  // has no WindowsService (apps/kira-space/main.go's own Services list) and so no per-window
-  // persisted "last active workspace" to await — every window boots to GENERAL_WORKSPACE and, below,
-  // falls forward onto its first restored repo instead, once hydrateTabs has resolved one.
+  // P128 §2.2/§2.6: this app now persists a per-window module mode too (internal/windowsvc,
+  // shared with Kira Studio since this phase) — hydrated before any other window-scoped state,
+  // mirroring Kira Studio's own main.ts:338. The fall-forward onto the first restored repo below
+  // still runs regardless of which mode this resolves to (state/workspace.ts's own
+  // `openRepoWorkspace`/`activateWorkspace` doc comment: that fall-forward must honour a persisted
+  // `terminal`/`ade` mode, not silently override it back to `git`).
+  modeStore.hydrateMode(await control.windowsEnsure());
+
   await Promise.all([
     layoutStore.hydrateLayout(),
     settingsStore.hydrateSettings(),
@@ -81,9 +87,12 @@ async function mountShell(): Promise<void> {
   // restored repo right here, after hydrateTabs, since hydrateTabs itself never calls back into it
   // (avoiding a third link in that module pair's existing two-way call graph).
   for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
-  // No persisted "last active workspace" survives a restart in this app (see above) — falling
-  // forward onto the first restored repo, when there is one, means a relaunch with open repositories
-  // lands on one of their own tabs rather than the empty GitStart screen every time.
+  // No persisted "last active repo" survives a restart in this app (unlike the per-window mode
+  // hydrated above) — falling forward onto the first restored repo, when there is one, means a
+  // relaunch with open repositories lands on one of their own tabs rather than the empty GitStart
+  // screen every time. `activateWorkspace` never forces the mode back to `git` (its own doc
+  // comment, state/workspace.ts), so this still honours whatever mode `windowsEnsure` restored
+  // above — a relaunch into `terminal`/`ade` stays there even with repositories open behind it.
   if (workspaceStore.active === GENERAL_WORKSPACE && workspaceStore.openRepos.length > 0) {
     workspaceStore.activateWorkspace(workspaceStore.openRepos[0] as string);
   }

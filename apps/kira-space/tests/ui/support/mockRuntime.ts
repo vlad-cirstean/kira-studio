@@ -69,6 +69,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
 
+  // P128 §2.2/§2.6: this app now persists a per-window module mode too, via the same shared
+  // internal/windowsvc.Service Kira Studio's own WindowsService embeds.
+  windowsEnsure: 'WindowsService.Ensure',
+  windowsSetMode: 'WindowsService.SetMode',
+
   // P119: the in-app update dialog's three bound calls.
   updateStatus: 'UpdateService.Status',
   updateInstall: 'UpdateService.InstallUpdate',
@@ -87,10 +92,16 @@ export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = bu
 // one of main.ts's own unconditional-every-boot Promise.all calls (bootstrap()'s own doc comment)
 // no committed fixture will ever snapshot, or a fire-and-forget call no spec asserts on the echo
 // of — the same reasoning Kira Studio's own WILDCARD_DEFAULTS carries per entry, trimmed to this
-// app's own boot sequence (this app has no windowsEnsure/WindowsService at all, so unlike Studio's
-// copy there is no inferredBootMode special case here).
+// app's own boot sequence. P128 §2.2/§2.6: `windowsEnsure` joins this table with a static `'git'`
+// answer, unlike Kira Studio's own copy — this app has no existing spec whose boot mode needs
+// inferring from an already-provided fixture (Studio's own inferredBootMode helper exists only
+// because some of its specs restore an Api-mode tab as active); every Space spec boots into `git`
+// today, and a spec that wants `terminal`/`ade` instead (modules.spec.ts) provides its own
+// `windowsEnsure` snapshot, which always wins over this default.
 const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.tabsSave]: 'null',
+  [IPC.windowsEnsure]: JSON.stringify({ mode: 'git' }),
+  [IPC.windowsSetMode]: 'null',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
   [IPC.settingsSet]: JSON.stringify(defaultSettings),
   [IPC.gitClientsList]: '[]',
