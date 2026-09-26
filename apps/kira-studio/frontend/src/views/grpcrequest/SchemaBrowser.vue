@@ -109,6 +109,7 @@ function selectMethod(service: string, method: string): void {
     <div class="h-bar shrink-0 flex items-center gap-1 px-2 border-b border-border">
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="tab.state.descriptorMode"
         data-testid="grpc-source-toggle"
         @update:model-value="(v) => v && setDescriptorMode(v as 'reflection' | 'proto')"

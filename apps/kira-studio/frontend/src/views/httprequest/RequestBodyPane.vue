@@ -156,6 +156,7 @@ const caption = computed(() =>
     <div class="h-bar shrink-0 flex items-center gap-1 overflow-x-auto px-2 border-b border-border">
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="selection"
         data-testid="http-body-mode"
         @update:model-value="(v) => v && setSelection(v as HttpBodySelection)"

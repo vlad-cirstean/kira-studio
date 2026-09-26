@@ -246,6 +246,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       </div>
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="opsStore.statusFilter"
         @update:model-value="(v) => v && (opsStore.statusFilter = v as (typeof statusFilterOptions)[number]['value'])"
       >

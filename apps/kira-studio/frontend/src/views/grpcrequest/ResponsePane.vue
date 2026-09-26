@@ -317,6 +317,7 @@ onUnmounted(() => {
       />
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="tab.state.responsePane"
         data-testid="grpc-response-pane-toggle"
         @update:model-value="(v) => v && setResponsePane(v as GrpcResponsePane)"

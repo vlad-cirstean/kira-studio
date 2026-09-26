@@ -251,7 +251,7 @@ const breadcrumb = computed(() => {
       </div>
       <div class="w-px h-3.5 bg-border-strong mx-0.5 shrink-0" />
       <div class="flex items-center gap-1.5 min-w-0">
-        <ToggleGroup type="single" :model-value="pane" data-testid="definition-pane" @update:model-value="(v) => v && setPane(v as 'structure' | 'source')">
+        <ToggleGroup type="single" size="kira" :model-value="pane" data-testid="definition-pane" @update:model-value="(v) => v && setPane(v as 'structure' | 'source')">
           <ToggleGroupItem v-for="opt in PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
             {{ opt.label }}
           </ToggleGroupItem>

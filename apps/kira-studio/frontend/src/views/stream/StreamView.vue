@@ -737,6 +737,7 @@ onUnmounted(() => {
 
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="String(tab.state.pageSize)"
         data-testid="stream-page-size-picker"
         @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"

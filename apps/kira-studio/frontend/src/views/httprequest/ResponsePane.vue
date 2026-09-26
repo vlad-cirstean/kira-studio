@@ -336,6 +336,7 @@ onUnmounted(() => {
         <ToggleGroup
           v-if="tab.state.responsePane === 'body' && prettyFormat"
           type="single"
+          size="kira"
           :model-value="tab.state.responseView"
           data-testid="http-response-view-toggle"
           @update:model-value="(v) => v && setResponseView(v as 'pretty' | 'raw')"
@@ -359,6 +360,7 @@ onUnmounted(() => {
       />
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="tab.state.responsePane"
         data-testid="http-response-pane-toggle"
         @update:model-value="(v) => v && setResponsePane(v as HttpResponsePane)"

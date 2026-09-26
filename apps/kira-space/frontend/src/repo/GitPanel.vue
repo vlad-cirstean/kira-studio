@@ -337,6 +337,7 @@ onUnmounted(() => {
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="tab"
         @update:model-value="(v) => v && (tab = v as 'repos' | 'files' | 'review')"
       >
@@ -543,6 +544,7 @@ onUnmounted(() => {
               <div class="shrink-0 px-1.5 border-b border-border flex items-center h-row">
                 <ToggleGroup
                   type="single"
+                  size="kira"
                   :model-value="view"
                   @update:model-value="(v) => v && (view = v as 'files' | 'search')"
                 >

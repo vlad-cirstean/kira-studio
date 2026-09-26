@@ -371,7 +371,7 @@ onUnmounted(() => {
           @enter="onCall"
         />
       </div>
-      <ToggleGroup type="single" :model-value="tab.state.tlsMode" data-testid="grpc-tls-toggle" @update:model-value="(v) => v && setTlsMode(v as 'plaintext' | 'tls')">
+      <ToggleGroup type="single" size="kira" :model-value="tab.state.tlsMode" data-testid="grpc-tls-toggle" @update:model-value="(v) => v && setTlsMode(v as 'plaintext' | 'tls')">
         <ToggleGroupItem v-for="opt in TLS_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>
       <!-- P22b D10: the same wrapper idiom .grpc-target-field uses above, for the identical reason
@@ -426,7 +426,7 @@ onUnmounted(() => {
     </ViewToolbar>
 
     <ViewToolbar border="none">
-      <ToggleGroup type="single" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
+      <ToggleGroup type="single" size="kira" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
         <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
       </ToggleGroup>
       <TooltipIconButton

@@ -118,6 +118,7 @@ watch(calendarOpen, (open) => {
     <div class="flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2">
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="zone"
         data-testid="cell-editor-timestamp-zone"
         @update:model-value="(v) => v && setZone(v as string)"

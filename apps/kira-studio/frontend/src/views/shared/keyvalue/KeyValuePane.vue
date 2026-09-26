@@ -825,6 +825,7 @@ onUnmounted(() => {
                DataToolbar.vue's own page-size segmented control occupies. -->
           <ToggleGroup
             type="single"
+            size="kira"
             :model-value="String(host?.pageSize ?? 100)"
             data-testid="keyvalue-page-size-picker"
             @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"

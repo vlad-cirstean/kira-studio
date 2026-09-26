@@ -655,6 +655,7 @@ onUnmounted(() => {
     <ViewToolbar border="none">
       <ToggleGroup
         type="single"
+        size="kira"
         :model-value="tab.state.requestPane"
         data-testid="http-request-pane-toggle"
         @update:model-value="(v) => v && setRequestPane(v as HttpRequestPane)"

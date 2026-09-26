@@ -277,6 +277,7 @@ onUnmounted(() => {
       <ViewToolbar border="none">
         <ToggleGroup
           type="single"
+          size="kira"
           :model-value="view"
           data-testid="repo-file-view-toggle"
           @update:model-value="(v) => v && onViewChange(v as 'source' | 'reading')"

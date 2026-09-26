@@ -36,7 +36,7 @@ function setRowDensity(density: RowDensity): void {
     <ToggleGroup
       type="single"
       variant="outline"
-      size="sm"
+      size="kira"
       :model-value="appearance.rowDensity"
       @update:model-value="(v) => v && setRowDensity(v as RowDensity)"
     >

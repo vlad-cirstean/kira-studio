@@ -263,6 +263,7 @@ function onDeleteRow(): void {
 
   <ToggleGroup
     type="single"
+    size="kira"
     :model-value="String(tab.state.pageSize)"
     data-testid="page-size-picker"
     @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
