@@ -16,9 +16,9 @@ type CacheSettings struct {
 
 // AdvancedSettings' own LogLevel is P120: Studio's own diagnostic-log verbosity, its own name/key
 // (`advanced.logLevel`), no longer the shared appsettings.AdvancedCore embed both apps used to
-// share under the git-era name `gitLogLevel` — Studio has no git module, so that name never fit.
+// share under a name that never fit Studio's own module set.
 // internal/logging.SetLevel is its actual mechanism; appsettings.ValidLogLevel is its validator,
-// genuinely shared with Kira Space's own advanced.gitLogLevel.
+// genuinely shared with Kira Space's own equivalent leaf.
 type AdvancedSettings struct {
 	OpLogRetentionDays int `json:"opLogRetentionDays"`
 	// P18 D14/D20: an estimated-rows-read threshold, never a cost unit — settings.ts's own

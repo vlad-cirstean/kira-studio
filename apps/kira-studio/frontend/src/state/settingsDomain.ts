@@ -72,7 +72,7 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
   // Studio's own diagnostic log verbosity (internal/logging, applied immediately by
   // bridge/settings.go's Set on every patch). `.default('info')` matches that leaf's own
   // pre-existing default. logLevelSchema is the shared enum (P103 Part 4 §7.1/§7.3, P120) — Kira
-  // Space's own `advanced.gitLogLevel` validates the same leaf against it under its own name.
+  // Space validates the same leaf against it under its own settings key.
   logLevel: logLevelSchema.default('info'),
 });
 

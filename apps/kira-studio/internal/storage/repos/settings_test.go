@@ -12,10 +12,9 @@ func newSettingsRepo(t *testing.T) *repos.SettingsRepo {
 }
 
 // TestSettingsRepo_LogLevelDefault is the code review's own regression guard (finding 1):
-// advanced.gitLogLevel (P120: renamed advanced.logLevel, Studio's own leaf — see migration 0028)
-// was added to the zod schema and the Settings dialog but never wired into GetAll/Set/
-// DefaultSettings — a patch silently dropped the write. Unset, it must read back settings.ts's own
-// default.
+// advanced.logLevel (Studio's own leaf — see migration 0028) was added to the zod schema and the
+// Settings dialog but never wired into GetAll/Set/DefaultSettings — a patch silently dropped the
+// write. Unset, it must read back settings.ts's own default.
 func TestSettingsRepo_LogLevelDefault(t *testing.T) {
 	r := newSettingsRepo(t)
 	got, err := r.GetAll()
