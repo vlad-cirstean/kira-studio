@@ -1,19 +1,19 @@
 import {
+  type BeautifyMode,
+  type BeautifyResult,
+  beautifyWith,
+  type Cursor,
+  type ParseResult,
   parseContainer,
   type RawNode,
-  renderCompact,
-  renderIndented,
+  skipWs,
+  tryParse,
 } from './views/shared/document/rawTree';
 
-export type BeautifyMode = 'indented' | 'compact';
-
-export interface BeautifyResult {
-  /** The reformatted text, or the input unchanged when `ok` is false. */
-  text: string;
-  ok: boolean;
-  /** Present only when `ok` is false: 'invalid JSON at offset 4021'. Shown on the status line. */
-  reason?: string;
-}
+// P115 H9: BeautifyMode/BeautifyResult moved to rawTree.ts (this app's own JSON scanner and
+// ejson.ts's shell-literal scanner both need them) — re-exported so every existing `from
+// './beautify'`/`from '../beautify'` import of either keeps working unchanged.
+export type { BeautifyMode, BeautifyResult };
 
 // ---------------------------------------------------------------------------------------------
 // JSON — a lossless scanner (D10). Never JSON.parse/JSON.stringify: a number is reproduced from
@@ -28,19 +28,6 @@ class JsonScanError extends Error {
 }
 
 const JSON_NUMBER_RE = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
-
-function isJsonWs(c: string | undefined): boolean {
-  return c === ' ' || c === '\t' || c === '\n' || c === '\r';
-}
-
-interface Cursor {
-  text: string;
-  i: number;
-}
-
-function skipJsonWs(c: Cursor): void {
-  while (isJsonWs(c.text[c.i])) c.i++;
-}
 
 function parseJsonString(c: Cursor): string {
   const start = c.i;
@@ -84,7 +71,7 @@ function parseJsonNumber(c: Cursor): string {
 }
 
 function parseJsonValue(c: Cursor): RawNode {
-  skipJsonWs(c);
+  skipWs(c);
   const ch = c.text[c.i];
   if (ch === '{') return parseJsonObject(c);
   if (ch === '[') return parseJsonArray(c);
@@ -108,12 +95,12 @@ function parseJsonValue(c: Cursor): RawNode {
 function parseJsonObject(c: Cursor): RawNode {
   return parseContainer(c, {
     parseKey: (cur) => {
-      skipJsonWs(cur);
+      skipWs(cur);
       if (cur.text[cur.i] !== '"') throw new JsonScanError(cur.i);
       return parseJsonString(cur);
     },
     parseValue: parseJsonValue,
-    skipWs: skipJsonWs,
+    skipWs,
     allowTrailingComma: false,
     error: (offset) => new JsonScanError(offset),
   });
@@ -122,25 +109,14 @@ function parseJsonObject(c: Cursor): RawNode {
 function parseJsonArray(c: Cursor): RawNode {
   return parseContainer(c, {
     parseValue: parseJsonValue,
-    skipWs: skipJsonWs,
+    skipWs,
     allowTrailingComma: false,
     error: (offset) => new JsonScanError(offset),
   });
 }
 
-type JsonParse = { ok: true; node: RawNode } | { ok: false; offset: number };
-
-function tryParseJson(text: string): JsonParse {
-  const c: Cursor = { text, i: 0 };
-  try {
-    const node = parseJsonValue(c);
-    skipJsonWs(c);
-    if (c.i !== text.length) throw new JsonScanError(c.i);
-    return { ok: true, node };
-  } catch (err) {
-    if (err instanceof JsonScanError) return { ok: false, offset: err.offset };
-    throw err;
-  }
+function tryParseJson(text: string): ParseResult {
+  return tryParse(text, parseJsonValue, skipWs, JsonScanError);
 }
 
 /** Used by detect.ts's `json` gate (§5b) — the one definition of "is this JSON" in the app. */
@@ -153,11 +129,7 @@ export function scanJson(text: string): { ok: boolean; offset?: number } {
 const jsonKeyText = (raw: string): string => raw;
 
 export function beautifyJson(text: string, mode: BeautifyMode): BeautifyResult {
-  const r = tryParseJson(text);
-  if (!r.ok) return { text, ok: false, reason: `invalid JSON at offset ${r.offset}` };
-  const rendered =
-    mode === 'indented' ? renderIndented(r.node, jsonKeyText) : renderCompact(r.node, jsonKeyText);
-  return { text: rendered, ok: true };
+  return beautifyWith(text, mode, tryParseJson, 'JSON', jsonKeyText);
 }
 
 // ---------------------------------------------------------------------------------------------

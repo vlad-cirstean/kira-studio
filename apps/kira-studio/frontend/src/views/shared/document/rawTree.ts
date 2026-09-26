@@ -11,6 +11,22 @@ export type RawNode =
   | { kind: 'object'; members: { keyRaw: string; value: RawNode }[] }
   | { kind: 'array'; items: RawNode[] };
 
+// P115 H9: beautify.ts's own Cursor and ejson.ts's own ShellCursor were the identical `{ text, i }`
+// shape; isJsonWs/isShellWs and skipJsonWs/skipShellWs were byte-for-byte copies over it. One
+// cursor shape and one whitespace skipper, shared.
+export interface Cursor {
+  text: string;
+  i: number;
+}
+
+function isWs(c: string | undefined): boolean {
+  return c === ' ' || c === '\t' || c === '\n' || c === '\r';
+}
+
+export function skipWs(c: Cursor): void {
+  while (isWs(c.text[c.i])) c.i++;
+}
+
 export interface ContainerGrammar<C extends { text: string; i: number }> {
   /** Present for an object container, absent for an array — parseContainer reads which shape to
    *  parse (and which bracket pair) from this alone. Owns its own leading whitespace skip. */
@@ -173,4 +189,64 @@ export function renderCompact(node: RawNode, keyText: (raw: string) => string): 
     });
     out.push(']');
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// P115 H9: beautify.ts's tryParseJson/beautifyJson and ejson.ts's tryParseShellText/
+// beautifyShellText were the same two functions with a different grammar/error-class/keyText
+// slotted in — moved here, generalized over those three, next to the RawNode/parseContainer/
+// render pair they already shared (P107 I2-17's own precedent for this file).
+// ---------------------------------------------------------------------------------------------
+
+export type ParseResult = { ok: true; node: RawNode } | { ok: false; offset: number };
+
+/** Parses `text` in full: one value via `parseValue`, trailing whitespace via `skipWs`, then
+ *  requires every remaining character consumed — anything left over is `new ErrorClass(offset)` at
+ *  that final position, the same "trailing content" error `parseValue`'s own grammar throws for a
+ *  mid-parse defect. Catches only `ErrorClass`'s own instances (never a stray bug in `parseValue`,
+ *  which still throws through). */
+export function tryParse<C extends Cursor, E extends Error & { offset: number }>(
+  text: string,
+  parseValue: (c: C) => RawNode,
+  skipWsFn: (c: C) => void,
+  ErrorClass: new (offset: number) => E,
+): ParseResult {
+  const c = { text, i: 0 } as C;
+  try {
+    const node = parseValue(c);
+    skipWsFn(c);
+    if (c.i !== text.length) throw new ErrorClass(c.i);
+    return { ok: true, node };
+  } catch (err) {
+    if (err instanceof ErrorClass) return { ok: false, offset: err.offset };
+    throw err;
+  }
+}
+
+export type BeautifyMode = 'indented' | 'compact';
+
+export interface BeautifyResult {
+  /** The reformatted text, or the input unchanged when `ok` is false. */
+  text: string;
+  ok: boolean;
+  /** Present only when `ok` is false: 'invalid JSON at offset 4021'. Shown on the status line. */
+  reason?: string;
+}
+
+/** Beautify/Minify for a `tryParse`-shaped scanner: parse, then reindent (`indented`) or flatten
+ *  (`compact`) the result with `keyText`. `errorLabel` fills the one thing beautify.ts's and
+ *  ejson.ts's own error message differed on — 'invalid JSON at offset 4' vs 'invalid document text
+ *  at offset 4'. */
+export function beautifyWith(
+  text: string,
+  mode: BeautifyMode,
+  tryParseText: (text: string) => ParseResult,
+  errorLabel: string,
+  keyText: (raw: string) => string,
+): BeautifyResult {
+  const r = tryParseText(text);
+  if (!r.ok) return { text, ok: false, reason: `invalid ${errorLabel} at offset ${r.offset}` };
+  const rendered =
+    mode === 'indented' ? renderIndented(r.node, keyText) : renderCompact(r.node, keyText);
+  return { text: rendered, ok: true };
 }

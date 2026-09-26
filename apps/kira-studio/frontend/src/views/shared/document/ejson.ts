@@ -7,8 +7,17 @@
 // `JSON.parse` never rounds a BSON integer through a lossy JS `number` the way it would for the SQL
 // cell editor's raw numeric literals (`beautify.ts`'s reason for a hand-written scanner there) —
 // plain `JSON.parse` is exact here.
-import type { BeautifyMode, BeautifyResult } from '../../../beautify';
-import { parseContainer, type RawNode, renderCompact, renderIndented } from './rawTree';
+import {
+  type BeautifyMode,
+  type BeautifyResult,
+  beautifyWith,
+  type Cursor,
+  type ParseResult,
+  parseContainer,
+  type RawNode,
+  skipWs,
+  tryParse,
+} from './rawTree';
 
 type DocNodeKind = 'object' | 'array' | 'scalar';
 
@@ -522,20 +531,7 @@ class ShellScanError extends Error {
   }
 }
 
-interface ShellCursor {
-  text: string;
-  i: number;
-}
-
-function isShellWs(c: string | undefined): boolean {
-  return c === ' ' || c === '\t' || c === '\n' || c === '\r';
-}
-
-function skipShellWs(c: ShellCursor): void {
-  while (isShellWs(c.text[c.i])) c.i++;
-}
-
-function parseShellString(c: ShellCursor): string {
+function parseShellString(c: Cursor): string {
   const start = c.i;
   const quote = c.text[c.i];
   if (quote !== '"' && quote !== "'") throw new ShellScanError(c.i);
@@ -549,7 +545,7 @@ function parseShellString(c: ShellCursor): string {
   return c.text.slice(start, c.i);
 }
 
-function parseShellNumber(c: ShellCursor): string {
+function parseShellNumber(c: Cursor): string {
   const start = c.i;
   if (c.text[c.i] === '-') c.i++;
   while (/[0-9.eE+-]/.test(c.text[c.i] ?? '')) c.i++;
@@ -557,7 +553,7 @@ function parseShellNumber(c: ShellCursor): string {
   return c.text.slice(start, c.i);
 }
 
-function parseShellIdentWord(c: ShellCursor): string {
+function parseShellIdentWord(c: Cursor): string {
   const start = c.i;
   while (/[A-Za-z0-9_$]/.test(c.text[c.i] ?? '')) c.i++;
   return c.text.slice(start, c.i);
@@ -565,7 +561,7 @@ function parseShellIdentWord(c: ShellCursor): string {
 
 // A constructor call's argument is opaque to this scanner — it only has to find the matching
 // close paren (tracking nested parens and quoted strings), never interpret what's inside.
-function parseShellCall(c: ShellCursor, identStart: number): string {
+function parseShellCall(c: Cursor, identStart: number): string {
   let depth = 0;
   let quote: string | null = null;
   while (c.i < c.text.length) {
@@ -596,8 +592,8 @@ function parseShellCall(c: ShellCursor, identStart: number): string {
   throw new ShellScanError(c.i);
 }
 
-function parseShellValue(c: ShellCursor): RawNode {
-  skipShellWs(c);
+function parseShellValue(c: Cursor): RawNode {
+  skipWs(c);
   const ch = c.text[c.i];
   if (ch === '{') return parseShellObject(c);
   if (ch === '[') return parseShellArray(c);
@@ -606,7 +602,7 @@ function parseShellValue(c: ShellCursor): RawNode {
   if (ch !== undefined && /[A-Za-z_$]/.test(ch)) {
     const identStart = c.i;
     const word = parseShellIdentWord(c);
-    skipShellWs(c);
+    skipWs(c);
     if (c.text[c.i] === '(') return { kind: 'literal', raw: parseShellCall(c, identStart) };
     if (word === 'true' || word === 'false' || word === 'null' || word === 'undefined') {
       return { kind: 'literal', raw: word };
@@ -616,28 +612,28 @@ function parseShellValue(c: ShellCursor): RawNode {
   throw new ShellScanError(c.i);
 }
 
-function parseShellKey(c: ShellCursor): string {
-  skipShellWs(c);
+function parseShellKey(c: Cursor): string {
+  skipWs(c);
   const ch = c.text[c.i];
   if (ch === '"' || ch === "'") return parseShellString(c);
   if (ch !== undefined && /[A-Za-z_$]/.test(ch)) return parseShellIdentWord(c);
   throw new ShellScanError(c.i);
 }
 
-function parseShellObject(c: ShellCursor): RawNode {
+function parseShellObject(c: Cursor): RawNode {
   return parseContainer(c, {
     parseKey: parseShellKey,
     parseValue: parseShellValue,
-    skipWs: skipShellWs,
+    skipWs,
     allowTrailingComma: true,
     error: (offset) => new ShellScanError(offset),
   });
 }
 
-function parseShellArray(c: ShellCursor): RawNode {
+function parseShellArray(c: Cursor): RawNode {
   return parseContainer(c, {
     parseValue: parseShellValue,
-    skipWs: skipShellWs,
+    skipWs,
     allowTrailingComma: true,
     error: (offset) => new ShellScanError(offset),
   });
@@ -646,19 +642,8 @@ function parseShellArray(c: ShellCursor): RawNode {
 // P42 D12: exported so views/console/lint.ts can validate a Mongo statement's argument against
 // this app's own shell-literal grammar (unquoted keys, single quotes, ObjectId(…)/ISODate(…)
 // calls) instead of JSON.parse, which would reject valid input this console actually accepts.
-export function tryParseShellText(
-  text: string,
-): { ok: true; node: RawNode } | { ok: false; offset: number } {
-  const c: ShellCursor = { text, i: 0 };
-  try {
-    const node = parseShellValue(c);
-    skipShellWs(c);
-    if (c.i !== text.length) throw new ShellScanError(c.i);
-    return { ok: true, node };
-  } catch (err) {
-    if (err instanceof ShellScanError) return { ok: false, offset: err.offset };
-    throw err;
-  }
+export function tryParseShellText(text: string): ParseResult {
+  return tryParse(text, parseShellValue, skipWs, ShellScanError);
 }
 
 // An unquoted/single-quoted raw key is normalized through JSON.stringify — beautify/minify always
@@ -672,11 +657,5 @@ const shellKeyText = (raw: string): string => JSON.stringify(raw.replace(/^['"]|
  * a hand edit gone wrong — reports the same shape `beautify.ts`'s JSON formatter does.
  */
 export function beautifyShellText(text: string, mode: BeautifyMode): BeautifyResult {
-  const r = tryParseShellText(text);
-  if (!r.ok) return { text, ok: false, reason: `invalid document text at offset ${r.offset}` };
-  const rendered =
-    mode === 'indented'
-      ? renderIndented(r.node, shellKeyText)
-      : renderCompact(r.node, shellKeyText);
-  return { text: rendered, ok: true };
+  return beautifyWith(text, mode, tryParseShellText, 'document text', shellKeyText);
 }
