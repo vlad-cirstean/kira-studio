@@ -468,7 +468,7 @@ onUnmounted(() => {
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
-                  class="h-row flex items-center gap-1 cursor-default select-none text-kira-sm pr-1.5 pl-6"
+                  class="h-row flex items-center gap-1 cursor-default select-none text-kira-md pr-1.5 pl-6"
                   :class="[
                     isActive(worktreeRecordId(wt.path)) ? 'bg-select' : 'hover:bg-hover',
                     wt.isCurrent || isOpen(worktreeRecordId(wt.path)) ? 'text-fg' : 'text-muted-foreground',
