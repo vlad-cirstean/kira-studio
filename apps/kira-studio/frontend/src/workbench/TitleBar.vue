@@ -2,6 +2,7 @@
 import type { AppMode } from '@shared/domain/mode';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { tabChipVariants } from '@theme/components/ui/tabs';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import TitleBarWindowActions from '@workbench/components/TitleBarWindowActions.vue';
 import { control } from '../bridge/control';
@@ -62,11 +63,8 @@ function onToggleKeepAwake(): void {
         v-for="mode in MODE_ORDER"
         :key="mode"
         type="button"
-        class="h-control-lg inline-flex items-center gap-1 px-3 rounded-kira-sm border cursor-pointer max-w-52 shrink-0 text-kira-sm wails-no-drag"
-        :class="[
-          modeStore.active === mode ? 'bg-elevated border-border-strong text-fg' : 'border-transparent text-muted-foreground hover:bg-hover',
-          { 'is-active': modeStore.active === mode },
-        ]"
+        class="wails-no-drag"
+        :class="tabChipVariants({ active: modeStore.active === mode, size: 'wide' })"
         data-testid="mode-tab"
         :data-mode="mode"
         @click="onClick(mode)"
