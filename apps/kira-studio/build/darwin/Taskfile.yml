@@ -159,8 +159,6 @@ tasks:
           echo "create:app:bundle: no PlistBuddy — this is a broken macOS environment (build/package already precondition on Darwin), not a supported one" >&2
           exit 1
         fi
-      # P100 Part 3: the VS Code extension is Kira Space's own product now — Kira Studio's bundle
-      # no longer carries a .vsix at all (G10 D8's original reasoning moved with it).
       - task: codesign:adhoc
 
   codesign:adhoc:
