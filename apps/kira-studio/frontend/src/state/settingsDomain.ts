@@ -125,9 +125,9 @@ const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
 });
 
-// This section held hooksEnabled/hooksPromptDismissed through P86-P126 (agent-activity
-// monitoring's own on/off + first-run-banner-dismiss leaves) — P127 moved that feature to a
-// shared, currently-unwired home with no settings-backed toggle, so both left with it; migration
+// This section held two on/off leaves for the P86 hook-based session monitor through P86-P126 (its
+// enable toggle and its first-run-banner-dismiss flag) — P127 moved that whole feature to a shared
+// home outside this app, with no settings-backed toggle there yet, so both left with it; migration
 // 0029 drops the two orphaned rows. keepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept
 // awake automatically whenever at least one Claude Code session is live, independent of the title
 // bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.

@@ -6,9 +6,9 @@ import (
 )
 
 // embeddedService is the settings-gated start-once/stop-and-clear lifecycle DbMcpService rebuilt
-// around its own embedded server (T2-13; P127: AgentHooksService, its own co-tenant here, moved
-// onto agenthooks.Manager instead — a mutex-guarded start/stop/status of its own kept host-side,
-// same shape, without this generic type): a mutex-guarded instance (the zero value when stopped),
+// around its own embedded server (T2-13; P127: this package's other former tenant, the Claude Code
+// session monitor, moved to its own start/stop/status type in its new shared home instead — same
+// shape, without this generic type): a mutex-guarded instance (the zero value when stopped),
 // a status snapshot built from it, start-once/stop-and-clear guards, and the boot-time "read the
 // setting, start if it says so, log rather than fail" sequence. Wiring — which setting gates it,
 // how the instance is actually constructed/closed, what its wire status looks like — stays in the

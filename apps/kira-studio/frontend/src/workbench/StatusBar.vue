@@ -16,7 +16,7 @@ import { useEngineStore } from './state/engine';
 // right-side items: update/app-metrics/cache-size/engine-status. P116 H7: the app-metrics item's
 // own markup moved to AppMetricsItem.vue, shared with Kira Space's own copy. P119: the update item's
 // own markup moved to UpdateAvailableItem.vue the same way — its click now opens the in-app dialog
-// (appUpdateStore.openUpdateDialog) instead of the release page (§4.6). P127: the agent-sessions
+// (appUpdateStore.openUpdateDialog) instead of the release page (§4.6). P127: the session-status
 // widget this file also carried moved out with the rest of agent-activity monitoring — no app shows
 // it as of this phase.
 const engineStore = useEngineStore();

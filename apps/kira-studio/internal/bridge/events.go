@@ -68,7 +68,7 @@ const (
 	// Process-scoped, never persisted: an OS power assertion that outlives the reason a user made
 	// it is a surprise, and the persistent half of this feature is the Settings toggle. P116:
 	// byte-identical to Kira Space's own channel of the same name, hoisted to repo-root
-	// internal/appevent. P127: ChannelAgentSessions/ChannelAgentEvent, once defined right below
+	// internal/appevent. P127: the two session-monitor channel constants, once defined right below
 	// this, hoisted there too, alongside the rest of agent-activity monitoring — no longer
 	// re-exported here since Studio no longer emits either.
 	ChannelKeepAwake = appevent.ChannelKeepAwake

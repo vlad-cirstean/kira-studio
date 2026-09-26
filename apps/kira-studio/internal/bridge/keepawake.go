@@ -16,7 +16,7 @@ import (
 // of a registered service and none of those may be renderer-callable. P116: the manual half
 // (Toggle) is now shared with Kira Space's own KeepAwakeService. P127: agentCount is fed by
 // internal/terminal's own registry count directly (terminal.Registry.OnChange), no dependency on
-// the hooks agenthooks/Manager provide.
+// the session monitor that used to report it (moved out of this app entirely).
 type KeepAwakeService struct {
 	Deps appcore.Deps
 	// Ctl and Toggle are exported so main.go can inject the platform driver and the shared manual
