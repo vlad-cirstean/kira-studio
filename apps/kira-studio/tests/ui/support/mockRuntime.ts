@@ -164,10 +164,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsUpdate: 'CustomScriptsService.Update',
   customScriptsRemove: 'CustomScriptsService.Remove',
 
-  agentHooksStatus: 'AgentHooksService.Status',
-  agentHooksSetEnabled: 'AgentHooksService.SetEnabled',
-  terminalAgentSessions: 'TerminalService.AgentSessions',
-
   keepAwakeStatus: 'KeepAwakeService.Status',
   keepAwakeSetManual: 'KeepAwakeService.SetManual',
   keepAwakeSetAgentAware: 'KeepAwakeService.SetAgentAware',
@@ -328,12 +324,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // cwd gets a plausible home directory, not a fixture miss. A spec that DOES care (terminal-
   // module.spec.ts's own unscoped-launch case) still wins with its own snapshot.
   [IPC.terminalDefaultCwd]: JSON.stringify({ path: '/home/test' }),
-  // P86: main.ts's bootstrap() joins hydrateAgentHooks()/initAgentSessions() to the same
-  // unconditional-every-boot Promise.all as hydrateCustomScripts() above, same reasoning — a spec
-  // that never configures hooks gets "off, nothing running" and "no sessions yet", not a fixture
-  // miss.
-  [IPC.agentHooksStatus]: JSON.stringify({ running: false, settingsPath: '', error: '' }),
-  [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // P87: main.ts's bootstrap() joins initKeepAwake() to the same unconditional-every-boot
   // Promise.all above, same reasoning. supported: true so the titlebar button renders in every
   // spec — the UI suite runs against a static server, not a real Go build, and a spec that never

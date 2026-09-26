@@ -6,9 +6,9 @@ import { useSettingsStore } from './settings';
 // createKeepAwakeStore.ts; the agent-aware Settings leaf stays here via `extend` — Kira Space has
 // no agent-aware reason to set.
 export const useKeepAwakeStore = createKeepAwakeStore(control, ({ state }) => ({
-  // setKeepAwakeAgentAware also writes settingsStore.claudeCode.keepAwakeWithAgents directly,
-  // mirroring setAgentHooksEnabled's own reasoning — this leaf both persists and recomputes the
-  // live assertion in one call, bypassing the Settings dialog's draft/Save flow entirely.
+  // setKeepAwakeAgentAware also writes settingsStore.claudeCode.keepAwakeWithAgents directly — this
+  // leaf both persists and recomputes the live assertion in one call, bypassing the Settings
+  // dialog's draft/Save flow entirely (dbmcp.ts's own D7/§7.1 instant-action posture).
   async setKeepAwakeAgentAware(on: boolean): Promise<void> {
     state.status = await control.keepAwakeSetAgentAware(on);
     useSettingsStore().claudeCode.keepAwakeWithAgents = on;

@@ -7,19 +7,16 @@
 // P100 Part 2 / P107 I2-19: this used to be a full duplicate of Kira Space's own
 // RepoTerminalView.vue (two Vite apps, no shared package boundary for a whole component) — now
 // both wrap @workbench/terminal/TerminalHostView.vue, which owns the template/style/composable
-// call genuinely identical between them. This file's own remaining job: build `deps` from this
-// app's stores, and the one real difference — the Claude Code hooks banner below, passed as
-// TerminalHostView's default slot, since Kira Space's own TerminalService has no AgentHooks
-// integration.
-import { Button } from '@theme/components/ui/button';
+// call genuinely identical between them. P127: this file used to also carry a Claude Code hooks
+// banner as TerminalHostView's default slot (agent-activity monitoring left Kira Studio); with it
+// gone, this file's own remaining job is building `deps` from this app's stores — no remaining
+// difference from Kira Space's own wrapper.
 import TerminalHostView, { type TerminalHostDeps } from '@workbench/terminal/TerminalHostView.vue';
-import { computed, ref } from 'vue';
-import { useAgentHooksStore } from '../../state/agentHooks';
 import { useSettingsStore } from '../../state/settings';
 import type { TerminalTabRecord } from '../../state/tabDomain';
 import { useTerminalsStore } from '../../state/terminals';
 
-const props = defineProps<{ tab: TerminalTabRecord }>();
+defineProps<{ tab: TerminalTabRecord }>();
 const settingsStore = useSettingsStore();
 const terminalsStore = useTerminalsStore();
 const deps: TerminalHostDeps = {
@@ -32,67 +29,8 @@ const deps: TerminalHostDeps = {
   openTerminalSession: terminalsStore.openTerminalSession,
   resizeTerminal: terminalsStore.resizeTerminal,
 };
-
-// P86 §9.4: discoverability for hooks reporting, without a write anywhere until the user actually
-// clicks Enable. Shown while this tab is a Claude Code launch, hooks are off, and the prompt was
-// never dismissed; hooksJustEnabled keeps the banner in place with a different line for the rest
-// of this tab's life once Enable is clicked — settingsStore.claudeCode.hooksEnabled flipping true
-// would otherwise make showHooksPrompt false and the banner vanish outright.
-const hooksJustEnabled = ref(false);
-
-const showHooksPrompt = computed(
-  () =>
-    props.tab.state.launchKind === 'claude-code' &&
-    !settingsStore.claudeCode.hooksPromptDismissed &&
-    (hooksJustEnabled.value || !settingsStore.claudeCode.hooksEnabled),
-);
-
-// Never types into the PTY (P83 §8.2, P85 §3.1) — the running session is not restarted and not
-// touched; the flag change applies to the next Claude Code tab opened.
-async function onEnableHooksPrompt(): Promise<void> {
-  await useAgentHooksStore().setAgentHooksEnabled(true);
-  hooksJustEnabled.value = true;
-}
-
-async function onDismissHooksPrompt(): Promise<void> {
-  await settingsStore.patchSettings({ claudeCode: { hooksPromptDismissed: true } });
-}
 </script>
 
 <template>
-  <TerminalHostView :tab="tab" :deps="deps">
-    <div
-      v-if="showHooksPrompt"
-      class="flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted-foreground text-kira-sm gap-1.5 mb-1 py-1 px-1.5"
-      data-testid="claude-code-hooks-prompt"
-    >
-      <span v-if="hooksJustEnabled" class="flex-1">
-        Session reporting is on. It applies to the next Claude Code tab you open.
-      </span>
-      <template v-else>
-        <span class="flex-1">
-          Kira Studio can show what this session is doing — a running-session count and a tab dot
-          when it needs your attention.
-        </span>
-        <!-- P110 B26: retired-primitive geometry (gap-1/px-1.5, --kira-s-2/--kira-s-3) is a real,
-             quantified mismatch against toolbar/kira's own gap-1.5/px-3 -- kept as a class override
-             rather than a new Button size, since only these two call sites need it. toolbar-primary
-             adds a hover:bg-primary/80 dim the old CSS never had (a `:hover`/`.primary` specificity
-             tie that always favoured `.primary`'s own static colour) -- an expected, low-risk
-             affordance gain, not a regression, per this stream's own swap-consequence precedent. -->
-        <Button
-          type="button"
-          variant="toolbar-primary"
-          size="kira"
-          class="gap-1 px-1.5"
-          @click="onEnableHooksPrompt"
-          >Enable</Button
-        >
-        <Button type="button" variant="toolbar" size="kira" class="gap-1 px-1.5" @click="onDismissHooksPrompt"
-          >Not now</Button
-        >
-      </template>
-      <!-- P110 I2-18: the descendant `span` rule moved directly onto each span above. -->
-    </div>
-  </TerminalHostView>
+  <TerminalHostView :tab="tab" :deps="deps" />
 </template>

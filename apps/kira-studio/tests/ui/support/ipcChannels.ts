@@ -160,12 +160,6 @@ export const IPC = {
   customScriptsUpdate: 'kira:customScripts:update',
   customScriptsRemove: 'kira:customScripts:remove',
 
-  // P86 §9.3/§12: the Claude Code settings section's own status, and the running-agent-sessions
-  // widget's boot-time hydrate.
-  agentHooksStatus: 'kira:agentHooks:status',
-  agentHooksSetEnabled: 'kira:agentHooks:setEnabled',
-  terminalAgentSessions: 'kira:agent:sessions:list',
-
   // P87 §10.3: the titlebar keep-awake toggle and the agent-aware Settings leaf.
   keepAwakeStatus: 'kira:keepAwake:status',
   keepAwakeSetManual: 'kira:keepAwake:setManual',
@@ -187,16 +181,9 @@ export const IPC = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape, EmitTo every
   // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
   customScriptsChanged: 'kira:customScripts:changed',
-  // P86 §11/§8.4: every live Claude Code session across every window, and one hook firing for one
-  // tab — both Emit (not EmitTo), customScriptsChanged's own shape restated. Real wire channel
-  // strings verbatim (bridge/events.go's ChannelAgentSessions/ChannelAgentEvent), no
-  // FQN_SUFFIX_BY_IPC_KEY entry (push channels, never a bound call) — driven by
-  // emitWailsEvent(page, IPC.agentSessions/agentEvent, …), terminal's own precedent above.
-  agentSessions: 'kira:agent:sessions',
-  agentEvent: 'kira:agent:event',
   // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
-  // agentSessions' own shape restated. Real wire channel string verbatim
-  // (bridge/events.go's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
+  // customScriptsChanged's own shape restated. Real wire channel string verbatim
+  // (internal/appevent's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
   // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.
   keepAwake: 'kira:keepAwake:changed',
   // P112: every API-client mutation broadcasts the scopes it touched, Emit'd (not EmitTo) —

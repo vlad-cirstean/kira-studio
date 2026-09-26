@@ -9,8 +9,6 @@ import { initApiDataSync } from './api/state/apiQueries';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { useTreeStore } from './project/state/tree';
-import { useAgentHooksStore } from './state/agentHooks';
-import { useAgentSessionsStore } from './state/agentSessions';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCacheStatsStore } from './state/cacheStats';
@@ -304,8 +302,6 @@ async function mountShell(): Promise<void> {
   const appMetricsStore = useAppMetricsStore(pinia);
   const modeStore = useModeStore(pinia);
   const customScriptsStore = useCustomScriptsStore(pinia);
-  const agentHooksStore = useAgentHooksStore(pinia);
-  const agentSessionsStore = useAgentSessionsStore(pinia);
   const dbMcpStore = useDbMcpStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const opsStore = useOpsStore(pinia);
@@ -352,8 +348,6 @@ async function mountShell(): Promise<void> {
     terminalsStore.hydrateTerminalDefaults(),
     dbMcpStore.hydrateDbMcp(),
     dbMcpStore.hydrateDbMcpApprovals(),
-    agentHooksStore.hydrateAgentHooks(),
-    agentSessionsStore.initAgentSessions(),
     keepAwakeStore.initKeepAwake(),
     opsStore.hydrateOps(),
     tabsStore.hydrateTabs(),

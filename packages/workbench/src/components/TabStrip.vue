@@ -13,9 +13,10 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
 // The strip, drag-reorder, wheel-scroll, keyboard-scroll-into-view and the six generic
 // context-menu items are exactly the two apps' shared skeleton (confirmed side by side); every
-// per-app extra — Kira Studio's incognito eye glyph + agent-attention dot, Kira Space's seti file
-// icons — arrives through the host's own `iconFor`/`tabIndicator`/`tabBadge`/`tabAttention` hooks
-// (host.ts) instead of an app-local import. The trailing "+" new-tab affordance is real per-app
+// per-app extra — Kira Studio's incognito eye glyph, Kira Space's seti file icons — arrives
+// through the host's own `iconFor`/`tabIndicator`/`tabBadge`/`tabAttention` hooks (host.ts,
+// tabAttention wired by no app as of P127) instead of an app-local import. The trailing "+"
+// new-tab affordance is real per-app
 // divergence (Kira Studio: the Terminal module's own plain-session menu; Kira Space: one repo-root
 // terminal, no menu) — not a lookup a host hook can express cleanly, so it stays a `#new-tab` slot,
 // each app supplying its own button exactly as before.

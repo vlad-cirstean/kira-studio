@@ -1,4 +1,3 @@
-import * as AgentHooksService from '@bindings/agenthooksservice.js';
 import * as AppService from '@bindings/appservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
@@ -22,7 +21,6 @@ import * as TreeService from '@bindings/treeservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
-import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -281,14 +279,6 @@ const studioControl = {
   onDbMcpApprovalChanged: (cb: (snap: DbMcpApprovalSnapshot) => void): (() => void) =>
     on(CHANNEL.dbMcpApproval, cb),
 
-  // P86 §9.3: the Claude Code settings section's own status — AppInfo/UpdateStatus's own "just
-  // unwrap, no trust()" shape (a Go-shaped one-way read with no zod schema of its own), not
-  // DbMcpStatus's: this status carries no secret worth a documented widen-then-narrow, just a
-  // bool and a path.
-  agentHooksStatus: (): Promise<WailsModels.AgentHooksStatus> => unwrap(AgentHooksService.Status()),
-  agentHooksSetEnabled: (enabled: boolean): Promise<WailsModels.AgentHooksStatus> =>
-    unwrap(AgentHooksService.SetEnabled({ enabled })),
-
   // P87 §7.2: the agent-aware Settings leaf — the titlebar toggle's own read/write/broadcast moved
   // to createCoreControl.ts (P116 H5); this one stays app-side since Kira Space has no agent-aware
   // reason to set.
@@ -370,18 +360,6 @@ const studioControl = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
-
-  // P86 §11/§12: every live Claude Code session across every window — the boot-time hydrate for a
-  // window opened after sessions already started (ChannelAgentSessions only fires on change), plus
-  // the broadcast subscription. Emit, not EmitTo (customScriptsChanged's own shape): the count is
-  // app-wide by definition, so this is not windowKey-addressed.
-  terminalAgentSessions: (): Promise<AgentSessionsEvent> =>
-    unwrap(TerminalService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
-  onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
-    on(CHANNEL.agentSessions, cb),
-  // P86 §8.4: one hook firing for one tab — state/agentSessions.ts's reducer is the one
-  // subscriber, filtering by terminalId against tabs this window owns.
-  onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.
