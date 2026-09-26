@@ -542,6 +542,57 @@ check_alias 'var\(--radius(-sm|-md|-lg|-xl)?\)' 'var(--kira-radius) (or the matc
 check_focus_width "(?<![-\\w])(?:focus-visible|focus-within|focus|has-\[[^\s\"']*focus-visible\]):ring-(?:[1-9][0-9]*|focus|error)"
 check_focus_width '(?<![-\w])(?:focus-visible|focus-within|focus|group-focus-within):outline-[2-9]'
 
+# check_toggle_orientation <pattern>
+# P121: the ToggleGroup/ToggleGroupItem registry string targeted Base UI's
+# data-horizontal/data-vertical attributes; reka-ui's ToggleGroupRoot never emits either (only
+# data-orientation, when `orientation` is passed) -- every such selector is dead on arrival, same
+# root cause as check_focus_width guards a different regression class. Modelled on check_focus_width:
+# SCAN_DIRS including components/ui (no legitimate survivor for either shape), plus the GU/KU pass.
+check_toggle_orientation() {
+  pattern="$1"
+  hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
+  gu_ku_hits=$(_gu_ku_hits "$pattern")
+  hits=$(printf '%s\n%s\n' "$hits" "$gu_ku_hits" | grep -v '^$' || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: dead Base UI orientation selector -- reka-ui emits data-orientation, never data-horizontal/data-vertical. Replace with data-[orientation=...] / group-not-data-[orientation=vertical]/<name>:" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_toggle_orientation '(?<![-\w])(?:[a-z0-9-]+:)*(?:group-)?data-(?:horizontal|vertical)(?:/[\w-]+)?:'
+
+# P121: the hand-rolled tab-chip class-string prefix (TabStrip, ConnectionDialog's old detail-tab
+# buttons, ConsoleView's result tabs, TitleBar's mode tabs each carried their own copy) -- folded
+# into tabChipVariants (packages/theme/src/components/ui/tabs). Not a single utility-class name
+# (check_class's own shape), so its own small function rather than a check_class call: no
+# legitimate survivor anywhere, including components/ui itself (tabs/index.ts defines the string
+# once, as a cva template literal, never as this exact prefix).
+check_chip_copy() {
+  hits=$(grep -rnoP --include='*.vue' \
+    -- 'h-control-lg inline-flex items-center gap-1 px-' $SCAN_DIRS 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: hand-rolled tab-chip class string -- replace with tabChipVariants (packages/theme/src/components/ui/tabs):" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_chip_copy
+
+# P121: Toggle/ToggleGroup's own radius must stay at the control tier (rounded-kira-sm, same as
+# Button/tab chips), never the panel tier (rounded-kira) the shadcn registry default used. Scoped to
+# just these two primitives -- rounded-kira is legitimate everywhere else a panel actually renders.
+check_toggle_radius() {
+  hits=$(grep -rnoP --include='*.vue' --include='*.ts' \
+    -- 'rounded-kira(?![-\w])' "$THEME_SRC/components/ui/toggle" "$THEME_SRC/components/ui/toggle-group" 2>/dev/null || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: Toggle/ToggleGroup radius at the panel tier -- use rounded-kira-sm (the control tier):" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+check_toggle_radius
+
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
 else
