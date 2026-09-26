@@ -29,7 +29,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
@@ -41,6 +40,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
@@ -381,7 +381,8 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
 	// on macOS, a documented no-op everywhere else. Constructed before terminalSvc below, since its
 	// Registry.OnChange closure closes over it.
-	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepawake.New(keepawake.NewPlatformDriver())}
+	keepAwakeCtl := keepawake.New(keepawake.NewPlatformDriver())
+	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepAwakeCtl, Toggle: &keepawake.Toggle{Ctl: keepAwakeCtl}}
 	bridge.StartKeepAwake(keepAwakeSvc)
 
 	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto

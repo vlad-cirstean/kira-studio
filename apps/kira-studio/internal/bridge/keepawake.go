@@ -4,25 +4,26 @@ import (
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/keepawake"
 )
 
 // KeepAwakeService composes P87's two keep-awake reasons — the titlebar toggle and the agent-aware
 // Settings leaf — onto one internal/keepawake.Controller. Modelled on AgentHooksService line for
 // line: the renderer-facing methods are exported, the app-internal triggers (agent-session-count
 // changes, system wake, boot/teardown) are package-level functions, since Wails binds every
-// exported method of a registered service and none of those may be renderer-callable.
+// exported method of a registered service and none of those may be renderer-callable. P116: the
+// manual half (Toggle) is now shared with Kira Space's own KeepAwakeService.
 type KeepAwakeService struct {
 	Deps appcore.Deps
-	// Ctl is exported so main.go can inject the platform driver — TerminalService.Registry's own
-	// shape. Wails binds a registered service's exported *methods*, never its fields, so this
-	// widens nothing on the wire.
-	Ctl *keepawake.Controller
+	// Ctl and Toggle are exported so main.go can inject the platform driver and the shared manual
+	// toggle — TerminalService.Registry's own shape. Wails binds a registered service's exported
+	// *methods*, never its fields, so this widens nothing on the wire.
+	Ctl    *keepawake.Controller
+	Toggle *keepawake.Toggle
 
 	mu         sync.Mutex
-	manual     bool
 	agentCount int
 }
 
@@ -41,14 +42,8 @@ type KeepAwakeStatus struct {
 }
 
 func (s *KeepAwakeService) statusLocked() KeepAwakeStatus {
-	st := KeepAwakeStatus{Supported: s.Ctl.Supported()}
-	s.mu.Lock()
-	st.Manual = s.manual
-	s.mu.Unlock()
-	if err := s.Ctl.Err(); err != nil {
-		st.Error = err.Error()
-	}
-	return st
+	st := s.Toggle.State()
+	return KeepAwakeStatus{Manual: st.Manual, Supported: st.Supported, Error: st.Error}
 }
 
 // Status reads the service's current state — never starts or stops anything. The boot-time
@@ -65,11 +60,8 @@ type KeepAwakeSetManualArgs struct {
 // SetManual flips the titlebar toggle's own reason and broadcasts the result to every window —
 // Emit, not EmitTo, since the assertion is app-wide by definition (§3.2).
 func (s *KeepAwakeService) SetManual(args KeepAwakeSetManualArgs) KeepAwakeStatus {
-	s.mu.Lock()
-	s.manual = args.Enabled
-	s.mu.Unlock()
-	s.Ctl.Set(keepawake.ReasonManual, args.Enabled)
-	st := s.statusLocked()
+	toggled := s.Toggle.SetManual(args.Enabled)
+	st := KeepAwakeStatus{Manual: toggled.Manual, Supported: toggled.Supported, Error: toggled.Error}
 	s.Deps.Events.Emit(ChannelKeepAwake, st)
 	return st
 }
