@@ -53,7 +53,7 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text' |
       // on the same element as a false same-group conflict. P110 I2-28: `codicon`
       // (GU/theme/tailwind.css's `--text-codicon`) is the same shape -- a font-size name, not a
       // t-shirt step.
-      text: ['kui-icon', 'kui-xs', 'kui-sm', 'kui-base', 'codicon'],
+      text: ['kui-icon', 'kui-sm', 'kui-base', 'codicon'],
       // P110 I2-28: `kv:leading-kui-control-sm` (KuiSegmented.vue), the same design-seam pattern
       // as the spacing names above.
       leading: ['kui-control-sm'],

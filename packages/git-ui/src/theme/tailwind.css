@@ -107,7 +107,6 @@
   --color-stash-auto-fg: var(--kv-stash-auto-fg);
 
   /* Text */
-  --text-xs: var(--kv-t-xs);
   --text-sm: var(--kv-t-sm);
   --text-base: var(--kv-t-md);
   --text-lg: var(--kv-t-lg);

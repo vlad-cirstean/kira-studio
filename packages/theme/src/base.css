@@ -105,6 +105,10 @@
      --kira-z-autocomplete's existing precedent for this same, single popup. */
   --spacing-completion-max-w: var(--kira-completion-max-w);
 
+  /* P123: removes Tailwind's stock text-xs...text-9xl from the host root, as GU/theme/tailwind.css
+     already does for kv -- chrome speaks only the four kira sizes below. text-kira-xs stays: the
+     data anchors (§3.8) still use it. */
+  --text-*: initial;
   --text-kira-xs: var(--kira-t-xs);
   --text-kira-sm: var(--kira-t-sm);
   --text-kira-md: var(--kira-t-md);
@@ -209,7 +213,7 @@ body {
      own, which preflight's `font: inherit` extends to every form control too — now renders in the
      fixed interface font; every genuinely-data surface names --kira-font-data explicitly. */
   font-family: var(--kira-font-ui);
-  font-size: var(--kira-font-size);
+  font-size: var(--kira-t-md);
   color: var(--kira-fg);
   background: var(--kira-bg-chrome);
   -webkit-font-smoothing: antialiased;

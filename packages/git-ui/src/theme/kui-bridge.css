@@ -41,7 +41,6 @@
   --kui-font-ui: var(--kv-font-ui);
   --kui-font-size: var(--kv-t-md);
   --kui-font-size-sm: var(--kv-t-sm);
-  --kui-font-size-xs: var(--kv-t-xs);
   --kui-shadow-float: var(--kv-shadow-dialog) var(--kv-widget-shadow);
   /* G20 D6: `packages/git-ui` had no `--kv-z-*` ladder to bridge from (ad hoc 10/20/30 literals
      throughout) — this phase is the one that establishes the values, not merely re-maps them.
