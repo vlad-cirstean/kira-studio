@@ -5,7 +5,11 @@ import { TooltipProvider } from '@theme/components/ui/tooltip';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
 import { workbenchHostKey } from '@workbench/host';
-import { provide } from 'vue';
+import { onMounted, onUnmounted, provide } from 'vue';
+import { control } from './bridge/control';
+import { useLayoutStore } from './state/layout';
+import { useSettingsStore } from './state/settings';
+import { useTabsStore } from './state/tabs';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
@@ -19,12 +23,33 @@ provide(workbenchHostKey, createWorkbenchHost());
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —
 // ConfirmDialog (G1 D17's own precedent) and, moved here wholesale from Studio,
 // GitPairingDialog/GitCredentialDialog (a pairing/credential prompt must be able to appear with
-// nothing else open). Studio's own onMounted here subscribed to a dozen menu-bar CHANNEL commands
-// (onOpenSettings/onToggleProjectPanel/onCommandPalette/onTabNext/…) — this app's own Go menu
-// (internal/shell/menutemplate.go) emits none of those (bridge/index.ts's own control object has
-// no onOpenSettings/onToggleProjectPanel/onCommandPalette/onTabNext/onTabPrev/onTabClose/onViewFind
-// etc. at all, confirmed by grepping it), so there is nothing left to subscribe to here — P104
-// deleted the last one (tooltip init/teardown, now TooltipProvider's own job).
+// nothing else open).
+//
+// P116 G1-G4: this app's own Go menu (internal/appshell/menu.go) now emits five of Kira Studio's
+// own dozen menu-bar CHANNEL commands (Settings…, Toggle Project Panel, Next/Previous/Close Tab) —
+// subscribed here the same shape Studio's own App.vue uses, trimmed to only those five (this app
+// has no command palette/connections/requests/imports/view-find-refresh-run-format of its own).
+const layoutStore = useLayoutStore();
+const settingsStore = useSettingsStore();
+const tabsStore = useTabsStore();
+
+let unsubscribe: Array<() => void> = [];
+
+onMounted(() => {
+  unsubscribe = [
+    control.onOpenSettings(() => {
+      settingsStore.settingsOpen = true;
+    }),
+    control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
+    control.onTabNext(tabsStore.activateNextTab),
+    control.onTabPrev(tabsStore.activatePrevTab),
+    control.onTabClose(tabsStore.closeActiveTab),
+  ];
+});
+
+onUnmounted(() => {
+  for (const off of unsubscribe) off();
+});
 </script>
 
 <template>

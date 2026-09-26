@@ -6,15 +6,19 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
 import { computed } from 'vue';
+import { useAppMetricsStore } from '../state/appMetrics';
 import { useBlameStatusStore } from '../state/blameStatus';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
 // §5.2) beside the shared caret-status slot. Now a thin composition over the shared bar chrome
-// (packages/workbench/src/components/StatusBar.vue).
+// (packages/workbench/src/components/StatusBar.vue). P116 G7 adds the app-metrics item back —
+// AppMetricsItem.vue, shared with Kira Studio's own copy of this file.
 const blameStatusStore = useBlameStatusStore();
+const appMetricsStore = useAppMetricsStore();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
 // is the extension's own choice; this bar hides items with nothing to say instead.
@@ -50,6 +54,9 @@ function onRevealBlameCommit(): void {
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>
+    </template>
+    <template #right>
+      <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
     <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s
          truncation, folded onto the button/span above -- Preflight already sets `font: inherit` on

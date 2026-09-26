@@ -100,11 +100,31 @@ export const useTabsStore = createTabsStore({
       actions.patchTabState(id, 'repo-graph', patch, { skipUnchanged: true });
     }
 
+    // P116 G4: Next/Previous/Close Tab (the Window menu's own three items) — Kira Studio's own
+    // tabs.ts activateNextTab/activatePrevTab/closeActiveTab, scoped to the active *workspace*
+    // (the open repo, or GENERAL_WORKSPACE) rather than Studio's active AppMode — this app's own
+    // analogue of "which tab set is on screen right now".
+    function activateNextTab(): void {
+      actions.stepTab(useWorkspaceStore().active, 1);
+    }
+
+    function activatePrevTab(): void {
+      actions.stepTab(useWorkspaceStore().active, -1);
+    }
+
+    function closeActiveTab(): void {
+      const id = actions.activeIdByWorkspace.value[useWorkspaceStore().active];
+      if (id) actions.closeTab(id);
+    }
+
     return {
       createPinnedRepoGraphTab,
       closeWorkspaceTabs: closeWorkspaceTabsAction,
       patchRepoFileTabState,
       patchRepoGraphTabState,
+      activateNextTab,
+      activatePrevTab,
+      closeActiveTab,
     };
   },
 });

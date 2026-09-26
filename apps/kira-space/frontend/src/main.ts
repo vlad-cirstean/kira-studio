@@ -3,8 +3,10 @@ import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { useAppMetricsStore } from './state/appMetrics';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
+import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
 import { pinia } from './state/pinia';
 import { ensureWorkspaceShell } from './state/repoTabs';
@@ -19,12 +21,15 @@ import '@workbench/workbench.css';
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
 // specific: grid/documents/keyvalue/stream/console page stores, none of which exist here) and no
-// appMetrics/appUpdate/cacheStats/agentHooks/agentSessions/keepAwake/ops/dbMcp/customScripts stores
-// (none of those subsystems exist in this app — apps/kira-space/main.go's own Services list has no
-// counterpart for any of them).
+// appUpdate/agentHooks/agentSessions/ops/dbMcp/customScripts stores (none of those subsystems exist
+// in this app — apps/kira-space/main.go's own Services list has no counterpart for any of them).
+// P116 G5/G7 add appMetrics/keepAwake back — this app now has its own metrics ticker and
+// keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New).
 async function mountShell(): Promise<void> {
-  // Every store used here runs before app.use(pinia) below, so each needs the module-level `pinia`
-  // instance passed explicitly (Pinia has no active instance yet at this point).
+  // Every store used here runs before app.use(pinia) below, so each needs the module-level
+  // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
+  const appMetricsStore = useAppMetricsStore(pinia);
+  const keepAwakeStore = useKeepAwakeStore(pinia);
   const layoutStore = useLayoutStore(pinia);
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
@@ -32,6 +37,10 @@ async function mountShell(): Promise<void> {
   const tabsStore = useTabsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
+
+  // Kira Studio's own initAppMetrics precedent: just subscribes, no data dependency — runs
+  // synchronously before the Promise.all below rather than joining it.
+  appMetricsStore.initAppMetrics();
 
   // P100 Part 2: Studio's own boot sequence awaited control.windowsEnsure() here, before
   // hydrateTabs, so modeStore's persisted-per-window mode was set before the first render. This app
@@ -45,12 +54,17 @@ async function mountShell(): Promise<void> {
     tabsStore.hydrateTabs(),
   ]);
 
+  // P116 G5: keep-awake hydrate joins the optional group below, not this critical Promise.all — a
+  // stuck/erroring OS power-assertion call must never block this app's own boot the way it's
+  // allowed to gate Kira Studio's (that app's own main.ts keeps it in the critical group).
+
   // F2: gitClients (Connected editors/pairing) and terminals (new-terminal defaults) are not on
   // the critical path to a rendered shell — Promise.allSettled so one of these hitting a DB error
   // never takes down the whole window the way it did bundled into the Promise.all above.
   const optional = await Promise.allSettled([
     gitClientsStore.hydrateGitClients(),
     terminalsStore.hydrateTerminalDefaults(),
+    keepAwakeStore.initKeepAwake(),
   ]);
   for (const result of optional) {
     if (result.status === 'rejected') {
