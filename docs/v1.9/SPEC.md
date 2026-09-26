@@ -6538,3 +6538,143 @@ correct).
    as full pixel coverage.
 
 No other deviation from the plan's scope, commit sequence, or content.
+
+## P120 result
+
+Plan: `docs/v1.9/plans/P120-studio-git-audit.md`. One sequential Sonnet implementer, per the
+plan's own §4 ordering (settings-schema moves are order-dependent: commit 2 compiles only once
+commit 1 removed Studio's `Git` consumer; commit 3 is breaking for Studio's wire shape only). 18
+commits, `94e9d961..cb32d1ec` (P120's own commits, in order): `e71b52a3` (drop Studio's git
+settings section), `036cb3f2` (move git settings from `appsettings` into Kira Space),
+`92b98128` (move `inlineBlame`/`dateFormat` into Kira Space), `a18d96a6` (Studio owns
+`advanced.logLevel`, migration 0028), `889ef003` (completes `a18d96a6`'s own staging — below),
+`65118b71` (move `LinkService` out of Studio), `d37d12dd` (drop `ChannelCodeSearch` and git
+tombstones from `events.go`), `354d0a10` (drop `CodeWorkspaceService` mocks and
+codeSearch/quickOpen channels), `3300f21d` (drop git-ipc tsconfig paths), `bd9cbac7` (fix
+Studio-scoped knip path and biome messages), `80ff6b33` (Scripts working-dir placeholder names
+home directory), `ccf63a84` (drop git references from Go comments), `3f8f3c5b` (drop git
+references from frontend and test comments), `1fd6d644` (drop vsix tombstone from darwin
+Taskfile), `c314da0d` (re-record settings visual baselines), `830666fe` (ARCHITECTURE drops
+Studio `LinkService` and git settings), `cb32d1ec` (drop remaining git-word comments found by
+§5.3 grep 1), plus this result commit as the 18th.
+
+**What landed.** Studio (a database/API client with no git module) had accreted git-shaped surface
+from the shared app base it split from (P100/P103): a Settings "Git" section
+(`inlineBlame`/`dateFormat`/`gitLogLevel`/`protectedBranches`/`fetchAutoIntervalMinutes`/
+`gitPath`/`graphFontSize`, all Kira Space concerns), a shared `internal/appsettings.AdvancedCore`
+struct forcing Studio's own log-level leaf to share a JSON key with Space's git log level, a
+`LinkService`/`OpenExternal` binding with no real Studio caller, and dead `ChannelCodeSearch`/
+`CodeWorkspaceService`/codeSearch/quickOpen IPC surface. All of it is gone from Studio: git
+settings and `LinkService` now live only in Kira Space (byte-identical keys, defaults and UI on
+that side — commit `036cb3f2`/`65118b71`); `AdvancedCore` is deleted and each app owns a plain
+`LogLevel` field directly, so Studio's leaf is renamed `advanced.gitLogLevel` →
+`advanced.logLevel` (migration `0028_p120_drop_git_settings.sql`, also dropping any leftover
+`git.*`/`appearance.inlineBlame`/`appearance.dateFormat` rows a pre-P120 install might carry);
+`GitLogLevelField.vue` generalizes to `LogLevelField.vue`, parameterized by leaf key, since the
+two apps' markup was already byte-identical. Dead IPC (`ChannelCodeSearch`, the
+`codeWorkspace*`/codeSearch/quickOpen mocks and channels) and the vsix Taskfile tombstone are
+removed. `docs/ARCHITECTURE.md` no longer lists `LinkService` under Studio and drops the
+git-settings known-open-item; every remaining git-word comment in `apps/kira-studio` either
+explains a coincidental substring (`buildinfo.go`'s `github.com` module path, `datagrip`'s
+"DataGrip" mention) or was rewritten (`ccf63a84`/`3f8f3c5b`/`cb32d1ec`).
+
+**Deviations from the plan, each root-caused and landed in the same pass:**
+
+- **Commit-4 split (`a18d96a6` + `889ef003`).** `a18d96a6`'s multi-path `git add` aborted partway
+  on a since-deleted pathspec; the partial staging wasn't caught before committing, so the migration
+  and `LogLevelField.vue` add/delete landed alone. `889ef003` lands the rest of that same change
+  (the actual `gitLogLevel`→`logLevel` rename across Studio's model/repo/bridge/migrations-list/
+  `main.go`/frontend schema/`AdvancedPane.vue`, Space's mirrored Go field split off the deleted
+  `AdvancedCore`) — no behavior beyond what `a18d96a6`'s own message describes, split across two
+  commits only by that staging mistake.
+- **Commit-11 PID recovery.** This session's own background `bun run test:ui:studio` process
+  survived past a session handoff (a fresh invocation of this same worktree/branch resumed after
+  commit 11, `ccf63a84`, had already landed); rather than assume the run was lost and restart it,
+  the resuming session located the still-running process by PID (`ps aux`, matched against the
+  logfile it was writing) and waited on that PID instead of starting a duplicate — the
+  resumability discipline CLAUDE.md requires, exercised here on this phase's own verification run,
+  not on any commit's edits (the worktree was clean, no uncommitted edits, at every handoff).
+- **Grep-1 cleanup (`cb32d1ec`).** §5.3 grep 1 (broad `git` sweep) still returned non-zero after
+  commit 15 — a handful of comments using the word "git" in prose that survived `ccf63a84`/
+  `3f8f3c5b`'s targeted passes. `cb32d1ec` clears the remainder; grep 1 now reads 0.
+- **First `test:ui:studio` run, killed and restarted.** An earlier full run (before the one
+  reported above) had to be abandoned mid-flight during an earlier session handoff and was
+  restarted clean once the worktree was reconfirmed intact; no code changes were at risk, since
+  this check runs read-only against an already-committed tree.
+
+**§5.3 orchestrator greps, all 8, run at `HEAD` (`cb32d1ec`):**
+
+1. Broad `git` sweep of Studio. Base 151 → **0**. Matches expected exactly (after `cb32d1ec`).
+2. Git-vocabulary sweep of Studio. Base 204 → **1**, plan expected 0. The one hit is
+   `apps/kira-studio/frontend/src/state/terminalTabs.ts:6`, a comment explaining that
+   `codeRepoId` stays on `TerminalTabState`'s shared shape (`@shared/domain/tabs`, used by Kira
+   Space too) even though Studio itself never passes it — documentary, not a leftover.
+3. Shared layer carries no Space-only git setting, three sub-greps, all expected 0: `internal/
+   appsettings` → **2** (both `appsettings.go` doc-comment lines naming
+   `GitSettings`/`InlineBlame`/`DateFormat`/`AdvancedCore` to explain why they're gone, not code);
+   `packages/shared/domain/settings.ts` + `packages/workbench/src` → **2** (one comment each in
+   `settings.ts` and `LogLevelField.vue` naming `advanced.gitLogLevel` to explain the leaf-key
+   split); Go `appsettings.*` call sites → **4** (doc comments in Studio's and Space's own
+   `storage/model|repos/settings.go` narrating "former `appsettings.ReadGit`/`UpsertGit`/
+   `AdvancedCore`" — all in prose, zero real call sites; `internal/appsettings.AdvancedCore` and
+   its `Read/UpsertGit` methods are actually deleted, confirmed separately by build success and
+   `go test ./...`).
+4. `linkOpenExternal` scope: **0** in `packages`/`apps/kira-studio` (matches expected exactly);
+   **3** in `apps/kira-space/frontend/src`, plan expected exactly 2 — the third is
+   `bridge/index.ts`'s own comment explaining the P120 move, alongside the definition and the
+   `hostHandlers.ts` caller the plan named.
+5. Migration present and registered: **1** and **1**, both exactly as expected.
+6. Space unchanged on the wire: base (recorded before commit 1) **3**, after **10** — not
+   the same count, but the intended result of commits 2/3, not a drift: the 7-count increase is
+   exactly the 7 JSON tags (`gitLogLevel`, `inlineBlame`, `dateFormat`, `protectedBranches`,
+   `fetchAutoIntervalMinutes`, `gitPath`, `graphFontSize`) that moved from `internal/appsettings`
+   (outside this grep's scope) into `apps/kira-space/internal/storage/model/settings.go` (inside
+   it) — confirmed byte-identical JSON tags before and after via `git grep` against
+   `94e9d961`/`HEAD`, so the actual wire shape Kira Space sends is unchanged; only which package
+   defines it moved.
+7. Studio bindings carry no git service: **1**, plan expected 0 — the hit is the directory name
+   `bindings/github.com` (Go module path segment in the generated bindings tree), matched only
+   because `-i` makes the pattern `git` substring-match inside "github.com"; no real service.
+8. CodeGraph, run after index sync: `codegraph_explore` on `appsettings.Git AdvancedCore
+   LinkService ChannelCodeSearch GitLogLevelField DateFormatField` shows no Studio file and no
+   `internal/appsettings` definition for any of them — all now Space-only or deleted.
+
+**§5.2 phase-end verification, run in full by this session:**
+
+- `go test ./...`: 69 packages ok, 0 FAIL.
+- `bun run test:unit`: 1662 pass, 0 fail, 14327 `expect()` calls.
+- `bun run test:visual:studio`: 14 passed, 0 failed.
+- `bun run test:visual:space`: 4 passed, 0 failed.
+- `bun run test:ui:space`, run twice per the flake-vs-regression check below: run 1 — 31 passed, 1
+  failed (`repo-workspace.spec.ts:228`'s out-of-order search-result test); run 2 — 32 passed, 0
+  failed.
+- `bun run test:ui:studio`, run twice, full suite each time: run 1 — 282 passed, 2 failed
+  (`cell-editor.spec.ts:332`'s NULL/empty/truncated case, `sql-schema.spec.ts:439`'s
+  no-completion-at-connection-root case), 4 did not run (the `ui-timing` project, skipped because
+  `playwright.config.ts` declares `dependencies: ['ui']` and `ui` had a failure); run 2 — 283
+  passed, 1 failed (`http-history.spec.ts:28`'s status-tooltip case, a Chromium page-crash), 4 did
+  not run. Three different tests failed across the two runs plus `test:ui:space`'s own run 1, none
+  touched by this phase (`git diff --stat 94e9d961..HEAD` against `cell-editor.spec.ts`,
+  `sql-schema.spec.ts`, `http-history.spec.ts` and `repo-workspace.spec.ts` — and every support
+  file each imports — is empty in every case), all timing/resource-sensitive specs (a
+  60s-timeout Monaco panel wait, a Monaco suggest-widget visibility race, a `page.hover()` that
+  crashed the page, an out-of-order streamed-search assertion). Read as this sandbox's own
+  load-sensitivity, same pattern as P119's own two-different-failures-across-two-runs precedent,
+  not a P120 regression, not chased further per CLAUDE.md's pre-existing-fix scope.
+- Manual DB-migration check: a throwaway Go program (run from a temporary
+  `apps/kira-studio/cmd/` package, never committed, so it could import `internal/storage/
+  migrations`) applied migrations 1-27 to a fresh sqlite file, seeded
+  `advanced.gitLogLevel="debug"`, `git.path="/usr/bin/git"`, `appearance.inlineBlame=true`,
+  `appearance.dateFormat="relative"` — the shape a real pre-P120 install's row could carry — then
+  reopened the same file and ran the full migration set (1-28), simulating a real app boot.
+  Result: the `settings` table holds exactly one matching row afterward,
+  `advanced.logLevel = "debug"` — the git rows are gone and the log-level value carried through
+  the rename, matching migration `0028`'s own two statements exactly.
+- `.github/workflows` diff: `git diff --stat 94e9d961..HEAD -- .github/workflows` is empty — this
+  phase touched no workflow file, so the OAuth push-scope constraint never applied here.
+- `bun run lint:dead`: exit 0; 7 duplicate-export findings and 9 config hints, identical to
+  P119's own count and in files this phase never touched (`git diff --stat 94e9d961..HEAD` against
+  each is empty).
+
+**Plan deviations.** Scope and design otherwise unchanged — every §4 commit landed in its planned
+order and content, only split or extended as detailed above. No `--no-verify` used on any commit.

@@ -644,4 +644,16 @@ caller to trace).
 
 ## Result
 
-(Filled in by commit 16.)
+Full record: `docs/v1.9/SPEC.md`'s own "## P120 result" section (commit list, all 8 §5.3 grep
+numbers with explanations, every test-suite tally, the manual DB-migration check, the
+`.github/workflows` empty-diff confirmation, and every deviation).
+
+Summary: 18 commits, `94e9d961..cb32d1ec` plus this result commit. Every §1 leftover removed —
+git settings and `LinkService` now live only in Kira Space, Studio owns `advanced.logLevel`
+(migration 0028) independent of Space's `advanced.gitLogLevel`, dead `ChannelCodeSearch`/
+`CodeWorkspaceService` IPC surface and the vsix Taskfile tombstone are gone. All 8 §5.3 greps
+verified, each documented non-zero traced to a real, harmless cause (documentary comments, a
+`github.com` substring match, the intended 7-field migration into Kira Space's own model — not a
+missed leftover). `go test ./...` (69 ok), `bun run test:unit` (1662 pass), both visual suites (14
++ 4 passed), and both UI suites (`test:ui:space`, `test:ui:studio`, each run twice) all clean apart
+from sandbox timing flakes in files this phase never touched. No `--no-verify` used.
