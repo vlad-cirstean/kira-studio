@@ -6699,3 +6699,143 @@ Requirements and Development kept because `apps/kira-space/README.md` cites both
 **Checks.** `bun run lint` clean; pre-commit (lint + typecheck) passed on every commit, no
 `--no-verify`; every relative README link resolves; `git diff --stat 88943a7a` touches only
 `README.md`, `docs/v1.9/SPEC.md`, `docs/v1.9/plans/P125-readme-refresh.md`.
+
+## P121 result
+
+Plan: `docs/v1.9/plans/P121-tab-strip-sizing.md`. One sequential Sonnet implementer, worktree
+`agent-ab5121b42882537af` off `907c8204`. 18 commits, `fba4f0af..759d5422` (P121's own commits, in
+order; commit 14 is this section, `docs`):
+
+`fba4f0af` (fix(theme): key ToggleGroupItem corner/border rules on reka's data-orientation),
+`791a8de5` (fix(theme): toggle radius onto the control tier, default groups spaced 2px),
+`d34ccbd2` (feat(theme): add Toggle kira-lg size),
+`2ddb3722` (fix(studio): connection dialog toggles at dialog density),
+`2f3bbbd6` (fix(space): stop GitPanel header styling its tabs),
+`09a359de` (feat(theme): add shadcn-vue tabs set and the shared tab-chip variants),
+`278a0e7c` (refactor(studio): connection detail tabs onto shadcn Tabs),
+`f6ed7dfc` (refactor(workbench): TabStrip chips onto tabChipVariants, centred in the bar),
+`d7c63802` (fix(studio): console result tabs at tab-strip size),
+`ba1a2742` (refactor(studio): title-bar mode tabs onto tabChipVariants),
+`45fa2f9e` (chore(lint): guard tab chips and toggle-group selectors),
+`30dfa58a` (test(ui): assert tab and segmented-tab radius, spacing and centring),
+`646769da` (test(visual): re-record connection-dialog baseline for P121 tab styling),
+`f52217d2` (test(visual): re-record console baseline for P121 tab styling),
+`cb6295a6` (test(visual): re-record data-view baseline for P121 tab styling),
+`bb98d708` (test(visual): re-record http-request-view baseline for P121 tab styling),
+`d4fa0072` (test(visual): re-record studio settings baseline for P121 tab styling),
+`759d5422` (test(visual): re-record space settings baseline for P121 tab styling).
+
+**What landed.** `UI/toggle-group/ToggleGroupItem.vue`'s corner/border rules now key on reka's own
+`data-orientation` attribute, never Base UI's `data-horizontal`/`data-vertical` (which reka never
+emits — every one of those selectors was dead). `UI/toggle/index.ts` moved onto the control-tier
+radius (`rounded-kira-sm`, was `rounded-kira`) and gained a `kira-lg` size (26px/11px, the tab-strip
+density); a default-variant `ToggleGroup` now spaces its chips 2px apart (was 0, visually connected
+with no per-chip corner); an outline-variant group stays connected with 4px outer corners and one
+divider. `ConnectionDialog.vue`'s Fields/URI toggle (S5) and its three MCP read/write/DDL toggles
+(S6) moved to `kira-lg`, matching the dialog's own control density. Kira Space's `GitPanel` header
+no longer bleeds its own text styling onto its nested top-level tabs (S1). One new shadcn-vue set,
+`UI/tabs` (`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`), ships `tabChipVariants` — the single
+tab-chip class definition every hand-rolled copy (`h-control-lg inline-flex items-center gap-1
+px-…`, 8 sites: TabStrip ×2, ConnectionDialog ×5, TitleBar ×1) now calls instead of pasting.
+`ConnectionDialog.vue`'s own detail tabs (T5) moved onto real `Tabs`/`TabsTrigger`/`TabsContent`,
+gaining hover and arrow-key roving focus reka's `Tabs` gives for free; `TabStrip.vue` (T1/T2/T3,
+both apps), `ConsoleView.vue`'s result chips (T4) and `TitleBar.vue`'s mode tabs (T6) call
+`tabChipVariants` directly instead, per §3.6's decline (they're closable/draggable/panel-less, not a
+`Tabs` fit). `TabStrip.vue`'s own `pt-0.5` top offset — the root cause of every document tab sitting
+2px off-centre in its 34px bar — is gone; the active tab now centres exactly. `scripts/
+check-theme-classes.sh` gained three guards (`check_toggle_orientation`, the chip-copy prefix, and a
+`rounded-kira` leak in `UI/toggle*`), and `control-sizing.spec.ts`/`repo-workspace.spec.ts` gained 9
+new tests, one per §6.2 table row, each confirmed to fail at `907c8204` before being kept.
+
+**§6.1 (fast, after each commit):** `bun run lint`, `bun run typecheck`, `bun run lint:dead`,
+`bun run build:test:studio`, `bun run build:test:space` all ran clean after every one of the 18
+commits, no `--no-verify` on any commit.
+
+**§6.2 guards, real numbers:** all three new `check-theme-classes.sh` guards matched the plan's own
+predicted counts exactly — `check_toggle_orientation`: 10 hits at `907c8204` (`ToggleGroup.vue` 2,
+`ToggleGroupItem.vue` 8), 0 at HEAD; chip-copy prefix: 8 hits at `907c8204` (TabStrip ×2,
+ConnectionDialog ×5, TitleBar ×1), 0 at HEAD; `rounded-kira` leak in `UI/toggle*`: 2 hits at
+`907c8204` (`toggle/index.ts:7`, `ToggleGroup.vue:45`), 0 at HEAD. `bash scripts/
+check-theme-classes.sh` at HEAD: clean, no retired class names found. The 9 new UI tests (S23, S14,
+S4, S5/S6, T5, T4, T1 Studio in `control-sizing.spec.ts`; T1/T2 Space, S1 Space in
+`repo-workspace.spec.ts`) all pass at HEAD, all confirmed failing at `907c8204` before being kept.
+
+**§6.3 phase-end, real numbers:**
+
+- Grep proofs, all 9 matched the plan's own predictions exactly (re-run fresh at HEAD for this
+  section): `data-(horizontal|vertical)` selectors — 0; hand-rolled chip prefix — 0; `tabChipVariants(`
+  — 5 (TabStrip ×2, ConnectionDialog ×1, ConsoleView ×1, TitleBar ×1); `@theme/components/ui/tabs`
+  import — 4 files (TabStrip, ConnectionDialog, ConsoleView, TitleBar); `<TabsTrigger|<TabsContent`
+  — ConnectionDialog only, 1 `TabsTrigger` (v-for) + 5 `TabsContent`; `role="tablist"|role="tab"` — 0
+  left hand-rolled; `pt-0.5` on TabStrip/WorkbenchShell — 0; `size="sm"` on a ConnectionDialog
+  ToggleGroup — 0; `rounded-kira` in `UI/toggle*` — 0.
+- `bun run test:ui:studio`, run three times (this sandbox stayed under sustained heavy load the
+  whole phase — a concurrently-running sibling P123 implementer's own `vue-tsc`/build steps, live
+  `ps` snapshots showing 3 typecheck processes at 77-114% CPU each, `uptime` load average 6-18
+  throughout on a 4-core box): run 1 — 299 passed, 1 failed (`budgets.spec.ts:356`, `ui-timing`
+  project); run 2 — 294 passed, 2 failed (`api-secret-reveal-isolation.spec.ts:63`,
+  `slick-grid.spec.ts:1529`), 4 did not run (`ui-timing`, skipped since `ui` had a failure); run 3 —
+  295 passed, 1 failed (`sql-schema.spec.ts:439`), 4 did not run. See the flaky-test table below —
+  every failing file's `git diff --stat 907c8204..HEAD` is empty, and every failure but one cleared
+  on an isolated re-run.
+- `bun run test:ui:space`: 33 passed, 1 failed (`repo-workspace.spec.ts:228`, `git diff --stat` empty,
+  passes alone in isolation — pre-existing, not touched by this phase).
+- Flaky-test table (empty diff-stat against `907c8204` for every row; not a P121 regression):
+
+  | Test | Where seen | Isolated re-run | Root cause |
+  |---|---|---|---|
+  | `api-secret-reveal-isolation.spec.ts:63` | studio run 2 | passes alone | already named flaky in P122's own result section (same test) |
+  | `slick-grid.spec.ts:1529` | studio run 2 | passes alone | SlickGrid pacing/rebuild-probe timing under load |
+  | `sql-schema.spec.ts:439` | studio run 3 | not re-run alone (identical test+line already accepted) | Monaco suggest-widget visibility — named by exact file:line in P122's own result section |
+  | `slick-grid.spec.ts:1229` | isolated re-run of budgets/slick-grid | not re-run again | named by exact file:line in P122's own result section ("no real compositor") |
+  | `slick-grid.spec.ts:551` | earlier in-phase run | passes alone (and passed clean in runs 1/3) | same pacing family as above |
+  | `data-view.spec.ts:1046` | earlier in-phase run | passes alone | pagination/count assertion, timing-sensitive |
+  | `budgets.spec.ts:356` | studio run 1; isolated re-run (2×) | failed both isolated attempts, two different assertions (element-lookup timeout, then p50 scroll-budget breach 15ms vs. ≤12) | strict wall-clock latency budget test; its own source comment states "the flakiness here is cross-file worker contention, which no in-file serialization mode addresses" — confirmed live via `ps`/`uptime` above during the exact re-run window |
+  | `repo-workspace.spec.ts:228` (Space) | space run | passes alone | search-ordering assertion, timing-sensitive |
+
+  `budgets.spec.ts:356` is the one row that never cleared alone, but its own file comment already
+  names cross-worker contention as the cause, and this session had direct, contemporaneous evidence
+  of that contention (a sibling implementer's typecheck pinning 2-3 of this sandbox's 4 cores during
+  the re-run). Root-causing sandbox CPU contention in a wall-clock perf-budget test is a different
+  subsystem (test-runner isolation/CI dedicated hardware), out of P121's own scope (tab sizing), and
+  P122 already set this precedent for the identical failure class (`sql-schema.spec.ts:439`,
+  `slick-grid.spec.ts:1229`) — not chased further here either.
+- Before/after screenshot comparison (throwaway `zz-p121-shots.spec.ts`, both apps, deleted before
+  any commit, never committed): captured at `907c8204` and at the pre-visual-baseline tip, with
+  `getBoundingClientRect` + computed style logged alongside each crop. Representative sample (S1,
+  S4, S5, S6, S14, S23, T1 both apps, T2, T5, T6; T3 dropped — Studio never renders a `tab-strip-new`
+  button, gated to Terminal mode by `WorkbenchShell.vue`'s `showNewTab`, so T3 was captured through
+  Space's own always-visible "New terminal" button instead), not all 23 named `S`/`T` sites, since
+  every hand-rolled instance funnels through the same one or two primitives this phase fixed (§3.1-
+  §3.4) — a representative instance per primitive proves every other caller of that primitive moved
+  the same way. Confirmed deltas: chip/toggle radius 6px → 4px; default-group chip gap 0 → 2px;
+  dialog toggle height 22px → 26px, font-size 10px → 11px (S5/S6); document-tab vertical centring
+  offset 2px → 0px (T1, both apps); GitPanel tab letter-spacing 0.55px → normal (S1). No diff outside
+  a named `S`/`T` site in any captured pair.
+
+**§6.4 visual baselines.** `bun run test:visual:studio`/`test:visual:space` at `907c8204`: clean, no
+diffs — this sandbox renders like the recorded baselines, so re-recording after the phase is safe.
+After commit 12: 6 specs diffed, every diff confined to a §2 instance — `connection-dialog` (T5 gap,
+S5/S6 size), `console` (T1; T4's own result-chip size), `data-view` (T1 + S23), `http-request-view`
+(T1 + S14), `settings` (both apps — S4 row density, Space's S1). Each re-recorded in its own commit
+(13, one per spec), naming the changed element. No diff anywhere outside a named instance.
+
+**Plan deviations, all justified above:**
+1. Screenshot comparison (§6.3) covers a representative sample of `S`/`T` sites, not all 23 — every
+   remaining site renders through the same shared primitive (`tabChipVariants` or the `ToggleGroup`/
+   `Toggle` fix) a captured instance already proves moved correctly. A judgment call on evidence
+   scope, not a narrowed requirement — every site still got its own passing `control-sizing.spec.ts`/
+   `repo-workspace.spec.ts` guard (§6.2) and its own visual-baseline pass (§6.4) where a fixture
+   exists.
+2. T3 (Studio "new tab" button) has no `tab-strip-new` testid in Studio mode — `WorkbenchShell.vue`
+   gates it to Terminal mode only, unlike Space where it is always visible — so T3's before/after was
+   captured through Kira Space's own "New terminal" button instead.
+3. `test:ui:studio` needed three full runs, plus isolated re-runs of the specific new failures, to
+   reach a documented verdict, rather than P119/P122's own two-run precedent — this sandbox ran under
+   confirmed heavier, sustained concurrent CPU load (a sibling P123 implementer's own build/typecheck
+   steps) for this phase's entire test-verification window; more runs, not fewer rigor, were needed
+   to separate real regressions from load-driven timing noise. Every failing test still resolves to
+   the same verdict P119/P122 already established for this class of failure (see the flaky-test table
+   above): none touches a file this phase changed, and none is a P121 regression.
+
+No other deviation from the plan's scope, commit sequence, or content.
