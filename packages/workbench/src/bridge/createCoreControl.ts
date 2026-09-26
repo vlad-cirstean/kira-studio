@@ -19,6 +19,11 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // has no agent-aware reason to set. Likewise windowsEnsure/windowsSetMode stay app-side — they are
 // Kira Studio's own AppMode plumbing, which Kira Space has none of.
 //
+// P119 adds three more: updateStatus/updateInstall/updateCancelInstall — both apps' own
+// UpdateService is now byte-identical (Status/InstallUpdate/CancelInstall over the shared
+// internal/appupdate), so the update dialog's whole control surface moves here rather than staying
+// duplicated per app the way studioControl's updateStatus/updateOpenReleasePage used to be.
+//
 // `CoreBindings` is a **structural** interface, not an adapter: each app's own generated
 // `@bindings/*` service modules (SettingsService, LayoutService, TabsService, LifecycleService,
 // TerminalService, FilesService, LinkService) already satisfy it by shape — no per-app glue code,
@@ -78,6 +83,11 @@ export interface CoreBindings {
     Status(): Promise<unknown>;
     SetManual(a: { enabled: boolean }): Promise<unknown>;
   };
+  update: {
+    Status(): Promise<unknown>;
+    InstallUpdate(): Promise<void>;
+    CancelInstall(): Promise<void>;
+  };
 }
 
 // P25 D13's folder-picker result — identical shape in both apps' own generated
@@ -95,6 +105,15 @@ export interface KeepAwakeStatus {
   manual: boolean;
   supported: boolean;
   error: string;
+}
+
+// AppUpdateStatus is both apps' own bound UpdateService.Status wire type, restated here rather
+// than imported from either app's own `@bindings/*` output — FolderChoice's own reasoning applies.
+export interface AppUpdateStatus {
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  installLogPath: string;
 }
 
 // `S`/`L`/`T`/`P` are each app's own Settings, Layout, TabRecord and SettingsPatch shape. Layout is
@@ -157,6 +176,11 @@ export interface CoreControl<S, L, T, P> {
   keepAwakeStatus: () => Promise<KeepAwakeStatus>;
   keepAwakeSetManual: (enabled: boolean) => Promise<KeepAwakeStatus>;
   onKeepAwakeChanged: (cb: (status: KeepAwakeStatus) => void) => () => void;
+
+  // P119's own three — see this file's header comment.
+  updateStatus: () => Promise<AppUpdateStatus>;
+  updateInstall: () => Promise<void>;
+  updateCancelInstall: () => Promise<void>;
 }
 
 export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L, T, P> {
@@ -235,5 +259,10 @@ export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L
       unwrap(b.keepAwake.SetManual({ enabled })).then((r) => trust<KeepAwakeStatus>(r)),
     onKeepAwakeChanged: (cb: (status: KeepAwakeStatus) => void): (() => void) =>
       on(CHANNEL.keepAwake, cb),
+
+    updateStatus: (): Promise<AppUpdateStatus> =>
+      unwrap(b.update.Status()).then((r) => trust<AppUpdateStatus>(r)),
+    updateInstall: (): Promise<void> => unwrap(b.update.InstallUpdate()),
+    updateCancelInstall: (): Promise<void> => unwrap(b.update.CancelInstall()),
   };
 }

@@ -4,6 +4,7 @@
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
+import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { runCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, provide } from 'vue';
@@ -15,6 +16,7 @@ import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { usePaletteStore } from './shortcuts/state';
+import { useAppUpdateStore } from './state/appUpdate';
 import { useConnectionDialogStore } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
 import { useFakeDataStore } from './state/fakeData';
@@ -36,6 +38,7 @@ import WorkbenchShell from './workbench/WorkbenchShell.vue';
 provide(workbenchHostKey, createWorkbenchHost());
 
 const engineStore = useEngineStore();
+const appUpdateStore = useAppUpdateStore();
 const paletteStore = usePaletteStore();
 const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
@@ -109,6 +112,7 @@ onUnmounted(() => {
     <GenerateDataDialog v-if="fakeDataStore.open" />
     <DbMcpApprovalDialog />
     <ConfirmDialog />
+    <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />
     <CommandPalette />
   </TooltipProvider>

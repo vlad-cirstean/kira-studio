@@ -9,6 +9,7 @@ import * as LinkService from '@bindings/linkservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
+import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type { HeadState } from '@kira/git-ipc';
 import type {
@@ -34,14 +35,14 @@ import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
-// to the 10 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
+// to the 13 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
 // LinkService added alongside this file — P100 Part 2 found repo/git/hostHandlers.ts's
 // link.openExternal handler had no Go counterpart here; see internal/bridge/link.go). No
 // apiControl.ts equivalent: this app has exactly one bound-call surface, not two composed halves.
-// P103 Part 2 (§5.6): 20 of that surface's own methods — the ones byte-for-byte identical with
-// Kira Studio's own studioControl — now come from createCoreControl.ts, shared with Kira Studio's
-// own copy of this file; this app's own 24 remaining methods are defined right here. P116 H5 moved
-// ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
+// P103 Part 2 (§5.6): a growing subset of that surface's own methods — the ones byte-for-byte
+// identical with Kira Studio's own studioControl — now come from createCoreControl.ts, shared with
+// Kira Studio's own copy of this file; this app's own remaining methods are defined right here.
+// P116 H5 moved ten more (open-settings/toggle-project-panel/tab-next/prev/close, keep-awake, app-metrics,
 // windowsOpenNew) into that same shared factory once this app grew its own window-chrome parity
 // (G1-G5/G7) — this app now has its own metrics ticker (main.go's own metrics.NewAppTicker) and
 // keep-awake controller, so both are wired the same way Kira Studio's own copy of this file is.
@@ -119,9 +120,9 @@ const spaceControl = {
   onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
 };
 
-// P103 Part 2 (§5.6): the 20 shared methods (createCoreControl.ts) plus this app's own 24
-// remaining ones (spaceControl, above) — every `control.xxx()` call site in the app is unchanged,
-// since neither the method names nor their bound-call FQNs moved.
+// P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus
+// this app's own remaining ones (spaceControl, above) — every `control.xxx()` call site in the app
+// is unchanged, since neither the method names nor their bound-call FQNs moved.
 export const control = {
   ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
     settings: SettingsService,
@@ -133,6 +134,7 @@ export const control = {
     link: LinkService,
     windows: WindowsService,
     keepAwake: KeepAwakeService,
+    update: UpdateService,
   }),
   ...spaceControl,
 };

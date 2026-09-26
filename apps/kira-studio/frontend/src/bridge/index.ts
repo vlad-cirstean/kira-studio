@@ -58,8 +58,8 @@ import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
 
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
-// every part of the app's own bound-call surface — the 20 methods §5.6 moved into
-// createCoreControl.ts (shared verbatim with Kira Space's own copy of this file), Studio's own 94
+// every part of the app's own bound-call surface — the methods §5.6/P119 moved into
+// createCoreControl.ts (shared verbatim with Kira Space's own copy of this file), Studio's own
 // remaining methods, defined right here, and the Api module's 40 (apiControl.ts) — and combines
 // them into the one `control` object every other file in the app imports. None of the three
 // depends on either of the others; all three ultimately depend only on rpc.ts's shared
@@ -67,8 +67,6 @@ import { apiControl } from './apiControl';
 // existing `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
 const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
-  updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
-  updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
   engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
   onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),
   onNewRequest: (cb: () => void): (() => void) => on(CHANNEL.newRequest, cb),
@@ -422,6 +420,7 @@ export const control = {
     link: LinkService,
     windows: WindowsService,
     keepAwake: KeepAwakeService,
+    update: UpdateService,
   }),
   ...apiControl,
   ...studioControl,

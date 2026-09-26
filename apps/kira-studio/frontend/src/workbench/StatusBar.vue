@@ -3,9 +3,9 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
+import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
-import { control } from '../bridge/control';
 import { useAgentSessionsStore } from '../state/agentSessions';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
@@ -16,6 +16,8 @@ import { useEngineStore } from './state/engine';
 // chrome (packages/workbench/src/components/StatusBar.vue) — this file keeps exactly the per-app
 // right-side items: update/agent-sessions/app-metrics/cache-size/engine-status. P116 H7: the
 // app-metrics item's own markup moved to AppMetricsItem.vue, shared with Kira Space's own copy.
+// P119: the update item's own markup moved to UpdateAvailableItem.vue the same way — its click now
+// opens the in-app dialog (appUpdateStore.openUpdateDialog) instead of the release page (§4.6).
 const engineStore = useEngineStore();
 const agentSessionsStore = useAgentSessionsStore();
 const appMetricsStore = useAppMetricsStore();
@@ -34,16 +36,6 @@ const cacheSizeLabel = computed(() => {
   const stats = cacheStatsStore.stats;
   return stats ? formatBytes(stats.l2Bytes) : null;
 });
-
-const updateTooltip = computed(
-  () =>
-    `Version ${appUpdateStore.latestVersion} is available. You have ${appUpdateStore.currentVersion}. ` +
-    `Opens GitHub in your browser.`,
-);
-
-function onOpenReleasePage(): void {
-  void control.updateOpenReleasePage().catch(() => {});
-}
 
 // P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — absent
 // (not a zero reading) rather than shown as "0".
@@ -82,20 +74,12 @@ const agentTooltip = computed(() =>
 <template>
   <StatusBarBase>
     <template #right>
-      <Tooltip v-if="appUpdateStore.available">
-        <TooltipTrigger as-child>
-          <button
-            type="button"
-            class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm cursor-pointer border-0 bg-none text-info hover:bg-hover hover:text-fg"
-            data-testid="update-available"
-            @click="onOpenReleasePage"
-          >
-            <CodiconIcon name="cloud-download" :size="13" />
-            Update {{ appUpdateStore.latestVersion }}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{ updateTooltip }}</TooltipContent>
-      </Tooltip>
+      <UpdateAvailableItem
+        v-if="appUpdateStore.available"
+        :latest-version="appUpdateStore.latestVersion"
+        :current-version="appUpdateStore.currentVersion"
+        @open="appUpdateStore.openUpdateDialog()"
+      />
       <Tooltip v-if="agentCount > 0">
         <TooltipTrigger as-child>
           <span class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover" data-testid="agent-sessions">
@@ -129,14 +113,5 @@ const agentTooltip = computed(() =>
         <TooltipContent>{{ engineStore.lastPingMs }} ms</TooltipContent>
       </Tooltip>
     </template>
-    <!-- P110 I2-18 (§3.5.3): `.update`'s own font: inherit + color/hover rules folded onto the
-         button above -- Preflight already sets `font: inherit` on every <button> (zeroing family/
-         size/weight to the parent's), so `text-kira-sm` is redundant with what buttons already
-         inherit and was dropped along with `text-fg`; `text-info hover:text-fg` replaces the old
-         .update/.update:hover pair. Measured getComputedStyle(button) on `[data-testid="update-
-         available"]` before/after: fontSize 12px -> 12px, fontFamily unchanged (system-ui stack),
-         color rgb(55, 148, 255) -> rgb(55, 148, 255) (text-info). Neighbouring <span> items keep
-         `text-fg text-kira-sm` untouched -- they are not buttons, so Preflight's font: inherit
-         does not reach them. -->
   </StatusBarBase>
 </template>

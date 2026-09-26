@@ -8,17 +8,22 @@ import {
 } from '@theme/components/ui/tooltip';
 import AppMetricsItem from '@workbench/components/AppMetricsItem.vue';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
+import UpdateAvailableItem from '@workbench/components/UpdateAvailableItem.vue';
 import { computed } from 'vue';
 import { useAppMetricsStore } from '../state/appMetrics';
+import { useAppUpdateStore } from '../state/appUpdate';
 import { useBlameStatusStore } from '../state/blameStatus';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
 // §5.2) beside the shared caret-status slot. Now a thin composition over the shared bar chrome
 // (packages/workbench/src/components/StatusBar.vue). P116 G7 adds the app-metrics item back —
-// AppMetricsItem.vue, shared with Kira Studio's own copy of this file.
+// AppMetricsItem.vue, shared with Kira Studio's own copy of this file. P119 adds the update item,
+// same shared component (UpdateAvailableItem.vue) and the same in-app dialog Kira Studio's own
+// copy opens.
 const blameStatusStore = useBlameStatusStore();
 const appMetricsStore = useAppMetricsStore();
+const appUpdateStore = useAppUpdateStore();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
 // is the extension's own choice; this bar hides items with nothing to say instead.
@@ -56,6 +61,12 @@ function onRevealBlameCommit(): void {
       </Tooltip>
     </template>
     <template #right>
+      <UpdateAvailableItem
+        v-if="appUpdateStore.available"
+        :latest-version="appUpdateStore.latestVersion"
+        :current-version="appUpdateStore.currentVersion"
+        @open="appUpdateStore.openUpdateDialog()"
+      />
       <AppMetricsItem :sample="appMetricsStore.sample" />
     </template>
     <!-- P110 I2-19 (§3.5.3): `.blame`'s font: inherit + color/disabled rules, and `.blame-text`'s

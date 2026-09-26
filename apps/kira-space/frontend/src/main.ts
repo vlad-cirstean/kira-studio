@@ -4,6 +4,7 @@ import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { useAppMetricsStore } from './state/appMetrics';
+import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
 import { useKeepAwakeStore } from './state/keepAwake';
@@ -21,10 +22,11 @@ import '@workbench/workbench.css';
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
 // specific: grid/documents/keyvalue/stream/console page stores, none of which exist here) and no
-// appUpdate/agentHooks/agentSessions/ops/dbMcp/customScripts stores (none of those subsystems exist
-// in this app — apps/kira-space/main.go's own Services list has no counterpart for any of them).
+// agentHooks/agentSessions/ops/dbMcp/customScripts stores (none of those subsystems exist in this
+// app — apps/kira-space/main.go's own Services list has no counterpart for any of them).
 // P116 G5/G7 add appMetrics/keepAwake back — this app now has its own metrics ticker and
-// keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New).
+// keep-awake toggle (main.go's own metrics.NewAppTicker/keepawake.New). P119 adds appUpdate back
+// too — this app now has its own update checker/installer.
 async function mountShell(): Promise<void> {
   // Every store used here runs before app.use(pinia) below, so each needs the module-level
   // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
@@ -88,6 +90,9 @@ async function mountShell(): Promise<void> {
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
   app.mount('#app');
+  // Off the boot critical path — Kira Studio's own main.ts precedent (an update check gains
+  // nothing from blocking first paint, and Go's own cache floor decides what actually fetches).
+  useAppUpdateStore().initAppUpdate();
 }
 
 // F2: mountShell's own essential hydrates (layout/settings/codeRepos/tabs) can still reject — a DB

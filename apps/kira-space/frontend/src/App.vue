@@ -4,9 +4,11 @@
 import { TooltipProvider } from '@theme/components/ui/tooltip';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
+import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { onMounted, onUnmounted, provide } from 'vue';
 import { control } from './bridge/control';
+import { useAppUpdateStore } from './state/appUpdate';
 import { useLayoutStore } from './state/layout';
 import { useSettingsStore } from './state/settings';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
@@ -31,6 +33,7 @@ provide(workbenchHostKey, createWorkbenchHost());
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const tabsStore = useTabsStore();
+const appUpdateStore = useAppUpdateStore();
 
 let unsubscribe: Array<() => void> = [];
 
@@ -61,6 +64,7 @@ onUnmounted(() => {
     <GitPairingDialog />
     <GitCredentialDialog />
     <ConfirmDialog />
+    <UpdateDialog v-if="appUpdateStore.dialogOpen" :store="appUpdateStore" />
     <ContextMenu />
   </TooltipProvider>
 </template>
