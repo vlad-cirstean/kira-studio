@@ -1204,8 +1204,64 @@ tab's mode is derived, never stored, the same shape the "page kind, never databa
 above already uses. `state/mode.ts`'s `useModeStore` is a plain selection (`setMode`); `activateTab`/
 `closeTab`/`closeOthers`/`closeToTheRight`/`closeAll`/`stepTab` are all scoped to the current
 workspace's own slice of the one shared `tabs` array. Switching mode touches no `TabRecord`,
-schedules no save, issues no IPC — the two modes cannot drift, cannot double-persist into each
-other, and (per-window `tabs.window_key` scoping, unaffected) cannot leak tabs across a window.
+schedules no save — it does eventually reach Go, debounced, for one different reason: which mode a
+window was last in, so it reopens into the same one (below).
+
+**The mode store, and its per-window persistence, are shared factories now (P128 §2.3/§2.6),
+not a Kira Studio-only mechanism.** `packages/workbench/src/state/createModeStore.ts`'s
+`createModeStore<M extends string, E>(control, defaultMode, extend)` is the whole of `useModeStore`
+for both apps: `state`, `hydrateMode` (boot-time set, no write-back), `setMode` (the user-facing
+selection, which schedules a write), and the debounced-then-flushed persistence below — Kira
+Studio's own copy passes `activeTab` through `extend`; Kira Space's (new as of P128 — this app had
+no mode dimension of its own before it) passes none. **A mode click is never a synchronous write
+(P22 D12/F20's own invariant, restated for the shared store):** `setMode` debounces
+`windowsSetMode` 150 ms (`useDebounceFn`, `MODE_WRITE_DEBOUNCE_MS`), and a window closing inside
+that window flushes it immediately instead of losing it — `control.onFlushBeforeClose`/
+`onWindowFlushBeforeClose`, the same native "about to close/quit" signals Go already blocks the
+close on. Persistence itself is `internal/appstorage.WindowModes{Default, Valid}` (P128 §2.2,
+replacing Kira Studio's own `validWindowModes`/`NormalizeMode`), one per app: Kira Studio's is
+`{studio, api, terminal}`, Kira Space's is `{git, terminal, ade}` — an unrecognised or missing
+stored value normalizes to `Default` (`git` for Kira Space; a stored `git`-mode window from before
+P100 degrades to `studio` on Kira Studio's own side, unchanged). The bound surface itself
+(`Ensure`/`SetMode`) is `internal/windowsvc.Service`, one package both apps' `WindowsService`
+embed (P128 §2.2, mirroring the terminal surface's own embedding below) rather than two
+hand-kept-identical implementations — Kira Space gained `Ensure`/`SetMode` for the first time
+here; it never had a `WindowsService` bound method beyond `OpenNew` before.
+
+**A module's own registry entry, not a per-shell branch, is what mounts its panel/start/"+"
+(P128 §2.3).** `packages/workbench/src/modes.ts`'s `ModeDef{label, icon, panel, start, newTab?}`/
+`ModeRegistry<M>` replaces every `modeStore.active === '<id>'` conditional in both apps'
+`WorkbenchShell.vue`: the shell reads `MODES[modeStore.active]` for its left panel and its
+`MainView` empty-state fallback, and `MODES[modeStore.active].newTab` (when set) for the tab
+strip's own "+" — a module with nothing to open (Kira Studio's own `studio`/`api`; Kira Space's own
+`ade` placeholder, below) simply leaves that slot empty. `packages/workbench/src/components/
+ModeSwitcher.vue` (generic over `M`) is the title-bar switcher itself, byte-identical markup to
+Kira Studio's pre-P128 inline one; Kira Space's own `TitleBar.vue` renders it for the first time.
+
+**The Terminal entry in both apps' `MODES` points at one shared module (P128 §2.4), not two
+hand-kept-identical copies.** `packages/workbench/src/terminal/module.ts` exports
+`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts?}`, the `terminalModuleKey`
+injection key, and `useTerminalModule()`/`useNewTerminal()`; each app's own `App.vue` builds one
+context object (its own `workbench/terminalModule.ts`) and `provide()`s it once, at the root, above
+`WorkbenchShell.vue`. `scripts` is the one field that differs by app: Kira Studio wires its own
+custom-scripts store through it (P91's "Quick commands" launch a saved script as a fresh terminal
+tab); Kira Space omits the field entirely — no custom-scripts store exists there, and
+`TerminalStart.vue`'s own quick-commands panel stays unrendered when `scripts` is absent, rather
+than each app needing its own copy of that conditional. `TerminalPanel.vue`, `TerminalStart.vue`,
+and `TerminalNewTab.vue` (the module's own registry entries) and `TerminalTabView.vue`/
+`TerminalHostView.vue` (the tab body, shared with repo terminals below) are the same five files in
+both apps, imported lazily (`defineAsyncComponent`) so a git-only session never pays for the
+terminal launch chunk.
+
+**Kira Space's own repo terminals and the Terminal module's own terminals now render through that
+same `TerminalTabView.vue`/`TerminalHostView.vue`, not two parallel implementations (P128 §2.4).**
+Before P128, `views/repo/RepoTerminalView.vue` was a second, hand-kept-identical copy of the tab
+body for a repo-scoped terminal; P128 deleted it. What now distinguishes a repo terminal from a
+Terminal-module one is only the `workspaceId`/`codeRepoId` the opener stamps onto the tab record
+when it creates it — `openRepoTerminalTab` (repo-scoped) versus the Terminal module's own
+`openTerminalTab` (workspace-scoped, `visibleWorkspace()`'s own id) — `TerminalTabView.vue`/
+`TerminalHostView.vue` themselves read neither field; `tab` is typed against `TerminalHostView`'s
+own prop shape, not either app's own tab-record type.
 
 **C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" in the Git
 module section) — `packages/shared/domain/tabs.ts`'s `TabScope = AppMode | 'repo'` is each
@@ -2239,8 +2295,19 @@ the only bound service the headless git module had, since everything else it did
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
 along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `main.go` binds a separate **10**
-(`grep -c application.NewService apps/kira-space/main.go`) for its own module.
+own service-list check, below. Kira Space's own `main.go` binds a separate **13**
+(`grep -c application.NewService apps/kira-space/main.go`; this count already included P116/P119's
+own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it) for
+its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
+Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
+`internal/windowsvc.Service` (`Ensure`/`SetMode`/`OpenNew`) and `internal/terminal.BoundService`
+(`Open`/`Write`/`Resize`/`Close`/`DefaultCwd`) each live once at repo root; both apps'
+`bridge.{Windows,Terminal}Service` are a one-line `struct{ *windowsvc.Service }`/
+`struct{ *terminal.BoundService }` around it, so Wails' own FQN (`app.method`, derived from the
+*embedding* type's own package) still reads `WindowsService.Ensure`/`TerminalService.Open` in each
+app's bindings — never the shared package's name — with no binding-name shim needed. Kira Space's
+own `WindowsService` gained `Ensure`/`SetMode` this way (P128 §2.2) — it bound only `OpenNew`
+before.
 `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
@@ -2436,17 +2503,30 @@ module — every `internal/git*` Go package (plus `internal/ghclient`/`internal/
 VS Code extension, and `packages/git-ui`/`packages/git-core`/`packages/git-ipc`/`packages/kira-ui`'s
 consumers — moved out of `apps/kira-studio` into `apps/kira-space`, a **separate, standalone macOS
 app** with its own binary, its own `~/.kira-space/` home (`KIRA_SPACE_HOME`), its own `kira.db` and
-`review.db`, and its own `git.sock`. Kira Space has **no `studio`/`api` sibling modules of its
-own** — its `WorkbenchShell.vue` says so directly ("this app has exactly one module"), so every
-"beside `studio` and `api`"/"peer `AppMode`"/"title bar reads `Studio | Api | Git`" claim below
-describes Kira Studio's history through P99, not Kira Space's present structure: **Kira Space's own
-window doesn't have a title-bar mode switcher at all — the repo workspace this section describes
-*is* the whole app**, mounted directly rather than living behind a `'git'` `AppMode` inside a
-bigger shell. Every "Kira Studio" below that means *this app, the one whose window hosts the git
-UI* now means Kira Space; every "Kira Studio" that means *the DB/API client, a different app
-entirely* (the Settings dialog's *Connected editors* pane and *Git* section, the trust authority,
-the pairing approval prompt) also now means Kira Space, for the same reason — Kira Studio itself
-holds none of this any more, confirmed by the phase-closing audit's own grep, below. **P116 gave
+`review.db`, and its own `git.sock`. Kira Space has **no `studio`/`api` sibling modules of Kira
+Studio's own kind** — every "beside `studio` and `api`"/"peer `AppMode`"/"title bar reads
+`Studio | Api | Git`" claim below describes Kira Studio's history through P99, not Kira Space's
+present structure. From P100 through P127, Kira Space's own window had no title-bar mode switcher
+at all — the repo workspace this section describes *was* the whole app, mounted directly rather
+than living behind a `'git'` `AppMode` inside a bigger shell; **P128 gave it a module system of its
+own instead (§2.6-§2.8 below), not Kira Studio's `studio`/`api`/`terminal` vocabulary reused, but
+its own: `git` (this section, unchanged — still the whole of what P100-P127 built, just no longer
+the *only* thing mounted), `terminal` (the same shared Terminal module Kira Studio's own copy uses,
+§2.4 below), and `ade` (a placeholder, §2.7, reserving a slot for a later chapter's real agent
+surface). `state/workspace.ts`'s `visibleWorkspace()` is the one function that reads across both
+the mode store and the (git-only, unchanged) workspace store: the active repo (or no repo) while
+`git` is active, the active module's own id otherwise — `host.ts`'s `activeWorkspace` and
+`state/tabs.ts`'s tab-stepping actions read it instead of the workspace store directly, so a
+Terminal-module tab or the `ade` placeholder never shows behind, or is confused for, a repo's own
+tab strip. Opening a repository (`openRepoWorkspace`) forces the mode back to `git`, so opening one
+from any path always shows it; the boot-time fall-forward onto the first restored repo
+(`main.ts`) does not, so a relaunch into a persisted `terminal`/`ade` mode stays there even with
+repositories open behind it.** Every "Kira Studio" below that means *this app, the one whose window
+hosts the git UI* now means Kira Space; every "Kira Studio" that means *the DB/API client, a
+different app entirely* (the Settings dialog's *Connected editors* pane and *Git* section, the
+trust authority, the pairing approval prompt) also now means Kira Space, for the same reason — Kira
+Studio itself holds none of this any more, confirmed by the phase-closing audit's own grep, below.
+**P116 gave
 Kira Space the rest of Kira Studio's own generic window chrome**: a native menu (Settings…, View ›
 Toggle Project Panel, Window › Next/Previous/Close Tab plus New Window, dev-only Reload/Open
 DevTools), a keep-awake toggle and New window button in the title bar, and a CPU/memory item in the
@@ -2492,10 +2572,11 @@ property the old per-repo tabs gave for free. `moduleOfWorkspace(key)`
 workspace can occur in this app again), and `internal/storage/model/window.go`'s
 `validWindowModes` dropped `"git"` as a legal value — a stored `git`-mode window degrades to
 `"studio"` through the same `NormalizeMode` fallback that already covered any unrecognised value,
-so no migration was needed. **Kira Space itself never had this peer-`AppMode` design at all**: it
-was built directly as a single-module app (per the note above), so P67b's whole mechanism is purely
+so no migration was needed. **Kira Space itself never had this peer-`AppMode` design**: it was
+built directly as a single-module app through P127, so P67b's whole mechanism is purely
 historical — a fact about how this feature evolved inside Kira Studio before it moved, not a
-description of Kira Space's own frontend.
+description of Kira Space's own frontend, then or since P128's own (differently-shaped, §2.6 above)
+module system.
 
 ### Transport
 
@@ -2871,8 +2952,9 @@ diff tabs, search) inside what was then Kira Studio's own Wails window, as one `
 Go's `internal/codeworkspace` (now `apps/kira-space/internal/codeworkspace`; its path-containment
 check stayed repo-root `internal/pathsafe`, never moved into it), plus the frontend's
 `views/repo/*`/`repo/*` trees — into Kira Space, a separate standalone app with no `studio`/`api`
-sibling modules of its own (Kira Space's `WorkbenchShell.vue`: "this app has exactly one module").
-The port kept the identical relative paths (`views/repo/RepoFileView.vue` is the same path under
+sibling modules of Kira Studio's own kind (P128 later gave it its own `git`/`terminal`/`ade`
+module system instead — "Git module" section above, §2.6). The port kept the identical relative
+paths (`views/repo/RepoFileView.vue` is the same path under
 `apps/kira-space/frontend/src` it was under `apps/kira-studio/frontend/src`), so every claim below
 about *what* this feature does and *how* it is built stays accurate; only the *hosting app* changed.
 Kira Studio itself has none of this any more — no repo import, no project tree, no diff tabs, no
