@@ -46,21 +46,12 @@ const (
 	// (the RunOp closure calling grpcclient.ServerStream), not a startup-wired long-lived source,
 	// so it needs no Sources entry and no Attach subscription.
 	ChannelGrpcCall = "kira:grpc:call"
-	// ChannelGitPairing and ChannelGitClientsChanged (G1's own two push channels, SPEC §3.3, D19 —
-	// the pairing prompt's live queue snapshot, and the Connected editors pane's list) moved with
-	// the rest of the git module's bridge wiring to apps/kira-space in P100 Part 1; this app emits
-	// neither any more.
-	// ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
-	// groups, delivered with EmitTo (one window only) exactly the shape ChannelGrpcCall (P11 D8)
-	// established: flush on 60ms/256 matches/the terminal event, one producer (StartSearch's own
-	// goroutine), no Sources entry.
-	ChannelCodeSearch = appevent.ChannelCodeSearch
 	// ChannelDbMcpApproval is M2 §7.1's own push channel — the prompt-mode approval queue's live
-	// snapshot, ChannelGitPairing's own shape applied to run_query's approval broker.
+	// snapshot: one FIFO of pending approvals, one presented at a time, each with its own timeout.
 	ChannelDbMcpApproval = "kira:dbmcp:approval"
 	// ChannelTerminal is P83's own push channel — one terminal's output and its exit, EmitTo'd to
-	// the one window that opened it, exactly like ChannelCodeSearch above (internal/bridge/
-	// terminal.go's own coalescer).
+	// the one window that opened it, flushed on the same 60ms/256-batch/terminal-event shape as
+	// ChannelGrpcCall above (internal/bridge/terminal.go's own coalescer).
 	ChannelTerminal = appevent.ChannelTerminal
 	// ChannelCustomScriptsChanged is P85's own list-changed broadcast — CustomScriptsService's own
 	// Create/Update/Remove Emit (not EmitTo) the full list, ChannelConnectionsChanged's own shape,
