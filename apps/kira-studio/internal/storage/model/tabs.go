@@ -19,9 +19,9 @@ type TabRecord struct {
 	State        json.RawMessage `json:"state"`
 	Order        int             `json:"order"`
 	Active       bool            `json:"active"`
-	// WorkspaceID is C5 §3.1/§4.2's own tab-isolation dimension: nil for every studio/api tab
+	// WorkspaceID is C5 §3.1/§4.2's own tab-isolation dimension: nil for studio/api tabs
 	// (workspaceKeyOf's own `??` fallback then derives the workspace from Kind, exactly as
-	// today), "repo:<code_repos.id>" for a tab scoped to that repository's own workspace.
+	// today), "terminal" for a terminal tab.
 	WorkspaceID *string `json:"workspaceId"`
 }
 
@@ -49,11 +49,6 @@ var RenderableTabKinds = map[string]bool{
 	// (go-ts-vocabulary-parity.spec.ts) demands a vocabulary complete regardless of what currently
 	// reaches it.
 	"terminal": true,
-	// P103 Part 2 (§5.1): repo-graph/repo-file/repo-diff/repo-multi-diff removed — P100 Part 2
-	// moved the whole repo workspace to Kira Space, so this app can no longer produce a tab of any
-	// of those four kinds. A pre-P100 row of one of them still in a user's `tabs` table now drops
-	// with a `warn` on restore (repos/tabs.go), which is this file's own documented posture for any
-	// unrecognised kind — no migration needed.
 }
 
 // IsRenderableTabKind reports whether kind is one of the renderable tab kinds.
@@ -71,10 +66,8 @@ func IsJSONObject(raw []byte) bool {
 // renderable, state is a JSON object), plus the non-empty identity fields no SQL constraint
 // covers (P2 R2: Save previously wrote records unvalidated, so a bad row round-tripped silently —
 // it persisted, then vanished on the next List() with nothing at the write site to say why).
-// WorkspaceID is required only for "terminal" (P103 Part 2: the other repo-* kinds that used to
-// share this requirement are gone; every remaining kind but terminal derives its workspace from
-// TAB_KIND_MODE instead) — Kira Space's own TabRecord.Validate requires it for every kind
-// (P107 I2-30).
+// WorkspaceID is required only for "terminal" — every other kind derives its workspace from
+// TAB_KIND_MODE instead.
 func (t TabRecord) Validate() error {
 	return appstorage.ValidateTab(appstorage.TabFields{
 		ID: t.ID, Path: t.Path, Kind: t.Kind, State: t.State, WorkspaceID: t.WorkspaceID,

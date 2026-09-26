@@ -1,10 +1,9 @@
 // Package mcpauth mints, persists and verifies the DB MCP server's static bearer token
-// (docs/v1.7/plans/M1-db-mcp-server-core.md §2). Same crypto shape as internal/gitsock's own
-// git_clients trust store (32 crypto/rand bytes, base64url on the wire, sha256(salt‖token) at
-// rest) but one token per server instance, persisted as one small JSON file rather than a database
-// table: the caller supplies the file's own identifying name (the DB server's fixed name), so this
-// package stays storage-shape-agnostic and importable from both internal/dbmcp (verify) and
-// internal/bridge (mint) with no shared database dependency.
+// (docs/v1.7/plans/M1-db-mcp-server-core.md §2). 32 crypto/rand bytes, base64url on the wire,
+// sha256(salt‖token) at rest, one token per server instance, persisted as one small JSON file
+// rather than a database table: the caller supplies the file's own identifying name (the DB
+// server's fixed name), so this package stays storage-shape-agnostic and importable from both
+// internal/dbmcp (verify) and internal/bridge (mint) with no shared database dependency.
 //
 // Every token now carries a 7-day expiry (TTL), rotated by remint — never mid-flight, only at a
 // moment a human can read the fresh plaintext (server start, or an explicit Regenerate). See
@@ -41,8 +40,7 @@ type Record struct {
 
 // MintTTL returns a fresh token in both forms D8 needs: plain (rendered into the registration
 // command exactly once) and the Record (what gets persisted), with ExpiresAt set to now+ttl. A
-// short read or any crypto/rand error is a hard failure — never a weaker token, mirroring
-// gitsock's own mintToken (internal/tokenauth, P107 I2-29).
+// short read or any crypto/rand error is a hard failure — never a weaker token.
 func MintTTL(ttl time.Duration) (plain string, rec Record, err error) {
 	plain, hash, salt, err := tokenauth.Mint()
 	if err != nil {

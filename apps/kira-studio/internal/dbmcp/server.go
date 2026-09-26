@@ -102,10 +102,9 @@ type Config struct {
 	MaskRules MaskRules
 	// ExplainThreshold is the expensive-query row threshold (advanced.expensiveQueryRows) — read
 	// fresh on every call, never cached: a stale threshold silently mis-flags every query after the
-	// user changes it. A plain func rather than an interface, gitsession.Registry.Settings's own
-	// seam, so this package keeps its existing backends and adds no new service dependency.
-	// Required — a silently-defaulted threshold would make every heavy-query verdict wrong in a
-	// way nothing surfaces.
+	// user changes it. A plain func rather than an interface, so this package keeps its existing
+	// backends and adds no new service dependency. Required — a silently-defaulted threshold would
+	// make every heavy-query verdict wrong in a way nothing surfaces.
 	ExplainThreshold func() int
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
 	Logger *slog.Logger

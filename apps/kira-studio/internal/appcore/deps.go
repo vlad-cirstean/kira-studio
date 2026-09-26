@@ -41,9 +41,6 @@ type Deps struct {
 	Tree        *tree.Service
 	Router      *adapterhost.Router // PushCacheConfig's Go-side half (bridge/settings.go); A17
 	Events      Emitter
-	// GitRegistry (internal/gitsession's own Registry) moved with the rest of the git module to
-	// apps/kira-space in P100 Part 1 — see bridge/settings.go's own comment on the
-	// ReconcileAutoFetch side effect this field used to feed.
 	// ApiVars (P12 D3: renamed from HttpVars — it resolves gRPC targets too) is P5 D19 — the
 	// gated variable/history reveal and stage 2 of the two-stage {{name}} substitution
 	// (bridge/http.go's Send calls ResolveRequest directly; every other VariablesService method

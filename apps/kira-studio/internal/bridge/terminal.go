@@ -11,10 +11,8 @@ import (
 )
 
 // TerminalService is P83 §3.2's own bound surface over internal/terminal — a Wails service plus
-// ChannelTerminal's push channel, deliberately not on the git contract (§3.1: gitsock hands its
-// router to an externally paired client with no allowlist wrapper, and a PTY handler is exactly
-// the risk gitstream.go already refuses worktree.prepare for). Reachable only from this process's
-// own webview.
+// ChannelTerminal's push channel. Reachable only from this process's own webview: a PTY handler is
+// never exposed to an externally paired client.
 type TerminalService struct {
 	Emit     appcore.Emitter
 	Registry *terminal.Registry
@@ -31,8 +29,7 @@ func (s *TerminalService) svc() *terminal.Service {
 	return &terminal.Service{Emit: s.Emit, Registry: s.Registry}
 }
 
-// Shutdown closes every live session — app teardown (main.go's teardown, beside
-// codeWorkspaceSvc.Shutdown()).
+// Shutdown closes every live session — called from main.go's own teardown.
 func (s *TerminalService) Shutdown() {
 	s.Registry.CloseAll()
 }
@@ -85,10 +82,9 @@ type TerminalDefaultCwdResult struct {
 	Path string `json:"path"`
 }
 
-// DefaultCwd is P91 §7's own read-only, argument-free call — the user's home directory, for the
-// Terminal module's unscoped launches (a repo-scoped terminal keeps using internal/gitsession's
-// own worktree-cwd resolution, untouched by this phase). Read-only, no arguments: nothing
-// renderer-controlled reaches the OS here.
+// DefaultCwd is P91 §7's own read-only, argument-free call — the user's home directory, every
+// terminal's own launch cwd. Read-only, no arguments: nothing renderer-controlled reaches the OS
+// here.
 func (s *TerminalService) DefaultCwd() TerminalDefaultCwdResult {
 	return TerminalDefaultCwdResult{Path: terminal.DefaultCwd()}
 }

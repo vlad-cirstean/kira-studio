@@ -31,7 +31,7 @@ type Repos struct {
 	// MaskRules is M5's rule store (connection_mask_rules) — needs no cipher, unlike MaskKeys just
 	// below, so it belongs in this aggregate the same as every other cipher-free repo.
 	MaskRules *MaskRulesRepo
-	// CustomScripts is P85's own launch-target store (custom_scripts) — CodeRepos's own shape.
+	// CustomScripts is P85's own launch-target store (custom_scripts).
 	CustomScripts *CustomScriptsRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.

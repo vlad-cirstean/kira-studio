@@ -26,9 +26,8 @@ type WindowRecord struct {
 // P91 §3: 'terminal' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint,
 // no migration needed), so an older binary reading an unrecognised mode still degrades cleanly
 // through NormalizeMode below; without an entry here, a window closed in the Terminal module
-// would silently reopen in Studio. P100 Part 1: 'git' (P67b §4.2) dropped with the rest of the
-// git module — a stored 'git' row now degrades to DefaultWindowMode the same way, no migration
-// needed for the same reason.
+// would silently reopen in Studio. A mode value stored by a since-removed module degrades to
+// DefaultWindowMode the same way, no migration needed for the same reason.
 var validWindowModes = map[string]bool{"studio": true, "api": true, "terminal": true}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this

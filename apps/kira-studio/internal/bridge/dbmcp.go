@@ -23,8 +23,8 @@ const dbMcpServerName = "kira-db"
 // by.
 const dbMcpTokenName = "mcp-db"
 
-// McpInstaller is mcpinstall.Installer's own seam, declared where it is consumed — the same
-// "declare the interface where it's consumed" precedent GitVsix (gitclients.go) already uses.
+// McpInstaller is mcpinstall.Installer's own seam, declared where it is consumed rather than where
+// it is implemented — the caller states only the methods it actually calls.
 type McpInstaller interface {
 	Status() mcpinstall.Status
 	Install(ctx context.Context, name, url, token string) mcpinstall.Result
@@ -307,9 +307,8 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 	return s.embedded.statusLocked()
 }
 
-// DbMcpInstallResult is mcpinstall.Result's wire projection — GitVsixInstallResult's own precedent
-// (gitclients.go): a domain package's plain Go struct never crosses the wire directly, only this
-// tagged copy of it.
+// DbMcpInstallResult is mcpinstall.Result's wire projection — a domain package's plain Go struct
+// never crosses the wire directly, only this tagged copy of it.
 type DbMcpInstallResult struct {
 	Outcome string   `json:"outcome"`
 	Detail  string   `json:"detail"`
@@ -321,8 +320,8 @@ func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
 }
 
 // InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
-// connections.Service.Reveal/gitvsix.Installer.Install's precedent. A no-op result (outcome
-// notFound) when nothing is running: there is nothing to register yet.
+// connections.Service.Reveal's own precedent. A no-op result (outcome notFound) when nothing is
+// running: there is nothing to register yet.
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
 	s.embedded.mu.Lock()
 	defer s.embedded.mu.Unlock()
@@ -382,7 +381,7 @@ func toWireApprovalPlan(p *dbmcp.ApprovalPlan) *DbMcpApprovalPlan {
 }
 
 // DbMcpApprovalRequest is dbmcp.ApprovalRequest's wire projection — an absolute deadline (epoch
-// ms) instead of a time.Time, GitPairingRequest's own precedent.
+// ms) instead of a time.Time, so a client-side countdown never drifts from the server's own clock.
 type DbMcpApprovalRequest struct {
 	RequestID      string `json:"requestId"`
 	ConnectionID   string `json:"connectionId"`
@@ -421,8 +420,8 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 	return out
 }
 
-// PendingApprovals is the snapshot a newly opened window fetches on mount — state/gitClients.ts's
-// own boot-time hydration, applied to the approval queue.
+// PendingApprovals is the snapshot a newly opened window fetches on mount, the same boot-time
+// hydration this app's other push-backed state applies to the approval queue.
 func (s *DbMcpService) PendingApprovals() DbMcpApprovalSnapshot {
 	return toWireApprovalSnapshot(s.Approvals.Pending())
 }
@@ -432,10 +431,9 @@ type DbMcpApprovalArgs struct {
 	RequestID string `json:"requestId"`
 }
 
-// ApproveQuery and DenyQuery never return a Go error — a decision is a value (Kira Space's own
-// GitClientsService.Approve/Deny set this precedent first) — and return the current snapshot
-// rather than an action-result enum, so the clicking window updates immediately instead of
-// waiting for its own broadcast to arrive.
+// ApproveQuery and DenyQuery never return a Go error — a decision is a value — and return the
+// current snapshot rather than an action-result enum, so the clicking window updates immediately
+// instead of waiting for its own broadcast to arrive.
 func (s *DbMcpService) ApproveQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
 	if args.RequestID == "" {
 		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")

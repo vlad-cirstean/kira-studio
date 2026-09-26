@@ -73,8 +73,8 @@ func New(opts Options) (*Server, error) {
 		return nil, errors.New("curl not found; hooks cannot report")
 	}
 
-	// localsock.Listen is gitaskpass.New's own identical precedent (D8's security boundary): no
-	// other OS user can read the shim, the token or reach the socket (P107 T2-9).
+	// localsock.Listen is D8's own security boundary: no other OS user can read the shim, the
+	// token or reach the socket (P107 T2-9).
 	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-agent-", TokenBytes: 32})
 	if err != nil {
 		return nil, fmt.Errorf("agenthooks: %w", err)

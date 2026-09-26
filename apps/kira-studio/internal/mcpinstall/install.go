@@ -1,10 +1,8 @@
 // Package mcpinstall registers the DB MCP server's embedded instance with Claude Code's own CLI
 // (docs/v1.7/plans/M1-db-mcp-server-core.md) — the one client this app installs for. Every real
 // spawn Install makes is argv-only, never a shell, never writes another program's config file
-// directly — the same discipline internal/gitvsix already applies to its own `code` spawn, though
-// the two packages share no code (unrelated problems, no probe order worth factoring out). Command
-// is the one exception: it renders shell syntax (`;`, redirection) purely as copy-paste TEXT for
-// the pane's fallback UI, never executed by this package itself.
+// directly. Command is the one exception: it renders shell syntax (`;`, redirection) purely as
+// copy-paste TEXT for the pane's fallback UI, never executed by this package itself.
 package mcpinstall
 
 import (
@@ -26,9 +24,8 @@ import (
 const spawnTimeout = 30 * time.Second
 
 // Deps are the three independent seams this package needs: finding `claude`, checking a candidate
-// exists, and spawning one. Function fields rather than an interface — gitvsix.Deps' own
-// precedent — so a test can inject each independently. A zero-value field falls back to the real
-// OS implementation (New).
+// exists, and spawning one. Function fields rather than an interface, so a test can inject each
+// independently. A zero-value field falls back to the real OS implementation (New).
 type Deps struct {
 	LookPath func(string) (string, error)
 	Stat     func(string) (os.FileInfo, error)
@@ -45,7 +42,7 @@ type Installer struct {
 }
 
 // New constructs an Installer over d, substituting the real OS implementation for any zero-value
-// field (gitclient.NewRunner/gitvsix.New's own shared shape).
+// field.
 func New(d Deps) *Installer {
 	i := &Installer{lookPath: d.LookPath, stat: d.Stat, run: d.Run}
 	if i.lookPath == nil {
@@ -65,14 +62,14 @@ func New(d Deps) *Installer {
 type Status struct {
 	// ClaudePath is "" when `claude` was not found at any probed location.
 	ClaudePath string
-	// Probed lists every path considered, in probe order — always populated (gitvsix.Status's own
-	// reasoning: a miss can be explained, not just reported).
+	// Probed lists every path considered, in probe order — always populated, so a miss can be
+	// explained, not just reported.
 	Probed []string
 }
 
 // Result is Install's own outcome — see the Outcome* constants below. Install never returns a Go
-// error (connections.Service.Reveal / gitvsix.Installer.Install's precedent): a registration
-// attempt is a value the pane renders, not a failure the caller must handle specially.
+// error (connections.Service.Reveal's own precedent): a registration attempt is a value the pane
+// renders, not a failure the caller must handle specially.
 type Result struct {
 	Outcome string
 	// Detail is a bounded, single-line reason on installFailed — never the token, never a child's
@@ -94,8 +91,7 @@ const (
 
 // claudeCandidates is §7.2's own probe order after the PATH step (locateClaude runs LookPath
 // first): the well-known absolute paths a Finder-launched app's launchd-inherited PATH
-// (/usr/bin:/bin:/usr/sbin:/sbin) never includes — the same launchd-PATH problem gitvsix already
-// documented for `code`.
+// (/usr/bin:/bin:/usr/sbin:/sbin) never includes.
 func claudeCandidates() []string {
 	candidates := []string{"/usr/local/bin/claude", "/opt/homebrew/bin/claude"}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
@@ -107,8 +103,8 @@ func claudeCandidates() []string {
 	return candidates
 }
 
-// locateClaude mirrors gitvsix's own darwinLocator shape: PATH first, then every absolute
-// candidate in order, every path considered recorded in probed regardless of outcome.
+// locateClaude checks PATH first, then every absolute candidate in order, every path considered
+// recorded in probed regardless of outcome.
 func (i *Installer) locateClaude() (path string, probed []string, found bool) {
 	return toolexec.Locate(i.lookPath, i.stat, "claude", claudeCandidates())
 }

@@ -60,9 +60,9 @@ func buildHooksDocument(quotedShimCommand string) ([]byte, error) {
 // ShellSingleQuote wraps s in single quotes for a POSIX shell argument — the command value
 // hooks.json stores (Claude Code runs it through a shell) and the `--settings` flag's own value
 // (internal/bridge/terminal.go's `$SHELL -l -i -c` composition). Refuses — a hard error, not a
-// best-effort escape — a string containing a single quote or a newline, exactly as
-// gitaskpass.buildShim refuses an unquotable argv element. A mkdtemp-derived path never contains
-// either; the check exists so a future change here cannot silently produce a broken command.
+// best-effort escape — a string containing a single quote or a newline: an unquotable argv
+// element. A mkdtemp-derived path never contains either; the check exists so a future change here
+// cannot silently produce a broken command.
 func ShellSingleQuote(s string) (string, error) {
 	if strings.ContainsAny(s, "'\n") {
 		return "", fmt.Errorf("agenthooks: path cannot be safely single-quoted: %q", s)

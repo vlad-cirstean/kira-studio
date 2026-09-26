@@ -11,18 +11,15 @@ import (
 	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
-// ApprovalTimeout is the app's own existing prompt bound (gitsock's pairingTimeout,
-// gitaskpass.DefaultTimeout), twice over — a prompt-mode query waits this long for a human answer
-// before giving up.
+// ApprovalTimeout bounds how long a prompt-mode query waits for a human answer before giving up.
 const ApprovalTimeout = 120 * time.Second
 
-// maxPendingApprovals is gitsock.Broker's own queue cap, for the same reason: an MCP client is a
-// program and can call in a loop, and nothing else bounds how many run_query calls can be
-// in-flight at once.
+// maxPendingApprovals caps the queue: an MCP client is a program and can call in a loop, and
+// nothing else bounds how many run_query calls can be in-flight at once.
 const maxPendingApprovals = 50
 
-// ApprovalOutcome is ApprovalBroker.Request's own vocabulary — never a Go error (gitsock's own
-// PairingOutcome precedent: a human decision is a value, not a failure).
+// ApprovalOutcome is ApprovalBroker.Request's own vocabulary — never a Go error: a human decision
+// is a value, not a failure.
 type ApprovalOutcome int
 
 const (
@@ -99,12 +96,12 @@ type approvalEntry struct {
 	result chan ApprovalOutcome // buffered 1; exactly one send over the entry's lifetime.
 }
 
-// ApprovalBroker implements M2 §5.1's queue/deadline/injected-clock state machine — gitsock.Broker
-// (G1's pairing prompt)'s own shape: a FIFO of pending requests (at most one "presented", always
-// the head) and a notify.OrderedEmitter[ApprovalSnapshot] fanning out every change (P107 T2-8: the
-// queue and the ordered-emit guard both now come from internal/notify, shared with gitsock.Broker).
-// The one deliberate difference: Request selects on the MCP request's own ctx as well as its
-// deadline, so a disconnected client stops the query without any external expiry ticker.
+// ApprovalBroker implements M2 §5.1's queue/deadline/injected-clock state machine: a FIFO of
+// pending requests (at most one "presented", always the head) and a
+// notify.OrderedEmitter[ApprovalSnapshot] fanning out every change (P107 T2-8: the queue and the
+// ordered-emit guard both come from the shared repo-root internal/notify package). Request selects
+// on the MCP request's own ctx as well as its deadline, so a disconnected client stops the query
+// without any external expiry ticker.
 type ApprovalBroker struct {
 	now func() time.Time
 
@@ -157,9 +154,9 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
 
-	// Every enqueue emits (gitsock's G31 round-2 finding #6): a second/third request queueing
-	// behind an already-presented head still changes Queued, and any subscriber's "N waiting" line
-	// must track that even though the presented head is unchanged.
+	// Every enqueue emits: a second/third request queueing behind an already-presented head still
+	// changes Queued, and any subscriber's "N waiting" line must track that even though the
+	// presented head is unchanged.
 	b.emitter.Emit(seq, snap)
 
 	timer := time.NewTimer(time.Until(entry.req.ExpiresAt))

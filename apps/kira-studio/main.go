@@ -389,7 +389,7 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	windowsSvc := &bridge.WindowsService{Deps: deps}
 
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
-	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
+	// service plus ChannelTerminal's push channel.
 	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
 	terminalSvc := &bridge.TerminalService{Emit: deps.Events, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
 	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,

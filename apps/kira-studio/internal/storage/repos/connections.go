@@ -298,10 +298,10 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 // duplicate mints its own key lazily, the same as any other connection with no key yet
 // (repos/maskkeys.go's EnsureKey).
 //
-// mcp_enabled is always inserted as 0, regardless of f.McpEnabled (finding #4, M7) — mirroring
-// CodeReposRepo's own "a fresh import is never granted MCP access by default" precedent. Mask
-// rules live in a separate table this single INSERT cannot also write, so Service.Duplicate copies
-// them in a second statement afterward; inserting the duplicate already-MCP-live here would let a
+// mcp_enabled is always inserted as 0, regardless of f.McpEnabled (finding #4, M7): a fresh import
+// is never granted MCP access by default. Mask rules live in a separate table this single INSERT
+// cannot also write, so Service.Duplicate copies them in a second statement afterward; inserting
+// the duplicate already-MCP-live here would let a
 // crash or error in that second write commit an MCP-exposed, zero-mask-rule duplicate (M6 finding
 // #6's own gap, reopened via this exact error path). SetMcpEnabled below is what flips it on, once
 // the mask rule copy that must precede any live MCP exposure has actually succeeded.

@@ -12,9 +12,9 @@ import (
 // same reason — a stale socket must not print into the agent's transcript on every tool call.
 //
 // Refuses — a hard error, not a best-effort escape — curlPath or sockPath containing a double
-// quote or a newline, gitaskpass.buildShim's own precedent for an argv element that cannot be
-// double-quoted safely. Neither an exec.LookPath result nor a mkdtemp-derived path ever contains
-// either; the check exists so a future change here cannot silently produce a broken command.
+// quote or a newline: an argv element that cannot be double-quoted safely. Neither an
+// exec.LookPath result nor a mkdtemp-derived path ever contains either; the check exists so a
+// future change here cannot silently produce a broken command.
 func buildShim(curlPath, sockPath string) (string, error) {
 	for _, arg := range []string{curlPath, sockPath} {
 		if strings.ContainsAny(arg, "\"\n") {

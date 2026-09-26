@@ -25,9 +25,8 @@ const modulePrefix = "github.com/kirathecat/kira-studio/apps/kira-studio/"
 // this go list scope no longer even sees), and the bare "internal" package (this file's own
 // directory; it holds no non-test code). rpcstream (SPEC §7's one deliberate module-agnostic-RPC
 // exception) moved out from under internal/bridge to the repo-root internal/rpcstream in P100
-// Part 1, so it and internal/gitsock (which only needed the exemption for its rpcstream dependency)
-// no longer need entries here — go list -deps no longer reports either as depending on anything
-// under .../internal/bridge.
+// Part 1, so it no longer needs an entry here — go list -deps no longer reports it as depending on
+// anything under .../internal/bridge.
 var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal":            true,
 	"internal/bridge":     true,

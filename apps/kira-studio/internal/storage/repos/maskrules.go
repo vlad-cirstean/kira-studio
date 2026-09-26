@@ -12,8 +12,8 @@ const maskRulesSelectColumns = `
 	id, connection_id, table_name, column_name, mask_kind, keep_hint, correlate, created_at, updated_at
 `
 
-// MaskRulesRepo reads and writes connection_mask_rules (M5 §3.1/§3.2) — coderepos.go's own plain
-// shape: a selectColumns const, a scan*Row(rowScanner) helper, List ordered deterministically.
+// MaskRulesRepo reads and writes connection_mask_rules (M5 §3.1/§3.2) — a plain shape: a
+// selectColumns const, a scan*Row(rowScanner) helper, each query ordered deterministically.
 type MaskRulesRepo struct {
 	DB *sql.DB
 }

@@ -12,9 +12,8 @@ import (
 
 const customScriptsSelectColumns = `id, name, command, working_dir, color, sort_order, created_at, updated_at`
 
-// CustomScriptsRepo reads and writes the `custom_scripts` table (P85 §8.1) —
-// CodeReposRepo's own plain shape: a selectColumns const, a scan*Row(rowScanner) helper, List
-// ordered deterministically.
+// CustomScriptsRepo reads and writes the `custom_scripts` table (P85 §8.1) — a plain shape: a
+// selectColumns const, a scan*Row(rowScanner) helper, List ordered deterministically.
 type CustomScriptsRepo struct {
 	DB *sql.DB
 }
@@ -29,7 +28,7 @@ func scanCustomScriptRow(row rowScanner) (model.CustomScript, error) {
 	return s, nil
 }
 
-// List orders by sort_order ASC, name ASC — CodeReposRepo.List's own tiebreak.
+// List orders by sort_order ASC, name ASC for a stable, deterministic tiebreak.
 func (r *CustomScriptsRepo) List() ([]model.CustomScript, error) {
 	rows, err := r.DB.Query(`SELECT ` + customScriptsSelectColumns + ` FROM custom_scripts ORDER BY sort_order ASC, name ASC`)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.CustomScript, bool, error) {
@@ -53,7 +52,7 @@ func (r *CustomScriptsRepo) Get(id string) (*model.CustomScript, error) {
 	return rec, nil
 }
 
-// Create inserts a new row, sort_order set to one past the current max — CodeReposRepo.Create's
+// Create inserts a new row, sort_order set to one past the current max — sqlitex.NextSortOrder's
 // own append-at-the-end convention. fields is validated (and its name/command trimmed in place)
 // before the insert.
 func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.CustomScript, error) {

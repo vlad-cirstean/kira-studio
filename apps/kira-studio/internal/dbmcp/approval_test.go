@@ -74,10 +74,9 @@ func TestApprovalBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 	}
 }
 
-// TestApprovalBroker_EmitsOnEveryEnqueueAndResolution pins the same contract G31 round-2 finding
-// #6 established for gitsock's own pairing broker: an enqueue behind an already-presented head, or
-// a resolution of either entry, must always emit a fresh snapshot with the right Queued — never
-// only on a head change.
+// TestApprovalBroker_EmitsOnEveryEnqueueAndResolution pins the contract: an enqueue behind an
+// already-presented head, or a resolution of either entry, must always emit a fresh snapshot with
+// the right Queued — never only on a head change.
 func TestApprovalBroker_EmitsOnEveryEnqueueAndResolution(t *testing.T) {
 	t.Parallel()
 	b := NewApprovalBroker(time.Now)
@@ -158,9 +157,9 @@ func TestApprovalBroker_DoubleApprove_ReportsAlreadyResolved(t *testing.T) {
 	}
 }
 
-// TestApprovalBroker_CtxCancel_NonHeadEntry_LeavesHeadPresented proves the deliberate difference
-// from gitsock.Broker (§5.1): Request selects on the caller's own ctx, so a disconnected MCP
-// client's queued-but-not-yet-presented request resolves as abandoned without disturbing the head.
+// TestApprovalBroker_CtxCancel_NonHeadEntry_LeavesHeadPresented proves Request selects on the
+// caller's own ctx, so a disconnected MCP client's queued-but-not-yet-presented request resolves
+// as abandoned without disturbing the head.
 func TestApprovalBroker_CtxCancel_NonHeadEntry_LeavesHeadPresented(t *testing.T) {
 	t.Parallel()
 	b := NewApprovalBroker(time.Now)
@@ -214,9 +213,9 @@ func TestApprovalBroker_DeadlineExpiresWithInjectedClock(t *testing.T) {
 	}
 }
 
-// TestApprovalBroker_QueueBoundedAgainstUnlimitedEnqueue mirrors gitsock's own maxQueueLen
-// coverage: an MCP client is a program and can call run_query in a loop, so the broker must deny
-// immediately past its cap rather than grow without bound.
+// TestApprovalBroker_QueueBoundedAgainstUnlimitedEnqueue covers maxPendingApprovals: an MCP client
+// is a program and can call run_query in a loop, so the broker must deny immediately past its cap
+// rather than grow without bound.
 func TestApprovalBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 	t.Parallel()
 	b := NewApprovalBroker(time.Now)
