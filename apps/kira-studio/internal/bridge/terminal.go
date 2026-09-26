@@ -140,10 +140,7 @@ type TerminalCloseArgs struct {
 // first line. It exists so a stale path fails with a clear E_INVALID instead of a confusing exec
 // error.
 func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error) {
-	if err := terminal.ValidateOpen(terminal.OpenArgs{
-		TerminalID: args.TerminalID, WindowKey: args.WindowKey, Cwd: args.Cwd,
-		Cols: args.Cols, Rows: args.Rows, Command: args.Command, LaunchKind: args.LaunchKind,
-	}); err != nil {
+	if err := terminal.ValidateOpen(terminal.OpenArgs(args)); err != nil {
 		return TerminalOpenResult{}, err
 	}
 	agent := args.LaunchKind == terminal.LaunchKindClaudeCode

@@ -9,13 +9,15 @@ import (
 
 // OpenArgs is the subset of each app's own bound TerminalOpenArgs that Open's validation chain
 // reads — the bound struct itself stays per app (P103 §2.3); each bridge converts to this before
-// calling ValidateOpen (P107 I2-5).
+// calling ValidateOpen (P107 I2-5). Field order matches both apps' own TerminalOpenArgs exactly
+// (H7, P115 Part 2), so each bridge's Open builds one with a plain conversion,
+// terminal.OpenArgs(args), instead of copying every field by hand.
 type OpenArgs struct {
 	TerminalID string
-	WindowKey  string
 	Cwd        string
 	Cols       int
 	Rows       int
+	WindowKey  string
 	Command    string
 	LaunchKind string
 }

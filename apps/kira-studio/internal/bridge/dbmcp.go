@@ -373,7 +373,7 @@ func toWireApprovalPlan(p *dbmcp.ApprovalPlan) *DbMcpApprovalPlan {
 	}
 	wireIssues := make([]DbMcpApprovalPlanIssue, len(issues))
 	for i, iss := range issues {
-		wireIssues[i] = DbMcpApprovalPlanIssue{Severity: iss.Severity, Code: iss.Code, Message: iss.Message}
+		wireIssues[i] = DbMcpApprovalPlanIssue(iss)
 	}
 	return &DbMcpApprovalPlan{
 		EstimatedRowsRead: p.EstimatedRowsRead, ThresholdRows: p.ThresholdRows,

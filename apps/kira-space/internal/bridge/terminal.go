@@ -81,10 +81,7 @@ type TerminalCloseArgs struct {
 // Open validates args, spawns a new session and returns its resolved shell path — Kira Studio's
 // own Open, minus the AgentHooks command/env composition.
 func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error) {
-	if err := terminal.ValidateOpen(terminal.OpenArgs{
-		TerminalID: args.TerminalID, WindowKey: args.WindowKey, Cwd: args.Cwd,
-		Cols: args.Cols, Rows: args.Rows, Command: args.Command, LaunchKind: args.LaunchKind,
-	}); err != nil {
+	if err := terminal.ValidateOpen(terminal.OpenArgs(args)); err != nil {
 		return TerminalOpenResult{}, err
 	}
 

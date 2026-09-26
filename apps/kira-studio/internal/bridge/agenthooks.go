@@ -64,7 +64,7 @@ func (s *AgentHooksService) Status() AgentHooksStatus {
 // window (§8.4: Emit, not EmitTo, since this has no window to address). The receiving window
 // filters by terminalId against tabs it owns; state/agentSessions.ts's reducer is the consumer.
 func (s *AgentHooksService) onEvent(ev agenthooks.Event) {
-	s.Deps.Events.Emit(ChannelAgentEvent, toWireAgentEvent(ev))
+	s.Deps.Events.Emit(ChannelAgentEvent, AgentEventWire(ev))
 }
 
 // AgentEventWire is agenthooks.Event's own wire projection — ChannelAgentEvent's payload, one hook
@@ -83,21 +83,6 @@ type AgentEventWire struct {
 	Message          string `json:"message"`
 	Source           string `json:"source"`
 	Reason           string `json:"reason"`
-}
-
-func toWireAgentEvent(ev agenthooks.Event) AgentEventWire {
-	return AgentEventWire{
-		TerminalID:       ev.TerminalID,
-		Event:            ev.Event,
-		SessionID:        ev.SessionID,
-		Cwd:              ev.Cwd,
-		ToolName:         ev.ToolName,
-		ToolUseID:        ev.ToolUseID,
-		NotificationType: ev.NotificationType,
-		Message:          ev.Message,
-		Source:           ev.Source,
-		Reason:           ev.Reason,
-	}
 }
 
 // startIfEnabled is main.go's own boot-time call, mirroring StartDbMcpIfEnabled's own posture

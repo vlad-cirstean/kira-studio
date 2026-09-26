@@ -38,7 +38,7 @@ func approvalPlanFrom(plan *queryplan.Plan, thresholdRows int) *ApprovalPlan {
 	}
 	issues := make([]ApprovalPlanIssue, len(sorted))
 	for i, iss := range sorted {
-		issues[i] = ApprovalPlanIssue{Severity: iss.Severity, Code: iss.Code, Message: iss.Message}
+		issues[i] = ApprovalPlanIssue(iss)
 	}
 	return &ApprovalPlan{
 		EstimatedRowsRead: plan.EstimatedRowsRead,
