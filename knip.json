@@ -117,7 +117,7 @@
         // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
         "src/**/*.test.ts",
         // Invoked via `bun run` against its own absolute path, from a Go test
-        // (apps/kira-studio/internal/gitsearch/differential_test.go) — never a static import.
+        // (apps/kira-space/internal/gitsearch/differential_test.go) — never a static import.
         "src/search/differentialRunner.ts"
       ],
       "project": ["src/**/*.ts"]
