@@ -9,10 +9,9 @@ import { onMounted, onUnmounted, provide } from 'vue';
 import { control } from './bridge/control';
 import { useLayoutStore } from './state/layout';
 import { useSettingsStore } from './state/settings';
-import { useTabsStore } from './state/tabs';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
-import { createWorkbenchHost } from './workbench/host';
+import { createWorkbenchHost, useTabsStore } from './workbench/host';
 import TitleBar from './workbench/TitleBar.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 

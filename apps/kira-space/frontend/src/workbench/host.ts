@@ -7,6 +7,16 @@ import { useTabsStore } from '../state/tabs';
 import { useWorkspaceStore, type WorkspaceKey } from '../state/workspace';
 import { TAB_VIEWS } from './tabViews';
 
+// P116 G4: re-exported so App.vue's own onMounted (Next/Previous/Close Tab) reaches the tabs store
+// through this module rather than importing '../state/tabs' directly — state/tabs.ts, state/
+// workspace.ts and state/repoTabs.ts form a three-way import cycle (state/tabs.ts's own header
+// comment), and this file already resolves it safely in the order above. A second, separately-
+// ordered static import of '../state/tabs' from App.vue (biome's import sort always places
+// './state/...' before './workbench/...') re-enters that cycle through a different path and left
+// `useTabsStore` transiently unbound the first time a click reached `ensureWorkspaceShell` —
+// reproduced, root-caused and fixed here rather than in App.vue.
+export { useTabsStore };
+
 // P103 Part 2 (§5.4): the WorkbenchHost instance this app provides once, in App.vue — no
 // `tabBadge`/`tabAttention`/`tabIndicator`: this app has no AgentSessions store (no Claude Code
 // hook integration) and no TabIncognito store (a Kira Studio-only feature), and no kind of its own
