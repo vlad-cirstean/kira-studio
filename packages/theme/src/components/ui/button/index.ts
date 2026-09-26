@@ -4,7 +4,7 @@ import { cva } from 'class-variance-authority';
 export { default as Button } from '@theme/components/ui/button/Button.vue';
 
 export const buttonVariants = cva(
-  'focus-visible:border-focus focus-visible:ring-focus/50 aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error dark:aria-invalid:border-error/50 rounded-kira border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*=size-])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  'focus-visible:border-focus aria-invalid:ring-error/20 dark:aria-invalid:ring-error/40 aria-invalid:border-error dark:aria-invalid:border-error/50 rounded-kira border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*=size-])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -16,7 +16,7 @@ export const buttonVariants = cva(
         ghost:
           'hover:bg-field hover:text-fg dark:hover:bg-field/50 aria-expanded:bg-field aria-expanded:text-fg',
         destructive:
-          'bg-error/10 hover:bg-error/20 focus-visible:ring-error/20 dark:focus-visible:ring-error/40 dark:bg-error/20 text-error focus-visible:border-error/40 dark:hover:bg-error/30',
+          'bg-error/10 hover:bg-error/20 dark:bg-error/20 text-error focus-visible:outline-error dark:hover:bg-error/30',
         link: 'text-primary underline-offset-4 hover:underline',
         // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
         // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
