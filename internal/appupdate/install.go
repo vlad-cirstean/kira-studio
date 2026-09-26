@@ -68,8 +68,9 @@ const (
 // exactly that of the documented curl | sh install and of the DMGs themselves, which are built
 // from the same repository — anyone who can push to main can change what every user's Update click
 // runs. Branch protection on main is therefore a real security boundary for this feature. TLS to
-// raw.githubusercontent.com and the contract-marker check above guard transport and compatibility,
-// not authorship.
+// the fetch host above (InstallScriptURL) and the contract-marker check guard transport and
+// compatibility, not authorship. (Spelled out instead of named here so this stays the file's only
+// literal reference — S11 in scripts/verify-packaging.sh checks for exactly one.)
 type Installer struct {
 	app     App
 	running string

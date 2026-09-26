@@ -4,7 +4,8 @@
 #
 # Rewritten for the Wails/Go shell (P57 M7/§4.13): electron-builder.yml and every check that read
 # it are gone — there is no updater feed format, no Electron fuses, no asar to unpack a native
-# module out of. What survives is the *property* those checks protected (no auto-update, ad-hoc
+# module out of. What survives is the *property* those checks protected (no *silent* auto-update —
+# P119 adds a real one, but only on an explicit Update click, through scripts/install.sh — ad-hoc
 # signed, correct bundle identity) reasserted against the Wails bundle's own layout.
 #
 # Static checks (S1, S2, S5) always run — S3/S4 were electron-builder.yml checks removed in the
@@ -32,12 +33,14 @@ note() {
   echo "verify-packaging: note — $1"
 }
 
-# --- S1: no updater dependency -------------------------------------------------------------
+# --- S1: no *silent* updater dependency -----------------------------------------------------
+# P119's own update-and-install still goes through scripts/install.sh on an explicit click —
+# electron-updater/update-electron-app are the silent, no-user-action kind this repo has never used.
 if grep -qE '"(electron-updater|update-electron-app)"' package.json; then
-  fail "updater dependency present" "package.json references electron-updater/update-electron-app; SPEC.md §1/§3 defer auto-update past v1"
+  fail "updater dependency present" "package.json references electron-updater/update-electron-app; SPEC.md §1/§3 defer silent auto-update past v1"
 fi
 
-# --- S2: no updater code in apps/ or packages/ ---------------------------------------------
+# --- S2: no silent-updater code in apps/ or packages/ ---------------------------------------
 if grep -rnE "autoUpdater|electron-updater" apps/ packages/ >/dev/null 2>&1; then
   fail "updater code present" "apps/ or packages/ references autoUpdater or electron-updater"
 fi
@@ -122,13 +125,52 @@ else
   fail "version files missing" "$VSCODE_PKG or $CONFIG_YML not found — this check needs updating along with it"
 fi
 
-# --- S10: the update check reads release metadata only — it never downloads an artifact --------
-# P66's own "no silent auto-update" premise made checkable: the update-availability banner reads
-# GitHub's releases/latest JSON and opens the release's own web page — nothing under apps/ or
-# packages/ may reference downloading a release asset, which is what a later phase would need to
-# turn this into a real (silent) auto-updater.
-if grep -rnE 'browser_download_url|releases/download' apps/ packages/ >/dev/null 2>&1; then
-  fail "release asset download present" "apps/ or packages/ references a release asset download; P66 ships an availability banner only"
+# --- S10: no app code downloads a release asset itself -------------------------------------
+# Rescoped by P119 (was: apps/ packages/ only) — internal/appupdate now lives at internal/, and
+# the invariant still holds for every line of app code: only scripts/install.sh, run by the user's
+# own explicit Update click (never silently), is a sanctioned downloader. scripts/ is deliberately
+# excluded from this scan for exactly that reason.
+if grep -rnE 'browser_download_url|releases/download' apps/ packages/ internal/ >/dev/null 2>&1; then
+  fail "release asset download present" "apps/, packages/ or internal/ references a release asset download outside scripts/install.sh"
+fi
+
+# --- S11: the curl installer and the Go installer agree on their one shared contract --------
+# P119 §2/§3.3: scripts/install.sh and internal/appupdate/install.go hand off over a fd-3 line and
+# a contract-marker comment neither side can drift from silently.
+if [ ! -f scripts/install.sh ]; then
+  fail "installer script missing" "scripts/install.sh not found"
+elif ! sh -n scripts/install.sh; then
+  fail "installer script invalid" "sh -n scripts/install.sh failed — see the syntax error above"
+fi
+
+SCRIPT_CONTRACT_LINE="$(sed -n '2p' scripts/install.sh 2>/dev/null || true)"
+if [ "$SCRIPT_CONTRACT_LINE" != "# kira-install-contract: 1" ]; then
+  fail "installer contract marker changed" "scripts/install.sh:2 is '$SCRIPT_CONTRACT_LINE', want '# kira-install-contract: 1'"
+fi
+GO_CONTRACT_COUNT="$(grep -c 'installContract *= *"# kira-install-contract: 1"' internal/appupdate/install.go 2>/dev/null || true)"
+if [ "${GO_CONTRACT_COUNT:-0}" -ne 1 ]; then
+  fail "installer contract marker out of sync" "internal/appupdate/install.go's installContract does not match scripts/install.sh's own contract line"
+fi
+
+INSTALL_URL_HITS="$(grep -rn 'raw.githubusercontent.com' apps/ packages/ internal/ \
+  --include=*.go --include=*.ts --include=*.vue 2>/dev/null || true)"
+INSTALL_URL_COUNT="$(printf '%s\n' "$INSTALL_URL_HITS" | grep -c . || true)"
+case "$INSTALL_URL_HITS" in
+  *"internal/appupdate/install.go"*"/vlad-cirstean/kira-studio/main/scripts/install.sh"*) ;;
+  *)
+    fail "installer URL not pinned as expected" "expected exactly one raw.githubusercontent.com reference, in internal/appupdate/install.go's InstallScriptURL, pointing at /vlad-cirstean/kira-studio/main/scripts/install.sh; got: $INSTALL_URL_HITS"
+    ;;
+esac
+if [ "${INSTALL_URL_COUNT:-0}" -ne 1 ]; then
+  fail "installer URL referenced more than once" "raw.githubusercontent.com should appear exactly once across apps/, packages/, internal/ (InstallScriptURL only); got $INSTALL_URL_COUNT hits: $INSTALL_URL_HITS"
+fi
+
+if command -v shellcheck >/dev/null 2>&1; then
+  if ! shellcheck -s sh scripts/install.sh; then
+    fail "shellcheck failed" "shellcheck -s sh scripts/install.sh reported issues — see above"
+  fi
+else
+  note "skipped shellcheck on scripts/install.sh — shellcheck not on PATH"
 fi
 
 # --- S5: the packaging scripts cannot publish -----------------------------------------------
