@@ -4,17 +4,27 @@ Not one of H1/H2/H3/H7/H8/H10 (Stream A's own mandate) — discovered incidental
 `bun run test:go`'s full suite, kept here per the working agreement's durability rule rather than
 buried in a result section.
 
-## Fixed in this pass
+## Already a known, accepted open item — not new, not fixed here
 
-5 `ipcfixture` tests failed with a stale fixture (`ClickHouse`, `Kafka`, `MariaDB`, `MySQL`, `SQS`):
-committed `.fixture.ts` missing `caps.keyTypes`, a field some earlier phase's `Caps` struct grew
-without regenerating fixtures. Mechanical, safe, in scope (test infra, not app logic) — regenerated
-via `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...` +
-`bunx biome check --write`. Diff per file: one `keyTypes: false,` line (ClickHouse also picked up a
-live container version-string bump, `26.3.32.14` → `26.3.33.24` — expected, captured from the real
-container each regen, not hand-edited).
+All 6 `ipcfixture` `TestFixture_*` failures (`ClickHouse`/`Kafka`/`MariaDB`/`MySQL`/`Redis`/`SQS`)
+are `docs/ARCHITECTURE.md`'s own pre-existing "Known open items" entry: `testdata/*.fixture.json`
+(the Go-side comparison fixture, separate from the frontend's `.fixture.ts` module) is stale —
+missing `caps.keyTypes` and the v1.7 `mcp_*_mode` columns — and closing it needs the JSON
+regeneration path to be *built* (`KIRA_IPC_FIXTURES=write` only ever regenerates the `.fixture.ts`
+frontend mock; nothing regenerates `testdata/*.json`, per that file's own doc comment: "produced
+once via `bun run` and never hand-edited"). Explicitly on-demand/CI-only, explicitly doesn't gate a
+phase's own fast checks. Genuinely out of Stream A's scope: building that regeneration path is
+infrastructure work, not a mechanical fix, and not one of H1/H2/H3/H7/H8/H10.
 
-## Flagged, not fixed — real regression, out of Stream A's scope
+Did regenerate the 5 non-Redis `tests/ipc/*/*.fixture.ts` files (the *frontend* mock module, not
+`testdata/*.json`) via `KIRA_IPC_FIXTURES=write go test ./apps/kira-studio/internal/ipcfixture/...`
++ `bunx biome check --write` — safe, mechanical, keeps that file in sync with the real current
+`caps.keyTypes` shape (diff: one `keyTypes: false,` line each, plus ClickHouse's live container
+version bump `26.3.32.14` → `26.3.33.24`). This does **not** move `TestFixture_*` from fail to pass
+— those compare against `testdata/*.json`, untouched — it only fixes the separate, real drift in the
+frontend-facing copy.
+
+## Flagged, not fixed — a second, distinct regression on top, out of Stream A's scope
 
 `TestFixture_Redis` fails for a different reason: `mutate be-delete-ttl: mutate requires a database
 path, got: database:db0/namespace:session/key:session%3Aabc`.

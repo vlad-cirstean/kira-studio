@@ -3890,6 +3890,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   empty. This suite is explicitly on-demand/CI-only (`CLAUDE.md`'s real-container two-suite rule),
   so it doesn't gate a phase's own fast checks. Closing it needs running the suite's own
   regeneration path (extend, per `CLAUDE.md`'s own P25/P26 guidance) against a current schema.
+  `TestFixture_Redis` also carries a second, independent failure on top of the above (found by P118
+  Stream A): `689b6eea` (P113 G2) narrowed `redis/mutate.go`'s `resolveDatabaseSegment` from "path is
+  database-rooted" (`segments[0].Kind == "database"`, any length) to `RequirePath`'s exact-one-
+  segment match, so the fixture's own namespaced-key delete scenario now fails path validation
+  before it ever reaches the stale-fixture diff above. Fix needs restoring the rooted-path check (or
+  a rooted/prefix variant of `RequirePath`) — a `redis/mutate.go` design call, out of scope for the
+  phase that found it.
 
 - **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
   definition** (M7 round 2, finding #1). A view that itself renames a masked column
