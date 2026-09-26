@@ -15,9 +15,9 @@ import (
 // the app's own window to github.com — an absent external open, not a present embedded one). The
 // renderer never supplies or receives a raw URL here: it names a PR by number, gitrpc's
 // pr.browserUrl composes the URL server-side (gitsession.RepoEntry.PrBrowserURL), and this
-// service re-validates that URL before Browser.OpenURL ever sees it — safeReleaseURL's own check
-// (appupdate/checker.go), applied to the one other URL this app will ever open. Two validations,
-// on both sides of the process boundary, because the boundary is the thing being defended.
+// service re-validates that URL before Browser.OpenURL ever sees it — scheme, host and path all
+// checked again here, server-side trust notwithstanding. Two validations, on both sides of the
+// process boundary, because the boundary is the thing being defended.
 //
 // P79 finding 2: the host half of that re-validation used to be a literal "github.com" compare,
 // which rejected every correctly-composed GHES URL right after PrBrowserURL was fixed to compose
@@ -40,8 +40,7 @@ var pullRequestPath = regexp.MustCompile(`^/[\w.-]+/[\w.-]+/pull/[0-9]+$`)
 
 // OpenPullRequestURL opens args.URL in the OS browser, refusing anything that is not an https
 // pull-request URL on a known GitHub host — BrowserManager.OpenURL (pkg/application) validates
-// nothing at all, and macOS `open` will act on any scheme it recognises (appupdate/checker.go's
-// own note).
+// nothing at all, and macOS `open` will act on any scheme it recognises.
 func (s *GitHubService) OpenPullRequestURL(args GitHubOpenPullRequestURLArgs) error {
 	u, err := url.Parse(args.URL)
 	if err != nil || u.Scheme != "https" || !gitsession.IsGitHubHost(u.Host, s.knownGhHosts()) ||

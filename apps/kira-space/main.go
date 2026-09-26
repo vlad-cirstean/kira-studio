@@ -25,6 +25,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/metrics"
@@ -46,8 +47,9 @@ var assets embed.FS
 // gitsock.Server (inside wireGit) -> application.New(Services: GitClientsService,
 // CodeWorkspaceService, the git stream registration, GitHubService) -> the menu -> the startup
 // window list, opened -> app.Run(). No adapters, no connections, no HTTP/gRPC, no DB MCP, no
-// terminal, no keep-awake, no Claude Code hooks, no update checker, no system notifications for
-// pairing requests — none of that is this app's own module. gitClientsSvc.AttachPush() wires
+// terminal, no keep-awake, no Claude Code hooks, no system notifications for pairing requests —
+// none of that is this app's own module. P119 added an update checker/installer, the one
+// exception. gitClientsSvc.AttachPush() wires
 // gitsock's pairing/clients-changed feeds onto the two push channels the pairing prompt and
 // Connected-editors pane read (P108 Part 20 F1).
 func main() {
@@ -112,6 +114,11 @@ func main() {
 	rawDialogs, attachDialogs := shell.NewDeferredDialogs()
 	dialogsSvc := appshell.NewDialogs(rawDialogs)
 
+	// P119: the update-availability checker and its detached installer — Kira Studio's own pair
+	// (main.go), same appupdate package, this app's own App constant.
+	updateChecker := appupdate.NewChecker(appupdate.Space.Name, buildinfo.Version)
+	updateInstaller := appupdate.NewInstaller(appupdate.Space, buildinfo.Version)
+
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
 	}
@@ -158,6 +165,9 @@ func main() {
 		windows.DetachAll()
 	})
 	teardown := sync.OnceFunc(func() {
+		// P119: a Cmd+Q mid-download aborts the install rather than leaving an orphan that later
+		// swaps a bundle the user quit away from. After hand-off this is a no-op.
+		updateInstaller.Cancel()
 		detachMetrics()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
@@ -207,6 +217,9 @@ func main() {
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
 			application.NewService(windowsSvc),
+			application.NewService(&bridge.UpdateService{
+				Checker: updateChecker, Installer: updateInstaller, Quit: quitter.RequestQuit,
+			}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
