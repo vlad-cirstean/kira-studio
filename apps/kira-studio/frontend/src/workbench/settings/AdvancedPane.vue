@@ -53,7 +53,7 @@ const expensiveQueryRowsId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="opLogRetentionDaysId" class="text-kira-sm">Operation log retention (days)</Label>
+        <Label :for="opLogRetentionDaysId">Operation log retention (days)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -80,7 +80,7 @@ const expensiveQueryRowsId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="expensiveQueryRowsId" class="text-kira-sm">Expensive query threshold (rows)</Label>
+        <Label :for="expensiveQueryRowsId">Expensive query threshold (rows)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"

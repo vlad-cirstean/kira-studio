@@ -55,7 +55,7 @@ const rowColoringId = useId();
     <FieldLegend class="pt-0">Typography</FieldLegend>
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="fontFamilyId" class="text-kira-sm">Data font</Label>
+        <Label :for="fontFamilyId">Data font</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -191,7 +191,7 @@ const rowColoringId = useId();
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <FieldContent>
-          <Label :for="rowColoringId" class="text-kira-sm">Row colouring</Label>
+          <Label :for="rowColoringId">Row colouring</Label>
           <FieldDescription
             >Colour grid values by their column's data type. Off renders every row in the
             plain text colour.</FieldDescription

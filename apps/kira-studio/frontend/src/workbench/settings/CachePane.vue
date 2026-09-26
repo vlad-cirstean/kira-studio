@@ -61,7 +61,7 @@ const hitRateId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="cacheBudgetMbId" class="text-kira-sm">Result page cache budget (MB)</Label>
+        <Label :for="cacheBudgetMbId">Result page cache budget (MB)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -85,7 +85,7 @@ const hitRateId = useId();
       </FieldError>
     </Field>
     <Field>
-      <Label :for="currentUsageId" class="text-kira-sm text-muted-foreground">Current usage</Label>
+      <Label :for="currentUsageId" class="text-muted-foreground">Current usage</Label>
       <Input
         :id="currentUsageId"
         type="text"
@@ -95,7 +95,7 @@ const hitRateId = useId();
       />
     </Field>
     <Field>
-      <Label :for="hitRateId" class="text-kira-sm text-muted-foreground">Hit rate</Label>
+      <Label :for="hitRateId" class="text-muted-foreground">Hit rate</Label>
       <Input
         :id="hitRateId"
         type="text"

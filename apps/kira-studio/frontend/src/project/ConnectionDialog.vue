@@ -726,11 +726,11 @@ const preconnectText = computed({
           <TabsContent value="General" class="flex flex-col gap-2">
           <div class="flex gap-2 items-start">
             <div class="flex flex-col gap-1 flex-2 text-kira-sm">
-              <Label class="text-kira-sm leading-none text-muted-foreground">Name</Label>
+              <Label class="leading-none text-muted-foreground">Name</Label>
               <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-ui" data-testid="connection-name" />
             </div>
             <div class="flex flex-col gap-1 flex-none text-kira-sm">
-              <Label class="text-kira-sm leading-none text-muted-foreground">Color</Label>
+              <Label class="leading-none text-muted-foreground">Color</Label>
               <fieldset
                 class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
                 aria-label="Connection color"
@@ -757,7 +757,7 @@ const preconnectText = computed({
           </p>
 
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">Mode</Label>
+            <Label class="leading-none text-muted-foreground">Mode</Label>
             <ToggleGroup
               type="single"
               variant="outline"
@@ -776,7 +776,7 @@ const preconnectText = computed({
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
             <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-              <Label class="text-kira-sm leading-none text-muted-foreground">Database file</Label>
+              <Label class="leading-none text-muted-foreground">Database file</Label>
               <div class="flex items-center gap-1">
                 <div class="flex-1 min-w-0">
                   <Input
@@ -796,7 +796,7 @@ const preconnectText = computed({
           <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="flex gap-2 items-start">
               <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                <Label class="text-kira-sm leading-none text-muted-foreground">Host</Label>
+                <Label class="leading-none text-muted-foreground">Host</Label>
                 <Input
                   :model-value="draft.host ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -805,7 +805,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="flex flex-col gap-1 flex-none basis-24 text-kira-sm">
-                <Label class="text-kira-sm leading-none text-muted-foreground">Port</Label>
+                <Label class="leading-none text-muted-foreground">Port</Label>
                 <NumberStepperInput
                   :model-value="draft.port != null ? String(draft.port) : ''"
                   data-testid="connection-port"
@@ -816,7 +816,7 @@ const preconnectText = computed({
             <span v-if="fieldErrors.host" class="text-error text-kira-xs leading-normal">{{ fieldErrors.host }}</span>
             <div v-if="isAwsStyle" class="flex gap-2 items-start">
               <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                <Label class="text-kira-sm leading-none text-muted-foreground">Region</Label>
+                <Label class="leading-none text-muted-foreground">Region</Label>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -825,7 +825,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                <Label class="text-kira-sm leading-none text-muted-foreground">AWS profile (optional)</Label>
+                <Label class="leading-none text-muted-foreground">AWS profile (optional)</Label>
                 <Input
                   :model-value="draft.username ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -836,7 +836,7 @@ const preconnectText = computed({
             </div>
             <template v-else>
               <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                <Label class="text-kira-sm leading-none text-muted-foreground">Database</Label>
+                <Label class="leading-none text-muted-foreground">Database</Label>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -846,7 +846,7 @@ const preconnectText = computed({
               </div>
               <div class="flex gap-2 items-start">
                 <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                  <Label class="text-kira-sm leading-none text-muted-foreground">User</Label>
+                  <Label class="leading-none text-muted-foreground">User</Label>
                   <Input
                     :model-value="draft.username ?? ''"
                     class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -855,7 +855,7 @@ const preconnectText = computed({
                   />
                 </div>
                 <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-                  <Label class="text-kira-sm leading-none text-muted-foreground">Password</Label>
+                  <Label class="leading-none text-muted-foreground">Password</Label>
                   <div class="flex items-center gap-1">
                     <div class="flex-1 min-w-0">
                       <Input
@@ -879,7 +879,7 @@ const preconnectText = computed({
           </template>
           <template v-else>
             <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-              <Label class="text-kira-sm leading-none text-muted-foreground">Connection URI</Label>
+              <Label class="leading-none text-muted-foreground">Connection URI</Label>
               <Input
                 :model-value="draft.uri ?? ''"
                 class="h-control-lg w-full rounded-kira-sm border-border-strong bg-field px-2 font-data"
@@ -893,7 +893,7 @@ const preconnectText = computed({
           </TabsContent>
 
           <TabsContent value="Advanced" class="flex flex-col gap-2">
-          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
+          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.readOnly"
               class="size-3.5"
@@ -906,7 +906,7 @@ const preconnectText = computed({
             <span class="text-subtle text-kira-xs leading-normal w-full">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
           </Label>
 
-          <Label v-if="isSqlKind" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
+          <Label v-if="isSqlKind" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.autoExplain"
               class="size-3.5"
@@ -925,7 +925,7 @@ const preconnectText = computed({
           </Label>
 
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">Throttle commands <span class="text-subtle">— per second</span></Label>
+            <Label class="leading-none text-muted-foreground">Throttle commands <span class="text-subtle">— per second</span></Label>
             <div class="w-24">
               <NumberStepperInput
                 :min="0"
@@ -949,7 +949,7 @@ const preconnectText = computed({
 
           <TabsContent value="Pre-connect" class="flex flex-col gap-2">
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
+            <Label class="leading-none text-muted-foreground">Pre-connect command <span class="text-subtle">— optional</span></Label>
             <Textarea
               v-model="preconnectText"
               class="font-data"
@@ -968,7 +968,7 @@ const preconnectText = computed({
           </div>
           <span v-if="fieldErrors.preconnect" class="text-error text-kira-xs leading-normal">{{ fieldErrors.preconnect }}</span>
 
-          <Label v-if="preconnectText" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
+          <Label v-if="preconnectText" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.preconnectSidecar"
               class="size-3.5"
@@ -988,7 +988,7 @@ const preconnectText = computed({
           </TabsContent>
 
           <TabsContent value="MCP" class="flex flex-col gap-2">
-          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
+          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.mcpEnabled"
               class="size-3.5"
@@ -1006,7 +1006,7 @@ const preconnectText = computed({
 
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
             <Label
-              class="text-kira-sm leading-none text-muted-foreground"
+              class="leading-none text-muted-foreground"
               >Description
               <span class="text-subtle">— what this database is for, read verbatim by an AI client</span></Label
             >
@@ -1022,7 +1022,7 @@ const preconnectText = computed({
             <span v-if="fieldErrors.mcpDescription" class="text-error text-kira-xs leading-normal">{{ fieldErrors.mcpDescription }}</span>
           </div>
 
-          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 text-kira-sm leading-none">
+          <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-1 leading-none">
             <Checkbox
               :model-value="draft.mcpAutoExplain"
               :disabled="!draft.mcpEnabled || !mcpExplainSupported"
@@ -1039,7 +1039,7 @@ const preconnectText = computed({
           </Label>
 
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
+            <Label class="leading-none text-muted-foreground">Read <span class="text-subtle">— SELECT and its engine equivalents</span></Label>
             <ToggleGroup
               type="single"
               size="kira-lg"
@@ -1059,7 +1059,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
+            <Label class="leading-none text-muted-foreground">Write <span class="text-subtle">— INSERT/UPDATE/DELETE and equivalents</span></Label>
             <ToggleGroup
               type="single"
               size="kira-lg"
@@ -1079,7 +1079,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="flex flex-col gap-1 flex-1 text-kira-sm">
-            <Label class="text-kira-sm leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
+            <Label class="leading-none text-muted-foreground">DDL <span class="text-subtle">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
             <ToggleGroup
               type="single"
               size="kira-lg"
@@ -1133,7 +1133,7 @@ const preconnectText = computed({
                   <option value="date">Date</option>
                   <option value="redact">Redact</option>
                 </NativeSelect>
-                <Label v-if="KEEP_HINT_LABEL[rule.kind]" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none text-kira-sm leading-none">
+                <Label v-if="KEEP_HINT_LABEL[rule.kind]" class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none leading-none">
                   <Checkbox
                     :model-value="rule.keepHint"
                     class="size-3.5"
@@ -1144,7 +1144,7 @@ const preconnectText = computed({
                   </Checkbox>
                   <span>{{ KEEP_HINT_LABEL[rule.kind] }}</span>
                 </Label>
-                <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none text-kira-sm leading-none">
+                <Label class="flex flex-row items-center gap-1.5 flex-wrap cursor-pointer flex-none leading-none">
                   <Checkbox
                     :model-value="rule.correlate"
                     :disabled="rule.kind === 'number'"

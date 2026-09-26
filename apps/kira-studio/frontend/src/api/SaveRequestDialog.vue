@@ -95,10 +95,10 @@ function splitTarget(value: string): [string, string | null] {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="flex flex-col gap-2 p-3">
-      <Label class="text-kira-sm text-muted-foreground mt-1">Name</Label>
+      <Label class="text-muted-foreground mt-1">Name</Label>
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
-      <Label class="text-kira-sm text-muted-foreground mt-1">Save to</Label>
+      <Label class="text-muted-foreground mt-1">Save to</Label>
       <NativeSelect v-model="target" variant="bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>

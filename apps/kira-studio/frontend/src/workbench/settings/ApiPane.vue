@@ -87,7 +87,7 @@ const disableCookieJarId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="httpVersionId" class="text-kira-sm">HTTP version</Label>
+        <Label :for="httpVersionId">HTTP version</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -112,7 +112,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="requestTimeoutMsId" class="text-kira-sm">Request timeout (ms)</Label>
+        <Label :for="requestTimeoutMsId">Request timeout (ms)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -142,7 +142,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxResponseMbId" class="text-kira-sm">Max response size (MB)</Label>
+        <Label :for="maxResponseMbId">Max response size (MB)</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -181,7 +181,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="sslVerifyId" class="text-kira-sm">Verify SSL certificates</Label>
+        <Label :for="sslVerifyId">Verify SSL certificates</Label>
       </Field>
       <TooltipIconButton
         icon="discard"
@@ -211,7 +211,7 @@ const disableCookieJarId = useId();
         >
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
-        <Label :for="followRedirectsId" class="text-kira-sm">Follow redirects</Label>
+        <Label :for="followRedirectsId">Follow redirects</Label>
       </Field>
       <TooltipIconButton
         icon="discard"
@@ -226,7 +226,7 @@ const disableCookieJarId = useId();
 
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="maxRedirectsId" class="text-kira-sm">Max redirects</Label>
+        <Label :for="maxRedirectsId">Max redirects</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
@@ -269,7 +269,7 @@ const disableCookieJarId = useId();
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <FieldContent>
-          <Label :for="disableCookieJarId" class="text-kira-sm">Disable cookie jar</Label>
+          <Label :for="disableCookieJarId">Disable cookie jar</Label>
           <FieldDescription
             >Off keeps a session cookie a server sets and replays it on later requests to
             the same host.</FieldDescription

@@ -38,7 +38,7 @@ const wordWrapId = useId();
         <CodiconIcon name="check" :size="10" />
       </Checkbox>
       <FieldContent>
-        <Label :for="wordWrapId" class="text-kira-sm">Word wrap</Label>
+        <Label :for="wordWrapId">Word wrap</Label>
         <slot />
       </FieldContent>
     </Field>

@@ -28,7 +28,7 @@ const defaultPageSizeId = useId();
   <div class="contents" v-show="active">
     <Field>
       <div class="flex items-center justify-between gap-1">
-        <Label :for="defaultPageSizeId" class="text-kira-sm">Default page size</Label>
+        <Label :for="defaultPageSizeId">Default page size</Label>
         <TooltipIconButton
           icon="discard"
           label="Reset to default"
