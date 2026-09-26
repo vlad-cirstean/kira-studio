@@ -848,7 +848,7 @@ watch(
         />
         <div class="kv:flex-1 kv:min-h-0 kv:overflow-auto">
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-xs kv:uppercase">Branches</div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Branches</div>
             <KuiButton
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
@@ -865,7 +865,7 @@ watch(
             </div>
           </div>
           <div>
-            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-xs kv:uppercase">Remote branches</div>
+            <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Remote branches</div>
             <KuiButton
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
@@ -927,7 +927,7 @@ watch(
         </div>
         <div
           v-if="review.phase.value === 'listing'"
-          class="kv:font-ui kv:text-muted-foreground kv:text-xs kv:truncate"
+          class="kv:font-ui kv:text-muted-foreground kv:text-sm kv:truncate"
         >
           {{ comparisonSummaryLabel }}
         </div>

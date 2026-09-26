@@ -14,7 +14,7 @@ defineProps<{ hiddenCount: number }>();
 <template>
   <KuiButton
     v-if="hiddenCount > 0"
-    class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-xs kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
+    class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-sm kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
   >
     Show {{ Math.min(REF_LIST_SECTION_CAP, hiddenCount) }} more ({{ hiddenCount }} remaining)
   </KuiButton>

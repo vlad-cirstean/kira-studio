@@ -35,7 +35,7 @@ const kuiButtonVariants = cva(
   // (git-ui/theme/tailwind.css, A1), so a raw `<button>` needs it stated explicitly — otherwise
   // the standalone VS Code webview (no host preflight either) would show the platform's
   // form-control font instead of inheriting Kira's, same reasoning as the explicit `py-0` below.
-  'kv:inline-flex kv:items-center kv:gap-1 kv:min-h-kui-control kv:py-0 kv:px-1.5 kv:bg-transparent kv:text-kui-fg-muted kv:border kv:border-transparent kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:no-underline kv:cursor-pointer kv:shrink-0 kv:enabled:hover:bg-kui-hover kv:enabled:hover:text-kui-fg kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1 kv:disabled:opacity-60 kv:disabled:cursor-default',
+  'kv:inline-flex kv:items-center kv:gap-1 kv:min-h-kui-control kv:py-0 kv:px-1.5 kv:bg-transparent kv:text-kui-fg-muted kv:border kv:border-transparent kv:rounded-kui kv:font-inherit kv:text-kui-base kv:no-underline kv:cursor-pointer kv:shrink-0 kv:enabled:hover:bg-kui-hover kv:enabled:hover:text-kui-fg kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1 kv:disabled:opacity-60 kv:disabled:cursor-default',
   {
     variants: {
       variant: {
@@ -99,7 +99,7 @@ defineExpose({
     <slot />
     <span
       v-if="count !== undefined"
-      class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-selected kv:text-kui-selected-fg kv:text-[0.75em] kv:leading-kui-control-sm"
+      class="kv:inline-flex kv:items-center kv:justify-center kv:min-w-kui-control-sm kv:h-kui-control-sm kv:px-0.75 kv:rounded-full kv:bg-kui-selected kv:text-kui-selected-fg kv:text-kui-sm kv:leading-kui-control-sm"
       >{{ count }}</span
     >
   </button>

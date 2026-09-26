@@ -344,7 +344,7 @@ function onClose(): void {
           class="kv:my-2"
         >
           <p>These untracked files already exist in your working tree and would be overwritten:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
           <p>Remedy: move or remove them yourself, or discard them and try again.</p>
@@ -354,7 +354,7 @@ function onClose(): void {
           class="kv:my-2"
         >
           <p>Your uncommitted changes to these files would be overwritten:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
           </ul>
           <p>Remedy: commit or discard those changes first.</p>
@@ -376,7 +376,7 @@ function onClose(): void {
           class="kv:my-2"
         >
           <p>This will likely conflict in:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-sm">
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
             <li v-for="path in pending.preflight.prediction.paths" :key="path">
               <code>{{ path }}</code>
             </li>

@@ -105,20 +105,20 @@ function onMenuSelect(id: string): void {
       <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
-        class="kv:whitespace-nowrap kv:text-xs kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
+        class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
         v-kui-tooltip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
       <span
         v-if="rowModel(entry).auto"
-        class="kv:whitespace-nowrap kv:text-xs kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
+        class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
         v-kui-tooltip="'Created automatically by an auto-stashed checkout'"
         >auto</span
       >
       <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-xs kv:opacity-80" v-kui-tooltip="'Includes untracked files'">-u</span>
-      <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
-      <span class="kv:text-xs kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
+      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-sm kv:opacity-80" v-kui-tooltip="'Includes untracked files'">-u</span>
+      <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
+      <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
     </KuiButton>
     <RowActionsButton
       @click="openMenuFromButton(entry, $event)"
@@ -126,7 +126,7 @@ function onMenuSelect(id: string): void {
     />
   </div>
   <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">{{ emptyMessage }}</div>
+  <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">{{ emptyMessage }}</div>
 
   <RowContextMenu
     v-if="stashMenu"

@@ -18,7 +18,7 @@ import type { ClassValue } from 'clsx';
 import { cn } from './cn.ts';
 
 const kuiTextInputClasses =
-  'kv:h-kui-control kv:py-0 kv:px-2 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-sm kv:placeholder:text-kui-fg-muted kv:focus-visible:border-kui-focus-border kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1';
+  'kv:h-kui-control kv:py-0 kv:px-2 kv:bg-kui-bg-input kv:text-kui-fg kv:border kv:border-kui-border-strong kv:rounded-kui kv:font-inherit kv:text-kui-base kv:placeholder:text-kui-fg-muted kv:focus-visible:border-kui-focus-border kv:focus-visible:outline kv:focus-visible:outline-1 kv:focus-visible:outline-kui-focus-border kv:focus-visible:-outline-offset-1';
 
 const props = defineProps<{
   modelValue: string;

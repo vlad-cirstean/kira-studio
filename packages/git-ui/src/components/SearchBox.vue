@@ -260,7 +260,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
       <section class="kv:flex kv:gap-0.25" aria-label="Search options">
         <KuiButton
           icon="codicon-case-sensitive"
-          class="kv:text-muted-foreground kv:text-xs"
+          class="kv:text-muted-foreground kv:text-sm"
           :active="search.caseSensitive.value"
           :aria-pressed="search.caseSensitive.value"
           v-kui-tooltip="'Match case'"
@@ -270,7 +270,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-whole-word"
-          class="kv:text-muted-foreground kv:text-xs"
+          class="kv:text-muted-foreground kv:text-sm"
           :active="search.wholeWord.value"
           :aria-pressed="search.wholeWord.value"
           v-kui-tooltip="'Match whole word'"
@@ -280,7 +280,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
         <KuiButton
           icon="codicon-regex"
-          class="kv:text-muted-foreground kv:text-xs"
+          class="kv:text-muted-foreground kv:text-sm"
           :active="search.regex.value"
           :aria-pressed="search.regex.value"
           v-kui-tooltip="'Use regular expression'"
@@ -290,14 +290,14 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
         />
       </section>
       <KuiSelect
-        class="kv:text-xs"
+        class="kv:text-sm"
         ariaLabel="Search scope"
         data-testid="search-scope"
         :model-value="search.scope.value"
         :options="scopeOptions"
         @update:model-value="onScopeChange"
       />
-      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-xs kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
+      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
       <KuiButton
         variant="icon"
         icon="codicon-close"
@@ -311,7 +311,7 @@ defineExpose({ focus: () => searchInputRef.value?.focus() });
       v-if="search.error.value"
       :id="ERROR_ID"
       ref="errorEl"
-      class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:max-w-[var(--kui-float-max-w,none)] kv:py-0.5 kv:px-1 kv:bg-panel kv:text-error kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float kv:text-xs"
+      class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:max-w-[var(--kui-float-max-w,none)] kv:py-0.5 kv:px-1 kv:bg-panel kv:text-error kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float kv:text-sm"
       role="alert"
       data-testid="search-error"
       :style="errorStyle"

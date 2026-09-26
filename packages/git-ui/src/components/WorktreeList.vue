@@ -136,16 +136,16 @@ async function confirmRemove(): Promise<void> {
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
       <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-        <span v-if="entry.isCurrent" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'This window'">●</span>
-        <span v-if="entry.isMain" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Main worktree'">M</span>
-        <span v-if="entry.locked" class="kv:text-xs kv:opacity-80" v-kui-tooltip="entry.locked.reason">
+        <span v-if="entry.isCurrent" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'This window'">●</span>
+        <span v-if="entry.isMain" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Main worktree'">M</span>
+        <span v-if="entry.locked" class="kv:text-sm kv:opacity-80" v-kui-tooltip="entry.locked.reason">
           <span class="codicon codicon-lock" aria-hidden="true"></span>
         </span>
-        <span v-if="entry.openElsewhere" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Open in another window'">
+        <span v-if="entry.openElsewhere" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Open in another window'">
           <span class="codicon codicon-window" aria-hidden="true"></span>
         </span>
         <span class="kv:truncate" v-kui-tooltip="entry.path">{{ worktreeLabel(entry) }}</span>
-        <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-xs kv:text-muted-foreground">{{ entry.path }}</span>
+        <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground">{{ entry.path }}</span>
       </div>
       <KuiButton
         v-if="writeCapability && !entry.isCurrent"
@@ -176,7 +176,7 @@ async function confirmRemove(): Promise<void> {
       </KuiButton>
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
-    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs">No worktrees</div>
+    <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No worktrees</div>
 
     <KuiDialog
       :open="pendingRemove !== undefined"

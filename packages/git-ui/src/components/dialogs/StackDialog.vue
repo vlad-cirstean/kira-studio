@@ -147,7 +147,7 @@ function closeDialog(): void {
       <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
       <template v-else>
         <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
-        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-sm">
+        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
           <li v-for="entry in preflight.plan" :key="entry.branch">
             <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
             ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
@@ -163,7 +163,7 @@ function closeDialog(): void {
 
       <template v-if="stack.restacking.value">
         <p>Restacking…</p>
-        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-sm">
+        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
           <li v-for="(p, i) in stack.progress.value" :key="i">
             {{ p.branch }} ({{ p.index }}/{{ p.total }})
           </li>

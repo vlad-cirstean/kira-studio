@@ -111,7 +111,7 @@ async function removeFromStack(branch: string): Promise<void> {
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
         <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-          <span v-if="row.isHead" class="kv:text-xs kv:opacity-80" v-kui-tooltip="'Current branch'">●</span>
+          <span v-if="row.isHead" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Current branch'">●</span>
           <span class="kv:truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
@@ -138,8 +138,8 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             {{ prBadgeLabel(row.pr) }}
           </span>
-          <span v-if="row.trackText" class="kv:text-xs kv:text-muted-foreground">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="kv:text-xs kv:opacity-80" v-kui-tooltip="row.checkedOutIn">
+          <span v-if="row.trackText" class="kv:text-sm kv:text-muted-foreground">{{ row.trackText }}</span>
+          <span v-if="row.checkedOutIn" class="kv:text-sm kv:opacity-80" v-kui-tooltip="row.checkedOutIn">
             <span class="codicon codicon-repo" aria-hidden="true"></span>
           </span>
         </div>
@@ -177,7 +177,7 @@ async function removeFromStack(branch: string): Promise<void> {
       >
         <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
           <span class="kv:truncate">{{ row.name }}</span>
-          <span class="kv:truncate kv:text-xs kv:text-diff-deleted">{{ row.orphanReason }}</span>
+          <span class="kv:truncate kv:text-sm kv:text-diff-deleted">{{ row.orphanReason }}</span>
         </div>
         <KuiButton
           v-if="writeCapability"
@@ -195,7 +195,7 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
-      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-xs"
+      class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm"
     >
       No stacked branches
     </div>

@@ -492,7 +492,7 @@ function reviewToggleTitle(path: string): string {
          drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own `class` prop
          on its `<FileTree>` usage (P110 A15: now `kv:flex-auto kv:min-h-0 kv:border-y
          kv:border-panel-border`) never reached this component's root at all before this move. -->
-    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-1 kv:px-5 kv:pb-4 kv:text-sm">
+    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-1 kv:px-5 kv:pb-4 kv:text-base">
       <span>Diffing against</span>
       <KuiSelect
         :model-value="String(parentIndex)"
@@ -552,7 +552,7 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
           ></span>
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-xs kv:flex kv:gap-1">
+          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -596,7 +596,7 @@ function reviewToggleTitle(path: string): string {
           <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
             <span
               v-if="!row.node.change.isBinary"
-              class="kv:font-ui kv:text-xs kv:flex kv:gap-1 kv:shrink-0"
+              class="kv:font-ui kv:text-sm kv:flex kv:gap-1 kv:shrink-0"
             >
               <span
                 class="kv:text-diff-added"
@@ -610,7 +610,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -618,11 +618,10 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv:shrink-0 kv:text-[0.5em] kv:text-diff-modified"
+            class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
             v-kui-tooltip="'Changed since you reviewed it'"
             aria-hidden="true"
-            >●</span
-          >
+          ></span>
         </template>
       </div>
 
@@ -676,7 +675,7 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
           ></span>
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
-          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-xs kv:flex kv:gap-1">
+          <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
             <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
@@ -717,13 +716,13 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="dirOf(row.node.path)"
-            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted-foreground kv:text-xs"
+            class="kv:overflow-hidden kv:text-ellipsis kv:text-muted-foreground kv:text-sm"
             >{{ dirOf(row.node.path) }}</span
           >
           <span class="kv:ml-auto kv:flex kv:items-center kv:gap-1 kv:shrink-0">
             <span
               v-if="!row.node.change.isBinary"
-              class="kv:font-ui kv:text-xs kv:flex kv:gap-1 kv:shrink-0"
+              class="kv:font-ui kv:text-sm kv:flex kv:gap-1 kv:shrink-0"
             >
               <span
                 class="kv:text-diff-added"
@@ -737,7 +736,7 @@ function reviewToggleTitle(path: string): string {
               >
             </span>
             <span
-              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-xs kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
+              class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
               v-kui-tooltip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
@@ -745,11 +744,10 @@ function reviewToggleTitle(path: string): string {
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
-            class="kv:shrink-0 kv:text-[0.5em] kv:text-diff-modified"
+            class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
             v-kui-tooltip="'Changed since you reviewed it'"
             aria-hidden="true"
-            >●</span
-          >
+          ></span>
         </template>
       </div>
 

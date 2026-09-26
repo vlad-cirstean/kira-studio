@@ -189,7 +189,7 @@ async function save(): Promise<void> {
          (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
          remaining surface for it. -->
     <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Display</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Display</h3>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-date-format">
         Commit date
         <KuiSelect
@@ -203,7 +203,7 @@ async function save(): Promise<void> {
     </section>
 
     <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Graph</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Graph</h3>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Load more page size
         <input
@@ -226,7 +226,7 @@ async function save(): Promise<void> {
     </section>
 
     <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Checkout</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Checkout</h3>
       <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.checkout.autoStash']" />
         Automatically stash local changes that block a branch switch
@@ -239,7 +239,7 @@ async function save(): Promise<void> {
     </section>
 
     <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Stash</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Stash</h3>
       <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.stash.showInGraph']" />
         Show stash entries as nodes in the commit graph
@@ -251,7 +251,7 @@ async function save(): Promise<void> {
     </section>
 
     <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Branch review</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Branch review</h3>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
         Candidate base branches (one per line, tried in order)
         <textarea
@@ -263,7 +263,7 @@ async function save(): Promise<void> {
     </section>
 
     <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">GitHub</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">GitHub</h3>
       <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
         <input type="checkbox" v-model="draft['kiraSpace.github.enabled']" />
         Show pull request status for this repository
@@ -271,7 +271,7 @@ async function save(): Promise<void> {
     </section>
 
     <section v-if="writeCapability" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Pull</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Pull</h3>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-pull-strategy">
         Strategy
         <KuiSelect
@@ -288,7 +288,7 @@ async function save(): Promise<void> {
          remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
          genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
     <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-sm kv:font-semibold kv:text-row-fg">Diagnostics</h3>
+      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Diagnostics</h3>
       <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-log-level">
         Log level
         <KuiSelect
