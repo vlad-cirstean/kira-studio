@@ -20,6 +20,10 @@ export const toggleVariants = cva(
         // ToggleGroup previously rendered at this cva's stock default (14px/32px) beside 11px/22px
         // toolbar chrome.
         kira: 'h-control min-w-control px-2 text-kira-sm [&_svg:not([class*=size-])]:size-3.5',
+        // P121 S5-S8: dialog density (mirrors Button's kira-lg) for a ToggleGroup rendered beside
+        // dialog inputs/buttons, not toolbar chrome.
+        'kira-lg':
+          'h-control-lg min-w-control-lg px-2 text-kira-sm [&_svg:not([class*=size-])]:size-3.5',
       },
     },
     defaultVariants: {
