@@ -33,18 +33,15 @@ type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
 }
 
-// ClaudeCodeSettings mirrors DbMcpSettings' own shape (P86 §8.4/§9.2): HooksEnabled is read fresh
-// at every terminal launch, not cached anywhere (internal/bridge/agenthooks.go owns the actual
-// server start/stop side effect) — never an installer, never a one-time write. HooksPromptDismissed
-// is the first-run banner's own "don't ask again" leaf (§9.4), independent of HooksEnabled so
-// declining the prompt once doesn't reappear on every new Claude Code tab.
-// KeepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept awake automatically whenever at
-// least one Claude Code session is live (internal/keepawake owns the actual OS assertion),
-// independent of the title bar's own keep-awake toggle. Off by default.
+// ClaudeCodeSettings held HooksEnabled/HooksPromptDismissed through P86-P126 (agent-activity
+// monitoring's own on/off + first-run-banner-dismiss leaves) — P127 moved that feature to a shared,
+// currently-unwired home (internal/agenthooks.Manager) with no settings-backed toggle, so both left
+// with it; migration 0029 drops the two orphaned rows. KeepAwakeWithAgents is P87 §6's own leaf: on,
+// this Mac is kept awake automatically whenever at least one Claude Code session is live
+// (internal/keepawake owns the actual OS assertion), independent of the title bar's own keep-awake
+// toggle. Off by default.
 type ClaudeCodeSettings struct {
-	HooksEnabled         bool `json:"hooksEnabled"`
-	HooksPromptDismissed bool `json:"hooksPromptDismissed"`
-	KeepAwakeWithAgents  bool `json:"keepAwakeWithAgents"`
+	KeepAwakeWithAgents bool `json:"keepAwakeWithAgents"`
 }
 
 // ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema (P90 item 1) — the
@@ -95,7 +92,7 @@ func DefaultSettings() Settings {
 			DisableCookieJar: true,
 		},
 		DbMcp:      DbMcpSettings{ServerEnabled: false},
-		ClaudeCode: ClaudeCodeSettings{HooksEnabled: false, HooksPromptDismissed: false, KeepAwakeWithAgents: false},
+		ClaudeCode: ClaudeCodeSettings{KeepAwakeWithAgents: false},
 	}
 }
 
@@ -136,9 +133,7 @@ type DbMcpPatch struct {
 
 // ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape (P86 §9.2).
 type ClaudeCodePatch struct {
-	HooksEnabled         *bool `json:"hooksEnabled,omitempty"`
-	HooksPromptDismissed *bool `json:"hooksPromptDismissed,omitempty"`
-	KeepAwakeWithAgents  *bool `json:"keepAwakeWithAgents,omitempty"`
+	KeepAwakeWithAgents *bool `json:"keepAwakeWithAgents,omitempty"`
 }
 
 type SettingsPatch struct {

@@ -55,8 +55,6 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	appsettings.LeafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
 	appsettings.Leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	appsettings.Leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
-	appsettings.Leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
-	appsettings.Leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
 	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	return result, nil
 }
@@ -123,12 +121,6 @@ func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
 func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
 	if cc == nil {
 		return nil
-	}
-	if err := appsettings.UpsertOptional(tx, "claudeCode.hooksEnabled", cc.HooksEnabled); err != nil {
-		return err
-	}
-	if err := appsettings.UpsertOptional(tx, "claudeCode.hooksPromptDismissed", cc.HooksPromptDismissed); err != nil {
-		return err
 	}
 	return appsettings.UpsertOptional(tx, "claudeCode.keepAwakeWithAgents", cc.KeepAwakeWithAgents)
 }

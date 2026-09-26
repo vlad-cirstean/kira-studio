@@ -63,7 +63,7 @@ func (e *embeddedService[S, ST]) stopLocked() {
 
 // startIfEnabled is main.go's own boot-time call: a failure (curl missing, a bind conflict) is
 // logged, never fatal — the app boots regardless. enabledSetting reads the owning service's own
-// settings leaf (ClaudeCode.HooksEnabled / DbMcp.ServerEnabled).
+// settings leaf (DbMcp.ServerEnabled, the sole embeddedService user post-P127).
 func (e *embeddedService[S, ST]) startIfEnabled(scope string, enabledSetting func() (bool, error)) {
 	ok, err := enabledSetting()
 	if err != nil {

@@ -125,16 +125,13 @@ const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
 });
 
-// P86 §9.2: mirrors dbMcpSettingsSchema exactly — hooksEnabled is read fresh at every Claude Code
-// launch (internal/bridge/agenthooks.go owns the actual listener start/stop side effect), never
-// cached. hooksPromptDismissed is the first-run banner's own "don't ask again" leaf (§9.4),
-// independent of hooksEnabled so declining the prompt once doesn't reappear on every new tab.
-// keepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept awake automatically whenever at
-// least one Claude Code session (P86's own tracked running-agent count) is live, independent of
-// the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
+// This section held hooksEnabled/hooksPromptDismissed through P86-P126 (agent-activity
+// monitoring's own on/off + first-run-banner-dismiss leaves) — P127 moved that feature to a
+// shared, currently-unwired home with no settings-backed toggle, so both left with it; migration
+// 0029 drops the two orphaned rows. keepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept
+// awake automatically whenever at least one Claude Code session is live, independent of the title
+// bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
 const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
-  hooksEnabled: z.boolean().default(false),
-  hooksPromptDismissed: z.boolean().default(false),
   keepAwakeWithAgents: z.boolean().default(false),
 });
 
@@ -161,8 +158,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
   }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
   claudeCode: claudeCodeSettingsSchema.default({
-    hooksEnabled: false,
-    hooksPromptDismissed: false,
     keepAwakeWithAgents: false,
   }),
 });
@@ -211,8 +206,6 @@ export const defaultSettings: Settings = {
     serverEnabled: false,
   },
   claudeCode: {
-    hooksEnabled: false,
-    hooksPromptDismissed: false,
     keepAwakeWithAgents: false,
   },
 };
