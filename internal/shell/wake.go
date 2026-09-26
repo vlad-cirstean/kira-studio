@@ -1,4 +1,4 @@
-package appshell
+package shell
 
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"

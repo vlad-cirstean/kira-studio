@@ -529,7 +529,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	d.windowsSvc.OpenNewWindow = openNew
 	shell.AttachReopen(app, func() { shell.ReopenWindows(deps) })
 	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
-	appshell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
+	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
 
 	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
