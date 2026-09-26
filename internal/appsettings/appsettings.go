@@ -1,25 +1,23 @@
 // Package appsettings is P103 Part 4 (§7.1)'s hoist of the settings sections that were
 // byte-identical, field for field and tag for tag, in both apps' own storage/model/settings.go:
-// AppearanceSettings (7 fields), and the one leaf AdvancedSettings shares, GitLogLevel. Each app's
-// own Settings composes Appearance here alongside its own per-app sections (Kira Studio's
-// Data/Cache/Api/DbMcp/ClaudeCode; Kira Space's own GitSettings), and each app's own
-// AdvancedSettings embeds AdvancedCore for the one leaf that's genuinely shared.
+// AppearanceSettings and the one leaf AdvancedSettings shares, GitLogLevel. Each app's own
+// Settings composes Appearance here alongside its own per-app sections (Kira Studio's
+// Data/Cache/Api/DbMcp/ClaudeCode; Kira Space's own GitSettings/InlineBlame/DateFormat, P120: the
+// two leaves only Kira Space's git module used), and each app's own AdvancedSettings embeds
+// AdvancedCore for the one leaf that's genuinely shared.
 package appsettings
 
 import "fmt"
 
-// Appearance mirrors both apps' own former AppearanceSettings verbatim.
+// Appearance mirrors both apps' own former AppearanceSettings verbatim, minus the two leaves only
+// Kira Space's git module actually uses (inlineBlame/dateFormat, P120: Kira Space's own
+// storage/model.Appearance embeds this and adds them).
 type Appearance struct {
 	FontFamily  string `json:"fontFamily"`
 	FontSize    int    `json:"fontSize"`
 	RowDensity  string `json:"rowDensity"`
 	WordWrap    bool   `json:"wordWrap"`
 	RowColoring bool   `json:"rowColoring"`
-	// InlineBlame is P62's git-blame annotation toggle in the repo file viewer.
-	InlineBlame bool `json:"inlineBlame"`
-	// DateFormat is P72 §9.1's relative-vs-absolute commit timestamp preference, moved here from
-	// the per-repo RepoSettingsDialog.vue/PersistedViewState.
-	DateFormat string `json:"dateFormat"`
 }
 
 // AdvancedCore is the one Advanced leaf both apps share — GitLogLevel is P72 §9.2's genuinely
@@ -40,8 +38,6 @@ type AppearancePatch struct {
 	RowDensity  *string `json:"rowDensity,omitempty"`
 	WordWrap    *bool   `json:"wordWrap,omitempty"`
 	RowColoring *bool   `json:"rowColoring,omitempty"`
-	InlineBlame *bool   `json:"inlineBlame,omitempty"`
-	DateFormat  *string `json:"dateFormat,omitempty"`
 }
 
 // AdvancedCorePatch mirrors AdvancedCore's own `.partial()` shape — each app's own AdvancedPatch
@@ -58,19 +54,12 @@ func DefaultAppearance() Appearance {
 		RowDensity:  "comfortable",
 		WordWrap:    true,
 		RowColoring: true,
-		InlineBlame: true,
-		DateFormat:  "relative",
 	}
 }
 
 // ValidRowDensity mirrors settings.ts's rowDensitySchema.
 func ValidRowDensity(v string) bool {
 	return v == "compact" || v == "comfortable"
-}
-
-// ValidDateFormat mirrors settings.ts's appearanceSettingsSchema.dateFormat enum.
-func ValidDateFormat(v string) bool {
-	return v == "relative" || v == "absolute"
 }
 
 // ValidLogLevel mirrors settings.ts's gitLogLevelSchema enum (kiraSpace.log.level before P100
@@ -98,9 +87,6 @@ func ValidateAppearance(a *AppearancePatch) error {
 	}
 	if a.RowDensity != nil && !ValidRowDensity(*a.RowDensity) {
 		return fmt.Errorf("appsettings: appearance.rowDensity: invalid value %q", *a.RowDensity)
-	}
-	if a.DateFormat != nil && !ValidDateFormat(*a.DateFormat) {
-		return fmt.Errorf("appsettings: appearance.dateFormat: invalid value %q", *a.DateFormat)
 	}
 	return nil
 }

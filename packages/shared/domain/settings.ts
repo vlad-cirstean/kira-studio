@@ -42,16 +42,6 @@ export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   // P9: colour grid cell text by the column's data type. `.default(true)` keeps a pre-P9 stored
   // shape parsing to today's behavior (colouring on).
   rowColoring: z.boolean().default(true),
-  // P62: inline git-blame annotation at the end of the cursor's line in the repo file viewer.
-  // `.default(true)` follows the same discipline as wordWrap/rowColoring above — a stored row
-  // saved before this field existed hydrates with the annotation on.
-  inlineBlame: z.boolean().default(true),
-  // P72 §9.1: relative-vs-absolute commit timestamps in the git graph — moved here from the
-  // per-repo RepoSettingsDialog.vue/PersistedViewState (a reading preference about the person, not
-  // the repository, the same class as fontSize/fontFamily above). `.default('relative')` matches
-  // PersistedViewState's own pre-existing default, so an existing stored settings row hydrates to
-  // today's behavior.
-  dateFormat: z.enum(['relative', 'absolute']).default('relative'),
 });
 export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 

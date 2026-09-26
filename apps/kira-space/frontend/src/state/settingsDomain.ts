@@ -55,10 +55,26 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
   gitLogLevel: gitLogLevelSchema.default('info'),
 });
 
+// P120: inlineBlame/dateFormat are this app's own — the only app with a git module to show either
+// in. `.extend(...)` on the shared appearanceSettingsSchema keeps the five shared leaves' own
+// validation/defaults in one place.
+const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.extend({
+  // P62: inline git-blame annotation at the end of the cursor's line in the repo file viewer.
+  // `.default(true)` follows the same discipline as wordWrap/rowColoring above — a stored row
+  // saved before this field existed hydrates with the annotation on.
+  inlineBlame: z.boolean().default(true),
+  // P72 §9.1: relative-vs-absolute commit timestamps in the git graph — moved here from the
+  // per-repo RepoSettingsDialog.vue/PersistedViewState (a reading preference about the person, not
+  // the repository, the same class as fontSize/fontFamily above). `.default('relative')` matches
+  // PersistedViewState's own pre-existing default, so an existing stored settings row hydrates to
+  // today's behavior.
+  dateFormat: z.enum(['relative', 'absolute']).default('relative'),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
 // with no `advanced`/`git` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
-  appearance: appearanceSettingsSchema,
+  appearance: appSpaceAppearanceSettingsSchema,
   advanced: advancedSettingsSchema.default({ gitLogLevel: 'info' }),
   git: gitSettingsSchema.default({
     protectedBranches: ['main', 'master', 'release/*'],
@@ -70,7 +86,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
 export type Settings = z.infer<typeof settingsSchema>;
 
 const settingsPatchSchema = /*#__PURE__*/ z.object({
-  appearance: appearanceSettingsSchema.partial().optional(),
+  appearance: appSpaceAppearanceSettingsSchema.partial().optional(),
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
 });

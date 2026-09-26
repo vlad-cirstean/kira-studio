@@ -145,7 +145,8 @@ test('kira:open-settings opens the Settings dialog', async ({ relaunch }) => {
 });
 
 // P117 S2: same NativeSelect binding fix as Kira Studio's own settings-apply-on-save.spec.ts --
-// DateFormatField is shared via packages/workbench, so the regression and its guard both apply here.
+// this app's own DateFormatField.vue used the identical pattern (P120: this field moved from the
+// former shared packages/workbench into this app), so the regression and its guard both apply here.
 test('the date-format select shows its real value on open (P117 S2)', async ({ relaunch }) => {
   const { window } = await relaunch();
   await window.click('[data-testid="open-settings"]');

@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import type { AppearanceSettings } from '@shared/domain/settings';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { Field, FieldDescription } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { useId } from 'vue';
+import type { Settings } from '../../state/settingsDomain';
 
 // I2-18: the commit-date leaf (select, reset button, helper text) was byte-identical between
-// kira-studio's and kira-space's own AppearancePane.vue.
+// kira-studio's and kira-space's own AppearancePane.vue. P120: dateFormat is this app's own leaf
+// now (only its git module reads it), so this field types on this app's own Settings['appearance']
+// instead of the former shared AppearanceSettings.
+type AppearanceSettings = Settings['appearance'];
+
 const props = defineProps<{
   appearance: AppearanceSettings;
   isAtDefault: (section: 'appearance', key: 'dateFormat') => boolean;

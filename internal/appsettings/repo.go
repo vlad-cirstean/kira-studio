@@ -51,13 +51,7 @@ func UpsertAppearance(tx *sql.Tx, a *AppearancePatch) error {
 	if err := UpsertOptional(tx, "appearance.wordWrap", a.WordWrap); err != nil {
 		return err
 	}
-	if err := UpsertOptional(tx, "appearance.rowColoring", a.RowColoring); err != nil {
-		return err
-	}
-	if err := UpsertOptional(tx, "appearance.inlineBlame", a.InlineBlame); err != nil {
-		return err
-	}
-	return UpsertOptional(tx, "appearance.dateFormat", a.DateFormat)
+	return UpsertOptional(tx, "appearance.rowColoring", a.RowColoring)
 }
 
 // Leaf mirrors both apps' own former leaf[T] verbatim: overwrites *dst with the stored value for
@@ -106,7 +100,5 @@ func ReadAppearance(stored map[string]json.RawMessage) Appearance {
 	LeafValid(stored, "appearance.rowDensity", &result.RowDensity, ValidRowDensity)
 	Leaf(stored, "appearance.wordWrap", &result.WordWrap)
 	Leaf(stored, "appearance.rowColoring", &result.RowColoring)
-	Leaf(stored, "appearance.inlineBlame", &result.InlineBlame)
-	LeafValid(stored, "appearance.dateFormat", &result.DateFormat, ValidDateFormat)
 	return result
 }

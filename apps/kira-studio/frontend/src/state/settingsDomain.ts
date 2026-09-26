@@ -188,8 +188,6 @@ export const defaultSettings: Settings = {
     rowDensity: 'comfortable',
     wordWrap: true,
     rowColoring: true,
-    inlineBlame: true,
-    dateFormat: 'relative',
   },
   data: {
     defaultPageSize: 100,

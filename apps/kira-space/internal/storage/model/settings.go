@@ -6,16 +6,27 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
-// Kira Space's own trimmed Settings model (P100 Part 1). Appearance is appsettings.Appearance
-// (P103 Part 4 §7.1) — it drives the graph/file-viewer rendering. Advanced embeds
-// appsettings.AdvancedCore for the one leaf this app owns, GitLogLevel — Kira Studio's own
-// OpLogRetentionDays/ExpensiveQueryRows are query-log concerns this app has none of.
-// Data/Cache/Api/DbMcp/ClaudeCode are dropped entirely: all five are DB-client-only concerns
-// (page sizes, the query cache budget, HTTP client tuning, the embedded DB MCP server, Claude Code
-// hooks) Kira Space has no use for. Git is this app's own (P120): the only app with a git module,
-// so its server-owned git leaves (G7 D16) live here rather than in the shared appsettings package.
+// Kira Space's own trimmed Settings model (P100 Part 1). Advanced embeds appsettings.AdvancedCore
+// for the one leaf this app owns, GitLogLevel — Kira Studio's own OpLogRetentionDays/
+// ExpensiveQueryRows are query-log concerns this app has none of. Data/Cache/Api/DbMcp/ClaudeCode
+// are dropped entirely: all five are DB-client-only concerns (page sizes, the query cache budget,
+// HTTP client tuning, the embedded DB MCP server, Claude Code hooks) Kira Space has no use for.
+// Appearance/Git are this app's own (P120): the only app with a git module, so the two leaves only
+// the git module uses (InlineBlame/DateFormat) and the server-owned git leaves (G7 D16) live here
+// rather than in the shared appsettings package.
 type AdvancedSettings struct {
 	appsettings.AdvancedCore
+}
+
+// Appearance embeds appsettings.Appearance for the five leaves both apps share, plus the two only
+// this app's git module uses: InlineBlame (P62's git-blame annotation toggle in the repo file
+// viewer) and DateFormat (P72 §9.1's relative-vs-absolute commit timestamp preference). The
+// embedding flattens on the wire the same way AdvancedSettings' own AdvancedCore embed already
+// does — encoding/json promotes an embedded struct's fields on both marshal and unmarshal.
+type Appearance struct {
+	appsettings.Appearance
+	InlineBlame bool   `json:"inlineBlame"`
+	DateFormat  string `json:"dateFormat"`
 }
 
 // GitSettings mirrors G7 D16's two server-owned git leaves: two windows disagreeing about either
@@ -38,9 +49,9 @@ type GitSettings struct {
 }
 
 type Settings struct {
-	Appearance appsettings.Appearance `json:"appearance"`
-	Advanced   AdvancedSettings       `json:"advanced"`
-	Git        GitSettings            `json:"git"`
+	Appearance Appearance       `json:"appearance"`
+	Advanced   AdvancedSettings `json:"advanced"`
+	Git        GitSettings      `json:"git"`
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -58,17 +69,34 @@ func DefaultGitSettings() GitSettings {
 // packages/shared/domain/settings.ts's defaultSettings.
 func DefaultSettings() Settings {
 	return Settings{
-		Appearance: appsettings.DefaultAppearance(),
-		Advanced:   AdvancedSettings{AdvancedCore: appsettings.AdvancedCore{GitLogLevel: "info"}},
-		Git:        DefaultGitSettings(),
+		Appearance: Appearance{
+			Appearance:  appsettings.DefaultAppearance(),
+			InlineBlame: true,
+			DateFormat:  "relative",
+		},
+		Advanced: AdvancedSettings{AdvancedCore: appsettings.AdvancedCore{GitLogLevel: "info"}},
+		Git:      DefaultGitSettings(),
 	}
 }
 
 // AdvancedPatch embeds appsettings.AdvancedCorePatch for the one leaf this app patches through the
-// shared mechanism (GitLogLevel). Appearance's own patch shape is appsettings.AppearancePatch
-// directly (P103 Part 4 §7.1).
+// shared mechanism (GitLogLevel).
 type AdvancedPatch struct {
 	appsettings.AdvancedCorePatch
+}
+
+// AppearancePatch embeds appsettings.AppearancePatch for the five leaves both apps share, plus this
+// app's own two (InlineBlame/DateFormat) — same embedding AdvancedPatch uses.
+type AppearancePatch struct {
+	appsettings.AppearancePatch
+	InlineBlame *bool   `json:"inlineBlame,omitempty"`
+	DateFormat  *string `json:"dateFormat,omitempty"`
+}
+
+// ValidDateFormat mirrors settingsDomain.ts's appearanceSettingsSchema.dateFormat enum (P120: only
+// this app's git module has a dateFormat leaf).
+func ValidDateFormat(v string) bool {
+	return v == "relative" || v == "absolute"
 }
 
 // GitPatch mirrors GitSettings' own `.partial()` shape (G7 D16).
@@ -80,9 +108,23 @@ type GitPatch struct {
 }
 
 type SettingsPatch struct {
-	Appearance *appsettings.AppearancePatch `json:"appearance,omitempty"`
-	Advanced   *AdvancedPatch               `json:"advanced,omitempty"`
-	Git        *GitPatch                    `json:"git,omitempty"`
+	Appearance *AppearancePatch `json:"appearance,omitempty"`
+	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
+	Git        *GitPatch        `json:"git,omitempty"`
+}
+
+// validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
+func validateAppearanceSection(a *AppearancePatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.ValidateAppearance(&a.AppearancePatch); err != nil {
+		return err
+	}
+	if a.DateFormat != nil && !ValidDateFormat(*a.DateFormat) {
+		return fmt.Errorf("model: appearance.dateFormat: invalid value %q", *a.DateFormat)
+	}
+	return nil
 }
 
 func validateAdvancedSection(a *AdvancedPatch) error {
@@ -124,7 +166,7 @@ func validateGitSection(g *GitPatch) error {
 // offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema either, so
 // they are accepted as-is.
 func (p SettingsPatch) Validate() error {
-	if err := appsettings.ValidateAppearance(p.Appearance); err != nil {
+	if err := validateAppearanceSection(p.Appearance); err != nil {
 		return err
 	}
 	if err := validateAdvancedSection(p.Advanced); err != nil {

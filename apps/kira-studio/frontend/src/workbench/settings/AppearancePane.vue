@@ -5,7 +5,6 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLegend } from '@theme/components/ui/field';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
-import DateFormatField from '@workbench/settings/fields/DateFormatField.vue';
 import FontSizeField from '@workbench/settings/fields/FontSizeField.vue';
 import RowDensityField from '@workbench/settings/fields/RowDensityField.vue';
 import WordWrapField from '@workbench/settings/fields/WordWrapField.vue';
@@ -43,17 +42,12 @@ function onRowColoringChange(checked: boolean): void {
   props.draft.appearance.rowColoring = checked;
 }
 
-function onInlineBlameChange(checked: boolean): void {
-  props.draft.appearance.inlineBlame = checked;
-}
-
 const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
 // P110 I2-26: `for`/`id` preserves the old <label>-wraps-control implicit association (see
 // FontSizeField.vue's own precedent comment) now that the field wrapper is a plain <Field> div.
 const fontFamilyId = useId();
 const rowColoringId = useId();
-const inlineBlameId = useId();
 </script>
 
 <template>
@@ -214,37 +208,5 @@ const inlineBlameId = useId();
         @click="resetLeaf('appearance', 'rowColoring')"
       />
     </FieldGroup>
-
-    <FieldGroup>
-      <Field orientation="horizontal" class="items-start">
-        <Checkbox
-          :id="inlineBlameId"
-          class="size-3.5"
-          :model-value="draft.appearance.inlineBlame"
-          data-testid="settings-inline-blame"
-          @update:model-value="(v) => onInlineBlameChange(v === true)"
-        >
-          <CodiconIcon name="check" :size="10" />
-        </Checkbox>
-        <FieldContent>
-          <Label :for="inlineBlameId" class="text-kira-sm">Inline blame</Label>
-          <FieldDescription
-            >Show who last changed the current line, at the end of that line, in the
-            repository file viewer.</FieldDescription
-          >
-        </FieldContent>
-      </Field>
-      <TooltipIconButton
-        icon="discard"
-        label="Reset to default"
-        class="ml-auto"
-        data-testid="settings-reset-appearance-inlineBlame"
-        :disabled-trigger="isAtDefault('appearance', 'inlineBlame')"
-        :disabled="isAtDefault('appearance', 'inlineBlame')"
-        @click="resetLeaf('appearance', 'inlineBlame')"
-      />
-    </FieldGroup>
-
-    <DateFormatField :appearance="draft.appearance" :is-at-default="isAtDefault" :reset-leaf="resetLeaf" />
   </div>
 </template>

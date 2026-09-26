@@ -41,10 +41,22 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	}
 
 	result := model.DefaultSettings()
-	result.Appearance = appsettings.ReadAppearance(stored)
+	result.Appearance = readAppearance(stored)
 	result.Git = readGit(stored)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
+}
+
+// readAppearance reads the shared appearance.* leaves plus this app's own two (inlineBlame/
+// dateFormat) on top of model.DefaultSettings().Appearance, mirroring the former
+// appsettings.ReadAppearance's own inlineBlame/dateFormat block (P120: only this app's git module
+// uses either leaf).
+func readAppearance(stored map[string]json.RawMessage) model.Appearance {
+	result := model.DefaultSettings().Appearance
+	result.Appearance = appsettings.ReadAppearance(stored)
+	appsettings.Leaf(stored, "appearance.inlineBlame", &result.InlineBlame)
+	appsettings.LeafValid(stored, "appearance.dateFormat", &result.DateFormat, model.ValidDateFormat)
+	return result
 }
 
 // readGit reads every git.* leaf from stored on top of model.DefaultGitSettings(), mirroring the
@@ -77,6 +89,21 @@ func upsertGit(tx *sql.Tx, g *model.GitPatch) error {
 	return appsettings.UpsertOptional(tx, "git.graphFontSize", g.GraphFontSize)
 }
 
+// upsertAppearance upserts the shared appearance.* leaves plus this app's own two (inlineBlame/
+// dateFormat) — mirrors the former appsettings.UpsertAppearance's own inlineBlame/dateFormat block.
+func upsertAppearance(tx *sql.Tx, a *model.AppearancePatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.UpsertAppearance(tx, &a.AppearancePatch); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "appearance.inlineBlame", a.InlineBlame); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "appearance.dateFormat", a.DateFormat)
+}
+
 func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 	if a == nil {
 		return nil
@@ -92,7 +119,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	}
 
 	err := appstorage.UpdateLeaves(r.DB, r.selectAll, settingsSelectAllSQL, func(tx *sql.Tx, _ map[string]json.RawMessage) error {
-		if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
+		if err := upsertAppearance(tx, patch.Appearance); err != nil {
 			return err
 		}
 		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
