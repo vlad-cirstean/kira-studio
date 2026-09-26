@@ -34,7 +34,7 @@ async function onImport(): Promise<void> {
             <CodiconIcon name="repo" :size="13" />
             Import repository…
           </Button>
-          <span v-if="importError" class="text-kira-xs text-error">{{ importError }}</span>
+          <span v-if="importError" class="text-kira-sm text-error">{{ importError }}</span>
         </AlertAction>
       </Alert>
     </div>

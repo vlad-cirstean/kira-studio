@@ -61,12 +61,12 @@ const vsixOutcomeMessage = computed(() => {
     <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
          VsixStatus, but the click itself always re-resolves through Install. -->
     <div class="git-vsix-install">
-      <p v-if="!gitClientsStore.vsix.bundled" class="text-subtle text-kira-xs" data-testid="git-vsix-not-bundled">
+      <p v-if="!gitClientsStore.vsix.bundled" class="text-subtle text-kira-sm" data-testid="git-vsix-not-bundled">
         The extension ships inside the packaged app. This build has none.
       </p>
       <template v-else>
         <p
-          class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-xs leading-normal"
+          class="font-data m-0 whitespace-pre-wrap break-all select-all rounded-kira-sm p-1 bg-field border border-border text-kira-sm leading-normal"
           data-testid="git-vsix-command"
         >
           {{ gitClientsStore.vsix.command }}
@@ -91,7 +91,7 @@ const vsixOutcomeMessage = computed(() => {
       </FieldDescription>
       <p
         v-if="gitClientsStore.vsix.bundled && !gitClientsStore.vsix.codeAvailable && gitClientsStore.vsix.probed.length > 0"
-        class="text-subtle text-kira-xs"
+        class="text-subtle text-kira-sm"
         data-testid="git-vsix-probed"
       >
         Looked for VS Code's <span class="font-data">code</span> command at:
@@ -99,7 +99,7 @@ const vsixOutcomeMessage = computed(() => {
       </p>
     </div>
 
-    <p v-if="gitClientsStore.clients.length === 0" class="text-subtle text-kira-xs" data-testid="git-clients-empty">
+    <p v-if="gitClientsStore.clients.length === 0" class="text-subtle text-kira-sm" data-testid="git-clients-empty">
       No editors have been paired yet. A VS Code editor pairs by connecting to
       <span class="font-data">~/.kira-space/git.sock</span>.
     </p>
@@ -115,7 +115,7 @@ const vsixOutcomeMessage = computed(() => {
           <!-- P110 B12: .git-client-info is unstyled (no flex) -- kept as an inline span with
                .helper-text's own utility-class equivalent, not FieldDescription (a <p>), so this
                stays inline exactly as it renders today. -->
-          <span class="text-subtle text-kira-xs leading-normal">
+          <span class="text-subtle text-kira-sm leading-normal">
             <template v-if="client.revokedAt">Revoked</template>
             <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
           </span>

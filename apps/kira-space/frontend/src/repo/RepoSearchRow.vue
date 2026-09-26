@@ -112,12 +112,12 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ row.path }}</TooltipContent>
     </Tooltip>
-    <span class="text-kira-xs text-subtle shrink-0" data-testid="repo-search-match-count">{{
+    <span class="text-kira-sm text-subtle shrink-0" data-testid="repo-search-match-count">{{
       row.matchCount
     }}</span>
     <Tooltip v-if="row.fileTruncated">
       <TooltipTrigger as-child>
-        <span class="text-kira-xs text-subtle">+</span>
+        <span class="text-kira-sm text-subtle">+</span>
       </TooltipTrigger>
       <TooltipContent>This file hit the per-file match cap — not every match is shown</TooltipContent>
     </Tooltip>
@@ -141,7 +141,7 @@ function onKeydown(e: KeyboardEvent): void {
     @dblclick="onDblClick"
     @keydown="onKeydown"
   >
-    <span class="text-kira-xs text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
+    <span class="text-kira-sm text-subtle shrink-0 min-w-10">{{ row.line }}:{{ row.column }}</span>
     <span class="overflow-hidden text-ellipsis"
       >{{ previewParts.before
       }}<span class="rounded-kira-xs bg-search-match">{{ previewParts.match }}</span

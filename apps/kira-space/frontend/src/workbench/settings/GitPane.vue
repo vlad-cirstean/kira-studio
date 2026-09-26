@@ -82,8 +82,8 @@ const graphFontSizeId = useId();
 
 <template>
   <div class="contents" v-show="active">
-    <h3>Git remote operations</h3>
-    <p class="text-subtle text-kira-xs">
+    <h3 class="text-kira-lg">Git remote operations</h3>
+    <p class="text-subtle text-kira-sm">
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>
@@ -169,7 +169,7 @@ const graphFontSizeId = useId();
         time, never cached, so a change here takes effect on the next one.</FieldDescription
       >
     </Field>
-    <h3>Graph</h3>
+    <h3 class="text-kira-lg">Graph</h3>
     <Field>
       <div class="flex items-center justify-between gap-1">
         <Label :for="graphFontSizeId">Font size</Label>

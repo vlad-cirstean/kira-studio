@@ -57,7 +57,7 @@ function submit(): void {
 
 <template>
   <!-- §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. -->
-  <div class="box-border w-full h-full bg-elevated border-t border-b border-border-strong text-fg text-xs flex flex-col gap-1.5 overflow-auto select-text py-2 px-3" data-testid="review-thread">
+  <div class="box-border w-full h-full bg-elevated border-t border-b border-border-strong text-fg text-kira-md flex flex-col gap-1.5 overflow-auto select-text py-2 px-3" data-testid="review-thread">
     <template v-if="mode === 'view' && comment">
       <div v-if="anchorLabel" class="text-warn italic">{{ anchorLabel }}</div>
       <div class="whitespace-pre-wrap break-words">{{ comment.body }}</div>
