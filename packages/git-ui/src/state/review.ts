@@ -2,9 +2,8 @@ import type { BaseResolution, CommitRange } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { copyToClipboard } from './clipboardActions.ts';
 import { DetailState } from './detail.ts';
-import type { Capabilities, DetailActions } from './detailActions.ts';
+import { type Capabilities, createDetailActions, type DetailActions } from './detailActions.ts';
 import { PackedStreamState } from './packedStream.ts';
 
 /**
@@ -440,39 +439,18 @@ export class ReviewSessionState {
     }
   }
 
+  // P115 H6: was a hand-built duplicate of `createDetailActions` (`detailActions.ts`) — every
+  // method here closed over the same fixed `repoId` `createDetailActions` reads through a
+  // function, and never passed `fallbackSha` (stash-only, so sharing this way is safe).
   #createRowActions(repoId: string): DetailActions {
-    return {
-      capabilities: this.#capabilities,
-      copy: (text, whatCopied) => {
-        void copyToClipboard(this.#bridge, text, whatCopied).then((outcome) => {
-          this.announcement.value = outcome.message;
-        });
-      },
-      announce: (text) => {
+    return createDetailActions(
+      this.#bridge,
+      (text) => {
         this.announcement.value = text;
       },
-      openInEditor: async ({ sha, path, originalPath, parentIndex, pinned }) => {
-        await this.#bridge.request('editor.openDiff', {
-          repoId,
-          sha,
-          path,
-          ...(originalPath !== undefined ? { originalPath } : {}),
-          parentIndex,
-          pinned,
-        });
-      },
-      openAllChanges: async ({ sha, parentIndex }) =>
-        this.#bridge.request('editor.openAllChanges', { repoId, sha, parentIndex }),
-      goToFile: async ({ rev, path, line }) =>
-        this.#bridge.request('editor.goToFile', { repoId, rev, path, line }),
-      openPullRequest: async ({ number }) => {
-        await this.#bridge.request('pr.openExternal', { repoId, number });
-      },
-      openExternalLink: async (url) => {
-        await this.#bridge.request('link.openExternal', { url });
-      },
-      revealInGraph: async ({ sha }) => this.#bridge.request('graph.revealCommit', { repoId, sha }),
-    };
+      this.#capabilities,
+      () => repoId,
+    );
   }
 
   #clearExpansions(): void {

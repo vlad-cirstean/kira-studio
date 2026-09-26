@@ -1328,7 +1328,7 @@ async function bootstrap(): Promise<void> {
   // doc comment), so `actions` is built exactly once, here, rather than reactively re-derived.
   actions.value = createDetailActions(
     bridge,
-    detailState,
+    (text) => detailState.announce(text),
     init.capabilities,
     () => repoState.value?.activeRepo.value?.repoId,
   );

@@ -1,7 +1,6 @@
 import type { GoToFileOutcome, ResultOf } from '@kira/git-ipc';
 import type { BridgeClient } from '../bridge/client.ts';
 import { copyToClipboard } from './clipboardActions.ts';
-import type { DetailState } from './detail.ts';
 
 export type Capabilities = ResultOf<'app.init'>['capabilities'];
 
@@ -82,9 +81,14 @@ export interface DetailActions {
   revealInGraph(params: { sha: string }): Promise<{ revealed: boolean }>;
 }
 
+/**
+ * `announce` is a plain sink rather than a `DetailState` instance (P115 H6): `App.vue`'s own
+ * `DetailState` and `ReviewSessionState`'s own `announcement` ref are the two live regions this
+ * bundle can feed, and this factory needs only the one method either exposes.
+ */
 export function createDetailActions(
   bridge: BridgeClient,
-  detailState: DetailState,
+  announce: (text: string) => void,
   capabilities: Capabilities,
   repoId: () => string | undefined,
 ): DetailActions {
@@ -92,11 +96,11 @@ export function createDetailActions(
     capabilities,
     copy(text, whatCopied) {
       void copyToClipboard(bridge, text, whatCopied).then((outcome) => {
-        detailState.announce(outcome.message);
+        announce(outcome.message);
       });
     },
     announce(text) {
-      detailState.announce(text);
+      announce(text);
     },
     async openInEditor({ sha, path, originalPath, parentIndex, pinned, fallbackSha }) {
       const repo = repoId();
