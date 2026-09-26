@@ -48,7 +48,7 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text' |
       ],
       radius: ['kui', 'kui-float'],
       shadow: ['float', 'kui-float'],
-      // P110 I2-2: M1 -- `kv:text-kui-xs`/`-sm`/`-base` (kuiRowVariants, KuiTextInput) read as
+      // P110 I2-2: M1 -- `kv:text-kui-sm`/`-base` (kuiRowVariants, KuiTextInput) read as
       // colour utilities without these, and drop a static `kv:text-kui-fg`/`-selected-fg` colour
       // on the same element as a false same-group conflict. P110 I2-28: `codicon`
       // (GU/theme/tailwind.css's `--text-codicon`) is the same shape -- a font-size name, not a

@@ -557,7 +557,7 @@ const fieldAttrs = computed(
           v-html="overlayHtml"
         ></div>
         <!-- P110 B25: primitives.css's old `.p-input input,textarea{...}` reset, direct utilities
-             now (`font-data`/`text-kira-sm` replace `font:inherit` -- form elements don't inherit
+             now (`font-data`/`text-kira-md` replace `font:inherit` -- form elements don't inherit
              either by UA default, so the original rule set them explicitly too, just via the box's
              own computed values rather than repeating the tokens; text color moves through
              `fieldOverlayClass`, in `fieldAttrs` below, since `.has-overlay` conditionally overrides
