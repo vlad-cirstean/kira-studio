@@ -193,6 +193,27 @@ check_alias() {
   fi
 }
 
+# check_focus_width <pattern>
+# P122: guards every focus ring against the retired shadcn 3px/50%-alpha halo (ring-N/ring-focus/
+# ring-error) or a >1px coloured outline -- both replaced by the shared `focus-ring` utility
+# (packages/theme/src/base.css). Modelled on check_alias: SCAN_DIRS *including* components/ui (no
+# shadcn-registry survivor for either shape any more, P122 plan §3.3), plus the GU/KU pass via
+# _gu_ku_hits (kv: roots keep their own 1px --kv-focus-border recipe, a different shape by design).
+# `peer-focus-visible:outline-2` (SwatchRadio.vue, P122 plan §3.5's own named exception) matches
+# neither pattern -- `peer-` sits outside both alternations.
+check_focus_width() {
+  pattern="$1"
+  hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
+  gu_ku_hits=$(_gu_ku_hits "$pattern")
+  hits=$(printf '%s\n%s\n' "$hits" "$gu_ku_hits" | grep -v '^$' || true)
+  if [ -n "$hits" ]; then
+    echo "check-theme-classes: focus ring wider/coloured than focus-ring (packages/theme/src/base.css):" >&2
+    echo "$hits" >&2
+    STATUS=1
+  fi
+}
+
 # P110 B3/B4: base.css's @theme used to shadow shadcn-bridge.css's own --color-muted; app code's
 # text-muted/text-fg-muted are both renamed to shadcn's own text-muted-foreground.
 check_class_all 'text-muted' 'text-muted-foreground'
@@ -515,6 +536,11 @@ check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-md!?" 'the rounded-kira-sm equiv
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-lg!?" 'the rounded-kira equivalent (e.g. rounded-lg -> rounded-kira)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-xl!?" 'the rounded-kira-pill equivalent (e.g. rounded-xl -> rounded-kira-pill)'
 check_alias 'var\(--radius(-sm|-md|-lg|-xl)?\)' 'var(--kira-radius) (or the matching --kira-radius-* step) -- shadcn-bridge.css no longer defines --radius'
+
+# P122: the one focus ring is 1px solid --kira-focus, inset (base.css's `focus-ring` utility) --
+# no component may bypass it with its own halo or a wider/coloured outline.
+check_focus_width "(?<![-\\w])(?:focus-visible|focus-within|focus|has-\[[^\s\"']*focus-visible\]):ring-(?:[1-9][0-9]*|focus|error)"
+check_focus_width '(?<![-\w])(?:focus-visible|focus-within|focus|group-focus-within):outline-[2-9]'
 
 if [ "$STATUS" -ne 0 ]; then
   echo "check-theme-classes: one or more retired class names are still in use. See P110 plan (docs/v1.9/plans/P110-css-tailwind-migration.md) §5.12." >&2
