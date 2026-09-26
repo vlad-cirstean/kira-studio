@@ -5,7 +5,13 @@
  * here rather than fixed twice. Presentation-free by design (`class`/`style` fall through to the
  * root, so each caller keeps its own positioning CSS) since the two callers style it completely
  * differently (an absolutely-positioned overlay vs. a header-cell-local handle).
+ *
+ * P118 H4: `git-ui`'s own `App.vue` was a third, hand-rolled copy of this handle for the
+ * right-docked detail pane, which drags/steps in the opposite screen direction from `value`
+ * (dragging left widens it) — `direction: 'reverse'` covers that without a fourth copy.
  */
+import { onBeforeUnmount } from 'vue';
+
 const props = withDefaults(
   defineProps<{
     /** Accessible name, e.g. "Resize author column". */
@@ -15,8 +21,11 @@ const props = withDefaults(
     /** Unset means no upper bound (StreamView's own columns never capped one). */
     max?: number;
     step?: number;
+    /** 'reverse' inverts both the pointer-drag delta and the arrow-key step, for a handle whose
+     *  drag direction runs opposite its value (App.vue's right-docked detail pane). */
+    direction?: 'normal' | 'reverse';
   }>(),
-  { max: Number.POSITIVE_INFINITY, step: 8 },
+  { max: Number.POSITIVE_INFINITY, step: 8, direction: 'normal' },
 );
 
 const emit = defineEmits<{
@@ -38,6 +47,16 @@ function clamp(next: number): number {
   return Math.min(props.max, Math.max(props.min, Math.round(next)));
 }
 
+function directionSign(): number {
+  return props.direction === 'reverse' ? -1 : 1;
+}
+
+// P118 H4: a drag in flight has to release its window listeners and pointer capture when this
+// component unmounts mid-drag (a tab/view switch away), not only on its own pointerup/cancel —
+// App.vue's own former copy of this handle needed exactly this (P108 F11's own fix), and this
+// component had no equivalent until now.
+let activeCleanup: (() => void) | undefined;
+
 function onPointerDown(e: PointerEvent): void {
   // P108 Part 11 F10: a right-button (or any non-primary) pointerdown started a drag and captured
   // the pointer too — this handle is a resize affordance, not a context-menu target; the primary
@@ -51,7 +70,7 @@ function onPointerDown(e: PointerEvent): void {
   const startValue = props.value;
   target.setPointerCapture(e.pointerId);
   const onMove = (moveEvent: PointerEvent): void => {
-    emit('update:value', clamp(startValue + (moveEvent.clientX - startX)));
+    emit('update:value', clamp(startValue + directionSign() * (moveEvent.clientX - startX)));
   };
   // F14: without this, an interrupted drag (the OS cancels the pointer -- a touch gesture handed
   // off to scroll/a system gesture, or capture lost some other way) never reached `onUp`, so these
@@ -63,11 +82,12 @@ function onPointerDown(e: PointerEvent): void {
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onCancel);
     window.removeEventListener('lostpointercapture', onCancel);
+    activeCleanup = undefined;
   };
   const onUp = (upEvent: PointerEvent): void => {
     target.releasePointerCapture?.(upEvent.pointerId);
     cleanup();
-    emit('change', clamp(startValue + (upEvent.clientX - startX)));
+    emit('change', clamp(startValue + directionSign() * (upEvent.clientX - startX)));
   };
   const onCancel = (): void => {
     cleanup();
@@ -79,12 +99,18 @@ function onPointerDown(e: PointerEvent): void {
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onCancel);
   window.addEventListener('lostpointercapture', onCancel);
+  activeCleanup = cleanup;
 }
+
+onBeforeUnmount(() => {
+  activeCleanup?.();
+});
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
   e.preventDefault();
-  const next = clamp(props.value + (e.key === 'ArrowRight' ? props.step : -props.step));
+  const step = e.key === 'ArrowRight' ? props.step : -props.step;
+  const next = clamp(props.value + directionSign() * step);
   emit('update:value', next);
   emit('change', next);
 }

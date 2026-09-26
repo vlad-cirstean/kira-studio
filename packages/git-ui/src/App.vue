@@ -20,10 +20,11 @@ import {
   computeFloatPosition,
   initTooltips,
   KuiButton,
+  KuiColumnResizeHandle,
   KuiTooltip,
   pointReference,
 } from '@kira/kira-ui';
-import { onClickOutside, useEventListener } from '@vueuse/core';
+import { onClickOutside } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -1666,53 +1667,11 @@ function setDetailWidth(next: number): void {
   detailWidth.value = Math.max(MIN_DETAIL_WIDTH, Math.min(MAX_DETAIL_WIDTH, Math.round(next)));
 }
 
-// P108 F11: pre-existing, not a P105 regression (P105 touched only the column handles) — mirrors
-// `KuiColumnResizeHandle` (kira-ui)'s own fix for the identical shape. The old plain
-// `window`/`mousemove`/`mouseup` pair never learned about a drag interrupted outside this window
-// (releasing the mouse outside the VS Code webview iframe or the browser window) or this
-// component unmounting mid-drag — either left the pane resizing on every later pointer move.
-// Pointer events + `setPointerCapture` fix the first; `stopDetailResizeDrag`, hoisted so
-// `onBeforeUnmount` can also call it, fixes the second.
-let stopDetailResizeDrag: (() => void) | undefined;
-
-function startDetailResize(event: PointerEvent): void {
-  event.preventDefault();
-  const target = event.currentTarget as HTMLElement;
-  const startX = event.clientX;
-  const startWidth = detailWidth.value;
-  target.setPointerCapture(event.pointerId);
-  const stopMove = useEventListener(window, 'pointermove', (moveEvent: PointerEvent) => {
-    // Dragging the left edge left (negative movementX) widens a right-docked pane.
-    setDetailWidth(startWidth - (moveEvent.clientX - startX));
-  });
-  const stopUp = useEventListener(window, 'pointerup', (upEvent: PointerEvent) => {
-    target.releasePointerCapture?.(upEvent.pointerId);
-    endDetailResize();
-  });
-  const stopCancel = useEventListener(window, ['pointercancel', 'lostpointercapture'], () => {
-    endDetailResize();
-  });
-  function endDetailResize(): void {
-    stopMove();
-    stopUp();
-    stopCancel();
-    stopDetailResizeDrag = undefined;
-  }
-  stopDetailResizeDrag = endDetailResize;
-}
-
-const DETAIL_HANDLE_KEY_STEP = 16;
-
-function handleDetailHandleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault();
-    setDetailWidth(detailWidth.value + DETAIL_HANDLE_KEY_STEP);
-  } else if (event.key === 'ArrowRight') {
-    event.preventDefault();
-    setDetailWidth(detailWidth.value - DETAIL_HANDLE_KEY_STEP);
-  }
-}
-
+// P118 H4: this was a third hand-rolled copy of `KuiColumnResizeHandle` (kira-ui) — P105 §5.2(a)'s
+// own extraction of the identical drag/keyboard shape from CommitGrid/StreamView — and it lacked
+// that component's primary-button guard (P108 Part 11 F10), so a right-click here started a drag.
+// `direction="reverse"` below covers the one real difference: this pane is right-docked, so it
+// widens as the handle moves left, opposite the shared component's own left-to-right convention.
 const detailWidthPx = computed(() => `${detailWidth.value}px`);
 
 // `exactOptionalPropertyTypes` (tsconfig.base.json) treats an explicit `undefined` differently
@@ -1752,8 +1711,6 @@ onBeforeUnmount(() => {
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   stopTooltips?.();
-  // P108 F11: releases a detail-pane resize drag still in flight when this view tears down.
-  stopDetailResizeDrag?.();
   unsubscribeUiAction();
   unsubscribeReconnect();
   graphView.dispose();
@@ -1931,18 +1888,17 @@ onBeforeUnmount(() => {
             aria-label="Commit detail"
             :style="{ width: detailWidthPx }"
           >
-            <hr
+            <KuiColumnResizeHandle
               v-if="breakpoint === 'wide'"
-              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-1.25 kv:m-0 kv:-ml-0.5 kv:border-0 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
-              aria-orientation="vertical"
-              aria-label="Resize detail pane"
-              :aria-valuenow="detailWidth"
-              :aria-valuemin="MIN_DETAIL_WIDTH"
-              :aria-valuemax="MAX_DETAIL_WIDTH"
-              :aria-valuetext="`${detailWidth} pixels`"
-              tabindex="0"
-              @pointerdown="startDetailResize"
-              @keydown="handleDetailHandleKeydown"
+              class="kv:absolute kv:top-0 kv:bottom-0 kv:left-0 kv:w-1.25 kv:m-0 kv:-ml-0.5 kv:cursor-col-resize kv:z-2 kv:bg-transparent kv:hover:bg-focus kv:focus-visible:bg-focus kv:focus-visible:outline-none"
+              label="Resize detail pane"
+              direction="reverse"
+              :value="detailWidth"
+              :min="MIN_DETAIL_WIDTH"
+              :max="MAX_DETAIL_WIDTH"
+              :step="16"
+              @update:value="setDetailWidth"
+              @change="setDetailWidth"
             />
             <p v-if="!hasSelection" class="kv:m-0 kv:p-3 kv:text-muted-foreground">Select a commit to see its details.</p>
             <WorkingDetailPane
