@@ -6699,3 +6699,124 @@ Requirements and Development kept because `apps/kira-space/README.md` cites both
 **Checks.** `bun run lint` clean; pre-commit (lint + typecheck) passed on every commit, no
 `--no-verify`; every relative README link resolves; `git diff --stat 88943a7a` touches only
 `README.md`, `docs/v1.9/SPEC.md`, `docs/v1.9/plans/P125-readme-refresh.md`.
+
+## P123 result
+
+Plan: `docs/v1.9/plans/P123-font-size-normalization.md` (+ appendix
+`docs/v1.9/plans/P123-font-size-sites.md`). One sequential Sonnet implementer, worktree
+`agent-a3bd8a6992c6d6d2c` off `367a3ac1`. P121 ran concurrently on its own branch
+(`p121-tab-strip-sizing`), by explicit user override — not coordinated with, not waited on.
+
+21 commits (the plan's own §5 numbering plus the visual re-recordings and one real fix found during
+phase-end verification), in order: `38e22ed0` (refactor(theme): put shadcn primitives on the
+four-size type scale), `805df948` (refactor(ui): drop redundant text size from Label call sites),
+`60be0225` (refactor(studio): move Studio chrome onto the four-size type scale), `07f4aeba`
+(refactor(space): move Kira Space chrome onto the four-size type scale), `a570c3aa`
+(refactor(workbench): move shared workbench chrome onto the four-size type scale), `2e4d3084`
+(refactor(git-ui): move git-ui and kira-ui chrome onto the four-size type scale), `d7e16aab`
+(refactor(theme): retire stock and xs text sizes from chrome tokens), `11e4439b` (refactor: reword
+comments naming retired text sizes), `c37f32c2` (chore(lint): guard chrome font sizes to the
+four-size scale), `8daa22a4` (test(ui): assert the chrome type scale and the data font), 8 visual
+re-recordings — one commit per diffing spec, not the plan's single commit 11 (see deviations):
+`5dcb2ad3` (connection-dialog), `121583ed` (console), `1732aeb2` (data-view), `7463676c`
+(http-request-view), `5df376c0` (schema-dialog), `3d06d7d6` (settings), `4a8e079e` (workbench),
+`a35c0ba5` (space settings), `40a46a7d` (docs: record the four-size chrome type scale — commit 12),
+`5cc4589f` (fix(studio): grow the connection dialog for the taller MCP tab — a real regression
+found during §6.5 full-suite verification, not in the plan's own sequence).
+
+**What landed.** Every chrome font size across both apps now speaks one four-value scale —
+`text-kira-sm/md/lg/xl` (host), `kv:text-sm/base/lg` (git-ui/kv root), `kv:text-kui-sm/base`
+(kira-ui) — driven by `--kira-t-sm/md/lg/xl` (`packages/theme/src/tokens.css`): sm for
+secondary/caption/status-bar text, md for default/control/body text (the same `--kira-font-size`
+variable Data font size's own default already used, by pre-existing P16/P22 design, not something
+this phase introduced), lg for headings, xl for hero titles only. The retired `xs` step (10px)
+folds into `sm` everywhere in chrome. Tailwind's stock `text-xs`…`text-9xl` scale is reset off both
+`@theme` roots (`--text-*: initial` in `packages/theme/src/base.css` and
+`packages/git-ui/src/theme/tailwind.css`), and `scripts/check-theme-classes.sh` gained
+`check_font_scale` to guard against either the stock scale or a stray `xs` chrome class coming
+back. Data views (SQL/document/git grids, Monaco, status-bar/tab dirty-dot glyphs) keep their own
+fixed or Data-font-size-tracking sizes, untouched by design (§2.3/§3.8) — `docs/ARCHITECTURE.md`
+records this as a standing fact (appended to the Styling row).
+
+**§6.1 (fast, after each commit).** `bun run lint`, `bun run typecheck`, `bun run lint:dead`,
+`bun run build:test:studio`, `bun run build:test:space` all ran clean after every one of the 21
+commits, no `--no-verify` on any commit.
+
+**§6.2/§6.5 grep proofs, re-run at the tip, all four match the plan's own predictions exactly:**
+
+- `sh scripts/check-theme-classes.sh`: passes (`check-theme-classes: no retired class names
+  found.`).
+- Stock scale (`text-(xs|sm|base|lg|[2-9]?xl)`) outside a comment: none.
+- `text-kira-xs` count: `packages/theme/src/base.css` 1 (the `@theme` entry), `AppearancePane.vue`
+  2, `StreamView.vue` 2, `KeyValuePane.vue` 1 — matches the plan's own predicted count exactly.
+- `kv:text-xs|kv:text-kui-xs|--text-kui-xs|--kui-font-size-xs`: none.
+- `--text-*: initial`: one each in `packages/theme/src/base.css` and
+  `packages/git-ui/src/theme/tailwind.css`.
+
+**§6.4 data views provably untouched, re-verified at the tip:**
+
+- Whole-file diff against `907c8204` (`slickTheme.css`, `SlickGridHost.vue`,
+  `ConsoleResultGrid.vue`, `DocumentTree.vue`, `DocumentRow.vue`, `CommitGrid.vue`,
+  `readTokens.ts`, `blame-annotation.css`): empty.
+- Anchor-block script (9 anchors: `KeyValuePane.vue`, `StreamView.vue`, `DocumentView.vue`,
+  `AppearancePane.vue` ×2, `RepoFileView.vue` ×2, `MonacoHost.vue`, `OperationsPanel.vue`): all 9
+  `OK` (byte-identical).
+- Token-chain diff (`tokens.css`, `kira-structure.css`, `vscode-bridge.css`,
+  `createSettingsStore.ts` against `907c8204`): completely empty — no `--kira-t-*`/`--kv-t-*`/
+  `--kira-font-size`/`--vscode-font-size` line touched, stronger than the plan's own bar (no diff
+  at all, not just no matching grep line).
+- Runtime probe: built both apps at `907c8204` (isolated `git archive` checkout, symlinked
+  `node_modules`/bindings) and at the phase tip; a throwaway Playwright script (not committed)
+  measured `fontSize`/`lineHeight`/`fontFamily` for the SQL grid cell and header (Data font size 12
+  and 16), a document tree row (`document-id`), and Space's commit graph cell (no graph font size
+  set, and set to 15). Every pair identical between the two commits. Key/value grid and stream grid
+  cells were not independently re-measured at runtime — no existing test harness exposes their
+  redis row-loading protocol, and their exact template lines are already proven byte-identical by
+  the anchor-block script above, sourced from the same token chain the diff above proves untouched,
+  so nothing was left open to check.
+
+**§6.5 full test suites.** `bun run test:ui:studio`: 290 passed, 1 intermittent failure
+(`api-secret-reveal-isolation.spec.ts:63`, `locator.uncheck` — investigated below), 4 did not run
+(gated on the one failure); re-run in isolation, 4/4 pass. `bun run test:ui:space`: 32 passed, 0
+failed. Visual baselines: `907c8204` run first for both apps, clean (no
+`docs/DEV_ENVIRONMENT.md` font-drift signature) — safe to re-record. At the tip, every predicted
+spec diffed (chrome text changes size everywhere): 7 Studio specs (`connection-dialog`, `console`,
+`data-view`, `http-request-view`, `schema-dialog`, `settings`, `workbench`) plus Space `settings`.
+Each diff image opened before recording; all showed chrome text/spacing only, no grid cell,
+document row or graph row movement — one commit per spec, per the plan.
+
+**Investigated, confirmed pre-existing, not fixed:**
+`api-secret-reveal-isolation.spec.ts`'s "Copy as curl does not skip re-auth" `uncheck()` failure —
+already investigated and disposed of once before this phase (see this file's own note above P125,
+same test, same "confirmed pre-existing... Playwright `uncheck()` poll racing an async reactive
+re-render under parallel WebKit load" verdict). Re-confirmed here independently: `git diff --stat`
+and `git log` against `907c8204` for this spec file and `VariablesDialog.vue` are both empty (no
+P123 commit touched either); `packages/theme/src/components/ui/checkbox/` (touched by `38e22ed0`)
+diffs empty against `907c8204` too, ruling out the shadcn Checkbox swap as a hit-area regression;
+the test passes 4/4 in isolation, both alone and re-run inside the full suite a second time. Same
+disposition as before: pre-existing sandbox/parallel-load timing flake, not a P123 regression, left
+as-is.
+
+**Real regression found and fixed during §6.5:** `ConnectionDialog.vue`'s fixed dialog height
+(`h-136`, 544px) no longer fit the MCP tab's content once its labels moved from sm/xs to md —
+measured overflow 6px (scrollHeight 462 vs clientHeight 456), caught by
+`connection-dialog-tabs.spec.ts`'s own "the dialog's box never moves" test. Fixed by bumping to
+`h-138` (552px), with a comment naming the cause (same precedent as P104's own 520 to 544 bump for
+the same tab). Required a second re-recording of `connection-dialog.spec.ts`'s visual baseline (the
+box grew 8px taller) — folded into the same fix commit (`5cc4589f`) rather than a separate one,
+since both are one fix.
+
+**Plan deviations, all justified above:**
+1. Visual re-recordings landed as 8 separate commits (one per diffing spec: 7 Studio + 1 Space),
+   not the plan's single commit 11 — each spec's diff was reviewed independently before recording,
+   and one commit per spec keeps that review legible in history, matching P122's own per-shape
+   commit granularity precedent.
+2. One extra commit (`5cc4589f`) beyond the plan's 12-commit sequence, for the `ConnectionDialog.vue`
+   height regression found during §6.5 full-suite verification — required by CLAUDE.md's "a failing
+   test... gets fixed on the spot" rule, not a scope change.
+3. The runtime probe's key/value and stream grid coverage narrowed to source-level proof (anchor
+   script + token-chain diff) rather than an independent runtime measurement, for the reason stated
+   in §6.4 above — no existing test harness exposes their redis fixture protocol, and the static
+   proof already closes the question the runtime probe exists to answer.
+
+No other deviation from the plan's scope, commit sequence, or content.
