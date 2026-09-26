@@ -9,7 +9,7 @@ export { default as TabsTrigger } from '@theme/components/ui/tabs/TabsTrigger.vu
 // The one tab-chip class definition — TabStrip, ConnectionDialog's detail tabs,
 // ConsoleView's result tabs and TitleBar's mode tabs all render through this.
 export const tabChipVariants = cva(
-  'inline-flex items-center gap-1 h-control-lg rounded-kira-sm border cursor-pointer shrink-0 max-w-52 text-kira-sm',
+  'inline-flex items-center gap-1 h-control-lg rounded-kira-sm border cursor-pointer shrink-0 max-w-52 text-kira-md',
   {
     variants: {
       active: {

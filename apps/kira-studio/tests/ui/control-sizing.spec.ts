@@ -464,7 +464,9 @@ test('the row-density ToggleGroup keeps a connected outline with 4px outer corne
 
 // P121 §6.2: the mode Fields/URI toggle (S5) and the MCP read/write/DDL toggles (S6) moved to
 // `size="kira-lg"` -- dialog density, matching this dialog's own 26px inputs and kira-lg buttons.
-test('connection dialog toggles render at dialog density, 26px/11px (P121 S5, S6)', async ({
+// Font size is 12px, not P121's original 11px: P123 moved toggleVariants' base class onto the
+// control-text role (text-kira-md), landed here by the P121/P123 rebase merge.
+test('connection dialog toggles render at dialog density, 26px/12px (P121 S5, S6)', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({
@@ -479,7 +481,7 @@ test('connection dialog toggles render at dialog density, 26px/11px (P121 S5, S6
     fontSize: getComputedStyle(el).fontSize,
   }));
   expect(modeStyle.height).toBeCloseTo(26, 0);
-  expect(modeStyle.fontSize).toBe('11px');
+  expect(modeStyle.fontSize).toBe('12px');
 
   await page.click('[data-testid="connection-tab-mcp"]');
   await page.click('[data-testid="connection-mcp-enabled"]');
@@ -489,7 +491,7 @@ test('connection dialog toggles render at dialog density, 26px/11px (P121 S5, S6
     fontSize: getComputedStyle(el).fontSize,
   }));
   expect(readStyle.height).toBeCloseTo(26, 0);
-  expect(readStyle.fontSize).toBe('11px');
+  expect(readStyle.fontSize).toBe('12px');
 });
 
 // P121 §6.2: the connection detail tabs (T5), now shadcn `Tabs` -- gained a hover state, the
@@ -570,7 +572,9 @@ function executeSnap(
 }
 
 // P121 §6.2: the console's own result chips ("Result 1", "Result 2") were the one tab-chip copy
-// off the shared scale (22px/10px, a 4px strip gap) -- now tab-strip size (T1's own 26px/11px/2px).
+// off the shared scale (22px/10px, a 4px strip gap) -- now tab-strip size (T1's own 26px/12px/2px,
+// 12px not P121's original 11px: P123 moved tabChipVariants onto the control-text role, landed
+// here by the P121/P123 rebase merge -- tabs/index.ts is a P121-only file no P123 commit touches).
 test('console result tabs render at tab-strip size, 2px strip gap (P121 T4)', async ({
   relaunch,
 }) => {
@@ -611,7 +615,7 @@ test('console result tabs render at tab-strip size, 2px strip gap (P121 T4)', as
     fontSize: getComputedStyle(el).fontSize,
   }));
   expect(style.height).toBeCloseTo(26, 0);
-  expect(style.fontSize).toBe('11px');
+  expect(style.fontSize).toBe('12px');
 
   const [firstBox, secondBox] = await Promise.all([
     resultTabs.nth(0).boundingBox(),
