@@ -9,7 +9,7 @@ import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Empty } from '@theme/components/ui/empty';
-import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
@@ -822,24 +822,22 @@ onUnmounted(() => {
           />
         </div>
         <div class="w-40 shrink-0">
-          <div
-            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-field px-2"
-          >
+          <InputGroup variant="kira" class="flex w-full">
             <span
               class="shrink-0 text-kira-xs"
               :class="tab.state.offsetFilter ? 'text-state-on' : 'text-muted-foreground'"
               >offset</span
             >
-            <Input
+            <InputGroupInput
               :model-value="offsetText"
               placeholder="e.g. 1000"
-              class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
+              class="h-full p-0 font-data"
               data-testid="stream-filter-offset"
-              @update:model-value="(v) => (offsetText = String(v))"
+              @update:model-value="(v: string | number) => (offsetText = String(v))"
               @keydown.enter="onApplyFilter"
               @blur="onApplyFilter"
             />
-          </div>
+          </InputGroup>
         </div>
         <div class="relative">
           <Tooltip>
@@ -899,25 +897,26 @@ onUnmounted(() => {
           <div class="flex items-center gap-0.5">
             <Tooltip :disabled="!timestampError">
               <TooltipTrigger as-child>
-                <div
-                  class="flex items-center gap-1 w-40 h-control rounded-kira-sm border bg-field px-2"
-                  :class="timestampError ? 'border-error' : 'border-border-strong'"
+                <InputGroup
+                  variant="kira"
+                  class="flex w-40"
+                  :aria-invalid="!!timestampError"
                 >
                   <span
                     class="shrink-0 text-kira-xs"
                     :class="tab.state.timestampFilter ? 'text-state-on' : 'text-muted-foreground'"
                     >since</span
                   >
-                  <Input
+                  <InputGroupInput
                     :model-value="timestampText"
                     placeholder="ISO timestamp"
-                    class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
+                    class="h-full p-0 font-data"
                     data-testid="stream-filter-timestamp"
-                    @update:model-value="(v) => (timestampText = String(v))"
+                    @update:model-value="(v: string | number) => (timestampText = String(v))"
                     @keydown.enter="onApplyFilter"
                     @blur="onApplyFilter"
                   />
-                </div>
+                </InputGroup>
               </TooltipTrigger>
               <TooltipContent>{{ timestampError }}</TooltipContent>
             </Tooltip>

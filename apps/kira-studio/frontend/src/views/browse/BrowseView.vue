@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert'
 import { Badge } from '@theme/components/ui/badge';
 import { Button } from '@theme/components/ui/button';
 import { Empty } from '@theme/components/ui/empty';
-import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/components/ui/resizable';
 import { Tooltip, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
@@ -337,16 +337,14 @@ onMounted(() => {
     </ViewToolbar>
 
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
-          <div
-            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-field px-2"
-          >
+          <InputGroup variant="kira" class="flex w-full font-ui">
             <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
-            <Input
+            <InputGroupInput
               :model-value="filterText"
               placeholder="Filter"
-              class="h-full w-full border-0 bg-transparent p-0 font-ui focus-visible:ring-0"
+              class="h-full p-0 font-ui"
               data-testid="browse-filter"
-              @update:model-value="(v) => (filterText = String(v))"
+              @update:model-value="(v: string | number) => (filterText = String(v))"
             />
             <TooltipIconButton
               v-if="filterText"
@@ -355,7 +353,7 @@ onMounted(() => {
               data-testid="browse-filter-clear"
               @click="filterText = ''"
             />
-          </div>
+          </InputGroup>
         </div>
         <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="browse-error">
           <AlertDescription>{{ rt.error.message }}</AlertDescription>

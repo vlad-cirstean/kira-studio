@@ -4,7 +4,7 @@ import { splitSqlStatements } from '@shared/domain/sql-split';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
@@ -222,15 +222,15 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 <template>
   <div class="h-full flex flex-col min-h-0 text-kira-sm">
     <div class="shrink-0 flex items-center gap-2 py-1 px-2 border-b border-border">
-      <div class="flex-none w-40 flex items-center gap-1 h-control rounded-kira-sm border border-border-strong bg-field px-2">
+      <InputGroup variant="kira" class="flex-none flex w-40">
         <CodiconIcon name="filter" :size="13" class="shrink-0 text-muted-foreground" />
-        <Input
+        <InputGroupInput
           v-model="opsStore.filterText"
           placeholder="Filter"
-          class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
+          class="h-full p-0 font-data"
           data-testid="ops-filter"
         />
-      </div>
+      </InputGroup>
       <ToggleGroup
         type="single"
         size="kira"

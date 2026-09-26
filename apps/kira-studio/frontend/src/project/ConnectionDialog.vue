@@ -22,6 +22,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Textarea } from '@theme/components/ui/textarea';
@@ -656,15 +657,15 @@ const preconnectText = computed({
       <div class="flex-1 min-h-0 overflow-auto" data-testid="connection-dialog-body">
     <template v-if="step === 'engine'">
       <div class="flex flex-col gap-3 p-3 min-h-0 flex-1">
-        <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-field px-2">
+        <InputGroup variant="kira" class="flex h-control-lg font-ui">
           <CodiconIcon name="search" :size="13" class="shrink-0 text-muted-foreground" />
-          <Input
+          <InputGroupInput
             v-model="engineSearch"
             placeholder="Search engines"
-            class="h-full w-full border-0 bg-transparent p-0 font-ui focus-visible:ring-0"
+            class="h-full p-0 font-ui"
             data-testid="connection-engine-search"
           />
-        </div>
+        </InputGroup>
 
         <fieldset class="grid grid-cols-3 gap-1.5 content-start m-0 border-0 p-0" aria-label="Connection kind" data-testid="connection-kind">
           <Tooltip v-for="kind in filteredKinds" :key="kind">
