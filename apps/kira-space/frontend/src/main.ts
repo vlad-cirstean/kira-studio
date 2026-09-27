@@ -3,6 +3,7 @@ import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { installAdeSignals } from './ade/queries';
 import { useAgentSessionsStore } from './ade/state/agentSessions';
 import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
@@ -18,9 +19,11 @@ import { useSettingsStore } from './state/settings';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import { GENERAL_WORKSPACE, useWorkspaceStore } from './state/workspace';
-// workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
-// base.css as two separate Tailwind roots and double its output.
-import '@workbench/workbench.css';
+// P131 Part 1 §3.2: styles.css re-exports @workbench/workbench.css (itself @theme/base.css, P104)
+// and adds one more @source over packages/git-ui/src, so this app's own unprefixed root scans
+// git-ui's migrated shadcn call sites too. Importing both here would compile base.css as two
+// separate Tailwind roots and double its output — this is the one entry point now.
+import './styles.css';
 
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result
@@ -46,6 +49,12 @@ async function mountShell(): Promise<void> {
   const tabsStore = useTabsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
+
+  // P129 Part 3 §2.8 item 2: right after the stores are built, before mount() below, so no push
+  // (`kira:ade:sessions`/`kira:ade:repo`/`kira:ade:credential`/agent `Stop`) is missed between mount
+  // and this window's first `useAdeSnapshot`/`useAdeSessions` call. No teardown — the window is the
+  // lifetime (queries.ts's own doc comment).
+  installAdeSignals(queryClient);
 
   // Kira Studio's own initAppMetrics precedent: just subscribes, no data dependency — runs
   // synchronously before the Promise.all below rather than joining it.
