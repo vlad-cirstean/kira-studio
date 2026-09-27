@@ -1229,14 +1229,20 @@ hand-kept-identical implementations — Kira Space gained `Ensure`/`SetMode` for
 here; it never had a `WindowsService` bound method beyond `OpenNew` before.
 
 **A module's own registry entry, not a per-shell branch, is what mounts its panel/start/"+"
-(P128 §2.3).** `packages/workbench/src/modes.ts`'s `ModeDef{label, icon, panel, start, newTab?}`/
-`ModeRegistry<M>` replaces every `modeStore.active === '<id>'` conditional in both apps'
-`WorkbenchShell.vue`: the shell reads `MODES[modeStore.active]` for its left panel and its
-`MainView` empty-state fallback, and `MODES[modeStore.active].newTab` (when set) for the tab
-strip's own "+" — a module with nothing to open (Kira Studio's own `studio`/`api`; Kira Space's own
-`ade` placeholder, below) simply leaves that slot empty. `packages/workbench/src/components/
-ModeSwitcher.vue` (generic over `M`) is the title-bar switcher itself, byte-identical markup to
-Kira Studio's pre-P128 inline one; Kira Space's own `TitleBar.vue` renders it for the first time.
+(P128 §2.3).** `packages/workbench/src/modes.ts`'s `ModeDef` is a discriminated union
+(`PanelModeDef{label, icon, layout?: 'panel', panel, start, newTab?} | FullModeDef{label, icon,
+layout: 'full', view}`, P129 Part 3 §0.12/§0.13) — `ModeRegistry<M, D=ModeDef>` replaces every
+`modeStore.active === '<id>'` conditional in both apps' `WorkbenchShell.vue`. A `panel`-layout
+module (the default, every module before P129) still mounts through `MODES[modeStore.active]`'s
+`panel`/`start`/`newTab` the same way; a `layout: 'full'` module mounts its own `view` in `#main`
+instead, with no left panel, no tab strip, and no "+" of its own — the shared
+`WorkbenchShellBase`'s own `tabStripVisible` prop (default `true`) gates the tab strip out for it.
+Kira Studio's own `MODES` stays pinned to `ModeRegistry<StudioMode, PanelModeDef>` (its shell still
+reads `.panel`/`.start` unconditionally, no full-layout module exists there yet); Kira Space's `ade`
+(P128's own placeholder, now the app's first full-layout module — see "Kira Space's `ade` module"
+below) is what the union exists for. `packages/workbench/src/components/ModeSwitcher.vue` (generic
+over `M`) is the title-bar switcher itself, byte-identical markup to Kira Studio's pre-P128 inline
+one; Kira Space's own `TitleBar.vue` renders it for the first time.
 
 **The Terminal entry in both apps' `MODES` points at one shared module (P128 §2.4), not two
 hand-kept-identical copies.** `packages/workbench/src/terminal/module.ts` exports
@@ -2596,13 +2602,13 @@ than living behind a `'git'` `AppMode` inside a bigger shell; **P128 gave it a m
 own instead (§2.6-§2.8 below), not Kira Studio's `studio`/`api`/`terminal` vocabulary reused, but
 its own: `git` (this section, unchanged — still the whole of what P100-P127 built, just no longer
 the *only* thing mounted), `terminal` (the same shared Terminal module Kira Studio's own copy uses,
-§2.4 below), and `ade` (a placeholder, §2.7, reserving a slot for a later chapter's real agent
-surface). `state/workspace.ts`'s `visibleWorkspace()` is the one function that reads across both
-the mode store and the (git-only, unchanged) workspace store: the active repo (or no repo) while
-`git` is active, the active module's own id otherwise — `host.ts`'s `activeWorkspace` and
-`state/tabs.ts`'s tab-stepping actions read it instead of the workspace store directly, so a
-Terminal-module tab or the `ade` placeholder never shows behind, or is confused for, a repo's own
-tab strip. Opening a repository (`openRepoWorkspace`) forces the mode back to `git`, so opening one
+§2.4 below), and `ade` (P128 placeholder, now the app's own agent-merge-queue surface — "Kira
+Space's `ade` module" below). `state/workspace.ts`'s `visibleWorkspace()` is the one function that
+reads across both the mode store and the (git-only, unchanged) workspace store: the active repo (or
+no repo) while `git` is active, the active module's own id otherwise — `host.ts`'s `activeWorkspace`
+and `state/tabs.ts`'s tab-stepping actions read it instead of the workspace store directly, so a
+Terminal-module tab or `ade`'s own full-area view never shows behind, or is confused for, a repo's
+own tab strip. Opening a repository (`openRepoWorkspace`) forces the mode back to `git`, so opening one
 from any path always shows it; the boot-time fall-forward onto the first restored repo
 (`main.ts`) does not, so a relaunch into a persisted `terminal`/`ade` mode stays there even with
 repositories open behind it.** Every "Kira Studio" below that means *this app, the one whose window
@@ -2625,6 +2631,36 @@ frontend is still a separately-installed VS Code extension (`apps/kira-space-vsc
 `apps/kira-studio-vscode` at P100 Part 3) connecting as an external client, dialing the same Unix
 socket the native window's own in-process stream also reaches (see "Git graph in the native
 workspace (C10)" below).
+
+**Kira Space's `ade` module (P129 Part 3) is the first `layout: 'full'` module (see the `ModeDef`
+union paragraph above) — a full-area view, no left panel, no tab strip, replacing P128's own
+placeholder.** `apps/kira-space/frontend/src/ade/`: `AdeView.vue` (the module's `FullModeDef.view`
+— repo tabs plus the active repo's own view, or an empty state when no repository is imported yet)
+mounts `AdeRepoTabs.vue` (one tab per imported repository, a needs-input badge summing every
+`attention`-phase session in that repo — every running session's own repo, not only a queued item's,
+`ade/activity.ts`'s own `needsInputByRepo`) and `AdeRepoView.vue` (that repo's sticky
+`AdeProjectHeader.vue` + `AdeMainLine.vue`; the timeline itself is Part 5's). `ade/useQueue.ts` is a
+pure port of the design mockup's own `renderVals()` — no Vue import, no reactivity, no clock read
+(`today` is an input) — cross-checked by `tests/unit/ade-queue-parity.spec.ts` running the mockup
+itself as an oracle via `node:vm`; the caller wraps it in `computed()`. `ade/queries.ts` wires 6 of
+`AdeService`'s 19 bound methods (`AgentSessions`, `Sessions`, `RepoSnapshot`, `RepoPrs`, `Refresh`,
+`ProvideCredential` — the rest land with their first consumer in later parts) through TanStack Vue
+Query: every query key is `['ade', ...]`-prefixed and `staleTime: Infinity` — freshness is entirely
+push-driven (`installAdeSignals`, called once from `main.ts`, no teardown: the window is the
+lifetime), never poll- or remount-driven, so a missing invalidation surfaces as a bug rather than
+hiding behind churn. Three pushes drive it: `kira:ade:sessions` invalidates the sessions list;
+`kira:ade:repo` invalidates one repo's snapshot/PRs; a session's own `Stop` (`kira:agent:event`)
+invalidates its repo's snapshot too (the linked-worktree dirty state an agent's edits leave behind).
+A `kira:ade:credential` prompt's `repoId` maps to a `codeRepoId` through `useCodeReposStore` (every
+window hydrates it at boot), not the snapshot cache — the focused window may never have loaded that
+repo's snapshot — and answers through the same `gitCredential.ts` store/`GitCredentialDialog.vue`
+the Git module's own askpass prompts already use, an unmapped `repoId` still enqueuing with no repo
+label rather than being dropped. `AgentSessionsControl`'s three members
+(`terminalAgentSessions`/`onAgentSessions`/`onAgentEvent`) satisfy P127's shared
+`createAgentSessionsStore` structurally, no adapter layer — Kira Space's own agent-activity store
+instance lives at `ade/state/agentSessions.ts`. `ade/state/adeUi.ts` (one Pinia store, one concern)
+owns the module's own runtime-only UI state: the active repo tab and a per-repo refresh note that
+persists until the next `Refresh`.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -4118,12 +4154,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   own conflicted paths outside the `shared` filter as a different signal (Part 3+'s own call, since
   it changes the wire shape `pairs` promises).
 
-- **A linked worktree's own dirty state is refreshed only on `Snapshot`/`ArchiveRisk`, never
-  watched (P129 Part 2 §6.3/§9)**. Every other git fact recomputes on demand from git itself, so
-  this matches every other fact's own freshness model, but a worktree a person or Claude dirties
-  between two snapshots (or right before `Archive`'s own `ArchiveRisk` call and the confirmed
-  `Archive` call that follows it) can go stale for that window. No file watcher covers a linked
-  worktree's own working tree the way `gitsession`'s existing repo watcher covers `.git` itself.
+- **A linked worktree's own dirty state is refreshed only on `Snapshot`/`ArchiveRisk`, an explicit
+  `Refresh`, or a session's own `Stop` (P129 Part 3 §0.11/§0.22 narrows P129 Part 2 §6.3/§9) — never
+  watched.** Part 3's `installAdeSignals` invalidates a repo's cached snapshot on that repo's own
+  agent session `Stop`, closing the window for the one case Part 2 could name exactly (Claude's own
+  edits, which always end in a `Stop`). Still open: a worktree a *person* dirties by hand, with no
+  session `Stop` to key off, between two snapshots (or right before `Archive`'s own `ArchiveRisk`
+  call and the confirmed `Archive` call that follows it) can still go stale for that window — no file
+  watcher covers a linked worktree's own working tree the way `gitsession`'s existing repo watcher
+  covers `.git` itself.
 
 - **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
   discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
