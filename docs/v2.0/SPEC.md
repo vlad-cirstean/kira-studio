@@ -426,3 +426,177 @@ and the successful one, went through a private index (`GIT_INDEX_FILE`) touching
 else.
 
 No deviations from the plan. No new known-open item.
+
+## P129 Part 1 result
+
+Plan: `docs/v2.0/plans/P129-part1-ade-agent-runtime.md`. One Opus planning pass, one sequential
+Sonnet implementer, no stream split (the plan's own §5: one continuous, order-dependent chain — the
+tracker before the bridge surface before the wiring). 8 commits, `8c57a481`..`f8db8db1`, plus one
+unplanned fixup (`3b41df9b`) and this result commit (`git log --oneline a5d2e7ad..HEAD` for the full
+range, which also carries interleaved commits from concurrent P130/P134 background sessions sharing
+this checkout — confirmed disjoint below).
+
+**Commits, in the plan's own §5 order, plus one unplanned fixup:**
+
+1. `8c57a481` — `feat(terminal): optional agent launch composition seam` (§4.1). Adds
+   `BoundService.ComposeAgent func(terminalID, command string) (string, []string, error)`;
+   `Open` calls it only when `agent && ComposeAgent != nil`, rechecks `MaxCommandBytes` after
+   composing, passes the returned env into `OpenParams`. Kira Studio's own `BoundService` leaves
+   the field nil — no behavior change there.
+2. `579467de` — `feat(agenthooks): hook UserPromptSubmit` (§4.8's Go half). Adds it to
+   `hookEvents`; confirmed against real Claude Code docs before this commit that `UserPromptSubmit`
+   is a real `hook_event_name` and `idle_prompt`/`auth_success` are real `Notification` types (the
+   task's own standing question — see below).
+3. `3d8aae85` — `feat(space): ade session storage`. Migration `0004_p129_ade_sessions.sql`
+   (`ade_sessions`: running/stopped, a `CHECK` enforcing exactly one of `branch`/`new_work_id`),
+   `model.AdeSession`, `repos.AdeSessionsRepo` (Get/List/Insert/MarkRunning/MarkStopped/
+   SetClaudeSessionID/SetLastActive/StopAllRunning), `Repos.AdeSessions` field.
+4. `6f0b4a64` — `feat(space): ade session tracker`. `internal/ade/{tracker.go,command.go,
+   paste.go}` plus `tracker_test.go`/`command_test.go` (§6.1's full list, 16 tests: prepare/compose/
+   reconcile live and past-grace and never-registered, mismatched-command refused, resume of a
+   running/foreign-repo/unknown record refused, resume reuses the recorded cwd and Claude session
+   id, `SessionStart` with a new id updates `claude_session_id`, an unknown-terminal event ignored,
+   `Recover` stops leftovers, `Send` writes paste-then-enter or is refused when not running, a
+   `-race` run of `Compose`/`Reconcile`/`HandleEvent` from concurrent goroutines, and
+   `quotePOSIX`'s own round-trip through a real `sh -c`).
+5. `7a7e0d3e` — `feat(space): spawn and track Claude Code sessions`. `bridge/ade.go` (`AdeService`:
+   `AgentSessions`/`Sessions`/`PrepareLaunch`/`Send`), `bridge/events.go`'s `ChannelAdeSessions`
+   plus the `ChannelAgentSessions`/`ChannelAgentEvent` re-exports, `main.go`'s wiring and teardown
+   order, `bridge/terminal.go`'s comment. Bindings regenerated; FQN gate held. Integration test
+   `TestAdeService_SpawnTrackAndExit` (a real `Registry`, a real `agenthooks.Manager` — real unix
+   socket, real HTTP listener — a real `Tracker` and `AdeService`, a fake `claude` script curling
+   `SessionStart` then `Stop` at the real listener the same shape a real hook shim uses).
+6. `401c2066` — `feat(workbench): waiting-on-monitor activity and event timestamps` (§4.8's TS
+   half). `AgentActivity` gains `wakeArmed`/`at`; `reduceAgentActivity(prev, event, now)` takes an
+   injected clock; the table's every case (`UserPromptSubmit`, `PreToolUse`'s `WAKE_TOOLS` sticky
+   OR, `PostToolUse` clearing `attention`, `Notification`'s `idle_prompt`/`auth_success` leaving
+   phase and message unchanged, `Stop`'s `waiting`); 5 new reducer-spec cases (8-12) on top of the 7
+   existing ones, all now passing a fixed `NOW`.
+7. `f8db8db1` — `docs: ARCHITECTURE records Kira Space's agent runtime (P129 Part 1)` (§5.2). The
+   hook-monitoring paragraph gains Kira Space as its first consumer and the new hook/phase rules; a
+   new paragraph for `internal/ade` (launch flow, the grace-window race guard, window-scoped PTYs);
+   two now-stale claims fixed (keep-awake's "no agent-hooks... leaf" and the bound-service-count
+   paragraph's "currently-unwired" plus Kira Space's own count, 13 → 14); a Known open items entry
+   for the `Bash`-background wake-arming limitation.
+8. `3b41df9b` — **unplanned fixup**, found running this phase's own `bun run lint:go` verification
+   pass (§6): commit 5's additions pushed `main`'s `gocognit` score from clean to 36 against the
+   repo's threshold of 30 — the one lint:go finding CLAUDE.md's working agreement requires fixing on
+   the spot. Extracted `wireAde`/`shutdownAde`, the same "plain top-level helper, not an inline
+   closure with its own error branches" shape `wireGit` already uses in that file. Back to 0 issues;
+   no behavior change (confirmed by `go build`, `go vet`, and re-running
+   `TestAdeService_SpawnTrackAndExit`).
+
+**The `idle_prompt`/`auth_success`/`UserPromptSubmit` question, confirmed before implementation
+started:** `UserPromptSubmit` is a real Claude Code `hook_event_name`; `idle_prompt` and
+`auth_success` are real `Notification` message types — confirmed against Claude Code's own hooks
+reference (WebFetch, prior session) before commit 2 landed, per the plan's own instruction to verify
+rather than assume.
+
+**Deviations and interpretation decisions, disclosed:**
+
+- **`TrackerDeps.ClaudeBin`** (not in the plan's literal §4.4 struct sketch) — defaults to
+  `"claude"` in production, unused unless a test sets it. This sandbox's login-shell PATH always
+  resolves a bare `claude` to the real installed CLI ahead of anything a test could prepend (every
+  `/etc/profile.d/*.sh` script re-prepends its own bin dir), which would make the plan's own literal
+  "fake claude script first on PATH" integration-test mechanism (§6.1) unachievable here without it.
+- **`AdeService.Deps appcore.Deps`** (the plan's own §4.6 sketch names only `Tracker`/`Registry`) —
+  added to match the codebase-wide `Deps appcore.Deps`-embedding convention every other bound
+  service in this app follows (`gitclientsvc.go`'s own precedent); needed for
+  `Repos.CodeRepos.Get`'s validation and `Events.Emit`.
+- **`sessionId` has two distinct meanings by design, not an inconsistency**: `PrepareLaunch`'s
+  returned `sessionId` is the Claude session id (chosen up front, per the plan's own §4.4 table);
+  `Send`'s `sessionId` argument is the `ade_sessions` record id. The record id never changes; the
+  Claude session id can (a `/clear` inside the session), so the record id is the stable handle the
+  UI holds across a session's lifetime — `Send` is keyed on that, never on the mutable one.
+- **`AdeSessionsChanged` broadcasts to every window** (`Events.Broadcast`, `ChannelKeepAwake`'s own
+  shape) rather than the focused window — a process-wide fact (a queue record changed), not one
+  addressed to whichever window happens to be focused. Not stated explicitly in the plan; read as
+  the natural fit for a payload-free invalidation signal every window's own query should refetch on.
+- **The `idle_prompt`/`auth_success` reducer rule leaves `message` unchanged, not just `phase`** —
+  the plan's own §4.8 table says "phase unchanged"; extended to `message` too on the reasoning that
+  overwriting `message` with text that was never a request for input would contradict the same
+  design rationale (§1) the plan cites for leaving `phase` alone. Reducer-spec case 11 asserts this.
+
+**Verification (plan §6), run once near phase end, against the phase's own final commit:**
+
+- `go build ./...`, `go vet ./...` — clean.
+- `bun run lint:go` — 0 issues (after the fixup above; the pre-fixup run found the one real
+  `gocognit` finding named there).
+- `go test ./internal/terminal/ ./internal/agenthooks/ ./apps/kira-space/internal/...
+  ./apps/kira-studio/internal/...` — all pass, `-race` where the plan's own §6.1 asks for it.
+  `apps/kira-space/internal`'s own `TestDomainPackagesDoNotImportBridge` layering test passes with
+  `internal/ade` in its checked set, exemption list unchanged. One pre-existing, unrelated failure
+  hit twice across repeated full-suite runs, each a different test
+  (`TestIntegration_ClearRemovesOnlyComments`, then `TestRevoke_DoesNotDisturbAnotherClient`, both
+  `apps/kira-space/internal/gitsock`) — confirmed not this phase's: `git diff --stat a5d2e7ad --
+  apps/kira-space/internal/gitsock` is empty, and each failing test passes cleanly in isolation
+  (`go test -run <name>`) — the same shared-sandbox worker-contention flake class P117/P127/P128/
+  P134's own results already documented, not a regression this phase introduced.
+- FQN gate on Space `terminalservice.ts` — byte-identical to the saved pre-phase baseline (`ByName`
+  lines diffed line for line).
+- Space bindings gain `adeservice.ts` — exactly `AgentSessions`, `PrepareLaunch`, `Send`,
+  `Sessions`.
+- `bun run typecheck`, `bun run lint` — clean.
+- `bun run lint:dead` — 7 pre-existing duplicate-export findings, same as P127/P128's own baseline,
+  none in a file this phase touched.
+- `bun run build:space`, `bun run build:studio` — clean.
+- `bun run test:unit` — 1667 pass, 0 fail (P128's own baseline was 1662; the 5 new reducer cases
+  account for the difference exactly).
+- `bun run test:ui:space` — 38/38 pass, unchanged.
+- `bun run test:ui:studio` — 300 tests (the +1 over P127/P128's own 299 baseline is P130's new
+  `focus-ring.spec.ts` case, not this phase). One full-parallel run hit 6 failures plus 4 not-run,
+  spread across `data-view.spec.ts`, `definition.spec.ts`, `focus-ring.spec.ts`, `mutations.spec.ts`
+  and `terminal-module.spec.ts` — none touched by this phase (`git diff --stat a5d2e7ad --
+  apps/kira-studio` shows only two files, both P130's own `focus-ring.spec.ts` and
+  `api-secret-reveal-isolation.spec.ts`). All 9 tests in those 5 files passed cleanly re-run together
+  in isolation (`npx playwright test --project=ui` on just those specs, 1.1m). Same cross-file
+  worker-contention flake class P117/P127/P128's own results already document — not a regression.
+
+### 6.1 Tests
+
+Matches the plan's own list exactly (`internal/ade/tracker_test.go`'s 14 cases plus
+`command_test.go`'s 2, the bridge integration test, the 5 new reducer-spec cases) — no test added
+for the repo CRUD, the wire structs, or `AgentSessions()`, all pass-throughs per the plan's own call.
+
+### 6.2 Live run
+
+**The CLI-launch half could not be exercised in this sandbox — disclosed, not silently skipped or
+faked, per the task's own instruction.** Kira Space's real server-mode binary (`go build -tags
+server`) boots cleanly with the new wiring and answers real bound calls over the real `/wails/
+runtime` HTTP surface: `AdeService.Sessions` returns `{"sessions":[]}` against a fresh database, and
+`AdeService.PrepareLaunch` against an unknown `codeRepoId` returns the real `E_INVALID` error
+through the real IPC error-mapping path (`{"code":"E_INVALID","message":"codeRepoId does not
+exist"}`) — confirming the real binary registers `AdeService` and the real wire path enforces the
+same validation the Go tests already cover, independent of the fake-CLI integration test. The
+installed CLI itself (2.1.283) could not be driven further than this: a fresh `claude` invocation in
+this container hits an interactive workspace-trust confirmation on first run in a new directory (no
+`hasTrustDialogAccepted` recorded for any project in this container's config); `--dangerously-skip-
+permissions` is refused outright when running as root (this sandbox's own user); and the sandbox's
+own safety classifier blocks the one remaining path — pre-accepting trust and disabling permission
+checks to get a real, unattended Claude Code agent process running — as "Create Unsafe Agents." No
+prompt was ever submitted and no attempt was made to work around that denial, per its own
+instruction. The full `PrepareLaunch -> Open -> SessionStart (running) -> exit -> Reconcile
+(stopped)` flow through a real CLI process is therefore **not checked here**; it is proven instead
+by `TestAdeService_SpawnTrackAndExit`'s fake-CLI shim, which drives the identical curl invocation
+shape a real hook shim uses (`internal/agenthooks/shim.go`'s own `buildShim`) against the real HTTP
+listener — the plan's own named fallback for exactly this case. Not checked either, for the same
+"no display" reason: xterm rendering of a session (Part 6's own first UI) and the bracketed-paste-
+then-Enter behavior in a real TUI (plan §8's own risk row).
+
+## Closing audit (plan §7), all 8 checks
+
+| Check | Command | Result |
+|---|---|---|
+| Token never bound | `rg -n 'KIRA_AGENT_HOOK\|Env' apps/kira-space/internal/bridge/ade.go` | Only the doc comment stating the invariant; no bound method or wire struct carries one |
+| Studio untouched | `git diff --stat a5d2e7ad -- apps/kira-studio` | Two files, both from concurrent P130/P134 background sessions (`c64e805c`, `ec20c4dd`) — confirmed by `git show --stat` on each of this phase's own 8 commits: none touches `apps/kira-studio` |
+| Seam used by Space only | `rg -n 'ComposeAgent' apps internal` | `internal/terminal/bound.go` (the field) and Kira Space's own `main.go`/`ade/tracker.go`/`bridge/ade_test.go`/`bridge/terminal.go` (comments) only |
+| One spawn path | `rg -n 'OpenWithCoalescedOutput\|Registry\.Open\(' apps/kira-space` | One hit, `bridge/codeworkspace.go`'s own unrelated worktree-registry `Registry.Open` — no second terminal spawn path |
+| Domain does not import bridge | `TestDomainPackagesDoNotImportBridge` | Pass, `internal/ade` included in the checked set |
+| Stale "inert" comments gone | `rg -n 'inert' internal/terminal apps/kira-space/internal/bridge docs/ARCHITECTURE.md` | Every hit is an unrelated pre-existing usage (Postman scripts/auth, permissions, `KeepAlive`); no claim that Agent is inert in Space |
+| No renderer scaffolding | `git diff --stat a5d2e7ad -- apps/kira-space/frontend/src` | Empty |
+| Reducer consumers compile | `bun run typecheck` | Clean |
+
+No known open item closes or opens beyond the one already recorded in `docs/ARCHITECTURE.md`'s
+Known open items (the `Bash`-background wake-arming limitation, commit 7, expected to stay open
+until Claude Code itself exposes more than a tool name to a hook, or this app's own privacy rule is
+revisited — neither is in scope for any planned P129 part).
