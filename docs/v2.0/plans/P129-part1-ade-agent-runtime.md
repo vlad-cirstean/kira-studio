@@ -13,7 +13,7 @@ this document does two jobs:
 2. **§4-§8: Part 1 in full depth.** Kira Space spawns `claude` through the shared terminal module,
    wires P127's `agenthooks.Manager` and reducer, and persists every session it ever started.
 
-Parts 2-8 each get their own plan (`docs/v2.0/plans/P129-part<N>-<slug>.md`), written by an Opus
+Parts 2-7 each get their own plan (`docs/v2.0/plans/P129-part<N>-<slug>.md`), written by an Opus
 pass against the tree the previous part left, before that part's implementation starts.
 
 Every path, symbol and count below was measured in this container at `6e4d57d3`:
@@ -28,12 +28,12 @@ installed CLI's own `claude --help` (2.1.283) for launch flags.
 
 ## 0. Open questions and resolutions
 
-Rows marked **user** need a user answer before the named part's planning pass starts. Nothing in
-Part 1 depends on any of them.
+Rows marked **user** record the user's own decision, given after this plan's first commit. Nothing
+in Part 1 depends on any of them.
 
 | Open | Resolution | Where |
 |---|---|---|
-| One pass or parts? | **Eight parts**, strict order. Part 1 is the agent runtime | §3 |
+| One pass or parts? | **Seven parts**, strict order. Part 1 is the agent runtime. First split was eight; the user's Jira decision (below) removed the Jira sync part and renumbered the last part from 8 to 7 | §3 |
 | Design says "UI only, mock data behind a typed data layer"; SPEC row says Kira Space really spawns agents and git reuses `gitsession` | **SPEC row governs the phase:** real sessions, real git. The design's "typed data layer" becomes the real `AdeService` wire types (§2.4) | §2.1 |
 | go-git for the in-memory conflict check (design §3.1) | **Declined, named requirement.** Not a dependency (`go.mod` has none). go-git v5 has no three-way tree merge (its `Merge` supports fast-forward only), so it cannot meet §3.1's "three-way tree merge in memory". `git merge-tree --write-tree` does exactly that, in the object database, no checkout, no temp files, and `gitsession` already runs it (`porcelain.MergeTreeArgs`/`ParseMergeTreeOutput`, `preflight.go:178,244`) | §2.3 |
 | Where the ade UI mounts | **P128's `ade` slot, as a full-area module.** The design has its own repo tab bar and resizable panel; the workbench left panel and tab strip would duplicate them. `ModeDef` gains a `layout: 'full'` variant (Part 3) | §2.2 |
@@ -41,10 +41,10 @@ Part 1 depends on any of them.
 | Wire transport | **Wails bound `AdeService` plus push signals**, not the `gitstream` rpc contract. That contract (`@kira/git-ipc`) also serves the VS Code extension; ade calls are coarse snapshots, no streaming | §2.3 |
 | Hooks on/off setting in Space | **Always on.** Space's ade needs activity; the design has no toggle. Start failure (curl missing, bind conflict) is logged, not fatal: sessions still spawn and track, activity icons stay absent | §4.3 |
 | Agent-aware keep-awake reason for Space (P127 §2.8 left it to P129) | **Not added.** Neither the design nor the SPEC row asks for it | §4.8 |
-| **user:** Claude Code icon asset (design §2.5: "official Claude Code icon asset") | Needs the asset file from the user (Anthropic brand asset, trademark, not a library license question). Blocks Part 5's agents pill | Part 5 |
-| **user:** Jira title/status source ("Pasted links show `syncing` until the API fills title and status") | No Jira integration exists anywhere in the repo. Needs a user decision: Jira Cloud REST with a token in the OS keychain, or a CLI (the `gh` precedent), plus the base URL. Part 7 exists for it | Part 7 |
-| **user:** `ready`, `ciFailing`, and the `Merge` action | Data model has `ready?`/`ciFailing?`; the mockup's `Merge` button is a no-op and §4 has no Merge template. Proposed default for the user to confirm: `ciFailing` = PR head's check runs failing, `ready` = PR approved and checks green and not behind, `Merge` = Claude dialog with a `Merge <branch>` template using only branch/worktree/PR number+URL | Part 2 (facts), Part 4 (template) |
-| `claude --resume <id>` from a directory other than the session's original cwd (archived worktree deleted, design §2.4 "only offers `new worktree`") | Unverified against the CLI. Part 1 resumes in the recorded cwd when it exists; Part 8's planning pass probes the installed CLI and picks the fallback | §8 |
+| **user:** Claude Code icon asset (design §2.5: "official Claude Code icon asset") | **User: generic placeholder icon, no branded asset.** Reuse an icon the app already ships, e.g. the `ade` module's own `robot` codicon (`apps/kira-space/frontend/src/workbench/modes.ts`, P128) or an existing terminal codicon; Part 5's plan picks one and names it. Not a blocker; no user-supplied asset | Part 5 |
+| **user:** Jira title/status source ("Pasted links show `syncing` until the API fills title and status") | **User: skip Jira sync.** No Jira API integration, no credentials, no `syncing` state, no fetched title or status. A pasted Jira link or `ABC-123` key is parsed, stored and rendered as a plain link (Part 6's detail panel). The Jira sync part is removed; the last part renumbers from 8 to 7 | Part 6 |
+| **user:** `ready`, `ciFailing`, and the `Merge` action | **User: skip all three.** Nothing computes `ready` or `ciFailing`; both are dropped from the data model (§2.4), with work status's `CI failing` and `ready` rungs. The PR surfaces as `ResolveBranchPr`'s raw state and title only (§2.4). No `Merge` button, action or dialog template anywhere in the phase | Part 2 (facts), Part 3 (work status), Part 4 (templates), Part 6 (header actions) |
+| `claude --resume <id>` from a directory other than the session's original cwd (archived worktree deleted, design §2.4 "only offers `new worktree`") | Unverified against the CLI. Part 1 resumes in the recorded cwd when it exists; Part 7's planning pass probes the installed CLI and picks the fallback | §8 |
 
 ---
 
@@ -111,13 +111,13 @@ Part 1 depends on any of them.
 - Design scope line "UI only, mock data" versus the row's real spawning and `gitsession` reuse:
   §0, row governs.
 - Design §3.1 names go-git: §0, declined with the requirement named.
-- `ready`/`ciFailing`/Merge, Jira source, icon asset: §0 user rows.
+- `ready`/`ciFailing`/Merge, Jira source, icon asset: §0 user rows, each now decided by the user.
 - "The app knows every session ever started on this machine": only sessions this app launched
   carry hooks, so "every session" means every session Kira Space started. Part 1 persists them.
 
 ---
 
-## 2. Whole-phase architecture (binding on Parts 2-8)
+## 2. Whole-phase architecture (binding on Parts 2-7)
 
 ### 2.1 Behavior source
 
@@ -137,7 +137,7 @@ theme. Every §9 "decision to keep" is a checklist item in each part's closing a
   `layout: 'full'`, Space's `WorkbenchShell.vue` hides the left panel and tab strip and renders
   `view` as the whole main area. `AdePanel.vue`/`AdeStart.vue` placeholders are deleted then.
   Studio's modes keep the default layout, no behavior change.
-- No `git-ui`/`kira-ui` import anywhere in `src/ade/` (P131 independence; enforced by Part 8's
+- No `git-ui`/`kira-ui` import anywhere in `src/ade/` (P131 independence; enforced by Part 7's
   closing audit).
 - State: TanStack Query for everything fetched from `AdeService` (repo snapshot, sessions,
   candidates), invalidated by push signals. Pinia stores, one concern each: `adeUi` (selection,
@@ -169,8 +169,8 @@ theme. Every §9 "decision to keep" is a checklist item in each part's closing a
   its preflight; ahead/behind and stack parents via the existing stack config keys
   (`gitops.StackParentKey`/`StackBaseKey`) and `stack.list` machinery; fetch (Refresh) and force
   push via `RepoEntry.RunRemote` (`fetch`, `forcePush` with `pushPreflight`'s lease tip);
-  conflict/overlap via `merge-tree --write-tree` and changed-path sets; PR data via
-  `RepoEntry.ResolveBranchPr`; refs-moved via the entry's `repo.changed` subscription. Part 2's
+  conflict/overlap via `merge-tree --write-tree` and changed-path sets; PR raw state and title
+  via `RepoEntry.ResolveBranchPr` (no derived flags, §2.4); refs-moved via the entry's `repo.changed` subscription. Part 2's
   plan resolves how a non-rpc caller supplies credentials to `RunRemote` (today a nil `Conn`
   means credential-free, `autofetch.go:163`).
 - Only Force push, Refresh (fetch) and Archive's worktree removal mutate git from the app. Every
@@ -187,9 +187,10 @@ Design §6 maps onto wire types (Go structs with json tags, mirrored in
 |---|---|---|
 | `Session` | `ade_sessions` table plus live activity from the P127 store | 1 |
 | `Branch` git facts (`ahead`, `behind`, `files`, `commits`, `dirty`, `merged`, worktree, owner, author) | Computed per snapshot from `gitsession` | 2 |
+| `Branch.ready`, `Branch.ciFailing` | **Dropped** (user decision, §0). No field, no derivation; work status has no `CI failing` or `ready` rung | — |
 | `Branch.kind`, `archivedAt`, `est`, names, links, notes (`UserMeta`) | `ade_branches` (per repo+branch meta) | 2 |
-| `Branch.pr` | `ResolveBranchPr` | 2 |
-| `Branch.jira` title/status | Part 7's source | 7 |
+| `Branch.pr` | `ResolveBranchPr`'s raw `PR.State` (`open`/`draft`/`merged`/`closed`, `ghclient.deriveState`) and `Title`, plus the `Number`/`URL` its link needs. No derived readiness, review or CI state; design's `Approved`/`Changes requested` chips have no source and are dropped | 2 |
+| `Branch.jira` | Plain link: key parsed from the pasted link or `ABC-123`, plus the pasted URL, stored in `ade_branches` links. No title, no status, no `syncing` (user decision, §0) | 2 (storage), 6 (parse, render) |
 | `CandidateBranch` | `for-each-ref` over local/remote heads not in the queue | 2 |
 | `NewWork` | `ade_new_work` | 2 |
 | `RepoPlan` (`day`, `order`, `queuedAfter`, `unpushed`) | `ade_plan` rows per repo; `queuedAfter` stored as ade's own override, not git stack config (a rebase target the user chose must not rewrite `git config` before Claude has rebased) | 2 |
@@ -206,27 +207,28 @@ ade's repo tabs. Days are ISO dates (design §5.10), "today" the local date.
 | Design | Part |
 |---|---|
 | §1 concepts, §6 data model | 2 (persisted, git facts), 3 (derived) |
-| §2.0 activity icons | 3 (component, tab counts), used by 4-8 |
-| §2.1 repo tab bar (repo tabs, needs-input counts) | 3; pinned `All agents` tab 8 |
-| §2.2 All agents view | 8 |
+| §2.0 activity icons | 3 (component, tab counts), used by 4-7 |
+| §2.1 repo tab bar (repo tabs, needs-input counts) | 3; pinned `All agents` tab 7 |
+| §2.2 All agents view | 7 |
 | §2.3 project header, fetch status, Refresh, `main` line, Rebase all | 3 |
 | §2.3 Add popover, timeline, history pull, overdue, days, weekends, capacity/overflow, Later, day off, drop targets, splitting, multi-day, work colors, review/merged/parked rows, action column, stack box, agents pill | 5 |
 | §2.4 detail panel (header, archive safety, Details, Changes, Agents) | 6 |
-| §2.5 icon | 5 (first consumer) |
+| §2.4 Jira row: plain link, no sync (user decision, §0) | 6 |
+| §2.5 icon: existing in-app icon, not the branded asset (user decision, §0) | 5 (first consumer) |
 | §3 rules, §5 ordering | 3 (`useQueue`), 2 (facts) |
 | §3 push/force push | 2 (backend), 5/6 (buttons) |
 | §3.1 conflict computation | 2 |
 | §4 Claude Code dialog, archive-at-risk dialog | 4 |
-| §7 visual tokens | every UI part (3-8) |
+| §7 visual tokens | every UI part (3-7) |
 | §8 libraries | 5 (drag), 6 (TipTap, xterm) |
-| §9 decisions to keep | every UI part's audit; 8 re-checks all |
+| §9 decisions to keep | every UI part's audit; 7 re-checks all |
 | Agent spawn, tracking, session persistence, activity | 1 |
-| Jira sync | 7 |
-| Screen-by-screen live comparison against `mockup.html` (the row's acceptance) | 8 |
+| Jira sync, `ready`/`ciFailing`, `Merge` action | None: dropped by user decision (§0) |
+| Screen-by-screen live comparison against `mockup.html` (the row's acceptance) | 7 |
 
 ---
 
-## 3. Split decision: eight parts, strict order
+## 3. Split decision: seven parts, strict order
 
 One pass cannot hold this: a Go runtime, a Go git-facts engine, a ~1,000-line derivation port,
 two dialogs, a timeline with drag and drop, a rich-text panel and a second view. Each part is one
@@ -237,13 +239,12 @@ fails otherwise), which is why frontend wiring for Part 1's backend lands in Par
 | Part | Scope | Depends on |
 |---|---|---|
 | 1 | Agent runtime: hooks wired in Space, launch composition, session tracker and table, `AdeService` session surface, reducer `waiting` extension | P127, P128 |
-| 2 | Queue backend: ade tables, repo snapshot git facts, conflicts/shares/behind/merged, candidates, PR data, Refresh, Force push, Archive with at-risk check, `kira:ade:repo` | 1 |
+| 2 | Queue backend: ade tables, repo snapshot git facts, conflicts/shares/behind/merged, candidates, PR raw state and title, Refresh, Force push, Archive with at-risk check, `kira:ade:repo` | 1 |
 | 3 | `useQueue()` port with unit tests; ade data layer (queries, `adeUi` store, agent store instance); `layout: 'full'` module; repo tab bar; project header; `main` line; activity icons | 2 |
 | 4 | Claude Code dialog (all templates, targets, worktree choice, busy check and override, force-push switch, Reset) and archive-at-risk dialog; send/launch through Part 1 | 3 |
-| 5 | Timeline and stack boxes: days, history, capacity, day off, action column, drag and drop, Add popover, Claude Code icon | 4 |
-| 6 | Detail panel: header actions, Details (TipTap notes, links, estimate), Changes, Agents (terminals, status strip, Stopped list), resizable | 5 |
-| 7 | Jira link sync | 6, user answer |
-| 8 | All agents view and pinned tab; cross-window Open; closing screen-by-screen comparison against `mockup.html` | 7 |
+| 5 | Timeline and stack boxes: days, history, capacity, day off, action column, drag and drop, Add popover, Claude Code icon (existing in-app icon) | 4 |
+| 6 | Detail panel: header actions, Details (TipTap notes, plain Jira/PR links, estimate), Changes, Agents (terminals, status strip, Stopped list), resizable | 5 |
+| 7 | All agents view and pinned tab; cross-window Open; closing screen-by-screen comparison against `mockup.html` | 6 |
 
 ---
 
@@ -435,8 +436,8 @@ implementer confirms them there (documentation, not the binary) before step 6.
 
 Everything in §2.5 not assigned to Part 1. Specifically: renderer wiring (control methods, agent
 store instance, sessions query, `CHANNEL.adeSessions`) lands in Part 3 with its first consumer;
-new-work rebind in Part 2; cross-window Open in Part 8; resume fallback when the cwd is gone in
-Part 8.
+new-work rebind in Part 2; cross-window Open in Part 7; resume fallback when the cwd is gone in
+Part 7.
 
 ---
 
@@ -448,7 +449,7 @@ Every commit passes the pre-commit hook (`bun run lint`, `bun run typecheck`) an
 after each Go step that touches a bound type (`wails3 generate bindings`, per
 `docs/DEV_ENVIRONMENT.md`).
 
-The `SPEC.md` split into eight part rows landed with this plan's own commit; no step for it.
+The `SPEC.md` split into part rows landed with this plan's own commit; no step for it.
 
 1. **`feat(terminal): optional agent launch composition seam`** — §4.1. Studio's `main.go`
    unchanged (field nil). No dedicated test: a nil check plus a pass-through; step 5's
@@ -493,7 +494,7 @@ Kira Studio's behavior cannot change: its `ComposeAgent` stays nil and it has no
 - Shared agent monitoring section: Space is now the consumer; `UserPromptSubmit`; `waiting` phase
   and its `Monitor`/`ScheduleWakeup` rule.
 - Known open items: replace "package unwired from Kira Space's UI" with "wired in Go; ade UI
-  lands in P129 Parts 3-8" (removed entirely by Part 8); add the `Bash` background limitation.
+  lands in P129 Parts 3-7" (removed entirely by Part 7); add the `Bash` background limitation.
 - Remove the "Agent is inert in Space" statement if ARCHITECTURE carries it.
 
 ---
@@ -568,7 +569,7 @@ Account for every hit.
 | Risk | Mitigation |
 |---|---|
 | Claude Code's TUI treats `\r` right after the paste end as part of the paste | Two separate writes (§4.5); the first real-TUI check (Part 4, sending to a running session) adds a short delay in `Send` if needed, as a fix commit there |
-| `claude --resume <id>` fails outside the session's original cwd | Part 1 always resumes in the recorded cwd. Part 8 (archived sessions, `new worktree`) probes and decides |
+| `claude --resume <id>` fails outside the session's original cwd | Part 1 always resumes in the recorded cwd. Part 7 (archived sessions, `new worktree`) probes and decides |
 | Composed command exceeds 64 KiB | Rechecked after composing; message capped at 32 KiB |
 | `OnChange` ordering: exit notification processed before spawn notification | `Reconcile` reads the live set itself each call, and the grace window covers the spawn race (§4.4) |
 | Hooks listener fails to start | Logged; sessions still spawn and persist; activity absent. Part 3 decides whether to surface it |
