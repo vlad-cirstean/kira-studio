@@ -2669,13 +2669,13 @@ persists until the next `Refresh`. `RepoSnapshot.main.name`/`.ref` hold short fo
 fix, since `AdeMainLine` renders `main` verbatim.
 
 **Kira Space's `ade` dialog (P129 Part 4) adds the Claude Code send/launch/archive flow on top of
-Part 3's read-only view.** Part 5's timeline now wires every opener but `resumeSpec` — Rebase all
-(Part 4), Queue after and Move (a stack box's own action, `AdeStackBlock`), Start new/existing work
-(the action column's `▶ Start`), and the archive-at-risk dialog's trigger (the action column's
-Archive) all reach `dialogFlow.ts` from a real caller; `resumeSpec` stays unwired since resuming a
-session has no opener yet, and the activity-icon click that would open a running session's own
-terminal in the Agents tab stays Part 6's, since that tab doesn't exist yet — Part 5 wires the
-agents pill's click to selection only, no placeholder state. `ade/dialogCompose.ts` is a pure,
+Part 3's read-only view.** Part 6's detail panel now wires the last opener: `resumeSpec`'s caller is
+the Agents tab's own Stopped list (its per-row Resume button), and the activity-icon click Part 5
+left as selection-only now calls `adeUi.openSession`, which selects the item, switches to the
+Agents tab, and picks that session's own terminal tab in one store call — Rebase all (Part 4), Queue
+after and Move (a stack box's own action, `AdeStackBlock`), Start new/existing work (the action
+column's `▶ Start`), and the archive-at-risk dialog's trigger (the action column's Archive) already
+reached `dialogFlow.ts` from a real caller since Part 5. `ade/dialogCompose.ts` is a pure,
 byte-exact port of the design mockup's own `sendDialog()`/message templates (no Vue import, no
 `Date.now()`/`new Date()`), taking real queue/session data as parameters where the mockup read
 globals — cross-checked by `tests/unit/ade-dialog-parity.spec.ts` running the mockup itself as an
@@ -2735,6 +2735,45 @@ retry that still fails surfaces as an `actionError` instead of re-opening the co
 branch's archive lands on `useQueue`'s local-day band (`localDayOf`, not UTC) it was fixed to use
 earlier this same phase, so an archive in the evening in most zones doesn't appear to land on
 tomorrow.
+
+**Kira Space's `ade` detail panel (P129 Part 6) is a flex-row split on `AdeRepoView`'s own right
+edge — `QueueView.panel` (a pure `useQueue` fact, `null` when nothing is selected) drives it, still
+with no Vue import.** `AdePanelResizeHandle.vue` is hand-rolled on VueUse's `useDraggable`/
+`useDebounceFn` rather than shadcn/reka `ResizablePanelGroup`: a second nested
+`ResizablePanelGroup` inside `WorkbenchShell`'s own outer one is an unproven topology (P132 Part 1
+§0.1 found outer-vertical nesting hangs the render process there), and reka's own `sizeUnit="px"`
+re-runs layout on every container resize tick, the same feedback shape that hung SlickGrid. The
+handle only reports a candidate width (`resize` while dragging or on each arrow-key press, `commit`
+to persist); `AdeRepoView.vue` owns the clamp (`PANEL_MIN = 340`, max is the root's own width minus
+that) and the settings write. `settings.ade.panelWidth === 0` means "half the root's own live
+width" (`useElementSize`), not a literal zero-width panel — the only stored value that means
+anything other than itself. Meta writes route through `useItemMeta.ts`: `SetBranchMeta` for a real
+branch, `UpdateNewWork` for a draft, both validated client-side (Jira/PR paste parsing, the estimate
+regex, new-work's "name or key" guard) before either mutation fires; a review item only ever reaches
+`setNotes` (the component hides every other input for it, mockup `mineOnly`) — `useItemMeta` stays
+ignorant of that restriction rather than re-enforcing it. `startFrom: ''` means main, matching Part
+5's own `movePlanArgs` convention rather than a new one. Links open through `RepoWebURL` (`queue.go`,
+already resolved server-side into `RepoSnapshot.webUrl`) and an OS-opened `<a>` (`LinkService.
+OpenExternal`), never TipTap's own click handler. Notes use TipTap v3 with `@tiptap/markdown`, not
+the more obvious `tiptap-markdown`: the latter parses Markdown to HTML through `markdown-it` then
+`window.DOMParser()`, which needs a DOM `bun test` (this repo's only unit runner) doesn't have,
+where `@tiptap/markdown` parses through `marked` into ProseMirror JSON with no DOM, headless
+(`MarkdownManager({extensions}).parse/serialize`) — the only way the SPEC's own round-trip
+acceptance check runs in a unit test at all. One `notesExtensions()` factory
+(`ade/notesExtensions.ts`) is shared by the editor and that spec so the two can't drift. Only a
+user's own edit ever writes notes back (the refetch rule): a snapshot refetch while the editor is
+focused is dropped rather than resetting its content mid-typing, since nothing besides this editor
+ever changes `notes` server-side. The Agents tab (`AdeAgentsTab.vue`) mounts `TerminalHostView` only
+for a session whose terminal this window itself opened (`terminalsStore.terminalSession(id)`
+truthy) — a session running in another window shows a plain cross-window notice instead, never a
+second PTY for the same id; `AdeAgentsTab` is also the first `ade/` caller to mount an xterm at all,
+so `ade/state/adeTerminals.ts` (one Pinia store, one concern) reaps this window's own stopped ade
+terminals — nothing else in `ade/` ever called `closeTerminalSession`/`cleanupTabRuntime`, so a
+stopped session's `byTabId` entry, drain queue and xterm instance would otherwise outlive the
+session for the app's life. `adeUi.agentTabByItem` falls back to the first running session when an
+item has no pick yet (mockup parity — starting a new session does not itself pick its tab); the
+activity-icon hand-off (`adeUi.openSession`) is the one caller that does pick it, alongside
+selecting the item and switching to the Agents tab.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
