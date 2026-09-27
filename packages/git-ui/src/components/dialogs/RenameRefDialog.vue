@@ -9,18 +9,21 @@
  * a prefilled name field rather than an empty one, validated with the same `validateRefName`
  * prefilter `BranchDialog.vue`/`TagDialog.vue` already use.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content.
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * only supplies its own body/footer content.
  */
 import { validateRefName } from '@kira/git-core';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
-import { computed, ref, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
 const props = defineProps<{ open: boolean; currentName: string; ops: OpsState }>();
 const emit = defineEmits<(e: 'close') => void>();
 
 const name = ref('');
+const nameId = useId();
 
 watch(
   () => props.open,
@@ -51,22 +54,31 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <KuiDialog :open="open" title="Rename branch" @close="cancel">
-    <p class="kv:text-diff-deleted">Renaming <code>{{ currentName }}</code></p>
+  <Dialog :open="open" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Rename branch</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p class="kv:text-diff-deleted">Renaming <code>{{ currentName }}</code></p>
 
-    <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-      New name
-      <input
-        type="text"
-        v-model="name"
-        class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-      />
-    </label>
-    <p v-if="nameError" class="kv:text-diff-deleted kv:my-0.5">{{ nameError }}</p>
+        <label :for="nameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          New name
+          <Input :id="nameId" v-model="name" type="text" size="kira" class="w-full" />
+        </label>
+        <p v-if="nameError" class="kv:text-diff-deleted kv:my-0.5">{{ nameError }}</p>
+      </div>
 
-    <template #actions>
-      <KuiButton variant="primary" :disabled="!canSubmit" @click="submit">Rename branch</KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmit" @click="submit">
+          Rename branch
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
