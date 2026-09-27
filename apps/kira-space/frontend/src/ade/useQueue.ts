@@ -1258,9 +1258,10 @@ function segmentTagAndAction(
   };
 }
 
-// mockup line 1080, verbatim. Exported for the panel header's own Archive actions (P129 Part 6
-// §0.5, first consumer outside this module).
-export const ARCHIVE_TIP =
+// mockup line 1080, verbatim — `buildPanelActions` bakes it into each Archive action's own `tip`
+// field (P129 Part 6 §0.5), so `AdePanelHeader.vue` consumes it through `action.tip`, never by
+// importing this constant directly. Module-private: knip flagged the earlier `export` as unused.
+const ARCHIVE_TIP =
   'Stop its agents, delete its worktree and hide it. The branch, notes and links are kept; it stays in history.';
 
 function buildCells(

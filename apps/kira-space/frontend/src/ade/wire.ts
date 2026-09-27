@@ -253,8 +253,10 @@ export interface AdeSetQueuedAfterArgs {
 
 /** `AdeJiraPatch` — the wire's own nested Jira half of `AdeNewWorkPatch`/`AdeBranchMetaPatch`
  *  (§5.3 of Part 2's plan: `patch{..., jira, ...}`) — the store's flat key/URL pointer pair, grouped
- *  to match the read side's own nested `AdeJira`. */
-export interface AdeJiraPatch {
+ *  to match the read side's own nested `AdeJira`. Module-private: only `AdeNewWorkPatch`/
+ *  `AdeBranchMetaPatch` (both exported) are ever imported by name outside this file; knip flagged
+ *  the earlier `export` here as unused. */
+interface AdeJiraPatch {
   key?: string;
   url?: string;
 }
