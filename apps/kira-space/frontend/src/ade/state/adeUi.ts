@@ -51,6 +51,10 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     /** P129 Part 6 §0.20: the detail panel's own tab (mockup `state.tab`) — one across every repo,
      *  like `dialog`, not per-repo (switching repo tabs keeps the same panel tab selected). */
     panelTab: 'details' as 'details' | 'changes' | 'agents',
+    /** P129 Part 6 §0.20: the Agents tab's own terminal-tab pick (mockup `state.termTab`), keyed
+     *  `${repo}:${item}` -> session record id — `AdeAgentsTab.vue` falls back to the first running
+     *  session when an item has no entry, or its entry names a session no longer running. */
+    agentTabByItem: {} as Record<string, string>,
   });
 
   function setActiveRepo(id: string): void {
@@ -132,6 +136,18 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     state.panelTab = tab;
   }
 
+  function setAgentTab(codeRepoId: string, item: string, sessionId: string): void {
+    state.agentTabByItem = { ...state.agentTabByItem, [`${codeRepoId}:${item}`]: sessionId };
+  }
+
+  /** P129 Part 6 §0.21: the activity icon's own hand-off — select the item, switch to the Agents
+   *  tab, and pick that session's own terminal tab, in one call. */
+  function openSession(codeRepoId: string, item: string, sessionId: string): void {
+    select(codeRepoId, item);
+    state.panelTab = 'agents';
+    setAgentTab(codeRepoId, item, sessionId);
+  }
+
   return {
     ...toRefs(state),
     setActiveRepo,
@@ -151,5 +167,7 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     closeConfirm,
     setConfirmError,
     setPanelTab,
+    setAgentTab,
+    openSession,
   };
 });

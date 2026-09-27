@@ -25,6 +25,7 @@ import {
 import type { SetPlanArgs } from '../timelineOps';
 import { adeTurns } from '../turnWatch';
 import type { AdeAddNewWorkArgs } from '../wire';
+import { useAdeTerminalsStore } from './adeTerminals';
 import { useAdeUiStore } from './adeUi';
 import { useAgentSessionsStore } from './agentSessions';
 
@@ -34,6 +35,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const adeUiStore = useAdeUiStore();
   const agentSessionsStore = useAgentSessionsStore();
   const terminalsStore = useTerminalsStore();
+  const adeTerminalsStore = useAdeTerminalsStore();
 
   const rebasing = reactive(new Map<string, Set<string>>());
   const EMPTY_ROOTS: ReadonlySet<string> = new Set();
@@ -120,8 +122,18 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     return {
       adeSend: (args) => sendMutation.mutateAsync(args),
       adePrepareLaunch: (args) => launchMutation.mutateAsync(args),
-      openTerminalSession: (tabId, codeRepoId, cwd, cols, rows, command, launchKind) =>
-        terminalsStore.openTerminalSession(tabId, codeRepoId, cwd, cols, rows, command, launchKind),
+      openTerminalSession: async (tabId, codeRepoId, cwd, cols, rows, command, launchKind) => {
+        adeTerminalsStore.track(tabId);
+        await terminalsStore.openTerminalSession(
+          tabId,
+          codeRepoId,
+          cwd,
+          cols,
+          rows,
+          command,
+          launchKind,
+        );
+      },
       terminalSession: (tabId) => terminalsStore.terminalSession(tabId),
     };
   }
