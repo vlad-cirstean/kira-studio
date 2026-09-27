@@ -15,13 +15,13 @@ import type { AdeRefreshResult, AdeRepoPrs, AdeRepoSnapshot, AdeSessionsResult }
 // below): a missing invalidation should surface as a bug, not hide behind remount churn, and a
 // snapshot read is real git work per repo tab switch (§0.11's own reasoning).
 
-export const adeSessionsKey = ['ade', 'sessions'] as const;
+const adeSessionsKey = ['ade', 'sessions'] as const;
 
-export function adeSnapshotKey(codeRepoId: string) {
+function adeSnapshotKey(codeRepoId: string) {
   return ['ade', 'snapshot', codeRepoId] as const;
 }
 
-export function adePrsKey(codeRepoId: string) {
+function adePrsKey(codeRepoId: string) {
   return ['ade', 'prs', codeRepoId] as const;
 }
 

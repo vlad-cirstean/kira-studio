@@ -26,8 +26,8 @@ import type {
 /** Mockup line 934: the sentinel "no day assigned yet" offset. */
 export const LATER = 9999;
 
-export type Tone = 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
-export type ItemKind = 'mine' | 'review' | 'parked';
+type Tone = 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
+type ItemKind = 'mine' | 'review' | 'parked';
 
 // mockup line 579: work-item colors, assigned once server-side (Part 2's own `snapshot.colors`) —
 // this module only maps the assigned palette index back to a hex value, never assigns one itself.
@@ -108,32 +108,32 @@ export interface QueueItem {
   estimate: { hours: number; days: number } | null;
 }
 
-export interface QueueStackMember {
+interface QueueStackMember {
   id: string;
   dep: number;
 }
 
-export interface QueueStack {
+interface QueueStack {
   root: string;
   members: QueueStackMember[];
   lead: string | null;
   parked: boolean;
 }
 
-export interface QueueTag {
+interface QueueTag {
   label: string;
   tone: Tone;
   tip: string;
 }
 
-export interface QueueAction {
+interface QueueAction {
   kind: 'queueAfter' | 'forcePush' | 'rebase';
   label: string;
   targetIds: string[];
   disabled: boolean;
 }
 
-export interface QueueCell {
+interface QueueCell {
   tag: { label: string; tone: Tone } | null;
   action: { kind: 'archive' | 'start'; id: string; label: string } | null;
   info: string | null;
@@ -182,7 +182,7 @@ export interface QueueBand {
   history: { title: string; branch: string; how: string }[];
 }
 
-export interface QueueAtRisk {
+interface QueueAtRisk {
   dirty: string[];
   unmerged: number;
 }

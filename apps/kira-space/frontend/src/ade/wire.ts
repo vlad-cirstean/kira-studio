@@ -28,7 +28,7 @@ export interface AdeSessionsResult {
 }
 
 /** `AdeMain` — `RepoSnapshot.main`'s own shape; absent means main is unresolved (§0.6). */
-export interface AdeMain {
+interface AdeMain {
   name: string;
   ref: string;
   tip: string;
@@ -52,7 +52,7 @@ interface AdeDirty {
 }
 
 /** A branch's or new-work item's own read-side Jira link — always present, empty meaning "none". */
-export interface AdeJira {
+interface AdeJira {
   key: string;
   url: string;
 }
@@ -122,7 +122,7 @@ export interface AdePair {
   conflicts: string[];
 }
 
-export interface AdeHistoryItem {
+interface AdeHistoryItem {
   item: string;
   kind: string;
   title: string;

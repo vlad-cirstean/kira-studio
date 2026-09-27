@@ -2,7 +2,6 @@ import type { AgentActivity, AgentPhase } from '@shared/domain/agent';
 import type { QueueInput } from '../../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
-  AdeHistoryItem,
   AdeNewWork,
   AdePair,
   AdePlan,
@@ -232,7 +231,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
 
   // ---- history -------------------------------------------------------------------------------
   const rawHistory: RawItem[] = comp.historyData()[repo] ?? [];
-  const history: AdeHistoryItem[] = rawHistory.map((h) => ({
+  const history: AdeRepoSnapshot['history'] = rawHistory.map((h) => ({
     item: h.name,
     kind: h.how.startsWith('merged') ? 'merged' : 'archived',
     title: h.title,
