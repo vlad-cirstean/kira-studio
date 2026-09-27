@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import AdeStackRow from './AdeStackRow.vue';
 import type { QueueItem, QueueSegment, QueueTag } from './useQueue';
+import type { DropResult } from './useTimelineDrag';
+import { useTimelineDrag } from './useTimelineDrag';
 
 // P129 Part 5 §0.21/§0.17: one stack block — the 210px action column (mockup 216-226) beside the
 // box itself (mockup 227-260). §0.17's own click wiring: this component only emits the action
 // object `useQueue.ts` already built (kind, targetIds/id, label) — the caller (`AdeRepoView`, via
 // the bubble chain) is the one that knows what a rebase/queueAfter/forcePush/start/archive action
-// does. The box's own inner sortable is commit 10's.
+// does. §0.12: the box itself is the inner sortable's own root — its row list.
 const props = defineProps<{
   segment: QueueSegment;
   itemsById: ReadonlyMap<string, QueueItem>;
@@ -22,7 +24,11 @@ const emit = defineEmits<{
   select: [id: string];
   segmentAction: [action: SegmentActionType];
   cellAction: [action: CellActionType];
+  drop: [result: NonNullable<DropResult>];
 }>();
+
+const boxEl = ref<HTMLElement | null>(null);
+useTimelineDrag(boxEl, 'row', (result) => emit('drop', result));
 
 // Mockup `tone()` (line 650-659) — literal tints, one 6-tone palette, never theme tokens (§0 standing
 // decision: tone tints stay literal). `[background, foreground, solid]`.
@@ -81,7 +87,12 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
 </script>
 
 <template>
-  <div class="flex items-start gap-2" data-testid="ade-stack-block">
+  <div
+    class="flex items-start gap-2"
+    data-testid="ade-stack-block"
+    data-ade-block
+    :data-ade-drag-ids="segment.dragIds.join(',')"
+  >
     <div class="flex w-[210px] shrink-0 flex-col pt-[3px]">
       <div
         v-for="(cell, i) in segment.cells"
@@ -136,6 +147,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
       </div>
     </div>
     <div
+      ref="boxEl"
       class="flex min-w-0 max-w-140 flex-1 flex-col gap-0 rounded-kira py-0.5"
       :style="boxStyle"
       :title="segment.tag.tip"

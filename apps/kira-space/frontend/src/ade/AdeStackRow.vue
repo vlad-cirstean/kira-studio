@@ -5,8 +5,10 @@ import AdeAgentsPill from './AdeAgentsPill.vue';
 import type { QueueItem, QueueStackMember } from './useQueue';
 
 // P129 Part 5 §0.21: one stack row (mockup `rowFor`, 1096-1129) — elbow, colour square, agents
-// pill, owner pill, title/branch. Read-only apart from selection (row click, title click, agent
-// pill click all select — Part 5 commit 6's own scope); drag lands with commit 10.
+// pill, owner pill, title/branch. Row click/title click/agent pill click all select. `data-ade-id`
+// plus `data-ade-row-movable` (movable = non-review) are `useTimelineDrag`'s own row-level hooks
+// (§0.12): a movable row's own drag starts the box's inner sortable; a review row bubbles to the
+// box's own outer handle instead.
 const props = defineProps<{
   member: QueueStackMember;
   item: QueueItem;
@@ -63,6 +65,7 @@ function onPick(): void {
     :class="movable ? 'cursor-grab' : 'cursor-default'"
     data-testid="ade-stack-row"
     :data-ade-row-movable="movable ? '' : null"
+    :data-ade-id="member.id"
     role="option"
     tabindex="0"
     :aria-selected="selected"

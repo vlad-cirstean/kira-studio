@@ -12,15 +12,28 @@ import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import AdeTimeline from './AdeTimeline.vue';
-import { type DialogCtx, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
+import { type DialogCtx, moveSpec, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
-import { type DayMenuResult, dayMenuFor, shiftWorkArgs } from './timelineOps';
+import {
+  type DayMenuResult,
+  dayMenuFor,
+  movePlanArgs,
+  type SetPlanArgs,
+  shiftWorkArgs,
+} from './timelineOps';
 import { useHistoryPull } from './useHistoryPull';
-import { isoToOffset, offsetToIso, type QueueBand, type QueueSegment, useQueue } from './useQueue';
+import {
+  isoToOffset,
+  LATER,
+  offsetToIso,
+  type QueueBand,
+  type QueueSegment,
+  useQueue,
+} from './useQueue';
 
 // P129 Part 3 §2.7: queries for its own repo, `computed(() => useQueue({...}))`, sticky header and
 // `main` line — nothing below them in Part 3, the timeline is Part 5's. P129 Part 4 §2.7 adds:
@@ -307,6 +320,28 @@ function onCellAction(action: NonNullable<QueueSegment['cells'][number]['action'
   }
 }
 
+// §0.12/§2.7: `AdeTimeline`'s own two drop outcomes — `dropVerdict` itself already ran there
+// (§2.7's "one place"), so this is a straight-through write, or the Move dialog with its own
+// `applyPlan` closure (§0.14: the dialog writes the plan before it delivers).
+function onApplyPlan(args: SetPlanArgs): void {
+  void adeActionsStore.applyPlan(props.codeRepoId, args);
+}
+
+function onOpenMoveDialog(args: { ids: string[]; before: string | null; day: number }): void {
+  const ctx = dialogCtx.value;
+  const snapshot = snapshotQuery.data.value;
+  if (!ctx || !snapshot) return;
+  const iso = args.day === LATER ? null : offsetToIso(today.value, args.day);
+  adeUiStore.openDialog(
+    moveSpec(ctx, args.ids, args.before, iso, () =>
+      adeActionsStore.applyPlan(
+        props.codeRepoId,
+        movePlanArgs(snapshot.plan, today.value, args.ids, args.before, args.day),
+      ),
+    ),
+  );
+}
+
 // §0.17: a background failure (archive after Stop, blocked, ended) surfaces here, under the
 // `main` line — Space has no toast system, and by the time these land the dialog that started
 // them is already closed.
@@ -365,8 +400,10 @@ function onDismissError(): void {
         </AlertDescription>
       </Alert>
       <AdeTimeline
-        v-if="view"
+        v-if="view && snapshotQuery.data.value"
         :view="view"
+        :plan="snapshotQuery.data.value.plan"
+        :today="today"
         :history-open="historyOpen"
         :pull="pull"
         :pct="pct"
@@ -381,6 +418,8 @@ function onDismissError(): void {
         @day-menu="onDayMenu"
         @segment-action="onSegmentAction"
         @cell-action="onCellAction"
+        @apply-plan="onApplyPlan"
+        @open-move-dialog="onOpenMoveDialog"
       />
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />

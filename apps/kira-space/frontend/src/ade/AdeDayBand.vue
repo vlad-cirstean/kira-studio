@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import AdeContinuationRow from './AdeContinuationRow.vue';
 import AdeStackBlock from './AdeStackBlock.vue';
 import type { QueueBand, QueueItem, QueueSegment } from './useQueue';
+import type { DropResult } from './useTimelineDrag';
+import { useTimelineDrag } from './useTimelineDrag';
 
 // P129 Part 5 §0.22: one day band (mockup 1286-1301) — ruler, history rows, overdue/overflow
 // strips, the day's own blocks, continuation rows, the day context menu. Every plan write this
 // component's own buttons trigger is the caller's own (`AdeRepoView`, via `AdeTimeline`'s bubble):
-// this component only emits intent, never reads `timelineOps.ts` or the plan itself.
+// this component only emits intent, never reads `timelineOps.ts` or the plan itself. §0.12: the
+// blocks column is the outer sortable's own root — one box list per band.
 const props = defineProps<{
   band: QueueBand;
   blocks: QueueSegment[];
   itemsById: ReadonlyMap<string, QueueItem>;
   parentOf: Readonly<Record<string, string>>;
   selectedId: string | null;
+  /** §0.12 highlight: this band is the current drag's own hit-test target. The band itself still
+   *  gates on `!isPast && !isDayOff` (mockup 1290's own "only when it accepts"). */
+  dragOver: boolean;
 }>();
 
 type SegmentActionType = NonNullable<QueueSegment['action']>;
@@ -26,7 +32,14 @@ const emit = defineEmits<{
   dayMenu: [ev: MouseEvent];
   segmentAction: [action: SegmentActionType];
   cellAction: [action: CellActionType];
+  drop: [result: NonNullable<DropResult>];
 }>();
+
+const blocksEl = ref<HTMLElement | null>(null);
+useTimelineDrag(blocksEl, 'block', (result) => emit('drop', result));
+
+const acceptsDrop = computed(() => !props.band.isPast && !props.band.isDayOff);
+const showDragHighlight = computed(() => props.dragOver && acceptsDrop.value);
 
 const greyed = computed(() => props.band.isWeekend || props.band.isDayOff);
 
@@ -37,6 +50,8 @@ const rowBorderClass = computed(() =>
 );
 
 const rowBg = computed(() => {
+  // §0.12: the drop highlight wins over every other band tint while it applies.
+  if (showDragHighlight.value) return 'rgba(232,163,61,0.1)';
   if (greyed.value) {
     return 'repeating-linear-gradient(135deg, rgba(255,255,255,0.018) 0 6px, transparent 6px 12px)';
   }
@@ -88,7 +103,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
        nested interactive rows/buttons of its own, so it can't itself take a click/button role. -->
   <div
     class="flex"
-    :class="rowBorderClass"
+    :class="[rowBorderClass, showDragHighlight ? 'outline outline-dashed outline-[#e8a33d]' : '']"
     :style="{ background: rowBg }"
     data-testid="ade-day-band"
     data-ade-band
@@ -118,6 +133,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
       <div class="font-data text-kira-sm" :style="{ color: subColor }">{{ sub }}</div>
     </div>
     <div
+      ref="blocksEl"
       class="flex min-w-0 flex-1 flex-col gap-1.5"
       :class="band.isEmpty ? (greyed ? 'min-h-4' : 'min-h-[22px]') : 'py-1.5 pl-2'"
     >
@@ -169,6 +185,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
         @select="emit('select', $event)"
         @segment-action="emit('segmentAction', $event)"
         @cell-action="emit('cellAction', $event)"
+        @drop="emit('drop', $event)"
       />
       <AdeContinuationRow
         v-for="span in band.spans"
