@@ -253,3 +253,11 @@ export interface AdeUpdateNewWorkArgs {
   id: string;
   patch: { branchName?: string };
 }
+
+/** `AdeSetPlanArgs` — `timelineOps.ts`'s own `SetPlanArgs` (§0.13) plus the repo id every wire args
+ *  type carries; `days` only for the touched ids, `order` always the full array (§0.13). */
+export interface AdeSetPlanArgs {
+  codeRepoId: string;
+  days: Record<string, string | null>;
+  order: string[];
+}

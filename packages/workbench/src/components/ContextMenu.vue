@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
@@ -45,9 +46,11 @@ async function onItemClick(item: MenuItem): Promise<void> {
     <DropdownMenuContent align="start" :side-offset="0" data-testid="context-menu" class="min-w-45">
       <template
         v-for="(item, idx) in contextMenuStore.items"
-        :key="item.type === 'separator' ? `sep-${idx}` : item.id"
+        :key="item.type === 'separator' || item.type === 'label' ? `${item.type}-${idx}` : item.id"
       >
         <DropdownMenuSeparator v-if="item.type === 'separator'" />
+
+        <DropdownMenuLabel v-else-if="item.type === 'label'">{{ item.label }}</DropdownMenuLabel>
 
         <DropdownMenuSub v-else-if="item.type === 'submenu'">
           <DropdownMenuSubTrigger :data-testid="`menu-item-${item.id}`">
@@ -60,9 +63,10 @@ async function onItemClick(item: MenuItem): Promise<void> {
             <DropdownMenuSubContent data-testid="context-submenu">
               <template
                 v-for="(sub, subIdx) in item.items"
-                :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id"
+                :key="sub.type === 'separator' || sub.type === 'label' ? `${sub.type}-${subIdx}` : sub.id"
               >
                 <DropdownMenuSeparator v-if="sub.type === 'separator'" />
+                <DropdownMenuLabel v-else-if="sub.type === 'label'">{{ sub.label }}</DropdownMenuLabel>
                 <DropdownMenuItem
                   v-else
                   :disabled="sub.type === 'item' && !!sub.disabled"

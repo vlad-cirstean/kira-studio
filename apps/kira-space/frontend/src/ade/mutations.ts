@@ -10,7 +10,9 @@ import type {
   AdeArchiveRisk,
   AdeLaunch,
   AdePrepareLaunchArgs,
+  AdeRepoSnapshot,
   AdeSendArgs,
+  AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
   AdeUpdateNewWorkArgs,
 } from './wire';
@@ -97,6 +99,44 @@ export function useAdeUpdateNewWork(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'updateNewWork'),
     mutationFn: (args: AdeUpdateNewWorkArgs): Promise<void> => control.adeUpdateNewWork(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+/** P129 Part 5 §0.15: `SetPlan` is optimistic — a drop moves no DOM of its own (`timelineOps.ts` is
+ *  pure), so without this the dropped box would sit at its old day until the refetch. TanStack's own
+ *  documented optimistic-update shape: `onMutate` cancels the in-flight snapshot query, snapshots it,
+ *  writes the merged `plan.day`/`plan.order`; `onError` restores it; `onSettled` invalidates last. */
+export function useAdeSetPlan(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'setPlan'),
+    mutationFn: (args: AdeSetPlanArgs): Promise<void> => control.adeSetPlan(args),
+    onMutate: async (args: AdeSetPlanArgs) => {
+      const key = adeSnapshotKey(toValue(codeRepoId));
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<AdeRepoSnapshot>(key);
+      if (previous) {
+        queryClient.setQueryData<AdeRepoSnapshot>(key, {
+          ...previous,
+          plan: {
+            ...previous.plan,
+            day: { ...previous.plan.day, ...args.days },
+            order: args.order,
+          },
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _args, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(adeSnapshotKey(toValue(codeRepoId)), context.previous);
+      }
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: adeSnapshotKey(toValue(codeRepoId)),

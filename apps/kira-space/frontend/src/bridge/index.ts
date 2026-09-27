@@ -47,6 +47,7 @@ import type {
   AdeRepoSnapshot,
   AdeSendArgs,
   AdeSessionsResult,
+  AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
   AdeUpdateNewWorkArgs,
 } from '../ade/wire';
@@ -235,6 +236,10 @@ const spaceControl = {
     unwrap(AdeService.SetQueuedAfter(args)),
   adeUpdateNewWork: (args: AdeUpdateNewWorkArgs): Promise<void> =>
     unwrap(AdeService.UpdateNewWork(args)),
+
+  // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
+  // `ForcePush`/`CandidateBranches`/`AddBranch`/`AddNewWork` stay unbound until commits 9 and 11.
+  adeSetPlan: (args: AdeSetPlanArgs): Promise<void> => unwrap(AdeService.SetPlan(args)),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

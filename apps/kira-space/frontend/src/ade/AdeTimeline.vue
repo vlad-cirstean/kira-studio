@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import AdeDayBand from './AdeDayBand.vue';
 import AdeDayControls from './AdeDayControls.vue';
 import AdeHistoryPull from './AdeHistoryPull.vue';
-import type { QueueSegment, QueueView } from './useQueue';
+import type { QueueBand, QueueSegment, QueueView } from './useQueue';
 
 // P129 Part 5 §2.7: the timeline surface — one band per day, in order, the pull row (closed) above
 // them and the Later day controls (§0.9) right above the Later band. Drag and drop (commit 10) and
@@ -24,6 +24,9 @@ const emit = defineEmits<{
   openHistory: [];
   moreWeek: [];
   pickDate: [iso: string];
+  rollover: [band: QueueBand];
+  overflowMove: [band: QueueBand];
+  dayMenu: [band: QueueBand, ev: MouseEvent];
 }>();
 
 const itemsById = computed(() => new Map(props.view.items.map((item) => [item.id, item])));
@@ -63,6 +66,9 @@ const blocksByDay = computed(() => {
         :parent-of="view.parentOf"
         :selected-id="view.selectedId"
         @select="emit('select', $event)"
+        @rollover="emit('rollover', band)"
+        @overflow-move="emit('overflowMove', band)"
+        @day-menu="(ev) => emit('dayMenu', band, ev)"
       />
     </template>
   </div>

@@ -12,6 +12,20 @@ export type AdeRefreshNote =
   | { kind: 'ok'; refsChanged: number; newlyMerged: string[] }
   | { kind: 'error'; message: string };
 
+/** P129 Part 5 §0.11: one shared confirm prompt (day-off move, §0.16's protected-branch force push)
+ *  — `AdeConfirmDialog.vue`'s own whole state. `token` non-null names the value its own `Input` must
+ *  match before "yes" enables (the protected branch's own name); `run` is the caller's already-bound
+ *  closure, awaited on "yes" — a rejection sets `error` and leaves the dialog open. */
+export interface AdeConfirmState {
+  title: string;
+  text: string;
+  yesLabel: string;
+  noLabel: string;
+  token: string | null;
+  error: string | null;
+  run: () => Promise<void>;
+}
+
 /** §2.5: `dialogCompose.ts`'s own `DialogState` plus the spec it was opened with and an in-dialog
  *  delivery error (§0.17) — `AdeClaudeDialog.vue` reads this whole. */
 interface AdeDialogState {
@@ -33,6 +47,7 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     /** §0.6: the timeline's own row selection, per repo — `useQueue`'s own first-item default
      *  applies when a repo has no entry here, or its entry no longer names a live item. */
     selectedByRepo: {} as Record<string, string>,
+    confirm: null as AdeConfirmState | null,
   });
 
   function setActiveRepo(id: string): void {
@@ -96,6 +111,20 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     if (state.dialog) state.dialog.error = message;
   }
 
+  /** §0.11: every open replaces whatever confirm was showing (the mockup's own single
+   *  `state.confirm`) and resets `error`, mirroring `openDialog`'s own reset-on-open rule. */
+  function openConfirm(c: Omit<AdeConfirmState, 'error'>): void {
+    state.confirm = { ...c, error: null };
+  }
+
+  function closeConfirm(): void {
+    state.confirm = null;
+  }
+
+  function setConfirmError(message: string): void {
+    if (state.confirm) state.confirm.error = message;
+  }
+
   return {
     ...toRefs(state),
     setActiveRepo,
@@ -111,5 +140,8 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     pickWorktree,
     dropRoots,
     setError,
+    openConfirm,
+    closeConfirm,
+    setConfirmError,
   };
 });

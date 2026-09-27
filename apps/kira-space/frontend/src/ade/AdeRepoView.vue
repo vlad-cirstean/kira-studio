@@ -2,10 +2,12 @@
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { useElementSize, useIntervalFn, useScroll } from '@vueuse/core';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, nextTick, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useSettingsStore } from '../state/settings';
 import AdeClaudeDialog from './AdeClaudeDialog.vue';
+import AdeConfirmDialog from './AdeConfirmDialog.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
@@ -16,8 +18,9 @@ import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
+import { type DayMenuResult, dayMenuFor, shiftWorkArgs } from './timelineOps';
 import { useHistoryPull } from './useHistoryPull';
-import { isoToOffset, offsetToIso, useQueue } from './useQueue';
+import { isoToOffset, offsetToIso, type QueueBand, useQueue } from './useQueue';
 
 // P129 Part 3 §2.7: queries for its own repo, `computed(() => useQueue({...}))`, sticky header and
 // `main` line — nothing below them in Part 3, the timeline is Part 5's. P129 Part 4 §2.7 adds:
@@ -32,6 +35,7 @@ const settingsStore = useSettingsStore();
 const agentSessionsStore = useAgentSessionsStore();
 const adeUiStore = useAdeUiStore();
 const adeActionsStore = useAdeActionsStore();
+const contextMenuStore = useContextMenuStore();
 
 const snapshotQuery = useAdeSnapshot(() => props.codeRepoId);
 const prsQuery = useAdePrs(() => props.codeRepoId);
@@ -95,6 +99,65 @@ function scrollToDay(k: number): void {
 
 function goCurrentWork(): void {
   if (view.value) scrollToDay(view.value.focusDay);
+}
+
+// §0.13: overdue's own "Move to today" — `shiftWorkArgs` against `view.firstWorkDay`, no dialog
+// (design §2.3, mockup `rollover`).
+async function onRollover(band: QueueBand): Promise<void> {
+  const snapshot = snapshotQuery.data.value;
+  const queueView = view.value;
+  if (!snapshot || !queueView) return;
+  const args = shiftWorkArgs(snapshot.plan, today.value, band.overdueIds, queueView.firstWorkDay);
+  await adeActionsStore.applyPlan(props.codeRepoId, args);
+}
+
+// §0.13: overflow's own "Move to …" — `shiftWorkArgs` against the band's own `overflowMoveDay`, no
+// dialog (mockup `overflowMove`).
+async function onOverflowMove(band: QueueBand): Promise<void> {
+  const snapshot = snapshotQuery.data.value;
+  if (!snapshot || band.overflowMoveDay === null) return;
+  const args = shiftWorkArgs(snapshot.plan, today.value, band.overflowIds, band.overflowMoveDay);
+  await adeActionsStore.applyPlan(props.codeRepoId, args);
+}
+
+// §0.10: the day context menu — `dayMenuFor` returns `null` on Later and past days (menu doesn't
+// open at all), off > weekend > weekday precedence otherwise. The title row is the workbench's new
+// `label` `MenuItem` variant (§0.10).
+function onDayMenu(band: QueueBand, ev: MouseEvent): void {
+  const menu = dayMenuFor(band, settingsStore.ade);
+  if (!menu) return;
+  const items: MenuItem[] = [
+    { type: 'label', label: band.longLabel },
+    { type: 'item', id: 'ade-day-toggle', label: menu.label, run: () => onDayMenuToggle(band, menu) },
+  ];
+  contextMenuStore.openContextMenu(ev, items);
+}
+
+async function onDayMenuToggle(band: QueueBand, menu: DayMenuResult): Promise<void> {
+  await settingsStore.patchSettings({ ade: menu.patch });
+  if (menu.confirmAfter) openDayOffConfirm(band);
+}
+
+// §0.11: marking a worked weekday off, with stacks already starting there, offers to move them —
+// `to` is `band.nextWorkDay` (`nextWork` already skips days off/unworked weekends, so it can't be
+// `null` here: `dayMenuFor` only sets `confirmAfter` for a still-in-range weekday).
+function openDayOffConfirm(band: QueueBand): void {
+  const to = band.nextWorkDay;
+  if (to === null) return;
+  const count = band.startIds.length;
+  adeUiStore.openConfirm({
+    title: `${band.longLabel} is a day off`,
+    text: `Move ${count} ${count === 1 ? 'branch' : 'branches'} planned for that day to ${band.nextWorkLong}?`,
+    yesLabel: `Move to ${band.nextWorkLabel}`,
+    noLabel: 'Leave it',
+    token: null,
+    run: async () => {
+      const snapshot = snapshotQuery.data.value;
+      if (!snapshot) return;
+      const args = shiftWorkArgs(snapshot.plan, today.value, band.startIds, to);
+      await adeActionsStore.applyPlan(props.codeRepoId, args);
+    },
+  });
 }
 
 // §0.9: a future date beyond the horizon (either "or date" or the History bar's "Go to") persists
@@ -284,8 +347,12 @@ function onDismissError(): void {
         @open-history="() => void openHistory()"
         @more-week="onMoreWeek"
         @pick-date="onPickDate"
+        @rollover="onRollover"
+        @overflow-move="onOverflowMove"
+        @day-menu="onDayMenu"
       />
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />
+    <AdeConfirmDialog />
   </div>
 </template>

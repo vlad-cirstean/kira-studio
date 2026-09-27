@@ -5,9 +5,9 @@ import AdeStackBlock from './AdeStackBlock.vue';
 import type { QueueBand, QueueItem, QueueSegment } from './useQueue';
 
 // P129 Part 5 §0.22: one day band (mockup 1286-1301) — ruler, history rows, overdue/overflow
-// strips, the day's own blocks, continuation rows. Read-only apart from selection this commit: the
-// overdue/overflow buttons render (label, tip) but their click wiring is commit 8's; the day
-// context menu (right-click) is commit 8's too, so no `@contextmenu` listener lands here yet.
+// strips, the day's own blocks, continuation rows, the day context menu. Every plan write this
+// component's own buttons trigger is the caller's own (`AdeRepoView`, via `AdeTimeline`'s bubble):
+// this component only emits intent, never reads `timelineOps.ts` or the plan itself.
 const props = defineProps<{
   band: QueueBand;
   blocks: QueueSegment[];
@@ -16,7 +16,12 @@ const props = defineProps<{
   selectedId: string | null;
 }>();
 
-const emit = defineEmits<{ select: [id: string] }>();
+const emit = defineEmits<{
+  select: [id: string];
+  rollover: [];
+  overflowMove: [];
+  dayMenu: [ev: MouseEvent];
+}>();
 
 const greyed = computed(() => props.band.isWeekend || props.band.isDayOff);
 
@@ -74,6 +79,8 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
 </script>
 
 <template>
+  <!-- biome-ignore lint/a11y/noStaticElementInteractions: right-click only (§0.24) — the band holds
+       nested interactive rows/buttons of its own, so it can't itself take a click/button role. -->
   <div
     class="flex"
     :class="rowBorderClass"
@@ -81,6 +88,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
     data-testid="ade-day-band"
     data-ade-band
     :data-ade-day="band.day"
+    @contextmenu.prevent="emit('dayMenu', $event)"
   >
     <div
       class="relative box-border w-15 shrink-0 text-right"
@@ -127,6 +135,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
           type="button"
           class="h-[22px] whitespace-nowrap rounded-kira-sm bg-[#e8a33d] px-2.5 text-kira-sm font-semibold text-[#15161a]"
           data-testid="ade-band-rollover"
+          @click="emit('rollover')"
         >
           Move to today
         </button>
@@ -140,6 +149,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
           type="button"
           class="h-[22px] max-w-90 truncate whitespace-nowrap rounded-kira-sm border border-[#ef6b5b] bg-transparent px-2.5 text-kira-sm font-semibold text-[#f28b7d]"
           data-testid="ade-band-overflow-move"
+          @click="emit('overflowMove')"
         >
           {{ band.overflowMoveLabel }}
         </button>

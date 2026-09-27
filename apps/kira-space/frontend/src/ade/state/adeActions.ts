@@ -15,9 +15,11 @@ import {
   useAdeArchive,
   useAdeLaunch,
   useAdeSend,
+  useAdeSetPlan,
   useAdeSetQueuedAfter,
   useAdeUpdateNewWork,
 } from '../mutations';
+import type { SetPlanArgs } from '../timelineOps';
 import { adeTurns } from '../turnWatch';
 import { useAdeUiStore } from './adeUi';
 import { useAgentSessionsStore } from './agentSessions';
@@ -84,6 +86,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const setQueuedAfterMutation = useAdeSetQueuedAfter(currentRepoId);
   const updateNewWorkMutation = useAdeUpdateNewWork(currentRepoId);
   const archiveMutation = useAdeArchive(currentRepoId);
+  const setPlanMutation = useAdeSetPlan(currentRepoId);
 
   function buildLaunchDeps(): LaunchDeps {
     return {
@@ -156,5 +159,21 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     await runJustDeleteArchive(buildDeps(repoId, ctx), item);
   }
 
-  return { rebasingFor, sendDialog, requestArchive, justDelete, actionError, dismissError };
+  /** §0.13/§2.5: every plan write this phase makes (drops, the Move dialog's own `applyPlan`,
+   *  overdue/overflow "Move to…", the day-off confirm's `shiftWork`) — one call, `SetPlan` is
+   *  idempotent so a retry after a partial failure is always safe. */
+  async function applyPlan(repoId: string, args: SetPlanArgs): Promise<void> {
+    currentRepoId.value = repoId;
+    await setPlanMutation.mutateAsync({ codeRepoId: repoId, days: args.days, order: args.order });
+  }
+
+  return {
+    rebasingFor,
+    sendDialog,
+    requestArchive,
+    justDelete,
+    applyPlan,
+    actionError,
+    dismissError,
+  };
 });

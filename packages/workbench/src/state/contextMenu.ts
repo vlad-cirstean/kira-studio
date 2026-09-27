@@ -24,7 +24,10 @@ export type MenuItem =
       run(): void | Promise<void>;
     }
   | { type: 'submenu'; id: string; label: string; icon?: string; items: MenuItem[] }
-  | { type: 'separator' };
+  | { type: 'separator' }
+  /** A non-interactive heading row above the items that follow it (P129 Part 5 §0.10's day
+   *  context menu: the day's own `dayLong` above its one toggle). */
+  | { type: 'label'; label: string };
 
 export const useContextMenuStore = defineStore('contextMenu', () => {
   const state = reactive({
