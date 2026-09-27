@@ -2660,7 +2660,40 @@ label rather than being dropped. `AgentSessionsControl`'s three members
 `createAgentSessionsStore` structurally, no adapter layer — Kira Space's own agent-activity store
 instance lives at `ade/state/agentSessions.ts`. `ade/state/adeUi.ts` (one Pinia store, one concern)
 owns the module's own runtime-only UI state: the active repo tab and a per-repo refresh note that
-persists until the next `Refresh`.
+persists until the next `Refresh`. `RepoSnapshot.main.name`/`.ref` hold short forms (`main`,
+`origin/main`), not full refnames, and `RepoSnapshot.remote` names the default remote — a Part 4
+fix, since `AdeMainLine` renders `main` verbatim.
+
+**Kira Space's `ade` dialog (P129 Part 4) adds the Claude Code send/launch/archive flow on top of
+Part 3's read-only view — still reachable only from `AdeMainLine`'s Rebase all this phase; every
+other opener (Queue after, Move, Start new/existing work, Resume, the archive-at-risk dialog's own
+trigger) is parity-tested but wired from a caller Parts 5-7 add.** `ade/dialogCompose.ts` is a pure,
+byte-exact port of the design mockup's own `sendDialog()`/message templates (no Vue import, no
+`Date.now()`/`new Date()`), taking real queue/session data as parameters where the mockup read
+globals — cross-checked by `tests/unit/ade-dialog-parity.spec.ts` running the mockup itself as an
+oracle via `node:vm`, and by `ade-dialog-rules.spec.ts` for the busy-check/override/multi-root
+rules the mockup doesn't cover standalone. `ade/dialogFlow.ts` is the thin, still-pure orchestration
+layer above it (still no Vue import) that a store adapts into real calls: `sendDialog()` resolves
+each target to either `Send` (an already-running session) or `PrepareLaunch` +
+`openTerminalSession` (`ade/launch.ts`, a fresh one, reattaching if `PrepareLaunch` names an
+existing terminal), then arms a turn watch per target before the delivery call that can fail —
+`ade/turnWatch.ts`'s singleton `adeTurns` watcher resolves a target's `.done` on that terminal's
+`Stop`, gated by `requireSubmit`: `false` for a fresh launch (its first `Stop` completes the turn),
+`true` for `Send` to a running session (a `Stop` before *this* prompt's own `UserPromptSubmit`
+belongs to the turn already running and is ignored, never resolving `.done`) — a delivery that fails
+before arming, or whose watch never resolves, is cancelled rather than left to leak. A rewrite that
+touches more than one root's own stack (§0.13's multi-root split) sends one message per root rather
+than one shared message, the rule `ade-dialog-rules.spec.ts` pins. The archive-at-risk half
+(`requestArchive`/`justDeleteArchive`) fetches `ArchiveRisk` first: nothing at risk archives
+directly, a blocked worktree (`WorktreeRemoveBlocker`) surfaces as an `actionError`, "Just delete"
+discards and archives immediately, and "Send to Claude, then archive" sends a prompt and archives
+only on that session's own `Stop` — re-fetching `ArchiveRisk` first, reopening the dialog with the
+target's own choice preserved if still at risk. `ade/state/adeActions.ts` (one Pinia store, one
+concern, alongside `adeUi.ts`'s dialog-open state) owns in-flight delivery bookkeeping — which
+target is mid-send, which item has a pending "send then archive" — and the per-repo `actionError`
+`AdeRepoView.vue` renders as a dismissible Alert; it does not expose which item has a pending
+archive to the UI, since no queue row marks it this phase (see Known open items). `AdeService`'s
+`ForcePush` stays unbound from the renderer — Part 5's own hand-off.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -4195,6 +4228,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   call and the confirmed `Archive` call that follows it) can still go stale for that window — no file
   watcher covers a linked worktree's own working tree the way `gitsession`'s existing repo watcher
   covers `.git` itself.
+
+- **A pending "Send to Claude, then archive" lives in the renderer, not persisted (P129 Part 4
+  §0.15/§0.16)**. `adeActions.ts`'s in-flight-archive bookkeeping is a plain reactive `Map`, gone on
+  reload or window close; a reload or close between the Send and the agent's own `Stop` drops the
+  pending archive with no record it was ever requested, and the branch stays unarchived with no
+  further prompt. Closing this needs the pending archive itself surviving a reload (a persisted
+  queue field or a Go-side flag `RepoSnapshot` already reports back), a later phase's call.
 
 - **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
   discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
