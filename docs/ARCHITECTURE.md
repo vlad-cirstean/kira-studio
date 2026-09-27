@@ -2669,9 +2669,13 @@ persists until the next `Refresh`. `RepoSnapshot.main.name`/`.ref` hold short fo
 fix, since `AdeMainLine` renders `main` verbatim.
 
 **Kira Space's `ade` dialog (P129 Part 4) adds the Claude Code send/launch/archive flow on top of
-Part 3's read-only view — still reachable only from `AdeMainLine`'s Rebase all this phase; every
-other opener (Queue after, Move, Start new/existing work, Resume, the archive-at-risk dialog's own
-trigger) is parity-tested but wired from a caller Parts 5-7 add.** `ade/dialogCompose.ts` is a pure,
+Part 3's read-only view.** Part 5's timeline now wires every opener but `resumeSpec` — Rebase all
+(Part 4), Queue after and Move (a stack box's own action, `AdeStackBlock`), Start new/existing work
+(the action column's `▶ Start`), and the archive-at-risk dialog's trigger (the action column's
+Archive) all reach `dialogFlow.ts` from a real caller; `resumeSpec` stays unwired since resuming a
+session has no opener yet, and the activity-icon click that would open a running session's own
+terminal in the Agents tab stays Part 6's, since that tab doesn't exist yet — Part 5 wires the
+agents pill's click to selection only, no placeholder state. `ade/dialogCompose.ts` is a pure,
 byte-exact port of the design mockup's own `sendDialog()`/message templates (no Vue import, no
 `Date.now()`/`new Date()`), taking real queue/session data as parameters where the mockup read
 globals — cross-checked by `tests/unit/ade-dialog-parity.spec.ts` running the mockup itself as an
@@ -2696,8 +2700,41 @@ target's own choice preserved if still at risk. `ade/state/adeActions.ts` (one P
 concern, alongside `adeUi.ts`'s dialog-open state) owns in-flight delivery bookkeeping — which
 target is mid-send, which item has a pending "send then archive" — and the per-repo `actionError`
 `AdeRepoView.vue` renders as a dismissible Alert; it does not expose which item has a pending
-archive to the UI, since no queue row marks it this phase (see Known open items). `AdeService`'s
-`ForcePush` stays unbound from the renderer — Part 5's own hand-off.
+archive to the UI, since no queue row marks it this phase (see Known open items).
+
+**Kira Space's `ade` timeline (P129 Part 5) is the calendar/drag-and-drop surface `AdeMainLine`
+mounts below the queue read Part 3 already renders — `useQueue`'s own view facts (`bands`,
+`segments`, `cells`, `spans`, `parentOf`, `effDay`) drive every row this phase adds, still with no
+Vue import or clock read of their own.** `ade/timelineOps.ts` is the one module that both writes a
+plan (`movePlanArgs`) and decides whether a drop applies directly, opens Part 4's Move dialog, or
+refuses (`dropVerdict`) — no other file constructs a `SetPlan` `order`/`days` payload, so the drop
+rules (a parked branch applies directly; my own work always confirms; a day earlier than a
+non-review parent's own effective day refuses) live in exactly one place. `mutations.ts`'s
+`SetPlan` mutation is optimistic (`onMutate` cancels the in-flight snapshot query and writes the
+new plan locally; `onError` rolls back; `onSettled` invalidates last), so a drag/menu action
+reflects immediately rather than waiting on the round trip. The DnD model is `vue-draggable-plus`
+(SortableJS) in `forceFallback` mode — a synthetic drag image driven by native mouse events rather
+than the HTML5 drag API SortableJS otherwise prefers, chosen because Playwright can drive
+`forceFallback` with a plain `mouse.move`/`down`/`up` sequence while HTML5 DnD has no such hook.
+`useTimelineDrag.ts` binds `useDraggable` with no `v-model` list — every sortable is a pass-through
+that leaves the DOM order alone and reports `onEnd`; the actual drop target comes from
+`AdeTimeline.vue`'s own hit-test (`useElementByPoint`/`useMouse` from VueUse, `closest`ing
+`[data-ade-box]` then `[data-ade-band]`), never from Sortable's own index, since a fallback clone
+can land the pointer over stale DOM. A review row carries no `data-ade-row-movable`, so grabbing it
+bubbles to its box's own block-level sortable and drags the whole segment. History's open/closed
+state and how far it reaches back (`historyOpen`/`historyReach`) live as local refs on
+`AdeRepoView`, keyed by `activeRepoId` — switching repo tabs remounts and re-closes history, same
+as the design mockup; selection stays in `adeUi.ts`, since it must outlive that remount. The
+timeline writes four settings fields (`horizonDays`, `extraDays`, `offDays`, `workWeekendDays`) via
+`patchSettings`, which applies the resolved `SettingsService.Set` response back verbatim rather than
+merging optimistically client-side; `historyReach` stays runtime-only, never persisted.
+`AdeService.ForcePush` (P129 Part 4's own hand-off) gets its first renderer caller here: a
+protected-branch result opens `AdeConfirmDialog` with the failing result's own branch name as both
+the confirm token and the retry's `confirmProtected` value, not the original request's item id — a
+retry that still fails surfaces as an `actionError` instead of re-opening the confirm. A merged
+branch's archive lands on `useQueue`'s local-day band (`localDayOf`, not UTC) it was fixed to use
+earlier this same phase, so an archive in the evening in most zones doesn't appear to land on
+tomorrow.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
