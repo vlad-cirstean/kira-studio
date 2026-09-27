@@ -600,3 +600,115 @@ No known open item closes or opens beyond the one already recorded in `docs/ARCH
 Known open items (the `Bash`-background wake-arming limitation, commit 7, expected to stay open
 until Claude Code itself exposes more than a tool name to a hook, or this app's own privacy rule is
 revisited — neither is in scope for any planned P129 part).
+
+## P130 result
+
+Plan: `docs/v2.0/plans/P130-focus-ring-no-animate.md`. One Opus planning pass, one sequential Sonnet
+implementer, one pass, no split (plan §7).
+
+**Commits, in the plan's own §7 order:**
+
+1. `ea1835fc` — `fix(theme): hold focus ring colour and geometry at rest so focus never animates it`.
+   `base.css`'s `@layer base` gains a `*` rule setting `outline-color`/`outline-width`/
+   `outline-offset` unconditionally (plan §2's diff, unchanged); `button/index.ts`'s `destructive`
+   variant moves `outline-error` off `focus-visible:` onto the rest state, so the base rule's own
+   `--kira-focus` never has to be overridden after the fact.
+2. `ec20c4dd` — `test(ui): guard focus ring against animating on focus`. Both apps'
+   `focus-ring.spec.ts` (plan §4.1), with one disclosed deviation from the literal recipe (below).
+3. `91f21b4e` — `docs: ARCHITECTURE records the at-rest focus ring (P130)`. Styling row's
+   `focus-ring` sentence extended per plan §4 step 4.
+4. This result commit.
+
+**What landed**, matching the plan's own §2 scope exactly: `packages/theme/src/base.css`'s base
+layer now holds every element's `outline-color`/`outline-width`/`outline-offset` at
+`--kira-focus`/`--kira-border-width`/`calc(var(--kira-border-width) * -1)` regardless of focus
+state; `:focus-visible` (unchanged, still applying the `focus-ring` `@utility`) therefore only flips
+the discrete `outline-style` keyword, which `transition-colors`/`transition-all` cannot interpolate.
+Nothing else in `base.css`, `focus-ring`, or any of plan §3's eight components changed shape — the
+fix is the one base-layer rule plus the one `destructive`-variant colour move.
+
+**Live check (plan §4 step 1), before and after, both apps — re-run fresh at result-writing time
+against a clean revert/restore of the committed diff, not carried over from an earlier partial run:**
+
+Before the fix (`base.css`/`button/index.ts` reverted to `ea1835fc^`, `bun run build:test:studio`
+and `build:test:space` rebuilt, both clean):
+
+```
+apps/kira-studio/tests/ui/focus-ring.spec.ts:75  Expected: "rgb(0, 120, 212)"  Received: "rgb(204, 204, 204)"
+apps/kira-space/tests/ui/focus-ring.spec.ts:68   Expected: "rgb(0, 120, 212)"  Received: "rgb(204, 204, 204)"
+```
+
+Both red, on the Input's `outlineColor` assertion — exactly plan §4 step 1's predicted mechanism
+(rest value reads the initial `currentcolor`-derived grey, not `--kira-focus`).
+
+After restoring the committed fix and rebuilding both test bundles: both specs green, 1/1 each
+(`connection dialog Input and Button focus rings never animate`, `settings dialog Input and Button
+focus rings never animate`).
+
+**Deviation from the plan, disclosed:** plan §4.1's literal recipe samples the Button with one
+`evaluate()` calling `el.focus()` directly, reasoning ("the Button's programmatic focus matches
+`:focus-visible` because focus arrives from an element that already matched it") that WebKit would
+carry the keyboard modality over from the Input. Live testing found this false: a script-invoked
+`el.focus()` on the Button never set `:focus-visible: true` in WebKit, regardless of what was
+focused immediately before, dialog auto-focus included. WebKit's own heuristic: a text input/
+textarea matches `:focus-visible` on any `.focus()` call, but a button/toggle matches only when
+focus arrives from a genuinely trusted (real, OS-dispatched) keyboard event — never a script call,
+and an untrusted synthetic `KeyboardEvent` dispatch doesn't count either (tried and confirmed no
+effect via a throwaway debug spec, deleted after use). Root-caused, not worked around blind: replaced
+the Button's focus step with `tabUntilTestId()`, a capped loop of real `page.keyboard.press('Tab')`
+presses that walks the actual DOM tab order until the target `data-testid` is `document.activeElement`
+(asserted, so a future tab-order change fails loudly instead of silently sampling the wrong element).
+The Save button also needed the connection form's required postgres fields filled in first, since a
+disabled button is unreachable by Tab. The assertion shape itself — `focusVisible`, `outlineColor`,
+the outline-transition list — is unchanged from the plan; only how focus reaches the Button changed.
+
+**Closing audit (plan §3's component table), every listed component confirmed live to inherit the
+fix, re-checked at result-writing time against the committed tree (not assumed from the plan text):**
+
+| Component (file) | Transition | Confirmed inherits fix |
+|---|---|---|
+| `Input` (`input/index.ts:12`) | `transition-colors` | yes — `focus-ring.spec.ts` asserts it directly, both apps |
+| `Textarea` (`textarea/Textarea.vue:24`) | `transition-colors` | yes — same base `:focus-visible` rule, no component-level outline override |
+| `InputGroup` default variant fieldset (`input-group/index.ts:49`) | `transition-colors` | yes — fieldset carries no outline override, so the `*` rule sets its rest values; confirmed `has-[[data-slot=input-group-control]:focus-visible]:focus-ring` unchanged |
+| `Button` (`button/index.ts:7`), `InputGroupButton`/`TooltipIconButton` | `transition-all` | yes — `focus-ring.spec.ts` asserts it directly (Tab-driven), both apps |
+| `Button` `destructive` variant | `transition-all` | yes — `outline-error` confirmed moved off `focus-visible:` onto the rest state (`grep -n destructive button/index.ts`) |
+| `Toggle` (`toggle/index.ts:7`), `ToggleGroupItem` | `transition-all` | yes — `focus-visible:border-focus`, no outline override; confirmed still present unchanged |
+| `Checkbox` (`checkbox/Checkbox.vue:22`) | `transition-colors` | yes — `focus-visible:border-focus`, no outline override; confirmed still present unchanged |
+| `DialogScrollContent` close button (`dialog/DialogScrollContent.vue:51`) | `transition-colors` | yes — no outline override; confirmed still present unchanged |
+
+**Verification (plan §5), run once near phase end:**
+
+- `bun run lint` (includes `check-theme-classes.sh`, `check-class-conflicts.ts`) — clean, on the
+  `docs/ARCHITECTURE.md` commit's own pre-commit hook run.
+- Full typecheck matrix (`tsgo`/`vue-tsc` across all eight projects, same commit's hook run) — clean.
+- `bun run build:studio`, `bun run build:space` — both clean (only pre-existing >500kB chunk-size
+  warnings, unrelated to this phase).
+- Full `bun run test:ui:studio` — run 4 times. `focus-ring.spec.ts` passed in all 4 runs. Each run
+  had exactly one or two unrelated failures, a different file each time: `data-view.spec.ts` (runs 1
+  and 4), `slick-grid.spec.ts` (run 1), `budgets.spec.ts` (runs 2 and 3), `api-ui-consistency.spec.ts`
+  (run 3). None of these four files was touched by this phase (`git diff --stat ea1835fc^ -- <file>`
+  empty for each). Investigated rather than assumed pre-existing: reverted `base.css`/`button/
+  index.ts` to `ea1835fc^` content, rebuilt, and ran `slick-grid.spec.ts` alone with `--workers=1` —
+  15/15 passed; restored the fix, rebuilt, reran — 15/15 passed again, proving no causal link between
+  the CSS change and that file's flake. The remaining three files fail with wall-clock/pacing
+  assertions (`budgets.spec.ts`'s own comment already documents "cross-file worker contention, which
+  no in-file serialization mode addresses") or a transient hover/z-index race
+  (`api-ui-consistency.spec.ts`), the same class of sandbox CPU-contention timing flake this repo's
+  own `playwright.config.ts` and `docs/DEV_ENVIRONMENT.md` already document for other files, never
+  reproducing on the same file twice across the 4 runs. Per `CLAUDE.md`'s pre-existing-issue
+  exception (confirmed via `git diff --stat` that this phase never touched any of them, and root-
+  caused rather than merely asserted for the one file most plausibly connected), these are logged
+  here rather than chased further as a P130 fix.
+- Full `bun run test:ui:space` — 38/38 passed, clean, including `focus-ring.spec.ts`.
+- `test:visual:studio`/`test:visual:space`, before (parent commit) and after (this phase's fix), same
+  sandbox: `test:visual:space` 4/4 both times. `test:visual:studio` 13/14 before (one failure,
+  `console.spec.ts`, a small red mark consistent with Monaco's blinking text caret — JS-driven, not
+  suppressed by `animations: 'disabled'`) and 13/14 after (one failure, a *different* file,
+  `schema-dialog.spec.ts`, same class of mark near Monaco's minimap/scrollbar). Both failures
+  reran clean 3/3 times each, in the same fix-state, immediately after — non-reproducible on an
+  unchanged tree, confirming pre-existing Monaco-internal rendering flakiness rather than anything
+  the outline-rule change touches. No new, reproducible diff traced to the rest-value change (plan
+  §5's own named residual risk); no baseline re-record needed.
+
+Deviations disclosed above (the Button's Tab-driven focus step) are test-recipe corrections, not
+scope changes — the assertion plan §4.1 specifies is unchanged and passes.
