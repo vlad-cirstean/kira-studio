@@ -94,6 +94,13 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeArchive: 'AdeService.Archive',
   adeSetQueuedAfter: 'AdeService.SetQueuedAfter',
   adeUpdateNewWork: 'AdeService.UpdateNewWork',
+
+  // P129 Part 5 §3.4: SetPlan/ForcePush plus the Add popover's three bound calls.
+  adeSetPlan: 'AdeService.SetPlan',
+  adeForcePush: 'AdeService.ForcePush',
+  adeCandidateBranches: 'AdeService.CandidateBranches',
+  adeAddBranch: 'AdeService.AddBranch',
+  adeAddNewWork: 'AdeService.AddNewWork',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(

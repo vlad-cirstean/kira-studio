@@ -12,6 +12,14 @@ import { startServer, type UiServer } from './server.ts';
 export interface UiFixturesOptions {
   /** Playwright's own `BrowserContextOptions.timezoneId`. */
   readonly timezoneId?: string;
+  /** P129 Part 5 §3.4: pins the boot-time wall clock (Playwright's own `page.clock`) to a known
+   *  instant — for a spec that needs a deterministic weekday (weekend hatching, Monday separators)
+   *  rather than whatever day the suite happens to run on. Installed before the first navigation, so
+   *  the app's own `new Date()`/`Date.now()` reads read this pinned instant from its very first
+   *  render, then `resume()`s immediately: real timers (TanStack retries, `useTimeoutFn` resets,
+   *  `useIntervalFn` ticks) keep advancing at 1x from that pinned start, rather than freezing —
+   *  only "which real day is `today`" is pinned, not "does time pass". */
+  readonly clockTime?: number | string | Date;
 }
 
 export interface UiFixturesConfig<TExtra extends object, TOptions extends UiFixturesOptions> {
@@ -74,6 +82,13 @@ export function createUiFixtures<
           if (msg.type() === 'error') consoleErrors.push(msg.text());
         });
         await page.setViewportSize({ width: 1440, height: 960 });
+
+        // Must land before the first navigation — same rule as installMocks below, and in the same
+        // order every original per-app relaunch() already required for it.
+        if (options?.clockTime !== undefined) {
+          await page.clock.install({ time: options.clockTime });
+          await page.clock.resume();
+        }
 
         // Must land before the first navigation — every original per-app relaunch()'s own rule.
         const extra = await config.installMocks(page, options);

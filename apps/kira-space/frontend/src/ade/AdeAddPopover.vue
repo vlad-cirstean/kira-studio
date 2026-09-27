@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@theme/components/ui/command';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@theme/components/ui/command';
 import { Input } from '@theme/components/ui/input';
 import { NativeSelect } from '@theme/components/ui/native-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
@@ -155,25 +162,27 @@ async function pick(branch: string): Promise<void> {
             <CommandInput placeholder="Search branches…" data-testid="ade-add-search" />
             <CommandList class="max-h-72 p-1">
               <CommandEmpty data-testid="ade-add-empty">No branches</CommandEmpty>
-              <CommandItem
-                v-for="c in candidatesQuery.data.value ?? []"
-                :key="c.name"
-                :value="c.name"
-                :disabled="pickingBranch !== null"
-                data-testid="ade-add-candidate"
-                :data-branch="c.name"
-                @select="pick(c.name)"
-              >
-                <span class="shrink-0 text-kira-sm text-muted-foreground">{{ agoOf(c.lastCommitAt) }}</span>
-                <span class="shrink-0 text-muted-foreground">·</span>
-                <span
-                  class="shrink-0 rounded-kira-sm px-1 text-kira-sm"
-                  :class="c.mine ? 'bg-[#23252b]' : 'text-[#7aa7ff]'"
-                  >{{ c.mine ? 'you' : c.author }}</span
+              <CommandGroup>
+                <CommandItem
+                  v-for="c in candidatesQuery.data.value ?? []"
+                  :key="c.name"
+                  :value="c.name"
+                  :disabled="pickingBranch !== null"
+                  data-testid="ade-add-candidate"
+                  :data-branch="c.name"
+                  @select="pick(c.name)"
                 >
-                <span class="shrink-0 text-muted-foreground">·</span>
-                <span class="min-w-0 truncate font-data">{{ c.name }}</span>
-              </CommandItem>
+                  <span class="shrink-0 text-kira-sm text-muted-foreground">{{ agoOf(c.lastCommitAt) }}</span>
+                  <span class="shrink-0 text-muted-foreground">·</span>
+                  <span
+                    class="shrink-0 rounded-kira-sm px-1 text-kira-sm"
+                    :class="c.mine ? 'bg-[#23252b]' : 'text-[#7aa7ff]'"
+                    >{{ c.mine ? 'you' : c.author }}</span
+                  >
+                  <span class="shrink-0 text-muted-foreground">·</span>
+                  <span class="min-w-0 truncate font-data">{{ c.name }}</span>
+                </CommandItem>
+              </CommandGroup>
             </CommandList>
           </Command>
         </TabsContent>

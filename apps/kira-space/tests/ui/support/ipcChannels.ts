@@ -105,4 +105,11 @@ export const IPC = {
   adeUpdateNewWork: 'kira:ade:updateNewWork',
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
+  // P129 Part 5 §3.4/§2.2: the timeline's own five remaining bound calls (SetPlan, ForcePush, the
+  // Add popover's three) — first mocked-UI consumer, so this is their first entry here.
+  adeSetPlan: 'kira:ade:setPlan',
+  adeForcePush: 'kira:ade:forcePush',
+  adeCandidateBranches: 'kira:ade:candidateBranches',
+  adeAddBranch: 'kira:ade:addBranch',
+  adeAddNewWork: 'kira:ade:addNewWork',
 } as const;
