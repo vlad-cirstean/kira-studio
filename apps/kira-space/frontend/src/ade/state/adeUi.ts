@@ -13,7 +13,7 @@ export type AdeRefreshNote =
 
 /** §2.5: `dialogCompose.ts`'s own `DialogState` plus the spec it was opened with and an in-dialog
  *  delivery error (§0.17) — `AdeClaudeDialog.vue` reads this whole. */
-export interface AdeDialogState {
+interface AdeDialogState {
   spec: DialogSpec;
   msg: string | null;
   push: boolean;

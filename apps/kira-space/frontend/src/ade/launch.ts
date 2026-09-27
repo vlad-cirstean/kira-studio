@@ -8,7 +8,7 @@ import type { AdeLaunch } from './wire';
 // already known), before `openTerminalSession` for a launch (terminal id only exists once
 // `PrepareLaunch` returns).
 
-export interface DeliverRunningTarget {
+interface DeliverRunningTarget {
   kind: 'send';
   /** The `ade_sessions` record id — `AdeSendArgs.sessionId`, never the Claude session id. */
   sessionId: string;
@@ -17,7 +17,7 @@ export interface DeliverRunningTarget {
   message: string;
 }
 
-export interface DeliverLaunchTarget {
+interface DeliverLaunchTarget {
   kind: 'launch';
   codeRepoId: string;
   /** Exactly one of `branch`/`newWorkId` is non-empty. */

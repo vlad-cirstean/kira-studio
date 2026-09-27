@@ -18,7 +18,7 @@ export interface DialogTarget {
   choice: string;
 }
 
-export type DialogKind = 'rebase' | 'queue' | 'move' | 'start' | 'archive';
+type DialogKind = 'rebase' | 'queue' | 'move' | 'start' | 'archive';
 
 /** The mockup's own `state.dialog` (`D`) shape — one flat object reused across kinds, several
  *  fields meaning different things per kind (`ids` is the rebase/queue busy-check stack, or the
@@ -47,13 +47,13 @@ export interface DialogSpec {
   risk?: { dirty: string[]; unmerged: number; worktree: string };
 }
 
-export interface DialogChip {
+interface DialogChip {
   value: string;
   label: string;
   on: boolean;
 }
 
-export interface DialogTargetView {
+interface DialogTargetView {
   title: string;
   branch: string;
   options: DialogChip[];
@@ -232,7 +232,7 @@ function stackIds(ctx: DialogCtx, rootId: string): string[] {
 }
 
 /** Mockup `agentTargets` (line 1069): the session record id, for `Send`, or `'new'`. */
-export function agentTargets(ctx: DialogCtx, ids: readonly string[]): DialogTarget[] {
+function agentTargets(ctx: DialogCtx, ids: readonly string[]): DialogTarget[] {
   return ids.map((id) => {
     const running = runningSessionsForItem(ctx, id);
     return { item: id, choice: running.length ? (running[0] as AdeSession).id : 'new' };
@@ -403,7 +403,7 @@ function rebaseRootBlocks(ctx: DialogCtx, spec: DialogSpec): string[] {
 }
 
 /** Mockup's rebase/queue message, over every root in `spec.roots` (lines 1664-1677). */
-export function composeRebaseMessage(ctx: DialogCtx, spec: DialogSpec, push: boolean): string {
+function composeRebaseMessage(ctx: DialogCtx, spec: DialogSpec, push: boolean): string {
   const blocks = rebaseRootBlocks(ctx, spec);
   const onto = spec.onto ?? 'main';
   const ontoItem = onto !== 'main' ? itemsById(ctx).get(onto) : undefined;

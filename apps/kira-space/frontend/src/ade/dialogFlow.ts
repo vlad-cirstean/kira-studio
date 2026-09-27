@@ -18,7 +18,7 @@ import type { TurnOutcome, TurnWatch } from './turnWatch';
  *  matters to `requestArchive`/`onArchiveTurn` below, never to the dialog itself). Kept local
  *  rather than importing `wire.ts`'s `AdeArchiveRisk` — this file never needs its `AdeDirty[]`
  *  shape, only the path strings the templates and the dialog actually read. */
-export interface ArchiveRisk {
+interface ArchiveRisk {
   dirty: string[];
   unmerged: number;
   worktree: string;
@@ -372,5 +372,3 @@ export async function sendDialog(
   if (spec.kind === 'start') return sendStart(deps, spec, state);
   return sendArchive(deps, spec, state);
 }
-
-export type { TurnOutcome };
