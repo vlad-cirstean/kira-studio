@@ -66,7 +66,11 @@ export function useAdeRefresh(codeRepoId: MaybeRefOrGetter<string>) {
     mutationFn: (): Promise<AdeRefreshResult> => control.adeRefresh(toValue(codeRepoId)),
     onSettled: (result, error) => {
       const id = toValue(codeRepoId);
-      if (error) {
+      // AdeService.Refresh resolves (never rejects) with `.error` set for a git-level failure
+      // (auth, network) — `error` here is only a transport/thrown failure, a separate case.
+      if (result?.error) {
+        adeUiStore.recordRefresh(id, { kind: 'error', message: result.error.message });
+      } else if (error) {
         adeUiStore.recordRefresh(id, {
           kind: 'error',
           message: error instanceof Error ? error.message : String(error),
