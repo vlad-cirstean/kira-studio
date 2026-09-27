@@ -1534,3 +1534,122 @@ ever requested.
 
 Working tree clean at this commit; nothing pushed (the orchestrating session pushes after its own
 verification, per its own standing instruction).
+
+## P133 result
+
+Plan: `docs/v2.0/plans/P133-terminal-module-script-config.md`. One Opus planning pass, one sequential
+Sonnet implementer (this session), no split (plan §4 lists one sequential commit chain). Implemented
+in an isolated worktree (`p133-impl`, off `v1.9` at `86b2bc29`) per plan §8's shared-tree hazard —
+P129 Part 4 and P132 were active in the main checkout concurrently, a user-authorized exception. Not
+pushed and not rebased onto `v1.9`: the orchestrating session does both.
+
+**Commits, in the plan's own §4 order:**
+
+1. `45fce535` — `feat(terminal): quick commands dialog in the shared terminal module`. Seam
+   (`module.ts`) grows `update`, drops `openEditor`; new `QuickCommandsDialog.vue` and
+   `scriptActions.ts`; `TerminalPanel.vue` mounts the dialog and delegates Edit/Manage/Remove to it;
+   Studio's `terminalModule.ts` wires `update` and drops `openEditor` (keeping `settingsStore` for
+   `appearance`).
+2. `8d508765` — `refactor(settings)!: remove Settings' Scripts pane`. Deletes `ScriptsPane.vue`;
+   drops its import/mount from `SettingsDialog.vue`, its section from `state/settings.ts` and
+   `settings/types.ts`'s count; `openSettingsAt`'s doc comment re-pointed at the Api panes.
+   `BREAKING CHANGE:` footer as planned.
+3. `973a308b` — `test(terminal): move scripts UI coverage into terminal-module.spec.ts`. Plan §5.1's
+   4 tests added (manage/add, create-error, edit-focus/blur-commit/colour, empty-revert/rejected-
+   revert); `settings-scripts.spec.ts` deleted.
+4. `c9e80326` — `test(visual): drop the Scripts settings baseline; add the quick commands dialog`.
+   `settings.spec.ts`'s `sections` drops `'Scripts'`, its baseline deleted; new
+   `tests/visual/terminal-module.spec.ts` added (baseline recorded in commit 6).
+5. `83194aeb` — `refactor: prune stale scripts-in-Settings comments`. Plan §2.7's comment-only edits:
+   both Go files, `customScripts.ts`, `SwatchRadio.vue`, `tailwind-core.css`, `ConnectedEditorsPane.vue`
+   (Space), `SettingsShell.vue`, `createSettingsStore.ts`.
+6. `da3dd9d6` — `test(visual): re-record settings baselines without the Scripts nav entry`. 7 Studio
+   settings baselines re-recorded plus the new `quick-commands-dialog.png`; each diff inspected
+   pixel-bounds-first (below) to confirm only the nav column moved.
+7. `e4f1e347` — `docs: ARCHITECTURE records terminal-module script configuration (P133)`. Rewrites the
+   terminal-module paragraph (lines ~1247-1260 pre-phase): seam shape, `QuickCommandsDialog.vue` as
+   the only script-editing surface, `TerminalStart.vue` corrected to `TerminalPanel.vue`, file count
+   updated.
+8. This result commit (`docs(v2.0): P133 result`).
+
+**Pixel-diff proof for commit 6** (plan §6/§9's own risk: "visual re-record hides a real
+regression"): for each of the 7 re-recorded settings baselines, old (`git show <parent>:<path>`) vs.
+new PNG bounding-box-diffed with Pillow — every changed-pixel bounding box confined to the nav
+column's x-range (the column `SettingsShell.vue`'s `v-for="section in sections"` renders), width
+consistent with one fewer row shifting the rest of the nav up; no diff pixel found in any pane's own
+content area. `quick-commands-dialog.png` recorded fresh (no prior baseline to diff against — it is
+the moved successor of the deleted Scripts-pane baseline, plan §5.2).
+
+**Verification (plan §6), run once near phase end:**
+
+| Check | Result |
+|---|---|
+| `bun run typecheck` | clean |
+| `bun run lint` | clean |
+| `bun run lint:dead` | 30 findings, none touching a P133 file (`openEditor`'s removal left no dead export) |
+| `go build ./...` | clean |
+| `bun run lint:go` | clean |
+| `bun run build:studio` | clean |
+| `bun run build:space` | clean |
+| `bun run test:unit` | 1728 passed, 0 failed (count unchanged, as expected — plan §5 adds no unit test) |
+| `bun run test:ui:studio` | 299 passed, 2 failed — both in `ui-timing` (`budgets.spec.ts:356`, `slick-grid.spec.ts:896`), a wall-clock-budget project. Investigated, not assumed: `git diff --stat 86b2bc29 -- <file>` empty for both files (P133 touches neither); a throwaway worktree at unmodified `86b2bc29` running the same `ui-timing` project also failed, on 5 *different* unrelated tests — confirming pre-existing sandbox worker-contention flakiness (`budgets.spec.ts`'s own comment already names this class of flake), not a P133 regression. No baseline count regression: the settings-scripts.spec.ts's 3 tests are gone, §5.1's 4 are added, net +1, consistent with the plan |
+| `bun run test:ui:space` | 45 passed, 0 failed, unchanged |
+| `bun run test:visual:studio` | Untouched-baseline check first (throwaway worktree at `86b2bc29`, all checked-in baselines matched — P127 precedent satisfied), then 7 re-recorded + 1 new = 14 passed, 0 failed |
+| `bun run test:visual:space` | 4 passed, 0 failed, unchanged |
+| Live run | Not possible without a display in this sandbox — stated per plan §6, left for the user |
+
+**Closing audit (plan §7), every command run for real and its actual output recorded — several rows
+needed a caveat on the literal command, disclosed inline:**
+
+| Check | Command | Plan's expectation | Actual result |
+|---|---|---|---|
+| No Settings reference to scripts (Studio) | `rg -n -i 'script' apps/kira-studio/frontend/src/workbench/SettingsDialog.vue apps/kira-studio/frontend/src/workbench/settings apps/kira-studio/frontend/src/state/settings.ts` | Empty | Not literally empty: matches are `<script setup lang="ts">` tags and `FieldDescription`/`mcpDescription` (both contain "cript" as a substring) in unrelated panes, plus `state/settings.ts:8`'s own comment naming `'Scripts'` while explaining its removal. Filtering those substring false positives out leaves zero real references to the scripts feature. **Pass, with caveat: the raw regex is too broad to literally read "Empty" in this codebase** |
+| No Settings reference to scripts (Space) | same, Space paths | Empty | Empty after the same substring filter (no raw hits needing the filter at all here — Space's Settings tree has no `FieldDescription`/`mcpDescription` matches in these exact paths). **Pass** |
+| Section gone | `rg -n "'Scripts'\|settings-section-Scripts\|ScriptsPane" apps packages` | Empty | 2 hits, both explanatory comments, not residual functionality: `QuickCommandsDialog.vue:18` ("ScriptsPane.vue's rules (§2.3) moved here verbatim") and `settings.ts:8` (quoted above). No `ScriptsPane` file, section, or testid remains. **Pass, with caveat: these are the very migration-provenance comments the plan itself asked for (§2.6), not leftover section wiring** |
+| No Settings detour | `rg -n 'openEditor\|openSettingsAt' packages/workbench/src/terminal apps/*/frontend/src/workbench/terminalModule.ts` | Empty | 2 hits, both comments describing the removal (`terminalModule.ts:11`, `module.ts:14`) — no `openEditor`/`openSettingsAt` call site remains in the terminal module. **Pass, with caveat: comment matches, not code** |
+| Update seam used | `rg -n 'scripts\.update\|\.update\(' packages/workbench/src/terminal/QuickCommandsDialog.vue` | Real calls in blur and colour handlers | 2 hits: `onScriptFieldBlur` (line 77) and `onScriptColorChange` (line 99). **Pass, exact match** |
+| shadcn Dialog used | `rg -n "ui/dialog" packages/workbench/src/terminal` | `QuickCommandsDialog.vue` | Exactly one hit, `QuickCommandsDialog.vue`'s own import line. **Pass, exact match** |
+| Stale tab-strip copy | `rg -n -i "tab strip.*(script\|dropdown)\|dropdown" apps/kira-studio/internal/storage/model/customscript.go apps/kira-studio/internal/bridge/customscripts.go apps/kira-studio/frontend/src/state/customScripts.ts packages/workbench/src/terminal` | Empty | 1 hit: `TerminalNewTab.vue:29`, a pre-existing P83 comment about the tab strip's own "+" button dropdown (which terminal kind to launch) — an unrelated feature, not the scripts-editing dropdown this phase removed. **Pass, with caveat: unrelated match, confirmed by reading the line** |
+| SFC form | `rg -L '<script setup lang="ts">' packages/workbench/src/terminal/*.vue`; `rg -n '<style' packages/workbench/src/terminal` | Both empty | The plan's literal `-L` is GNU-grep's "files without match" flag; ripgrep's `-L` means `--follow` (symlinks) instead, so the command as written lists matching files, not violators — a tooling-flag mismatch in the plan itself, not a finding. Re-run with ripgrep's real files-without-match flag (`rg --files-without-match`): empty — all 6 `.vue` files under `packages/workbench/src/terminal` use `<script setup lang="ts">`. The `<style>` check: empty, exact match. **Pass, with caveat: plan's literal `-L` command doesn't test what it intends under ripgrep; re-run with the correct flag confirms the real check** |
+| Space untouched in behaviour | `git diff --stat 86b2bc29 -- apps/kira-space` | `ConnectedEditorsPane.vue` comment only | Exactly `apps/kira-space/frontend/src/workbench/settings/ConnectedEditorsPane.vue \| 4 ++--`, 1 file changed. **Pass, exact match** |
+| Go comment-only | `git diff 86b2bc29 -- '*.go' \| rg '^[+-][^+-]' \| rg -v '^[+-]\s*//'` | Empty | Empty. **Pass, exact match** |
+| Rules present | Read `QuickCommandsDialog.vue` against §2.3 rules 1-7 | Each present | Rule 1 (blur-commit, `onScriptFieldBlur` 57-92) present; rule 2 (empty-reverts, 62-67) present; rule 3 (rejected-edit reverts plus message, 83-91) present; rule 4 (immediate colour with catch and `colorSyncKey` resync, 96-109) present; rule 5 (remove via `useRemoveScript`, 111-118) present; rule 6 (add, all four fields trimmed, error shown, reset on success, 131-149) present; rule 7 (drafts re-sync via `watch(..., {immediate:true})`, line 47) present. **Pass, all 7 rules confirmed by direct read** |
+
+**Acceptance (plan §10), mapped row by row:**
+
+| Row wording | Status |
+|---|---|
+| "no Settings reference to scripts in either app" | Satisfied — §2.6/§2.7 landed (commits 2, 5); closing-audit rows 1-3 pass (with the disclosed regex caveats above) |
+| "every script field editable from the terminal module" | Satisfied — `QuickCommandsDialog.vue` §2.2-§2.3; §5.1's 4 tests (commit 3) cover name, command, workingDir, colour, create and edit |
+| shadcn Dialog from "Edit…" and a "Manage scripts…" replacement | Satisfied — `Dialog`/`DialogContent` from `@theme/components/ui/dialog` (§2.2); `TerminalPanel.vue`'s gear now reads "Manage quick commands…" and opens the dialog unfocused, context-menu "Edit…" opens it focused on the row |
+| Field rules: blur-commit, empty-reverts, rejected-edit revert, immediate colour | Satisfied — §2.3 rules 1-4 all present (closing-audit row 11); §5.1 tests 3-4 exercise them |
+| Seam grows update; Studio storage unchanged | Satisfied — `TerminalScriptsSeam.update` added, `openEditor` removed (§2.1); Go/store diffs are comment-only (closing-audit row 10) |
+| Kira Space gains no script storage | Satisfied — Space's only diff is `ConnectedEditorsPane.vue`'s comment (closing-audit row 9); Space's `terminalModule.ts` still injects no `scripts` |
+| Remove pane, mount, section, header comment; prune SettingsShell/createSettingsStore comments; `openSettingsAt` stays | Satisfied — commit 2 removes the pane/mount/section; commit 5 prunes the named comments; `openSettingsAt` itself is untouched, still called by `CookiesPane.vue`/`RequestSettingsPane.vue` |
+| `settings-scripts.spec.ts` coverage into `terminal-module.spec.ts`; `'Scripts'` out of `tests/visual/settings.spec.ts` | Satisfied — commit 3 (UI tests), commit 4 (`'Scripts'` dropped from the visual spec's `sections`) |
+| Kira Studio's suites pass | Satisfied, with the 2 pre-existing/environmental `ui-timing` failures disclosed above (proven unrelated by diff-scope and a baseline-commit cross-check) |
+
+**Deviations from the plan, disclosed:**
+
+1. Plan §7's literal `rg -L` "SFC form" command doesn't test what it intends under ripgrep (`-L`
+   means `--follow` there, not GNU grep's files-without-match) — re-run with
+   `rg --files-without-match` to get the real answer (empty, as expected). A plan-text tooling
+   mismatch, not an implementation shortfall.
+2. Several closing-audit `rg` checks that expect literal "Empty" instead return explanatory
+   migration-provenance comments (naming the old `ScriptsPane`/`'Scripts'`/`openEditor` while
+   describing what replaced them) or unrelated substring matches (`<script setup>` tags,
+   `FieldDescription`/`mcpDescription`, an unrelated P83 tab-strip-dropdown comment). None is a
+   residual reference to the removed feature; each is disclosed inline in the closing-audit table
+   above rather than silently reported as a clean "Empty".
+3. `createSettingsStore.ts:71`'s "eight (Kira Studio)" schema-section-count comment and
+   `SettingsShell.vue:21`'s equivalent are untouched, exactly as plan §2.6 instructs (they count
+   `Settings`-schema sections, which Scripts was never one of) — noting only that the actual
+   `Settings` schema in `settingsDomain.ts` has 7 keys, a pre-existing inaccuracy in that comment
+   this phase did not introduce and was explicitly told not to touch.
+4. The 2 `ui-timing` test failures (`budgets.spec.ts`, `slick-grid.spec.ts`) are pre-existing sandbox
+   worker-contention flakiness, confirmed unrelated to this phase by diff scope and a baseline-commit
+   cross-check in a throwaway worktree (removed after use) — logged per CLAUDE.md's pre-existing-issue
+   allowance rather than chased as a P133 fix.
+
+Working tree clean at this commit; nothing pushed and not rebased onto `v1.9` — the orchestrating
+session handles both, per its own standing instruction for this worktree.
