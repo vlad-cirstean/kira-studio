@@ -23,9 +23,14 @@
  * or `StashAvailable` were ever false). Its own Discard/Stash-and-carry/Cancel buttons, and the
  * `#stashAndCarry` route they call into, are completely UNCHANGED — this file simply gets called
  * less often than before.
+ *
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now (reka-ui's own
+ * `FocusScope`/Escape/outside-click replace `KuiDialog`'s hand-rolled equivalents) — this file
+ * still only supplies its own body/footer content.
  */
 import type { CheckoutPreflight } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -67,46 +72,57 @@ function stashAndCarry(): void {
 </script>
 
 <template>
-  <KuiDialog :open="active" :title="`Can't check out ${preflight?.target.name}`" @close="cancel">
-    <template v-if="headline?.kind === 'inProgressOperation'">
-      <p>An operation is already in progress. Resolve or abort it first.</p>
-    </template>
+  <Dialog :open="active" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Can't check out {{ preflight?.target.name }}</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <template v-if="headline?.kind === 'inProgressOperation'">
+          <p>An operation is already in progress. Resolve or abort it first.</p>
+        </template>
 
-    <template v-else-if="headline?.kind === 'worktreeConflict'">
-      <p>
-        <code>{{ headline.branch }}</code> is already checked out in another worktree
-        (<code>{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
-        places at once.
-      </p>
-    </template>
+        <template v-else-if="headline?.kind === 'worktreeConflict'">
+          <p>
+            <code>{{ headline.branch }}</code> is already checked out in another worktree
+            (<code>{{ headline.worktreePath }}</code>). Git will not check out the same branch in two
+            places at once.
+          </p>
+        </template>
 
-    <template v-else-if="headline?.kind === 'blockedByUntracked'">
-      <p>These untracked files would be overwritten by the checkout:</p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-        <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
-      </ul>
-      <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
-    </template>
+        <template v-else-if="headline?.kind === 'blockedByUntracked'">
+          <p>These untracked files would be overwritten by the checkout:</p>
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+            <li v-for="path in headline.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+          <p>Move or remove them yourself, then try again — there is no safe way to discard them here.</p>
+        </template>
 
-    <template v-else-if="trackedBlocker">
-      <p>These local changes would be overwritten by the checkout:</p>
-      <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-        <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
-      </ul>
-      <p v-if="canDiscard" class="kv:text-diff-deleted">
-        Discard permanently deletes these changes — this cannot be undone.
-        <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
-      </p>
-    </template>
+        <template v-else-if="trackedBlocker">
+          <p>These local changes would be overwritten by the checkout:</p>
+          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+            <li v-for="path in trackedBlocker.paths" :key="path"><code>{{ path }}</code></li>
+          </ul>
+          <p v-if="canDiscard" class="kv:text-diff-deleted">
+            Discard permanently deletes these changes — this cannot be undone.
+            <template v-if="canStashAndCarry">Stashing them instead keeps them, safely.</template>
+          </p>
+        </template>
+      </div>
 
-    <template #actions>
-      <KuiButton v-if="canStashAndCarry" variant="primary" @click="stashAndCarry">
-        Stash changes and check out
-      </KuiButton>
-      <KuiButton v-if="canDiscard" variant="danger" @click="discard">
-        Discard changes and check out
-      </KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button v-if="canStashAndCarry" variant="dialog-primary" size="kira-lg" @click="stashAndCarry">
+          Stash changes and check out
+        </Button>
+        <Button v-if="canDiscard" variant="dialog-danger" size="kira-lg" @click="discard">
+          Discard changes and check out
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

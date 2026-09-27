@@ -15,19 +15,27 @@
  *    confirmation (a `<details>` disclosure, collapsed by default) — needed on top of, not
  *    instead of, the typed branch name when the branch is also protected.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content. The plain-`--force` confirm button stays inside the `<details>` body
- * (in the default slot) rather than moving to `<template #actions>`, since it belongs beside its
- * own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * only supplies its own body/footer content. The plain-`--force` confirm button stays inside the
+ * `<details>` body (in the default slot) rather than moving to `DialogFooter`, since it belongs
+ * beside its own disclosure and acknowledgement checkbox, not beside the lease/Cancel pair.
  */
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
-import { computed, ref, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
 const props = defineProps<{ ops: OpsState }>();
 
 const pending = computed(() => props.ops.pendingForcePush.value);
 const active = computed(() => pending.value !== undefined);
+// P131 Part 1 §6.2: biome's noLabelWithoutControl can't see through a nested shadcn `Input`
+// component to the native `<input>` it renders, unlike the raw `<input>` this label used to wrap
+// directly -- an explicit for/id pair keeps the same association, verifiably.
+const branchNameId = useId();
 
 const typedBranch = ref('');
 const understandPlain = ref(false);
@@ -73,69 +81,79 @@ function confirmPlain(): void {
 </script>
 
 <template>
-  <KuiDialog
-    v-if="pending"
-    :open="active"
-    :title="`Force push ${pending.branch} to ${pending.remote}?`"
-    @close="cancel"
-  >
-    <p>
-      This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
-      <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
-      <template v-if="pending.preflight.behind > 0">
-        It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
-        ahead of what you last saw.
-      </template>
-    </p>
+  <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Force push {{ pending.branch }} to {{ pending.remote }}?</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p>
+          This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
+          <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
+          <template v-if="pending.preflight.behind > 0">
+            It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
+            ahead of what you last saw.
+          </template>
+        </p>
 
-    <p v-if="protectedBy" class="kv:text-diff-deleted kv:my-0.5">
-      <code>{{ resolvedBranch }}</code> matches your protected pattern
-      <code>{{ protectedBy }}</code>. Type the branch name to confirm.
-    </p>
-    <label v-if="protectedBy" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-      Branch name
-      <input
-        v-model="typedBranch"
-        type="text"
-        :placeholder="resolvedBranch"
-        data-testid="force-push-confirm-branch"
-        class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-      />
-    </label>
+        <p v-if="protectedBy" class="kv:text-diff-deleted kv:my-0.5">
+          <code>{{ resolvedBranch }}</code> matches your protected pattern
+          <code>{{ protectedBy }}</code>. Type the branch name to confirm.
+        </p>
+        <label v-if="protectedBy" :for="branchNameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+          Branch name
+          <Input
+            :id="branchNameId"
+            v-model="typedBranch"
+            type="text"
+            :placeholder="resolvedBranch"
+            size="kira"
+            class="w-full"
+            data-testid="force-push-confirm-branch"
+          />
+        </label>
 
-    <details class="kv:mt-2 kv:pt-1 kv:border-t kv:border-panel-border">
-      <summary class="kv:cursor-pointer kv:text-muted-foreground">Use plain <code>--force</code> instead</summary>
-      <p class="kv:text-diff-deleted kv:my-0.5">
-        This skips the lease check entirely — it will overwrite the remote branch even if someone
-        else has pushed to it since the lease's own tip was read, with no protection against
-        discarding their work.
-      </p>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input v-model="understandPlain" type="checkbox" data-testid="force-push-plain-ack" />
-        I understand — overwrite the remote branch without checking for other pushes
-      </label>
-      <div class="kv:flex kv:justify-end kv:mt-1">
-        <KuiButton
-          variant="danger"
-          :disabled="!canConfirmPlain"
-          data-testid="force-push-confirm-plain"
-          @click="confirmPlain"
-        >
-          Force push (plain --force)
-        </KuiButton>
+        <details class="kv:mt-2 kv:pt-1 kv:border-t kv:border-panel-border">
+          <summary class="kv:cursor-pointer kv:text-muted-foreground">Use plain <code>--force</code> instead</summary>
+          <p class="kv:text-diff-deleted kv:my-0.5">
+            This skips the lease check entirely — it will overwrite the remote branch even if someone
+            else has pushed to it since the lease's own tip was read, with no protection against
+            discarding their work.
+          </p>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="understandPlain" data-testid="force-push-plain-ack" />
+            I understand — overwrite the remote branch without checking for other pushes
+          </Label>
+          <div class="kv:flex kv:justify-end kv:mt-1">
+            <Button
+              variant="dialog-danger"
+              size="kira-lg"
+              :disabled="!canConfirmPlain"
+              data-testid="force-push-confirm-plain"
+              @click="confirmPlain"
+            >
+              Force push (plain --force)
+            </Button>
+          </div>
+        </details>
       </div>
-    </details>
 
-    <template #actions>
-      <KuiButton
-        variant="primary"
-        :disabled="!canConfirmLease"
-        data-testid="force-push-confirm-lease"
-        @click="confirmLease"
-      >
-        Force push (with lease)
-      </KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!canConfirmLease"
+          data-testid="force-push-confirm-lease"
+          @click="confirmLease"
+        >
+          Force push (with lease)
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

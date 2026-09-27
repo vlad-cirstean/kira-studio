@@ -8,11 +8,12 @@
  * "discard" — a merge/rebase cannot be told to just throw the local changes away), so
  * `resolvePullDialog` takes a plain `boolean` rather than a tagged route.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content.
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * only supplies its own body/footer content.
  */
 import type { PullPreflight } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -31,23 +32,34 @@ function stashAndCarry(): void {
 </script>
 
 <template>
-  <KuiDialog v-if="pending" :open="active" title="Can't pull — local changes in the way" @close="cancel">
-    <p>
-      Pulling with <code>{{ pending.strategy }}</code> would rewrite history here, and your
-      working tree has uncommitted changes that would be overwritten.
-    </p>
-    <p class="kv:text-diff-deleted">
-      Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
-      then — if it can be applied back with no conflict — they are popped back automatically. A
-      predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
-      discarded.
-    </p>
+  <Dialog v-if="pending" :open="active" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Can't pull — local changes in the way</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p>
+          Pulling with <code>{{ pending.strategy }}</code> would rewrite history here, and your
+          working tree has uncommitted changes that would be overwritten.
+        </p>
+        <p class="kv:text-diff-deleted">
+          Stashing them first keeps them safe: your changes are pushed to a stash, the pull runs,
+          then — if it can be applied back with no conflict — they are popped back automatically. A
+          predicted conflict leaves them stashed instead of forcing a bad pop; nothing is ever
+          discarded.
+        </p>
+      </div>
 
-    <template #actions>
-      <KuiButton variant="primary" data-testid="pull-stash-and-carry" @click="stashAndCarry">
-        Stash changes and pull
-      </KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button variant="dialog-primary" size="kira-lg" data-testid="pull-stash-and-carry" @click="stashAndCarry">
+          Stash changes and pull
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

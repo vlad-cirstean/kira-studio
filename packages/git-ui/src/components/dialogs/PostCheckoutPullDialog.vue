@@ -5,8 +5,11 @@
  * `PullDialog.vue`'s "a pending ref set by the state class, this dialog renders while it is set,
  * resolving it settles the promise the caller is awaiting" shape, one route simpler: there is only
  * ever Pull now / Not now, never a hazard to describe.
+ *
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now.
  */
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 
@@ -25,18 +28,31 @@ function pullNow(): void {
 </script>
 
 <template>
-  <KuiDialog v-if="pending" :open="active" title="Pull the latest changes?" @close="notNow">
-    <p>
-      <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
-      {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
-      <code>{{ pending.upstreamShortName }}</code> — pull now?
-    </p>
+  <Dialog v-if="pending" :open="active" @update:open="(v) => !v && notNow()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Pull the latest changes?</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p>
+          <strong>{{ pending.branch }}</strong> is {{ pending.behind }}
+          {{ pending.behind === 1 ? 'commit' : 'commits' }} behind
+          <code>{{ pending.upstreamShortName }}</code> — pull now?
+        </p>
+      </div>
 
-    <template #actions>
-      <KuiButton variant="primary" data-testid="post-checkout-pull-now" @click="pullNow">
-        Pull now
-      </KuiButton>
-      <KuiButton data-testid="post-checkout-pull-not-now" @click="notNow">Not now</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button variant="dialog-primary" size="kira-lg" data-testid="post-checkout-pull-now" @click="pullNow">
+          Pull now
+        </Button>
+        <Button variant="dialog" size="kira-lg" data-testid="post-checkout-pull-not-now" @click="notNow">
+          Not now
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
