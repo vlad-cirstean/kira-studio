@@ -26,6 +26,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
@@ -137,32 +138,7 @@ func main() {
 	// Registry, since Tracker.Reconcile/Send both need the same live-session set and PTYs the
 	// terminal service itself opens.
 	terminalRegistry := terminal.NewRegistry()
-
-	// adeTracker is Kira Space's own agent session tracker (P129 Part 1 §4.4) — persists every
-	// Claude Code session this app spawns or resumes. Recover, before any window exists: a fresh
-	// Registry never has any of a previous process life's PTYs live, so every row that life left
-	// "running" is unconditionally stale.
-	adeTracker := ade.NewTracker(ade.TrackerDeps{
-		Store: repositories.AdeSessions, LiveAgents: terminalRegistry.AgentSessions,
-		WriteTerminal: terminalRegistry.Write, Now: time.Now,
-		OnChange: func() { bridge.AdeSessionsChanged(events) },
-	})
-	if err := adeTracker.Recover(); err != nil {
-		slog.Warn("ade: recover", "scope", "ade", "err", err)
-	}
-
-	// agentHooks is P129 Part 1 §4.3's own "always on" posture: the design has no toggle, and a
-	// start failure (curl missing, a bind conflict) is logged, never fatal — sessions still spawn
-	// and track, activity icons stay absent. SetHooks before any window exists, so Compose never
-	// races an unset hooks func with a real launch.
-	agentHooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
-		adeTracker.HandleEvent(ev)
-		bridge.EmitAgentEvent(emitter, ev)
-	}})
-	if err := agentHooks.Start(); err != nil {
-		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
-	}
-	adeTracker.SetHooks(agentHooks.ComposeLaunch)
+	adeTracker, agentHooks := wireAde(repositories, terminalRegistry, emitter, events)
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
@@ -221,15 +197,10 @@ func main() {
 		keepAwakeCtl.Close()
 		// terminalSvc.Shutdown() first: every PTY dies, and each one's own exit fires
 		// Registry.OnChange (Reconcile marks its row stopped) while the DB is still open. Then
-		// adeTracker.Close() flushes whatever last-active time is still only in memory, then
-		// agentHooks.Stop() (P129 Part 1 §4.3).
+		// shutdownAde flushes whatever last-active time is still only in memory and stops the
+		// hooks listener (P129 Part 1 §4.3).
 		terminalSvc.Shutdown()
-		if err := adeTracker.Close(); err != nil {
-			slog.Warn("ade: close", "scope", "ade", "err", err)
-		}
-		if err := agentHooks.Stop(); err != nil {
-			slog.Warn("agent hooks: stop", "scope", "ade", "err", err)
-		}
+		shutdownAde(adeTracker, agentHooks)
 		detachGitPush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
@@ -398,6 +369,51 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 		os.Exit(0)
 	}
 	return instanceLock
+}
+
+// wireAde constructs and starts Kira Space's own agent runtime (P129 Part 1 §4.3/§4.4): the
+// ade.Tracker and the agenthooks.Manager it drives, wired together before any window exists so
+// Compose never races an unset hooks func with a real launch. Recover runs here too — a fresh
+// Registry never has any of a previous process life's PTYs live, so every row that life left
+// "running" is unconditionally stale. Kira Studio's own main.go has no equivalent: its
+// ComposeAgent stays nil and it wires no agenthooks.Manager of its own.
+func wireAde(
+	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
+) (*ade.Tracker, *agenthooks.Manager) {
+	tracker := ade.NewTracker(ade.TrackerDeps{
+		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
+		WriteTerminal: registry.Write, Now: time.Now,
+		OnChange: func() { bridge.AdeSessionsChanged(events) },
+	})
+	if err := tracker.Recover(); err != nil {
+		slog.Warn("ade: recover", "scope", "ade", "err", err)
+	}
+
+	// agentHooks is P129 Part 1 §4.3's own "always on" posture: the design has no toggle, and a
+	// start failure (curl missing, a bind conflict) is logged, never fatal — sessions still spawn
+	// and track, activity icons stay absent.
+	hooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
+		tracker.HandleEvent(ev)
+		bridge.EmitAgentEvent(emitter, ev)
+	}})
+	if err := hooks.Start(); err != nil {
+		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
+	}
+	tracker.SetHooks(hooks.ComposeLaunch)
+
+	return tracker, hooks
+}
+
+// shutdownAde is wireAde's own teardown half (main.go's teardown func): flushes adeTracker's
+// still-in-memory lastActive values, then stops the hooks listener — a plain helper so main's own
+// gocognit score doesn't carry two more nested error checks for a call site used exactly once.
+func shutdownAde(tracker *ade.Tracker, hooks *agenthooks.Manager) {
+	if err := tracker.Close(); err != nil {
+		slog.Warn("ade: close", "scope", "ade", "err", err)
+	}
+	if err := hooks.Stop(); err != nil {
+		slog.Warn("agent hooks: stop", "scope", "ade", "err", err)
+	}
 }
 
 // wireGit is Kira Studio's own wireGit (main.go), lifted wholesale onto this app's own
