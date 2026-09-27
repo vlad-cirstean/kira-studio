@@ -22,4 +22,8 @@ export interface ControlSnapshot<T = unknown> {
    *  `control.ts`'s `unwrap` reads `.cause.code`/`.cause.message` off the thrown error. Mutually
    *  exclusive with `response`. */
   error?: { code: string; message: string; details?: unknown };
+  /** P129 Part 3 §3.3: holds this call's reply until the spec calls the handle's own `release()`
+   *  for this channel (mockRuntime.ts's shared `ControlMockHandle`) — Kira Studio's own
+   *  `credential-reveal.spec.ts` precedent, ported for the ade module's own Refresh-pending test. */
+  hold?: boolean;
 }

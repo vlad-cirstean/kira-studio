@@ -29,7 +29,9 @@ const noteClass = computed(() => {
       <div
         class="flex h-[30px] min-w-0 max-w-140 flex-1 items-center gap-2.5 rounded-kira border border-border bg-elevated px-3"
       >
-        <span class="font-data text-kira-sm font-semibold">{{ mainName ?? '' }}</span>
+        <span class="font-data text-kira-sm font-semibold" data-testid="ade-main-name">{{
+          mainName ?? ''
+        }}</span>
         <span class="whitespace-nowrap text-kira-sm" :class="noteClass" data-testid="ade-main-note">{{
           note
         }}</span>

@@ -79,4 +79,21 @@ export const IPC = {
   terminalResize: 'kira:terminal:resize',
   terminalClose: 'kira:terminal:close',
   terminal: 'kira:terminal:data',
+
+  // P129 Part 3 §2.2/§3.3: the ade module's own bound-call surface (6 of AdeService's 19 methods)
+  // plus its push channels. `adeSessions` names the bound call (AdeService.Sessions, matching
+  // control.ts's own method name) — its push counterpart is `adeSessionsChanged`, not `adeSessions`
+  // again, the same `gitClientsList`/`gitClientsChanged` split this file already uses elsewhere, to
+  // avoid two entries needing the same object key.
+  terminalAgentSessions: 'kira:ade:agentSessions',
+  adeSessions: 'kira:ade:sessions:call',
+  adeRepoSnapshot: 'kira:ade:repoSnapshot',
+  adeRepoPrs: 'kira:ade:repoPrs',
+  adeRefresh: 'kira:ade:refresh',
+  adeProvideCredential: 'kira:ade:provideCredential',
+  adeSessionsChanged: 'kira:ade:sessions',
+  adeRepo: 'kira:ade:repo',
+  adeCredential: 'kira:ade:credential',
+  agentSessions: 'kira:agent:sessions',
+  agentEvent: 'kira:agent:event',
 } as const;

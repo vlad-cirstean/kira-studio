@@ -78,6 +78,14 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   updateStatus: 'UpdateService.Status',
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
+
+  // P129 Part 3 §2.2/§3.3: the ade module's own 6 bound calls (of AdeService's 19 methods).
+  terminalAgentSessions: 'AdeService.AgentSessions',
+  adeSessions: 'AdeService.Sessions',
+  adeRepoSnapshot: 'AdeService.RepoSnapshot',
+  adeRepoPrs: 'AdeService.RepoPrs',
+  adeRefresh: 'AdeService.Refresh',
+  adeProvideCredential: 'AdeService.ProvideCredential',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -137,6 +145,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     latestVersion: '',
     installLogPath: '',
   }),
+  // P129 Part 3 §3.3: every boot now calls AdeService.AgentSessions (createAgentSessionsStore's own
+  // initAgentSessions) and, once `ade` is the active mode, AdeService.Sessions too — same
+  // "no committed fixture will ever snapshot this" reasoning as the rest of this table. A spec that
+  // cares (ade-module.spec.ts) still wins with its own snapshot.
+  [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
+  [IPC.adeSessions]: JSON.stringify({ sessions: [] }),
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at
