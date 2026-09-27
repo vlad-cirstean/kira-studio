@@ -35,6 +35,14 @@
  *
  * Landed unwired (I2-3): run directly with `bun scripts/check-class-conflicts.ts`. Wired into
  * `bun run lint` at I2-9, once every hit its first run surfaces is fixed.
+ *
+ * P131 Part 1 §7: a third rule, scoped to `packages/git-ui/src/**\/*.vue` only -- a tag whose local
+ * name is imported from `@theme/components/**` (a shadcn component) is a theme-root element, so it
+ * must carry no `kv:` token: `kv:` is git-ui's own prefixed root's vocabulary and never merges
+ * through the theme's unprefixed `cn()` a shadcn component's own template uses internally. Detected
+ * from each file's own `<script setup>` import specifiers (regex, not a full TS parse -- import
+ * statements are a fixed enough shape), then matched against template tag names in both PascalCase
+ * (as imported) and kebab-case (Vue's own template-tag normalisation).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -53,10 +61,12 @@ const SCAN_DIRS = [
   'packages/kira-ui/src',
 ];
 
+const GIT_UI_DIR = 'packages/git-ui/src';
+
 interface Hit {
   file: string;
   line: number;
-  kind: 'static-conflict' | 'static-vs-conditional' | 'registration';
+  kind: 'static-conflict' | 'static-vs-conditional' | 'registration' | 'kv-on-theme-component';
   staticTokens: string;
   conditional: string;
 }
@@ -150,6 +160,69 @@ function isCnRootCall(ast: unknown): boolean {
   return callee?.type === 'Identifier' && (callee.name === 'cn' || callee.name === 'twMergeKv');
 }
 
+// P131 Part 1 §7: local names a git-ui file imports from a shadcn theme component module --
+// `import { Dialog, DialogContent } from '@theme/components/ui/dialog'` or
+// `import Foo from '@theme/components/ui/foo/Foo.vue'`. Regex over the raw script source: import
+// statements are a fixed enough shape that a full TS parse buys nothing here.
+function themeComponentLocalNames(scriptSrc: string): Set<string> {
+  const names = new Set<string>();
+  const importRe = /import\s+([^;]+?)\s+from\s+['"](@theme\/components\/[^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex-exec-loop idiom
+  while ((m = importRe.exec(scriptSrc))) {
+    const clause = m[1].trim();
+    const namedMatch = clause.match(/^\{([^}]*)\}$/);
+    if (namedMatch) {
+      for (const part of namedMatch[1].split(',')) {
+        const spec = part.trim();
+        if (!spec) continue;
+        const asMatch = spec.match(/^\S+\s+as\s+(\S+)$/);
+        names.add(asMatch ? asMatch[1] : spec);
+      }
+    } else {
+      // Default import, e.g. `Foo` in `import Foo from '@theme/components/ui/foo/Foo.vue'`.
+      names.add(clause);
+    }
+  }
+  return names;
+}
+
+function pascalToKebab(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+// Fail 3 (§7): a shadcn theme-component tag in git-ui markup carrying a `kv:` token.
+function checkKvOnThemeComponent(
+  node: TemplateNode,
+  themeNames: Set<string>,
+  relPath: string,
+  hits: Hit[],
+): void {
+  const tag: string = node.tag ?? '';
+  const matches = themeNames.has(tag) || [...themeNames].some((n) => pascalToKebab(n) === tag);
+  if (!matches) return;
+  const { staticClass, classExpAst, line } = findClassAttrs(node);
+  const tokens = tokensOf(staticClass).filter((t) => t.startsWith('kv:'));
+  if (classExpAst) {
+    const lits: string[] = [];
+    collectLiterals(classExpAst, lits);
+    for (const lit of lits) {
+      for (const tok of tokensOf(lit)) {
+        if (tok.startsWith('kv:')) tokens.push(tok);
+      }
+    }
+  }
+  for (const tok of tokens) {
+    hits.push({
+      file: relPath,
+      line,
+      kind: 'kv-on-theme-component',
+      staticTokens: `<${tag}>`,
+      conditional: tok,
+    });
+  }
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: compiler-sfc's compiled-template AST node shape
 type TemplateNode = any;
 
@@ -235,7 +308,18 @@ function checkStaticVsConditional(
   }
 }
 
-function checkElement(node: TemplateNode, relPath: string, hits: Hit[]): void {
+function checkElement(
+  node: TemplateNode,
+  relPath: string,
+  themeNames: Set<string>,
+  hits: Hit[],
+): void {
+  // P131 Part 1 §7: independent of the static/conditional checks below (and of whether the tag
+  // carries any static class at all) -- only git-ui's own tree is in scope for this rule.
+  if (themeNames.size > 0 && relPath.startsWith(GIT_UI_DIR)) {
+    checkKvOnThemeComponent(node, themeNames, relPath, hits);
+  }
+
   const { staticClass, classExpAst, line } = findClassAttrs(node);
   if (!staticClass) return;
   if (classExpAst && isCnRootCall(classExpAst)) return; // merges at runtime, §3.1
@@ -249,13 +333,13 @@ function checkElement(node: TemplateNode, relPath: string, hits: Hit[]): void {
   }
 }
 
-function walk(node: TemplateNode, relPath: string, hits: Hit[]): void {
+function walk(node: TemplateNode, relPath: string, themeNames: Set<string>, hits: Hit[]): void {
   if (!node) return;
   if (node.type === 1) {
-    checkElement(node, relPath, hits);
+    checkElement(node, relPath, themeNames, hits);
   }
   for (const child of node.children ?? []) {
-    walk(child, relPath, hits);
+    walk(child, relPath, themeNames, hits);
   }
   // Element nodes can also carry v-if/v-else branch content under `branches` (IfNode) — compiler
   // AST already flattens those into `children` on the containing IfBranchNode, which itself has
@@ -263,7 +347,7 @@ function walk(node: TemplateNode, relPath: string, hits: Hit[]): void {
   // ForNode/IfNode are covered by the generic `children` walk above since both node kinds expose
   // a `children` (or `branches[].children`) array. Cover `branches` explicitly for completeness.
   if (Array.isArray(node.branches)) {
-    for (const branch of node.branches) walk(branch, relPath, hits);
+    for (const branch of node.branches) walk(branch, relPath, themeNames, hits);
   }
 }
 
@@ -280,7 +364,9 @@ function checkFile(absPath: string, hits: Hit[]): void {
   }
   const ast = descriptor.template?.ast;
   if (!ast) return;
-  walk(ast, relPath, hits);
+  const scriptSrc = (descriptor.scriptSetup?.content ?? '') + (descriptor.script?.content ?? '');
+  const themeNames = themeComponentLocalNames(scriptSrc);
+  walk(ast, relPath, themeNames, hits);
 }
 
 // --- Registration self-check ---
@@ -393,7 +479,10 @@ function main(): void {
     listVueFiles(join(REPO_ROOT, dir), files);
     for (const f of files) checkFile(f, hits);
   }
-  checkRegistration('packages/theme/src/base.css', false, hits);
+  // P131 Part 1 §3.1 moved every --text-*/--radius-*/--shadow-*/--animate-*/--leading-* name out of
+  // base.css into tailwind-core.css -- this self-check must follow, or it silently checks zero
+  // names (a for-loop over an empty themeTokenNames() list, no error).
+  checkRegistration('packages/theme/src/tailwind-core.css', false, hits);
   checkRegistration('packages/kira-ui/src/theme/tailwind-theme.css', true, hits);
 
   if (hits.length === 0) {
@@ -408,6 +497,10 @@ function main(): void {
     } else if (h.kind === 'static-vs-conditional') {
       console.error(
         `${h.file}:${h.line}  static-vs-conditional  '${h.staticTokens}' vs '${h.conditional}'`,
+      );
+    } else if (h.kind === 'kv-on-theme-component') {
+      console.error(
+        `${h.file}:${h.line}  kv-on-theme-component  ${h.staticTokens} carries '${h.conditional}' -- a shadcn component reads the unprefixed root`,
       );
     } else {
       console.error(`${h.file}:${h.line}  registration  ${h.staticTokens}`);

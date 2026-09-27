@@ -14,7 +14,10 @@
 # the deliberate exception: every shadcn colour/radius alias that duplicated a kira name was
 # renamed away inside components/ui too (one name per value, repo-wide), so those checks scan it
 # on purpose -- a re-pulled registry file that still says bg-card must fail lint, same as any
-# other file.
+# other file. P131 Part 1 §7: check_alias, check_focus_width and check_font_scale's host pass each
+# gained a second, `kv:`-excluding pass over packages/git-ui/src too -- a migrated dialog's own
+# shadcn component (packages/git-ui/src/components/dialogs/*.vue) speaks this same unprefixed
+# vocabulary, so a retired/forbidden shape there is a real hit, not exempt just for living in GU.
 #
 # Every commit that retires a class name appends its own `check_class` call here, in the same
 # commit that does the rename/deletion (P110 plan §5.12). Never a batch add at the end.
@@ -177,15 +180,23 @@ check_class_in_attrs_all() {
 # check_alias <retired-name-regex> <replacement>
 # P110 I2-37/I2-38: check_class WITHOUT the components/ui exclusion -- one name per value, repo-
 # wide (§3.11.3), so a shadcn alias colour/radius name is retired everywhere PT reaches, including
-# its own registry-authored components. PT-root only: SCAN_DIRS never includes GU/KU, and this
-# function takes no [scan-dirs] override -- the kv root defines none of these shadcn names for
-# colours, and defines its OWN --radius-sm/--radius-lg with different, legitimate meanings, so it
-# must never be extended there.
+# its own registry-authored components. PT-root scan is unconditional (SCAN_DIRS never includes
+# GU/KU) -- the kv root defines none of these shadcn names for colours, and defines its OWN
+# --radius-sm/--radius-lg with different, legitimate meanings, so that scan must never include it.
+# P131 Part 1 §7: a SECOND pass now also scans packages/git-ui/src, but only for an UNPREFIXED hit
+# (a migrated dialog's shadcn component speaks PT's own alias-retirement vocabulary) -- never a
+# `kv:`-prefixed one, git-ui's own root's unrelated names, excluded by the `(?!kv:)` right after
+# the lookbehind (which itself gains `:` so a match can never start mid-token, right after a
+# `kv:` variant prefix the outer alternation's own `(?:[a-z0-9-]+:)*` group would otherwise still
+# capture).
 check_alias() {
   name="$1"
   replacement="$2"
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "(?<![-\\w])(?:[a-z0-9-]+:)*${name}(?![-\\w])" $SCAN_DIRS 2>/dev/null || true)
+  gu_hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "(?<![\\w:-])(?!kv:)(?:[a-z0-9-]+:)*${name}(?![-\\w])" "$GIT_UI_SRC" 2>/dev/null || true)
+  hits=$(printf '%s\n%s\n' "$hits" "$gu_hits" | grep -v '^$' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: retired alias '$name' still used -- replace with '$replacement':" >&2
     echo "$hits" >&2
@@ -201,12 +212,23 @@ check_alias() {
 # _gu_ku_hits (kv: roots keep their own 1px --kv-focus-border recipe, a different shape by design).
 # `peer-focus-visible:outline-2` (SwatchRadio.vue, P122 plan §3.5's own named exception) matches
 # neither pattern -- `peer-` sits outside both alternations.
+# P131 Part 1 §7: a THIRD pass scans packages/git-ui/src again, this time for an UNPREFIXED hit
+# (a migrated dialog's own shadcn component) -- _gu_ku_hits above only ever matches a `kv:`-
+# prefixed variant chain (git-ui's own root, a different, allowed recipe), so it would miss an
+# unprefixed shadcn tag carrying this same retired halo. Every caller's own $pattern literally
+# starts with the 10-character `(?<![-\w])` lookbehind (both call sites below), stripped here via
+# `cut -c11-` (POSIX sh has no `${var:n}` substring expansion) and replaced with
+# `(?<![\w:-])(?!kv:)` -- same rewrite check_alias applies inline to its own pattern.
 check_focus_width() {
   pattern="$1"
   hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
     -- "$pattern" $SCAN_DIRS 2>/dev/null || true)
   gu_ku_hits=$(_gu_ku_hits "$pattern")
-  hits=$(printf '%s\n%s\n' "$hits" "$gu_ku_hits" | grep -v '^$' || true)
+  pattern_tail=$(printf '%s' "$pattern" | cut -c11-)
+  gu_unprefixed_pattern="(?<![\\w:-])(?!kv:)${pattern_tail}"
+  gu_unprefixed_hits=$(grep -rnoP --include='*.vue' --include='*.ts' --include='*.css' \
+    -- "$gu_unprefixed_pattern" "$GIT_UI_SRC" 2>/dev/null || true)
+  hits=$(printf '%s\n%s\n%s\n' "$hits" "$gu_ku_hits" "$gu_unprefixed_hits" | grep -v '^$' || true)
   if [ -n "$hits" ]; then
     echo "check-theme-classes: focus ring wider/coloured than focus-ring (packages/theme/src/base.css):" >&2
     echo "$hits" >&2
@@ -242,6 +264,11 @@ _font_scale_anchor() {
 # shadcn primitive onto the scale too, so no separate directory is added the way check_focus_width
 # does for itself. kv pass: GU/KU's own class-attribute/`.ts`-file convention (_gu_ku_hits'
 # shape, not the helper itself -- KV_CSS also needs `.css` files, which _gu_ku_hits never scans).
+# P131 Part 1 §7: the host CLASS pass (only -- not host_css, a raw CSS `font-size:` declaration,
+# which git-ui's own existing kv_css pass below already guards for that root) gains a git-ui-
+# scoped, `kv:`-excluding variant: a migrated dialog's shadcn component follows chrome's own
+# unprefixed scale, so an off-scale `text-*` utility there is a real hit too, distinct from the
+# `kv:`-prefixed one the existing kv pass below already catches.
 check_font_scale() {
   host_class='(?<![-\w])text-(?:xs|sm|base|lg|[2-9]?xl|kira-xs|\[(?!#|rgb|hsl|color:|var\()[^\]\s]+\]|\(length:[^)\s]+\))(?![-\w])'
   host_css='(?<![-\w])font-size\s*:(?!\s*var\(--kira-t-(?:sm|md|lg|xl)\)\s*[;}])'
@@ -262,6 +289,20 @@ check_font_scale() {
   if [ -n "$host_hits" ]; then
     echo "check-theme-classes: chrome font size off the four-value scale -- replace with $hint:" >&2
     echo "$host_hits" >&2
+    STATUS=1
+  fi
+
+  # P131 Part 1 §7: same host_class shape, git-ui-scoped and kv:-excluding (a migrated dialog's own
+  # shadcn component follows chrome's scale unprefixed; its `kv:`-prefixed markup is the separate
+  # kv pass below).
+  host_class_tail=$(printf '%s' "$host_class" | cut -c11-)
+  gu_host_class="(?<![\\w:-])(?!kv:)${host_class_tail}"
+  gu_host_hits=$(grep -rnP --include='*.vue' --include='*.ts' \
+    -- "$gu_host_class" "$GIT_UI_SRC" 2>/dev/null |
+    grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' || true)
+  if [ -n "$gu_host_hits" ]; then
+    echo "check-theme-classes: chrome font size off the four-value scale -- replace with $hint:" >&2
+    echo "$gu_host_hits" >&2
     STATUS=1
   fi
 
@@ -616,8 +657,9 @@ check_alias "${ALIAS_COLOR_PREFIX}-accent(?:/\\d+)?" 'the -hover equivalent (e.g
 check_alias "${ALIAS_COLOR_PREFIX}-destructive(?:/\\d+)?" 'the -error equivalent (e.g. text-destructive -> text-error), never the variant="destructive" prop value'
 
 # P110 I2-38: one radius name per value, repo-wide -- kira names win (§3.11.3's radius half).
-# PT-root only, never extended to GU/KU: the kv root defines its own --radius-sm/--radius-lg
-# (packages/git-ui/src/theme/tailwind.css) with different, legitimate meanings.
+# check_alias's own kv:-excluding git-ui pass (§7 above) covers an unprefixed shadcn radius alias
+# there too; the kv root's own --radius-sm/--radius-lg (packages/git-ui/src/theme/tailwind.css)
+# keep their own, different, legitimate meanings and are never matched by that pass.
 ALIAS_ROUNDED_SIDE='(?:t|r|b|l|tl|tr|bl|br|ss|se|es|ee)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-sm!?" 'the rounded-kira-xs equivalent (e.g. rounded-sm -> rounded-kira-xs)'
 check_alias "rounded(?:-${ALIAS_ROUNDED_SIDE})?-md!?" 'the rounded-kira-sm equivalent (e.g. rounded-md -> rounded-kira-sm)'
