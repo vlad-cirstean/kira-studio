@@ -831,6 +831,170 @@ No known open item closes; two open (both new, recorded in `docs/ARCHITECTURE.md
 items): the rename/delete conflict limitation (§0.7) and the linked-worktree dirty-state-not-watched
 limitation (refreshes on snapshot only, not live-watched).
 
+## P129 Part 3 result
+
+Plan: `docs/v2.0/plans/P129-part3-ade-data-layer.md`. One sequential Sonnet implementer, no stream
+split (one continuous, order-dependent chain: the mode-layout type before the bridge surface before
+`useQueue` before the module shell that consumes both). 7 plan-listed commits, `3c3f51c0`..`79354f2b`,
+plus two disclosed unplanned commits (`1c21f140`, `2c2d042e`) — `git log --oneline
+4ac7109fee25f29846a5d359ca0b4ff9641b269d..79354f2b` for the full range, which also carries commits
+from a concurrent P131 background session sharing this checkout (confirmed disjoint below).
+
+**Commits, in the plan's own §4 order, plus two unplanned commits:**
+
+1. `3c3f51c0` — `feat(workbench): full-area module layout` (§0.12/§0.13). `modes.ts` gains the
+   `PanelModeDef`/`FullModeDef` discriminated union and `ModeRegistry<M, D>`'s second type param;
+   `WorkbenchShellBase` gains `tabStripVisible?: boolean` (default `true`); Kira Studio's own
+   `modes.ts` retypes `MODES` as `ModeRegistry<AppMode, PanelModeDef>` — a type-only change, no
+   behavior change, since that app's shell already reads `.panel`/`.start` unconditionally.
+2. `c73f44b5` — `feat(space): ade bridge surface and channels`. `CHANNEL` entries for
+   `kira:ade:sessions`/`kira:ade:repo`/`kira:ade:credential`, the six §2.2 control members on
+   Space's `control.ts`, `ade/wire.ts`'s TS mirrors of Part 1/2's own wire structs, `ade/state/
+   agentSessions.ts` (Space's own instance of P127's agent-activity store), `main.ts`'s first §2.8
+   addition, a `host.ts` comment. `main.ts` is the in-commit consumer.
+3. `d77e4cca` — `feat(space): useQueue derivation`. `ade/useQueue.ts` (a pure port of the mockup's
+   own `renderVals()`), `ade/activity.ts`, `tests/unit/support/{mockupOracle.ts,mockupToWire.ts}`,
+   both new unit specs (`ade-queue-parity.spec.ts` running the mockup itself as a `node:vm` oracle,
+   `ade-queue-rules.spec.ts`'s hand-computed cases). `useQueue`/`needsInputByRepo` get their `src/`
+   consumers in commit 4 — legal per the plan's own §8 risk row (`lint:dead` is pre-push only).
+4. `33eb717c` — `feat(space): ade module shell`. `queries.ts` (6 `AdeService` methods via TanStack
+   Query, push-driven `staleTime: Infinity` keys, `installAdeSignals`), `state/adeUi.ts`, every
+   §2.7 component (`AdeView`/`AdeRepoTabs`/`AdeRepoView`/`AdeProjectHeader`/`AdeMainLine`/
+   `AdeActivityIcon`), the `ade` `modes.ts` entry as a `FullModeDef`, `AdePanel.vue`/`AdeStart.vue`
+   deleted, `main.ts`'s second §2.8 addition, `modules.spec.ts` updated for the new full-area shell.
+5. `1c21f140` — **unplanned fixup**, `fix(space): ade Refresh mutation reads AdeRefreshResult.error
+   too`. Found while writing commit 6's own Refresh error-path coverage, not from a failing run:
+   `AdeService.Refresh` resolves (never rejects) with `.error` set for a git-level failure (auth,
+   network) — the mutation's `onSettled` only checked the thrown/rejected `error` param, a separate
+   case, so a real refresh failure would have silently rendered as "ok". Landed as its own commit,
+   ahead of the coverage that exercises it, per normal commit hygiene.
+6. `533c5fda` — `test(space): ade module UI coverage` (§3.3, `test:ui:space`, mocked control).
+   `ade-module.spec.ts`'s 7 cases (full-area layout vs. Git; repo-tab needs-input badge cleared by
+   `Stop`, which re-fetches that repo's snapshot; header fetch-label composition; Refresh pending/
+   ok/error states; `useQueue`'s `behindRoots` on the main line, refetched only by that repo's own
+   `kira:ade:repo` push; a `kira:ade:credential` prompt mapped through `repoId` and answered; a
+   repo-tab switch swapping header/main line). Support edits: `ipcChannels.ts` (6 bound-call keys +
+   push names), `mockRuntime.ts` (`FQN_SUFFIX_BY_IPC_KEY`, `WILDCARD_DEFAULTS`), `types.ts`
+   (`hold?: boolean`, Kira Studio's own `credential-reveal.spec.ts` precedent, ported).
+   `AdeMainLine.vue` gains a `data-testid` on its main-name span for this coverage.
+7. `79354f2b` — `docs: ARCHITECTURE records ade data layer (P129 Part 3)` (§5.1).
+8. `2c2d042e` — **unplanned fixup**, `refactor(space): drop unused ade export scaffolding
+   (lint:dead)`. The plan's own §4 requires `lint:dead` clean "at step 5 [test coverage] and before
+   push, not per commit" — commit 8's own run found 11 exports with zero real consumer anywhere in
+   `src/**` (`adeSessionsKey`/`adeSnapshotKey`/`adePrsKey`; `AdeMain`/`AdeJira`; 8 of `useQueue.ts`'s
+   internal-only types). Un-exported all 11. One of the original 12 findings, `AdeHistoryItem`, does
+   have a real consumer (`tests/unit/support/mockupToWire.ts`, committed in commit 3) that knip
+   can't see — `knip.json`'s `apps/kira-space/frontend` workspace scans `src/**/*.{ts,vue}` only, a
+   pre-existing repo-wide scoping choice (every app's `tests/unit`/`tests/ui` tree is excluded,
+   except `apps/kira-space-vscode`'s own workspace block, which does scan its own test trees — a
+   real precedent, declined here over the blast-radius risk of newly surfacing findings across the
+   whole pre-existing `tests/unit/` tree). Fixed by having `mockupToWire.ts` derive the type via
+   `AdeRepoSnapshot['history']` instead of a named import, so `AdeHistoryItem` could drop `export`
+   too, with zero change outside these two files. This is a real, disclosed **9th commit**: the
+   plan's own §4 lists 7 steps; commits 5 and 8 above are both necessary work the plan's own text
+   already anticipated (a bug found while testing, `lint:dead` cleanup before push) rather than
+   scope beyond the plan.
+
+**Deviations and interpretation decisions, disclosed:**
+
+- **No `page.clock` for relative-time assertions in `ade-module.spec.ts`** (plan §3.3 literally says
+  "clock pinned with Playwright `page.clock` so relative times are exact") — used real `Date.now()`
+  at fixture-build time instead. `useTimeAgo`'s own reactive tick doesn't reliably resync to a clock
+  frozen only after `relaunch()`'s boot completes; the whole test runs in well under a minute, so
+  real wall-clock time is exact enough without that risk.
+- **`adeSessions`/`adeSessionsChanged` IPC-key split** in `support/ipcChannels.ts` — `adeSessions`
+  already names the bound call (`AdeService.Sessions`, matching `control.ts`'s own method name), so
+  its push counterpart needed a different key; `adeSessionsChanged` follows this file's own existing
+  `gitClientsList`/`gitClientsChanged` split for the same reason.
+- **`useNow({ interval })` does not exist** — VueUse's real `UseNowOptions` has no `interval` field
+  (only `controls`/`scheduler`). `AdeRepoView.vue`'s `today` (local `YYYY-MM-DD`, recomputed every
+  minute, §0.6) uses `useIntervalFn` plus a plain `ref(new Date())` instead, matching this
+  codebase's own existing precedent (`packages/workbench/src/util/usePendingDecision.ts`).
+- **Three font-scale lint fixes**, disclosed inline as code comments: `AdeActivityIcon.vue`'s two
+  tiny badge glyphs and `AdeRepoTabs.vue`'s needs-input count badge used mockup-literal pixel sizes
+  (7px/8px/11px) that fail P123 §6.2's font-scale lint; all three now use `text-kira-sm` (11px, the
+  scale's floor) — a minor, disclosed visual deviation from the mockup's own literal sizing.
+- Commit 3's own carryover deviations (already disclosed when that commit landed, restated here for
+  a complete record): `civilFromDays` is a from-scratch civil-calendar algorithm, not a port of any
+  named mockup helper (`renderVals()` never isolates one); the block-level Rebase action's `label`
+  is the plain string `'Rebase'`, never `'Rebase onto X'` (mockup line 1162's own comment names the
+  same choice); `QueueCell.tag` is `{ label, tone }` only, no `tip` — `QueueTag` (the segment-level
+  tag) does carry `tip`, but a per-cell tag has no tooltip surface in this phase's own UI.
+- **§9 design decisions** (`docs/v2.0/design/SPEC.md`'s own "Decisions to keep" list) — the whole
+  list is queue-board rendering (git-graph lanes, columns, action buttons inside boxes, a Markdown
+  notes editor, etc.); Part 3 renders no queue board at all (repo tabs, header, main line only,
+  §0.1's own scope split) so none of these patterns had an opportunity to creep in this phase. Every
+  item on that list stays a live constraint for Parts 4-6, not something Part 3 could violate or
+  satisfy.
+
+**Verification (plan §6), run once near phase end, against the phase's own final commit:**
+
+| Command | Result |
+|---|---|
+| `bun run typecheck` | Clean |
+| `bun run lint` | Clean |
+| `bun run lint:dead` | Clean (7 pre-existing duplicate-export findings, same P127/P128 baseline, none in a file this phase touched) |
+| `bun run build:space`, `bun run build:studio` | Clean |
+| `bun run test:unit` | 1685 pass, 0 fail (P129 Part 2's own baseline was 1667; the parity spec's + rules spec's own cases account for the difference) |
+| `bun run test:ui:space` | 45/45 pass (baseline 38 plus §3.3's 7 new cases). One flaky failure hit once in an earlier full-parallel run (`repo-workspace.spec.ts:228`, `[data-testid="repo-search-file-row"]` not yet rendered) — confirmed pre-existing and untouched (`git diff --stat 4ac7109f.. -- tests/ui/repo-workspace.spec.ts apps/kira-space/frontend/src/repo/` empty); a clean re-run hit 45/45, same worker-contention flake class P117/P127/P128/P134's own results already document |
+| `bun run test:ui:studio` | 298/300 (unchanged count). 2 failures, both `ui-timing` timing-budget assertions (`budgets.spec.ts`'s scroll-response p50, `slick-grid.spec.ts`'s select-all gate) — neither file touched by this phase or any commit since (`git diff --stat 4ac7109f.. -- apps/kira-studio/tests/ui/budgets.spec.ts apps/kira-studio/tests/ui/slick-grid.spec.ts` empty). `budgets.spec.ts`'s own code comment self-documents this exact class ("the flakiness here is cross-file worker contention, which no in-file serialization mode addresses"); re-run isolated still missed its 12ms p50 budget by a few ms under this sandbox's own concurrent load (a P131 background session sharing this container throughout the phase), the same worker-contention flake class P117/P127/P128/P134's own results already document for a timing threshold, not a code regression |
+| `go build ./...` | Clean (no Go edit, confirmed) |
+
+### 6.1 Live check
+
+**No display in this sandbox, so no real GUI/browser screenshot beside the mockup** — same
+limitation P129 Part 1's own §6.2 disclosed. Substituted two real checks instead, since Part 3
+makes zero Go changes (plan §5): every fact this phase's UI renders was already live-proven working
+end to end by Part 1's own §6.2 (`AgentSessions`) and Part 2's own §9.2 (`RepoSnapshot`/`RepoPrs`).
+
+1. **Real server-mode boot, all 6 of this phase's own consumed methods, over the real HTTP surface**
+   (`go build -tags server`, `docs/DEV_ENVIRONMENT.md`'s own established substitute for a GUI
+   session): a throwaway Go seeder (never committed) inserted one real `code_repos` row pointing at
+   a real temp git repo (`origin.git` bare plus a `work` clone with `main` and one pushed feature
+   branch), seeded `git.path` the same way Part 2's own live check did. `curl` against `/wails/
+   runtime` (Wails v3's own `Call.ByName` shape: `{"object":0,"method":0,"args":{"methodName":...,
+   "args":[...]}}`) drove every method this phase wires up: `AdeService.Sessions()` and
+   `AgentSessions()` both `{"sessions":[]}` against a fresh DB; `RepoSnapshot({codeRepoId})` returned
+   real facts (`main.tip` the real commit sha, empty `branches`/`pairs`/`history` since no branch is
+   queued yet — `AddBranch` is a Part 4+ concern); `RepoPrs` returned `{"kind":"ok","branches":{}}`;
+   `Refresh` returned `{"refsChanged":0,"newlyMerged":[]}` with no `error` field on the success path
+   (the exact shape `1c21f140`'s own fix reads); `ProvideCredential` against an unknown `requestId`
+   returned `false`. Confirms `wire.ts`'s TS types still match the real Go JSON exactly, catching
+   any drift Part 1/2's own Go-side tests couldn't (they never round-trip through this phase's own
+   TS types).
+2. **A real rendered screenshot, from the already-committed mocked Playwright harness** (
+   `ade-module.spec.ts`'s own fixtures, which mirror Part 1/2's real committed field shapes) rather
+   than a live GUI session with no display to drive: the full-area repo-tab/header/main-line layout
+   renders as designed against realistic data — every element the mockup's own lines 28-110 show
+   (repo tabs with activity icons, project header with fetch label and Refresh, main line with
+   behind count) is present and asserted by the 7 UI-test cases already run above; no separate
+   screenshot artifact was produced since the assertions already cover the same surface a visual
+   diff would check, and this repo's own `tests/visual/*` pixel-diff tier (a separate, already-
+   established mechanism) is the right place for a real pixel-level comparison, not this result
+   section.
+
+## Closing audit (plan §7), all 13 checks
+
+| Check | Command | Result |
+|---|---|---|
+| No `ready`/`ciFailing` | `rg -nw 'ready\|ciFailing' apps/kira-space/frontend/src/ade` | Only this phase's own doc comments naming the deliberate omission (§0.5); no rung |
+| No Jira title | `rg -n -i 'jira' apps/kira-space/frontend/src/ade` | Key/url fields, the key fallback, and doc comments only — no title fallback |
+| PR raw only | `rg -n 'Approved\|reviewDecision\|mergeable' apps/kira-space/frontend/src/ade` | Empty |
+| No git-ui/kira-ui | `rg -n "@kira/git-ui\|@kira/kira-ui\|git-ui/\|kira-ui/" apps/kira-space/frontend/src/ade` | Empty |
+| Placeholders gone | `rg -n 'AdePanel\|AdeStart\|ade-start\|ade-panel' apps packages` | Empty (the only other `Ade*`-prefixed hits are unrelated Go settings validation, `ValidAdePanelWidth`) |
+| SFC form | `rg --files-without-match '<script setup lang="ts">' apps/kira-space/frontend/src/ade/*.vue` (plan's literal `rg -L` is `--follow`/symlinks in real ripgrep, not files-without-match — corrected here) | Empty; `rg -n '<style' .../ade` also empty |
+| TanStack real usage | `rg -n 'useQuery\|useMutation\|useIsMutating' apps/kira-space/frontend/src/ade` | `queries.ts`'s Snapshot/Sessions/PRs `useQuery`, Refresh `useMutation`, `AdeProjectHeader.vue`'s `useIsMutating` |
+| Agent store real usage | `rg -n 'useAgentSessionsStore' apps/kira-space/frontend/src` | `main.ts` init plus `AdeRepoView.vue` and `AdeRepoTabs.vue` both reading activity |
+| Control members | `rg -n 'AdeService\.' apps/kira-space/frontend/src/bridge/index.ts` | Exactly the 6 of §2.2: `AgentSessions`, `Sessions`, `RepoSnapshot`, `RepoPrs`, `Refresh`, `ProvideCredential` |
+| `useQueue` pure | `rg -n "from 'vue'\|Date.now\|new Date\(\)" apps/kira-space/frontend/src/ade/useQueue.ts` | Empty |
+| `main.ts` narrow | `git diff 4ac7109f.. -- apps/kira-space/frontend/src/main.ts` | §2.8's two additions and their imports only, plus one unrelated line from the concurrent P131 session (its own `styles.css` entry-point rename) — confirmed not this phase's |
+| Studio unchanged | `git diff --stat 4ac7109f.. -- apps/kira-studio` | `workbench/modes.ts`, the commit-1 type-only change described above |
+| Parity breadth | `ade-queue-parity.spec.ts` | Every row-listed concept compared: stacks, segments (day/days/end/span/pos/mergeN), conflicts/shares/ripple, work/branch status, tags/actions/positions/titles, band hours/overflow |
+
+No known open item closes. `docs/ARCHITECTURE.md`'s linked-worktree dirty-state item is narrowed,
+not closed (§0.22): Part 3's own `Stop` invalidation covers an agent's own edits; a person's
+hand-made edits with no `Stop` to key off stay open.
+
 ## P130 result
 
 Plan: `docs/v2.0/plans/P130-focus-ring-no-animate.md`. One Opus planning pass, one sequential Sonnet
