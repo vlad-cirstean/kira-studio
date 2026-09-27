@@ -344,3 +344,85 @@ with none of this phase's changes applied, and via `--repeat-each=3` that it fai
 this belongs to a different subsystem, not a design decision this phase can make), left unfixed here
 and named as a candidate for its own follow-up `P` phase rather than folded into this result section
 as a footnote.
+
+## P134 result
+
+Plan: `docs/v2.0/plans/P134-secret-reveal-flake.md`, already Opus-authored and root-caused live
+before implementation started. No further discovery needed — the plan named an exact file, line and
+fix — so this phase skipped a separate Sonnet-implementer handoff and applied the plan's own §3 edit
+directly, per `CLAUDE.md`'s CodeGraph exception for "executing an already-named fix." 1 commit,
+`c64e805c`, plus this result commit.
+
+**Commits:**
+
+1. `c64e805c` — `test(studio): wait out secret checkbox's re-auth reveal in isolation spec` — the
+   plan's §3 edit, verbatim.
+2. This result commit.
+
+**Root cause, reconfirmed live in the real repo file** (the plan's own live check ran against a
+scratch copy outside the repo; this phase re-proved it in
+`apps/kira-studio/tests/ui/api-secret-reveal-isolation.spec.ts` itself). Test 1's line 123
+`.uncheck()` targets a controlled ARIA checkbox (`VariableRow.vue`'s `variable-secret`, a
+`packages/theme` `Checkbox` over reka-ui's `CheckboxRoot`) whose `aria-checked` flips only after
+`onUpdateSecret`'s `revealVariable` IPC round trip resolves. `.uncheck()` clicks once and reads the
+checked state once, immediately, with no retry — when the reveal's cross-process round trip (real in
+`tests/ui`, answered via `page.route`) outlasts that one-shot read, it throws
+`Clicking the checkbox did not change its state`. Not an app bug: the checkbox deliberately waits for
+re-auth before showing unchecked (test 2, line 185's own comment, pins why a cancelled reveal must
+leave it checked).
+
+**Before/after, `--repeat-each=20` against the whole file, `ui` project, this sandbox:**
+
+| Run | Result |
+|---|---|
+| Baseline (pre-fix), default `workers: '100%'` (4) | 71 passed, 9 failed — every failure test 1's `.uncheck()`, `Error: locator.uncheck: Clicking the checkbox did not change its state` |
+| Baseline (pre-fix), `--workers=1` (rules out worker-count as the cause) | 72 passed, 8 failed — same error, same test, same line |
+| After fix, default `workers: '100%'` (4) | **80 passed, 0 failed** |
+
+Both baseline runs also hit a handful of unrelated failures on tests 2-4 (`Test timeout of 60000ms
+exceeded`, `waiting for locator('[data-testid="status-bar"]')` — an app-launch stall, not the
+checkbox race) — this sandbox's `uptime` showed load average 5-6 on 4 cores during those runs from
+concurrent P129/P130 agent activity building and testing in the same environment. Distinct error
+signature from the `.uncheck()` race, gone entirely in the clean 80/80 post-fix run, and outside this
+phase's own scope to fix (same class of shared-sandbox contention flake P117/P127/P128's own results
+already documented).
+
+**Fix**, exactly the plan's §3: line 123's `.uncheck()` replaced with `secretBox.click()` followed by
+the polling `await expect(secretBox).not.toBeChecked()` — the same wait shape already used in
+`api-ui-consistency.spec.ts:1213` for this same checkbox. Deliberately not line 185's bare `click()`:
+that test asserts the checkbox *stays* checked (a cancelled reveal), so it has no unchecked
+postcondition to poll for; test 1 does, and a bare click here would leave the reveal-count assertion
+racing the route handler's own log write with nothing guaranteeing it wins.
+
+**Isolation guarantee confirmed intact.** The `expect(control.log().filter((e) => e.channel ===
+IPC.variablesReveal)).toHaveLength(2)` assertion — pinning this test's own cross-dialog re-auth
+guarantee, that un-ticking secret in the Variables tab makes its own real `variablesReveal` call
+rather than trusting the stale entry Copy-as-curl left in the shared `revealedValues` map — is
+byte-identical before and after, same expression, same position immediately after the checkbox
+settles (shifted three lines down only because the new wait code is longer, confirmed by direct
+before/after diff of the assertion's own source). If the original stale-map bug this test guards
+against returned, the checkbox would still settle unchecked and this same assertion would still fail
+at 1 — the fix adds a wait, drops no assertion.
+
+**Verification:**
+
+- `bun run build:test:studio` — clean.
+- `bunx biome check` on the touched file — clean, no fixes applied.
+- Pre-commit hook (biome across 1480 files, `check-tokens`/`check-theme-classes`/
+  `check-class-conflicts`, full `typecheck` across every project) passed clean on the actual commit,
+  no `--no-verify`.
+- `--repeat-each=20` on the whole file: 80 passed, 0 failed, 0 flaky (table above) — meets the plan's
+  own acceptance criterion exactly.
+
+**Shared-sandbox git note, unrelated to the fix itself, recorded per this session's own defensive-git
+instructions.** Landing the one-file commit needed two retries against concurrent P129/P130 activity
+on the same working tree: an initial plain `git commit` (no pathspec) picked up other agents'
+already-staged files alongside this phase's own, undone at once with `git reset --soft` (never
+`--hard`) before it could reach a push; a retry then hit a `HEAD` ref-lock race from a concurrent
+commit landing mid-hook, resolved by rebuilding against the new `HEAD` and retrying. Both attempts,
+and the successful one, went through a private index (`GIT_INDEX_FILE`) touching only this file;
+`git status --short` after each step confirmed every P129/P130 file untouched. Final commit
+`c64e805c` contains exactly `apps/kira-studio/tests/ui/api-secret-reveal-isolation.spec.ts`, nothing
+else.
+
+No deviations from the plan. No new known-open item.
