@@ -11,10 +11,15 @@
  *   progress list driven by `StackState.progress` while `StackState.restacking` is true, and a
  *   Cancel button that calls `ops.cancelRestack()`. A paused (conflicted) restack is surfaced
  *   here in words (D8) — resolving it is G5's own `ConflictBanner.vue`, not a second UI here.
+ *
+ * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * `DialogTitle`'s default slot, and the parent picker is `NativeSelect`.
  */
 import type { RestackPreflight } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
-import { computed, ref, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { StackState } from '../../state/stack.ts';
@@ -37,6 +42,10 @@ const open = computed(() => props.target !== undefined);
 // ---------------------------------------------------------------------------------------
 
 const selectedParent = ref('');
+// P131 Part 1 §6.2: biome's noLabelWithoutControl can't see through NativeSelect's
+// `inheritAttrs: false` to the native `<select>` it renders -- an explicit for/id pair keeps the
+// same association, verifiably (same fix as ForcePushDialog.vue's/TagDialog.vue's Input labels).
+const parentId = useId();
 
 watch(
   () => props.target,
@@ -122,75 +131,92 @@ function closeDialog(): void {
 </script>
 
 <template>
-  <KuiDialog
-    :open="open"
-    :title="target?.mode === 'setParent' ? `Set ${target.branch}'s stack parent` : `Restack ${target?.branch ?? ''}`"
-    @close="closeDialog"
-  >
-    <template v-if="target?.mode === 'setParent'">
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Parent branch
-        <select
-          v-model="selectedParent"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        >
-          <option value="">None (remove from stack)</option>
-          <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
-        </select>
-      </label>
-    </template>
-
-    <template v-else-if="target?.mode === 'restack' && preflight">
-      <p v-if="preflight.verdict === 'blocked'" class="kv:text-diff-deleted">
-        {{ blockerText(preflight) }}
-      </p>
-      <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
-      <template v-else>
-        <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
-        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
-          <li v-for="entry in preflight.plan" :key="entry.branch">
-            <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
-            ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
-            {{ entry.reason === 'stale' ? 'stale' : 'ancestor restacked' }},
-            base: {{ entry.baseSource }})
-          </li>
-        </ul>
-        <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted-foreground">
-          These branches will need a force-push afterwards:
-          {{ preflight.needsForcePush.join(', ') }}.
-        </p>
-      </template>
-
-      <template v-if="stack.restacking.value">
-        <p>Restacking…</p>
-        <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
-          <li v-for="(p, i) in stack.progress.value" :key="i">
-            {{ p.branch }} ({{ p.index }}/{{ p.total }})
-          </li>
-        </ul>
-      </template>
-    </template>
-
-    <template #actions>
-      <template v-if="target?.mode === 'setParent'">
-        <KuiButton variant="primary" @click="submitSetParent">Save</KuiButton>
-        <KuiButton @click="closeDialog">Cancel</KuiButton>
-      </template>
-      <template v-else-if="target?.mode === 'restack'">
-        <template v-if="stack.restacking.value">
-          <KuiButton @click="cancelRestack">Cancel restack</KuiButton>
+  <Dialog :open="open" @update:open="(v) => !v && closeDialog()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>
+          {{
+            target?.mode === 'setParent'
+              ? `Set ${target.branch}'s stack parent`
+              : `Restack ${target?.branch ?? ''}`
+          }}
+        </DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <template v-if="target?.mode === 'setParent'">
+          <label :for="parentId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Parent branch
+            <NativeSelect
+              :id="parentId"
+              v-model="selectedParent"
+              variant="bordered"
+              size="kira"
+              class="w-full"
+            >
+              <option value="">None (remove from stack)</option>
+              <option v-for="name in parentCandidates" :key="name" :value="name">{{ name }}</option>
+            </NativeSelect>
+          </label>
         </template>
-        <template v-else>
-          <KuiButton
-            variant="primary"
-            :disabled="!preflight || preflight.verdict === 'blocked' || preflight.verdict === 'noop'"
-            @click="submitRestack"
-          >
-            Restack
-          </KuiButton>
-          <KuiButton @click="closeDialog">Close</KuiButton>
+
+        <template v-else-if="target?.mode === 'restack' && preflight">
+          <p v-if="preflight.verdict === 'blocked'" class="kv:text-diff-deleted">
+            {{ blockerText(preflight) }}
+          </p>
+          <p v-else-if="preflight.verdict === 'noop'">This stack is already up to date.</p>
+          <template v-else>
+            <p>The following branches will be restacked onto <code>{{ preflight.base }}</code>:</p>
+            <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
+              <li v-for="entry in preflight.plan" :key="entry.branch">
+                <code>{{ entry.branch }}</code> onto <code>{{ entry.parent }}</code>
+                ({{ entry.commits }} commit{{ entry.commits === 1 ? '' : 's' }},
+                {{ entry.reason === 'stale' ? 'stale' : 'ancestor restacked' }},
+                base: {{ entry.baseSource }})
+              </li>
+            </ul>
+            <p v-if="preflight.needsForcePush.length > 0" class="kv:text-muted-foreground">
+              These branches will need a force-push afterwards:
+              {{ preflight.needsForcePush.join(', ') }}.
+            </p>
+          </template>
+
+          <template v-if="stack.restacking.value">
+            <p>Restacking…</p>
+            <ul class="kv:max-h-50 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:text-base">
+              <li v-for="(p, i) in stack.progress.value" :key="i">
+                {{ p.branch }} ({{ p.index }}/{{ p.total }})
+              </li>
+            </ul>
+          </template>
         </template>
-      </template>
-    </template>
-  </KuiDialog>
+      </div>
+
+      <DialogFooter class="justify-end gap-1">
+        <template v-if="target?.mode === 'setParent'">
+          <Button variant="dialog-primary" size="kira-lg" @click="submitSetParent">Save</Button>
+          <Button variant="dialog" size="kira-lg" @click="closeDialog">Cancel</Button>
+        </template>
+        <template v-else-if="target?.mode === 'restack'">
+          <template v-if="stack.restacking.value">
+            <Button variant="dialog" size="kira-lg" @click="cancelRestack">Cancel restack</Button>
+          </template>
+          <template v-else>
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              :disabled="!preflight || preflight.verdict === 'blocked' || preflight.verdict === 'noop'"
+              @click="submitRestack"
+            >
+              Restack
+            </Button>
+            <Button variant="dialog" size="kira-lg" @click="closeDialog">Close</Button>
+          </template>
+        </template>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
