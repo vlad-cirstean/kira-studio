@@ -8,7 +8,13 @@ import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
 import { useAdeUiStore } from './state/adeUi';
 import { adeTurns } from './turnWatch';
-import type { AdeRefreshResult, AdeRepoPrs, AdeRepoSnapshot, AdeSessionsResult } from './wire';
+import type {
+  AdeCandidateBranch,
+  AdeRefreshResult,
+  AdeRepoPrs,
+  AdeRepoSnapshot,
+  AdeSessionsResult,
+} from './wire';
 
 // P129 Part 3 §0.11/§2.4: query keys follow queryClient.ts's flat `[domain, ...ids]` convention,
 // every one `staleTime: Infinity` — the client already has `retry: false`/
@@ -30,6 +36,12 @@ export function adePrsKey(codeRepoId: string) {
 
 export function adeRefreshKey(codeRepoId: string) {
   return ['ade', 'refresh', codeRepoId] as const;
+}
+
+/** §0.19: the Add popover's own Existing-branch tab — not part of the snapshot (a candidate is
+ *  explicitly *not yet queued*, so it never belongs in `AdeRepoSnapshot`). */
+export function adeCandidatesKey(codeRepoId: string) {
+  return ['ade', 'candidates', codeRepoId] as const;
 }
 
 export function useAdeSessions() {
@@ -55,6 +67,21 @@ export function useAdePrs(codeRepoId: MaybeRefOrGetter<string>) {
     queryFn: (): Promise<AdeRepoPrs> => control.adeRepoPrs(toValue(codeRepoId)),
     staleTime: Number.POSITIVE_INFINITY,
     enabled: toValue(codeRepoId) !== '',
+  }));
+}
+
+/** §0.19: `staleTime: 0` — a candidate list must reflect whatever the user pushed a moment ago
+ *  (branches Add just queued must drop off), and `enabled` gates it to "while the popover is
+ *  open", so it never runs in the background for a repo tab that never opens Add. */
+export function useAdeCandidates(
+  codeRepoId: MaybeRefOrGetter<string>,
+  enabled: MaybeRefOrGetter<boolean>,
+) {
+  return useQuery(() => ({
+    queryKey: adeCandidatesKey(toValue(codeRepoId)),
+    queryFn: (): Promise<AdeCandidateBranch[]> => control.adeCandidateBranches(toValue(codeRepoId)),
+    staleTime: 0,
+    enabled: toValue(enabled) && toValue(codeRepoId) !== '',
   }));
 }
 

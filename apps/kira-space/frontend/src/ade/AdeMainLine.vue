@@ -5,7 +5,9 @@ import { computed } from 'vue';
 // P129 Part 3 §0.17/§2.7: mockup lines 96-105's own geometry (60px ruler gutter, 218px offset, a
 // 560px-max 30px pill) — kept exact so Part 4's "Rebase all" button and Part 5's timeline slot into
 // the same row/gutter without a relayout. P129 Part 4 §0.20/§2.7 adds the button itself, the one
-// in-part opener (§0.8) — every other opener's first UI caller is a later row.
+// in-part opener (§0.8) — every other opener's first UI caller is a later row. P129 Part 5 §0.19
+// adds a default slot after the pill, for the Add button + popover — this component stays ignorant
+// of what fills it, same as it already is of `useQueue`/`adeActions` (§0.20's own doc comment).
 const props = defineProps<{
   mainName: string | null;
   behindCount: number;
@@ -55,6 +57,7 @@ const noteClass = computed(() => {
           Rebase all
         </Button>
       </div>
+      <slot />
     </div>
   </div>
 </template>

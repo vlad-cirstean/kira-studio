@@ -6,6 +6,7 @@ import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu
 import { computed, nextTick, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useSettingsStore } from '../state/settings';
+import AdeAddPopover from './AdeAddPopover.vue';
 import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import AdeConfirmDialog from './AdeConfirmDialog.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
@@ -378,7 +379,9 @@ function onDismissError(): void {
           :behind-count="view?.behindRoots.length ?? 0"
           :can-rebase-all="canRebaseAll"
           @rebase-all="onRebaseAll"
-        />
+        >
+          <AdeAddPopover :code-repo-id="codeRepoId" :items="view?.items ?? []" />
+        </AdeMainLine>
         <AdeHistoryBar
           v-if="inHistory"
           @go-to-date="onGoToDate"

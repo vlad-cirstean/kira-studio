@@ -34,8 +34,11 @@ import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type {
+  AdeAddBranchArgs,
+  AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
+  AdeCandidateBranch,
   AdeCredentialRequest,
   AdeForcePushArgs,
   AdeForcePushResult,
@@ -240,12 +243,22 @@ const spaceControl = {
     unwrap(AdeService.UpdateNewWork(args)),
 
   // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
-  // `CandidateBranches`/`AddBranch`/`AddNewWork` stay unbound until commit 11.
   adeSetPlan: (args: AdeSetPlanArgs): Promise<void> => unwrap(AdeService.SetPlan(args)),
   // §0.16: generated binding's own return type is `AdeForcePushResult[] | null` — `?? []` matches
-  // this file's other list-result normalizations (e.g. `adeCandidateBranches`).
+  // this file's other list-result normalizations (e.g. `adeCandidateBranches` below).
   adeForcePush: (args: AdeForcePushArgs): Promise<AdeForcePushResult[]> =>
     unwrap(AdeService.ForcePush(args)).then((r) => trust<AdeForcePushResult[]>(r ?? [])),
+  // §0.19: the Add popover's own three RPCs — candidates for the Existing-branch tab, the two
+  // queue-writes for either tab. `AddNewWork` alone takes no `AdeCodeRepoArgs` wrapper on the Go
+  // side (the args struct already carries `codeRepoId`), unlike `CandidateBranches`.
+  adeCandidateBranches: (codeRepoId: string): Promise<AdeCandidateBranch[]> =>
+    unwrap(AdeService.CandidateBranches({ codeRepoId })).then((r) =>
+      trust<AdeCandidateBranch[]>(r ?? []),
+    ),
+  adeAddBranch: (args: AdeAddBranchArgs): Promise<string> =>
+    unwrap(AdeService.AddBranch(args)).then((r) => trust<string>(r)),
+  adeAddNewWork: (args: AdeAddNewWorkArgs): Promise<string> =>
+    unwrap(AdeService.AddNewWork(args)).then((r) => trust<string>(r)),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

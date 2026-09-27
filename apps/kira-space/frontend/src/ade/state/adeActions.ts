@@ -12,6 +12,8 @@ import {
 import type { LaunchDeps } from '../launch';
 import {
   fetchArchiveRisk,
+  useAdeAddBranch,
+  useAdeAddNewWork,
   useAdeArchive,
   useAdeForcePush,
   useAdeLaunch,
@@ -22,6 +24,7 @@ import {
 } from '../mutations';
 import type { SetPlanArgs } from '../timelineOps';
 import { adeTurns } from '../turnWatch';
+import type { AdeAddNewWorkArgs } from '../wire';
 import { useAdeUiStore } from './adeUi';
 import { useAgentSessionsStore } from './agentSessions';
 
@@ -110,6 +113,8 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const archiveMutation = useAdeArchive(currentRepoId);
   const setPlanMutation = useAdeSetPlan(currentRepoId);
   const forcePushMutation = useAdeForcePush(currentRepoId);
+  const addNewWorkMutation = useAdeAddNewWork(currentRepoId);
+  const addBranchMutation = useAdeAddBranch(currentRepoId);
 
   function buildLaunchDeps(): LaunchDeps {
     return {
@@ -228,6 +233,23 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     }
   }
 
+  /** §0.19: the Add popover's own New-work tab — returns the new item's id so the caller can select
+   *  it and close the popover. */
+  async function addNewWork(
+    repoId: string,
+    args: Omit<AdeAddNewWorkArgs, 'codeRepoId'>,
+  ): Promise<string> {
+    currentRepoId.value = repoId;
+    return addNewWorkMutation.mutateAsync({ codeRepoId: repoId, ...args });
+  }
+
+  /** §0.19: the Add popover's own Existing-branch tab — `kind` always `''`, Go resolves mine/review
+   *  by author-email match (§0.19's own "no kind picker in this popover"). */
+  async function addBranch(repoId: string, branch: string): Promise<string> {
+    currentRepoId.value = repoId;
+    return addBranchMutation.mutateAsync({ codeRepoId: repoId, branch, kind: '' });
+  }
+
   return {
     rebasingFor,
     sendDialog,
@@ -236,6 +258,8 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     applyPlan,
     pushingFor,
     forcePush,
+    addNewWork,
+    addBranch,
     actionError,
     dismissError,
   };

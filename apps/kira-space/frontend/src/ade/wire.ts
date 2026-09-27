@@ -279,3 +279,30 @@ export interface AdeForcePushResult {
   ok: boolean;
   error?: AdeRemoteOpError;
 }
+
+/** `AdeCandidateBranch` — `Queue.Candidates`' own row (§0.19/§5.3): every branch not yet queued or
+ *  archived, newest commit first (server-sorted, no client re-sort). */
+export interface AdeCandidateBranch {
+  name: string;
+  author: string;
+  lastCommitAt: number;
+  remoteOnly: boolean;
+  mine: boolean;
+}
+
+export interface AdeAddBranchArgs {
+  codeRepoId: string;
+  branch: string;
+  kind?: string;
+}
+
+/** `AdeAddNewWorkArgs` — `startFrom` `''` means `main` (Go's own default, §0.19). */
+export interface AdeAddNewWorkArgs {
+  codeRepoId: string;
+  title: string;
+  jiraKey: string;
+  jiraUrl: string;
+  startFrom: string;
+  notes: string;
+  est: string;
+}

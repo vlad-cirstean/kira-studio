@@ -4,8 +4,10 @@ import { queryClient } from '@workbench/state/queryClient';
 import type { MaybeRefOrGetter } from 'vue';
 import { toValue } from 'vue';
 import { control } from '../bridge/control';
-import { adePrsKey, adeSessionsKey, adeSnapshotKey } from './queries';
+import { adeCandidatesKey, adePrsKey, adeSessionsKey, adeSnapshotKey } from './queries';
 import type {
+  AdeAddBranchArgs,
+  AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
   AdeForcePushArgs,
@@ -160,6 +162,35 @@ export function useAdeForcePush(codeRepoId: MaybeRefOrGetter<string>) {
         queryKey: adeSnapshotKey(toValue(codeRepoId)),
         exact: true,
       });
+    },
+  }));
+}
+
+/** §0.19: New-work tab's own "Add to Later" — invalidates the snapshot (the new row) and the
+ *  candidates list (§0.19: a fresh draft has no branch yet, so it never appears there anyway, but
+ *  invalidating both queue-writes identically keeps this mutation and `useAdeAddBranch` symmetric). */
+export function useAdeAddNewWork(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'addNewWork'),
+    mutationFn: (args: AdeAddNewWorkArgs): Promise<string> => control.adeAddNewWork(args),
+    onSettled: () => {
+      const id = toValue(codeRepoId);
+      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+      void queryClient.invalidateQueries({ queryKey: adeCandidatesKey(id), exact: true });
+    },
+  }));
+}
+
+/** §0.19: Existing-branch tab's own pick — the queued branch must both appear in the snapshot and
+ *  drop off the candidates list. */
+export function useAdeAddBranch(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'addBranch'),
+    mutationFn: (args: AdeAddBranchArgs): Promise<string> => control.adeAddBranch(args),
+    onSettled: () => {
+      const id = toValue(codeRepoId);
+      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+      void queryClient.invalidateQueries({ queryKey: adeCandidatesKey(id), exact: true });
     },
   }));
 }
