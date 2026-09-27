@@ -5,12 +5,13 @@
  * is required) — see that method's own doc comment — so a plain revert of an ordinary commit
  * never opens it at all.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content. The W20 accessibility-contrast fix that used to live here as a
- * `.kv-modal-button--primary` override is no longer needed: `KuiButton`'s own `primary` variant
- * already carries adequate contrast in `@kira/kira-ui`'s theme.
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * only supplies its own body/footer content.
  */
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Label } from '@theme/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -53,61 +54,71 @@ function confirm(): void {
 </script>
 
 <template>
-  <KuiDialog :open="active" title="Revert" @close="cancel">
-    <p>
-      Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
-      as a new commit — the original stays in history, so this is safe on branches you've already
-      pushed.
-    </p>
+  <Dialog :open="active" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Revert</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p>
+          Reverting applies the inverse of {{ isMultiSha ? 'each selected commit' : 'this commit' }}
+          as a new commit — the original stays in history, so this is safe on branches you've already
+          pushed.
+        </p>
 
-    <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
-      HEAD is detached: the revert commit will not belong to any branch until you create one.
-    </p>
+        <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
+          HEAD is detached: the revert commit will not belong to any branch until you create one.
+        </p>
 
-    <template v-if="needsMainline">
-      <p>
-        This reverts a merge commit — pick which parent's history to treat as the "mainline"
-        (§7.10: git cannot guess this for you):
-      </p>
-      <div
-        v-for="entry in preflight?.mainlineRequired"
-        :key="entry.sha"
-        class="kv:my-1 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm"
-      >
-        <p class="kv:m-0 kv:mb-0.5 kv:font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
-        <label
-          v-for="parent in entry.parents"
-          :key="parent.parentNumber"
-          class="kv:block kv:py-0.5"
-        >
-          <input
-            type="radio"
-            name="kv-revert-mainline"
-            :value="parent.parentNumber"
-            v-model="selectedMainline"
+        <template v-if="needsMainline">
+          <p>
+            This reverts a merge commit — pick which parent's history to treat as the "mainline"
+            (§7.10: git cannot guess this for you):
+          </p>
+          <RadioGroup v-model="selectedMainline">
+            <div
+              v-for="entry in preflight?.mainlineRequired"
+              :key="entry.sha"
+              class="kv:my-1 kv:p-1 kv:border kv:border-panel-border kv:rounded-sm"
+            >
+              <p class="kv:m-0 kv:mb-0.5 kv:font-semibold"><code>{{ entry.sha.slice(0, 7) }}</code></p>
+              <Label
+                v-for="parent in entry.parents"
+                :key="parent.parentNumber"
+                class="flex flex-row items-center gap-1 py-0.5"
+              >
+                <RadioGroupItem :value="parent.parentNumber" />
+                Parent {{ parent.parentNumber }} — <code>{{ parent.sha.slice(0, 7) }}</code>
+                {{ parent.subject }}
+              </Label>
+            </div>
+          </RadioGroup>
+        </template>
+
+        <template v-if="!needsMainline || selectedMainline !== undefined">
+          <PreflightPrediction
+            v-if="preflight"
+            :prediction="preflight.prediction"
+            v-model:no-commit="noCommit"
           />
-          Parent {{ parent.parentNumber }} — <code>{{ parent.sha.slice(0, 7) }}</code>
-          {{ parent.subject }}
-        </label>
+
+          <p v-if="isMultiSha" class="kv:text-diff-deleted">
+            This prediction covers only the first of the {{ preflight?.shas.length }} selected
+            commits — the rest may conflict differently.
+          </p>
+        </template>
       </div>
-    </template>
 
-    <template v-if="!needsMainline || selectedMainline !== undefined">
-      <PreflightPrediction
-        v-if="preflight"
-        :prediction="preflight.prediction"
-        v-model:no-commit="noCommit"
-      />
-
-      <p v-if="isMultiSha" class="kv:text-diff-deleted">
-        This prediction covers only the first of the {{ preflight?.shas.length }} selected
-        commits — the rest may conflict differently.
-      </p>
-    </template>
-
-    <template #actions>
-      <KuiButton variant="primary" :disabled="!canConfirm" @click="confirm">Revert</KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button variant="dialog-primary" size="kira-lg" :disabled="!canConfirm" @click="confirm">
+          Revert
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

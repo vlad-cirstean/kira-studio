@@ -6,10 +6,13 @@
  * blocking `alreadyApplied` advisory (probe 6) — it never sets a blocker or changes `verdict`, so
  * it is rendered as its own note rather than folded into the blocker list below.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content.
+ * P131 Part 1 §6.1: the modal shell is shadcn's `Dialog`/`DialogContent` now — this file still
+ * only supplies its own body/footer content.
  */
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Label } from '@theme/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import PreflightPrediction from './PreflightPrediction.vue';
@@ -71,84 +74,93 @@ function confirm(): void {
 </script>
 
 <template>
-  <KuiDialog :open="active" title="Cherry-pick" @close="cancel">
-    <p>Applies this commit's changes here as a new commit — the original stays where it is.</p>
+  <Dialog :open="active" @update:open="(v) => !v && cancel()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Cherry-pick</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <p>Applies this commit's changes here as a new commit — the original stays where it is.</p>
 
-    <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
-      HEAD is detached: the new commit will not belong to any branch until you create one.
-    </p>
+        <p v-if="preflight?.detachedHead" class="kv:text-diff-deleted">
+          HEAD is detached: the new commit will not belong to any branch until you create one.
+        </p>
 
-    <p v-if="preflight?.alreadyApplied" class="kv:text-diff-deleted">
-      This change already appears in this branch's history; the pick will probably be empty.
-    </p>
+        <p v-if="preflight?.alreadyApplied" class="kv:text-diff-deleted">
+          This change already appears in this branch's history; the pick will probably be empty.
+        </p>
 
-    <template v-if="hasBlocker">
-      <div v-for="(blocker, i) in blockers" :key="i" class="kv:my-1">
-        <template v-if="blocker.kind === 'inProgressOperation'">
-          <p>An operation is already in progress. Resolve or abort it first.</p>
+        <template v-if="hasBlocker">
+          <div v-for="(blocker, i) in blockers" :key="i" class="kv:my-1">
+            <template v-if="blocker.kind === 'inProgressOperation'">
+              <p>An operation is already in progress. Resolve or abort it first.</p>
+            </template>
+            <template v-else-if="blocker.kind === 'stagedChanges'">
+              <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+              </ul>
+            </template>
+            <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
+              <p>These local changes would be overwritten by this pick:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+              </ul>
+            </template>
+            <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
+              <p>These untracked files would be overwritten by this pick:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+              </ul>
+            </template>
+          </div>
         </template>
-        <template v-else-if="blocker.kind === 'stagedChanges'">
-          <p>Staged changes would be overwritten by this pick — commit or unstage them first:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-        </template>
-        <template v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'">
-          <p>These local changes would be overwritten by this pick:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-        </template>
-        <template v-else-if="blocker.kind === 'untrackedWouldBeOverwritten'">
-          <p>These untracked files would be overwritten by this pick:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-        </template>
-      </div>
-    </template>
 
-    <template v-if="!hasBlocker && needsMainline">
-      <p>
-        This picks a merge commit — pick which parent's history to treat as the "mainline"
-        (probe 8: git cannot guess this for you):
-      </p>
-      <div
-        v-for="entry in preflight?.mainlineRequired"
-        :key="entry.parentNumber"
-        class="kv:py-0.5"
-      >
-        <label>
-          <input
-            type="radio"
-            name="kv-cherry-pick-mainline"
-            :value="entry.parentNumber"
-            v-model="selectedMainline"
+        <template v-if="!hasBlocker && needsMainline">
+          <p>
+            This picks a merge commit — pick which parent's history to treat as the "mainline"
+            (probe 8: git cannot guess this for you):
+          </p>
+          <RadioGroup v-model="selectedMainline">
+            <div
+              v-for="entry in preflight?.mainlineRequired"
+              :key="entry.parentNumber"
+              class="kv:py-0.5"
+            >
+              <Label class="flex flex-row items-center gap-1">
+                <RadioGroupItem :value="entry.parentNumber" />
+                Parent {{ entry.parentNumber }} — <code>{{ entry.sha.slice(0, 7) }}</code>
+                {{ entry.subject }}
+              </Label>
+            </div>
+          </RadioGroup>
+        </template>
+
+        <template v-if="!hasBlocker && (!needsMainline || selectedMainline !== undefined)">
+          <PreflightPrediction
+            v-if="preflight"
+            :prediction="preflight.prediction"
+            v-model:no-commit="noCommit"
           />
-          Parent {{ entry.parentNumber }} — <code>{{ entry.sha.slice(0, 7) }}</code>
-          {{ entry.subject }}
-        </label>
+        </template>
       </div>
-    </template>
 
-    <template v-if="!hasBlocker && (!needsMainline || selectedMainline !== undefined)">
-      <PreflightPrediction
-        v-if="preflight"
-        :prediction="preflight.prediction"
-        v-model:no-commit="noCommit"
-      />
-    </template>
-
-    <template #actions>
-      <KuiButton
-        variant="primary"
-        :disabled="!canConfirm"
-        data-testid="cherry-pick-confirm"
-        @click="confirm"
-      >
-        Cherry-pick
-      </KuiButton>
-      <KuiButton @click="cancel">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :disabled="!canConfirm"
+          data-testid="cherry-pick-confirm"
+          @click="confirm"
+        >
+          Cherry-pick
+        </Button>
+        <Button variant="dialog" size="kira-lg" @click="cancel">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
