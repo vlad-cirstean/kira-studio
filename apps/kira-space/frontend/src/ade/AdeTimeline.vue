@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AdeDayBand from './AdeDayBand.vue';
+import AdeDayControls from './AdeDayControls.vue';
+import AdeHistoryPull from './AdeHistoryPull.vue';
 import type { QueueSegment, QueueView } from './useQueue';
 
-// P129 Part 5 §2.7: the timeline surface — one band per day, in order. Read-only apart from
-// selection this commit (§4 step 6): the pull row (`AdeHistoryPull`), history bar, Later day
-// controls (commit 7), drag and drop (commit 10) and the Add popover (commit 11) all land on this
-// component in later commits, extending its own template rather than replacing it.
-const props = defineProps<{ view: QueueView }>();
+// P129 Part 5 §2.7: the timeline surface — one band per day, in order, the pull row (closed) above
+// them and the Later day controls (§0.9) right above the Later band. Drag and drop (commit 10) and
+// the Add popover (commit 11) extend this component's own template further. `AdeRepoView` owns the
+// scroll container, `historyOpen`/`historyReach` and every navigation function (§0.9) — this
+// component only renders and bubbles intent up.
+const props = defineProps<{
+  view: QueueView;
+  historyOpen: boolean;
+  pull: number;
+  pct: number;
+  historyDays: number;
+  minExtraDate: string;
+}>();
 
-const emit = defineEmits<{ select: [id: string] }>();
+const emit = defineEmits<{
+  select: [id: string];
+  openHistory: [];
+  moreWeek: [];
+  pickDate: [iso: string];
+}>();
 
 const itemsById = computed(() => new Map(props.view.items.map((item) => [item.id, item])));
 
@@ -26,15 +41,29 @@ const blocksByDay = computed(() => {
 
 <template>
   <div data-testid="ade-timeline">
-    <AdeDayBand
-      v-for="band in view.bands"
-      :key="band.day"
-      :band="band"
-      :blocks="blocksByDay.get(band.day) ?? []"
-      :items-by-id="itemsById"
-      :parent-of="view.parentOf"
-      :selected-id="view.selectedId"
-      @select="emit('select', $event)"
+    <AdeHistoryPull
+      v-if="!historyOpen"
+      :pull="pull"
+      :pct="pct"
+      :history-count="view.historyCount"
+      :history-days="historyDays"
+      @open="emit('openHistory')"
     />
+    <template v-for="band in view.bands" :key="band.day">
+      <AdeDayControls
+        v-if="band.isLater"
+        :min-date="minExtraDate"
+        @more-week="emit('moreWeek')"
+        @pick-date="(iso) => emit('pickDate', iso)"
+      />
+      <AdeDayBand
+        :band="band"
+        :blocks="blocksByDay.get(band.day) ?? []"
+        :items-by-id="itemsById"
+        :parent-of="view.parentOf"
+        :selected-id="view.selectedId"
+        @select="emit('select', $event)"
+      />
+    </template>
   </div>
 </template>

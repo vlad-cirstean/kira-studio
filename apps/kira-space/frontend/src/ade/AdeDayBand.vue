@@ -79,8 +79,8 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
     :class="rowBorderClass"
     :style="{ background: rowBg }"
     data-testid="ade-day-band"
-    :data-ade-band="band.day"
-    :data-ade-day="band.isLater ? 'later' : band.day"
+    data-ade-band
+    :data-ade-day="band.day"
   >
     <div
       class="relative box-border w-15 shrink-0 text-right"

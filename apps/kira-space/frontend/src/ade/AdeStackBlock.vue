@@ -73,7 +73,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
 </script>
 
 <template>
-  <div class="flex items-start gap-2" data-testid="ade-stack-block" :data-ade-box="segment.root">
+  <div class="flex items-start gap-2" data-testid="ade-stack-block">
     <div class="flex w-[210px] shrink-0 flex-col pt-[3px]">
       <div
         v-for="(cell, i) in segment.cells"
@@ -130,6 +130,9 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
       :style="boxStyle"
       :title="segment.tag.tip"
       data-testid="ade-stack-box"
+      data-ade-box
+      :data-ade-lead="segment.lead ?? ''"
+      :data-ade-day="segment.day"
     >
       <AdeStackRow
         v-for="(member, i) in segment.members"
