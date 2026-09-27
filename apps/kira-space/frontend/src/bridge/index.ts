@@ -1,3 +1,4 @@
+import * as AdeService from '@bindings/adeservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
@@ -12,6 +13,7 @@ import * as TerminalService from '@bindings/terminalservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type { HeadState } from '@kira/git-ipc';
+import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   GitClient,
   GitPairingActionResult,
@@ -31,9 +33,51 @@ import type {
 import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type {
+  AdeCredentialRequest,
+  AdePr,
+  AdeRefreshResult,
+  AdeRepoChangedEvent,
+  AdeRepoPrs,
+  AdeRepoSnapshot,
+  AdeSessionsResult,
+} from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
+
+// P129 Part 3 §2.3's own doc comment (ade/wire.ts): every `toWire*` helper in `bridge/ade.go`
+// builds its array/map fields with an explicit `make(...)`, so only these four "straight
+// passthrough" spots (never `make()`'d at the wire layer) can really arrive as JSON `null` — an
+// empty queue's own plan, an unreferenced repo's colors, a pair with no overlap at all, or
+// `Refresh`'s own zero-value error path. Normalized once, here, rather than a null check at every
+// `useQueue()` call site (the existing `codeWorkspaceListFiles` binding above sets this precedent
+// for a nested field, not just a top-level array).
+function normalizeAdeRepoSnapshot(raw: AdeRepoSnapshot): AdeRepoSnapshot {
+  return {
+    ...raw,
+    plan: {
+      day: raw.plan.day ?? {},
+      order: raw.plan.order ?? [],
+      queuedAfter: raw.plan.queuedAfter ?? {},
+      unpushed: raw.plan.unpushed ?? {},
+    },
+    colors: raw.colors ?? {},
+    pairs: (raw.pairs ?? []).map((p) => ({
+      ...p,
+      shared: p.shared ?? [],
+      conflicts: p.conflicts ?? [],
+    })),
+  };
+}
+
+function normalizeAdeRepoPrs(raw: AdeRepoPrs): AdeRepoPrs {
+  const branches: Record<string, AdePr> = {};
+  for (const [branch, pr] of Object.entries(raw.branches ?? {})) {
+    if (pr) branches[branch] = pr;
+  }
+  return { ...raw, branches };
+}
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
 // to the 13 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
@@ -124,6 +168,42 @@ const spaceControl = {
   codeWorkspaceCancelSearch: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.CancelSearch({ id })),
   onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
+
+  // P129 Part 3 §2.2: the ade module's own bound-call surface — 6 of `AdeService`'s 19 methods,
+  // the rest landing with their first consumer part (§0.10). `terminalAgentSessions`/
+  // `onAgentSessions`/`onAgentEvent` satisfy `AgentSessionsControl` structurally (P127's shared
+  // store factory, `ade/state/agentSessions.ts`'s own call), the same "no adapter" shape
+  // `createAgentSessionsStore`'s own doc comment states.
+  terminalAgentSessions: (): Promise<AgentSessionsEvent> =>
+    unwrap(AdeService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
+  onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
+    on(CHANNEL.agentSessions, cb),
+  onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),
+
+  adeSessions: (): Promise<AdeSessionsResult> =>
+    unwrap(AdeService.Sessions()).then((r) => trust<AdeSessionsResult>(r)),
+  adeRepoSnapshot: (codeRepoId: string): Promise<AdeRepoSnapshot> =>
+    unwrap(AdeService.RepoSnapshot({ codeRepoId })).then((r) =>
+      normalizeAdeRepoSnapshot(trust<AdeRepoSnapshot>(r)),
+    ),
+  adeRepoPrs: (codeRepoId: string): Promise<AdeRepoPrs> =>
+    unwrap(AdeService.RepoPrs({ codeRepoId })).then((r) =>
+      normalizeAdeRepoPrs(trust<AdeRepoPrs>(r)),
+    ),
+  adeRefresh: (codeRepoId: string): Promise<AdeRefreshResult> =>
+    unwrap(AdeService.Refresh({ codeRepoId })).then((r) => {
+      const result = trust<AdeRefreshResult>(r);
+      return { ...result, newlyMerged: result.newlyMerged ?? [] };
+    }),
+  adeProvideCredential: (requestId: string, secret: string | null): Promise<boolean> =>
+    unwrap(AdeService.ProvideCredential({ requestId, secret: secret ?? undefined })),
+  // P129 Part 3 §0.10 note: `adeSessions()`'s own push counterpart is payload-free (Go's
+  // `AdeSessionsChanged` calls `Broadcast`, never `Emit`) — `onFlushBeforeClose`'s own precedent
+  // just above in createCoreControl.ts, restated here since this file has no `() => void` push yet.
+  onAdeSessions: (cb: () => void): (() => void) => on(CHANNEL.adeSessions, cb),
+  onAdeRepo: (cb: (event: AdeRepoChangedEvent) => void): (() => void) => on(CHANNEL.adeRepo, cb),
+  onAdeCredential: (cb: (request: AdeCredentialRequest) => void): (() => void) =>
+    on(CHANNEL.adeCredential, cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

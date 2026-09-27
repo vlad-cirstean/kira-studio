@@ -62,9 +62,11 @@ export interface WorkbenchHost<WK extends string, R extends TabLike> {
    *  (`TAB_KINDS[tab.kind].badge`); Kira Space wires none, since no kind of its own declares one. */
   tabBadge?(tab: R): { icon: string; tooltip: string } | null;
   /** `.is-attention`'s own boolean — a Claude Code tab that wants the user's attention, not the
-   *  active tab. No app wires this as of P127 (agent-activity monitoring moved to a shared home,
-   *  packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts, used by no app
-   *  yet): kept as a generic optional host seam, `extraTabMenu`'s own zero-consumer precedent. */
+   *  active tab. No app wires this as of P129 Part 3 (agent-activity monitoring moved to a shared
+   *  home, packages/workbench/src/state/{agentActivity,createAgentSessionsStore}.ts; Kira Space's
+   *  own instance, ade/state/agentSessions.ts, feeds the ade module's repo tabs directly rather
+   *  than through a tab-strip indicator): kept as a generic optional host seam, `extraTabMenu`'s
+   *  own zero-consumer precedent. */
   tabAttention?(tab: R): boolean;
   /** A leading mark before the tab title, the one per-tab extra neither `iconFor` (the tab's own
    *  icon) nor `tabBadge` (a trailing, kind-supplied mark) covers — Kira Studio's own incognito eye

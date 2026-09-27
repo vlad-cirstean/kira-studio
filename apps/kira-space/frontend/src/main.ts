@@ -3,6 +3,7 @@ import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { useAgentSessionsStore } from './ade/state/agentSessions';
 import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
@@ -34,6 +35,7 @@ import '@workbench/workbench.css';
 async function mountShell(): Promise<void> {
   // Every store used here runs before app.use(pinia) below, so each needs the module-level
   // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
+  const agentSessionsStore = useAgentSessionsStore(pinia);
   const appMetricsStore = useAppMetricsStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const layoutStore = useLayoutStore(pinia);
@@ -75,6 +77,10 @@ async function mountShell(): Promise<void> {
     gitClientsStore.hydrateGitClients(),
     terminalsStore.hydrateTerminalDefaults(),
     keepAwakeStore.initKeepAwake(),
+    // P129 Part 3 §2.8 item 1: the boot-time hydrate for the ade module's own agent-activity store
+    // (repo tabs' needs-input badge, §0.15) — a stuck/erroring subscribe must never block the rest
+    // of this app's own boot, same reasoning as every other member of this group.
+    agentSessionsStore.initAgentSessions(),
   ]);
   for (const result of optional) {
     if (result.status === 'rejected') {
