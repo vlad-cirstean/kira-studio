@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { localIsoOfMs } from '../../frontend/src/ade/localDay';
-import { useQueue } from '../../frontend/src/ade/useQueue';
+import { type QueueBand, type QueueSegment, useQueue } from '../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
   AdeNewWork,
@@ -8,6 +8,7 @@ import type {
   AdePlan,
   AdeRepoPrs,
   AdeRepoSnapshot,
+  AdeSession,
 } from '../../frontend/src/ade/wire';
 import type { Settings } from '../../frontend/src/state/settingsDomain';
 
@@ -61,6 +62,20 @@ function branch(
     est: '',
     notes: '',
     addedAt: 0,
+    ...overrides,
+  };
+}
+
+function session(overrides: Partial<AdeSession> & Pick<AdeSession, 'id' | 'branch'>): AdeSession {
+  return {
+    claudeSessionId: 'abcdef12-0000-0000-0000-000000000000',
+    codeRepoId: 'repo',
+    newWorkId: '',
+    cwd: '',
+    state: 'running',
+    terminalId: 't1',
+    startedAt: 0,
+    lastActiveAt: 0,
     ...overrides,
   };
 }
@@ -213,5 +228,135 @@ describe('ade-queue-rules', () => {
     expect(v.items.map((it) => it.id)).toEqual(['a']);
     // the stale `queuedAfter` entries are both ignored — 'a' keeps no parent.
     expect(v.segments.some((s) => s.after !== null)).toBe(false);
+  });
+
+  // P129 Part 5 §0.5/§3.1 — the parity spec's own mockup oracle has no zone concept at all (it
+  // always computes a history day from the same process clock `useQueue` would), so the bug this
+  // fixes (an evening local archive landing on the wrong UTC day) can only be exercised here, with
+  // a hand-picked `localDayOf` standing in for a real caller in a non-UTC zone.
+  test('6. history entry lands on localDayOf, not archivedAt own UTC-floor day', () => {
+    // 03:00 UTC on today (2026-09-22) — 20:00 the previous evening in, say, US Pacific. A naive
+    // `Math.floor(ms / DAY_MS)` would floor this to *today* (offset 0); the caller's own local day
+    // (fed in via `localDayOf`, standing in for `localIsoOfMs` in a real non-UTC zone) says
+    // yesterday (offset -1).
+    const archivedAt = Date.UTC(2026, 8, 22, 3, 0);
+    const snap = snapshot({
+      branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })],
+      history: [{ item: 'x', kind: 'archived', title: 'X title', branch: 'x-branch', archivedAt }],
+    });
+    const v = view(snap, { historyOpen: true, localDayOf: () => '2026-09-21' });
+    const yesterday = v.bands.find((b) => b.day === -1);
+    expect(yesterday?.history).toEqual([{ title: 'X title', branch: 'x-branch', how: 'archived' }]);
+    const today = v.bands.find((b) => b.day === 0);
+    expect(today?.history ?? []).toEqual([]);
+  });
+
+  test('7. band facts: iso, isMonday, weekend flags, nextWorkDay, overdueIds, startIds, overflowMoveLabel, isEmpty', () => {
+    const settings: Settings['ade'] = {
+      ...DEFAULT_SETTINGS,
+      workWeekendDays: ['2026-09-26'], // that Saturday, worked
+    };
+    const snap = snapshot({
+      branches: [
+        branch({ id: 'a', branch: 'feat/a', kind: 'mine', est: '480m' }), // 8h
+        branch({ id: 'b', branch: 'feat/b', kind: 'mine', est: '120m' }), // 2h
+        branch({ id: 'over', branch: 'feat/over', kind: 'mine', est: '60m' }), // 1h — 11h > 6h cap
+        branch({ id: 'late', branch: 'feat/late', kind: 'mine' }), // past, unmerged: overdue
+      ],
+      plan: plan({
+        day: { a: '2026-09-22', b: '2026-09-22', over: '2026-09-22', late: '2026-09-20' },
+        order: ['a', 'b', 'over', 'late'],
+      }),
+    });
+    const v = view(snap, { settings });
+
+    // today (2026-09-22, a Tuesday): overflow moves all three (8+2+1=11h over a 6h cap).
+    const today = v.bands.find((b) => b.day === 0) as QueueBand;
+    expect(today.iso).toBe('2026-09-22');
+    expect(today.isMonday).toBe(false);
+    expect(today.isCalendarWeekend).toBe(false);
+    expect(today.isEmpty).toBe(false);
+    expect([...today.startIds].sort()).toEqual(['a', 'b', 'over']);
+    expect(today.nextWorkDay).toBe(1);
+    expect(today.nextWorkLabel).toBe('Wed 23');
+    expect(today.overflowMoveLabel).toBe('Move to Wed 23 · 3 branches');
+
+    // an empty weekday inside the horizon.
+    const empty = v.bands.find((b) => b.day === 2) as QueueBand;
+    expect(empty.isEmpty).toBe(true);
+    expect(empty.startIds).toEqual([]);
+
+    // the next Monday (offset 6, 2026-09-28).
+    const monday = v.bands.find((b) => b.day === 6) as QueueBand;
+    expect(monday.iso).toBe('2026-09-28');
+    expect(monday.isMonday).toBe(true);
+
+    // a worked weekend (offset 4, 2026-09-26): calendar weekend, exempted via workWeekendDays.
+    const sat = v.bands.find((b) => b.day === 4) as QueueBand;
+    expect(sat.iso).toBe('2026-09-26');
+    expect(sat.isCalendarWeekend).toBe(true);
+    expect(sat.isWorkedWeekend).toBe(true);
+    expect(sat.isWeekend).toBe(false);
+
+    // a past, unmerged, overdue lead segment.
+    const late = v.bands.find((b) => b.day === -2) as QueueBand;
+    expect(late.isOverdue).toBe(true);
+    expect(late.overdueIds).toEqual(['late']);
+
+    expect(v.firstWorkDay).toBe(0);
+    expect(v.effDay.a).toBe(0);
+  });
+
+  test('8. dragIds exclude review members; QueueAction.tip only on Force push; cell/action tips', () => {
+    const ARCHIVE_TIP =
+      'Stop its agents, delete its worktree and hide it. The branch, notes and links are kept; it stays in history.';
+    const snap = snapshot({
+      branches: [
+        branch({ id: 'rev', branch: 'someone/rev', kind: 'review', owner: 'someone' }),
+        branch({ id: 'm2', branch: 'feat/m2', kind: 'mine', base: 'rev' }),
+        branch({ id: 'up', branch: 'feat/up', kind: 'mine' }),
+        branch({ id: 'bh', branch: 'feat/bh', kind: 'mine', behind: 2 }),
+        branch({ id: 'st', branch: 'feat/st', kind: 'mine' }),
+        branch({ id: 'st2', branch: 'feat/st2', kind: 'mine' }),
+        branch({ id: 'mg', branch: 'feat/mg', kind: 'mine', merged: true }),
+      ],
+      plan: plan({ unpushed: { up: true } }),
+    });
+    const v = view(snap, {
+      sessions: [session({ id: 's1', branch: 'feat/st', lastActiveAt: 12_345 })],
+    });
+
+    const stackSeg = v.segments.find((s) => s.members.some((m) => m.id === 'm2')) as QueueSegment;
+    expect(stackSeg.dragIds).toEqual(['m2']);
+
+    const upSeg = v.segments.find((s) => s.members.some((m) => m.id === 'up')) as QueueSegment;
+    expect(upSeg.action?.kind).toBe('forcePush');
+    expect(upSeg.action?.tip).toBe('git push --force-with-lease');
+
+    const bhSeg = v.segments.find((s) => s.members.some((m) => m.id === 'bh')) as QueueSegment;
+    expect(bhSeg.action?.kind).toBe('rebase');
+    expect(bhSeg.action?.tip).toBe('');
+
+    const stSeg = v.segments.find((s) => s.members.some((m) => m.id === 'st2')) as QueueSegment;
+    expect(stSeg.cells[0]?.tip).toBe(stSeg.tag.tip);
+    expect(stSeg.cells[0]?.action).toEqual({
+      kind: 'start',
+      id: 'st2',
+      label: '▶ Start',
+      tip: 'start Claude Code in its worktree',
+    });
+
+    const mgSeg = v.segments.find((s) => s.members.some((m) => m.id === 'mg')) as QueueSegment;
+    expect(mgSeg.cells[0]?.action).toEqual({
+      kind: 'archive',
+      id: 'mg',
+      label: 'Archive',
+      tip: ARCHIVE_TIP,
+    });
+
+    const stItem = v.items.find((it) => it.id === 'st');
+    expect(stItem?.agents).toEqual([
+      { sessionId: 's1', label: 'claude abcdef12', kind: 'idle', lastActiveAt: 12_345 },
+    ]);
   });
 });

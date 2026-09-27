@@ -1,6 +1,5 @@
 import type { AgentActivity, AgentPhase } from '@shared/domain/agent';
 import type { DialogCtx } from '../../../frontend/src/ade/dialogCompose';
-import { localIsoOfMs } from '../../../frontend/src/ade/localDay';
 import { type QueueInput, useQueue } from '../../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
@@ -74,6 +73,8 @@ export interface MockupToWireResult {
   rebasing: Set<string>;
   pushing: Set<string>;
   today: string;
+  historyOpen: boolean;
+  historyReach: number;
 }
 
 /** Converts one mockup repo's own raw fixture data (`repoData()`, `historyData()`, `state.plans` /
@@ -310,12 +311,19 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
     rebasing: new Set(s.rebasing ?? []),
     pushing: new Set(s.pushing ?? []),
     today: MOCKUP_TODAY,
+    historyOpen: !!s.showHistory,
+    historyReach: s.history as number,
   };
 }
 
-// §0.5/§3.1: `mockupOracle.ts` forces `TZ=UTC` process-wide, so the real `localIsoOfMs` (local
-// getters) and the mockup's own UTC day math name the same instant here — real converter, no
-// parallel test-only day mapping to drift from it.
+// §0.5/§3.1: recovers the fixture's own day offset from `msFromOffset`'s own noon-anchored instant
+// (`Math.floor` never crosses a day boundary, noon being clear of both ends) and maps it back
+// through `isoFromOffset` — exact fixture-offset parity, independent of the real `localIso`'s own
+// local-getter implementation (which `localIsoOfMs` above still covers for every other call site).
+function localDayOfFixture(ms: number): string {
+  return isoFromOffset(Math.floor(ms / DAY_MS) - baseDays());
+}
+
 export function toQueueInput(result: MockupToWireResult, selectedId?: string): QueueInput {
   return {
     snapshot: result.snapshot,
@@ -324,7 +332,9 @@ export function toQueueInput(result: MockupToWireResult, selectedId?: string): Q
     prs: result.prs,
     settings: result.settings,
     today: result.today,
-    localDayOf: localIsoOfMs,
+    localDayOf: localDayOfFixture,
+    historyOpen: result.historyOpen,
+    historyReach: result.historyReach,
     selectedId,
     rebasing: result.rebasing,
     pushing: result.pushing,

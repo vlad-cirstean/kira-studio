@@ -8,7 +8,7 @@ import {
   useQueue,
 } from '../../frontend/src/ade/useQueue';
 import { loadNeutralizedComponent, type MockupComponent } from './support/mockupOracle';
-import { mockupToWire, toQueueInput } from './support/mockupToWire';
+import { isoFromOffset, mockupToWire, toQueueInput } from './support/mockupToWire';
 
 // P129 Part 3 §3.1 — the mockup itself, run unmodified via `node:vm` (`support/mockupOracle.ts`), is
 // the oracle; `support/mockupToWire.ts` converts its own raw fixture data (never `renderVals()`'s own
@@ -133,7 +133,44 @@ function compareStructure(
           ? `${myBand.hours}h`
           : '';
     expect(band.sub).toBe(expectedSub);
+
+    // §0.4 additions — `iso`/`isMonday` independently, via the same offset the oracle's own domId
+    // already encodes (Date parses the ISO in UTC, matching `mockupOracle.ts`'s own forced TZ=UTC;
+    // never the port's own `civilFromDays` arithmetic).
+    if (myBand.day === LATER) {
+      expect(myBand.iso).toBeNull();
+    } else {
+      const expectedIso = isoFromOffset(myBand.day);
+      expect(myBand.iso).toBe(expectedIso);
+      const dow = new Date(`${expectedIso}T00:00:00Z`).getUTCDay();
+      expect(myBand.isMonday).toBe(dow === 1);
+      expect(myBand.isCalendarWeekend).toBe(dow === 0 || dow === 6);
+    }
+    // `isEmpty` against the oracle's own band-level arrays (blocks/spans/history), not the port's.
+    const oracleEmpty =
+      band.blocks.length === 0 && band.spans.length === 0 && band.history.length === 0;
+    expect(myBand.isEmpty).toBe(oracleEmpty);
+    // `overflowMoveLabel` <-> oracle `overLabel` (only meaningful when something overflows).
+    if (band.isOver) expect(myBand.overflowMoveLabel).toBe(band.overLabel);
+    // continuation rows (spans): title/note/tip direct; `isEnd` via the oracle's own amber
+    // `noteStyle` (the mockup exposes it as a style string, not a flag).
+    expect(band.spans.length).toBe(myBand.spans.length);
+    band.spans.forEach((span: MockupComponent, i: number) => {
+      const mySpan = myBand.spans[i];
+      expect(mySpan, `no port span at band ${band.domId} index ${i}`).toBeDefined();
+      expect(span.title).toBe(mySpan?.title);
+      expect(span.note).toBe(mySpan?.note);
+      expect(span.tip).toBe(mySpan?.tip);
+      expect(mySpan?.isEnd).toBe((span.noteStyle as string).includes('#f0b85c'));
+    });
   }
+
+  // `focusDay`: `renderVals()` sets it on the component instance as a side effect (mockup 1302).
+  expect(view.focusDay).toBe(comp.focusDay);
+  // `historyCount` <-> mockup `histCount`, only readable through the closed-pull row's own text
+  // (mockup 1784) since `histCount` itself is never returned as a standalone field.
+  const historyMatch = /(\d+) archived/.exec(oracle.pullText as string);
+  if (historyMatch) expect(view.historyCount).toBe(Number(historyMatch[1]));
 
   // ---- needs-input count, this repo's own tab -----------------------------------------------
   // `repoTabs[]` carries no `key` field, only `label` — the pinned "All agents" tab shares
@@ -289,6 +326,20 @@ describe('ade-queue-parity — mockup renderVals() vs useQueue()', () => {
       c.state.horizon = 7;
       c.state.history = 7;
     });
+    compareStructure(comp, wire, 'web-app');
+  });
+
+  // §0.4/§3.1: history closed — same band keys as the horizon/segment-driven set alone, no history
+  // rows. `buildScenario` always sets `showHistory = true`; this is the one case that overrides it.
+  test('history closed (showHistory = false / historyOpen: false)', () => {
+    const comp = loadNeutralizedComponent();
+    comp.state.repo = 'web-app';
+    comp.state.lastRepo = 'web-app';
+    comp.state.showHistory = false;
+    const wire = mockupToWire(comp, 'web-app');
+    expect(wire.historyOpen).toBe(false);
+    const view = useQueue(toQueueInput(wire));
+    for (const band of view.bands) expect(band.history).toEqual([]);
     compareStructure(comp, wire, 'web-app');
   });
 });

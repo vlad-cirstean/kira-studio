@@ -1,5 +1,5 @@
 import type { Settings } from '../state/settingsDomain';
-import { type ActivityKind, activityKind } from './activity';
+import { type ActivityKind, activityKind, sessionLabel } from './activity';
 import type {
   AdeCommit,
   AdeFile,
@@ -92,6 +92,12 @@ export interface QueueInput {
   selectedId?: string;
   rebasing?: ReadonlySet<string>;
   pushing?: ReadonlySet<string>;
+  /** §0.6: whether the history bands render at all (`AdeRepoView`'s own local ref, reset on a
+   *  repo-tab remount) — default `false`. */
+  historyOpen?: boolean;
+  /** Past days shown while `historyOpen` — default `settings.historyDays`; a "Go to date"
+   *  navigation grows this at runtime without writing `settings.historyDays` (§0.9). */
+  historyReach?: number;
 }
 
 export interface QueueItem {
@@ -110,6 +116,8 @@ export interface QueueItem {
    *  non-`stopped` prefix — Parts 4-6's own concern, not this module's. */
   acts: ActivityKind[];
   estimate: { hours: number; days: number } | null;
+  /** Running sessions only (mockup `running(b)`), sorted by `actRank` — drives the agents pill. */
+  agents: { sessionId: string; label: string; kind: ActivityKind; lastActiveAt: number }[];
 }
 
 interface QueueStackMember {
@@ -135,12 +143,18 @@ interface QueueAction {
   label: string;
   targetIds: string[];
   disabled: boolean;
+  /** `git push --force-with-lease` for Force push, else `''` (§0.4 — a design simplification: the
+   *  mockup's own rebase-onto tip is a different, detail-panel-only surface Part 5 doesn't port). */
+  tip: string;
 }
 
 interface QueueCell {
   tag: { label: string; tone: Tone } | null;
-  action: { kind: 'archive' | 'start'; id: string; label: string } | null;
+  action: { kind: 'archive' | 'start'; id: string; label: string; tip: string } | null;
   info: string | null;
+  /** The segment's own final tag tip, on every cell (mockup 1175 gives every tag/info cell the
+   *  block tip). */
+  tip: string;
 }
 
 export interface QueueSegment {
@@ -165,6 +179,20 @@ export interface QueueSegment {
   /** Merge order number for each `mine` member of this segment (mockup `mergeN`). */
   mergeN: Record<string, number>;
   cells: QueueCell[];
+  /** Non-review member ids (mockup 1168) — empty means not draggable. */
+  dragIds: string[];
+}
+
+/** A continuation row (mockup 1245-1259): day `idx+1` of `startDay`'s own multi-day segment,
+ *  rendered on every day of its span after the first. */
+export interface QueueSpan {
+  lead: string;
+  title: string;
+  color: string;
+  note: string;
+  isEnd: boolean;
+  tip: string;
+  startDay: number;
 }
 
 export interface QueueBand {
@@ -184,6 +212,29 @@ export interface QueueBand {
   isOverdue: boolean;
   overdueStackCount: number;
   history: { title: string; branch: string; how: string }[];
+  /** `null` for Later. */
+  iso: string | null;
+  isMonday: boolean;
+  /** Plain calendar weekend, regardless of the `workWeekendDays` override — `isWeekend` above is
+   *  the mockup's own override-aware `weekend` (unworked weekend only). */
+  isCalendarWeekend: boolean;
+  /** A calendar weekend exempted via `workWeekendDays` (mockup `wkWork`). */
+  isWorkedWeekend: boolean;
+  /** No segments, spans or history on this day (mockup `empty`). */
+  isEmpty: boolean;
+  /** `dayLong` — `Today, ` prefixed on today, `Later` for the Later band. */
+  longLabel: string;
+  /** Non-review ids of overdue (unmerged, past-due) lead segments landing here. */
+  overdueIds: string[];
+  /** Non-review ids of lead segments starting here (mockup `startsHere`, §0.10's day-off menu). */
+  startIds: string[];
+  /** `nextWork(dk)` — `null` for Later. */
+  nextWorkDay: number | null;
+  nextWorkLabel: string;
+  nextWorkLong: string;
+  /** `''` when nothing overflows. */
+  overflowMoveLabel: string;
+  spans: QueueSpan[];
 }
 
 interface QueueAtRisk {
@@ -207,6 +258,17 @@ export interface QueueView {
    *  order kept (matches the mockup) — `dialogCompose.ts`'s `stackIds`/`agentTargets` read these. */
   parentOf: Record<string, string>;
   kids: Record<string, string[]>;
+  /** History entries with `-settings.historyDays <= day <= 0` (mockup `histCount`, line 1303) —
+   *  unconditional on `historyOpen`, drives the closed pull row's own count. */
+  historyCount: number;
+  /** The earliest past band with any segment on it, else `0` (mockup `focus`, line 1271) —
+   *  `scrollToDay`'s own "Current work ↓" target. */
+  focusDay: number;
+  /** `firstWork(0)` — today if it's a work day, else the next one. */
+  firstWorkDay: number;
+  /** Every item's own effective day (offset, or `LATER`) — `timelineOps.ts`'s drop rules read this
+   *  (§0.13's "never before its parent"). */
+  effDay: Record<string, number>;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -246,6 +308,19 @@ function parseEst(
 function isoToDays(iso: string): number {
   const [y, mo, d] = iso.split('-').map(Number) as [number, number, number];
   return Date.UTC(y, mo - 1, d) / DAY_MS;
+}
+
+/** P129 Part 5 §0.4: a day offset from `today` as its own ISO `YYYY-MM-DD` — not defined for
+ *  `LATER`. The inverse of `isoToOffset`, both on the same `isoToDays`/`civilFromDays` arithmetic
+ *  (no `Date` constructor, Part 3's own clock-read audit grep). */
+export function offsetToIso(today: string, k: number): string {
+  const { year, month0, date } = civilFromDays(isoToDays(today) + k);
+  return `${year}-${String(month0 + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+}
+
+/** The inverse of `offsetToIso`: an ISO `YYYY-MM-DD`'s own day offset from `today`. */
+export function isoToOffset(today: string, iso: string): number {
+  return isoToDays(iso) - isoToDays(today);
 }
 
 interface Calendar {
@@ -315,6 +390,12 @@ function nextWork(cal: Calendar, k: number): number {
   let n = k + 1;
   while (isOff(cal, n)) n++;
   return n;
+}
+
+/** Mockup `firstWork` (line 944): `k` itself when it's already a work day, else the next one —
+ *  `QueueView.firstWorkDay` is `firstWork(cal, 0)` (today, or the next work day). */
+function firstWork(cal: Calendar, k: number): number {
+  return isOff(cal, k) ? nextWork(cal, k) : k;
 }
 
 function dayLabel(cal: Calendar, k: number): string {
@@ -951,6 +1032,7 @@ function tagForMergedParkedConflictRipple(
           label: 'Queue after',
           targetIds: [g.stackRoot, d.conf.entry.with],
           disabled: false,
+          tip: '',
         }
       : null;
     return { tag: { label: '✕ conflict', tone: 'red', tip }, action };
@@ -968,6 +1050,7 @@ function tagForMergedParkedConflictRipple(
         label: pushing.size ? 'Pushing…' : 'Force push',
         targetIds: upIds,
         disabled: pushing.size > 0,
+        tip: 'git push --force-with-lease',
       },
     };
   }
@@ -1000,6 +1083,7 @@ function tagForBehindAfterCont(
         label: rebasing.has(g.root) ? '…' : 'Rebase',
         targetIds: [g.root],
         disabled: d.busy,
+        tip: '',
       },
     };
   }
@@ -1024,6 +1108,7 @@ function tagForBehindAfterCont(
             // from a rebase-onto-main action.
             targetIds: [g.root, g.after.id],
             disabled: d.busy,
+            tip: '',
           }
         : null;
     return { tag, action };
@@ -1080,6 +1165,10 @@ function segmentTagAndAction(
   };
 }
 
+// mockup line 1080, verbatim.
+const ARCHIVE_TIP =
+  'Stop its agents, delete its worktree and hide it. The branch, notes and links are kept; it stays in history.';
+
 function buildCells(
   g: Seg,
   byId: Map<string, Item>,
@@ -1087,7 +1176,12 @@ function buildCells(
   parentOf: Map<string, string>,
   cal: Calendar,
 ): QueueCell[] {
-  const cells: QueueCell[] = g.members.map(() => ({ tag: null, action: null, info: null }));
+  const cells: QueueCell[] = g.members.map(() => ({
+    tag: null,
+    action: null,
+    info: null,
+    tip: '',
+  }));
   g.members.forEach((x, i) => {
     const item = byId.get(x.id) as Item;
     if (item.merged) {
@@ -1095,12 +1189,19 @@ function buildCells(
         cells[i] = { ...(cells[i] as QueueCell), tag: { label: '✓ merged', tone: 'purple' } };
       cells[i] = {
         ...(cells[i] as QueueCell),
-        action: { kind: 'archive', id: x.id, label: 'Archive' },
+        action: { kind: 'archive', id: x.id, label: 'Archive', tip: ARCHIVE_TIP },
       };
     } else if (item.kind === 'mine' && item.sessions.length === 0) {
       cells[i] = {
         ...(cells[i] as QueueCell),
-        action: { kind: 'start', id: x.id, label: '▶ Start' },
+        action: {
+          kind: 'start',
+          id: x.id,
+          label: '▶ Start',
+          tip: item.draft
+            ? 'Claude creates the branch and starts'
+            : 'start Claude Code in its worktree',
+        },
       };
     }
   });
@@ -1206,6 +1307,131 @@ function historyDayOffset(
   return isoToDays(localDayOf(archivedAtMs)) - cal.todayDays;
 }
 
+/** Non-review member ids of a list of segments (mockup `idsOf`, line 1275). */
+function idsOfNonReview(segs: readonly Seg[], byId: Map<string, Item>): string[] {
+  const out: string[] = [];
+  for (const g of segs)
+    for (const x of g.members) if (byId.get(x.id)?.kind !== 'review') out.push(x.id);
+  return out;
+}
+
+interface DayFlags {
+  isToday: boolean;
+  isPast: boolean;
+  isCalendarWeekend: boolean;
+  isWorkedWeekend: boolean;
+  weekend: boolean;
+  dayOff: boolean;
+  iso: string | null;
+  isMonday: boolean;
+  /** Next work day on/after `dk` (mockup `nextWork`), or `LATER` itself when `dk` is `LATER`. */
+  nxt: number;
+  nextWorkDay: number | null;
+}
+
+/** Calendar-derived per-day flags for `buildBands`'s own day closure — split out purely to keep
+ *  that closure's own complexity down (same rationale as `deriveSegState` above), no behavior
+ *  change from one combined function. */
+function deriveDayFlags(cal: Calendar, dk: number, today: string): DayFlags {
+  const isCalendarWeekend = dk !== LATER && isWeekend(cal, dk);
+  const isWorkedWeekend = isCalendarWeekend && cal.workWeekend.has(dk);
+  const nxt = dk === LATER ? LATER : nextWork(cal, dk);
+  return {
+    isToday: dk === 0,
+    isPast: dk < 0,
+    isCalendarWeekend,
+    isWorkedWeekend,
+    weekend: isCalendarWeekend && !isWorkedWeekend,
+    dayOff: dk !== LATER && isDayOff(cal, dk),
+    iso: dk === LATER ? null : offsetToIso(today, dk),
+    isMonday: dk !== LATER && dateParts(cal, dk).dow === 1,
+    nxt,
+    nextWorkDay: dk === LATER ? null : nxt,
+  };
+}
+
+/** `dayLabel` plus the month suffix on a month boundary — returns the tracker's next value rather
+ *  than mutating it, since the tracker lives in `buildBands`'s own closure. */
+function dayLabelWithMonth(
+  cal: Calendar,
+  dk: number,
+  prevMonth: number | null,
+): { label: string; month: number | null } {
+  const label = dayLabel(cal, dk);
+  if (dk !== LATER && dk !== 0) {
+    const p = dateParts(cal, dk);
+    const suffixed =
+      prevMonth !== null && p.month !== prevMonth ? `${label} ${MO[p.month]}` : label;
+    return { label: suffixed, month: p.month };
+  }
+  if (dk === 0) return { label, month: dateParts(cal, 0).month };
+  return { label, month: prevMonth };
+}
+
+/** Continuation rows landing on `dk` (mockup 1245-1259): day `idx+1..n` of a multi-day segment. A
+ *  multi-day span always has a real lead in practice (its own estimate parses off a `mine` item);
+ *  guarded rather than assumed, unlike the mockup's own unchecked `by[g.lead]`. */
+function spansForDay(
+  seq: readonly Seg[],
+  dk: number,
+  snapshot: AdeRepoSnapshot,
+  titleOfId: (id: string) => string,
+  cal: Calendar,
+): QueueSpan[] {
+  const spans: QueueSpan[] = [];
+  for (const g of seq) {
+    if (g.days.length < 2 || !g.lead) continue;
+    const idx = g.days.indexOf(dk);
+    if (idx <= 0) continue;
+    const isEnd = idx === g.days.length - 1;
+    const colorIndex = snapshot.colors[g.lead] ?? 0;
+    spans.push({
+      lead: g.lead,
+      title: titleOfId(g.lead),
+      color: PALETTE[colorIndex % PALETTE.length] as string,
+      note: `day ${idx + 1}/${g.days.length}${isEnd ? ' · merges' : ''}`,
+      isEnd,
+      tip: `continues from ${dayLabel(cal, g.day)}; click to open`,
+      startDay: g.day,
+    });
+  }
+  return spans;
+}
+
+interface DayOverdueOverflow {
+  overdue: Seg[];
+  overflow: string[];
+  overflowMoveLabel: string;
+}
+
+/** Overdue stacks and overflow ids for one day, plus the overflow's own move-label text. */
+function overdueOverflowFor(
+  dk: number,
+  isPast: boolean,
+  onThisDay: readonly Seg[],
+  hoursOn: Map<number, number>,
+  seq: Seg[],
+  byId: Map<string, Item>,
+  eff: Map<string, number>,
+  workdayHours: number,
+  spanDayShare: number,
+  cal: Calendar,
+  nxt: number,
+  titleOfId: (id: string) => string,
+): DayOverdueOverflow {
+  const overdue = isPast
+    ? onThisDay.filter((g) => g.lead && g.end < 0 && !g.members.some((x) => byId.get(x.id)?.merged))
+    : [];
+  const overflow = !isPast
+    ? overflowOf(dk, hoursOn, seq, byId, eff, workdayHours, spanDayShare)
+    : [];
+  const overflowMoveLabel =
+    overflow.length > 0
+      ? `Move to ${dayLabel(cal, nxt)} · ${overflow.length === 1 ? titleOfId(overflow[0] as string) : `${overflow.length} branches`}`
+      : '';
+  return { overdue, overflow, overflowMoveLabel };
+}
+
 function buildBands(
   seq: Seg[],
   byId: Map<string, Item>,
@@ -1217,9 +1443,15 @@ function buildBands(
   workdayHours: number,
   spanDayShare: number,
   localDayOf: (ms: number) => string,
-): QueueBand[] {
+  titleOfId: (id: string) => string,
+  today: string,
+  historyOpen: boolean,
+  historyReach: number,
+): { bands: QueueBand[]; historyCount: number; focusDay: number } {
   const keys = new Set<number>();
-  for (let h = -settings.historyDays; h < 0; h++) keys.add(h);
+  // §0.4: history band keys exist only while open (mockup 1234) — `historyReach`, not
+  // `settings.historyDays`, since a "Go to date" navigation can grow it at runtime (§0.9).
+  if (historyOpen) for (let h = -historyReach; h < 0; h++) keys.add(h);
   for (let k = 0; k < settings.horizonDays; k++) keys.add(k);
   for (const g of seq) for (const d of g.days) if (d !== LATER) keys.add(d);
   for (const off of cal.offDays) keys.add(off);
@@ -1238,53 +1470,77 @@ function buildBands(
     if (list) list.push(entry);
     else historyByDay.set(d, [entry]);
   }
+  // §0.4: `historyCount` (mockup `histCount`, line 1303) is unconditional on `historyOpen`.
+  const historyCount = snapshot.history.filter((h) => {
+    const d = historyDayOffset(h.archivedAt, cal, localDayOf);
+    return d >= -settings.historyDays && d <= 0;
+  }).length;
 
   let prevMonth: number | null = null;
-  return dayKeys.map((dk) => {
+  let focusDay = 0;
+  const bands = dayKeys.map((dk) => {
     const hrs = Math.round((hoursOn.get(dk) ?? 0) * 10) / 10;
-    const isToday = dk === 0;
-    const isPast = dk < 0;
-    const weekend = dk !== LATER && isWeekend(cal, dk) && !cal.workWeekend.has(dk);
-    const dayOff = dk !== LATER && isDayOff(cal, dk);
+    const flags = deriveDayFlags(cal, dk, today);
+    const { label, month } = dayLabelWithMonth(cal, dk, prevMonth);
+    prevMonth = month;
 
-    let label = dayLabel(cal, dk);
-    if (dk !== LATER && dk !== 0) {
-      const p = dateParts(cal, dk);
-      if (prevMonth !== null && p.month !== prevMonth) label += ` ${MO[p.month]}`;
-      prevMonth = p.month;
-    } else if (dk === 0) {
-      prevMonth = dateParts(cal, 0).month;
-    }
+    const onThisDay = seq.filter((g) => g.day === dk);
+    const { overdue, overflow, overflowMoveLabel } = overdueOverflowFor(
+      dk,
+      flags.isPast,
+      onThisDay,
+      hoursOn,
+      seq,
+      byId,
+      eff,
+      workdayHours,
+      spanDayShare,
+      cal,
+      flags.nxt,
+      titleOfId,
+    );
+    const spans = spansForDay(seq, dk, snapshot, titleOfId, cal);
 
-    const overdue = isPast
-      ? seq.filter(
-          (g) =>
-            g.day === dk && g.lead && g.end < 0 && !g.members.some((x) => byId.get(x.id)?.merged),
-        )
-      : [];
-    const overflow = !isPast
-      ? overflowOf(dk, hoursOn, seq, byId, eff, workdayHours, spanDayShare)
-      : [];
-    const nxt = dk === LATER ? LATER : nextWork(cal, dk);
+    const isEmpty =
+      onThisDay.length === 0 && spans.length === 0 && (historyByDay.get(dk)?.length ?? 0) === 0;
+    if (flags.isPast && onThisDay.length > 0 && focusDay === 0) focusDay = dk;
+
+    const startSegs = onThisDay.filter((g) => g.lead);
 
     return {
       day: dk,
       label,
       isLater: dk === LATER,
-      isToday,
-      isPast,
-      isWeekend: weekend,
-      isDayOff: dayOff,
+      isToday: flags.isToday,
+      isPast: flags.isPast,
+      isWeekend: flags.weekend,
+      isDayOff: flags.dayOff,
       hours: hrs,
       capacity: workdayHours,
-      isOverflow: overflow.length > 0 && !weekend && !dayOff,
+      isOverflow: overflow.length > 0 && !flags.weekend && !flags.dayOff,
       overflowIds: overflow,
-      overflowMoveDay: overflow.length > 0 ? nxt : null,
+      overflowMoveDay: overflow.length > 0 ? flags.nxt : null,
       isOverdue: overdue.length > 0,
       overdueStackCount: overdue.length,
-      history: historyByDay.get(dk) ?? [],
+      history: historyOpen ? (historyByDay.get(dk) ?? []) : [],
+      iso: flags.iso,
+      isMonday: flags.isMonday,
+      isCalendarWeekend: flags.isCalendarWeekend,
+      isWorkedWeekend: flags.isWorkedWeekend,
+      isEmpty,
+      longLabel: dayLong(flags.iso, today),
+      overdueIds: idsOfNonReview(overdue, byId),
+      startIds: idsOfNonReview(startSegs, byId),
+      nextWorkDay: flags.nextWorkDay,
+      nextWorkLabel: flags.nextWorkDay === null ? '' : dayLabel(cal, flags.nextWorkDay),
+      nextWorkLong:
+        flags.nextWorkDay === null ? '' : dayLong(offsetToIso(today, flags.nextWorkDay), today),
+      overflowMoveLabel,
+      spans,
     };
   });
+
+  return { bands, historyCount, focusDay };
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1400,11 +1656,14 @@ export function useQueue(input: QueueInput): QueueView {
       infos.length && !cells.some((c) => c.info)
         ? { ...tag, tip: `${tag.tip} · ${infos.join(' · ')}` }
         : tag;
+    // §0.4: every cell gets the segment's own final tag tip (mockup 1175).
+    const taggedCells = cells.map((c) => ({ ...c, tip: finalTag.tip }));
     const segMergeN: Record<string, number> = {};
     for (const x of g.members) {
       const n = mergeN.get(x.id);
       if (n !== undefined) segMergeN[x.id] = n;
     }
+    const dragIds = g.members.filter((x) => byId.get(x.id)?.kind !== 'review').map((x) => x.id);
     return {
       stackRoot: g.stackRoot,
       root: g.root,
@@ -1422,12 +1681,15 @@ export function useQueue(input: QueueInput): QueueView {
       tag: finalTag,
       action,
       mergeN: segMergeN,
-      cells,
+      cells: taggedCells,
+      dragIds,
     };
   });
 
   const hoursOn = buildHoursOn(seq, byId, cal, workdayHours, spanDayShare);
-  const bands = buildBands(
+  const historyOpen = input.historyOpen ?? false;
+  const historyReach = input.historyReach ?? settings.historyDays;
+  const { bands, historyCount, focusDay } = buildBands(
     seq,
     byId,
     eff,
@@ -1438,7 +1700,12 @@ export function useQueue(input: QueueInput): QueueView {
     workdayHours,
     spanDayShare,
     input.localDayOf,
+    titleOfId,
+    input.today,
+    historyOpen,
+    historyReach,
   );
+  const firstWorkDay = firstWork(cal, 0);
 
   // §2.6 stage 17.
   const mineB = seq.filter((g) => g.lead);
@@ -1467,6 +1734,16 @@ export function useQueue(input: QueueInput): QueueView {
     const acts = [...item.sessions]
       .map((s) => activityKind(s, input.activity))
       .sort((a, b) => actRank(a) - actRank(b));
+    // §0.4: running sessions only (mockup `running(b)`), sorted the same way `acts` is.
+    const agents = item.sessions
+      .filter((s) => s.state === 'running')
+      .map((s) => ({
+        sessionId: s.id,
+        label: sessionLabel(s),
+        kind: activityKind(s, input.activity),
+        lastActiveAt: s.lastActiveAt,
+      }))
+      .sort((a, b) => actRank(a.kind) - actRank(b.kind));
     return {
       id: item.id,
       kind: item.kind,
@@ -1479,6 +1756,7 @@ export function useQueue(input: QueueInput): QueueView {
       branchStatus: branchStatusOf(item.id, statusCtx),
       acts,
       estimate: parseEst(item.est, workdayHours, spanDayShare),
+      agents,
     };
   });
 
@@ -1493,6 +1771,10 @@ export function useQueue(input: QueueInput): QueueView {
     behindRoots,
     parentOf: Object.fromEntries(parentOf),
     kids: Object.fromEntries([...kids].map(([k, v]) => [k, [...v]])),
+    historyCount,
+    focusDay,
+    firstWorkDay,
+    effDay: Object.fromEntries(eff),
   };
 }
 
