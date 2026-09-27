@@ -5,6 +5,7 @@ import {
   type DialogCtx,
   type DialogSpec,
   type DialogState,
+  moveSpec,
   rebaseSpec,
   startSpec,
 } from '../../frontend/src/ade/dialogCompose';
@@ -698,5 +699,112 @@ describe('dialogFlow', () => {
     expect(actionError as string | null).toBe(
       "Claude's session ended before archiving; archive again when ready",
     );
+  });
+
+  // §0.14/§3.3: the Move dialog applies the plan (`spec.applyPlan`) before delivery, both awaited
+  // before close — `SetPlan` is idempotent, so a delivery retry after a successful `applyPlan`
+  // re-delivers without ever re-applying a stale plan (never the other order).
+  test('move: applyPlan runs before delivery', async () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const ctx = ctxFor(snap);
+    const order: string[] = [];
+    const spec = moveSpec(ctx, ['a'], null, '2026-09-23', async () => {
+      order.push('applyPlan');
+    });
+    const { deps: launch } = fakeLaunch();
+    const launchWithLog: LaunchDeps = {
+      ...launch,
+      adePrepareLaunch: async (args) => {
+        order.push('deliver');
+        return launch.adePrepareLaunch(args);
+      },
+    };
+
+    await sendDialog(baseDeps({ ctx, launch: launchWithLog }), spec, DEFAULT_STATE);
+
+    expect(order).toEqual(['applyPlan', 'deliver']);
+  });
+
+  test('move: applyPlan rejecting sets the error, skips delivery, dialog stays open', async () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const ctx = ctxFor(snap);
+    const spec = moveSpec(ctx, ['a'], null, '2026-09-23', async () => {
+      throw new Error('plan write failed');
+    });
+    const { deps: launch, calls } = fakeLaunch();
+    let errorMessage: string | null = null;
+    let closed = false;
+
+    await sendDialog(
+      baseDeps({
+        ctx,
+        launch,
+        setError: (msg) => {
+          errorMessage = msg;
+        },
+        closeDialog: () => {
+          closed = true;
+        },
+      }),
+      spec,
+      DEFAULT_STATE,
+    );
+
+    expect(calls).toEqual([]);
+    expect(closed).toBe(false);
+    expect(errorMessage as string | null).toBe('plan write failed');
+  });
+
+  test('move: delivery rejecting after applyPlan resolved sets the error', async () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const ctx = ctxFor(snap);
+    let applyPlanCalls = 0;
+    const spec = moveSpec(ctx, ['a'], null, '2026-09-23', async () => {
+      applyPlanCalls++;
+    });
+    const { deps: launch } = fakeLaunch({ failLaunchAt: 1 });
+    let errorMessage: string | null = null;
+
+    await sendDialog(
+      baseDeps({
+        ctx,
+        launch,
+        setError: (msg) => {
+          errorMessage = msg;
+        },
+      }),
+      spec,
+      DEFAULT_STATE,
+    );
+
+    expect(applyPlanCalls).toBe(1);
+    expect(errorMessage as string | null).toBe('prepare launch failed');
+  });
+
+  test('move: retrying after a delivery failure re-applies the plan and delivers once', async () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const ctx = ctxFor(snap);
+    let applyPlanCalls = 0;
+    const spec = moveSpec(ctx, ['a'], null, '2026-09-23', async () => {
+      applyPlanCalls++;
+    });
+    const { deps: launch, calls } = fakeLaunch({ failLaunchAt: 1 });
+    let closed = false;
+    const deps = baseDeps({
+      ctx,
+      launch,
+      closeDialog: () => {
+        closed = true;
+      },
+    });
+
+    await sendDialog(deps, spec, DEFAULT_STATE);
+    expect(applyPlanCalls).toBe(1);
+    expect(closed).toBe(false);
+
+    await sendDialog(deps, spec, DEFAULT_STATE);
+    expect(applyPlanCalls).toBe(2);
+    expect(closed).toBe(true);
+    expect(calls.filter((c) => c.startsWith('launch:')).length).toBe(2);
   });
 });

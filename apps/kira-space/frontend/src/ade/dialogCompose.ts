@@ -33,7 +33,10 @@ export interface DialogSpec {
   before?: string | null;
   /** ISO `YYYY-MM-DD`, or `null` for Later (§0.6) — never a raw day offset. */
   day?: string | null;
-  afterSend?: () => void;
+  /** §0.14: the Move dialog's own plan write, awaited before delivery (`sendMove`) — `SetPlan` is
+   *  absolute (idempotent), so a delivery-retry after a successful `applyPlan` never re-applies a
+   *  stale plan. */
+  applyPlan?: () => Promise<void>;
   draft?: boolean;
   /** The draft's base branch name (already resolved to a git name, or `'main'`). */
   base?: string;
@@ -329,7 +332,7 @@ export function moveSpec(
   ids: readonly string[],
   before: string | null,
   day: string | null,
-  afterSend?: () => void,
+  applyPlan?: () => Promise<void>,
 ): DialogSpec {
   const lead = ids[0] as string;
   return {
@@ -339,7 +342,7 @@ export function moveSpec(
     before,
     day,
     targets: agentTargets(ctx, [lead]),
-    afterSend,
+    applyPlan,
   };
 }
 

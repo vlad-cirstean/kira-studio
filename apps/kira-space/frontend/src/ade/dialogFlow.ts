@@ -228,9 +228,11 @@ async function sendStart(
   }
 }
 
-/** §0.12 `move` — deliver to the lead's own resolved target, then the caller's own `SetPlan`
- *  (`spec.afterSend`, Part 5's), both before close (mockup order: plan write before close;
- *  ours adds the real delivery Part 5's static demo never needed). */
+/** §0.14: the caller's own `SetPlan` (`spec.applyPlan`, Part 5's) runs first, awaited, then delivery
+ *  to the lead's own resolved target, both before close (mockup order: plan write before close;
+ *  ours adds the real delivery Part 5's static demo never needed). `SetPlan` is idempotent, so this
+ *  order means a delivery failure's own retry re-applies the same plan and delivers exactly once —
+ *  the reverse order would re-deliver on a plan-write retry instead. */
 async function sendMove(deps: SendDialogDeps, spec: DialogSpec, state: DialogState): Promise<void> {
   const message = deliveredMessage(deps.ctx, spec, state);
   const leadId = (spec.ids ?? [])[0];
@@ -239,10 +241,10 @@ async function sendMove(deps: SendDialogDeps, spec: DialogSpec, state: DialogSta
     return;
   }
   try {
+    await spec.applyPlan?.();
     const tg = targetFor(spec, leadId);
     const choice = tg ? resolvedChoice(deps.ctx, tg) : 'new';
     await deliver(deps.launch, buildDeliverTarget(deps.ctx, leadId, choice, message), () => {});
-    spec.afterSend?.();
     deps.closeDialog();
   } catch (err) {
     deps.setError(errMessage(err));
