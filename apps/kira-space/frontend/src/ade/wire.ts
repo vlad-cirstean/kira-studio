@@ -161,6 +161,9 @@ export interface AdePr {
 export interface AdeRepoPrs {
   kind: string; // 'ok' | 'disabled' | 'unavailable'
   branches: Record<string, AdePr>;
+  /** P129 Part 6 §0.8: the repo's own web root, `''` when there's no GitHub remote (renders the
+   *  Branch ref unlinked). */
+  webUrl: string;
 }
 
 /** `gitsession.RemoteOpError` — `AdeRefreshResult.error`'s own shape, reused verbatim by

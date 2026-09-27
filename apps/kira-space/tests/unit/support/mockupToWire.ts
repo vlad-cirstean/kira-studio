@@ -19,6 +19,10 @@ const DAY_MS = 86_400_000;
 // and `Date.UTC(2026, 8, 22)` name the same instant.
 export const MOCKUP_TODAY = '2026-09-22';
 
+/** P129 Part 6 §0.8: a fixed GitHub-shaped web root — no mockup fixture carries a real one, so
+ *  every parity/rules scenario shares this constant for the Branch link's own `href`. */
+export const MOCKUP_WEB_URL = 'https://github.test/acme/repo';
+
 function baseDays(): number {
   return Date.UTC(2026, 8, 22) / DAY_MS;
 }
@@ -306,7 +310,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
     snapshot,
     sessions,
     activity,
-    prs: { kind: 'ok', branches: prBranches },
+    prs: { kind: 'ok', branches: prBranches, webUrl: MOCKUP_WEB_URL },
     settings,
     rebasing: new Set(s.rebasing ?? []),
     pushing: new Set(s.pushing ?? []),

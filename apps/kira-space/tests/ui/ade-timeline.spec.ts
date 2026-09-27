@@ -31,7 +31,7 @@ const REPO = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
-const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {} };
+const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };
 
 function fullBranch(overrides: Partial<AdeBranch> & Pick<AdeBranch, 'id' | 'branch'>): AdeBranch {
   return {

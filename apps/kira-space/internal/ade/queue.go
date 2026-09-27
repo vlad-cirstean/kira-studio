@@ -173,6 +173,9 @@ type PrFact struct {
 type RepoPrs struct {
 	Kind     string // "ok" | "disabled" | "unavailable"
 	Branches map[string]*PrFact
+	// WebURL is the repo's own web root (P129 Part 6 §0.8), "" when there is no GitHub remote or
+	// GitHub is disabled — the Branch link renders unlinked in that case.
+	WebURL string
 }
 
 type CandidateBranch struct {
@@ -1098,6 +1101,8 @@ func (q *Queue) Prs(ctx context.Context, codeRepoID string) (RepoPrs, error) {
 		return RepoPrs{}, err
 	}
 
+	webURL, _ := entry.RepoWebURL(ctx)
+
 	var branches []string
 	for _, b := range state.Branches {
 		if b.ArchivedAt == nil {
@@ -1105,7 +1110,7 @@ func (q *Queue) Prs(ctx context.Context, codeRepoID string) (RepoPrs, error) {
 		}
 	}
 	if len(branches) == 0 {
-		return RepoPrs{Kind: "ok", Branches: map[string]*PrFact{}}, nil
+		return RepoPrs{Kind: "ok", Branches: map[string]*PrFact{}, WebURL: webURL}, nil
 	}
 
 	out := make(map[string]*PrFact)
@@ -1132,7 +1137,7 @@ func (q *Queue) Prs(ctx context.Context, codeRepoID string) (RepoPrs, error) {
 	if kind == "" {
 		kind = "ok"
 	}
-	return RepoPrs{Kind: kind, Branches: out}, nil
+	return RepoPrs{Kind: kind, Branches: out, WebURL: webURL}, nil
 }
 
 // --- Candidates (§5.3) -------------------------------------------------------------------------

@@ -487,6 +487,19 @@ func (e *RepoEntry) PrBrowserURL(ctx context.Context, number int) (string, bool)
 	return fmt.Sprintf("https://%s/%s/pull/%d", repo.Host, repo.Path(), number), true
 }
 
+// RepoWebURL is the Branch link's own web root (P129 Part 6 §0.8) — same gates as PrBrowserURL,
+// so a disabled/non-GitHub remote renders the ref unlinked rather than pointing nowhere.
+func (e *RepoEntry) RepoWebURL(ctx context.Context) (string, bool) {
+	if !e.githubEnabled() {
+		return "", false
+	}
+	repo, ok := e.githubRepo(ctx)
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("https://%s/%s", repo.Host, repo.Path()), true
+}
+
 // maxEagerPurgeBranches bounds D8's own eager post-fetch re-resolve pass, triggered by refsChanged
 // and nothing else (never a timer, §0.4's own ground rule) — a repository with many stale review
 // sessions never turns one refsChanged signal into an unbounded burst of gh calls.

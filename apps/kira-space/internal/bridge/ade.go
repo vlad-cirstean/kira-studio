@@ -396,6 +396,8 @@ type AdePr struct {
 type AdeRepoPrs struct {
 	Kind     string            `json:"kind"` // "ok" | "disabled" | "unavailable"
 	Branches map[string]*AdePr `json:"branches"`
+	// WebURL is the repo's own web root (P129 Part 6 §0.8), "" when unlinked.
+	WebURL string `json:"webUrl"`
 }
 
 type AdeForcePushResult struct {
@@ -515,7 +517,7 @@ func toWireAdePrs(p ade.RepoPrs) AdeRepoPrs {
 	for branch, pr := range p.Branches {
 		out[branch] = &AdePr{Number: pr.Number, Title: pr.Title, URL: pr.URL, State: pr.State}
 	}
-	return AdeRepoPrs{Kind: p.Kind, Branches: out}
+	return AdeRepoPrs{Kind: p.Kind, Branches: out, WebURL: p.WebURL}
 }
 
 func toWireAdeCandidates(candidates []ade.CandidateBranch) []AdeCandidateBranch {
@@ -774,7 +776,9 @@ func (p AdeNewWorkPatchArgs) validate() error {
 			return err
 		}
 	}
-	if p.StartFrom != nil {
+	// §0.13: "" means main (AddNewWork's own convention) — only a non-empty value must name a real
+	// ref, matching AdeAddNewWorkArgs.Validate's own "if a.StartFrom != """ gate.
+	if p.StartFrom != nil && *p.StartFrom != "" {
 		if err := validateAdeBranchName(*p.StartFrom, "startFrom"); err != nil {
 			return err
 		}

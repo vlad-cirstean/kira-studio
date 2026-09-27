@@ -59,7 +59,7 @@ const SESSION_B = {
   terminalId: 'term-b',
 };
 
-const EMPTY_PRS = { kind: 'ok', branches: {} };
+const EMPTY_PRS = { kind: 'ok', branches: {}, webUrl: '' };
 
 function emptySnapshot(codeRepoId: string, overrides: Record<string, unknown> = {}) {
   return {

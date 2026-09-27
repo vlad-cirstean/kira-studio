@@ -96,7 +96,7 @@ const SESSION_B: AdeSession = {
   lastActiveAt: 0,
 };
 
-const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {} };
+const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };
 
 function snapshotFixture(): AdeRepoSnapshot {
   return {

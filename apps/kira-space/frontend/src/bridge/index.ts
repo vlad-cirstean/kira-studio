@@ -97,7 +97,7 @@ function normalizeAdeRepoPrs(raw: AdeRepoPrs): AdeRepoPrs {
   for (const [branch, pr] of Object.entries(raw.branches ?? {})) {
     if (pr) branches[branch] = pr;
   }
-  return { ...raw, branches };
+  return { ...raw, branches, webUrl: raw.webUrl ?? '' };
 }
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed

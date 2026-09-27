@@ -115,7 +115,7 @@ function snapshot(overrides: Partial<AdeRepoSnapshot> = {}): AdeRepoSnapshot {
   };
 }
 
-const NO_PRS: AdeRepoPrs = { kind: 'ok', branches: {} };
+const NO_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };
 
 function view(snap: AdeRepoSnapshot, overrides: Partial<Parameters<typeof useQueue>[0]> = {}) {
   return useQueue({
@@ -212,6 +212,7 @@ describe('ade-queue-rules', () => {
     const prs: AdeRepoPrs = {
       kind: 'ok',
       branches: { 'feat/a': { number: 1, title: 'PR Title A', url: '', state: 'Open' } },
+      webUrl: '',
     };
     const v = view(snap, { prs });
     expect(v.items.find((it) => it.id === 'a')?.title).toBe('PR Title A');

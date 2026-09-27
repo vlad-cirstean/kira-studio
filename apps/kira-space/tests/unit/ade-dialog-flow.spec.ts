@@ -212,7 +212,7 @@ function snapshot(overrides: Partial<AdeRepoSnapshot> = {}): AdeRepoSnapshot {
   };
 }
 
-const NO_PRS: AdeRepoPrs = { kind: 'ok', branches: {} };
+const NO_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };
 const DEFAULT_STATE: DialogState = { msg: null, push: false, override: false, branchName: '' };
 
 function ctxFor(snap: AdeRepoSnapshot): DialogCtx {
