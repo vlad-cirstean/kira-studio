@@ -23,6 +23,8 @@ type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
 
 const emit = defineEmits<{
   select: [id: string];
+  /** P129 Part 6 §0.21: bubbled from `AdeStackRow`, re-emitted with both arguments. */
+  openSession: [itemId: string, sessionId: string];
   segmentAction: [action: SegmentActionType];
   cellAction: [action: CellActionType];
   drop: [result: NonNullable<DropResult>];
@@ -155,6 +157,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
         :dashed-elbow="segment.cont && i === 0"
         :selected="selectedId === member.id"
         @select="emit('select', $event)"
+        @open-session="(itemId, sessionId) => emit('openSession', itemId, sessionId)"
       />
     </div>
   </div>

@@ -27,6 +27,8 @@ type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
 
 const emit = defineEmits<{
   select: [id: string];
+  /** P129 Part 6 §0.21: bubbled from `AdeStackBlock`, re-emitted with both arguments. */
+  openSession: [itemId: string, sessionId: string];
   rollover: [];
   overflowMove: [];
   dayMenu: [ev: MouseEvent];
@@ -183,6 +185,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
         :parent-of="parentOf"
         :selected-id="selectedId"
         @select="emit('select', $event)"
+        @open-session="(itemId, sessionId) => emit('openSession', itemId, sessionId)"
         @segment-action="emit('segmentAction', $event)"
         @cell-action="emit('cellAction', $event)"
         @drop="emit('drop', $event)"

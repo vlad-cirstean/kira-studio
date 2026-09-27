@@ -8,12 +8,13 @@ import { adeAgoOptions } from './ago';
 import type { QueueItem } from './useQueue';
 
 // P129 Part 5 §0.18: the mockup's own running-sessions capsule (mockup 233-247) — the robot icon is
-// the standing generic-icon decision (Part 1 §0), never the branded asset. Click selects the branch
-// only; opening that session's terminal in the Agents tab is Part 6's (no session tab exists yet),
-// flagged to the orchestrator in the result section, not built here.
+// the standing generic-icon decision (Part 1 §0), never the branded asset. P129 Part 6 §0.21: a
+// click opens that agent's own session in the Agents tab (select the item, switch tab, pick its
+// terminal), threaded up through `AdeStackRow`/`AdeStackBlock`/`AdeDayBand`/`AdeTimeline` to
+// `AdeRepoView`, whose handler calls `adeUi.openSession`.
 const props = defineProps<{ itemId: string; agents: QueueItem['agents'] }>();
 
-const emit = defineEmits<{ select: [id: string] }>();
+const emit = defineEmits<{ openSession: [itemId: string, sessionId: string] }>();
 
 function stateColor(kind: QueueItem['agents'][number]['kind']): string {
   if (kind === 'input') return '#f0b85c';
@@ -42,7 +43,7 @@ function lastActive(ms: number): string {
           class="inline-flex size-4 items-center justify-center rounded"
           :aria-label="`Open claude ${agent.sessionId}`"
           :data-testid="`ade-agent-${agent.sessionId}`"
-          @click="emit('select', props.itemId)"
+          @click="emit('openSession', props.itemId, agent.sessionId)"
         >
           <AdeActivityGlyph :kind="agent.kind" :size="13" />
         </button>

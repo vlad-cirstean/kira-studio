@@ -266,6 +266,11 @@ function onSelect(id: string): void {
   adeUiStore.select(props.codeRepoId, id);
 }
 
+// §0.21: the activity icon's own hand-off, bubbled from `AdeAgentsPill`.
+function onOpenSession(itemId: string, sessionId: string): void {
+  adeUiStore.openSession(props.codeRepoId, itemId, sessionId);
+}
+
 // §2.7: built once here, read by both the Rebase all opener below and `AdeClaudeDialog`'s own
 // `composeDialog` call (passed down as a prop) — `null` until the snapshot/queue view are loaded,
 // same guard `view` above already has.
@@ -450,6 +455,7 @@ function onDismissError(): void {
         :history-days="settingsStore.ade.historyDays"
         :min-extra-date="minExtraDate"
         @select="onSelect"
+        @open-session="onOpenSession"
         @open-history="() => void openHistory()"
         @more-week="onMoreWeek"
         @pick-date="onPickDate"

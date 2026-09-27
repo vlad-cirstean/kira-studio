@@ -34,6 +34,8 @@ type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
 
 const emit = defineEmits<{
   select: [id: string];
+  /** P129 Part 6 §0.21: bubbled from `AdeDayBand`, re-emitted with both arguments. */
+  openSession: [itemId: string, sessionId: string];
   openHistory: [];
   moreWeek: [];
   pickDate: [iso: string];
@@ -125,6 +127,7 @@ function onDrop(result: NonNullable<DropResult>): void {
         :selected-id="view.selectedId"
         :drag-over="dragOverDay === band.day"
         @select="emit('select', $event)"
+        @open-session="(itemId, sessionId) => emit('openSession', itemId, sessionId)"
         @rollover="emit('rollover', band)"
         @overflow-move="emit('overflowMove', band)"
         @day-menu="(ev) => emit('dayMenu', band, ev)"

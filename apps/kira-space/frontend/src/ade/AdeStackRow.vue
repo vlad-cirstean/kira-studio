@@ -21,7 +21,12 @@ const props = defineProps<{
   selected: boolean;
 }>();
 
-const emit = defineEmits<{ select: [id: string] }>();
+const emit = defineEmits<{
+  select: [id: string];
+  /** P129 Part 6 §0.21: bubbled from `AdeAgentsPill`'s own click, re-emitted with both arguments —
+   *  `$event` only carries the first. */
+  openSession: [itemId: string, sessionId: string];
+}>();
 
 const movable = computed(() => props.item.kind !== 'review');
 const merged = computed(() => props.item.status.label === 'merged');
@@ -102,7 +107,11 @@ function onPick(): void {
               : { background: item.color }
       "
     />
-    <AdeAgentsPill :item-id="item.id" :agents="item.agents" @select="emit('select', $event)" />
+    <AdeAgentsPill
+      :item-id="item.id"
+      :agents="item.agents"
+      @open-session="(itemId, sessionId) => emit('openSession', itemId, sessionId)"
+    />
     <span
       v-if="item.kind === 'review'"
       title="Someone else's branch: read-only here"
