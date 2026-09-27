@@ -68,9 +68,9 @@ export function createSettingsStore<S extends string, Se extends SettingsShape, 
       // section.
       const settingsSection = ref<S | null>(null);
 
-      /** TabStrip.vue's "Manage scripts…" — opens Settings already switched to `section`,
-       *  api/menus.ts's own `Environments…` precedent restated for a section instead of a whole
-       *  dialog. */
+      /** Kira Studio's CookiesPane.vue/RequestSettingsPane.vue "Edit global defaults…" — opens
+       *  Settings already switched to `section`, api/menus.ts's own `Environments…` precedent
+       *  restated for a section instead of a whole dialog. */
       function openSettingsAt(section: S): void {
         settingsSection.value = section;
         settingsOpen.value = true;

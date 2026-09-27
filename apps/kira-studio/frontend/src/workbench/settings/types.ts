@@ -1,8 +1,8 @@
 import type { SettingsPaneProps as GenericSettingsPaneProps } from '@workbench/components/settingsPaneProps';
 import type { Settings } from '../../state/settingsDomain';
 
-// P103 Part 2 (§5.5): the one prop contract every one of this app's eight settings panes takes,
-// factored out once rather than repeated eight times (CLAUDE.md's "code never duplicates") — the
+// P103 Part 2 (§5.5): the one prop contract every one of this app's seven settings panes takes,
+// factored out once rather than repeated seven times (CLAUDE.md's "code never duplicates") — the
 // exact shape SettingsShell.vue's own `#pane` scoped slot hands each pane, plus `active` (this
 // app's own `workbench/SettingsDialog.vue` wrapper binds it per pane, `activeSection === '<Section>'`).
 //

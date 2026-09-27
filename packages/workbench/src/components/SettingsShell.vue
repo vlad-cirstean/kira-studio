@@ -60,8 +60,7 @@ import { computed, reactive, ref } from 'vue';
 // `.section-pane`'s own layout) keeps every pane's script — and by extension every registered field
 // error and every already-instantiated Pinia store/`useQuery` — alive for as long as the dialog is
 // open, exactly matching the original file's own posture where the "Database MCP" mask-rule count
-// query or the "Scripts" section's own `watch(customScriptsStore.records, …)` don't care which
-// section is on screen.
+// query doesn't care which section is on screen.
 // The patch shape `save` receives, section by section — each present section only its own changed
 // leaves (`SettingsPatch`'s own shape, generalised: every field of `settingsPatchSchema` is
 // `<Section>.partial().optional()`, never the whole section).
@@ -129,8 +128,9 @@ const pendingPatch = computed<SectionPatch>(() => {
 const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
 // P85 §10.1: activeSection seeds from the app's own deep-link state (`initialSection`, e.g.
-// "Manage scripts…") — undefined (a plain open) falls back to the first section, G12 D9's own
-// default (both apps' first entry is "Appearance").
+// CookiesPane.vue's "Edit global defaults…" landing on the 'Api' section) — undefined (a plain
+// open) falls back to the first section, G12 D9's own default (both apps' first entry is
+// "Appearance").
 const activeSection = ref<string>(props.initialSection ?? props.sections[0]);
 
 // P28 §2.2: two generic helpers replace an all-or-nothing Revert to Defaults — a future leaf needs

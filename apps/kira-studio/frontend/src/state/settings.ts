@@ -3,18 +3,16 @@ import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { defaultSettings, type Settings, type SettingsPatch } from './settingsDomain';
 
-// P85 §10.1: moved out of SettingsDialog.vue so `Manage scripts…` (TabStrip.vue, workbench/) can
-// deep-link to the Scripts section without SettingsDialog.vue itself in scope — a workbench/ ->
-// state/ read, the direction this app's layering already permits. G12 D9's own reasoning for the
-// list is unchanged: 'Database MCP' bypasses draft/Save for its own stated reason; 'Scripts' joins
-// it for the same reason (§10.1: a CRUD section, not a staged leaf); P86 §9.3's 'Claude Code' joins
-// them too, an instant on/off switch exactly like 'Database MCP'.
+// P17 D1/G12 D9: 'Database MCP' bypasses draft/Save for its own stated reason — an instant-effect
+// CRUD/toggle section, not a staged leaf; P86 §9.3's 'Claude Code' joins it for the same reason.
+// P133 §2.6: 'Scripts' is gone — custom scripts are configured only from the Terminal module's own
+// QuickCommandsDialog.vue now, `openSettingsAt` stays for the Api panes' own deep link
+// (CookiesPane.vue/RequestSettingsPane.vue's "Edit global defaults…").
 export const sections = [
   'Appearance',
   'Data',
   'Cache',
   'Api',
-  'Scripts',
   'Claude Code',
   'Database MCP',
   'Advanced',

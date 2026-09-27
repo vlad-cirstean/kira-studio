@@ -12,10 +12,9 @@ import CachePane from './settings/CachePane.vue';
 import ClaudeCodePane from './settings/ClaudeCodePane.vue';
 import DatabaseMcpPane from './settings/DatabaseMcpPane.vue';
 import DataPane from './settings/DataPane.vue';
-import ScriptsPane from './settings/ScriptsPane.vue';
 
 // P103 Part 2 (§5.5): the old single-file workbench/SettingsDialog.vue, now a thin composition
-// over SettingsShell.vue plus this app's own eight panes (workbench/settings/*.vue, extracted
+// over SettingsShell.vue plus this app's own seven panes (workbench/settings/*.vue, extracted
 // verbatim from this file's own former inline `<template v-if>` branches — see SettingsShell.vue's
 // own file-level comment for what stays app-side and why). Everything genuinely app-specific stays
 // here: which six of Settings' sections this dialog edits, the dialog's own width/height, the
@@ -81,13 +80,6 @@ async function save(patch: SettingsPatch): Promise<void> {
       />
       <ApiPane
         :active="s.activeSection === 'Api'"
-        :draft="s.draft"
-        :is-at-default="s.isAtDefault"
-        :reset-leaf="s.resetLeaf"
-        :register-field-error="s.registerFieldError"
-      />
-      <ScriptsPane
-        :active="s.activeSection === 'Scripts'"
         :draft="s.draft"
         :is-at-default="s.isAtDefault"
         :reset-leaf="s.resetLeaf"
