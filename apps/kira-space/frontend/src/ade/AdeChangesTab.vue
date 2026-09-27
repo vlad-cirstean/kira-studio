@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { QueueItem, QueuePanel } from './useQueue';
+import type { QueueItem, QueuePanel, QueuePanelConflict } from './useQueue';
 
 // P129 Part 6 §0.17: the Changes tab (mockup 373-406) — straight off `panel.changes`. Rows with
 // nothing to show are omitted, as in the mockup (Conflicts/Shares); Commits/Files render their own
@@ -25,7 +25,7 @@ const worktreeColor = computed(() => (props.changes.dirtyCount ? '#f0b85c' : '#c
 const rippleColor = computed(() => (props.changes.rippleTone === 'amber' ? '#f0b85c' : '#c9c7c2'));
 
 const conflictText = computed(() => {
-  const c0 = props.changes.conflicts[0];
+  const c0: QueuePanelConflict | undefined = props.changes.conflicts[0];
   if (!c0) return '';
   return `${branchNameOf(c0.with)} · ${c0.files.map(basename).join(', ')}`;
 });

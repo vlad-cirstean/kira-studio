@@ -38,6 +38,7 @@ import type {
   AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
+  AdeBindNewWorkArgs,
   AdeCandidateBranch,
   AdeCredentialRequest,
   AdeForcePushArgs,
@@ -52,6 +53,7 @@ import type {
   AdeRepoSnapshot,
   AdeSendArgs,
   AdeSessionsResult,
+  AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
   AdeUpdateNewWorkArgs,
@@ -241,6 +243,12 @@ const spaceControl = {
     unwrap(AdeService.SetQueuedAfter(args)),
   adeUpdateNewWork: (args: AdeUpdateNewWorkArgs): Promise<void> =>
     unwrap(AdeService.UpdateNewWork(args)),
+  // P129 Part 6 §0.23: the two members left of `AdeService`'s 19 (bound count 17 -> 19) — the
+  // detail panel's own field writes (`SetBranchMeta`) and the candidate picker's resolution
+  // (`BindNewWork`).
+  adeSetBranchMeta: (args: AdeSetBranchMetaArgs): Promise<void> =>
+    unwrap(AdeService.SetBranchMeta(args)),
+  adeBindNewWork: (args: AdeBindNewWorkArgs): Promise<void> => unwrap(AdeService.BindNewWork(args)),
 
   // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
   adeSetPlan: (args: AdeSetPlanArgs): Promise<void> => unwrap(AdeService.SetPlan(args)),

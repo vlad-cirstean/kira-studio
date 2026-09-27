@@ -10,12 +10,14 @@ import type {
   AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
+  AdeBindNewWorkArgs,
   AdeForcePushArgs,
   AdeForcePushResult,
   AdeLaunch,
   AdePrepareLaunchArgs,
   AdeRepoSnapshot,
   AdeSendArgs,
+  AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
   AdeUpdateNewWorkArgs,
@@ -108,6 +110,37 @@ export function useAdeUpdateNewWork(codeRepoId: MaybeRefOrGetter<string>) {
         queryKey: adeSnapshotKey(toValue(codeRepoId)),
         exact: true,
       });
+    },
+  }));
+}
+
+/** P129 Part 6 §0.12: the detail panel's own field writes for a real branch (`useItemMeta.ts`'s
+ *  first caller) — review items only ever send `notes` (Go refuses the rest; the UI hides those
+ *  inputs, so this mutation never needs to know the difference). */
+export function useAdeSetBranchMeta(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'setBranchMeta'),
+    mutationFn: (args: AdeSetBranchMetaArgs): Promise<void> => control.adeSetBranchMeta(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+/** §0.15: the candidate picker's own resolution — binds an ambiguous draft to the branch Claude
+ *  actually created, so both the snapshot (the item moves from new-work to branch) and the
+ *  sessions list (the same session now reports that branch) need a fresh read. */
+export function useAdeBindNewWork(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'bindNewWork'),
+    mutationFn: (args: AdeBindNewWorkArgs): Promise<void> => control.adeBindNewWork(args),
+    onSettled: () => {
+      const id = toValue(codeRepoId);
+      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+      void queryClient.invalidateQueries({ queryKey: adeSessionsKey, exact: true });
     },
   }));
 }

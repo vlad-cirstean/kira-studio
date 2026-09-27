@@ -251,12 +251,53 @@ export interface AdeSetQueuedAfterArgs {
   after: string;
 }
 
-/** `AdeUpdateNewWorkArgs` — Part 4's only consumer is the optional Start-new-work branch name
- *  (§0.6); the patch's other fields (title/jira/startFrom/notes/est) are later parts' own. */
+/** `AdeJiraPatch` — the wire's own nested Jira half of `AdeNewWorkPatch`/`AdeBranchMetaPatch`
+ *  (§5.3 of Part 2's plan: `patch{..., jira, ...}`) — the store's flat key/URL pointer pair, grouped
+ *  to match the read side's own nested `AdeJira`. */
+export interface AdeJiraPatch {
+  key?: string;
+  url?: string;
+}
+
+/** `AdeNewWorkPatchArgs`, widened for Part 6's own writes (§0.12) — Part 4's only field was
+ *  `branchName` (the Start-new-work dialog's own draft-to-branch rename). */
+export interface AdeNewWorkPatch {
+  title?: string;
+  jira?: AdeJiraPatch;
+  startFrom?: string;
+  notes?: string;
+  est?: string;
+  branchName?: string;
+}
+
 export interface AdeUpdateNewWorkArgs {
   codeRepoId: string;
   id: string;
-  patch: { branchName?: string };
+  patch: AdeNewWorkPatch;
+}
+
+/** `AdeBranchMetaPatchArgs` (§0.11/§0.12) — `SetBranchMeta` never turns a branch back into
+ *  "review" and nothing in Part 6 changes `kind`, so this patch has no `kind` field at all. */
+export interface AdeBranchMetaPatch {
+  name?: string;
+  jira?: AdeJiraPatch;
+  prUrl?: string;
+  est?: string;
+  notes?: string;
+}
+
+export interface AdeSetBranchMetaArgs {
+  codeRepoId: string;
+  branch: string;
+  patch: AdeBranchMetaPatch;
+}
+
+/** §0.15: the candidate picker's own resolution — binds an ambiguous new-work draft to the branch
+ *  Claude actually created. */
+export interface AdeBindNewWorkArgs {
+  codeRepoId: string;
+  id: string;
+  branch: string;
 }
 
 /** `AdeSetPlanArgs` — `timelineOps.ts`'s own `SetPlanArgs` (§0.13) plus the repo id every wire args

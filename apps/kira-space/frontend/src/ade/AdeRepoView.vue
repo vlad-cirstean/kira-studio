@@ -478,6 +478,7 @@ function onDismissError(): void {
       :dialog-ctx="dialogCtx"
       :code-repo-id="codeRepoId"
       :items-by-id="itemsById"
+      :prs="prsQuery.data.value"
       :width="panelWidth"
     />
   </template>
