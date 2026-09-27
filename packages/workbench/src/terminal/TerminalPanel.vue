@@ -7,25 +7,29 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { connColorVar } from '@theme/connColor';
-import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref, useTemplateRef } from 'vue';
 import { useNewTerminal, useTerminalModule } from './module';
+import QuickCommandsDialog from './QuickCommandsDialog.vue';
+import { useRemoveScript } from './scriptActions';
 
-const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const ctx = useTerminalModule();
 const { open: openNewTerminal } = useNewTerminal();
+const removeScript = useRemoveScript();
 
 // P91 §11: the Terminal module's own left panel — a second *view* over P85's custom_scripts store
 // (§10, decided against a second, module-scoped list), not a second data store. Add/remove are
-// inline; full editing (rename, re-command, working directory, colour) deep-links to the Settings
-// section P85 already built (§11.3) — a 180-480px panel cannot hold four labelled fields legibly,
-// and this stays the one place those rules live. P128 §2.4: moved to the shared terminal module —
-// `ctx.scripts` (module.ts) is the optional custom-scripts seam; Kira Space injects none, so its
-// panel below shows only a header and one "New terminal" action.
+// inline; full editing (rename, re-command, working directory, colour) opens
+// `QuickCommandsDialog.vue` (P133 §2.2), the shared module's own manager dialog. P128 §2.4: moved
+// to the shared terminal module — `ctx.scripts` (module.ts) is the optional custom-scripts seam;
+// Kira Space injects none, so its panel below shows only a header and one "New terminal" action.
 const scripts = computed(() => ctx.scripts);
+
+// P133 §2.4: dialog visibility is this one component's own local state, not a Pinia store —
+// CLAUDE.md's Pinia rule is for *shared* client state, and nothing else reads this.
+const editor = ref<{ focusId: string | null } | null>(null);
 
 const search = ref('');
 const adding = ref(false);
@@ -70,10 +74,10 @@ function cancelAdd(): void {
   addError.value = null;
 }
 
-// §11.3: staged locally, committed with ctx.scripts.create — SettingsDialog.vue's own posture,
-// including trimming both fields before building CustomScriptFields (P85's own late fix). Left at
-// workingDir '' / color 'none' — a quick command added here runs in the module's default cwd
-// until the user sets one in Settings.
+// §11.3: staged locally, committed with ctx.scripts.create — including trimming both fields
+// before building CustomScriptFields (P85's own late fix). Left at workingDir '' / color 'none' —
+// a quick command added here runs in the module's default cwd until the user sets one in the
+// Quick commands dialog.
 async function onAdd(): Promise<void> {
   if (!canAdd.value || !scripts.value) return;
   addError.value = null;
@@ -103,11 +107,7 @@ function runScript(script: CustomScript): void {
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
   if (!scripts.value) return;
-  const ok = await confirmDialogStore.confirmDialog(
-    `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
-    { danger: true },
-  );
-  if (ok) await scripts.value.remove(script.id);
+  await removeScript(scripts.value, script);
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {
@@ -118,7 +118,9 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       id: 'edit',
       label: 'Edit…',
       icon: 'edit',
-      run: () => scripts.value?.openEditor(),
+      run: () => {
+        editor.value = { focusId: script.id };
+      },
     },
     { type: 'separator' },
     {
@@ -155,10 +157,10 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
         />
         <TooltipIconButton
           icon="settings-gear"
-          label="Manage scripts…"
-          aria-label="Manage scripts"
+          label="Manage quick commands…"
+          aria-label="Manage quick commands"
           data-testid="quick-commands-manage"
-          @click="scripts.openEditor()"
+          @click="editor = { focusId: null }"
         />
       </div>
       <template v-if="!empty">
@@ -252,6 +254,12 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           </AlertAction>
         </Alert>
       </div>
+      <QuickCommandsDialog
+        v-if="editor"
+        :scripts="scripts"
+        :focus-id="editor.focusId"
+        @close="editor = null"
+      />
     </div>
     <!-- P128 §2.4: no scripts seam (Kira Space) — just a header and one "New terminal" action,
          the same one the tab strip's own "+" menu opens (useNewTerminal). -->

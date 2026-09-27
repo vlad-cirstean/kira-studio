@@ -8,14 +8,16 @@ import type { TerminalHostDeps } from './terminalHost';
 // three components mount in both apps. `openTerminalTab` binds the app's own module workspace
 // ('terminal' in both) itself, so shared code never names a workspace key.
 
-/** Studio's own custom-scripts panel (P85) — optional, since Kira Space has no scripts store of
+/** Studio's own custom-scripts store (P85) — optional, since Kira Space has no scripts store of
  *  its own (§0's seam resolution). Every Quick-commands element in TerminalPanel.vue sits behind
- *  `ctx.scripts` being set. */
+ *  `ctx.scripts` being set. P133 §2.1: full editing now lives in `QuickCommandsDialog.vue`, the
+ *  shared module's own component, so the seam grows `update` and drops `openEditor` — there is no
+ *  host detour left to call out to. */
 export interface TerminalScriptsSeam {
   records(): readonly CustomScript[];
   create(fields: CustomScriptFields): Promise<unknown>;
+  update(id: string, fields: CustomScriptFields): Promise<unknown>;
   remove(id: string): Promise<void>;
-  openEditor(): void;
 }
 
 export interface TerminalModuleContext {
