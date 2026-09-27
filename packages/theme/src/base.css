@@ -195,6 +195,14 @@
 }
 
 @layer base {
+  /* P130: focus-ring's colour, width and offset, held at rest, so focus flips only the discrete
+     outline-style -- transition-colors/-all never animate the ring from currentcolor/medium. */
+  * {
+    outline-color: var(--kira-focus);
+    outline-width: var(--kira-border-width);
+    outline-offset: calc(var(--kira-border-width) * -1);
+  }
+
   :focus-visible {
     @apply focus-ring;
   }

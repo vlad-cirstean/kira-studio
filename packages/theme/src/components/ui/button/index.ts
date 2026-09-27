@@ -15,8 +15,11 @@ export const buttonVariants = cva(
           'bg-field text-fg hover:bg-field/80 aria-expanded:bg-field aria-expanded:text-fg',
         ghost:
           'hover:bg-field hover:text-fg dark:hover:bg-field/50 aria-expanded:bg-field aria-expanded:text-fg',
+        // P130: outline-error at rest (not focus-visible:outline-error) -- the base-layer rest
+        // rule holds every element's outline colour at --kira-focus (blue) until outline-style
+        // flips, so a focus-visible-only override here would still flash blue-to-red on focus.
         destructive:
-          'bg-error/10 hover:bg-error/20 dark:bg-error/20 text-error focus-visible:outline-error dark:hover:bg-error/30',
+          'bg-error/10 hover:bg-error/20 dark:bg-error/20 text-error outline-error dark:hover:bg-error/30',
         link: 'text-primary underline-offset-4 hover:underline',
         // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
         // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
