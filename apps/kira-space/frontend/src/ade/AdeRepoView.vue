@@ -8,6 +8,7 @@ import { useSettingsStore } from '../state/settings';
 import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
+import AdeTimeline from './AdeTimeline.vue';
 import { type DialogCtx, rebaseAllSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
@@ -62,8 +63,15 @@ const view = computed(() => {
     today: today.value,
     localDayOf: localIsoOfMs,
     rebasing: adeActionsStore.rebasingFor(props.codeRepoId),
+    // §0.6: outlives a repo-tab remount (stored in `adeUi`, not a local ref) — `useQueue`'s own
+    // first-item default applies once the entry is unset or names a since-removed item.
+    selectedId: adeUiStore.selectedByRepo[props.codeRepoId],
   });
 });
+
+function onSelect(id: string): void {
+  adeUiStore.select(props.codeRepoId, id);
+}
 
 // §2.7: built once here, read by both the Rebase all opener below and `AdeClaudeDialog`'s own
 // `composeDialog` call (passed down as a prop) — `null` until the snapshot/queue view are loaded,
@@ -145,6 +153,7 @@ function onDismissError(): void {
           </Button>
         </AlertDescription>
       </Alert>
+      <AdeTimeline v-if="view" :view="view" @select="onSelect" />
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />
   </div>

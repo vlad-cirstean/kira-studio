@@ -118,9 +118,12 @@ export interface QueueItem {
   estimate: { hours: number; days: number } | null;
   /** Running sessions only (mockup `running(b)`), sorted by `actRank` — drives the agents pill. */
   agents: { sessionId: string; label: string; kind: ActivityKind; lastActiveAt: number }[];
+  /** A review item's own author (mockup `b.owner`), `''` otherwise — P129 Part 5 §0.21's owner
+   *  pill, the first UI consumer of the internal `Item.owner` this module already carried. */
+  owner: string;
 }
 
-interface QueueStackMember {
+export interface QueueStackMember {
   id: string;
   dep: number;
 }
@@ -132,7 +135,7 @@ interface QueueStack {
   parked: boolean;
 }
 
-interface QueueTag {
+export interface QueueTag {
   label: string;
   tone: Tone;
   tip: string;
@@ -1757,6 +1760,7 @@ export function useQueue(input: QueueInput): QueueView {
       acts,
       estimate: parseEst(item.est, workdayHours, spanDayShare),
       agents,
+      owner: item.owner,
     };
   });
 

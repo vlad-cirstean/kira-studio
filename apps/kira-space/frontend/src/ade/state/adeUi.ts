@@ -4,9 +4,10 @@ import type { DialogSpec } from '../dialogCompose';
 
 // P129 Part 3 §0.9/§2.5: the `ade` module's own runtime UI state — active repo tab and the
 // per-repo Refresh note (§0.16's "the note persists, runtime, per repo, until the next Refresh").
-// Selection (`selectedByRepo`) lands with Part 5's timeline click, `historyOpen` with the same
-// part — neither exists yet. P129 Part 4 adds dialog state: the one `AdeClaudeDialog` open across
-// every repo, never two at once (mockup's own single `state.dialog`).
+// P129 Part 4 adds dialog state: the one `AdeClaudeDialog` open across every repo, never two at
+// once (mockup's own single `state.dialog`). P129 Part 5 §0.6 adds `selectedByRepo` (mockup's own
+// `selected[repo]`) — it outlives an `AdeRepoView` repo-tab remount, unlike `historyOpen`, which
+// stays a local ref on that component (§0.6's own reasoning).
 export type AdeRefreshNote =
   | { kind: 'ok'; refsChanged: number; newlyMerged: string[] }
   | { kind: 'error'; message: string };
@@ -29,10 +30,17 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     activeRepoId: '' as string,
     refreshNote: {} as Record<string, AdeRefreshNote>,
     dialog: null as AdeDialogState | null,
+    /** §0.6: the timeline's own row selection, per repo — `useQueue`'s own first-item default
+     *  applies when a repo has no entry here, or its entry no longer names a live item. */
+    selectedByRepo: {} as Record<string, string>,
   });
 
   function setActiveRepo(id: string): void {
     state.activeRepoId = id;
+  }
+
+  function select(codeRepoId: string, id: string): void {
+    state.selectedByRepo = { ...state.selectedByRepo, [codeRepoId]: id };
   }
 
   function recordRefresh(codeRepoId: string, note: AdeRefreshNote): void {
@@ -91,6 +99,7 @@ export const useAdeUiStore = defineStore('adeUi', () => {
   return {
     ...toRefs(state),
     setActiveRepo,
+    select,
     recordRefresh,
     openDialog,
     closeDialog,
