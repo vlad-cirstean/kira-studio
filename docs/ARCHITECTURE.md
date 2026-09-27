@@ -1246,18 +1246,22 @@ one; Kira Space's own `TitleBar.vue` renders it for the first time.
 
 **The Terminal entry in both apps' `MODES` points at one shared module (P128 §2.4), not two
 hand-kept-identical copies.** `packages/workbench/src/terminal/module.ts` exports
-`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts?}`, the `terminalModuleKey`
+`TerminalModuleContext{defaultCwd, openTerminalTab, host, scripts?}` (`scripts`'s own
+`TerminalScriptsSeam{records, create, update, remove}`, P133 §2.1), the `terminalModuleKey`
 injection key, and `useTerminalModule()`/`useNewTerminal()`; each app's own `App.vue` builds one
 context object (its own `workbench/terminalModule.ts`) and `provide()`s it once, at the root, above
 `WorkbenchShell.vue`. `scripts` is the one field that differs by app: Kira Studio wires its own
 custom-scripts store through it (P91's "Quick commands" launch a saved script as a fresh terminal
 tab); Kira Space omits the field entirely — no custom-scripts store exists there, and
-`TerminalStart.vue`'s own quick-commands panel stays unrendered when `scripts` is absent, rather
-than each app needing its own copy of that conditional. `TerminalPanel.vue`, `TerminalStart.vue`,
-and `TerminalNewTab.vue` (the module's own registry entries) and `TerminalTabView.vue`/
-`TerminalHostView.vue` (the tab body, shared with repo terminals below) are the same five files in
-both apps, imported lazily (`defineAsyncComponent`) so a git-only session never pays for the
-terminal launch chunk.
+`TerminalPanel.vue`'s own quick-commands panel stays unrendered when `scripts` is absent, rather
+than each app needing its own copy of that conditional. A script's every field (name, command,
+working directory, colour) is configured only from that panel's own `QuickCommandsDialog.vue`
+(P133 §2.2) — its gear button ("Manage quick commands…") and its rows' context-menu "Edit…" both
+open it, focused on the right row for "Edit…"; Settings has no Scripts section any more.
+`TerminalPanel.vue`, `TerminalStart.vue`, `TerminalNewTab.vue`, and `QuickCommandsDialog.vue` (the
+module's own registry entries and dialog) and `TerminalTabView.vue`/`TerminalHostView.vue` (the tab
+body, shared with repo terminals below) are the same six files in both apps, imported lazily
+(`defineAsyncComponent`) so a git-only session never pays for the terminal launch chunk.
 
 **Kira Space's own repo terminals and the Terminal module's own terminals now render through that
 same `TerminalTabView.vue`/`TerminalHostView.vue`, not two parallel implementations (P128 §2.4).**
