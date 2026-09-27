@@ -4,10 +4,13 @@ import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
 // P91 §17.2: TERMINAL_OPEN_OK's shape uses control.log() polling rather than call-count
-// assertions, and settings-scripts.spec.ts for the script fixtures. The mocked DefaultCwd below is
-// '/home/test' — mockRuntime.ts's own boot default (IPC.terminalDefaultCwd) — so an unscoped
-// terminal's title falls out of its basename, 'test' (tabKinds.ts's terminal kind: `s.label ||
-// basename(s.cwd) || 'Terminal'`).
+// assertions. The mocked DefaultCwd below is '/home/test' — mockRuntime.ts's own boot default
+// (IPC.terminalDefaultCwd) — so an unscoped terminal's title falls out of its basename, 'test'
+// (tabKinds.ts's terminal kind: `s.label || basename(s.cwd) || 'Terminal'`).
+//
+// P133 §5.1: the full script-editing coverage (create with all four fields, edit, blur-commit,
+// empty/rejected reverts, colour) moved here from the deleted settings-scripts.spec.ts — Settings'
+// own Scripts pane is gone, QuickCommandsDialog.vue is now the only place those rules run.
 
 const SCRIPT = {
   id: 'script-1',
@@ -29,6 +32,10 @@ const TERMINAL_OPEN_OK: ControlSnapshot = {
 
 function tab(page: import('@playwright/test').Page) {
   return page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
+}
+
+function dialog(page: import('@playwright/test').Page) {
+  return page.locator('[data-testid="quick-commands-dialog"]');
 }
 
 async function openTerminalModule(page: import('@playwright/test').Page): Promise<void> {
@@ -146,4 +153,208 @@ test('adding a quick command calls customScriptsCreate with the trimmed fields, 
       color: 'none',
     },
   });
+});
+
+// P133 §5.1 test 1: moved from settings-scripts.spec.ts's tests 1 and 2, merged the way the
+// inline-add test above already merges "Add stays disabled" with a successful add.
+test('Manage opens the quick commands dialog; add sends the trimmed fields', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: [] },
+      { channel: IPC.customScriptsCreate, response: SCRIPT },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await expect(dialog(page)).toBeVisible();
+
+  await expect(dialog(page).locator('[data-testid="custom-script-list"]')).toHaveCount(0);
+  await expect(dialog(page).getByText('No quick commands yet.')).toBeVisible();
+
+  const addButton = dialog(page).locator('[data-testid="custom-script-add"]');
+  await expect(addButton).toBeDisabled();
+
+  await dialog(page).locator('[data-testid="custom-script-add-name"]').fill(`  ${SCRIPT.name}  `);
+  await expect(addButton).toBeDisabled(); // command still empty
+
+  await dialog(page)
+    .locator('[data-testid="custom-script-add-command"]')
+    .fill(`  ${SCRIPT.command}  `);
+  await dialog(page)
+    .locator('[data-testid="custom-script-add-workingdir"]')
+    .fill(SCRIPT.workingDir);
+  await dialog(page).locator('[data-testid="color-green"]').click();
+  await expect(addButton).toBeEnabled();
+  await addButton.click();
+
+  await expect
+    .poll(() => control.log().some((entry) => entry.channel === IPC.customScriptsCreate))
+    .toBe(true);
+  const call = control.log().find((entry) => entry.channel === IPC.customScriptsCreate);
+  expect(call?.args).toEqual({
+    fields: {
+      name: SCRIPT.name,
+      command: SCRIPT.command,
+      workingDir: SCRIPT.workingDir,
+      color: 'green',
+    },
+  });
+});
+
+// P133 §5.1 test 2: moved from settings-scripts.spec.ts's test 3.
+test('a non-absolute working directory surfaces the backend error on add', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: [] },
+      {
+        channel: IPC.customScriptsCreate,
+        error: {
+          code: 'E_BAD_REQUEST',
+          message: 'model: custom script: working directory must be an absolute path',
+        },
+      },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await expect(dialog(page)).toBeVisible();
+
+  await dialog(page).locator('[data-testid="custom-script-add-name"]').fill(SCRIPT.name);
+  await dialog(page).locator('[data-testid="custom-script-add-command"]').fill(SCRIPT.command);
+  await dialog(page).locator('[data-testid="custom-script-add-workingdir"]').fill('relative/dir');
+  await dialog(page).locator('[data-testid="custom-script-add"]').click();
+
+  await expect(dialog(page).locator('[data-testid="custom-script-error"]')).toHaveText(
+    'model: custom script: working directory must be an absolute path',
+  );
+});
+
+// P133 §5.1 test 3. Both customScriptsUpdate snapshots are matched by their exact args (the mock
+// answers one of several same-channel snapshots by (channel, args) — installControlMocks's own
+// findSnap), since the two calls below carry genuinely different fields.
+test('Edit… opens the dialog focused on that row; blur commits; colour applies immediately', async ({
+  relaunch,
+}) => {
+  const editedName = `${SCRIPT.name} edited`;
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: [SCRIPT] },
+      {
+        channel: IPC.customScriptsUpdate,
+        args: {
+          id: SCRIPT.id,
+          fields: {
+            name: editedName,
+            command: SCRIPT.command,
+            workingDir: SCRIPT.workingDir,
+            color: SCRIPT.color,
+          },
+        },
+        response: { ...SCRIPT, name: editedName },
+      },
+      {
+        channel: IPC.customScriptsUpdate,
+        args: {
+          id: SCRIPT.id,
+          fields: {
+            name: SCRIPT.name,
+            command: SCRIPT.command,
+            workingDir: SCRIPT.workingDir,
+            color: 'blue',
+          },
+        },
+        response: { ...SCRIPT, color: 'blue' },
+      },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator(`[data-testid="quick-command-${SCRIPT.id}"]`).click({ button: 'right' });
+  await page.locator('[data-testid="menu-item-edit"]').click();
+  await expect(dialog(page)).toBeVisible();
+
+  const row = dialog(page).locator(`[data-testid="custom-script-${SCRIPT.id}"]`);
+  const nameInput = row.locator('[data-testid="custom-script-name"]');
+  await expect(nameInput).toBeFocused();
+
+  await nameInput.fill(`  ${editedName}  `);
+  await nameInput.blur();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.customScriptsUpdate).length)
+    .toBe(1);
+  const updateCalls = () => control.log().filter((e) => e.channel === IPC.customScriptsUpdate);
+  expect(updateCalls()[0]?.args).toEqual({
+    id: SCRIPT.id,
+    fields: {
+      name: editedName,
+      command: SCRIPT.command,
+      workingDir: SCRIPT.workingDir,
+      color: SCRIPT.color,
+    },
+  });
+
+  // The mock never broadcasts customScriptsChanged, so the record `onScriptColorChange` reads
+  // from still carries SCRIPT's own original name — not the just-typed edit.
+  await row.locator('[data-testid="color-blue"]').click();
+  await expect.poll(() => updateCalls().length).toBe(2);
+  expect(updateCalls()[1]?.args).toEqual({
+    id: SCRIPT.id,
+    fields: {
+      name: SCRIPT.name,
+      command: SCRIPT.command,
+      workingDir: SCRIPT.workingDir,
+      color: 'blue',
+    },
+  });
+});
+
+// P133 §5.1 test 4. The single customScriptsUpdate snapshot only ever matches the rejected
+// workingDir edit below -- the empty-command blur never calls update at all (client-side revert).
+test('an empty field reverts on blur; a rejected edit reverts and shows the error', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.customScriptsList, response: [SCRIPT] },
+      {
+        channel: IPC.customScriptsUpdate,
+        args: {
+          id: SCRIPT.id,
+          fields: {
+            name: SCRIPT.name,
+            command: SCRIPT.command,
+            workingDir: 'relative/dir',
+            color: SCRIPT.color,
+          },
+        },
+        error: {
+          code: 'E_BAD_REQUEST',
+          message: 'model: custom script: working directory must be an absolute path',
+        },
+      },
+    ],
+  });
+
+  await openTerminalModule(page);
+  await page.locator('[data-testid="quick-commands-manage"]').click();
+  await expect(dialog(page)).toBeVisible();
+
+  const row = dialog(page).locator(`[data-testid="custom-script-${SCRIPT.id}"]`);
+  const commandInput = row.locator('[data-testid="custom-script-command"]');
+  await commandInput.fill('');
+  await commandInput.blur();
+  await expect(commandInput).toHaveValue(SCRIPT.command);
+  expect(control.log().some((e) => e.channel === IPC.customScriptsUpdate)).toBe(false);
+
+  const workingDirInput = row.locator('[data-testid="custom-script-workingdir"]');
+  await workingDirInput.fill('relative/dir');
+  await workingDirInput.blur();
+  await expect(workingDirInput).toHaveValue(SCRIPT.workingDir);
+  await expect(dialog(page).locator('[data-testid="custom-script-error"]')).toHaveText(
+    'model: custom script: working directory must be an absolute path',
+  );
 });
