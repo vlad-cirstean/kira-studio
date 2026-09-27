@@ -15,8 +15,11 @@ import (
 // the one byte git guarantees never appears inside a field value). LF-framed: none of these fields
 // can legally carry a raw newline (a commit's author name/email are single-line by git's own commit
 // grammar, same as %(taggername) elsewhere in this package).
+// authoremail uses the :trim modifier -- %(authoremail) alone prints the raw "<addr>" envelope
+// (angle brackets included), which would never match a plain `git config user.email` read and so
+// would silently defeat every isMine comparison this format exists to feed (§0.11).
 const InventoryFormat = "%(refname)%00%(objectname)%00%(committerdate:unix)%00%(authorname)%00" +
-	"%(authoremail)%00%(worktreepath)%00%(upstream)%00%(upstream:track)"
+	"%(authoremail:trim)%00%(worktreepath)%00%(upstream)%00%(upstream:track)"
 
 const inventoryFieldCount = 8
 
