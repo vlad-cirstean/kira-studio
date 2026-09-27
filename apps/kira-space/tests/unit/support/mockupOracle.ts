@@ -131,3 +131,37 @@ export function loadNeutralizedComponent(): MockupComponent {
   neutralize(comp);
   return comp;
 }
+
+export interface RunMockupDialogOptions {
+  repo: string;
+  /** Shallow-merged onto `comp.state` before the first render — set `selected: {[repo]: id}` here
+   *  for a scenario that needs a selected item (§3.1 scenario 2/6), or a session/plan fixture a
+   *  particular scenario needs. */
+  statePatch?: Record<string, unknown>;
+  /** Invoked with the fresh `comp` and its first `renderVals()` result (`V`) — call whichever
+   *  opener closure `V` exposes (`V.rebaseAll()`, a block's `action.run()`, a `sel.actions[].run()`,
+   *  a drop handler, …) to populate `comp.state.dialog` (P129 Part 4 §3.1). */
+  open: (comp: MockupComponent, view: MockupComponent) => void;
+}
+
+/** Runs one mockup dialog opener and returns both halves the parity spec projects against: the raw
+ *  opener output (`comp.state.dialog`, the mockup's own `D`) and the rendered dialog view-model
+ *  (`renderVals().dialog`, the mockup's own `dlg`) computed fresh after `open` ran. `comp` itself
+ *  comes back too, for a state-variant case that re-renders after a further `comp.setState(...)`
+ *  (push/override/edited, §3.1's own "state variants"). */
+export function runMockupDialog(options: RunMockupDialogOptions): {
+  comp: MockupComponent;
+  spec: MockupComponent;
+  view: MockupComponent;
+} {
+  const Component = loadComponentCtor();
+  const comp = new Component({});
+  comp.state.repo = options.repo;
+  comp.state.lastRepo = options.repo;
+  neutralize(comp);
+  if (options.statePatch) Object.assign(comp.state, options.statePatch);
+  const view = comp.renderVals();
+  options.open(comp, view);
+  const after = comp.renderVals();
+  return { comp, spec: comp.state.dialog, view: after.dialog };
+}

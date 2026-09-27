@@ -199,6 +199,10 @@ export interface QueueView {
   /** Mine, non-parked, non-continuation lead segments whose root is behind main and not merged
    *  (mockup line 1756) — root ids. Part 3's own UI reads only this field. */
   behindRoots: string[];
+  /** P129 Part 4 §0.9: exposes the graph `buildParentOf` already computes internally, insertion
+   *  order kept (matches the mockup) — `dialogCompose.ts`'s `stackIds`/`agentTargets` read these. */
+  parentOf: Record<string, string>;
+  kids: Record<string, string[]>;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1011,7 +1015,10 @@ function tagForBehindAfterCont(
         ? {
             kind: 'rebase',
             label: rebasing.has(g.root) ? '…' : 'Rebase',
-            targetIds: [g.root],
+            // P129 Part 4 §0.9 fix: an `after` rebase names its own onto target, matching
+            // `queueAfter`'s own `[root, with]` shape — was `[g.root]` alone, indistinguishable
+            // from a rebase-onto-main action.
+            targetIds: [g.root, g.after.id],
             disabled: d.busy,
           }
         : null;
@@ -1471,7 +1478,22 @@ export function useQueue(input: QueueInput): QueueView {
     ripple,
     atRisk,
     behindRoots,
+    parentOf: Object.fromEntries(parentOf),
+    kids: Object.fromEntries([...kids].map(([k, v]) => [k, [...v]])),
   };
+}
+
+// -------------------------------------------------------------------------------------------------
+// P129 Part 4 §0.3/§0.9: `dayLong`, the dialog templates' own day label (mockup line 946)
+// -------------------------------------------------------------------------------------------------
+
+/** `null` (Later, §0.6) -> `'Later'`; else `WD DATE MO`, `'Today, '`-prefixed when `iso === today`. */
+export function dayLong(iso: string | null, today: string): string {
+  if (iso === null) return 'Later';
+  const days = isoToDays(iso);
+  const { month0, date } = civilFromDays(days);
+  const dow = ((((days % 7) + 7) % 7) + 4) % 7; // 1970-01-01 (day 0) was a Thursday (index 4).
+  return `${iso === today ? 'Today, ' : ''}${WD[dow]} ${date} ${MO[month0]}`;
 }
 
 function actRank(a: ActivityKind): number {

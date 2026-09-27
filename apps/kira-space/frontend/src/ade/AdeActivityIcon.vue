@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
-import type { ActivityKind } from './activity';
+import { ACTIVITY_LABEL, type ActivityKind } from './activity';
 
 // P129 Part 3 §0.18/§2.7: mockup line 663-670's own `act()` shapes at its `z = 12` size — the only
 // size Part 3 renders (repo tabs, §0.18's own note: "Part 3 renders them in repo tabs"). Tints stay
@@ -11,15 +11,7 @@ import type { ActivityKind } from './activity';
 // below that floor exists in this app's chrome.
 const props = defineProps<{ kind: ActivityKind }>();
 
-const LABEL: Record<ActivityKind, string> = {
-  input: 'needs input',
-  working: 'working',
-  waiting: 'waiting on monitor',
-  idle: 'idle',
-  stopped: 'stopped',
-};
-
-const label = computed(() => LABEL[props.kind]);
+const label = computed(() => ACTIVITY_LABEL[props.kind]);
 </script>
 
 <template>

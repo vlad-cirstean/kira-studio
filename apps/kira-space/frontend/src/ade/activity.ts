@@ -10,6 +10,22 @@ import type { AdeSession } from './wire';
  *  as an explicit `idle` phase. */
 export type ActivityKind = 'input' | 'working' | 'waiting' | 'idle' | 'stopped';
 
+/** Mockup line 663-670's own label set — `AdeActivityIcon.vue`'s tooltip and, per P129 Part 4
+ *  §0.10, the dialog's busy-row text (`<branch> · claude <sid> · <label>`). */
+export const ACTIVITY_LABEL: Record<ActivityKind, string> = {
+  input: 'needs input',
+  working: 'working',
+  waiting: 'waiting on monitor',
+  idle: 'idle',
+  stopped: 'stopped',
+};
+
+/** `claude <id>` template rung (§0.3): the Claude session id's first UUID group, unchanged for the
+ *  mockup's own 4-hex ids. */
+export function sessionLabel(session: AdeSession): string {
+  return `claude ${session.claudeSessionId.slice(0, 8)}`;
+}
+
 export function activityKind(
   session: AdeSession,
   activity: ReadonlyMap<string, AgentActivity>,

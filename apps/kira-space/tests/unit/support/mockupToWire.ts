@@ -1,5 +1,6 @@
 import type { AgentActivity, AgentPhase } from '@shared/domain/agent';
-import type { QueueInput } from '../../../frontend/src/ade/useQueue';
+import type { DialogCtx } from '../../../frontend/src/ade/dialogCompose';
+import { type QueueInput, useQueue } from '../../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
   AdeNewWork,
@@ -22,7 +23,11 @@ function baseDays(): number {
   return Date.UTC(2026, 8, 22) / DAY_MS;
 }
 
-function isoFromOffset(offset: number): string {
+/** Exported for `ade-dialog-parity.spec.ts`'s own Move scenario (§3.1 family 8): the mockup's own
+ *  `D.day` is a raw day offset (`moveDialog`'s own `dval`), while our `moveSpec` takes an ISO date
+ *  (or `null` for Later, §0.6) — the same offset<->ISO mapping `mockupToWire` already uses for
+ *  `plan.day`. */
+export function isoFromOffset(offset: number): string {
   const d = new Date((baseDays() + offset) * DAY_MS);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
@@ -319,4 +324,30 @@ export function toQueueInput(result: MockupToWireResult, selectedId?: string): Q
     rebasing: result.rebasing,
     pushing: result.pushing,
   };
+}
+
+function lastSegmentForFixture(name: string): string {
+  const parts = name.split('/');
+  return (parts.length ? parts[parts.length - 1] : name) as string;
+}
+
+/** P129 Part 4 §3.1: `dialogCompose.ts`'s own `DialogCtx`, over the same converted data — every
+ *  branch's `worktree` is set explicitly to what `wtOf`'s own fallback would compute anyway
+ *  (`worktreeBasePath` trimmed plus the branch's last segment), so parity holds regardless of which
+ *  of the two paths a template actually takes. Built from `comp.state`/`repoData()` directly (never
+ *  `renderVals()`'s own output), same independence rule as `mockupToWire` itself. */
+export function toDialogContext(
+  result: MockupToWireResult,
+  repo: string,
+  selectedId?: string,
+): DialogCtx {
+  const worktreeBasePath = `~/wt/${repo}`;
+  const branches = result.snapshot.branches.map((b) => ({
+    ...b,
+    worktree: b.branch ? `${worktreeBasePath}/${lastSegmentForFixture(b.branch)}` : '',
+  }));
+  const snapshot: AdeRepoSnapshot = { ...result.snapshot, branches, worktreeBasePath };
+  const withSnapshot: MockupToWireResult = { ...result, snapshot };
+  const view = useQueue(toQueueInput(withSnapshot, selectedId));
+  return { view, snapshot, sessions: result.sessions, today: result.today, repoRoot: '' };
 }
