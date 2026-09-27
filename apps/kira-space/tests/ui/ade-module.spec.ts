@@ -65,7 +65,10 @@ function emptySnapshot(codeRepoId: string, overrides: Record<string, unknown> = 
   return {
     codeRepoId,
     gitRepoId: codeRepoId,
-    main: { name: 'main', ref: 'refs/heads/main', tip: 'abc123' },
+    // P129 Part 4 §0.5/§3.4: `main` now carries the short display form (`mainDisplay`'s own
+    // `refs/remotes/<r>/X` -> `<r>/X`), and the snapshot carries its own default `remote`.
+    main: { name: 'main', ref: 'origin/main', tip: 'abc123' },
+    remote: 'origin',
     branches: [],
     newWork: [],
     plan: { day: {}, order: [], queuedAfter: {}, unpushed: {} },
@@ -406,7 +409,7 @@ test("switching the active repo tab swaps the header and main line to that repo'
         channel: IPC.adeRepoSnapshot,
         args: { codeRepoId: REPO_A.id },
         response: emptySnapshot(REPO_A.id, {
-          main: { name: 'main', ref: 'refs/heads/main', tip: 'a' },
+          main: { name: 'main', ref: 'origin/main', tip: 'a' },
         }),
       },
       { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO_A.id }, response: EMPTY_PRS },
@@ -414,7 +417,7 @@ test("switching the active repo tab swaps the header and main line to that repo'
         channel: IPC.adeRepoSnapshot,
         args: { codeRepoId: REPO_B.id },
         response: emptySnapshot(REPO_B.id, {
-          main: { name: 'master', ref: 'refs/heads/master', tip: 'b' },
+          main: { name: 'master', ref: 'master', tip: 'b' },
         }),
       },
       { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO_B.id }, response: EMPTY_PRS },

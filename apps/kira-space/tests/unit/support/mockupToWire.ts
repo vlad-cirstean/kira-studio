@@ -262,7 +262,13 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
   const snapshot: AdeRepoSnapshot = {
     codeRepoId: repo,
     gitRepoId: repo,
-    main: { name: 'main', ref: 'refs/heads/main', tip: '0000000' },
+    // P129 Part 4 §0.5/§3.1: `main`'s own ref is the short display form (`mainDisplay`'s own
+    // `refs/remotes/<r>/X` -> `<r>/X` case) — the mockup's own dialog templates assume a
+    // remote-tracking main (`ontoRef` defaults to `origin/main`), so this is the real shape that
+    // reproduces its output, not the plain `refs/heads/main` the useQueue-only converter had before
+    // (useQueue itself never reads `snapshot.main`, so this had no effect on Part 3's own parity).
+    main: { name: 'main', ref: 'origin/main', tip: '0000000' },
+    remote: 'origin',
     branches,
     newWork,
     plan,

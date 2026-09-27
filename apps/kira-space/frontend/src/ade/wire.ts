@@ -136,6 +136,9 @@ export interface AdeRepoSnapshot {
   codeRepoId: string;
   gitRepoId: string;
   main?: AdeMain;
+  /** P129 Part 4 §2.3: the repo's own default remote, `''` when none — `AdeMainLine`'s dialog
+   *  templates read this for `git fetch <remote>` rather than a hardcoded "origin". */
+  remote: string;
   branches: AdeBranch[];
   newWork: AdeNewWork[];
   plan: AdePlan;
@@ -185,4 +188,68 @@ export interface AdeCredentialRequest {
 /** `kira:ade:repo`'s own payload — a debounced "re-fetch this repo's snapshot/prs" signal. */
 export interface AdeRepoChangedEvent {
   codeRepoId: string;
+}
+
+// P129 Part 4 §2.3: the launch/archive wire mirrors — Part 3 left these six methods' request/result
+// shapes for their first consumer part (§0.10 of the Part 3 plan). Every field mirrors
+// `bridge/ade.go`'s own json tags exactly; not `omitempty` on the Go side stays required here too
+// (branch/newWorkId/resume are "" when unused, never left off the wire).
+
+/** `AdePrepareLaunchArgs` — exactly one of `branch`/`newWorkId` is non-empty (§4.6 of Part 1's
+ *  plan); `resume` is `''` for a new session, else an existing `ade_sessions.id`. */
+export interface AdePrepareLaunchArgs {
+  codeRepoId: string;
+  branch: string;
+  newWorkId: string;
+  cwd: string;
+  resume: string;
+  message: string;
+}
+
+/** `AdePrepareLaunchResult` — `command` is the base launch (no hooks/prompt yet); the renderer's own
+ *  `openTerminalSession` call is what actually spawns it (§0.14). */
+export interface AdeLaunch {
+  terminalId: string;
+  sessionId: string;
+  command: string;
+}
+
+/** `AdeSendArgs` — `sessionId` is the `ade_sessions` record id, not the Claude session id. */
+export interface AdeSendArgs {
+  sessionId: string;
+  message: string;
+}
+
+export interface AdeItemArgs {
+  codeRepoId: string;
+  item: string;
+}
+
+export interface AdeArchiveArgs {
+  codeRepoId: string;
+  item: string;
+  discard: boolean;
+}
+
+/** `AdeArchiveRiskResult` — `blocked`, when non-empty, names the reason `Archive` would refuse
+ *  outright (§0.16 step 2). */
+export interface AdeArchiveRisk {
+  dirty: AdeDirty[];
+  unmerged: number;
+  worktree: string;
+  blocked?: string;
+}
+
+export interface AdeSetQueuedAfterArgs {
+  codeRepoId: string;
+  item: string;
+  after: string;
+}
+
+/** `AdeUpdateNewWorkArgs` — Part 4's only consumer is the optional Start-new-work branch name
+ *  (§0.6); the patch's other fields (title/jira/startFrom/notes/est) are later parts' own. */
+export interface AdeUpdateNewWorkArgs {
+  codeRepoId: string;
+  id: string;
+  patch: { branchName?: string };
 }

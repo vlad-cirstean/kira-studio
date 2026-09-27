@@ -56,6 +56,7 @@ import type { TabRecord } from '../state/tabDomain';
 function normalizeAdeRepoSnapshot(raw: AdeRepoSnapshot): AdeRepoSnapshot {
   return {
     ...raw,
+    remote: raw.remote ?? '',
     plan: {
       day: raw.plan.day ?? {},
       order: raw.plan.order ?? [],

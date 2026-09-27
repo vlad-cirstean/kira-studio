@@ -361,9 +361,11 @@ type AdeHistoryItem struct {
 }
 
 type AdeRepoSnapshot struct {
-	CodeRepoID       string           `json:"codeRepoId"`
-	GitRepoID        string           `json:"gitRepoId"`
-	Main             *AdeMain         `json:"main,omitempty"`
+	CodeRepoID string   `json:"codeRepoId"`
+	GitRepoID  string   `json:"gitRepoId"`
+	Main       *AdeMain `json:"main,omitempty"`
+	// Remote is P129 Part 4 §2.2's own addition — the repo's own default remote, empty when none.
+	Remote           string           `json:"remote"`
 	Branches         []AdeBranchWire  `json:"branches"`
 	NewWork          []AdeNewWorkWire `json:"newWork"`
 	Plan             AdePlanWire      `json:"plan"`
@@ -500,7 +502,7 @@ func toWireAdeSnapshot(s ade.RepoSnapshot) AdeRepoSnapshot {
 		newWork[i] = toWireAdeNewWork(w)
 	}
 	return AdeRepoSnapshot{
-		CodeRepoID: s.CodeRepoID, GitRepoID: s.GitRepoID, Main: toWireAdeMain(s.Main),
+		CodeRepoID: s.CodeRepoID, GitRepoID: s.GitRepoID, Main: toWireAdeMain(s.Main), Remote: s.Remote,
 		Branches: branches, NewWork: newWork, Plan: toWireAdePlan(s.Plan), Colors: s.Colors,
 		Pairs: toWireAdePairs(s.Pairs), History: toWireAdeHistory(s.History), LastFetchAt: s.LastFetchAt,
 		AutofetchMinutes: s.AutofetchMinutes, WorktreeBasePath: s.WorktreeBasePath,

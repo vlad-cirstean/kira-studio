@@ -149,15 +149,19 @@ type PlanFact struct {
 type RepoSnapshot struct {
 	CodeRepoID, GitRepoID string
 	Main                  *Main
-	Branches              []BranchFact
-	NewWork               []NewWorkFact
-	Plan                  PlanFact
-	Colors                map[string]int
-	Pairs                 []PairFact
-	History               []HistoryItem
-	LastFetchAt           *int64
-	AutofetchMinutes      int
-	WorktreeBasePath      string
+	// Remote is the repo's own default remote (§0.5 of the P129 Part 4 plan, DefaultRemote's own
+	// "origin if present, else the sole remote, else \"\"") — the renderer's own dialog templates
+	// read it for `git fetch <remote>` rather than a hardcoded "origin".
+	Remote           string
+	Branches         []BranchFact
+	NewWork          []NewWorkFact
+	Plan             PlanFact
+	Colors           map[string]int
+	Pairs            []PairFact
+	History          []HistoryItem
+	LastFetchAt      *int64
+	AutofetchMinutes int
+	WorktreeBasePath string
 }
 
 type PrFact struct {
@@ -529,12 +533,13 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 	}
 	var mainFact *Main
 	if hasMain {
-		mainFact = &Main{Name: mainRefName, Ref: mainRefName, Tip: mainTip}
+		name, ref := mainDisplay(mainRefName)
+		mainFact = &Main{Name: name, Ref: ref, Tip: mainTip}
 	}
 
 	return RepoSnapshot{
 		CodeRepoID: codeRepoID, GitRepoID: entry.Summary.RepoID,
-		Main: mainFact, Branches: branchFacts,
+		Main: mainFact, Remote: remote, Branches: branchFacts,
 		NewWork:          buildNewWorkFacts(state.NewWork, branchCandidates),
 		Plan:             buildPlanFact(state.Plan, branchFacts),
 		Colors:           buildColors(state.Colors),
@@ -544,6 +549,23 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 		AutofetchMinutes: autofetch,
 		WorktreeBasePath: entry.RepoSettings().WorktreeBasePath,
 	}, nil
+}
+
+// mainDisplay is P129 Part 4 §0.5's own short-form split of MainRef's full refname:
+// `refs/heads/X` -> name X, ref X (a local-only main); `refs/remotes/<r>/X` -> name X, ref
+// `<r>/X` (a remote-tracking main, the common case) — `countRefsChanged` keeps keying on the full
+// refname unchanged, only this display pair is shortened. A refname this doesn't recognize (never
+// produced by MainRef today) passes through unchanged in both fields, rather than panicking.
+func mainDisplay(full string) (name, ref string) {
+	if rest, ok := strings.CutPrefix(full, "refs/heads/"); ok {
+		return rest, rest
+	}
+	if rest, ok := strings.CutPrefix(full, "refs/remotes/"); ok {
+		if i := strings.IndexByte(rest, '/'); i > 0 {
+			return rest[i+1:], rest
+		}
+	}
+	return full, full
 }
 
 func splitArchived(branches []model.AdeBranch) (active, archived []model.AdeBranch) {

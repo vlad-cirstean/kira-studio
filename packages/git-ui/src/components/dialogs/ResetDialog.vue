@@ -10,10 +10,6 @@
  * recomputes `destroys`/`requiresTypedConfirmation`/`routes`/`verdict` client-side via `core`'s own
  * `classifyReset`, holding `leaving`/`gaining`/`dirty` fixed (they do not depend on `mode` at all).
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content. The title embeds `<code>` markup, so it goes through `KuiDialog`'s own
- * `#title` slot rather than its plain string `title` prop.
- *
  * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, the mode
  * fieldset's radios are `RadioGroup`/`RadioGroupItem` (still an imperative `selectMode` call via
  * `@update:model-value`, not a plain `v-model`, per OQ11 above), the stash-first checkbox is

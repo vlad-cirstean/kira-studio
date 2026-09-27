@@ -17,10 +17,6 @@
  * order still matters if a caller opened `createOpen`/`branchTarget` while a pop confirmation from
  * an unrelated row happened to already be pending).
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content, per mode. `KuiDialog`'s single `open`/`title` pair is driven by `mode`
- * itself (one title/close-handler/actions-set per mode, chosen the same way the body already was).
- *
  * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
  * `DialogTitle`'s default slot, and the four modes' own controls are Input/Checkbox/RadioGroup —
  * `mode`/`onClose`'s own dispatch is otherwise unchanged.

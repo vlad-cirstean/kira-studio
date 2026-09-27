@@ -85,6 +85,7 @@ function snapshot(overrides: Partial<AdeRepoSnapshot> = {}): AdeRepoSnapshot {
   return {
     codeRepoId: 'repo',
     gitRepoId: 'repo',
+    remote: 'origin',
     branches: [],
     newWork: [],
     plan: plan(),

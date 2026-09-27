@@ -11,9 +11,6 @@
  * `runCheckout`'s own inline handling of that route (not a second dialog) is the rest of the
  * confirm step.
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content.
- *
  * G28 D16: `OpsState.runCheckout` now resolves a blocked verdict AUTOMATICALLY — no dialog at all
  * — whenever `preflight.routes` offers `"detachHere"` (always) or `"autoStash"` (when
  * `kiraSpace.checkout.autoStash` is on), re-issuing the same op with `mode: 'detach'` and/or

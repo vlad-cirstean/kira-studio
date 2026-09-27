@@ -22,13 +22,6 @@
  * three modes do, so this is a second file in that shape, not a fourth mode grafted onto
  * `StashDialog.vue` itself (a settings dialog and a stash workflow share no state).
  *
- * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
- * body/actions content. Its three native `<select>`s are `<KuiSelect>` now too; each one's
- * `update:model-value` payload is the primitive's own plain `string`, cast back to the narrower
- * union `RepoSettingsSnapshot` actually declares (the option `value`s themselves are always one
- * of that union's own members, so the cast is never a lie, just narrower than `KuiSelect`'s own
- * generic-string contract can express).
- *
  * G-UX D8: the **Display** section's `dateFormat` field is a SECOND kind of exception to "hand-
  * written from `RepoSettingsSnapshot`" — it does not live in that snapshot at all
  * (`PersistedViewState` owns it under `'vscode'`/`'harness'`, a view preference, not a repository
