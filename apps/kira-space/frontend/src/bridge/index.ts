@@ -37,6 +37,8 @@ import type {
   AdeArchiveArgs,
   AdeArchiveRisk,
   AdeCredentialRequest,
+  AdeForcePushArgs,
+  AdeForcePushResult,
   AdeItemArgs,
   AdeLaunch,
   AdePr,
@@ -238,8 +240,12 @@ const spaceControl = {
     unwrap(AdeService.UpdateNewWork(args)),
 
   // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
-  // `ForcePush`/`CandidateBranches`/`AddBranch`/`AddNewWork` stay unbound until commits 9 and 11.
+  // `CandidateBranches`/`AddBranch`/`AddNewWork` stay unbound until commit 11.
   adeSetPlan: (args: AdeSetPlanArgs): Promise<void> => unwrap(AdeService.SetPlan(args)),
+  // §0.16: generated binding's own return type is `AdeForcePushResult[] | null` — `?? []` matches
+  // this file's other list-result normalizations (e.g. `adeCandidateBranches`).
+  adeForcePush: (args: AdeForcePushArgs): Promise<AdeForcePushResult[]> =>
+    unwrap(AdeService.ForcePush(args)).then((r) => trust<AdeForcePushResult[]>(r ?? [])),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

@@ -12,7 +12,7 @@ import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import AdeTimeline from './AdeTimeline.vue';
-import { type DialogCtx, rebaseAllSpec } from './dialogCompose';
+import { type DialogCtx, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
 import { useAdeActionsStore } from './state/adeActions';
@@ -20,7 +20,7 @@ import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
 import { type DayMenuResult, dayMenuFor, shiftWorkArgs } from './timelineOps';
 import { useHistoryPull } from './useHistoryPull';
-import { isoToOffset, offsetToIso, type QueueBand, useQueue } from './useQueue';
+import { isoToOffset, offsetToIso, type QueueBand, type QueueSegment, useQueue } from './useQueue';
 
 // P129 Part 3 §2.7: queries for its own repo, `computed(() => useQueue({...}))`, sticky header and
 // `main` line — nothing below them in Part 3, the timeline is Part 5's. P129 Part 4 §2.7 adds:
@@ -237,6 +237,7 @@ const view = computed(() => {
     today: today.value,
     localDayOf: localIsoOfMs,
     rebasing: adeActionsStore.rebasingFor(props.codeRepoId),
+    pushing: adeActionsStore.pushingFor(props.codeRepoId),
     // §0.6: outlives a repo-tab remount (stored in `adeUi`, not a local ref) — `useQueue`'s own
     // first-item default applies once the entry is unset or names a since-removed item.
     selectedId: adeUiStore.selectedByRepo[props.codeRepoId],
@@ -276,6 +277,34 @@ function onRebaseAll(): void {
   const ctx = dialogCtx.value;
   if (!ctx) return;
   adeUiStore.openDialog(rebaseAllSpec(ctx));
+}
+
+// §0.17/§0.16: the action column's own two events — `rebase`/`queueAfter` open the Move dialog,
+// `forcePush` calls `adeActions.forcePush` directly (no dialog, mockup `forcePush`).
+function onSegmentAction(action: NonNullable<QueueSegment['action']>): void {
+  if (action.kind === 'forcePush') {
+    void adeActionsStore.forcePush(props.codeRepoId, action.targetIds);
+    return;
+  }
+  const ctx = dialogCtx.value;
+  if (!ctx) return;
+  // `action` itself stays typed `QueueAction` after the guard above (a single interface with a
+  // union-typed `kind`, not a discriminated union of interfaces) — TS only narrows a direct
+  // `action.kind` read, so `specForQueueAction` takes the two fields it needs rather than the whole
+  // object.
+  adeUiStore.openDialog(specForQueueAction(ctx, { kind: action.kind, targetIds: action.targetIds }));
+}
+
+// §0.17/§0.16: `start` opens the launch dialog; `archive` (nothing at risk) archives directly —
+// `dialogFlow.ts`'s own `requestArchive` opens Part 4's archive-risk dialog itself when needed.
+function onCellAction(action: NonNullable<QueueSegment['cells'][number]['action']>): void {
+  const ctx = dialogCtx.value;
+  if (!ctx) return;
+  if (action.kind === 'start') {
+    adeUiStore.openDialog(startSpec(ctx, action.id));
+  } else {
+    void adeActionsStore.requestArchive(props.codeRepoId, action.id, ctx);
+  }
 }
 
 // §0.17: a background failure (archive after Stop, blocked, ended) surfaces here, under the
@@ -350,6 +379,8 @@ function onDismissError(): void {
         @rollover="onRollover"
         @overflow-move="onOverflowMove"
         @day-menu="onDayMenu"
+        @segment-action="onSegmentAction"
+        @cell-action="onCellAction"
       />
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />

@@ -16,11 +16,16 @@ const props = defineProps<{
   selectedId: string | null;
 }>();
 
+type SegmentActionType = NonNullable<QueueSegment['action']>;
+type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
+
 const emit = defineEmits<{
   select: [id: string];
   rollover: [];
   overflowMove: [];
   dayMenu: [ev: MouseEvent];
+  segmentAction: [action: SegmentActionType];
+  cellAction: [action: CellActionType];
 }>();
 
 const greyed = computed(() => props.band.isWeekend || props.band.isDayOff);
@@ -162,6 +167,8 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
         :parent-of="parentOf"
         :selected-id="selectedId"
         @select="emit('select', $event)"
+        @segment-action="emit('segmentAction', $event)"
+        @cell-action="emit('cellAction', $event)"
       />
       <AdeContinuationRow
         v-for="span in band.spans"

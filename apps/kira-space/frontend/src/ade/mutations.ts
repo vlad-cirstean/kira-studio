@@ -8,6 +8,8 @@ import { adePrsKey, adeSessionsKey, adeSnapshotKey } from './queries';
 import type {
   AdeArchiveArgs,
   AdeArchiveRisk,
+  AdeForcePushArgs,
+  AdeForcePushResult,
   AdeLaunch,
   AdePrepareLaunchArgs,
   AdeRepoSnapshot,
@@ -137,6 +139,22 @@ export function useAdeSetPlan(codeRepoId: MaybeRefOrGetter<string>) {
         queryClient.setQueryData(adeSnapshotKey(toValue(codeRepoId)), context.previous);
       }
     },
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+/** §0.16: not optimistic — a force push's own outcome (ok/protected/other error) per branch is
+ *  read straight off the result, and the confirm-and-retry loop lives in `adeActions.ts`. */
+export function useAdeForcePush(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'forcePush'),
+    mutationFn: (args: AdeForcePushArgs): Promise<AdeForcePushResult[]> =>
+      control.adeForcePush(args),
     onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: adeSnapshotKey(toValue(codeRepoId)),

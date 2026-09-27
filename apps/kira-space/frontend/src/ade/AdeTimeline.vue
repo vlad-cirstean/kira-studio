@@ -19,6 +19,9 @@ const props = defineProps<{
   minExtraDate: string;
 }>();
 
+type SegmentActionType = NonNullable<QueueSegment['action']>;
+type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
+
 const emit = defineEmits<{
   select: [id: string];
   openHistory: [];
@@ -27,6 +30,8 @@ const emit = defineEmits<{
   rollover: [band: QueueBand];
   overflowMove: [band: QueueBand];
   dayMenu: [band: QueueBand, ev: MouseEvent];
+  segmentAction: [action: SegmentActionType];
+  cellAction: [action: CellActionType];
 }>();
 
 const itemsById = computed(() => new Map(props.view.items.map((item) => [item.id, item])));
@@ -69,6 +74,8 @@ const blocksByDay = computed(() => {
         @rollover="emit('rollover', band)"
         @overflow-move="emit('overflowMove', band)"
         @day-menu="(ev) => emit('dayMenu', band, ev)"
+        @segment-action="emit('segmentAction', $event)"
+        @cell-action="emit('cellAction', $event)"
       />
     </template>
   </div>

@@ -163,7 +163,9 @@ export interface AdeRepoPrs {
   branches: Record<string, AdePr>;
 }
 
-/** `gitsession.RemoteOpError` — `AdeRefreshResult.error`'s own shape. */
+/** `gitsession.RemoteOpError` — `AdeRefreshResult.error`'s own shape, reused verbatim by
+ *  `AdeForcePushResult` (§0.16, same Go type on both). Not exported: every reader (`adeActions.ts`'s
+ *  `forcePush`) reaches it through `AdeForcePushResult['error']`, never by importing this name. */
 interface AdeRemoteOpError {
   kind: string;
   message: string;
@@ -260,4 +262,20 @@ export interface AdeSetPlanArgs {
   codeRepoId: string;
   days: Record<string, string | null>;
   order: string[];
+}
+
+/** `AdeForcePushArgs` — one call per force-push batch (§0.16); `confirmProtected` names the
+ *  branches whose own protected-branch prompt the caller already confirmed (re-sent one at a
+ *  time, §0.16's own "branches confirm one at a time"). */
+export interface AdeForcePushArgs {
+  codeRepoId: string;
+  branches: string[];
+  confirmProtected?: string[];
+}
+
+/** `AdeForcePushResult` — one outcome per requested branch. */
+export interface AdeForcePushResult {
+  branch: string;
+  ok: boolean;
+  error?: AdeRemoteOpError;
 }

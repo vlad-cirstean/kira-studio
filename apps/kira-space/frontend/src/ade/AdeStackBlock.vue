@@ -4,9 +4,10 @@ import AdeStackRow from './AdeStackRow.vue';
 import type { QueueItem, QueueSegment, QueueTag } from './useQueue';
 
 // P129 Part 5 §0.21/§0.17: one stack block — the 210px action column (mockup 216-226) beside the
-// box itself (mockup 227-260). Read-only apart from selection this commit: cell/segment action
-// buttons render (label, tip, disabled) but their click wiring lands with §0.17 in commit 9 (day-off
-// and overdue/overflow buttons in commit 8); the box's own inner sortable is commit 10's.
+// box itself (mockup 227-260). §0.17's own click wiring: this component only emits the action
+// object `useQueue.ts` already built (kind, targetIds/id, label) — the caller (`AdeRepoView`, via
+// the bubble chain) is the one that knows what a rebase/queueAfter/forcePush/start/archive action
+// does. The box's own inner sortable is commit 10's.
 const props = defineProps<{
   segment: QueueSegment;
   itemsById: ReadonlyMap<string, QueueItem>;
@@ -14,7 +15,14 @@ const props = defineProps<{
   selectedId: string | null;
 }>();
 
-const emit = defineEmits<{ select: [id: string] }>();
+type SegmentActionType = NonNullable<QueueSegment['action']>;
+type CellActionType = NonNullable<QueueSegment['cells'][number]['action']>;
+
+const emit = defineEmits<{
+  select: [id: string];
+  segmentAction: [action: SegmentActionType];
+  cellAction: [action: CellActionType];
+}>();
 
 // Mockup `tone()` (line 650-659) — literal tints, one 6-tone palette, never theme tokens (§0 standing
 // decision: tone tints stay literal). `[background, foreground, solid]`.
@@ -108,6 +116,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
           class="h-[22px] shrink-0 whitespace-nowrap rounded-kira-sm px-2.5 text-kira-sm font-semibold"
           :style="actionButtonStyle(segment.tag.tone, segment.action.disabled)"
           :data-testid="`ade-segment-action-${segment.action.kind}`"
+          @click="emit('segmentAction', segment.action)"
           >{{ segment.action.label }}</button
         >
         <button
@@ -121,6 +130,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
               : { background: '#d97757', color: '#1a0f0a' }
           "
           :data-testid="`ade-cell-action-${cell.action.kind}-${cell.action.id}`"
+          @click="emit('cellAction', cell.action)"
           >{{ cell.action.label }}</button
         >
       </div>

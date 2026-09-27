@@ -13,6 +13,7 @@ import type { LaunchDeps } from '../launch';
 import {
   fetchArchiveRisk,
   useAdeArchive,
+  useAdeForcePush,
   useAdeLaunch,
   useAdeSend,
   useAdeSetPlan,
@@ -40,9 +41,30 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   // Alert under the `main` line.
   const pendingArchive = reactive(new Map<string, string>());
   const actionError = reactive(new Map<string, string>());
+  /** §0.16: `useQueue`'s own `pushing` input — branches with a `ForcePush` call in flight. */
+  const pushing = reactive(new Map<string, Set<string>>());
 
   function pendingKey(repo: string, item: string): string {
     return `${repo}:${item}`;
+  }
+
+  function pushingFor(repo: string): ReadonlySet<string> {
+    return pushing.get(repo) ?? EMPTY_ROOTS;
+  }
+
+  function addPushing(repo: string, branches: readonly string[]): void {
+    let set = pushing.get(repo);
+    if (!set) {
+      set = new Set();
+      pushing.set(repo, set);
+    }
+    for (const b of branches) set.add(b);
+  }
+
+  function removePushing(repo: string, branches: readonly string[]): void {
+    const set = pushing.get(repo);
+    if (!set) return;
+    for (const b of branches) set.delete(b);
   }
 
   function dismissError(repo: string): void {
@@ -87,6 +109,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const updateNewWorkMutation = useAdeUpdateNewWork(currentRepoId);
   const archiveMutation = useAdeArchive(currentRepoId);
   const setPlanMutation = useAdeSetPlan(currentRepoId);
+  const forcePushMutation = useAdeForcePush(currentRepoId);
 
   function buildLaunchDeps(): LaunchDeps {
     return {
@@ -167,12 +190,52 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     await setPlanMutation.mutateAsync({ codeRepoId: repoId, days: args.days, order: args.order });
   }
 
+  /** §0.16: the action column's own `forcePush` segment action, and a protected-branch confirm's
+   *  own "yes" (re-called with `confirmProtected: [branch]`, one branch at a time). */
+  async function forcePush(
+    repoId: string,
+    branches: readonly string[],
+    confirmProtected?: readonly string[],
+  ): Promise<void> {
+    currentRepoId.value = repoId;
+    addPushing(repoId, branches);
+    try {
+      const results = await forcePushMutation.mutateAsync({
+        codeRepoId: repoId,
+        branches: [...branches],
+        confirmProtected: confirmProtected ? [...confirmProtected] : undefined,
+      });
+      for (const r of results) {
+        if (r.ok) continue;
+        if (r.error?.kind === 'ProtectedBranch') {
+          adeUiStore.openConfirm({
+            title: `Force push ${r.branch}`,
+            text: r.error.message,
+            yesLabel: 'Force push',
+            noLabel: 'Cancel',
+            token: r.branch,
+            run: () => forcePush(repoId, [r.branch], [r.branch]),
+          });
+        } else {
+          actionError.set(
+            repoId,
+            `Force push ${r.branch} failed: ${r.error?.message ?? 'unknown error'}`,
+          );
+        }
+      }
+    } finally {
+      removePushing(repoId, branches);
+    }
+  }
+
   return {
     rebasingFor,
     sendDialog,
     requestArchive,
     justDelete,
     applyPlan,
+    pushingFor,
+    forcePush,
     actionError,
     dismissError,
   };
