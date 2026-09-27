@@ -112,4 +112,7 @@ export const IPC = {
   adeCandidateBranches: 'kira:ade:candidateBranches',
   adeAddBranch: 'kira:ade:addBranch',
   adeAddNewWork: 'kira:ade:addNewWork',
+  // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
+  adeSetBranchMeta: 'kira:ade:setBranchMeta',
+  adeBindNewWork: 'kira:ade:bindNewWork',
 } as const;

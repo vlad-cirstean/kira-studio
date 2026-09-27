@@ -101,6 +101,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeCandidateBranches: 'AdeService.CandidateBranches',
   adeAddBranch: 'AdeService.AddBranch',
   adeAddNewWork: 'AdeService.AddNewWork',
+
+  // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
+  adeSetBranchMeta: 'AdeService.SetBranchMeta',
+  adeBindNewWork: 'AdeService.BindNewWork',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
