@@ -601,6 +601,225 @@ Known open items (the `Bash`-background wake-arming limitation, commit 7, expect
 until Claude Code itself exposes more than a tool name to a hook, or this app's own privacy rule is
 revisited — neither is in scope for any planned P129 part).
 
+## P129 Part 2 result
+
+Plan: `docs/v2.0/plans/P129-part2-ade-queue-backend.md`. One sequential Sonnet implementer, no
+stream split (one continuous, order-dependent chain per the plan's own §8: storage before facts
+before the queue service before the bridge surface). 7 plan-listed commits, `3c647568`..`9dbf7272`,
+plus two disclosed unplanned fixups (`28244fa2`, `f4bca800`) and this result commit
+(`git log --oneline 20e27f6e..HEAD` for the full range — clean, no interleaved concurrent-session
+commits this time).
+
+**Commits, in the plan's own §8 order, with the two fixups placed where they were found:**
+
+1. `3c647568` — `feat(space): ade queue storage`. Migration `0005_p129_ade_queue.sql`
+   (`ade_branches`/`ade_new_work`/`ade_plan`/`ade_colors`), `embed.go`, `model/adequeue.go`,
+   `repos/adequeue.go` (`AdeQueueRepo`: Load/AddBranch/AddNewWork/UpdateNewWork/SetBranchMeta/
+   SetPlan/SetQueuedAfter/MarkFacts/Archive/Rebind, `ErrQueued`/`ErrArchived` sentinels),
+   `repos.Repos.AdeQueue`. Item id is a branch's own short name or `nw:<uuid>` for new work with no
+   branch yet — git bans `:` in ref names, so the two id spaces never collide.
+2. `ab453ada` — `feat(space): ade settings leaves`. New `settings.ade` section (§7): `panelWidth`,
+   `allAgentsFilter`, `horizonDays`, `historyDays`, `extraDays`/`offDays`/`workWeekendDays`,
+   `workdayHours`, `spanDayShare` — Part 3's own queue-board UI prefs, persisted so they survive a
+   relaunch, no UI reads them yet. Go (`model/settings.go`'s `AdeSettings`/`AdePatch`/
+   `validateAdeSection`) and TS (`settingsDomain.ts`'s `adeSettingsSchema`); bindings regenerated.
+3. `9b5feb55` — `feat(gitsession): queue fact reads`. `porcelain/inventory.go`
+   (`InventoryArgs`/`ParseInventory`, one `for-each-ref` over `refs/heads` and `refs/remotes`:
+   refname, tip, committer date, author identity, worktree path, upstream tracking, reusing
+   `refs.go`'s own `parseTrack`/`RefTrack`), `inventory_test.go`; `gitsession/queuefacts.go` (§3).
+4. **`28244fa2`** — **unplanned fixup**, found while writing `queue_test.go`'s "mine vs review by
+   author email" case (commit 5's own work): `InventoryFormat` used `%(authoremail)` (raw
+   `<addr>` envelope) instead of `%(authoremail:trim)`, so every `isMine` comparison against
+   `git config user.email` failed silently and misclassified every branch as "review" instead of
+   "mine" — a real production bug in commit 3's own file, fixed in-scope per CLAUDE.md (found and
+   fixed within this same phase, not a truly separate/older phase).
+5. `248700ca` — `feat(space): ade facts engine`. `ade/facts.go`/`ade/facts_test.go` — pure functions
+   over plain inputs (no git, no DB, no bridge) encoding §0's rules that need testing as interacting
+   logic: `inferParents` (§0.5, four-rule parent inference plus a cycle guard), `pairFacts`
+   (§0.7/§4.3, conflict/share pair table), `mergedRule`, `rebindCandidates`, `colorSlot`, `atRisk`.
+6. `771be482` — `feat(space): ade queue service`. `ade/queue.go` (`Queue`/`QueueDeps`, §5.1): a
+   per-repo held `gitsession.Conn`, a per-repo mutex serializing `Snapshot`'s rebind step, writes,
+   `Refresh`, `ForcePush` and `Archive`, and a 250ms per-repo debounce on repo-changed before
+   `OnRepoChanged` fires. `Snapshot` assembles the wire shape per §5.1's own steps (load, resolve
+   queued refs, rebind check, ancestors + `inferParents`, per-branch facts via `errgroup` limited to
+   4, pairs, `MarkFacts`, assemble); `Refresh` fetches, re-snapshots, cross-checks `ResolveBranchPr`
+   for "mine" branches not yet git-merged; `ForcePush` runs `--force-with-lease
+   --force-if-includes` per branch; `Archive` runs the worktree-remove preflight, stops linked
+   running sessions, then removes the worktree. `queue_test.go`: the full 10 integration cases
+   against real git (§9.1, listed below). Four of `queue.go`'s own functions (`snapshotLocked`,
+   `reconcileNewWork`, `Refresh`, `Archive`) exceeded golangci-lint's `gocognit`/`gocyclo` threshold
+   of 30; each decomposed into named helpers with identical behavior, re-verified against the full
+   `queue_test.go` suite after every step, plus 4 `copyloopvar` findings fixed (redundant loop-var
+   copies, unneeded under Go 1.22+ semantics) — 0 golangci-lint issues on `internal/ade` when done.
+7. `6f0b0787` — `feat(space): AdeService queue surface`. `bridge/ade.go`: `AdeService.Queue` field
+   plus §5.3's 15 bound methods (`RepoSnapshot`, `RepoPrs`, `CandidateBranches`, `AddBranch`,
+   `AddNewWork`, `UpdateNewWork`, `SetBranchMeta`, `SetPlan`, `SetQueuedAfter`, `BindNewWork`,
+   `Refresh`, `ForcePush`, `ArchiveRisk`, `Archive`, `ProvideCredential`) over `internal/ade.Queue` —
+   19 total with Part 1's own 4. Every method validates args to `E_INVALID` before touching the
+   store/git (Jira key/URL/est/notes/name shape, branch-vs-item-id ref rules, kind enums, ISO
+   dates), and maps `repos.ErrQueued`/`ErrArchived` to `E_INVALID` like every other caller-mistake
+   sentinel in this file. `bridge/events.go`: `ChannelAdeRepo`/`ChannelAdeCredential` (§5.3) —
+   `AdeRepoChanged` broadcasts a debounced per-repo change signal, `AdeCredentialRequested` delivers
+   to the focused window (§6.5). `main.go`: `wireAde` gains `gitWired` and constructs `ade.Queue`
+   (`Sessions` filters `Tracker.List` by `codeRepoId`; `CodeRepo`/`GitPath`/`AutofetchMinutes` read
+   the existing repo/settings leaves; `CloseTerminal` wraps `terminal.Registry.Close`;
+   `OnRepoChanged`/`OnCredential`/`OnSessionsChanged` target the two new channels and the existing
+   ade-sessions broadcast); teardown closes the queue's own `Conn` before stopping agent hooks.
+8. `9dbf7272` — `docs: ARCHITECTURE records ade queue backend (P129 Part 2)` (§8.2). Kira Space ade
+   paragraph: queue tables and item ids, the facts pipeline (inventory, parent inference, per-branch
+   ranges, pairs), merge-tree over go-git with the git >= 2.38 requirement named, the merged rule,
+   the new-work rebind rule, ade's own `gitsession.Conn` (separate from the git module's own
+   per-window streaming Conns but wired to the same Askpass broker — the same pattern `gitrpc`'s own
+   remote-op handler already uses, confirmed by reading `gitrpc/remote.go` directly rather than
+   trusting the plan's own phrasing) and `kira:ade:credential`, the `kira:ade:repo` debounce,
+   Refresh/ForcePush/Archive paths. Two new Known open items: the rename/delete conflict limitation
+   (§0.7) and the linked-worktree dirty-state-not-watched limitation (refreshes on snapshot only).
+9. **`f4bca800`** — **unplanned fixup**, found running this phase's own `bun run lint:dead`
+   verification pass: commit 2's own six `ADE_*_RANGE`/`ADE_DATE_LIST_MAX` constants in
+   `settingsDomain.ts` were `export const`-ed, contradicting that same file's own doc comment
+   ("Not exported — nothing outside this file references the raw schema object") and only ever used
+   inside this same file's own zod schema — `knip`'s unused-exports rule failed with all six
+   flagged. Confirmed via grep no external file references any of the six names, then dropped
+   `export` from all six — a real bug in this same phase's own earlier commit, fixed in-scope.
+10. This result section.
+
+**Deviations and interpretation decisions, disclosed:**
+
+- **`QueueDeps.OnSessionsChanged` and `QueueDeps.AutofetchMinutes`** (not in the plan's own §5.1
+  literal `QueueDeps` sketch) — §6.4's rebind needs an `AdeSessionsChanged` signal when a rebind
+  moves session rows, and §5.2's `AdeRepoSnapshot.AutofetchMinutes` must echo the global
+  `git.fetchAutoIntervalMinutes` leaf; neither has a seam in the plan's literal struct list, and
+  `internal/ade` has no other way to reach either fact (documented inline at `QueueDeps`' own
+  declaration, `queue.go`).
+- **Autofetch maps to the global leaf, not per repo** (measured against Part 1 plan §2.4's own
+  "autofetch maps to the existing per-repo fetch interval"): the interval is the global
+  `git.fetchAutoIntervalMinutes` (`model.GitSettings`), 0 = off. Design `UiPrefs.autofetch` is a
+  boolean view over it (`> 0`); no new leaf. `lastFetchAt` is the mtime of `<CommonDir>/FETCH_HEAD`
+  (covers fetches by Claude, autofetch and the git module alike).
+- **`Refresh` recomputes merge/history facts via the same `snapshotLocked` path `Snapshot` uses**
+  (ancestor-based `MarkFacts`) rather than a separate hand-rolled check, so the two paths cannot
+  drift apart over time — not stated explicitly in the plan, read as the natural fit given
+  `Snapshot`'s own steps already compute everything `Refresh` needs.
+- **`reconcileNewWork` returns ambiguous rebind candidates** so `NewWorkFact.BranchCandidates`
+  (§0.10) gets populated instead of silently dropped when a new-work item's agent leaves more than
+  one candidate branch behind.
+- **`AdeJiraPatch` (nested `key`/`url`) on the wire**, not the store's own flat `JiraKey`/`JiraURL`
+  pointers §5.2's literal patch shape implies — matches the read side's own nested `Jira` field
+  instead (`AdeNewWorkPatchArgs`/`AdeBranchMetaPatchArgs.toModel()` map it back to the flat model
+  patch), so a caller reads and writes Jira through the same shape.
+- **`SetQueuedAfter`'s `after` validates as a general item id** (non-empty, bounded, no
+  NUL/newline) rather than §5.3's literal validation bullet, which lists it under the stricter
+  branch-ref shape rule — a new-work item id is `nw:<uuid>`, which the branch-ref rule's own banned
+  `:` would otherwise reject outright, breaking queuing a session after a new-work item entirely.
+- **`base: ""` means main on the wire** (`AdeBranchWire.Base`), not the design doc's literal
+  `'main'` string sentinel — this is the plan's own §5.2 sketch convention (`Base string // parent
+  item id, "" = main`), confirmed still in effect by the §9.2 live check below (both root branches
+  came back with `"base": ""`), not a deviation introduced here.
+
+**Verification (plan §9), run once near phase end, against the phase's own final commit:**
+
+- `go build ./...`, `go vet ./...` — clean.
+- `bun run lint:go` (whole repo) — 0 issues (after the four `copyloopvar`/complexity fixes folded
+  into commit 6 above; the pre-fix run found exactly those).
+- `go test ./apps/kira-space/internal/...` — all pass; `TestDomainPackagesDoNotImportBridge`
+  (Space's layering test) passes with `internal/ade` in its checked set, exemption list unchanged.
+- `go test -race -count=1 ./apps/kira-space/internal/ade/ ./apps/kira-space/internal/gitsession/`
+  — pass.
+- Space bindings gain exactly §5.3's 15 new `AdeService` methods (19 total with Part 1's own 4).
+- FQN gate on every other Space service — byte-identical to the saved pre-phase baseline (`ByName`
+  lines diffed line for line; `TerminalService`'s 6 lines checked explicitly).
+- `bun run typecheck`, `bun run lint` — clean.
+- `bun run lint:dead` — 7 pre-existing duplicate-export findings (same baseline P127/P128/Part 1
+  already document), 0 unused-export findings after fixup commit `f4bca800` above (6 real ones
+  found and fixed first).
+- `bun run build:space`, `bun run build:studio` — clean.
+- `bun run test:unit` — 1667 pass, 0 fail — unchanged from Part 1's own baseline exactly (no new
+  unit tests added or moved this phase; `internal/ade`'s new coverage is Go, not `bun test`).
+- `bun run test:ui:space` — 38/38 pass, unchanged from Part 1's own baseline.
+- `bun run test:ui:studio` — 300 tests, matching Part 1's own baseline exactly; a full run this
+  phase passed clean end to end (no failures), so none of Part 1's own documented cross-file
+  worker-contention flakes (`data-view.spec.ts`/`definition.spec.ts`/`focus-ring.spec.ts`/
+  `mutations.spec.ts`/`terminal-module.spec.ts`) recurred this run.
+
+### 9.1 Tests
+
+Matches `queue_test.go`'s actual 10 cases against the plan's own §9.1 list, one for one: (1) two
+mine branches, same-line conflict vs. same-file-different-hunk share vs. different-file no pair;
+(2) mine × review conflict, review owner set from another author email; (3) stack parent inference
+(`base`/`behind`); (4) file deltas/binary flag, commits newest first, dirty codes; (5) merged
+detection via `Refresh`; (6) `Refresh`'s fetch-and-rerun-facts-for-moved-refs; (7) force push
+success plus lease-rejection-continues-the-loop; (8) archive clean/dirty/`discard` paths; (9)
+rebind (bound, and unbound-with-`branchCandidates`); (10) `-race` concurrent `Snapshot` × 8 with a
+`Refresh` and a `SetPlan`. `facts_test.go` covers the conflict/share computation plus every
+interacting rule the SPEC row names as table tests over plain inputs, no git or DB. No test added
+for the repo CRUD, wrappers, settings leaves, or validation helpers, per the plan's own call.
+
+### 9.2 Live check
+
+Server-mode Space (`go build -tags server`) against a real temp repo (a bare `origin` plus a clone
+with `main` and two local branches, `feat/one`/`feat/two`, each one commit ahead of `main` touching
+a different file, both pushed). Seeded `git.gitPath` (`/usr/bin/git`, so `Discovery` is never
+consulted — the darwin-only `Locate` limitation P126 hit does not apply here) and one `code_repos`
+row via a throwaway Go program driving the real `storage`/`repos` packages directly (never
+committed, removed before this phase's own final commit), then drove the real `/wails/runtime` HTTP
+surface with `curl` (no browser, no UI, matching the plan's own "No UI"): `AddBranch` for both
+branches succeeded; `RepoSnapshot` returned both branches with real facts (`ahead: 1`/`behind: 0`
+each, their own commit and file-delta lists, `authorEmail`/`isMine: true` correctly resolved —
+confirming the `28244fa2` fix above holds against a real repo, not just the unit test), `pairs: []`
+(correct: the two branches touch different files, so §0.7's pair rule finds no shared path),
+`colors` assigned `0`/`1`. `RepoPrs` returned `{"kind":"disabled","branches":{}}` — **`disabled`**,
+since this sandbox has no `gh` auth configured (stated per the plan's own instruction to say which).
+
+### Closing audit (plan §10), all 8 checks
+
+| Check | Command | Result |
+|---|---|---|
+| No go-git | `rg -n 'go-git' go.mod apps/kira-space` | Empty |
+| Only three git mutations | `rg -n 'RunRemote\|RunOp' apps/kira-space/internal/ade` | Exactly 3 call sites: fetch, `forcePush`, `worktreeRemove` |
+| No argv built in `ade` | `rg -n '"(merge-tree\|for-each-ref\|log\|status)"' apps/kira-space/internal/ade` | Empty |
+| No derived PR flags | `rg -n '\bready\b\|\bciFailing\b\|\bApproved\b\|\breview(Decision\|State)\b' apps/kira-space/internal/ade apps/kira-space/internal/bridge/ade.go` | Empty. **Note:** the plan's own literal (unanchored) regex `'ready\|ciFailing\|Approved\|review(Decision\|State)'` returns many matches, but every one is the substring "already" caught by the unanchored `ready` — a false positive in the plan's own literal command, not a real finding; word-boundary-anchored, the check is genuinely empty |
+| Jira plain | `rg -n -i 'jira' apps/kira-space/internal` | Every hit across `bridge/ade.go`, the migration SQL, `storage/repos/adequeue.go`, `storage/model/adequeue.go` and `internal/ade/queue.go` is `JiraKey`/`JiraURL` plain-storage/wire/validation only — no title, status, live-sync or API-call field anywhere |
+| Layering | Space `layering_test.go` | Pass — `TestDomainPackagesDoNotImportBridge` includes `internal/ade` |
+| Every design §6 field served | Field-by-field map below | No field missing except the dropped `ready`, `ciFailing`, Jira title/status (user decision, Part 1 plan §0) |
+| No renderer feature code | `git diff --stat 20e27f6e -- apps/kira-space/frontend/src` | One file only, `settingsDomain.ts` (commit 2's leaves plus fixup `f4bca800`) |
+
+**Every design §6 field served, field by field** (design doc `docs/v2.0/design/SPEC.md` §6 against
+`AdeRepoSnapshot`/`AdeRepoPrs`/the `ade.*` settings leaves):
+
+- `Branch`: `id`/`name`/`kind`/`owner`/`base`/`ahead`/`behind`/`est`/`merged`/`jira`(`key`/`url`
+  only)/`sessions`(Part 1's `Sessions()`, joined by branch in Part 3's `useQueue`, design §6 line
+  "Branch.sessions is Part 1's Sessions()")/`files`/`commits`/`dirty` all served
+  (`AdeBranchWire`). `ready`/`ciFailing` dropped (user decision, Part 1 plan §0); `archivedAt` moves
+  to `AdeHistoryItem.ArchivedAt` once archived rather than staying on the active-branch row; `pr` is
+  served as a separate `RepoPrs.Branches` map keyed by branch rather than nested per-branch, per the
+  SPEC row's own "PR surfaced as `ResolveBranchPr`'s raw state" wording; `UserMeta`'s
+  `names`/`links`/`est`/`notes` fold directly into `AdeBranchWire`'s own `name`/`draftTitle`/`jira`/
+  `prUrl`/`est`/`notes` fields rather than staying a separate side-table (an implementation
+  simplification, not a missing field).
+- `CandidateBranch`: `name`/`author`/`lastCommitAt` served (`AdeCandidateBranch`), plus
+  `remoteOnly` (an addition beyond the design, needed to distinguish a remote-only candidate from a
+  local one in the Add → Existing branch search).
+- `NewWork`: `id`/`title`/`jira`/`startFrom`/`notes`/`est`/`branchName` served (`AdeNewWorkWire`),
+  plus `createdAt` and `branchCandidates` (§0.10's own rebind picker addition).
+- `RepoPlan`: `day`/`order`/`queuedAfter` served (`AdePlanWire`); `unpushed` is derived from git at
+  read time, not stored (design resolution #2 above), served as the same wire field.
+- `ColorMap`: served as `AdeRepoSnapshot.Colors`.
+- `UiPrefs`: `panelWidth`/`allAgentsFilter`/`horizonDays`/`historyDays`/`extraDays`/`offDays`/
+  `workWeekendDays`/`workdayHours`/`spanDayShare` served as Space settings leaves (`ade.*`);
+  `historyOpen` is runtime-only per Part 1 plan §0 (resets per repo tab, never persisted);
+  `autofetch` maps to the existing global `git.fetchAutoIntervalMinutes` leaf (design resolution
+  above), surfaced to the renderer as `AdeRepoSnapshot.AutofetchMinutes`.
+- `Session`: `id`/`state`/`lastActive`/`worktree` are Part 1's own `AdeSessionWire`; `activity` is a
+  Part 3 reducer concern, not this phase's.
+- Additions beyond design §6 needed to serve it: `AdeRepoSnapshot.Main`/`LastFetchAt`/
+  `WorktreeBasePath` (main-branch identity, fetch staleness and the worktree base path the timeline
+  needs — none named as a top-level design interface, all required to compute `ahead`/`behind`/
+  `merged` and the Add flow).
+
+No known open item closes; two open (both new, recorded in `docs/ARCHITECTURE.md`'s Known open
+items): the rename/delete conflict limitation (§0.7) and the linked-worktree dirty-state-not-watched
+limitation (refreshes on snapshot only, not live-watched).
+
 ## P130 result
 
 Plan: `docs/v2.0/plans/P130-focus-ring-no-animate.md`. One Opus planning pass, one sequential Sonnet
