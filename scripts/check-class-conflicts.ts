@@ -199,7 +199,19 @@ function checkKvOnThemeComponent(
   hits: Hit[],
 ): void {
   const tag: string = node.tag ?? '';
-  const matches = themeNames.has(tag) || [...themeNames].some((n) => pascalToKebab(n) === tag);
+  // Exact PascalCase match (`<Dialog>`, as every call site in this repo writes it), or a REAL
+  // kebab-case rendering with an inserted hyphen (`<RadioGroupItem>` -> `radio-group-item`).
+  // Deliberately NOT a bare `.toLowerCase()` of a single-word name -- that would collapse `Label`/
+  // `Dialog`/`Button`/`Input` down to `label`/`dialog`/`button`/`input`, colliding with the native
+  // HTML elements of the same spelling that Vue's compiler always resolves those lowercase tags
+  // to, never to a same-named component (confirmed against ForcePushDialog.vue's own native
+  // `<label>` false-positiving here before this guard was added).
+  const matches =
+    themeNames.has(tag) ||
+    [...themeNames].some((n) => {
+      const kebab = pascalToKebab(n);
+      return kebab.includes('-') && kebab === tag;
+    });
   if (!matches) return;
   const { staticClass, classExpAst, line } = findClassAttrs(node);
   const tokens = tokensOf(staticClass).filter((t) => t.startsWith('kv:'));
