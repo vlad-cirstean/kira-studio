@@ -16,6 +16,12 @@ import (
 type BoundService struct {
 	Emit     appevent.Emitter
 	Registry *Registry
+	// ComposeAgent, when set, rewrites a claude-code launch's command and supplies extra env before
+	// spawn. Kira Space sets it (P129, its own session tracker's Compose method); Kira Studio leaves
+	// it nil, so its own Open is byte-identical to before this field existed. A func field, not a
+	// method: Wails' binding generator only ever sees exported *methods* on the registered type
+	// (§1.7's FQN rule), so adding this never grows either app's own bound-call surface.
+	ComposeAgent func(terminalID, command string) (string, []string, error)
 }
 
 // svc is the internal/terminal.Service this bound type delegates its generic half to — built fresh
@@ -76,9 +82,24 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 	}
 	// P127: agent-activity monitoring (the `--settings` flag, the hook env vars) left Kira Studio;
 	// Agent stays — it is P87's own keep-awake input (§2.5), read from this registry's own live-
-	// session count, no dependency on the hooks. Space never sets Registry.OnChange, so Agent is
-	// inert there (P128 §1.5) — no behaviour change in either app.
+	// session count, no dependency on the hooks. P129: Kira Space sets ComposeAgent below, so its
+	// own claude-code launches are composed and tracked; Kira Studio leaves it nil, so its Open is
+	// unchanged.
 	agent := args.LaunchKind == LaunchKindClaudeCode
+
+	command, env := args.Command, []string(nil)
+	if agent && b.ComposeAgent != nil {
+		composed, composedEnv, err := b.ComposeAgent(args.TerminalID, command)
+		if err != nil {
+			return OpenResult{}, ipcerr.New("E_INVALID", err.Error())
+		}
+		// ValidateOpen already checked args.Command alone; composing can grow it (the `--settings`
+		// flag, a quoted prompt), so the same bound is rechecked here with the same message.
+		if len(composed) > MaxCommandBytes {
+			return OpenResult{}, ipcerr.New("E_INVALID", "command is too long")
+		}
+		command, env = composed, composedEnv
+	}
 
 	sess, err := b.svc().OpenWithCoalescedOutput(OpenParams{
 		ID:        args.TerminalID,
@@ -86,7 +107,8 @@ func (b *BoundService) Open(args OpenArgs) (OpenResult, error) {
 		Cwd:       args.Cwd,
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
-		Command:   args.Command,
+		Command:   command,
+		Env:       env,
 		Agent:     agent,
 	}, args.WindowKey, args.TerminalID)
 	if err != nil {
