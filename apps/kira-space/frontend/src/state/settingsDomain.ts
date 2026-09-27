@@ -72,14 +72,14 @@ const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.
 // overrides), persisted as settings leaves rather than component state so they survive a relaunch.
 // No UI reads these yet — Part 3 wires the queue board to them. Not exported — nothing outside this
 // file references the raw schema object; `Settings['ade']` covers real consumers.
-export const ADE_PANEL_WIDTH_RANGE = { min: 340, max: 4000 } as const;
-export const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
-export const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
-export const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
-export const ADE_SPAN_DAY_SHARE_RANGE = { min: 0.05, max: 1 } as const;
+const ADE_PANEL_WIDTH_RANGE = { min: 340, max: 4000 } as const;
+const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
+const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
+const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
+const ADE_SPAN_DAY_SHARE_RANGE = { min: 0.05, max: 1 } as const;
 // §0.13 keeps at most 1000 override dates in any one list — well past what a calendar UI would ever
 // need to page through, so it is a sanity ceiling, not a real limit.
-export const ADE_DATE_LIST_MAX = 1000;
+const ADE_DATE_LIST_MAX = 1000;
 
 const adeIsoDateSchema = /*#__PURE__*/ z
   .string()
