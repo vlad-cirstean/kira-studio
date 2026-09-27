@@ -7,7 +7,8 @@ import (
 )
 
 // CustomScript mirrors packages/shared/domain/scripts.ts's customScriptSchema — one custom_scripts
-// row (P85 §8.1): a user-configured launch target shown in the tab strip's "+" dropdown.
+// row (P85 §8.1): a user-configured launch target, listed in the Terminal module's Quick commands
+// panel (P133).
 type CustomScript struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`

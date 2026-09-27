@@ -12,8 +12,8 @@ import type { SettingsPaneProps } from './types';
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Connected editors'"` branch — state/gitClients.ts, moved to this
 // app wholesale from Kira Studio (P100 Part 2). Bypasses draft/Save entirely, same posture as
-// Kira Studio's own 'Scripts'/'Database MCP' sections: gitClientsStore is a module-level store,
-// not a settings leaf.
+// Kira Studio's own 'Database MCP' section: gitClientsStore is a module-level store, not a
+// settings leaf.
 defineProps<SettingsPaneProps>();
 
 const confirmDialogStore = useConfirmDialogStore();

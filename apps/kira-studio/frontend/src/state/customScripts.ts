@@ -3,9 +3,9 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 
-// P85 §9.3: state/, not repo/state/ — TabStrip.vue (workbench/) and SettingsDialog.vue
-// (workbench/) both read this, the same layering argument state/terminals.ts's own header
-// comment makes for P83.
+// P85 §9.3: state/, not repo/state/ — workbench/terminalModule.ts is this store's own reader
+// (the shared TerminalPanel.vue/QuickCommandsDialog.vue, via the TerminalScriptsSeam), the same
+// layering argument state/terminals.ts's own header comment makes for P83.
 export const useCustomScriptsStore = defineStore('customScripts', () => {
   const state = reactive({ records: [] as CustomScript[] });
 
@@ -15,7 +15,7 @@ export const useCustomScriptsStore = defineStore('customScripts', () => {
   // subscription that replaces records wholesale — state/settings.ts's hydrateSettings/
   // onSettingsChanged pair, verbatim in shape, and connections.ts's own onConnectionsChanged is the
   // precedent for why this is needed at all: without it, a script added in one window never appears
-  // in another window's dropdown.
+  // in another window's Quick commands list.
   async function hydrateCustomScripts(): Promise<void> {
     state.records = await control.customScriptsList();
 

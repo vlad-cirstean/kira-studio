@@ -10,8 +10,8 @@ import (
 // MaskRulesService's own per-method-args-struct shape, reaching s.Deps.Repos.CustomScripts
 // directly rather than through a dedicated Deps field: CollectionsService already establishes
 // that a service wrapping one repo needs none. Every mutation broadcasts the full list on
-// ChannelCustomScriptsChanged (Emit, not EmitTo) so a second window's dropdown stays live
-// (state/customScripts.ts's own onCustomScriptsChanged subscription).
+// ChannelCustomScriptsChanged (Emit, not EmitTo) so a second window's Quick commands list stays
+// live (state/customScripts.ts's own onCustomScriptsChanged subscription).
 type CustomScriptsService struct {
 	Deps appcore.Deps
 }
@@ -69,7 +69,8 @@ func (s *CustomScriptsService) Remove(args CustomScriptsRemoveArgs) error {
 		return ipcerr.BadRequest("id is required")
 	}
 	// The only failure mode reaching this layer is an unknown id (sql.ErrNoRows, wrapped) —
-	// idempotent-remove semantics are Settings' own confirm-first UI, not this layer's job.
+	// idempotent-remove semantics are the Terminal module's own confirm-first UI, not this
+	// layer's job.
 	if err := s.Deps.Repos.CustomScripts.Remove(args.ID); err != nil {
 		return ipcerr.BadRequest(err.Error())
 	}
