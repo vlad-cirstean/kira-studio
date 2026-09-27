@@ -120,7 +120,11 @@ test('a secret revealed via Copy as curl does not skip re-auth in the later-open
   await page.click('[data-testid="menu-item-variables"]');
   await expect(page.locator('[data-testid="variables-dialog"]')).toBeVisible();
 
-  await variableRow(page, 'var-apikey').locator('[data-testid="variable-secret"]').uncheck();
+  // Controlled ARIA toggle: it flips only once the re-auth reveal resolves, so `.uncheck()`'s
+  // one-shot post-click read races that IPC round trip. Click, then wait for the flip.
+  const secretBox = variableRow(page, 'var-apikey').locator('[data-testid="variable-secret"]');
+  await secretBox.click();
+  await expect(secretBox).not.toBeChecked();
 
   expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(2);
 });
