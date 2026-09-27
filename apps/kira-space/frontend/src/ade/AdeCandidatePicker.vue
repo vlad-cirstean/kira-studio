@@ -21,7 +21,7 @@ function onUse(): void {
 </script>
 
 <template>
-  <div class="flex h-7 items-center gap-2" data-testid="ade-candidate-picker">
+  <div class="col-span-2 flex h-7 items-center gap-2" data-testid="ade-candidate-picker">
     <span
       class="rounded-kira-sm bg-[rgba(232,163,61,0.14)] px-1.5 py-0.5 text-kira-sm font-semibold text-[#f0b85c]"
     >
