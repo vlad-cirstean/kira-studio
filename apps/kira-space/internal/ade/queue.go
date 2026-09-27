@@ -179,6 +179,9 @@ type CandidateBranch struct {
 	Name, Author string
 	LastCommitAt int64
 	RemoteOnly   bool
+	// Mine mirrors AddBranch's own resolveKind rule (§0.2/3 of the P129 Part 5 plan), so the
+	// Existing-branch picker's "you" label never disagrees with the kind AddBranch would assign.
+	Mine bool
 }
 
 type RefreshResult struct {
@@ -1151,6 +1154,10 @@ func (q *Queue) Candidates(ctx context.Context, codeRepoID string) ([]CandidateB
 	for _, b := range state.Branches {
 		known[b.Branch] = true
 	}
+	userEmail, err := entry.ConfigValue(ctx, "user.email")
+	if err != nil {
+		return nil, err
+	}
 
 	seen := make(map[string]bool)
 	var out []CandidateBranch
@@ -1159,14 +1166,16 @@ func (q *Queue) Candidates(ctx context.Context, codeRepoID string) ([]CandidateB
 			continue
 		}
 		seen[r.Short] = true
-		out = append(out, CandidateBranch{Name: r.Short, Author: r.AuthorName, LastCommitAt: r.CommitterUnix})
+		mine := resolveKind(r, userEmail, "") == model.AdeBranchKindMine
+		out = append(out, CandidateBranch{Name: r.Short, Author: r.AuthorName, LastCommitAt: r.CommitterUnix, Mine: mine})
 	}
 	for _, r := range inv {
 		if r.Remote == "" || known[r.Short] || seen[r.Short] {
 			continue
 		}
 		seen[r.Short] = true
-		out = append(out, CandidateBranch{Name: r.Short, Author: r.AuthorName, LastCommitAt: r.CommitterUnix, RemoteOnly: true})
+		mine := resolveKind(r, userEmail, "") == model.AdeBranchKindMine
+		out = append(out, CandidateBranch{Name: r.Short, Author: r.AuthorName, LastCommitAt: r.CommitterUnix, RemoteOnly: true, Mine: mine})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].LastCommitAt > out[j].LastCommitAt })
 	return out, nil

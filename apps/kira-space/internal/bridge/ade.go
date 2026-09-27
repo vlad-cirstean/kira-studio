@@ -382,6 +382,7 @@ type AdeCandidateBranch struct {
 	Author       string `json:"author"`
 	LastCommitAt int64  `json:"lastCommitAt"`
 	RemoteOnly   bool   `json:"remoteOnly"`
+	Mine         bool   `json:"mine"`
 }
 
 // AdePr is RepoPrs.Branches' own value shape — ResolveBranchPr's raw state, verbatim.
@@ -520,7 +521,7 @@ func toWireAdePrs(p ade.RepoPrs) AdeRepoPrs {
 func toWireAdeCandidates(candidates []ade.CandidateBranch) []AdeCandidateBranch {
 	out := make([]AdeCandidateBranch, len(candidates))
 	for i, c := range candidates {
-		out[i] = AdeCandidateBranch{Name: c.Name, Author: c.Author, LastCommitAt: c.LastCommitAt, RemoteOnly: c.RemoteOnly}
+		out[i] = AdeCandidateBranch{Name: c.Name, Author: c.Author, LastCommitAt: c.LastCommitAt, RemoteOnly: c.RemoteOnly, Mine: c.Mine}
 	}
 	return out
 }
