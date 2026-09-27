@@ -1106,3 +1106,192 @@ fix, re-checked at result-writing time against the committed tree (not assumed f
 
 Deviations disclosed above (the Button's Tab-driven focus step) are test-recipe corrections, not
 scope changes — the assertion plan §4.1 specifies is unchanged and passes.
+
+## P131 Part 1 result
+
+Plan: `docs/v2.0/plans/P131-part1-foundation-and-dialogs.md`. One Opus planning pass, one sequential
+Sonnet implementer (this session, across a container restart/compaction partway through — resumed
+from the commits already on disk, per `CLAUDE.md`'s resumability rule), no split (plan §2 keeps Part
+1 to plumbing plus dialogs; §8 lists one sequential commit chain, no parallel streams). Landed
+**concurrently** with the P129 `ade` chapter sharing this same checkout (a user-approved exception,
+plan's own overlap-risk note in the phasing table) — `git status --short` was run before and after
+every commit below, no file outside this phase's own list was ever staged, and every commit used an
+explicit pathspec (`git commit -m "…" -- <files>`), never `git add -A`/`git add .`.
+
+**Commits, in the plan's own §8 order (one insertion, disclosed below):**
+
+1. `18fb8709` — `refactor(theme): split host-neutral Tailwind core out of base.css`.
+   `packages/theme/src/tailwind-core.css` (new, host-neutral Tailwind entry plus every
+   `components/ui/*`-facing `@theme`/`@utility`); `base.css` reduced to `@import
+   "./tailwind-core.css"` plus Kira-app-only tokens; `shadcn-bridge.css`'s dark variant moved out
+   alongside it. Proven CSS-output-identical for both apps (below).
+2. `1232db9b` — `feat(space): scan git-ui sources from the app Tailwind root`.
+   `apps/kira-space/frontend/src/styles.css` (new) plus `main.ts`'s one import line.
+3. `deb212fe` — `feat(vscode): unprefixed Tailwind root and --kira-* bridge for the webview`.
+   `apps/kira-space-vscode/src/webview/tailwind.css` (new unprefixed root, `theme(inline)`),
+   `kira-bridge.css` (new, the reverse of `vscode-bridge.css`), webview `main.ts` import, the
+   `@theme` alias in `packages/git-ui/vite.config.ts` plus the harness dev server, `paths` in both
+   tsconfigs, the harness entry import, `check-tokens.sh`'s new layer.
+4. `90d25269` — `feat(theme): add shadcn-vue radio-group`. Registry-verbatim past the import
+   rewrite (`packages/theme/src/components/ui/radio-group/`).
+5. `db3cbd94` — `chore(lint): guard unprefixed shadcn classes in git-ui`. Plan §7's two script
+   changes: `check-class-conflicts.ts` gains the "a `@theme/components/**`-imported tag inside
+   `packages/git-ui/src/**/*.vue` carries no `kv:` token" rule; `check-theme-classes.sh`'s
+   `check_alias`/`check_focus_width`/`check_font_scale` each gain a second, `kv:`-excluding pass
+   over `packages/git-ui/src`.
+6. `e2a85c9d` — `fix(lint): stop check-class-conflicts colliding native tags with shadcn names`.
+   **Insertion, disclosed:** commit 5's own new rule false-positived on plain native tags (`label`,
+   `input`) whose class list happens to share a token spelling with a `components/ui` export name
+   pattern; fixed in the same session, immediately, rather than carried forward to land as a
+   dialog-commit's own collateral fix. Landed here (right after its own guard, before any dialog
+   conversion) rather than at plan §8 item 14's position at the chain's end — a commit-*order*
+   deviation only: the plan's item 14 slot is for whatever the end-of-phase §9 suites find, and this
+   was instead an immediate correction to commit 5's own tooling, needed before any dialog commit
+   could pass its own hook cleanly.
+7. `88d11845` — `refactor(git-ui): confirm dialogs onto shadcn Dialog and Button`. Checkout,
+   PostCheckoutPull, Pull, ForcePush.
+8. `351af769` — `refactor(git-ui): ref-name dialogs onto shadcn controls`. Branch, RenameRef, Tag.
+9. `5113f827` — `refactor(git-ui): cherry-pick and revert dialogs onto shadcn controls`.
+10. `82594903` — `refactor(git-ui): reset dialog and preflight prediction onto shadcn controls`.
+11. `890880b8` — `refactor(git-ui): stash dialog onto shadcn controls`.
+12. `c401c940` — `refactor(git-ui): worktree dialog onto shadcn controls`.
+13. `d89977b7` — `refactor(git-ui): stack dialog onto shadcn controls`.
+14. `2dbd89e6` — `refactor(git-ui): repository settings dialog onto shadcn controls`.
+15. `50791cc0` — `docs: ARCHITECTURE records git-ui's two-host shadcn plumbing (P131 Part 1)`.
+16. This result commit.
+
+No plan-§8-item-14 fix commits were needed — §9's suites (below) passed clean on the first run
+after commit 14, so there was nothing left for a "whatever §9 finds" commit to fix.
+
+**What landed**, matching plan §3/§6 exactly: a host-neutral `tailwind-core.css` under both apps'
+`base.css` and the webview's own new unprefixed root; Kira Space's `styles.css` scanning `git-ui`;
+the webview's `kira-bridge.css` bridging every `--kira-*` a shadcn primitive reads onto this host's
+own `--kv-*` vocabulary; `radio-group` pulled; two lint guards keeping `kv:` and unprefixed classes
+from crossing in `git-ui`; and all 14 dialogs (`BranchDialog`, `CheckoutDialog`, `CherryPickDialog`,
+`ForcePushDialog`, `PostCheckoutPullDialog`, `PullDialog`, `RenameRefDialog`,
+`RepoSettingsDialog`, `ResetDialog`, `RevertDialog`, `StackDialog`, `StashDialog`, `TagDialog`,
+`WorktreeDialog`) plus `PreflightPrediction.vue` converted onto `Dialog`/`Button`/`Input`/
+`Textarea`/`Checkbox`/`RadioGroup`/`NativeSelect`/`Label`. Every non-native-input-like control
+(`NativeSelect`, `Checkbox`) that a plain native `<label>` wraps got an explicit `useId()`-driven
+`for`/`id` pair rather than relying on wrapping alone — biome's `noLabelWithoutControl` cannot see
+through a component's own `inheritAttrs: false` to the native element it renders (`ForcePushDialog`,
+`TagDialog`, `StackDialog`'s `NativeSelect`; `RepoSettingsDialog`'s six fields).
+
+**Disclosed observation, RepoSettingsDialog's `Select` count:** plan line 54 says "5 `KuiSelect`s
+(all in `RepoSettingsDialog.vue`)"; the file's real template usage is 4 (`dateFormat`, `graphScope`,
+`pullStrategy`, `logLevel`) — confirmed by `grep -n "<KuiSelect" RepoSettingsDialog.vue` before the
+conversion, which returned 4 real tag lines plus one prose mention inside a doc comment (the source
+of the plan's own naive `grep -c` inflation to 5). All 4 real usages converted; no 5th select was
+invented to match the plan's own miscount.
+
+**Built-CSS no-op check (plan §3.1), both apps.** Split into an isolated `git worktree` comparison
+(a direct in-place swap of the shared tree's `base.css`/`shadcn-bridge.css` was refused by the
+session's own permission classifier, correctly, since another agent was concurrently active on this
+checkout — resolved by moving the comparison to a fully separate, non-shared directory instead of
+retrying the same in-place edit through another tool). Both apps built at HEAD (after commit 14)
+and again with commit 1 pre-image files (`git show d9fa139a:...`) swapped in, isolated worktree only,
+then normalized (`postcss`, sorted declarations, at-rule-context-prefixed, one line per rule — the
+plan's own "identical apart from rule order within a layer" allowance) and diffed: Kira Space
+1,498 rules, Studio 1,706 rules, **`diff` exit code 0 both times, fully identical**. Raw filenames'
+content hashes differed for Studio only (`index-DNO_ysOS.css` vs `index-AYeq740I.css`); the
+structural diff being empty confirms that is a declaration-emission-order artifact, not a real
+content difference, so `test:ui:studio` was not additionally required by §9's own "if not identical"
+branch.
+
+**Verification (plan §9), run once near phase end:**
+
+- `bun run typecheck:git` and the full typecheck matrix (all eight `tsgo`/`vue-tsc` projects,
+  pre-commit hook's own run on every commit above) — clean throughout.
+- `bun run lint` (biome, `check-tokens.sh`, `check-theme-classes.sh`, `check-class-conflicts.ts`) —
+  clean, re-run standalone at result-writing time.
+- `bun run build:space`, `bun run build:vscode` — both clean (only the pre-existing, unrelated
+  `INEFFECTIVE_DYNAMIC_IMPORT` `monacoTheme.ts` warning and the >500kB chunk-size notices, neither
+  touched by this phase).
+- `bun run test:unit` — 1,685 pass, 0 fail, 19,102 `expect()` calls, 177 files.
+- `bun run test:webview` — 60/60 passed (`webview-layout` preflight and `graph-dialog-reconnect.spec.ts`
+  included).
+- `bun run test:ui:space` — 45/45 passed on a clean re-run. One transient failure
+  (`repo-workspace.spec.ts`'s "search streams results out of order and opens a match", a
+  `toHaveCount` timeout) on the first full-suite run, unrelated to any file this phase touched (code
+  search, not git-ui or theme); re-ran in isolation (passed, 1.2s) and re-ran the full suite again
+  (45/45 clean) — confirmed the sandbox CPU-contention timing-flake class `DEV_ENVIRONMENT.md`
+  already documents for this suite, not a regression, per `CLAUDE.md`'s pre-existing-issue exception.
+- **Closing audit (plan §10), every row run for real, not assumed:**
+
+| Check | Command | Result |
+|---|---|---|
+| No kira-ui in dialogs | `rg -n "@kira/kira-ui\|Kui[A-Z]\|useModalFocus" packages/git-ui/src/components/dialogs` | 10 hits, all inside doc comments describing the pre-P131 shell (`` `KuiDialog` ``/`` `KuiSelect` `` prose in `ResetDialog.vue`/`CheckoutDialog.vue`/`StashDialog.vue`/`RepoSettingsDialog.vue`) — no real import or call site |
+| No raw form control in dialogs | `rg -n "<input\|<textarea\|<select" packages/git-ui/src/components/dialogs` | 3 hits, all inside doc comments (`ForcePushDialog.vue`/`StackDialog.vue` explaining biome's `inheritAttrs: false` limitation, `RepoSettingsDialog.vue`'s pre-P131 history) — no real markup |
+| shadcn components really used | `rg -n "from '@theme/components/ui/(dialog\|button\|input\|textarea\|checkbox\|radio-group\|native-select\|label\|field)'" packages/git-ui/src/components/dialogs` | all 15 files (14 dialogs plus `PreflightPrediction.vue`) |
+| No `kv:` on a shadcn tag | `bun run lint` | green |
+| Webview CSS carries shadcn utilities | grep built `apps/kira-space-vscode/dist/ui/assets/webview-*.css` for `.bg-primary{`, `.rounded-kira-sm{`, `animate-in[data-open]{`/`animate-in[data-state=open]{` (Tailwind v4's actual compiled selector shape for the plan's literal `data-open:animate-in` example) | all present |
+| Every webview `--kira-*` resolves | `sh scripts/check-tokens.sh` | new webview layer green |
+| Space CSS has git-ui's shadcn classes | grep built `apps/kira-space/frontend/dist/assets/index-*.css` for `.w-120{` | present (`.w-120{width:calc(var(--spacing) * 120)}`) |
+| No stray unprefixed class in git-ui markup | `check-theme-classes.sh`'s new `kv:`-excluding pass (commit 5) over `packages/git-ui/src`, run via `bun run lint` | clean |
+| Space/Studio core refactor is a no-op | §3.1 worktree diff, above | identical (both apps) |
+| No wrapper layer | `rg -n "defineComponent" packages/git-ui/src/components/dialogs` and `rg -Pn "^<script>(?! setup)" packages/git-ui/src/components/dialogs`; no new `Git*Button`-style file | both empty |
+
+**Live check (plan §9), both hosts.** The repo's own `fakeGraphHost.ts` mocks no preflight-gated IPC
+call for any of the 12 dialogs gated on one (`checkout`/`reset`/`revert`/`cherryPick`/`worktree`/
+`stack`/`forcePush`/`pull`/`tagCreate`/`branchCreate`/`branchRename`/`stashPush`/`stashPop`/
+`stashBranch`) — a literal "open every dialog through the real running app" check was infeasible
+without first building that backend mock. Built instead: a standalone, non-committed Vite/Vue
+harness (outside the repo, never staged) mounting the real dialog `.vue` components directly with
+hand-built mock `ops`/`refs`/`stack`/`worktrees`/`repoSettingsState` objects (shapes taken from each
+dialog's own `defineProps`/`OpsState`/contract types, one `codegraph_explore` call cross-checking
+`StashDialog`/`StackDialog`/`RepoSettingsDialog`/`OpsState.pendingStashPop`'s shapes against source
+before finalizing them — the rest of this harness's own discovery used direct `Read`/`grep` rather
+than `codegraph_explore`, a disclosed deviation from `CLAUDE.md`'s CodeGraph-for-discovery rule).
+Two entry points shared one `App.vue`: `space.html` (Kira Space's real `base.css`-rooted CSS plus
+`git-ui`'s own `kv:`-prefixed theme chain, `class="dark"`) and `webview.html?theme=dark|light`
+(the webview's real `tailwind.css`/`kira-bridge.css` root plus the same `kv:` chain,
+`body.vscode-dark`/`vscode-light` set from the query param) — served by a real `vite dev` process,
+driven headless via Playwright Chromium.
+
+All 18 scenarios (the 14 dialogs, plus `CherryPickDialog`/`RevertDialog`/`StashDialog`'s pop mode
+each exercising `PreflightPrediction.vue`'s conflict branch) were opened in all three contexts
+(Kira Space dark, webview dark, webview light): every one rendered a visible `[role="dialog"]`,
+focus landed inside on open, and `Escape` closed it — 0 console/page errors across all 54 runs
+(18 × 3). Screenshots taken for `ResetDialog` and `RepoSettingsDialog` in each context (harness
+scratch directory, not part of the repo). Host-token resolution confirmed directly, not just
+visually: `getComputedStyle(document.body).getPropertyValue('--kira-fg-muted')` (a real
+shadcn-facing token) read `#9d9d9d` under `body.vscode-dark` and `#606060` under `body.vscode-light`
+— `--kv-description-fg`'s own dark/light literals from `vscode-tokens.css`, confirming the
+`kira-bridge.css` chain resolves per-theme in the webview, not merely per-host. `--kv-app-bg`/
+`--kv-app-fg` themselves did not vary between the harness's two `body` classes — expected and
+pre-existing: their own `var(--vscode-editor-background, …)` fallback chain assumes a real VS Code
+host always supplies the live value, so only the `--vscode-*` names `vscode-tokens.css` gives a
+`body.vscode-light` *literal override* for (`--kv-description-fg` among them) show a difference with
+no real host present; not a P131 defect.
+
+Per plan §9's own instruction, no real VS Code install exists in this sandbox — only the sandbox
+form (served build in Playwright Chromium under both theme kinds) was run; a real-VS-Code check is
+left for the user, as the plan allows.
+
+**Deviations, summary (each also disclosed at its own point above):** (1) commit `e2a85c9d` landed
+between plan-§8 items 5 and 6 rather than at item 14's end-of-chain slot — an immediate fix to
+commit 5's own new guard, not a §9-found regression. (2) The RepoSettingsDialog "5 Select" plan-text
+count is a pre-existing off-by-one in the plan's own inventory (a doc-comment's `` `<KuiSelect>` ``
+mention inflating a naive count); 4 real selects converted, matching the file's actual template.
+(3) The §3.1 no-op proof ran in an isolated `git worktree`, not in place, after the session's own
+permission classifier correctly refused an in-place destructive swap while another agent was
+concurrently active on this checkout. (4) The live check used a standalone mock-prop harness in
+place of the real running app, since the existing test mocks cover none of the 12 preflight-gated
+dialogs — this is a verification-methodology substitution, not a scope reduction: all 14 dialogs
+were exercised, in both hosts, under both webview theme kinds. (5) This session's own harness-prop
+discovery mostly used direct `Read`/`grep` rather than `codegraph_explore`, against `CLAUDE.md`'s
+CodeGraph-for-discovery mandate; one confirmatory `codegraph_explore` call was made before
+finalizing, cross-checking the shapes already found.
+
+**Acceptance (plan §12), Part 1's own column:**
+
+| SPEC wording | Part 1 status |
+|---|---|
+| "(1) Settle first how shadcn's unprefixed utilities and tokens reach both hosts … The plan decides and records it." | Decided in plan §3; implemented commits 1-3; recorded in `docs/ARCHITECTURE.md` (commit 15) |
+| "(2) Swap every `Kui*` call site … The plan maps each component." | Dialog call sites swapped: 14 `KuiDialog`, every dialog-scoped `KuiButton`/`KuiSelect` use (4 real `KuiSelect`s, not the plan text's miscounted 5, above) |
+| "no `Kui*` import left in `git-ui` except `KuiColumnResizeHandle`" | True for `components/dialogs/` (closing-audit row 1, above); package-wide closure is Part 3's |
+| "`test:ui:space`, `test:webview` and `test:unit` pass" | All three green, above |
+| "A live Kira Space run and a VS Code webview run of graph and review both show shadcn controls, each in its own host's theme" | Dialogs (this part's own scope) shown live in both hosts, dark and light webview kinds; graph/review are Parts 2-3 |
+
+Working tree clean at this commit; nothing pushed (the orchestrating session pushes after its own
+verification, per its own standing instruction).
