@@ -21,11 +21,20 @@
  *   dialog cannot actually observe. Once running, output streams live (`ops.
  *   worktreePrepareOutput`) with a Cancel button; dismissing the dialog while it runs does not
  *   cancel it — `AppToolbar.vue`'s own strip takes over as the visible indicator (D13).
+ *
+ * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * `DialogTitle`'s default slot, and the create phase's mode picker/text fields/checkbox are
+ * RadioGroup/Input/Checkbox.
  */
 import { validateRefName } from '@kira/git-core';
 import type { WorktreeAddPreflight } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
-import { computed, ref, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../../state/worktrees.ts';
@@ -75,6 +84,9 @@ const mode = ref<Mode>('newBranch');
 const branch = ref('');
 const startPoint = ref('');
 const preflight = ref<WorktreeAddPreflight | undefined>(undefined);
+const pathId = useId();
+const branchId = useId();
+const startPointId = useId();
 let previewToken = 0;
 
 watch(
@@ -256,166 +268,176 @@ function onClose(): void {
 </script>
 
 <template>
-  <KuiDialog :open="active" :title="title" @close="onClose">
-    <template v-if="phase === 'create'">
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Path
-        <input
-          type="text"
-          v-model="path"
-          placeholder="../my-repo-feature-x"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-      </label>
-      <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        <legend>Start from</legend>
-        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
-          <input type="radio" value="existingBranch" v-model="mode" />
-          An existing branch
-        </label>
-        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
-          <input type="radio" value="newBranch" v-model="mode" />
-          A new branch
-        </label>
-        <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
-          <input type="radio" value="detach" v-model="mode" />
-          Detached (no branch)
-        </label>
-      </fieldset>
+  <Dialog :open="active" @update:open="(v) => !v && onClose()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>{{ title }}</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <template v-if="phase === 'create'">
+          <label :for="pathId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Path
+            <Input
+              :id="pathId"
+              v-model="path"
+              type="text"
+              size="kira"
+              class="w-full"
+              placeholder="../my-repo-feature-x"
+            />
+          </label>
+          <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            <legend>Start from</legend>
+            <RadioGroup v-model="mode">
+              <Label class="flex flex-row items-center gap-1">
+                <RadioGroupItem value="existingBranch" />
+                An existing branch
+              </Label>
+              <Label class="flex flex-row items-center gap-1">
+                <RadioGroupItem value="newBranch" />
+                A new branch
+              </Label>
+              <Label class="flex flex-row items-center gap-1">
+                <RadioGroupItem value="detach" />
+                Detached (no branch)
+              </Label>
+            </RadioGroup>
+          </fieldset>
 
-      <label v-if="mode === 'existingBranch'" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Branch
-        <input
-          type="text"
-          v-model="branch"
-          list="kv-worktree-branches"
-          placeholder="branch name"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-        <datalist id="kv-worktree-branches">
-          <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
-        </datalist>
-      </label>
-      <template v-else-if="mode === 'newBranch'">
-        <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-          New branch name
-          <input
-            type="text"
-            v-model="branch"
-            placeholder="feature/x"
-            class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-          />
-        </label>
-        <p v-if="newBranchNameError" class="kv:text-diff-deleted kv:my-0.5">{{ newBranchNameError }}</p>
-        <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-          Start point
-          <input
-            type="text"
-            v-model="startPoint"
-            placeholder="main"
-            class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-          />
-        </label>
-      </template>
-      <label v-else class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Commit-ish
-        <input
-          type="text"
-          v-model="startPoint"
-          placeholder="a branch, tag or sha"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-      </label>
+          <label v-if="mode === 'existingBranch'" :for="branchId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Branch
+            <Input
+              :id="branchId"
+              v-model="branch"
+              type="text"
+              size="kira"
+              class="w-full"
+              list="kv-worktree-branches"
+              placeholder="branch name"
+            />
+            <datalist id="kv-worktree-branches">
+              <option v-for="row in refs.branches.value" :key="row.refname" :value="row.shortName" />
+            </datalist>
+          </label>
+          <template v-else-if="mode === 'newBranch'">
+            <label :for="branchId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+              New branch name
+              <Input :id="branchId" v-model="branch" type="text" size="kira" class="w-full" placeholder="feature/x" />
+            </label>
+            <p v-if="newBranchNameError" class="kv:text-diff-deleted kv:my-0.5">{{ newBranchNameError }}</p>
+            <label :for="startPointId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+              Start point
+              <Input :id="startPointId" v-model="startPoint" type="text" size="kira" class="w-full" placeholder="main" />
+            </label>
+          </template>
+          <label v-else :for="startPointId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Commit-ish
+            <Input
+              :id="startPointId"
+              v-model="startPoint"
+              type="text"
+              size="kira"
+              class="w-full"
+              placeholder="a branch, tag or sha"
+            />
+          </label>
 
-      <template v-if="preflight">
-        <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="kv:text-diff-deleted kv:my-0.5">
-          <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
-          <template v-else-if="blocker.kind === 'pathExists'">
-            <code>{{ blocker.path }}</code> already exists.
+          <template v-if="preflight">
+            <p v-for="blocker in preflight.blockers" :key="blocker.kind" class="kv:text-diff-deleted kv:my-0.5">
+              <template v-if="blocker.kind === 'invalidPath'">The path is invalid.</template>
+              <template v-else-if="blocker.kind === 'pathExists'">
+                <code>{{ blocker.path }}</code> already exists.
+              </template>
+              <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
+                <code>{{ blocker.branch }}</code> is already checked out at
+                <code>{{ blocker.worktreePath }}</code>.
+              </template>
+              <template v-else-if="blocker.kind === 'branchExists'">
+                A branch named <code>{{ blocker.branch }}</code> already exists.
+              </template>
+              <template v-else-if="blocker.kind === 'unknownStartPoint'">
+                <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
+              </template>
+            </p>
+            <p v-if="canOfferDetachHere" class="kv:text-diff-deleted">
+              The new worktree will start with a detached HEAD.
+            </p>
+            <Button v-if="canOfferDetachHere" variant="dialog-primary" size="kira-lg" @click="submitCreateDetached">
+              Create it detached at that branch's commit
+            </Button>
+            <p v-for="note in preflight.notes" :key="note.kind" class="kv:text-diff-deleted">
+              <template v-if="note.kind === 'pathInsideRepo'">
+                This path is inside the current repository.
+              </template>
+              <template v-else-if="note.kind === 'parentDirectoryMissing'">
+                The parent directory will be created.
+              </template>
+              <template v-else-if="note.kind === 'detachedHead'">
+                The new worktree will start with a detached HEAD.
+              </template>
+            </p>
           </template>
-          <template v-else-if="blocker.kind === 'branchCheckedOutElsewhere'">
-            <code>{{ blocker.branch }}</code> is already checked out at
-            <code>{{ blocker.worktreePath }}</code>.
-          </template>
-          <template v-else-if="blocker.kind === 'branchExists'">
-            A branch named <code>{{ blocker.branch }}</code> already exists.
-          </template>
-          <template v-else-if="blocker.kind === 'unknownStartPoint'">
-            <code>{{ blocker.startPoint }}</code> does not resolve to a commit.
-          </template>
-        </p>
-        <p v-if="canOfferDetachHere" class="kv:text-diff-deleted">
-          The new worktree will start with a detached HEAD.
-          <KuiButton @click="submitCreateDetached">
-            Create it detached at that branch's commit
-          </KuiButton>
-        </p>
-        <p v-for="note in preflight.notes" :key="note.kind" class="kv:text-diff-deleted">
-          <template v-if="note.kind === 'pathInsideRepo'">
-            This path is inside the current repository.
-          </template>
-          <template v-else-if="note.kind === 'parentDirectoryMissing'">
-            The parent directory will be created.
-          </template>
-          <template v-else-if="note.kind === 'detachedHead'">
-            The new worktree will start with a detached HEAD.
-          </template>
-        </p>
-      </template>
-    </template>
+        </template>
 
-    <template v-else-if="phase === 'prepare'">
-      <p class="kv:text-diff-deleted">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
-      <template v-if="!started">
-        <p>This repository has a prepare script:</p>
-        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
-        <p v-if="!runPrepareScriptCapability" class="kv:text-diff-deleted kv:my-0.5">
-          Running scripts is disabled here.
-        </p>
-        <label v-else class="kv:flex kv:flex-row kv:items-center kv:gap-0.5">
-          <input type="checkbox" v-model="runChecked" />
-          Run this script now, as your own shell, with your own permissions
-        </label>
-      </template>
-      <template v-else>
-        <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all"><span
-          v-for="(line, i) in ops.worktreePrepareOutput.value"
-          :key="i"
-          :class="line.stream === 'stderr' ? 'kv:text-diff-deleted' : ''"
-        >{{ line.text }}
+        <template v-else-if="phase === 'prepare'">
+          <p class="kv:text-diff-deleted">Worktree created at <code>{{ worktreeCreated }}</code>.</p>
+          <template v-if="!started">
+            <p>This repository has a prepare script:</p>
+            <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all">{{ prepareScript }}</pre>
+            <p v-if="!runPrepareScriptCapability" class="kv:text-diff-deleted kv:my-0.5">
+              Running scripts is disabled here.
+            </p>
+            <Label v-else class="flex flex-row items-center gap-1">
+              <Checkbox v-model="runChecked" />
+              Run this script now, as your own shell, with your own permissions
+            </Label>
+          </template>
+          <template v-else>
+            <pre class="kv:max-h-60 kv:overflow-y-auto kv:p-1 kv:bg-panel kv:border kv:border-panel-border kv:font-data kv:text-sm kv:whitespace-pre-wrap kv:break-all"><span
+              v-for="(line, i) in ops.worktreePrepareOutput.value"
+              :key="i"
+              :class="line.stream === 'stderr' ? 'kv:text-diff-deleted' : ''"
+            >{{ line.text }}
 </span></pre>
-        <p v-if="prepareResult && !preparing">
-          <template v-if="prepareResult.ok">Finished successfully.</template>
-          <template v-else-if="prepareResult.cancelled">Cancelled.</template>
-          <template v-else-if="prepareResult.timedOut">Timed out.</template>
-          <template v-else>Exited with status {{ prepareResult.exitCode }}.</template>
-        </p>
-      </template>
-    </template>
+            <p v-if="prepareResult && !preparing">
+              <template v-if="prepareResult.ok">Finished successfully.</template>
+              <template v-else-if="prepareResult.cancelled">Cancelled.</template>
+              <template v-else-if="prepareResult.timedOut">Timed out.</template>
+              <template v-else>Exited with status {{ prepareResult.exitCode }}.</template>
+            </p>
+          </template>
+        </template>
+      </div>
 
-    <template #actions>
-      <template v-if="phase === 'create'">
-        <KuiButton variant="primary" :disabled="!canSubmitCreate" @click="submitCreate">
-          Create
-        </KuiButton>
-        <KuiButton @click="cancelCreate">Cancel</KuiButton>
-      </template>
-      <template v-else-if="phase === 'prepare' && !started">
-        <KuiButton
-          variant="primary"
-          :disabled="!runChecked || !runPrepareScriptCapability"
-          @click="startPrepare"
-        >
-          Run
-        </KuiButton>
-        <KuiButton @click="skipPrepare">Skip</KuiButton>
-      </template>
-      <template v-else-if="phase === 'prepare' && preparing">
-        <KuiButton @click="cancelPrepare">Cancel</KuiButton>
-      </template>
-      <template v-else-if="phase === 'prepare'">
-        <KuiButton variant="primary" @click="finishPrepare">Close</KuiButton>
-      </template>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <template v-if="phase === 'create'">
+          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitCreate" @click="submitCreate">
+            Create
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
+        </template>
+        <template v-else-if="phase === 'prepare' && !started">
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="!runChecked || !runPrepareScriptCapability"
+            @click="startPrepare"
+          >
+            Run
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="skipPrepare">Skip</Button>
+        </template>
+        <template v-else-if="phase === 'prepare' && preparing">
+          <Button variant="dialog" size="kira-lg" @click="cancelPrepare">Cancel</Button>
+        </template>
+        <template v-else-if="phase === 'prepare'">
+          <Button variant="dialog-primary" size="kira-lg" @click="finishPrepare">Close</Button>
+        </template>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
