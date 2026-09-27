@@ -324,6 +324,18 @@ function localDayOfFixture(ms: number): string {
   return isoFromOffset(Math.floor(ms / DAY_MS) - baseDays());
 }
 
+/** P129 Part 5 §3.2: the wire-side id for one of the mockup's own fixture ids — always the same
+ *  string (`mockupToWire`'s own `id: b.id`/`id: dr.id` mapping, never renamed), asserted here rather
+ *  than assumed so a future fixture edit that drops or renames an id fails loudly in this helper
+ *  instead of silently comparing the wrong row in a drop-verdict test. */
+export function wireIdOf(comp: MockupComponent, repo: string, mockupId: string): string {
+  const raw: RawItem[] = comp.repoData()[repo] ?? [];
+  const drafts: RawItem[] = comp.state.newWork?.[repo] ?? [];
+  const found = raw.some((b) => b.id === mockupId) || drafts.some((d) => d.id === mockupId);
+  if (!found) throw new Error(`wireIdOf: no fixture item '${mockupId}' in repo '${repo}'`);
+  return mockupId;
+}
+
 export function toQueueInput(result: MockupToWireResult, selectedId?: string): QueueInput {
   return {
     snapshot: result.snapshot,
