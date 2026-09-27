@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
@@ -51,10 +52,27 @@ type GitSettings struct {
 	GraphFontSize int `json:"graphFontSize"`
 }
 
+// AdeSettings is P129 Part 2 §7's own UiPrefs-as-settings-leaves: Part 3's queue-board layout and
+// planning-horizon preferences, persisted so they survive a relaunch. No UI reads them yet.
+type AdeSettings struct {
+	// PanelWidth is the queue side panel's own width in px; 0 means "half the window" (Part 3's own
+	// layout default) rather than a literal zero-width panel.
+	PanelWidth      int      `json:"panelWidth"`
+	AllAgentsFilter string   `json:"allAgentsFilter"`
+	HorizonDays     int      `json:"horizonDays"`
+	HistoryDays     int      `json:"historyDays"`
+	ExtraDays       []string `json:"extraDays"`
+	OffDays         []string `json:"offDays"`
+	WorkWeekendDays []string `json:"workWeekendDays"`
+	WorkdayHours    float64  `json:"workdayHours"`
+	SpanDayShare    float64  `json:"spanDayShare"`
+}
+
 type Settings struct {
 	Appearance Appearance       `json:"appearance"`
 	Advanced   AdvancedSettings `json:"advanced"`
 	Git        GitSettings      `json:"git"`
+	Ade        AdeSettings      `json:"ade"`
 }
 
 // DefaultGitSettings mirrors docs/v1.3/plans/G7 D16's own default: the same three-pattern default
@@ -68,7 +86,22 @@ func DefaultGitSettings() GitSettings {
 	}
 }
 
-// DefaultSettings mirrors the Appearance/Advanced/Git slice of
+// DefaultAdeSettings mirrors settingsDomain.ts's own adeSettingsSchema defaults (P129 Part 2 §7).
+func DefaultAdeSettings() AdeSettings {
+	return AdeSettings{
+		PanelWidth:      0,
+		AllAgentsFilter: "active",
+		HorizonDays:     14,
+		HistoryDays:     14,
+		ExtraDays:       []string{},
+		OffDays:         []string{},
+		WorkWeekendDays: []string{},
+		WorkdayHours:    6,
+		SpanDayShare:    0.5,
+	}
+}
+
+// DefaultSettings mirrors the Appearance/Advanced/Git/Ade slice of
 // packages/shared/domain/settings.ts's defaultSettings.
 func DefaultSettings() Settings {
 	return Settings{
@@ -79,6 +112,7 @@ func DefaultSettings() Settings {
 		},
 		Advanced: AdvancedSettings{GitLogLevel: "info"},
 		Git:      DefaultGitSettings(),
+		Ade:      DefaultAdeSettings(),
 	}
 }
 
@@ -109,10 +143,24 @@ type GitPatch struct {
 	GraphFontSize            *int      `json:"graphFontSize,omitempty"`
 }
 
+// AdePatch mirrors AdeSettings' own `.partial()` shape (§7).
+type AdePatch struct {
+	PanelWidth      *int      `json:"panelWidth,omitempty"`
+	AllAgentsFilter *string   `json:"allAgentsFilter,omitempty"`
+	HorizonDays     *int      `json:"horizonDays,omitempty"`
+	HistoryDays     *int      `json:"historyDays,omitempty"`
+	ExtraDays       *[]string `json:"extraDays,omitempty"`
+	OffDays         *[]string `json:"offDays,omitempty"`
+	WorkWeekendDays *[]string `json:"workWeekendDays,omitempty"`
+	WorkdayHours    *float64  `json:"workdayHours,omitempty"`
+	SpanDayShare    *float64  `json:"spanDayShare,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
+	Ade        *AdePatch        `json:"ade,omitempty"`
 }
 
 // validateAppearanceSection mirrors upsertAppearance's own leaf list (repos/settings.go).
@@ -164,6 +212,79 @@ func validateGitSection(g *GitPatch) error {
 	return nil
 }
 
+// ValidAdePanelWidth mirrors settingsDomain.ts's adeSettingsSchema.panelWidth refinement: 0 (="half
+// the window") or an explicit 340..4000 drag width.
+func ValidAdePanelWidth(v int) bool {
+	return v == 0 || (v >= 340 && v <= 4000)
+}
+
+// ValidAdeAllAgentsFilter mirrors adeSettingsSchema.allAgentsFilter's enum.
+func ValidAdeAllAgentsFilter(v string) bool {
+	return v == "active" || v == "older"
+}
+
+func floatInRange(lo, hi float64) func(float64) bool {
+	return func(v float64) bool { return v >= lo && v <= hi }
+}
+
+var (
+	ValidAdeHorizonDays  = appsettings.InRange(1, 365)
+	ValidAdeHistoryDays  = appsettings.InRange(1, 365)
+	ValidAdeWorkdayHours = floatInRange(1, 24)
+	ValidAdeSpanDayShare = floatInRange(0.05, 1)
+)
+
+var adeISODateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// ValidAdeDateList mirrors settingsDomain.ts's adeDateListSchema: at most 1000 entries, each an ISO
+// (YYYY-MM-DD) date — extraDays/offDays/workWeekendDays all share this one shape.
+func ValidAdeDateList(vs []string) bool {
+	if len(vs) > 1000 {
+		return false
+	}
+	for _, v := range vs {
+		if !adeISODateRe.MatchString(v) {
+			return false
+		}
+	}
+	return true
+}
+
+// validateAdeSection mirrors upsertAde's own leaf list (repos/settings.go).
+func validateAdeSection(a *AdePatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.PanelWidth != nil && !ValidAdePanelWidth(*a.PanelWidth) {
+		return fmt.Errorf("model: ade.panelWidth: invalid value %d", *a.PanelWidth)
+	}
+	if a.AllAgentsFilter != nil && !ValidAdeAllAgentsFilter(*a.AllAgentsFilter) {
+		return fmt.Errorf("model: ade.allAgentsFilter: invalid value %q", *a.AllAgentsFilter)
+	}
+	if a.HorizonDays != nil && !ValidAdeHorizonDays(*a.HorizonDays) {
+		return fmt.Errorf("model: ade.horizonDays: out of range value %d", *a.HorizonDays)
+	}
+	if a.HistoryDays != nil && !ValidAdeHistoryDays(*a.HistoryDays) {
+		return fmt.Errorf("model: ade.historyDays: out of range value %d", *a.HistoryDays)
+	}
+	if a.ExtraDays != nil && !ValidAdeDateList(*a.ExtraDays) {
+		return fmt.Errorf("model: ade.extraDays: invalid date list")
+	}
+	if a.OffDays != nil && !ValidAdeDateList(*a.OffDays) {
+		return fmt.Errorf("model: ade.offDays: invalid date list")
+	}
+	if a.WorkWeekendDays != nil && !ValidAdeDateList(*a.WorkWeekendDays) {
+		return fmt.Errorf("model: ade.workWeekendDays: invalid date list")
+	}
+	if a.WorkdayHours != nil && !ValidAdeWorkdayHours(*a.WorkdayHours) {
+		return fmt.Errorf("model: ade.workdayHours: out of range value %v", *a.WorkdayHours)
+	}
+	if a.SpanDayShare != nil && !ValidAdeSpanDayShare(*a.SpanDayShare) {
+		return fmt.Errorf("model: ade.spanDayShare: out of range value %v", *a.SpanDayShare)
+	}
+	return nil
+}
+
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming the
 // offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema either, so
 // they are accepted as-is.
@@ -175,6 +296,9 @@ func (p SettingsPatch) Validate() error {
 		return err
 	}
 	if err := validateGitSection(p.Git); err != nil {
+		return err
+	}
+	if err := validateAdeSection(p.Ade); err != nil {
 		return err
 	}
 	return nil

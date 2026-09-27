@@ -43,6 +43,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result := model.DefaultSettings()
 	result.Appearance = readAppearance(stored)
 	result.Git = readGit(stored)
+	result.Ade = readAde(stored)
 	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	return result, nil
 }
@@ -69,6 +70,53 @@ func readGit(stored map[string]json.RawMessage) model.GitSettings {
 	appsettings.Leaf(stored, "git.path", &result.GitPath)
 	appsettings.LeafValid(stored, "git.graphFontSize", &result.GraphFontSize, model.ValidGraphFontSize)
 	return result
+}
+
+// readAde reads every ade.* leaf from stored on top of model.DefaultAdeSettings() (P129 Part 2 §7).
+func readAde(stored map[string]json.RawMessage) model.AdeSettings {
+	result := model.DefaultAdeSettings()
+	appsettings.LeafValid(stored, "ade.panelWidth", &result.PanelWidth, model.ValidAdePanelWidth)
+	appsettings.LeafValid(stored, "ade.allAgentsFilter", &result.AllAgentsFilter, model.ValidAdeAllAgentsFilter)
+	appsettings.LeafValid(stored, "ade.horizonDays", &result.HorizonDays, model.ValidAdeHorizonDays)
+	appsettings.LeafValid(stored, "ade.historyDays", &result.HistoryDays, model.ValidAdeHistoryDays)
+	appsettings.LeafValid(stored, "ade.extraDays", &result.ExtraDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.offDays", &result.OffDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.workWeekendDays", &result.WorkWeekendDays, model.ValidAdeDateList)
+	appsettings.LeafValid(stored, "ade.workdayHours", &result.WorkdayHours, model.ValidAdeWorkdayHours)
+	appsettings.LeafValid(stored, "ade.spanDayShare", &result.SpanDayShare, model.ValidAdeSpanDayShare)
+	return result
+}
+
+// upsertAde mirrors upsertGit's own shape.
+func upsertAde(tx *sql.Tx, a *model.AdePatch) error {
+	if a == nil {
+		return nil
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.panelWidth", a.PanelWidth); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.allAgentsFilter", a.AllAgentsFilter); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.horizonDays", a.HorizonDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.historyDays", a.HistoryDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.extraDays", a.ExtraDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.offDays", a.OffDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.workWeekendDays", a.WorkWeekendDays); err != nil {
+		return err
+	}
+	if err := appsettings.UpsertOptional(tx, "ade.workdayHours", a.WorkdayHours); err != nil {
+		return err
+	}
+	return appsettings.UpsertOptional(tx, "ade.spanDayShare", a.SpanDayShare)
 }
 
 // upsertGit mirrors the former appsettings.UpsertGit verbatim — "git.path" (not "git.gitPath") is
@@ -125,7 +173,10 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
 			return err
 		}
-		return upsertGit(tx, patch.Git)
+		if err := upsertGit(tx, patch.Git); err != nil {
+			return err
+		}
+		return upsertAde(tx, patch.Ade)
 	})
 	if err != nil {
 		return model.Settings{}, err

@@ -68,8 +68,63 @@ const appSpaceAppearanceSettingsSchema = /*#__PURE__*/ appearanceSettingsSchema.
   dateFormat: z.enum(['relative', 'absolute']).default('relative'),
 });
 
+// P129 Part 2 §7: Part 3's own queue-board UI prefs (panel width, planning-horizon window, calendar
+// overrides), persisted as settings leaves rather than component state so they survive a relaunch.
+// No UI reads these yet — Part 3 wires the queue board to them. Not exported — nothing outside this
+// file references the raw schema object; `Settings['ade']` covers real consumers.
+export const ADE_PANEL_WIDTH_RANGE = { min: 340, max: 4000 } as const;
+export const ADE_HORIZON_DAYS_RANGE = { min: 1, max: 365 } as const;
+export const ADE_HISTORY_DAYS_RANGE = { min: 1, max: 365 } as const;
+export const ADE_WORKDAY_HOURS_RANGE = { min: 1, max: 24 } as const;
+export const ADE_SPAN_DAY_SHARE_RANGE = { min: 0.05, max: 1 } as const;
+// §0.13 keeps at most 1000 override dates in any one list — well past what a calendar UI would ever
+// need to page through, so it is a sanity ceiling, not a real limit.
+export const ADE_DATE_LIST_MAX = 1000;
+
+const adeIsoDateSchema = /*#__PURE__*/ z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
+const adeDateListSchema = /*#__PURE__*/ z.array(adeIsoDateSchema).max(ADE_DATE_LIST_MAX);
+
+const adeSettingsSchema = /*#__PURE__*/ z.object({
+  // 0 = half the window's own width (Part 3's own layout default), 340..4000 an explicit drag.
+  panelWidth: z
+    .number()
+    .int()
+    .refine((v) => v === 0 || (v >= ADE_PANEL_WIDTH_RANGE.min && v <= ADE_PANEL_WIDTH_RANGE.max), {
+      message: 'expected 0 or 340..4000',
+    })
+    .default(0),
+  allAgentsFilter: z.enum(['active', 'older']).default('active'),
+  horizonDays: z
+    .number()
+    .int()
+    .min(ADE_HORIZON_DAYS_RANGE.min)
+    .max(ADE_HORIZON_DAYS_RANGE.max)
+    .default(14),
+  historyDays: z
+    .number()
+    .int()
+    .min(ADE_HISTORY_DAYS_RANGE.min)
+    .max(ADE_HISTORY_DAYS_RANGE.max)
+    .default(14),
+  extraDays: adeDateListSchema.default([]),
+  offDays: adeDateListSchema.default([]),
+  workWeekendDays: adeDateListSchema.default([]),
+  workdayHours: z
+    .number()
+    .min(ADE_WORKDAY_HOURS_RANGE.min)
+    .max(ADE_WORKDAY_HOURS_RANGE.max)
+    .default(6),
+  spanDayShare: z
+    .number()
+    .min(ADE_SPAN_DAY_SHARE_RANGE.min)
+    .max(ADE_SPAN_DAY_SHARE_RANGE.max)
+    .default(0.5),
+});
+
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
-// with no `advanced`/`git` keys, and that row must still parse on next launch.
+// with no `advanced`/`git`/`ade` keys, and that row must still parse on next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema,
   advanced: advancedSettingsSchema.default({ gitLogLevel: 'info' }),
@@ -79,6 +134,17 @@ const settingsSchema = /*#__PURE__*/ z.object({
     gitPath: '',
     graphFontSize: 0,
   }),
+  ade: adeSettingsSchema.default({
+    panelWidth: 0,
+    allAgentsFilter: 'active',
+    horizonDays: 14,
+    historyDays: 14,
+    extraDays: [],
+    offDays: [],
+    workWeekendDays: [],
+    workdayHours: 6,
+    spanDayShare: 0.5,
+  }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -86,6 +152,7 @@ const settingsPatchSchema = /*#__PURE__*/ z.object({
   appearance: appSpaceAppearanceSettingsSchema.partial().optional(),
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
+  ade: adeSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -107,5 +174,16 @@ export const defaultSettings: Settings = {
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
     graphFontSize: 0,
+  },
+  ade: {
+    panelWidth: 0,
+    allAgentsFilter: 'active',
+    horizonDays: 14,
+    historyDays: 14,
+    extraDays: [],
+    offDays: [],
+    workWeekendDays: [],
+    workdayHours: 6,
+    spanDayShare: 0.5,
   },
 };
