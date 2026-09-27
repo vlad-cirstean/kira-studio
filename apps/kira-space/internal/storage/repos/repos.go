@@ -13,7 +13,9 @@ import (
 // (GitClientsService, CodeWorkspaceService, GithubService, this app's own window shell, and
 // SettingsService reads for advanced.gitLogLevel/git.*) actually touched. Layout and Tabs are
 // P100 Part 2's own addition, once the frontend gave both a real consumer
-// (migrations/0002_p100_tabs_layout.sql).
+// (migrations/0002_p100_tabs_layout.sql). AdeSessions is P129 Part 1's own addition — ade.Tracker's
+// persisted history of every Claude Code session it has spawned or resumed
+// (migrations/0004_p129_ade_sessions.sql).
 type Repos struct {
 	Settings        *SettingsRepo
 	Windows         *WindowsRepo
@@ -22,6 +24,7 @@ type Repos struct {
 	CodeRepos       *CodeReposRepo
 	Layout          *LayoutRepo
 	Tabs            *TabsRepo
+	AdeSessions     *AdeSessionsRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -51,6 +54,7 @@ func New(db *sql.DB) (*Repos, error) {
 		CodeRepos:       &CodeReposRepo{DB: db},
 		Layout:          &LayoutRepo{DB: db, selectAll: layoutSelectAll},
 		Tabs:            &TabsRepo{DB: db, selectAll: tabsSelectAll},
+		AdeSessions:     &AdeSessionsRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }
