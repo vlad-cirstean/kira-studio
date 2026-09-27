@@ -1,7 +1,6 @@
-import type { ModeRegistry, PanelModeDef } from '@workbench/modes';
+import type { ModeRegistry } from '@workbench/modes';
 import { defineAsyncComponent } from 'vue';
-import AdePanel from '../ade/AdePanel.vue';
-import AdeStart from '../ade/AdeStart.vue';
+import AdeView from '../ade/AdeView.vue';
 import GitNewTab from '../repo/GitNewTab.vue';
 import GitPanel from '../repo/GitPanel.vue';
 import GitStart from '../repo/GitStart.vue';
@@ -12,13 +11,11 @@ import type { SpaceMode } from '../state/mode';
 // terminal at step 7, ade here at step 8).
 export const MODE_ORDER: SpaceMode[] = ['git', 'terminal', 'ade'];
 
-// P129 Part 3 §0.12: pinned to `PanelModeDef` for now (deviation from the plan's own commit-1/
-// commit-4 split, disclosed in the phase result: `modes.ts`'s own union change is repo-wide, so
-// this app's `MODES` needs a matching type-only pin in the same commit or `WorkbenchShell.vue`'s
-// unconditional `.panel`/`.start`/`.newTab` reads stop typechecking) — every entry here is still a
-// panel module, same type-only reasoning as Kira Studio's own `modes.ts`. Widens to the base
-// `ModeDef` union once `ade` below becomes a `layout: 'full'` entry (a later commit in this phase).
-export const MODES: ModeRegistry<SpaceMode, PanelModeDef> = {
+// P129 Part 3 §0.12: the base `ModeDef` union, not `ModeRegistry<SpaceMode, PanelModeDef>` — `ade`
+// below is the app's first `layout: 'full'` module. Kira Studio's own `MODES` stays pinned to
+// `PanelModeDef` (its shell still reads `.panel`/`.start` unconditionally); this app's shell now
+// branches on `layout` instead (`workbench/WorkbenchShell.vue`'s own `isFull` computed).
+export const MODES: ModeRegistry<SpaceMode> = {
   git: {
     label: 'Git',
     icon: 'source-control',
@@ -35,7 +32,7 @@ export const MODES: ModeRegistry<SpaceMode, PanelModeDef> = {
     start: defineAsyncComponent(() => import('@workbench/terminal/TerminalStart.vue')),
     newTab: defineAsyncComponent(() => import('@workbench/terminal/TerminalNewTab.vue')),
   },
-  // P128 §2.7: a placeholder module — no Go, no store, no bridge — reserving this app's own
-  // "Agents" slot ahead of a later chapter's real surface. No `newTab`: nothing to open yet.
-  ade: { label: 'Agents', icon: 'robot', panel: AdePanel, start: AdeStart },
+  // P129 Part 3 §0.12/§2.1: the module's own real surface — a full-area view, no left panel, no
+  // tab strip, no tabs of its own (P128's own placeholder deleted in this commit).
+  ade: { label: 'Agents', icon: 'robot', layout: 'full', view: AdeView },
 };

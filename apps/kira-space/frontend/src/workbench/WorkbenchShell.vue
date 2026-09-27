@@ -33,19 +33,27 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
   runCommand(id);
 });
 
+// P129 Part 3 §0.12/§0.13/§2.1: a `layout: 'full'` module (`ade`) has no panel/start/newTab at all
+// — `def`'s own `layout` discriminant is what every computed below narrows on, so a `FullModeDef`
+// never has its (non-existent) `.panel`/`.start`/`.newTab` accessed.
+const def = computed(() => MODES[modeStore.active]);
+const isFull = computed(() => def.value.layout === 'full');
 // P1 D6/C6 (Kira Studio's own pattern): the left panel mounts whichever module is active's own
 // self-contained panel component.
-const activeModePanel = computed(() => MODES[modeStore.active].panel);
+const activeModePanel = computed(() => (def.value.layout === 'full' ? undefined : def.value.panel));
 // MainView.vue's own fallback when the active module has no active tab.
-const modeStart = computed(() => MODES[modeStore.active].start);
+const modeStart = computed(() => (def.value.layout === 'full' ? undefined : def.value.start));
 // The tab strip's own "+", when the active module has one.
-const modeNewTab = computed(() => MODES[modeStore.active].newTab);
+const modeNewTab = computed(() => (def.value.layout === 'full' ? undefined : def.value.newTab));
+// Rendered in `#main` instead of the tab-scoped MainView, in place of it, for a full-layout module.
+const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : undefined));
 </script>
 
 <template>
   <WorkbenchShellBase
-    :project-visible="layoutStore.panel.project.visible"
+    :project-visible="!isFull && layoutStore.panel.project.visible"
     :project-width="layoutStore.panel.project.width"
+    :tab-strip-visible="!isFull"
     @resize-project="layoutStore.setProjectWidth"
   >
     <template #panel>
@@ -59,7 +67,8 @@ const modeNewTab = computed(() => MODES[modeStore.active].newTab);
       </TabStrip>
     </template>
     <template #main>
-      <MainView>
+      <component :is="fullView" v-if="isFull" />
+      <MainView v-else>
         <template #empty>
           <component :is="modeStart" />
         </template>

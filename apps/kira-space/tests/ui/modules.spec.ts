@@ -125,9 +125,11 @@ test('round trip: a repo\'s tabs hide behind Terminal, a Terminal-module tab ope
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
   await expect(tab(page, 'terminal')).toHaveCount(0);
 
-  // Agents (P128 §2.7's placeholder) has no `newTab` — the tab strip's own "+" slot stays empty.
+  // Agents (P129 Part 3 §0.12/§0.13: a `layout: 'full'` module) renders its own full-area view in
+  // `#main` — no tab strip at all (never an empty "+" slot within one), and no project panel.
   await modeTab(page, 'ade').click();
   await expect(modeTab(page, 'ade')).toHaveClass(/is-active/);
-  await expect(page.locator('[data-testid="ade-start"]')).toBeVisible();
-  await expect(page.locator('[data-testid="tab-strip-new"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-view"]')).toBeVisible();
+  await expect(page.locator('[data-testid="tab-strip"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="project-panel"]')).toHaveCount(0);
 });
