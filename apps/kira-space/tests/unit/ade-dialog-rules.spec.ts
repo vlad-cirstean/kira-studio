@@ -10,6 +10,7 @@ import {
   startSpec,
   wtOf,
 } from '../../frontend/src/ade/dialogCompose';
+import { localIsoOfMs } from '../../frontend/src/ade/localDay';
 import { useQueue } from '../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
@@ -125,6 +126,7 @@ function ctxFor(
     prs: NO_PRS,
     settings: DEFAULT_SETTINGS,
     today: '2026-09-22',
+    localDayOf: localIsoOfMs,
     selectedId: opts.selectedId,
   });
   return { view, snapshot: snap, sessions, today: '2026-09-22', repoRoot: opts.repoRoot ?? '' };

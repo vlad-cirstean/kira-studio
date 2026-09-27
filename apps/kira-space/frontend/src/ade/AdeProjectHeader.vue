@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useTimeAgo } from '@vueuse/core';
 import { computed } from 'vue';
+import { adeAgoOptions } from './ago';
 import { adeRefreshKey, useAdeRefresh } from './queries';
 import type { AdeRefreshNote } from './state/adeUi';
 import { useAdeUiStore } from './state/adeUi';
@@ -25,25 +26,9 @@ const refreshMutation = useAdeRefresh(() => props.codeRepoId);
 const pendingCount = useIsMutating(() => ({ mutationKey: adeRefreshKey(props.codeRepoId) }));
 const isPending = computed(() => pendingCount.value > 0);
 
-// §0.16: "just now" / "Nm ago" / "Nh ago" / "Nd ago" — the mockup's own ago() thresholds (line
-// 1343: <60min, <1440min, else), plus "just now" for the first minute (the mockup's own `f2`
-// fixture value right after a refresh completes, line 725).
-const ago = useTimeAgo(() => props.lastFetchAt ?? 0, {
-  messages: {
-    justNow: 'just now',
-    past: (n: string) => `${n} ago`,
-    future: (n: string) => `${n} ago`,
-    invalid: '',
-    minute: (n: number) => `${n}m`,
-    hour: (n: number) => `${n}h`,
-    day: (n: number) => `${n}d`,
-  },
-  units: [
-    { max: 3_600_000, value: 60_000, name: 'minute' },
-    { max: 86_400_000, value: 3_600_000, name: 'hour' },
-    { max: Number.POSITIVE_INFINITY, value: 86_400_000, name: 'day' },
-  ],
-});
+// §0.16/§0.20: the mockup's own `f2` fixture value right after a refresh completes (line 725) —
+// options moved to `ago.ts`'s `adeAgoOptions`, shared across every "time ago" label in `ade`.
+const ago = useTimeAgo(() => props.lastFetchAt ?? 0, adeAgoOptions);
 
 const note = computed(() => adeUiStore.refreshNote[props.codeRepoId]);
 

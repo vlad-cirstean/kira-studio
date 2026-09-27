@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { localIsoOfMs } from '../../frontend/src/ade/localDay';
 import { useQueue } from '../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
@@ -109,6 +110,7 @@ function view(snap: AdeRepoSnapshot, overrides: Partial<Parameters<typeof useQue
     prs: NO_PRS,
     settings: DEFAULT_SETTINGS,
     today: '2026-09-22',
+    localDayOf: localIsoOfMs,
     ...overrides,
   });
 }

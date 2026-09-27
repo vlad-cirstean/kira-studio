@@ -9,6 +9,7 @@ import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import { type DialogCtx, rebaseAllSpec } from './dialogCompose';
+import { localIso, localIsoOfMs } from './localDay';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
@@ -39,10 +40,7 @@ const now = ref(new Date());
 useIntervalFn(() => {
   now.value = new Date();
 }, 60_000);
-const today = computed(() => {
-  const d = now.value;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-});
+const today = computed(() => localIso(now.value));
 
 const repoSessions = computed(() =>
   (sessionsQuery.data.value?.sessions ?? []).filter((s) => s.codeRepoId === props.codeRepoId),
@@ -62,6 +60,7 @@ const view = computed(() => {
     prs: prsQuery.data.value,
     settings: settingsStore.ade,
     today: today.value,
+    localDayOf: localIsoOfMs,
     rebasing: adeActionsStore.rebasingFor(props.codeRepoId),
   });
 });

@@ -85,6 +85,10 @@ export interface QueueInput {
   settings: Settings['ade'];
   /** Local `YYYY-MM-DD` — never `toISOString()`, which is UTC (§0.6). */
   today: string;
+  /** A history entry's `archivedAt` (epoch ms) as its own local `YYYY-MM-DD` (§0.5) — this module
+   *  stays pure (no clock/zone read of its own), so the caller injects `localDay.ts`'s
+   *  `localIsoOfMs`. Required: every caller has a zone; a UTC day is the bug this fixes. */
+  localDayOf: (ms: number) => string;
   selectedId?: string;
   rebasing?: ReadonlySet<string>;
   pushing?: ReadonlySet<string>;
@@ -1191,8 +1195,15 @@ function overflowOf(
 // §2.6 stage 16: bands
 // -------------------------------------------------------------------------------------------------
 
-function historyDayOffset(archivedAtMs: number, cal: Calendar): number {
-  return Math.floor(archivedAtMs / DAY_MS) - cal.todayDays;
+// §0.5: the local day, not `Math.floor(archivedAtMs / DAY_MS)` (a UTC day) — in any non-UTC zone
+// an evening archive would land on the wrong band. `localDayOf` is the caller's own zone read
+// (`localDay.ts`'s `localIsoOfMs`); this module stays pure otherwise.
+function historyDayOffset(
+  archivedAtMs: number,
+  cal: Calendar,
+  localDayOf: (ms: number) => string,
+): number {
+  return isoToDays(localDayOf(archivedAtMs)) - cal.todayDays;
 }
 
 function buildBands(
@@ -1205,6 +1216,7 @@ function buildBands(
   hoursOn: Map<number, number>,
   workdayHours: number,
   spanDayShare: number,
+  localDayOf: (ms: number) => string,
 ): QueueBand[] {
   const keys = new Set<number>();
   for (let h = -settings.historyDays; h < 0; h++) keys.add(h);
@@ -1219,7 +1231,7 @@ function buildBands(
 
   const historyByDay = new Map<number, { title: string; branch: string; how: string }[]>();
   for (const h of snapshot.history) {
-    const d = historyDayOffset(h.archivedAt, cal);
+    const d = historyDayOffset(h.archivedAt, cal, localDayOf);
     const how = h.mergedAt != null ? 'merged · archived' : 'archived';
     const list = historyByDay.get(d);
     const entry = { title: h.title, branch: h.branch, how };
@@ -1425,6 +1437,7 @@ export function useQueue(input: QueueInput): QueueView {
     hoursOn,
     workdayHours,
     spanDayShare,
+    input.localDayOf,
   );
 
   // §2.6 stage 17.

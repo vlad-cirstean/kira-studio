@@ -15,6 +15,7 @@ import {
   sendDialog,
 } from '../../frontend/src/ade/dialogFlow';
 import type { LaunchDeps } from '../../frontend/src/ade/launch';
+import { localIsoOfMs } from '../../frontend/src/ade/localDay';
 import {
   createTurnWatcher,
   type TurnOutcome,
@@ -221,6 +222,7 @@ function ctxFor(snap: AdeRepoSnapshot): DialogCtx {
     prs: NO_PRS,
     settings: DEFAULT_SETTINGS,
     today: '2026-09-22',
+    localDayOf: localIsoOfMs,
   });
   return { view, snapshot: snap, sessions: [], today: '2026-09-22', repoRoot: '' };
 }

@@ -1,4 +1,5 @@
 import { composeDialog, type DialogCtx, rebaseAllSpec } from '../../frontend/src/ade/dialogCompose';
+import { localIsoOfMs } from '../../frontend/src/ade/localDay';
 import { useQueue } from '../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
@@ -155,6 +156,7 @@ function expectedRebaseAllMessage(): string {
     prs: EMPTY_PRS,
     settings: DEFAULT_SETTINGS,
     today: '2026-09-27',
+    localDayOf: localIsoOfMs,
   });
   const ctx: DialogCtx = {
     view,

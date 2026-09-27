@@ -1,5 +1,6 @@
 import type { AgentActivity, AgentPhase } from '@shared/domain/agent';
 import type { DialogCtx } from '../../../frontend/src/ade/dialogCompose';
+import { localIsoOfMs } from '../../../frontend/src/ade/localDay';
 import { type QueueInput, useQueue } from '../../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
@@ -312,6 +313,9 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
   };
 }
 
+// §0.5/§3.1: `mockupOracle.ts` forces `TZ=UTC` process-wide, so the real `localIsoOfMs` (local
+// getters) and the mockup's own UTC day math name the same instant here — real converter, no
+// parallel test-only day mapping to drift from it.
 export function toQueueInput(result: MockupToWireResult, selectedId?: string): QueueInput {
   return {
     snapshot: result.snapshot,
@@ -320,6 +324,7 @@ export function toQueueInput(result: MockupToWireResult, selectedId?: string): Q
     prs: result.prs,
     settings: result.settings,
     today: result.today,
+    localDayOf: localIsoOfMs,
     selectedId,
     rebasing: result.rebasing,
     pushing: result.pushing,
