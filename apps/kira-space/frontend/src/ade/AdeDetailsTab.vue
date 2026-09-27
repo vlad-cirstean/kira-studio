@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import AdeCandidatePicker from './AdeCandidatePicker.vue';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
+import AdeNotesEditor from './AdeNotesEditor.vue';
 import { branchWebUrl, prRow } from './links';
 import { useAdeBindNewWork } from './mutations';
 import { useAdeUiStore } from './state/adeUi';
@@ -10,9 +11,8 @@ import { useItemMeta } from './useItemMeta';
 import type { QueuePanel } from './useQueue';
 import type { AdeRepoPrs } from './wire';
 
-// P129 Part 6 §0.9-§0.15: the Details tab (mockup 305-370, minus the Notes editor — that's
-// commit 6's own AdeNotesEditor). Name grid, Branch/Jira/PR rows, Estimate, an interim plain
-// notes textarea (replaced wholesale by the real editor next commit, same `setNotes` write path).
+// P129 Part 6 §0.9-§0.15: the Details tab (mockup 305-370). Name grid, Branch/Jira/PR rows,
+// Estimate, Notes (TipTap, `AdeNotesEditor`).
 const props = defineProps<{
   panel: QueuePanel;
   prs: AdeRepoPrs | undefined;
@@ -174,16 +174,9 @@ async function onCandidatePick(branch: string): Promise<void> {
   }
 }
 
-// ---- Notes (interim plain textarea — commit 6 replaces this with AdeNotesEditor) -------------------
-const notesDraft = ref(props.panel.notes);
-watch(
-  () => props.panel.id,
-  () => {
-    notesDraft.value = props.panel.notes;
-  },
-);
-function commitNotes(): void {
-  if (notesDraft.value !== props.panel.notes) void meta.setNotes(notesDraft.value);
+// ---- Notes -----------------------------------------------------------------------------------------
+function onNotesSave(value: string): void {
+  void meta.setNotes(value);
 }
 </script>
 
@@ -228,16 +221,7 @@ function commitNotes(): void {
       @save="meta.setEstimate"
     />
 
-    <div class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-[#2f323b] bg-[#121316]">
-      <div class="border-b border-[#22252c] bg-[#16171b] px-1.5 py-1 text-kira-sm text-[#9a9ca5]">Notes</div>
-      <textarea
-        v-model="notesDraft"
-        class="min-h-25 flex-1 resize-none bg-transparent p-2.5 text-kira-md leading-normal text-fg outline-none"
-        placeholder="Write notes…"
-        data-testid="ade-notes-textarea"
-        @blur="commitNotes"
-      />
-    </div>
+    <AdeNotesEditor :notes="panel.notes" :item-id="panel.id" @save="onNotesSave" />
     <span v-if="meta.errors.notes" class="text-kira-sm text-[#f28b7d]">{{ meta.errors.notes }}</span>
   </div>
 </template>
