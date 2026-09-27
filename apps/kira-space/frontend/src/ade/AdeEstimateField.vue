@@ -11,6 +11,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{ save: [value: string] }>();
 
+// Vue's compiler auto-casts `v-model` on a native `type="number"` input to a JS number once the
+// user types (unrelated to any explicit `.number` modifier) — `num` is declared a string, but a
+// live value here can be a number regardless. `String(...)` before `.trim()` is required, not
+// cosmetic: without it, `num.value.trim` is undefined for any typed value, `commit` throws inside
+// its own `emit(...)` argument, and the emit never happens — every estimate write silently no-ops.
 const num = ref(props.estimate.num);
 const unit = ref<'h' | 'd'>(props.estimate.unit);
 
@@ -23,7 +28,8 @@ watch(
 );
 
 function commit(): void {
-  emit('save', num.value.trim() ? `${num.value}${unit.value}` : '');
+  const numStr = String(num.value).trim();
+  emit('save', numStr ? `${numStr}${unit.value}` : '');
 }
 
 function pickUnit(next: 'h' | 'd'): void {
