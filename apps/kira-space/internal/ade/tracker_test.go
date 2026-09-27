@@ -1,0 +1,385 @@
+package ade
+
+import (
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agenthooks"
+	"github.com/kirathecat/kira-studio/internal/terminal"
+)
+
+// fakeLive is a test double for Registry.AgentSessions/Write — a terminal is "live" once added,
+// until removed, with no real PTY involved.
+type fakeLive struct {
+	mu   sync.Mutex
+	ids  map[string]bool
+	logs []string
+}
+
+func newFakeLive() *fakeLive { return &fakeLive{ids: map[string]bool{}} }
+
+func (f *fakeLive) add(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ids[id] = true
+}
+
+func (f *fakeLive) remove(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.ids, id)
+}
+
+func (f *fakeLive) AgentSessions() []terminal.AgentSession {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]terminal.AgentSession, 0, len(f.ids))
+	for id := range f.ids {
+		out = append(out, terminal.AgentSession{ID: id, Cwd: "/repo"})
+	}
+	return out
+}
+
+func (f *fakeLive) Write(id string, b []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.logs = append(f.logs, id+":"+string(b))
+	return nil
+}
+
+// fakeClock is a manually-advanced time source, so grace-window behaviour is observable without a
+// real sleep.
+type fakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func newFakeClock() *fakeClock { return &fakeClock{now: time.Unix(1_700_000_000, 0)} }
+
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, *fakeClock, string) {
+	t.Helper()
+	db, err := storage.OpenAt(t.TempDir())
+	if err != nil {
+		t.Fatalf("storage.OpenAt: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	repositories, err := repos.New(db.DB)
+	if err != nil {
+		t.Fatalf("repos.New: %v", err)
+	}
+
+	codeRepo, err := repositories.CodeRepos.Create(model.CodeRepo{ID: "cr1", Name: "n", Root: "/repo", RepoID: "rid"})
+	if err != nil {
+		t.Fatalf("create code repo: %v", err)
+	}
+
+	live := newFakeLive()
+	clock := newFakeClock()
+	tr := NewTracker(TrackerDeps{
+		Store: repositories.AdeSessions, LiveAgents: live.AgentSessions, WriteTerminal: live.Write,
+		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute,
+	})
+	return tr, repositories.AdeSessions, live, clock, codeRepo.ID
+}
+
+// composeAndSpawn drives the full launch flow a real BoundService.Open would (Prepare then
+// Compose, live registered right after), returning Prepare's own result.
+func composeAndSpawn(t *testing.T, tr *Tracker, live *fakeLive, args PrepareArgs) PrepareResult {
+	t.Helper()
+	res, err := tr.Prepare(args)
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+		t.Fatalf("Compose: %v", err)
+	}
+	live.add(res.TerminalID)
+	return res
+}
+
+func TestTracker_PrepareComposeReconcileLive(t *testing.T) {
+	tr, _, live, _, repoID := newTestTracker(t)
+
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+
+	sessions, err := tr.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(sessions) != 1 || sessions[0].State != model.AdeSessionStateRunning {
+		t.Fatalf("sessions = %+v, want one running", sessions)
+	}
+	if sessions[0].TerminalID != res.TerminalID {
+		t.Fatalf("terminalId = %q, want %q", sessions[0].TerminalID, res.TerminalID)
+	}
+	if sessions[0].ClaudeSessionID != res.SessionID {
+		t.Fatalf("claudeSessionId = %q, want %q", sessions[0].ClaudeSessionID, res.SessionID)
+	}
+
+	// Still live: Reconcile must not stop it, grace or not.
+	tr.Reconcile()
+	sessions, _ = tr.List()
+	if sessions[0].State != model.AdeSessionStateRunning {
+		t.Fatalf("state after Reconcile while live = %q, want running", sessions[0].State)
+	}
+}
+
+func TestTracker_ReconcileStopsOnExitAfterGrace(t *testing.T) {
+	tr, _, live, clock, repoID := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+
+	live.remove(res.TerminalID)
+	// Within the grace window: Reconcile must not stop it yet (Compose runs before the PTY
+	// registers, so a Reconcile racing the spawn must never stop a record that only just started).
+	tr.Reconcile()
+	sessions, _ := tr.List()
+	if sessions[0].State != model.AdeSessionStateRunning {
+		t.Fatalf("state within grace = %q, want still running", sessions[0].State)
+	}
+
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+	sessions, _ = tr.List()
+	if sessions[0].State != model.AdeSessionStateStopped {
+		t.Fatalf("state past grace = %q, want stopped", sessions[0].State)
+	}
+	if sessions[0].TerminalID != "" {
+		t.Fatalf("terminalId after stop = %q, want empty", sessions[0].TerminalID)
+	}
+}
+
+func TestTracker_ComposeMismatchedCommandRefused(t *testing.T) {
+	tr, _, _, _, repoID := newTestTracker(t)
+	res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if _, _, err := tr.Compose(res.TerminalID, res.Command+" extra"); err != ErrCommandMismatch {
+		t.Fatalf("Compose with mismatched command: err = %v, want ErrCommandMismatch", err)
+	}
+}
+
+func TestTracker_SpawnNeverRegisteredStopsAfterGrace(t *testing.T) {
+	tr, _, _, clock, repoID := newTestTracker(t)
+	res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+		t.Fatalf("Compose: %v", err)
+	}
+	// Never added to `live` — the spawn itself failed after Compose returned.
+
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+	sessions, _ := tr.List()
+	if len(sessions) != 1 || sessions[0].State != model.AdeSessionStateStopped {
+		t.Fatalf("sessions = %+v, want one stopped", sessions)
+	}
+}
+
+func TestTracker_ResumeRejectsRunningRecord(t *testing.T) {
+	tr, _, live, _, repoID := newTestTracker(t)
+	composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+
+	// The record id, not the returned SessionID (Claude session id) — recover it via List since
+	// Prepare/Compose never hand the record id back directly.
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo", Resume: recordID}); err != ErrSessionRunning {
+		t.Fatalf("resume of a running record: err = %v, want ErrSessionRunning", err)
+	}
+}
+
+func TestTracker_ResumeUnknownRecordRefused(t *testing.T) {
+	tr, _, _, _, repoID := newTestTracker(t)
+	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Resume: "does-not-exist"}); err != ErrSessionNotFound {
+		t.Fatalf("resume of an unknown record: err = %v, want ErrSessionNotFound", err)
+	}
+}
+
+func TestTracker_ResumeWrongRepoRefused(t *testing.T) {
+	tr, _, live, clock, repoID := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	live.remove(res.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: "other-repo", Branch: "main", Cwd: "/repo", Resume: recordID}); err != ErrSessionWrongRepo {
+		t.Fatalf("resume from another repo: err = %v, want ErrSessionWrongRepo", err)
+	}
+}
+
+func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
+	tr, _, live, clock, repoID := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo/original"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	live.remove(res.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	resumeRes, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/somewhere/else", Resume: recordID})
+	if err != nil {
+		t.Fatalf("Prepare resume: %v", err)
+	}
+	if resumeRes.SessionID != res.SessionID {
+		t.Fatalf("resume claude session id = %q, want reused %q", resumeRes.SessionID, res.SessionID)
+	}
+	if _, _, err := tr.Compose(resumeRes.TerminalID, resumeRes.Command); err != nil {
+		t.Fatalf("Compose resume: %v", err)
+	}
+	sessions, _ = tr.List()
+	if sessions[0].Cwd != "/repo/original" {
+		t.Fatalf("cwd after resume = %q, want the originally recorded cwd", sessions[0].Cwd)
+	}
+	if sessions[0].ID != recordID {
+		t.Fatalf("record id changed across resume: got %q, want %q", sessions[0].ID, recordID)
+	}
+}
+
+func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
+	tr, store, live, _, repoID := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	newClaudeID := "11111111-1111-1111-1111-111111111111"
+	tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "SessionStart", SessionID: newClaudeID})
+
+	rec, err := store.Get(recordID)
+	if err != nil || rec == nil {
+		t.Fatalf("Get after /clear: %v %v", rec, err)
+	}
+	if rec.ClaudeSessionID != newClaudeID {
+		t.Fatalf("claudeSessionId after /clear = %q, want %q", rec.ClaudeSessionID, newClaudeID)
+	}
+}
+
+func TestTracker_HandleEventUnknownTerminalIgnored(t *testing.T) {
+	tr, _, _, _, _ := newTestTracker(t)
+	// Must not panic or error for a terminal this tracker never Composed.
+	tr.HandleEvent(agenthooks.Event{TerminalID: "unknown", Event: "Stop"})
+}
+
+func TestTracker_Recover_StopsLeftoverRunningRows(t *testing.T) {
+	tr, store, live, _, repoID := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+	_ = res
+
+	// A fresh process life: a new Tracker over the same store, as main.go's own boot does.
+	fresh := NewTracker(TrackerDeps{Store: store, LiveAgents: func() []terminal.AgentSession { return nil }, WriteTerminal: live.Write, Now: time.Now})
+	if err := fresh.Recover(); err != nil {
+		t.Fatalf("Recover: %v", err)
+	}
+	rec, err := store.Get(recordID)
+	if err != nil || rec == nil {
+		t.Fatalf("Get after Recover: %v %v", rec, err)
+	}
+	if rec.State != model.AdeSessionStateStopped {
+		t.Fatalf("state after Recover = %q, want stopped", rec.State)
+	}
+	if rec.TerminalID != "" {
+		t.Fatalf("terminalId after Recover = %q, want empty", rec.TerminalID)
+	}
+}
+
+func TestTracker_SendWritesBracketedPasteThenEnter(t *testing.T) {
+	tr, _, live, _, repoID := newTestTracker(t)
+	composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	if err := tr.Send(recordID, "hello"); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if len(live.logs) != 2 {
+		t.Fatalf("writes = %d, want 2 (paste, then enter)", len(live.logs))
+	}
+	if live.logs[1][len(live.logs[1])-1:] != "\r" {
+		t.Fatalf("second write = %q, want to end with \\r", live.logs[1])
+	}
+}
+
+func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
+	tr, _, _, _, _ := newTestTracker(t)
+	if err := tr.Send("no-such-record", "hello"); err != ErrSessionNotRunning {
+		t.Fatalf("Send to an unknown record: err = %v, want ErrSessionNotRunning", err)
+	}
+}
+
+// TestTracker_ConcurrentComposeReconcileHandleEvent is P129 Part 1 §6.1's own race guard: three
+// call sources (BoundService.Open's own goroutine via Compose, Registry.OnChange's own goroutine
+// via Reconcile, agenthooks' own request-handler goroutine via HandleEvent) genuinely run
+// concurrently in production. Run with -race.
+func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
+	tr, _, live, _, repoID := newTestTracker(t)
+
+	const n = 20
+	results := make([]PrepareResult, n)
+	for i := 0; i < n; i++ {
+		res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+		if err != nil {
+			t.Fatalf("Prepare %d: %v", i, err)
+		}
+		results[i] = res
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		res := results[i]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, _, err := tr.Compose(res.TerminalID, res.Command); err != nil {
+				t.Errorf("Compose: %v", err)
+				return
+			}
+			live.add(res.TerminalID)
+		}()
+	}
+	wg.Wait()
+
+	var wg2 sync.WaitGroup
+	for i := 0; i < n; i++ {
+		res := results[i]
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			tr.HandleEvent(agenthooks.Event{TerminalID: res.TerminalID, Event: "PreToolUse", ToolName: "Bash"})
+			tr.Reconcile()
+		}()
+	}
+	wg2.Wait()
+
+	sessions, err := tr.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(sessions) != n {
+		t.Fatalf("sessions = %d, want %d", len(sessions), n)
+	}
+}
