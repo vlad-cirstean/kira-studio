@@ -21,7 +21,10 @@ export interface AgentSessionsEvent {
 // transcript_path, ...) was already dropped server-side and never reaches here.
 export interface AgentEvent {
   terminalId: string;
-  event: string; // hook_event_name: SessionStart, PreToolUse, PostToolUse, Notification, Stop, SessionEnd
+  // hook_event_name: SessionStart, SessionEnd, PreToolUse, PostToolUse, Notification, Stop,
+  // UserPromptSubmit (P129 Part 1 §4.8: a new user turn is the one reliable "working" start for a
+  // text-only reply).
+  event: string;
   sessionId: string;
   cwd: string;
   toolName: string;
@@ -33,8 +36,10 @@ export interface AgentEvent {
 }
 
 // §13's own reducer output — one Claude Code tab's current activity, derived from the AgentEvent
-// stream by state/agentSessions.ts's reduceAgentActivity.
-export type AgentPhase = 'idle' | 'working' | 'attention';
+// stream by state/agentActivity.ts's reduceAgentActivity. 'waiting' is P129 Part 1's own addition:
+// a session that armed a wake tool (Monitor, ScheduleWakeup) before its own Stop is "waiting on
+// monitor", not plain idle (design mapping done in Part 3's UI, not here).
+export type AgentPhase = 'idle' | 'working' | 'attention' | 'waiting';
 
 export interface AgentActivity {
   phase: AgentPhase;
@@ -42,4 +47,11 @@ export interface AgentActivity {
   toolName: string | null; // most recent PreToolUse's tool, for the tooltip
   message: string | null; // Notification text, when phase is 'attention'
   sessionId: string | null;
+  // wakeArmed is P129 Part 1's own addition: true once a wake tool (Monitor, ScheduleWakeup) has
+  // run during the current turn, cleared by the next UserPromptSubmit or Stop. Turns 'idle' into
+  // 'waiting' on Stop.
+  wakeArmed: boolean;
+  // at is P129 Part 1's own addition: receipt time (ms) of the event that produced this activity —
+  // every event updates it, including one that leaves phase unchanged.
+  at: number;
 }

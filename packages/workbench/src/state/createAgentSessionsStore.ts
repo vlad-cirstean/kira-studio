@@ -56,7 +56,7 @@ export function createAgentSessionsStore(control: AgentSessionsControl) {
       }
       state.activity.set(
         event.terminalId,
-        reduceAgentActivity(state.activity.get(event.terminalId), event),
+        reduceAgentActivity(state.activity.get(event.terminalId), event, Date.now()),
       );
     }
 
