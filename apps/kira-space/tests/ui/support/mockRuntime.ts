@@ -86,6 +86,14 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeRepoPrs: 'AdeService.RepoPrs',
   adeRefresh: 'AdeService.Refresh',
   adeProvideCredential: 'AdeService.ProvideCredential',
+
+  // P129 Part 4 §3.4: the dialog's own six delivery/archive bound calls.
+  adePrepareLaunch: 'AdeService.PrepareLaunch',
+  adeSend: 'AdeService.Send',
+  adeArchiveRisk: 'AdeService.ArchiveRisk',
+  adeArchive: 'AdeService.Archive',
+  adeSetQueuedAfter: 'AdeService.SetQueuedAfter',
+  adeUpdateNewWork: 'AdeService.UpdateNewWork',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(

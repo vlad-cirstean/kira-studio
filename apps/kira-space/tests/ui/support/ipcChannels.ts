@@ -94,6 +94,15 @@ export const IPC = {
   adeSessionsChanged: 'kira:ade:sessions',
   adeRepo: 'kira:ade:repo',
   adeCredential: 'kira:ade:credential',
+  // P129 Part 4 §3.4: the dialog's own six delivery/archive bound calls (PrepareLaunch, Send,
+  // ArchiveRisk, Archive, SetQueuedAfter, UpdateNewWork) — the launch/archive half of
+  // AdeService's 19 methods this part first calls.
+  adePrepareLaunch: 'kira:ade:prepareLaunch',
+  adeSend: 'kira:ade:send',
+  adeArchiveRisk: 'kira:ade:archiveRisk',
+  adeArchive: 'kira:ade:archive',
+  adeSetQueuedAfter: 'kira:ade:setQueuedAfter',
+  adeUpdateNewWork: 'kira:ade:updateNewWork',
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
 } as const;
