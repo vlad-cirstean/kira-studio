@@ -20,11 +20,20 @@
  * G21 D2: the modal shell is `@kira/kira-ui`'s `KuiDialog` now — this file only supplies its own
  * body/actions content, per mode. `KuiDialog`'s single `open`/`title` pair is driven by `mode`
  * itself (one title/close-handler/actions-set per mode, chosen the same way the body already was).
+ *
+ * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now, `title` feeds
+ * `DialogTitle`'s default slot, and the four modes' own controls are Input/Checkbox/RadioGroup —
+ * `mode`/`onClose`'s own dispatch is otherwise unchanged.
  */
 import { validateRefName } from '@kira/git-core';
 import type { StashBranchPreflight, StashEntry } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
-import { computed, ref, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@theme/components/ui/radio-group';
+import { computed, ref, useId, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import { stashLabel } from '../stashListModel.ts';
 
@@ -75,6 +84,7 @@ const active = computed(() => mode.value !== undefined);
 const message = ref('');
 const includeUntracked = ref(props.includeUntrackedDefault);
 const keepIndex = ref(false);
+const messageId = useId();
 /** OQ9: wired from the caller's current changed-files selection when non-empty (`App.vue` passes
  *  it through `createOpen`'s own open call — see that wiring's own comment); empty means "whole
  *  worktree", never a half-wired guess. Shown here as a read-only summary, not an editable field —
@@ -117,6 +127,7 @@ async function submitCreate(): Promise<void> {
 
 const branchName = ref('');
 const branchPreflight = ref<StashBranchPreflight | undefined>(undefined);
+const branchNameId = useId();
 let previewToken = 0;
 
 watch(
@@ -184,6 +195,7 @@ type SaveSource = 'workingTree' | 'entry';
 
 const saveLabel = ref('');
 const saveSource = ref<SaveSource>('workingTree');
+const saveLabelId = useId();
 
 watch(
   () => [props.saveOpen, props.saveSourceEntry] as const,
@@ -231,7 +243,7 @@ function confirmPop(): void {
 }
 
 // ---------------------------------------------------------------------------------------
-// mode-dispatched title / close, for the one shared `KuiDialog`
+// mode-dispatched title / close, for the one shared dialog shell
 // ---------------------------------------------------------------------------------------
 
 const title = computed(() => {
@@ -253,171 +265,185 @@ function onClose(): void {
 </script>
 
 <template>
-  <KuiDialog :open="active" :title="title" @close="onClose">
-    <template v-if="mode === 'create'">
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Message (optional)
-        <input
-          type="text"
-          v-model="message"
-          placeholder="git's own WIP message"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-      </label>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="includeUntracked" />
-        Include untracked files (<code>-u</code>)
-      </label>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="keepIndex" />
-        Keep staged changes staged (<code>--keep-index</code>)
-      </label>
-      <p v-if="pathspec.length > 0" class="kv:text-diff-deleted">
-        Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
-        stashed, not the whole working tree.
-      </p>
-    </template>
-
-    <template v-else-if="mode === 'branch'">
-      <p class="kv:text-diff-deleted">
-        From <code>{{
-          // A template literal here would put two closing braces back to back, which this Vue
-          // parser reads as the mustache's own closing delimiter mid-expression.
-          // biome-ignore lint/style/useTemplate: see above
-          'stash@{' + (branchTarget?.index ?? '') + '}'
-        }}</code>:
-        {{ branchTarget?.message }}
-      </p>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Branch name
-        <input
-          type="text"
-          v-model="branchName"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-      </label>
-      <p v-if="branchNameLocalError" class="kv:text-diff-deleted kv:my-0.5">{{ branchNameLocalError }}</p>
-      <p v-else-if="branchPreflight?.name.error" class="kv:text-diff-deleted kv:my-0.5">
-        {{ branchPreflight.name.error }}
-      </p>
-      <div v-if="branchPreflight?.verdict === 'blocked'" class="kv:my-2">
-        <p>
-          The branch will be created, but switching to it will not be clean — your working tree
-          has changes that would be overwritten. You will stay on your current branch until you
-          resolve that yourself.
-        </p>
-      </div>
-    </template>
-
-    <template v-else-if="mode === 'save'">
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Label
-        <input
-          type="text"
-          v-model="saveLabel"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        />
-      </label>
-      <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        <legend>Source</legend>
-        <label class="kv:flex-row kv:items-center">
-          <input type="radio" value="workingTree" v-model="saveSource" />
-          This working tree
-        </label>
-        <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv:text-diff-deleted">
-          Untracked files will not be included — <code>git stash create</code> cannot save them.
-          Promote an existing stash entry that already includes them instead if you need to keep
-          those too.
-        </p>
-        <label v-if="saveSourceEntry" class="kv:flex-row kv:items-center">
-          <input type="radio" value="entry" v-model="saveSource" />
-          This stash entry: {{ stashLabel(saveSourceEntry) }}
-        </label>
-      </fieldset>
-      <p class="kv:text-diff-deleted">The source is copied — it is never removed or dropped.</p>
-    </template>
-
-    <template v-else-if="mode === 'popConfirm' && pending">
-      <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
-        <div
-          v-if="blocker.kind === 'untrackedCollision'"
-          class="kv:my-2"
-        >
-          <p>These untracked files already exist in your working tree and would be overwritten:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-          <p>Remedy: move or remove them yourself, or discard them and try again.</p>
-        </div>
-        <div
-          v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
-          class="kv:my-2"
-        >
-          <p>Your uncommitted changes to these files would be overwritten:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
-          </ul>
-          <p>Remedy: commit or discard those changes first.</p>
-        </div>
-        <div v-else class="kv:my-2">
-          <p>An operation is already in progress — finish or abort it first.</p>
-        </div>
-      </template>
-
-      <template v-if="pending.preflight.blockers.length === 0">
-        <div
-          v-if="pending.preflight.prediction.kind === 'clean'"
-          class="kv:my-2 kv:text-diff-added"
-        >
-          No conflicts predicted.
-        </div>
-        <div
-          v-else-if="pending.preflight.prediction.kind === 'conflicts'"
-          class="kv:my-2"
-        >
-          <p>This will likely conflict in:</p>
-          <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
-            <li v-for="path in pending.preflight.prediction.paths" :key="path">
-              <code>{{ path }}</code>
-            </li>
-          </ul>
-          <p>
-            Your stash stays in the list either way{{
-              pending.verb === 'pop' ? ' if this conflicts' : ''
-            }}
-            — nothing is lost.
+  <Dialog :open="active" @update:open="(v) => !v && onClose()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>{{ title }}</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <template v-if="mode === 'create'">
+          <label :for="messageId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Message (optional)
+            <Input
+              :id="messageId"
+              v-model="message"
+              type="text"
+              size="kira"
+              class="w-full"
+              placeholder="git's own WIP message"
+            />
+          </label>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="includeUntracked" />
+            Include untracked files (<code>-u</code>)
+          </Label>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="keepIndex" />
+            Keep staged changes staged (<code>--keep-index</code>)
+          </Label>
+          <p v-if="pathspec.length > 0" class="kv:text-diff-deleted">
+            Only {{ pathspec.length }} selected file{{ pathspec.length === 1 ? '' : 's' }} will be
+            stashed, not the whole working tree.
           </p>
-        </div>
-        <div v-else class="kv:my-2">
-          Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
-        </div>
-      </template>
-    </template>
+        </template>
 
-    <template #actions>
-      <template v-if="mode === 'create'">
-        <KuiButton variant="primary" @click="submitCreate">Stash</KuiButton>
-        <KuiButton @click="cancelCreate">Cancel</KuiButton>
-      </template>
-      <template v-else-if="mode === 'branch'">
-        <KuiButton variant="primary" :disabled="!canSubmitBranch" @click="submitBranch">
-          Create branch
-        </KuiButton>
-        <KuiButton @click="cancelBranch">Cancel</KuiButton>
-      </template>
-      <template v-else-if="mode === 'save'">
-        <KuiButton variant="primary" :disabled="!canSubmitSave" @click="submitSave">Save</KuiButton>
-        <KuiButton @click="cancelSave">Cancel</KuiButton>
-      </template>
-      <template v-else-if="mode === 'popConfirm' && pending">
-        <KuiButton variant="primary" @click="confirmPop">
-          {{ pending.preflight.verdict === 'blocked' ? 'Force ' : '' }}{{
-            pending.verb === 'pop' ? 'Pop' : 'Apply'
-          }}
-          anyway
-        </KuiButton>
-        <KuiButton @click="cancelPop">Cancel</KuiButton>
-      </template>
-    </template>
-  </KuiDialog>
+        <template v-else-if="mode === 'branch'">
+          <p class="kv:text-diff-deleted">
+            From <code>{{
+              // A template literal here would put two closing braces back to back, which this Vue
+              // parser reads as the mustache's own closing delimiter mid-expression.
+              // biome-ignore lint/style/useTemplate: see above
+              'stash@{' + (branchTarget?.index ?? '') + '}'
+            }}</code>:
+            {{ branchTarget?.message }}
+          </p>
+          <label :for="branchNameId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Branch name
+            <Input :id="branchNameId" v-model="branchName" type="text" size="kira" class="w-full" />
+          </label>
+          <p v-if="branchNameLocalError" class="kv:text-diff-deleted kv:my-0.5">{{ branchNameLocalError }}</p>
+          <p v-else-if="branchPreflight?.name.error" class="kv:text-diff-deleted kv:my-0.5">
+            {{ branchPreflight.name.error }}
+          </p>
+          <div v-if="branchPreflight?.verdict === 'blocked'" class="kv:my-2">
+            <p>
+              The branch will be created, but switching to it will not be clean — your working tree
+              has changes that would be overwritten. You will stay on your current branch until you
+              resolve that yourself.
+            </p>
+          </div>
+        </template>
+
+        <template v-else-if="mode === 'save'">
+          <label :for="saveLabelId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Label
+            <Input :id="saveLabelId" v-model="saveLabel" type="text" size="kira" class="w-full" />
+          </label>
+          <fieldset class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            <legend>Source</legend>
+            <RadioGroup v-model="saveSource">
+              <Label class="flex flex-row items-center gap-1">
+                <RadioGroupItem value="workingTree" />
+                This working tree
+              </Label>
+              <p v-if="saveSource === 'workingTree' && saveHasUntracked" class="kv:text-diff-deleted">
+                Untracked files will not be included — <code>git stash create</code> cannot save them.
+                Promote an existing stash entry that already includes them instead if you need to keep
+                those too.
+              </p>
+              <Label v-if="saveSourceEntry" class="flex flex-row items-center gap-1">
+                <RadioGroupItem value="entry" />
+                This stash entry: {{ stashLabel(saveSourceEntry) }}
+              </Label>
+            </RadioGroup>
+          </fieldset>
+          <p class="kv:text-diff-deleted">The source is copied — it is never removed or dropped.</p>
+        </template>
+
+        <template v-else-if="mode === 'popConfirm' && pending">
+          <template v-for="blocker in pending.preflight.blockers" :key="blocker.kind">
+            <div
+              v-if="blocker.kind === 'untrackedCollision'"
+              class="kv:my-2"
+            >
+              <p>These untracked files already exist in your working tree and would be overwritten:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+              </ul>
+              <p>Remedy: move or remove them yourself, or discard them and try again.</p>
+            </div>
+            <div
+              v-else-if="blocker.kind === 'localChangesWouldBeOverwritten'"
+              class="kv:my-2"
+            >
+              <p>Your uncommitted changes to these files would be overwritten:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in blocker.paths" :key="path"><code>{{ path }}</code></li>
+              </ul>
+              <p>Remedy: commit or discard those changes first.</p>
+            </div>
+            <div v-else class="kv:my-2">
+              <p>An operation is already in progress — finish or abort it first.</p>
+            </div>
+          </template>
+
+          <template v-if="pending.preflight.blockers.length === 0">
+            <div
+              v-if="pending.preflight.prediction.kind === 'clean'"
+              class="kv:my-2 kv:text-diff-added"
+            >
+              No conflicts predicted.
+            </div>
+            <div
+              v-else-if="pending.preflight.prediction.kind === 'conflicts'"
+              class="kv:my-2"
+            >
+              <p>This will likely conflict in:</p>
+              <ul class="kv:max-h-40 kv:overflow-y-auto kv:my-1 kv:pl-3 kv:font-data kv:text-base">
+                <li v-for="path in pending.preflight.prediction.paths" :key="path">
+                  <code>{{ path }}</code>
+                </li>
+              </ul>
+              <p>
+                Your stash stays in the list either way{{
+                  pending.verb === 'pop' ? ' if this conflicts' : ''
+                }}
+                — nothing is lost.
+              </p>
+            </div>
+            <div v-else class="kv:my-2">
+              Couldn't predict the outcome: {{ pending.preflight.prediction.reason }}
+            </div>
+          </template>
+        </template>
+      </div>
+
+      <DialogFooter class="justify-end gap-1">
+        <template v-if="mode === 'create'">
+          <Button variant="dialog-primary" size="kira-lg" @click="submitCreate">Stash</Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelCreate">Cancel</Button>
+        </template>
+        <template v-else-if="mode === 'branch'">
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="!canSubmitBranch"
+            @click="submitBranch"
+          >
+            Create branch
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelBranch">Cancel</Button>
+        </template>
+        <template v-else-if="mode === 'save'">
+          <Button variant="dialog-primary" size="kira-lg" :disabled="!canSubmitSave" @click="submitSave">
+            Save
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelSave">Cancel</Button>
+        </template>
+        <template v-else-if="mode === 'popConfirm' && pending">
+          <Button variant="dialog-primary" size="kira-lg" @click="confirmPop">
+            {{ pending.preflight.verdict === 'blocked' ? 'Force ' : '' }}{{
+              pending.verb === 'pop' ? 'Pop' : 'Apply'
+            }}
+            anyway
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelPop">Cancel</Button>
+        </template>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
