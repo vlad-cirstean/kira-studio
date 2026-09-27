@@ -2109,8 +2109,10 @@ keepawake` (repo-root as of v1.9 P116, shared by both apps rather than Kira Stud
 independent, level-shaped reasons onto one `Controller`, a set of held reasons rather than a
 refcount (a refcount double-acquires the moment either source re-asserts a level it already holds).
 Kira Studio composes two — the titlebar toggle and `claudeCode.keepAwakeWithAgents` being on while
-at least one Claude Code session is live; Kira Space, with no agent-hooks/Settings leaf of its own
-(P100), composes the titlebar toggle alone. While the set is non-empty, macOS runs
+at least one Claude Code session is live; Kira Space composes the titlebar toggle alone — it wires
+`internal/agenthooks` itself now (P129 Part 1, below), but has no Settings leaf of its own to hold an
+agent-aware keep-awake toggle, and adding one is out of that phase's own scope. While the set is
+non-empty, macOS runs
 `caffeinate -i -s -w <our pid>` as a child process — argv-only, no shell, the only variable in the
 line is this app's own pid; `-w` makes `caffeinate` exit on its own if the app crashes, so a missed
 teardown can never orphan an assertion that keeps the machine awake forever. `-s` (system sleep) is
@@ -2136,10 +2138,54 @@ sides share stayed at `packages/shared/domain/agent.ts` (unmoved — already sha
 event-channel strings hoisted to `internal/appevent`. What a host app still supplies itself: the
 on/off setting (if any), the bound service surface a hook's own launch reaches, and wiring
 `Manager.ComposeLaunch`'s result into its own `TerminalService.Open` — never `ComposeLaunch`'s env
-map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **No app wires any of this as of
-P127** — Kira Studio dropped its own bridge/UI/settings leaves in this phase and kept only the
-plain registry-count keep-awake reason above (`OpenParams.Agent`, no hook dependency); Kira Space
-wires it in next (P129).
+map directly, since `KIRA_AGENT_HOOK_TOKEN` must stay inside Go. **Kira Space is the first, and so
+far only, consumer (P129 Part 1)** — Kira Studio dropped its own bridge/UI/settings leaves at P127
+and kept only the plain registry-count keep-awake reason above (`OpenParams.Agent`, no hook
+dependency); it still wires none of this. Kira Space's own `main.go` starts `agenthooks.Manager`
+unconditionally, with no on/off setting of its own (P129 Part 1's own posture: a start failure —
+`curl` missing, a bind conflict — is logged, never fatal, and sessions still spawn and track with
+activity icons simply absent). `hookEvents` (`internal/agenthooks/config.go`) now also asks Claude
+Code to fire `UserPromptSubmit`, the one hook event P127's own set left out — `reduceAgentActivity`
+(below) is its first consumer. `AgentEvent`'s wire shape is unchanged (`packages/shared/domain/
+agent.ts`) — every field a real hook payload can carry was already there.
+
+**`reduceAgentActivity`'s own phase lattice gained a fourth value, `waiting` (P129 Part 1 §4.8).**
+`AgentActivity` gained `wakeArmed` (sticky across a turn, set when a `PreToolUse` names `Monitor` or
+`ScheduleWakeup` — the two tools an agent uses to arm a wake-up rather than end its turn for good)
+and `at` (every event's own receipt time, including one that leaves `phase` unchanged). `Stop`
+resolves to `waiting` instead of `idle` when `wakeArmed` was set, then clears it; `UserPromptSubmit`
+(the new hook event above) is the one reliable "working" start for a turn that answers in plain
+text with no tool call, and always clears whatever `wakeArmed` the previous turn set. A
+`Notification` carrying `idle_prompt`/`auth_success` leaves `phase` (and `message`) unchanged — an
+idle session polling for a wake-up is not "needs input." **Known limitation:** a `Bash` call cannot
+arm `waiting` even when its own command is really a background watcher script, since `tool_input` is
+never decoded (P86's own privacy rule, restated in Known open items below) — only `Monitor`/
+`ScheduleWakeup` by name can.
+
+**Kira Space's own agent runtime — spawning and tracking the Claude Code sessions its "agent merge
+queue" UI opens — is `apps/kira-space/internal/ade` (P129 Part 1; the UI itself is Parts 3-7).**
+`ade.Tracker` is one instance, shared by `internal/terminal.BoundService.ComposeAgent` (the launch
+hook below), `terminal.Registry.OnChange` (`Reconcile`), `agenthooks.Manager`'s own `OnEvent`
+(`HandleEvent`), and `AdeService` (`bridge/ade.go`, bound as `PrepareLaunch`/`Send`/`Sessions`/
+`AgentSessions`). `PrepareLaunch` validates the request, mints a terminal id and records a pending
+launch intent; the renderer then opens that terminal through the ordinary, unchanged
+`TerminalService.Open` path, whose `ComposeAgent` seam (`internal/terminal/bound.go`, nil for Kira
+Studio) consumes the intent, inserts or revives the session's `ade_sessions` row as `running`, and
+appends the agent-hooks env and the initial prompt (a bracketed paste followed by a bare `\r`,
+`internal/ade/paste.go`) to the launch command — one spawn path, no second way in. A `time.AfterFunc`
+grace window (30s in production) covers the race between `Compose` returning and the PTY actually
+registering with `Registry`: `Reconcile` reads the live agent set itself on every call (both a spawn
+and an exit fire `Registry.OnChange`) and only stops a record whose terminal is gone *and* whose
+grace window has elapsed, so an exit notification that outraces its own spawn's notification can
+never wrongly stop a fresh record. `ade_sessions` (migration `0004`) persists across restarts;
+`Recover()` unconditionally marks every row a previous process life left `running` as `stopped`,
+called once at boot before any window exists — a fresh `Registry` never has that life's PTYs live.
+**Sessions are window-scoped, like every other terminal PTY (P103 Part 3's own choice, not revisited
+here):** closing the window that hosts a running Claude Code session kills its PTY same as any other
+terminal, and the record reads `stopped` — resumable (`claude --resume`, always in the session's own
+recorded cwd, never wherever the resuming call happens to run) but not literally still running
+behind the closed window. Changing PTY lifetime scope to survive a window close is out of this
+phase's own scope.
 
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
 TypeScript bindings under `apps/kira-studio/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
@@ -2287,7 +2333,8 @@ Stack, above — `GrpcService` (P11), `CollectionsService` and `VariablesService
 `ResponseHistoryService` (P8), `GrpcHistoryService` (P11), `DataGripService`, P25's connection
 import); one Database MCP's (`DbMcpService`, M1); and two the terminal surface's
 (`KeepAwakeService`, `TerminalService`, P83 — `AgentHooksService` left this list at P127, its
-listener moved to a shared, currently-unwired package; see the keep-awake paragraph below).
+listener moved to a shared package that Kira Space, not Kira Studio, now wires (P129 Part 1; see the
+keep-awake and Claude Code hook monitoring paragraphs above)).
 `UpdateService` (P66) rounds it out. **One used to be the git module's — `GitClientsService`, gone
 as of P100.** It
 was the *Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and
@@ -2295,10 +2342,10 @@ the only bound service the headless git module had, since everything else it did
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
 along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `main.go` binds a separate **13**
+own service-list check, below. Kira Space's own `main.go` binds a separate **14**
 (`grep -c application.NewService apps/kira-space/main.go`; this count already included P116/P119's
-own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it) for
-its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
+own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it, and
+P129 Part 1's own `AdeService` since) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
 Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 `internal/windowsvc.Service` (`Ensure`/`SetMode`/`OpenNew`) and `internal/terminal.BoundService`
 (`Open`/`Write`/`Resize`/`Close`/`DefaultCwd`) each live once at repo root; both apps'
@@ -4014,6 +4061,16 @@ own secrets.
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
+
+- **A backgrounded `Bash` tool call cannot arm the `waiting` activity phase (P129 Part 1 §4.8)**.
+  `reduceAgentActivity`'s `wakeArmed` flag — the signal that turns a session's `Stop` into `waiting
+  on monitor` instead of plain `idle` — is set only when a `PreToolUse`'s own `toolName` is `Monitor`
+  or `ScheduleWakeup`; a `Bash` call backgrounding an equivalent watcher script is indistinguishable
+  from any other `Bash` call here, since `tool_input` is never decoded (P86's own privacy rule, kept
+  deliberately: decoding it would mean parsing arbitrary tool arguments for a UI nicety). Closing
+  this for real would mean either decoding `tool_input` for `Bash` specifically (breaking the
+  privacy rule for one tool) or Claude Code itself distinguishing a "waiting" background run from an
+  ordinary one at the hook level — neither is this phase's call to make.
 
 - **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
   discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
