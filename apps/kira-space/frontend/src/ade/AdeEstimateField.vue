@@ -57,11 +57,14 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
         aria-label="Estimate unit"
         class="m-0 flex gap-0.5 rounded-kira-sm border border-[#2f323b] bg-[#1b1d22] p-0.5"
       >
+        <!-- mousedown.prevent: without it, clicking a toggle button blurs the number input first,
+             firing its own @change/commit with the STALE unit, before this button's click runs. -->
         <button
           type="button"
           class="rounded px-2 py-0.5 text-kira-sm"
           :class="unit === 'h' ? 'bg-[#2f323b] text-fg' : 'text-[#9a9ca5]'"
           :aria-pressed="unit === 'h'"
+          @mousedown.prevent
           @click="pickUnit('h')"
         >
           hours
@@ -71,6 +74,7 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
           class="rounded px-2 py-0.5 text-kira-sm"
           :class="unit === 'd' ? 'bg-[#2f323b] text-fg' : 'text-[#9a9ca5]'"
           :aria-pressed="unit === 'd'"
+          @mousedown.prevent
           @click="pickUnit('d')"
         >
           days
