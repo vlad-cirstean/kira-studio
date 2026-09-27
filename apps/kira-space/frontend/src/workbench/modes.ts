@@ -1,4 +1,4 @@
-import type { ModeRegistry } from '@workbench/modes';
+import type { ModeRegistry, PanelModeDef } from '@workbench/modes';
 import { defineAsyncComponent } from 'vue';
 import AdePanel from '../ade/AdePanel.vue';
 import AdeStart from '../ade/AdeStart.vue';
@@ -12,7 +12,13 @@ import type { SpaceMode } from '../state/mode';
 // terminal at step 7, ade here at step 8).
 export const MODE_ORDER: SpaceMode[] = ['git', 'terminal', 'ade'];
 
-export const MODES: ModeRegistry<SpaceMode> = {
+// P129 Part 3 §0.12: pinned to `PanelModeDef` for now (deviation from the plan's own commit-1/
+// commit-4 split, disclosed in the phase result: `modes.ts`'s own union change is repo-wide, so
+// this app's `MODES` needs a matching type-only pin in the same commit or `WorkbenchShell.vue`'s
+// unconditional `.panel`/`.start`/`.newTab` reads stop typechecking) — every entry here is still a
+// panel module, same type-only reasoning as Kira Studio's own `modes.ts`. Widens to the base
+// `ModeDef` union once `ade` below becomes a `layout: 'full'` entry (a later commit in this phase).
+export const MODES: ModeRegistry<SpaceMode, PanelModeDef> = {
   git: {
     label: 'Git',
     icon: 'source-control',

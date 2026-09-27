@@ -59,8 +59,13 @@ interface Props {
   projectWidth: number;
   opsVisible?: boolean;
   opsHeight?: number;
+  /** P129 Part 3 §0.13: hides the tab-strip row for a `layout: 'full'` module (Kira Space's own
+   *  `ade`, which renders its own view in `#main` instead of tab-scoped `MainView`) — both
+   *  `hasDock` branches below render this row unconditionally otherwise. Default `true`: Kira
+   *  Studio passes nothing, so its own geometry is unchanged. */
+  tabStripVisible?: boolean;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { tabStripVisible: true });
 const emit = defineEmits<{
   'resize-project': [size: number];
   'resize-ops': [size: number];
@@ -176,7 +181,7 @@ function onOpsResize(percent: number): void {
               <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
                    the tab's own breathing room from this row's border-bottom, not a margin tacked
                    on after it. -->
-              <div class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
+              <div v-if="tabStripVisible" class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
                 <slot name="tab-strip"><TabStrip /></slot>
               </div>
               <div class="flex-1 min-h-0" data-testid="main-view">
@@ -209,7 +214,7 @@ function onOpsResize(percent: number): void {
           <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is the
                tab's own breathing room from this row's border-bottom, not a margin tacked on
                after it. -->
-          <div class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
+          <div v-if="tabStripVisible" class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
             <slot name="tab-strip"><TabStrip /></slot>
           </div>
           <div class="flex-1 min-h-0" data-testid="main-view">

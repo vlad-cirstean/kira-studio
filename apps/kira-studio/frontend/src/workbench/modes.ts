@@ -1,5 +1,5 @@
 import type { AppMode } from '@shared/domain/mode';
-import type { ModeRegistry } from '@workbench/modes';
+import type { ModeRegistry, PanelModeDef } from '@workbench/modes';
 import { defineAsyncComponent } from 'vue';
 import ApiStart from '../api/ApiStart.vue';
 import CollectionsPanel from '../api/CollectionsPanel.vue';
@@ -17,7 +17,11 @@ export const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal'];
 // newTab now live in the shared terminal module (packages/workbench/src/terminal/) — no
 // `modeStore.active === 'terminal'` branch anywhere in WorkbenchShell.vue any more, the module
 // owns its own "+" via `newTab`.
-export const MODES: ModeRegistry<AppMode> = {
+// P129 Part 3 §0.12: every one of this app's own modes is a panel module, so `MODES` is typed
+// `ModeRegistry<AppMode, PanelModeDef>` rather than the base `ModeDef` union — a one-line type
+// change, no behavior change, since this app's own shell already reads `.panel`/`.start`
+// unconditionally.
+export const MODES: ModeRegistry<AppMode, PanelModeDef> = {
   studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
   api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
   // P91 §2: a peer module, lazy the same reason Studio/Api's entries are — nothing
