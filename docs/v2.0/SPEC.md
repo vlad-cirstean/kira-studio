@@ -736,10 +736,19 @@ commits this time).
 - `bun run test:unit` — 1667 pass, 0 fail — unchanged from Part 1's own baseline exactly (no new
   unit tests added or moved this phase; `internal/ade`'s new coverage is Go, not `bun test`).
 - `bun run test:ui:space` — 38/38 pass, unchanged from Part 1's own baseline.
-- `bun run test:ui:studio` — 300 tests, matching Part 1's own baseline exactly; a full run this
-  phase passed clean end to end (no failures), so none of Part 1's own documented cross-file
-  worker-contention flakes (`data-view.spec.ts`/`definition.spec.ts`/`focus-ring.spec.ts`/
-  `mutations.spec.ts`/`terminal-module.spec.ts`) recurred this run.
+- `bun run test:ui:studio` — 300 tests, matching Part 1's own baseline exactly; none of Part 1's
+  own documented cross-file worker-contention flakes (`data-view.spec.ts`/`definition.spec.ts`/
+  `focus-ring.spec.ts`/`mutations.spec.ts`/`terminal-module.spec.ts`) recurred this run. One
+  different failure: `budgets.spec.ts`'s `[ui-timing]` interaction-budgets case missed its own
+  50ms max-scroll-delta threshold by 2ms (52ms). `git diff --stat 20e27f6e -- apps/kira-studio` is
+  empty — this phase touches zero files under `apps/kira-studio`, so the failure cannot originate
+  here; it is the same class of sandbox CPU-timing jitter `docs/DEV_ENVIRONMENT.md` already
+  documents for other timing/pixel-sensitive suites (`tests/visual/*`'s own font-package note), on
+  a razor-thin perf tripwire in an unrelated subsystem (Kira Studio's own SlickGrid scroll
+  performance). Not fixed here: doing so would mean adjusting or investigating a Kira Studio
+  perf-tripwire threshold, work genuinely outside this phase's own scope (a different subsystem,
+  per CLAUDE.md's own exception) — not carried forward as a new open item since a single 2ms miss
+  on a sandbox-timing-sensitive test gives no reason to believe this recurs reliably.
 
 ### 9.1 Tests
 
