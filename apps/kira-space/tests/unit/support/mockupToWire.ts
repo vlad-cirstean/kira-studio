@@ -145,7 +145,10 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
       behind: b.behind ?? 0,
       merged: isMerged,
       mergedAt: isMerged ? msFromOffset(0) : null,
-      worktree: '',
+      // P129 Part 6 §2.3: `wtOf`'s own fallback (mockup line 1630, `~/wt/<repo>/<last segment>`) —
+      // `toDialogContext` below recomputes the identical value on top of this, no-op today, kept only
+      // because Part 4's own dialog scenarios still build their own `DialogCtx` through it directly.
+      worktree: b.name ? `~/wt/${repo}/${lastSegmentForFixture(b.name)}` : '',
       files: (b.files ?? []).map(([path, delta]: [string, string]) => ({
         path,
         ...parseFileDelta(delta),
@@ -288,7 +291,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
     history,
     lastFetchAt: null,
     autofetchMinutes: 0,
-    worktreeBasePath: '',
+    worktreeBasePath: `~/wt/${repo}`,
   };
 
   const settings: Settings['ade'] = {

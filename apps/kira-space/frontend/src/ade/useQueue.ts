@@ -245,6 +245,94 @@ interface QueueAtRisk {
   unmerged: number;
 }
 
+// -------------------------------------------------------------------------------------------------
+// P129 Part 6 §0.4/§2.3: the selected item's own panel facts — a pure port of the mockup's own
+// `sel` (renderVals lines 1380-1653), built from internals this module already holds. `null` when
+// nothing is selected.
+// -------------------------------------------------------------------------------------------------
+
+export interface QueuePanelAction {
+  kind:
+    | 'forcePush'
+    | 'rebaseMain'
+    | 'rebaseAfter'
+    | 'rebaseStack'
+    | 'queueAfter'
+    | 'start'
+    | 'archive';
+  label: string;
+  tone: 'primary' | 'purple' | 'red' | 'claude' | 'secondary';
+  disabled: boolean;
+  tip: string;
+  targetIds: string[];
+}
+
+export interface QueuePanelConflict {
+  with: string;
+  files: string[];
+}
+
+export interface QueuePanelSession {
+  id: string;
+  claudeSessionId: string;
+  terminalId: string;
+  cwd: string;
+  kind: ActivityKind;
+  lastActiveAt: number;
+}
+
+export interface QueuePanel {
+  id: string;
+  kind: ItemKind;
+  draft: boolean;
+  /** `true` only for a new-work draft with no branch yet (§0.14/§0.15's own "new work" concept) —
+   *  distinct from `draft`, which also covers a real branch whose git ref doesn't exist yet. */
+  isNewWork: boolean;
+  merged: boolean;
+  readOnly: boolean;
+  title: string;
+  defaultTitle: string;
+  nameValue: string;
+  color: string;
+  status: { label: string; tone: Tone };
+  branchStatus: { label: string; tone: Tone };
+  owner: string;
+  mono: string;
+  actions: QueuePanelAction[];
+  branch: {
+    ref: string;
+    from: string | null;
+    fromOptions: { value: string; label: string }[] | null;
+  };
+  jira: { key: string; url: string };
+  prUrl: string;
+  notes: string;
+  estimate: { num: string; unit: 'h' | 'd'; days: number };
+  changes: {
+    base: string;
+    ahead: number;
+    behind: number;
+    worktree: string;
+    dirtyCount: number;
+    rippleText: string;
+    rippleTone: 'amber' | 'grey';
+    conflicts: QueuePanelConflict[];
+    shared: { with: string; file: string } | null;
+    dirty: { code: string; path: string }[];
+    commits: { sha: string; message: string }[];
+    files: {
+      path: string;
+      added: number | null;
+      deleted: number | null;
+      binary: boolean;
+      conflict: boolean;
+    }[];
+  };
+  running: QueuePanelSession[];
+  stopped: { id: string; claudeSessionId: string; lastActiveAt: number }[];
+  candidates: string[];
+}
+
 export interface QueueView {
   items: QueueItem[];
   stacks: QueueStack[];
@@ -272,6 +360,8 @@ export interface QueueView {
   /** Every item's own effective day (offset, or `LATER`) — `timelineOps.ts`'s drop rules read this
    *  (§0.13's "never before its parent"). */
   effDay: Record<string, number>;
+  /** P129 Part 6 §0.4: the selected item's own panel facts, `null` when nothing is selected. */
+  panel: QueuePanel | null;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1168,8 +1258,9 @@ function segmentTagAndAction(
   };
 }
 
-// mockup line 1080, verbatim.
-const ARCHIVE_TIP =
+// mockup line 1080, verbatim. Exported for the panel header's own Archive actions (P129 Part 6
+// §0.5, first consumer outside this module).
+export const ARCHIVE_TIP =
   'Stop its agents, delete its worktree and hide it. The branch, notes and links are kept; it stays in history.';
 
 function buildCells(
@@ -1547,6 +1638,372 @@ function buildBands(
 }
 
 // -------------------------------------------------------------------------------------------------
+// P129 Part 6 §0.4: panel builder — mockup `stackIds`/`defaultTitle`/`sel` (renderVals 830-831,
+// 1380-1653), ported the same way the rest of this module is: real facts in, same shape out.
+// -------------------------------------------------------------------------------------------------
+
+/** Mockup `stackIds` (line 1063, restated identically by `dialogCompose.ts`'s own copy): the root
+ *  plus every `mine`, non-draft descendant, depth-first in `kids` order — force push's own targets
+ *  and the Rebase stack action's own busy check. */
+function stackIdsOf(
+  rootId: string,
+  byId: Map<string, Item>,
+  kids: Map<string, string[]>,
+): string[] {
+  const out = [rootId];
+  const down = (x: string): void => {
+    for (const c of kids.get(x) ?? []) {
+      const item = byId.get(c);
+      if (item?.kind === 'mine' && !item.draft) {
+        out.push(c);
+        down(c);
+      }
+    }
+  };
+  down(rootId);
+  return out;
+}
+
+/** Mockup `defaultTitle` (line 830) — `titleOf` minus its own `s.names` override rung only.
+ *  `item.draftTitle` (mockup's own `b.newTitle`, the persisted draft/new-work title text) is not an
+ *  override layer the way `s.names` is — both a real branch's PR title and a draft's own typed title
+ *  stay part of the "default" chain, so this is `titleOf` verbatim without the `nameOverride` check. */
+function panelDefaultTitle(item: Item, prs: AdeRepoPrs | undefined): string {
+  if (item.draftTitle) return item.draftTitle;
+  const prTitle = item.branch ? prs?.branches[item.branch]?.title : undefined;
+  if (prTitle) return prTitle;
+  if (item.branch) return item.branch;
+  return item.jiraKey || 'New work';
+}
+
+/** Mockup's own `estM`/`estP`/`estNum`/`estUnit` (renderVals 1450-1454), verbatim. */
+function panelEstimate(
+  rawEst: string,
+  workdayHours: number,
+  spanDayShare: number,
+): { num: string; unit: 'h' | 'd'; days: number } {
+  const m = String(rawEst ?? '')
+    .trim()
+    .match(/^(\d+(?:\.\d+)?)\s*([hd])$/i);
+  const parsed = parseEst(rawEst, workdayHours, spanDayShare);
+  const num = m ? (m[1] as string) : parsed ? String(Math.round(parsed.hours * 10) / 10) : '';
+  const unit = (m ? (m[2] as string).toLowerCase() : 'h') as 'h' | 'd';
+  return { num, unit, days: parsed ? parsed.days : 0 };
+}
+
+interface PanelCtx {
+  byId: Map<string, Item>;
+  parentOf: Map<string, string>;
+  kids: Map<string, string[]>;
+  conflicts: Map<string, ConflictEntry[]>;
+  boxOf: Map<string, Seg>;
+  mergeN: Map<string, number>;
+  statusCtx: StatusCtx;
+  ripple: string[];
+  rebasing: ReadonlySet<string>;
+  pushing: ReadonlySet<string>;
+  plan: AdePlan;
+  snapshot: AdeRepoSnapshot;
+  prs: AdeRepoPrs | undefined;
+  activity: ReadonlyMap<string, import('@shared/domain/agent').AgentActivity>;
+  workdayHours: number;
+  spanDayShare: number;
+  titleOfId: (id: string) => string;
+  cal: Calendar;
+}
+
+/** Mockup lines 1385-1397 (§0.5-§0.7 for the design-only additions) — the panel's own action bar,
+ *  in the mockup's exact push order (`finalActions` drops every Archive past the first once merged,
+ *  mockup line 1397). Split out of `buildPanel` on its own: this one block, all boolean-heavy
+ *  `if`s, was most of that function's own cognitive-complexity budget. */
+function buildPanelActions(
+  selectedId: string,
+  item: Item,
+  root: string,
+  busy: boolean,
+  ctx: PanelCtx,
+): QueuePanelAction[] {
+  const actions: QueuePanelAction[] = [];
+  if (item.merged) {
+    actions.push({
+      kind: 'archive',
+      label: 'Archive',
+      tone: 'purple',
+      disabled: false,
+      tip: ARCHIVE_TIP,
+      targetIds: [selectedId],
+    });
+  }
+  const upStack = stackIdsOf(root, ctx.byId, ctx.kids).filter((id) => ctx.plan.unpushed[id]);
+  if (upStack.length) {
+    const names = upStack.map((id) => ctx.byId.get(id)?.branch || id).join(', ');
+    actions.push({
+      kind: 'forcePush',
+      label: ctx.pushing.size
+        ? 'Pushing…'
+        : `Force push${upStack.length > 1 ? ` (${upStack.length})` : ''}`,
+      tone: 'primary',
+      disabled: ctx.pushing.size > 0,
+      tip: `git push --force-with-lease for: ${names}`,
+      targetIds: upStack,
+    });
+  }
+  const rootBehind = behindOf(root, ctx.byId) > 0;
+  if (!item.merged && item.kind === 'mine' && ctx.byId.get(root)?.kind === 'mine' && rootBehind) {
+    actions.push({
+      kind: 'rebaseMain',
+      label: busy ? 'Rebasing…' : 'Rebase onto main',
+      tone: 'primary',
+      disabled: busy,
+      tip: '',
+      targetIds: [root],
+    });
+  }
+  const gS = ctx.boxOf.get(selectedId);
+  if (
+    !item.merged &&
+    item.kind === 'mine' &&
+    gS?.after &&
+    gS.lead &&
+    ctx.byId.get(rootOf(gS.lead, ctx.parentOf))?.kind === 'mine' &&
+    !rootBehind
+  ) {
+    const trueRoot = rootOf(gS.lead, ctx.parentOf);
+    const afterId = gS.after.id;
+    actions.push({
+      kind: 'rebaseAfter',
+      label: busy
+        ? 'Rebasing…'
+        : `Rebase onto ${shortName(ctx.byId.get(afterId)?.branch ?? afterId)}`,
+      tone: 'primary',
+      disabled: busy,
+      tip: '',
+      targetIds: [trueRoot, afterId],
+    });
+  }
+  // §0.6: Rebase stack — a design-only addition the mockup has no button for.
+  if (
+    !item.merged &&
+    item.kind === 'mine' &&
+    !item.draft &&
+    ctx.parentOf.has(selectedId) &&
+    behindOf(selectedId, ctx.byId) > 0 &&
+    ctx.byId.get(root)?.kind === 'mine' &&
+    !rootBehind
+  ) {
+    const parentId = ctx.parentOf.get(selectedId) as string;
+    const stackBusy = stackIdsOf(selectedId, ctx.byId, ctx.kids).some((id) => ctx.rebasing.has(id));
+    actions.push({
+      kind: 'rebaseStack',
+      label: stackBusy ? 'Rebasing…' : 'Rebase stack',
+      tone: 'primary',
+      disabled: stackBusy,
+      tip: '',
+      targetIds: [selectedId, parentId],
+    });
+  }
+  const conf = ctx.conflicts.get(selectedId);
+  if (item.kind === 'mine' && conf?.length) {
+    const withId = (conf[0] as ConflictEntry).with;
+    actions.push({
+      kind: 'queueAfter',
+      label: `Queue after ${shortName(ctx.byId.get(withId)?.branch ?? withId)}`,
+      tone: 'red',
+      disabled: false,
+      tip: '',
+      targetIds: [root, withId],
+    });
+  }
+  if (item.kind === 'mine' && item.sessions.length === 0) {
+    actions.push({
+      kind: 'start',
+      label: '▶ Start agent',
+      tone: 'claude',
+      disabled: false,
+      tip: '',
+      targetIds: [selectedId],
+    });
+  }
+  if (item.kind !== 'mine' || !item.merged) {
+    actions.push({
+      kind: 'archive',
+      label: 'Archive',
+      tone: 'secondary',
+      disabled: false,
+      tip: ARCHIVE_TIP,
+      targetIds: [selectedId],
+    });
+  }
+  // mockup line 1397: merged drops every Archive after the first.
+  return item.merged ? actions.filter((a, i) => !(a.kind === 'archive' && i > 0)) : actions;
+}
+
+/** Mockup `pos`/`facts` (renderVals 1399/1601; §0.14 flips the draft order). */
+function buildPanelMono(
+  selectedId: string,
+  item: Item,
+  seg: Seg | undefined,
+  ctx: PanelCtx,
+): string {
+  let pos: string;
+  if (item.kind === 'mine') {
+    if (item.merged) pos = 'merged';
+    else {
+      const day = seg ? dayLabel(ctx.cal, seg.day) : '';
+      const span = seg && seg.days.length > 1 ? `–${dayLabel(ctx.cal, seg.end)}` : '';
+      pos = `${day}${span} #${ctx.mergeN.get(selectedId) ?? ''}`;
+    }
+  } else if (item.kind === 'review') {
+    pos = `${item.owner} · review`;
+  } else {
+    pos = `${seg ? dayLabel(ctx.cal, seg.day) : ''} · not merging`;
+  }
+  return item.draft ? `no branch yet · ${pos}` : `${pos} · ${item.branch}`;
+}
+
+/** New-work Branch row (§0.14): `from`/`fromOptions`, both in item-id space (real branches' own
+ *  `id` equals their git branch name, `queue.go` 714 — so this is "by branch name" either way). */
+function buildPanelBranchFrom(
+  selectedId: string,
+  item: Item,
+  ctx: PanelCtx,
+): { from: string | null; fromOptions: { value: string; label: string }[] | null } {
+  const opts: { value: string; label: string }[] = [{ value: '', label: 'main' }];
+  for (const other of ctx.byId.values()) {
+    if (
+      other.id !== selectedId &&
+      !other.draft &&
+      other.kind !== 'parked' &&
+      !ancestorsOf(other.id, ctx.parentOf).includes(selectedId)
+    ) {
+      opts.push({ value: other.id, label: other.branch || other.id });
+    }
+  }
+  return { from: item.base, fromOptions: opts }; // item.base: '' means main (§0.13)
+}
+
+/** Mockup `run`/`stopped` (renderVals 1382). */
+function buildPanelAgents(
+  item: Item,
+  ctx: PanelCtx,
+): {
+  running: QueuePanelSession[];
+  stopped: { id: string; claudeSessionId: string; lastActiveAt: number }[];
+} {
+  const running = item.sessions
+    .filter((s) => s.state === 'running')
+    .map((s) => ({
+      id: s.id,
+      claudeSessionId: s.claudeSessionId,
+      terminalId: s.terminalId,
+      cwd: s.cwd,
+      kind: activityKind(s, ctx.activity),
+      lastActiveAt: s.lastActiveAt,
+    }))
+    .sort((a, b) => actRank(a.kind) - actRank(b.kind));
+  const stopped = item.sessions
+    .filter((s) => s.state !== 'running')
+    .map((s) => ({ id: s.id, claudeSessionId: s.claudeSessionId, lastActiveAt: s.lastActiveAt }));
+  return { running, stopped };
+}
+
+/** Mockup `sel` (renderVals 1380-1653) — the selected item's own panel facts. */
+function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null {
+  if (selectedId === null) return null;
+  const item = ctx.byId.get(selectedId);
+  if (!item) return null;
+
+  const isNewWork = item.branch === '';
+  const rawBranch = ctx.snapshot.branches.find((b) => b.id === selectedId);
+  const rawNewWork = ctx.snapshot.newWork.find((w) => w.id === selectedId);
+
+  const root = rootOf(selectedId, ctx.parentOf);
+  const busy = ctx.rebasing.size > 0;
+  const finalActions = buildPanelActions(selectedId, item, root, busy, ctx);
+  const seg = ctx.boxOf.get(selectedId);
+  const mono = buildPanelMono(selectedId, item, seg, ctx);
+  const conf = ctx.conflicts.get(selectedId);
+
+  // ---- Changes tab facts (mockup lines 1622-1633) ------------------------------------------------
+  const parentId = ctx.parentOf.get(selectedId);
+  const base = parentId !== undefined ? ctx.byId.get(parentId)?.branch || 'main' : 'main';
+  const dirtyCount = item.dirty.length;
+  const rippleText =
+    item.kind !== 'mine'
+      ? '—'
+      : ctx.ripple.length
+        ? `rebase ${ctx.ripple.map((rid) => shortName(ctx.byId.get(rid)?.branch ?? rid)).join(', ')}`
+        : 'nothing to rebase';
+  const rippleTone: 'amber' | 'grey' =
+    item.kind === 'mine' && ctx.ripple.length > 0 ? 'amber' : 'grey';
+  const worktreePath = rawBranch?.worktree ?? '';
+  const worktree = item.draft
+    ? 'created on Start'
+    : `${item.kind === 'review' ? 'read-only · ' : ''}${worktreePath}${dirtyCount ? ` · ${dirtyCount} uncommitted` : ''}`;
+  const shared = seg?.after ? { with: seg.after.id, file: seg.after.file } : null;
+  const rawDirty = rawBranch?.dirty ?? [];
+  const confFiles = new Set<string>();
+  for (const c of conf ?? []) for (const f of c.files) confFiles.add(f);
+
+  // ---- links (mockup `linkOf`, `d.jira`/`d.prUrl`/`d.worktree`) ----------------------------------
+  const jira = rawBranch?.jira ?? rawNewWork?.jira ?? { key: '', url: '' };
+  const prUrl = rawBranch?.prUrl ?? '';
+  const notes = rawBranch?.notes ?? rawNewWork?.notes ?? '';
+
+  const { from: branchFrom, fromOptions } = isNewWork
+    ? buildPanelBranchFrom(selectedId, item, ctx)
+    : { from: null, fromOptions: null };
+
+  const { running: runningSessions, stopped: stoppedSessions } = buildPanelAgents(item, ctx);
+
+  return {
+    id: selectedId,
+    kind: item.kind,
+    draft: item.draft,
+    isNewWork,
+    merged: item.merged,
+    readOnly: item.kind === 'review',
+    title: ctx.titleOfId(selectedId),
+    defaultTitle: panelDefaultTitle(item, ctx.prs),
+    nameValue: item.branch ? item.nameOverride : item.draftTitle,
+    color: PALETTE[(ctx.snapshot.colors[selectedId] ?? 0) % PALETTE.length] as string,
+    status: workStatus(selectedId, ctx.statusCtx),
+    branchStatus: branchStatusOf(selectedId, ctx.statusCtx),
+    owner: item.owner,
+    mono,
+    actions: finalActions,
+    branch: { ref: item.branch, from: branchFrom, fromOptions },
+    jira,
+    prUrl,
+    notes,
+    estimate: panelEstimate(item.est, ctx.workdayHours, ctx.spanDayShare),
+    changes: {
+      base,
+      ahead: item.ahead,
+      behind: behindOf(selectedId, ctx.byId),
+      worktree,
+      dirtyCount,
+      rippleText,
+      rippleTone,
+      conflicts: conf ?? [],
+      shared,
+      dirty: rawDirty.map((d) => ({ code: d.code, path: d.path })),
+      commits: item.commits.map((c) => ({ sha: c.sha, message: c.message })),
+      files: item.files.map((f) => ({
+        path: f.path,
+        added: f.added ?? null,
+        deleted: f.deleted ?? null,
+        binary: f.binary,
+        conflict: confFiles.has(f.path),
+      })),
+    },
+    running: runningSessions,
+    stopped: stoppedSessions,
+    candidates: rawNewWork?.branchCandidates ?? [],
+  };
+}
+
+// -------------------------------------------------------------------------------------------------
 // useQueue
 // -------------------------------------------------------------------------------------------------
 
@@ -1588,6 +2045,12 @@ export function useQueue(input: QueueInput): QueueView {
   );
   const { seq, mergeN } = buildMergeOrder(segsRaw, byId, conflicts);
   computeAfter(seq, byId, sharedLookup);
+
+  // P129 Part 6 §0.4: mockup `boxOf` (line 1002) — the day-segment each item is displayed in,
+  // built once for the panel's own `mono`/`shared` facts (a member's own segment, not necessarily
+  // its stack's root segment).
+  const boxOf = new Map<string, Seg>();
+  for (const g of seq) for (const m of g.members) boxOf.set(m.id, g);
 
   // §2.6 stage 11: selection, ripple, atRisk.
   let selectedId: string | null = input.selectedId ?? null;
@@ -1764,6 +2227,27 @@ export function useQueue(input: QueueInput): QueueView {
     };
   });
 
+  const panel = buildPanel(selectedId, {
+    byId,
+    parentOf,
+    kids,
+    conflicts,
+    boxOf,
+    mergeN,
+    statusCtx,
+    ripple,
+    rebasing,
+    pushing,
+    plan: snapshot.plan,
+    snapshot,
+    prs,
+    activity: input.activity,
+    workdayHours,
+    spanDayShare,
+    titleOfId,
+    cal,
+  });
+
   return {
     items: queueItems,
     stacks,
@@ -1777,6 +2261,7 @@ export function useQueue(input: QueueInput): QueueView {
     kids: Object.fromEntries([...kids].map(([k, v]) => [k, [...v]])),
     historyCount,
     focusDay,
+    panel,
     firstWorkDay,
     effDay: Object.fromEntries(eff),
   };

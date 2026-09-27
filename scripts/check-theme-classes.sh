@@ -378,11 +378,15 @@ check_class_all 'title-action' 'Button variant="title" size="title" (packages/th
 check_class_all 'title-action--labelled' 'Button variant="title" size="title-labelled"'
 check_class_all 'title-bar-actions' 'flex items-center gap-0.5 ml-auto wails-no-drag'
 check_class_all 'tab-new' 'inline utility classes on the new-tab button (see WorkbenchShell.vue)'
-# P110 B14: audit §3.6's alias classes, deleted from primitives.css one at a time. `mono` is a
+# P110 B14: audit §3.6's alias classes, deleted from primitives.css one at a time. `mono` was a
 # common word outside class contexts too (tokens.css's own LAW 08 prose, a stray doc comment) --
-# both were reworded to drop the bare word rather than excluding a path, so this plain check_class
-# call has zero legitimate survivors left to false-positive against.
-check_class_all 'mono' 'font-data'
+# both were reworded to drop the bare word rather than excluding a path, so the plain check_class
+# call had zero legitimate survivors left to false-positive against, at the time.
+# P129 Part 6: `QueuePanel.mono` (`useQueue.ts`) is now a real, plan-mandated field/variable name,
+# not prose -- unlike a comment, that identifier isn't something to reword away. Same fix as
+# `muted`/`dim` below: attribute-scoped, so a real `<a class="mono">` survivor still fails, but a
+# TS property or local named `mono` doesn't.
+check_class_in_attrs_all 'mono' 'font-data'
 # P110 B15: `muted` is common prose too (design-idiom comments, docs) -- uses the attribute-scoped
 # variant above instead of reworking every legitimate comment.
 check_class_in_attrs_all 'muted' 'text-muted-foreground'

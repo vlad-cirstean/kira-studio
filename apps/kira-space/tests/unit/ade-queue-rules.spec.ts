@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { prRow } from '../../frontend/src/ade/links';
 import { localIsoOfMs } from '../../frontend/src/ade/localDay';
 import { type QueueBand, type QueueSegment, useQueue } from '../../frontend/src/ade/useQueue';
 import type {
@@ -6,6 +7,7 @@ import type {
   AdeNewWork,
   AdePair,
   AdePlan,
+  AdePr,
   AdeRepoPrs,
   AdeRepoSnapshot,
   AdeSession,
@@ -359,5 +361,146 @@ describe('ade-queue-rules', () => {
     expect(stItem?.agents).toEqual([
       { sessionId: 's1', label: 'claude abcdef12', kind: 'idle', lastActiveAt: 12_345 },
     ]);
+  });
+
+  // P129 Part 6 §3.3 — the panel deviations the parity spec's own default fixture never lands on:
+  // `Rebase stack` (a design-only action, no mockup equivalent at all) across its six conditions.
+  test('9. Rebase stack shown/hidden across its six conditions', () => {
+    const stack = (overrides: {
+      rootOverrides?: Partial<AdeBranch>;
+      childOverrides?: Partial<AdeBranch>;
+    }): AdeRepoSnapshot =>
+      snapshot({
+        branches: [
+          branch({
+            id: 'r',
+            branch: 'feat/r',
+            kind: 'mine',
+            behind: 0,
+            ...overrides.rootOverrides,
+          }),
+          branch({
+            id: 'c',
+            branch: 'feat/c',
+            kind: 'mine',
+            base: 'r',
+            behind: 3,
+            ...overrides.childOverrides,
+          }),
+        ],
+      });
+
+    const hasRebaseStack = (snap: AdeRepoSnapshot): boolean =>
+      (view(snap, { selectedId: 'c' }).panel?.actions ?? []).some((a) => a.kind === 'rebaseStack');
+
+    // baseline: shows.
+    expect(hasRebaseStack(stack({}))).toBe(true);
+
+    // (a) merged.
+    expect(hasRebaseStack(stack({ childOverrides: { merged: true } }))).toBe(false);
+    // (b) not mine (review).
+    expect(hasRebaseStack(stack({ childOverrides: { kind: 'review', owner: 'them' } }))).toBe(
+      false,
+    );
+    // (c) draft (no real branch yet).
+    expect(hasRebaseStack(stack({ childOverrides: { exists: false } }))).toBe(false);
+    // (d) no parent (base main — parentOf has no entry for it).
+    expect(hasRebaseStack(stack({ childOverrides: { base: '' } }))).toBe(false);
+    // (e) not behind (nothing to rebase onto).
+    expect(hasRebaseStack(stack({ childOverrides: { behind: 0 } }))).toBe(false);
+    // (f) root not mine.
+    expect(hasRebaseStack(stack({ rootOverrides: { kind: 'review', owner: 'them' } }))).toBe(false);
+    // (g) root itself behind main — Rebase-onto-main takes over instead.
+    const rootBehind = stack({ rootOverrides: { behind: 2 } });
+    expect(hasRebaseStack(rootBehind)).toBe(false);
+    expect(
+      (view(rootBehind, { selectedId: 'c' }).panel?.actions ?? []).some(
+        (a) => a.kind === 'rebaseMain',
+      ),
+    ).toBe(true);
+  });
+
+  test('10. Start agent shows only with zero sessions ever, running or stopped', () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const hasStart = (sessions: AdeSession[]): boolean =>
+      (view(snap, { sessions, selectedId: 'a' }).panel?.actions ?? []).some(
+        (a) => a.kind === 'start',
+      );
+
+    expect(hasStart([])).toBe(true);
+    expect(hasStart([session({ id: 's1', branch: 'feat/a', state: 'stopped' })])).toBe(false);
+    expect(hasStart([session({ id: 's1', branch: 'feat/a', state: 'running' })])).toBe(false);
+  });
+
+  test('11. new-work mono line reads `no branch yet · <pos>` (design wins over the mockup order)', () => {
+    const snap = snapshot({ newWork: [newWork({ id: 'd1', title: 'Some new thing' })] });
+    const mono = view(snap, { selectedId: 'd1' }).panel?.mono;
+    expect(mono?.startsWith('no branch yet · ')).toBe(true);
+  });
+
+  test('12. Force push label: no count suffix at N=1, "(2)" at N=2', () => {
+    const one = snapshot({
+      branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })],
+      plan: plan({ unpushed: { a: true } }),
+    });
+    const oneAction = (view(one, { selectedId: 'a' }).panel?.actions ?? []).find(
+      (a) => a.kind === 'forcePush',
+    );
+    expect(oneAction?.label).toBe('Force push');
+
+    const two = snapshot({
+      branches: [
+        branch({ id: 'a', branch: 'feat/a', kind: 'mine' }),
+        branch({ id: 'b', branch: 'feat/b', kind: 'mine', base: 'a' }),
+      ],
+      plan: plan({ unpushed: { a: true, b: true } }),
+    });
+    const twoAction = (view(two, { selectedId: 'a' }).panel?.actions ?? []).find(
+      (a) => a.kind === 'forcePush',
+    );
+    expect(twoAction?.label).toBe('Force push (2)');
+  });
+
+  // P129 Part 6 §0.11/§3.3 — `prRow`'s own decision matrix (`links.ts`), direct unit coverage since
+  // no parity scenario drives every combination of a resolved PR and a pasted-over one.
+  describe('prRow', () => {
+    const resolved: AdePr = {
+      number: 42,
+      title: 'Fix the thing',
+      url: 'https://x/pull/42',
+      state: 'open',
+    };
+
+    test('resolved only: chip and title from the resolved PR', () => {
+      const r = prRow(resolved, '');
+      expect(r).toEqual({
+        url: 'https://x/pull/42',
+        number: 42,
+        chip: { label: 'Open', tone: 'green' },
+        title: 'Fix the thing',
+      });
+    });
+
+    test('pasted only: no chip, no title — just the link', () => {
+      const r = prRow(undefined, 'https://x/pull/7');
+      expect(r).toEqual({ url: 'https://x/pull/7', number: 7, chip: null, title: '' });
+    });
+
+    test('both, matching numbers: resolved chip and title still show', () => {
+      const r = prRow(resolved, 'https://x/pull/42');
+      expect(r.chip).toEqual({ label: 'Open', tone: 'green' });
+      expect(r.title).toBe('Fix the thing');
+      expect(r.url).toBe('https://x/pull/42');
+    });
+
+    test('both, differing numbers: pasted wins as a bare link, no chip/title', () => {
+      const r = prRow(resolved, 'https://x/pull/99');
+      expect(r).toEqual({ url: 'https://x/pull/99', number: 99, chip: null, title: '' });
+    });
+
+    test('neither on a review item: empty row', () => {
+      const r = prRow(undefined, '');
+      expect(r).toEqual({ url: '', number: null, chip: null, title: '' });
+    });
   });
 });
