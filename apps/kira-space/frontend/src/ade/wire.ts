@@ -41,7 +41,7 @@ export interface AdeFile {
   binary: boolean;
 }
 
-interface AdeCommit {
+export interface AdeCommit {
   sha: string;
   message: string;
 }
