@@ -14,6 +14,7 @@ import { Input } from '@theme/components/ui/input';
 import { Switch } from '@theme/components/ui/switch';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import AdeActivityIcon from './AdeActivityIcon.vue';
 import { composeDialog, type DialogCtx } from './dialogCompose';
@@ -21,11 +22,12 @@ import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
 
-// P129 Part 4 §2.7: the one dialog every opener shares (mockup lines 472-543's own markup order) —
-// archive's own risk `Alert` and `Just delete` button land in this file's own §0.16 commit; nothing
-// in Part 4's shipped UI opens an archive dialog yet (§0.8), so `view.isArchive` is always `false`
-// here for now. `ctx` is `null` while the repo's own snapshot hasn't loaded — the dialog can't have
-// been opened from a `null` view either, but the guard keeps this component's own typing honest.
+// P129 Part 4 §2.7: the one dialog every opener shares (mockup lines 472-543's own markup order).
+// `view.isArchive` only turns `true` once `adeActionsStore.requestArchive` opens this dialog
+// (§0.16) — Part 4's shipped UI has no button that calls it yet (§0.8), so this branch is
+// parity/flow-tested but not yet end-to-end reachable; Part 5 adds the caller. `ctx` is `null`
+// while the repo's own snapshot hasn't loaded — the dialog can't have been opened from a `null`
+// view either, but the guard keeps this component's own typing honest.
 const props = defineProps<{ codeRepoId: string; ctx: DialogCtx | null }>();
 
 const adeUiStore = useAdeUiStore();
@@ -91,6 +93,12 @@ function onPickTarget(index: number, choice: string): void {
 function onPickWorktree(wt: string): void {
   if (wt === 'same' || wt === 'new') adeUiStore.pickWorktree(wt);
 }
+
+function onJustDelete(): void {
+  const item = adeUiStore.dialog?.spec.branch;
+  if (!props.ctx || !item) return;
+  void adeActionsStore.justDelete(props.codeRepoId, item, props.ctx);
+}
 </script>
 
 <template>
@@ -127,6 +135,10 @@ function onPickWorktree(wt: string): void {
               </Button>
             </div>
           </AlertDescription>
+        </Alert>
+
+        <Alert v-if="view.isArchive" variant="destructive" data-testid="ade-dialog-risk">
+          <AlertDescription>{{ view.riskText }}</AlertDescription>
         </Alert>
 
         <Input
@@ -204,6 +216,21 @@ function onPickWorktree(wt: string): void {
       </div>
 
       <DialogFooter>
+        <Tooltip v-if="view.isArchive">
+          <TooltipTrigger as-child>
+            <Button
+              variant="dialog-danger"
+              size="kira-lg"
+              data-testid="ade-dialog-just-delete"
+              @click="onJustDelete"
+            >
+              Just delete
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            Skip Claude: delete the worktree now; uncommitted changes are lost
+          </TooltipContent>
+        </Tooltip>
         <span class="ml-auto flex items-center gap-1">
           <Button variant="dialog" size="kira-lg" data-testid="ade-dialog-cancel" @click="onCancel">
             Cancel

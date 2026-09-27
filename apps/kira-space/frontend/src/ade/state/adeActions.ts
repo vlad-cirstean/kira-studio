@@ -1,18 +1,29 @@
+import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { reactive, ref, watch } from 'vue';
 import { useTerminalsStore } from '../../state/terminals';
 import type { DialogCtx } from '../dialogCompose';
-import { sendDialog as runSendDialog } from '../dialogFlow';
+import {
+  justDeleteArchive as runJustDeleteArchive,
+  requestArchive as runRequestArchive,
+  sendDialog as runSendDialog,
+  type SendDialogDeps,
+} from '../dialogFlow';
 import type { LaunchDeps } from '../launch';
-import { useAdeLaunch, useAdeSend, useAdeSetQueuedAfter, useAdeUpdateNewWork } from '../mutations';
+import {
+  fetchArchiveRisk,
+  useAdeArchive,
+  useAdeLaunch,
+  useAdeSend,
+  useAdeSetQueuedAfter,
+  useAdeUpdateNewWork,
+} from '../mutations';
 import { adeTurns } from '../turnWatch';
 import { useAdeUiStore } from './adeUi';
 import { useAgentSessionsStore } from './agentSessions';
 
 // P129 Part 4 §2.1/§2.5: in-flight agent actions — a separate concern from `adeUi`'s own dialog
-// state (CLAUDE.md's own Pinia rule: one store, one concern). Archive's own fields
-// (`pendingArchive`, `actionError`) and actions (`requestArchive`, `justDelete`) land in this
-// file's own §0.16 commit.
+// state (CLAUDE.md's own Pinia rule: one store, one concern).
 export const useAdeActionsStore = defineStore('adeActions', () => {
   const adeUiStore = useAdeUiStore();
   const agentSessionsStore = useAgentSessionsStore();
@@ -20,6 +31,21 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
 
   const rebasing = reactive(new Map<string, Set<string>>());
   const EMPTY_ROOTS: ReadonlySet<string> = new Set();
+
+  // §0.16/§2.5: `pendingArchive` keyed `repo:item` (bookkeeping only — no queue status reads it,
+  // design names none); `actionError` keyed by repo, a *background* failure surfacing after the
+  // dialog that started it already closed (§0.17) — `AdeRepoView` renders it as a dismissible
+  // Alert under the `main` line.
+  const pendingArchive = reactive(new Map<string, string>());
+  const actionError = reactive(new Map<string, string>());
+
+  function pendingKey(repo: string, item: string): string {
+    return `${repo}:${item}`;
+  }
+
+  function dismissError(repo: string): void {
+    actionError.delete(repo);
+  }
 
   /** `useQueue`'s own `rebasing` input (Part 3 §0.8) — one repo's slice of the in-flight set. */
   function rebasingFor(repo: string): ReadonlySet<string> {
@@ -57,6 +83,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const launchMutation = useAdeLaunch(currentRepoId);
   const setQueuedAfterMutation = useAdeSetQueuedAfter(currentRepoId);
   const updateNewWorkMutation = useAdeUpdateNewWork(currentRepoId);
+  const archiveMutation = useAdeArchive(currentRepoId);
 
   function buildLaunchDeps(): LaunchDeps {
     return {
@@ -68,37 +95,66 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     };
   }
 
+  /** One `SendDialogDeps` builder for every `dialogFlow.ts` entry point (`sendDialog`,
+   *  `requestArchive`, `justDelete`) — `currentRepoId` retargets the shared mutations first, same
+   *  as the pre-archive `sendDialog` did inline. */
+  function buildDeps(repoId: string, ctx: DialogCtx): SendDialogDeps {
+    currentRepoId.value = repoId;
+    return {
+      ctx,
+      launch: buildLaunchDeps(),
+      turns: { watch: adeTurns.watch },
+      setQueuedAfter: (args) => setQueuedAfterMutation.mutateAsync(args),
+      updateNewWork: (args) => updateNewWorkMutation.mutateAsync(args),
+      rebasing: {
+        add: (root) => addRebasing(repoId, root),
+        remove: (root) => removeRebasing(repoId, root),
+      },
+      dropRoots: (sent) => adeUiStore.dropRoots(sent),
+      setError: (message) => adeUiStore.setError(message),
+      closeDialog: () => adeUiStore.closeDialog(),
+      archive: (args) =>
+        archiveMutation.mutateAsync({ codeRepoId: repoId, item: args.item, discard: args.discard }),
+      fetchArchiveRisk: async (item) => {
+        const risk = await fetchArchiveRisk(queryClient, repoId, item);
+        return {
+          dirty: risk.dirty.map((d) => d.path),
+          unmerged: risk.unmerged,
+          worktree: risk.worktree,
+          blocked: risk.blocked,
+        };
+      },
+      openDialog: (spec) => adeUiStore.openDialog(spec),
+      setPendingArchive: (item, terminalId) =>
+        pendingArchive.set(pendingKey(repoId, item), terminalId),
+      clearPendingArchive: (item) => pendingArchive.delete(pendingKey(repoId, item)),
+      setActionError: (message) => actionError.set(repoId, message),
+    };
+  }
+
   /** The dialog's own Send button (`AdeClaudeDialog.vue`), given the repo it opened for and the
    *  `DialogCtx` the repo view's own `useDialogContext` built. Reads `adeUi.dialog` for the spec
    *  and scratch state — the same object the dialog's own view rendered from. */
   async function sendDialog(repoId: string, ctx: DialogCtx): Promise<void> {
     const dialog = adeUiStore.dialog;
     if (!dialog) return;
-    currentRepoId.value = repoId;
-    await runSendDialog(
-      {
-        ctx,
-        launch: buildLaunchDeps(),
-        turns: { watch: adeTurns.watch },
-        setQueuedAfter: (args) => setQueuedAfterMutation.mutateAsync(args),
-        updateNewWork: (args) => updateNewWorkMutation.mutateAsync(args),
-        rebasing: {
-          add: (root) => addRebasing(repoId, root),
-          remove: (root) => removeRebasing(repoId, root),
-        },
-        dropRoots: (sent) => adeUiStore.dropRoots(sent),
-        setError: (message) => adeUiStore.setError(message),
-        closeDialog: () => adeUiStore.closeDialog(),
-      },
-      dialog.spec,
-      {
-        msg: dialog.msg,
-        push: dialog.push,
-        override: dialog.override,
-        branchName: dialog.branchName,
-      },
-    );
+    await runSendDialog(buildDeps(repoId, ctx), dialog.spec, {
+      msg: dialog.msg,
+      push: dialog.push,
+      override: dialog.override,
+      branchName: dialog.branchName,
+    });
   }
 
-  return { rebasingFor, sendDialog };
+  /** §0.16's own initial "Archive" click — before any dialog. */
+  async function requestArchive(repoId: string, item: string, ctx: DialogCtx): Promise<void> {
+    await runRequestArchive(buildDeps(repoId, ctx), item);
+  }
+
+  /** §0.16 "Just delete" footer button. */
+  async function justDelete(repoId: string, item: string, ctx: DialogCtx): Promise<void> {
+    await runJustDeleteArchive(buildDeps(repoId, ctx), item);
+  }
+
+  return { rebasingFor, sendDialog, requestArchive, justDelete, actionError, dismissError };
 });

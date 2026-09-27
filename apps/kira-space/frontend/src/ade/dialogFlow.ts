@@ -1,4 +1,5 @@
 import {
+  archiveSpec,
   type DialogCtx,
   type DialogSpec,
   type DialogState,
@@ -11,10 +12,18 @@ import { type DeliverTarget, deliver, type LaunchDeps } from './launch';
 import type { TurnOutcome, TurnWatch } from './turnWatch';
 
 // P129 Part 4 §0.12/§2.1: the Send button's own per-kind delivery — deps injected (mutations,
-// `adeTurns`, `adeUi`/`adeActions` writers) so this stays testable with fake deps, no Vue. Archive's
-// own send path (`Send to Claude, then archive`, §0.16) lands in this file's own next commit
-// (`requestArchive`/`onArchiveTurn`) — Part 4's shipped UI opens no archive dialog (§0.8), so
-// `sendDialog`'s archive branch here is unreached until that commit wires it in.
+// `adeTurns`, `adeUi`/`adeActions` writers) so this stays testable with fake deps, no Vue.
+
+/** §0.16's own risk shape (`archiveSpec`'s own `risk` param, minus `blocked` — that field only
+ *  matters to `requestArchive`/`onArchiveTurn` below, never to the dialog itself). Kept local
+ *  rather than importing `wire.ts`'s `AdeArchiveRisk` — this file never needs its `AdeDirty[]`
+ *  shape, only the path strings the templates and the dialog actually read. */
+export interface ArchiveRisk {
+  dirty: string[];
+  unmerged: number;
+  worktree: string;
+  blocked?: string;
+}
 
 export interface SendDialogDeps {
   ctx: DialogCtx;
@@ -30,8 +39,35 @@ export interface SendDialogDeps {
    *  slice bound in by the store's own thin wrapper). */
   rebasing: { add: (root: string) => void; remove: (root: string) => void };
   dropRoots: (sentIds: string[]) => void;
+  /** In-dialog failure (Send, launch, UpdateNewWork, Just delete, §0.17) — shown while the dialog
+   *  stays open. Distinct from `setActionError`, which is a *background* failure surfacing after
+   *  the dialog already closed. */
   setError: (message: string) => void;
   closeDialog: () => void;
+  /** §0.16: archive-only deps. One deps object covers every entry point in this file
+   *  (`sendDialog`, `requestArchive`, `justDeleteArchive`) — most of these go unused outside the
+   *  archive kind, but building one object keeps the store's own wiring in one place. */
+  archive: (args: { item: string; discard: boolean }) => Promise<void>;
+  fetchArchiveRisk: (item: string) => Promise<ArchiveRisk>;
+  openDialog: (spec: DialogSpec) => void;
+  setPendingArchive: (item: string, terminalId: string) => void;
+  clearPendingArchive: (item: string) => void;
+  setActionError: (message: string) => void;
+}
+
+/** §0.16 step 2: `AdeArchiveRisk.blocked`'s own kind (`gitpreflight.WorktreeRemoveBlocker.Kind`) to
+ *  a short reason; an unrecognized kind falls back to itself verbatim (plan's own "raw kind as
+ *  fallback"). */
+const BLOCKED_REASON: Record<string, string> = {
+  notAWorktree: 'not a worktree',
+  mainWorktree: 'the main worktree',
+  currentWorktree: 'the worktree Space itself is open in',
+  openInAnotherWindow: 'open in another window',
+  locked: 'locked',
+};
+
+function blockedMessage(kind: string): string {
+  return BLOCKED_REASON[kind] ?? kind;
 }
 
 function errMessage(err: unknown): string {
@@ -102,8 +138,8 @@ async function sendRebaseOrQueue(
     const choice = tg ? resolvedChoice(deps.ctx, tg) : 'new';
     const message = messageForRoot(deps.ctx, spec, root, state);
     const target = buildDeliverTarget(deps.ctx, root, choice, message);
+    let watch: TurnWatch | null = null;
     try {
-      let watch: TurnWatch | null = null;
       await deliver(deps.launch, target, (terminalId, requireSubmit) => {
         watch = deps.turns.watch(terminalId, { requireSubmit });
       });
@@ -117,6 +153,12 @@ async function sendRebaseOrQueue(
       }
       void (watch as TurnWatch | null)?.done.then(() => deps.rebasing.remove(root));
     } catch (err) {
+      // `deliver`'s own `onArmed` fires before the failure-prone call (`Send`, or the
+      // status-check after `openTerminalSession`), so a watch can already be armed for the very
+      // delivery that just failed — cancel it, or its `.done` never resolves and leaks forever.
+      // The cast defeats TS narrowing `watch` to `never`: it can't see the closure above (passed
+      // to `deliver`) as the thing that assigns it.
+      (watch as TurnWatch | null)?.cancel();
       for (const r of roots) if (!sentIds.includes(r)) deps.rebasing.remove(r);
       deps.dropRoots(sentIds);
       deps.setError(errMessage(err));
@@ -207,6 +249,118 @@ async function sendMove(deps: SendDialogDeps, spec: DialogSpec, state: DialogSta
   }
 }
 
+/** §0.16 "Send to Claude, then archive" background half — runs once the watched turn settles,
+ *  after the dialog has already closed. `'ended'` (session ended before any `Stop`) surfaces
+ *  directly; nothing to retry against. `'stop'` attempts the real archive; a failure re-fetches
+ *  risk rather than branching on Archive's own error code or message: measured against the current
+ *  Go implementation, the dirty-worktree rejection (`checkWorktreeRemovable`) is a plain error
+ *  routed to `E_INTERNAL`, the same code every other `Archive` failure gets — there is no
+ *  `E_INVALID`/`atRisk` signal on the wire to match against (the plan's own assumption doesn't
+ *  hold here). So: still-at-risk after the failed attempt means "Claude left changes" (reopen with
+ *  fresh risk, same target choice); no risk left means a genuine other failure (`actionError`). */
+async function onArchiveTurn(
+  deps: SendDialogDeps,
+  item: string,
+  outcome: TurnOutcome,
+  choice: string,
+): Promise<void> {
+  deps.clearPendingArchive(item);
+  if (outcome === 'ended') {
+    deps.setActionError("Claude's session ended before archiving; archive again when ready");
+    return;
+  }
+  try {
+    await deps.archive({ item, discard: false });
+  } catch (err) {
+    let risk: ArchiveRisk;
+    try {
+      risk = await deps.fetchArchiveRisk(item);
+    } catch {
+      deps.setActionError(errMessage(err));
+      return;
+    }
+    if (risk.dirty.length > 0 || risk.unmerged > 0) {
+      const spec = archiveSpec(deps.ctx, item, risk);
+      const tg = spec.targets.find((t) => t.item === item);
+      if (tg) tg.choice = choice;
+      deps.openDialog(spec);
+      return;
+    }
+    deps.setActionError(errMessage(err));
+  }
+}
+
+/** §0.16 "Send to Claude, then archive" — the archive dialog's own Send button. Delivers to the
+ *  resolved target, closes, and watches the turn in the background (`onArchiveTurn`, not awaited
+ *  here) — mirrors `sendRebaseOrQueue`'s own fire-and-forget `.done.then(...)`. */
+async function sendArchive(
+  deps: SendDialogDeps,
+  spec: DialogSpec,
+  state: DialogState,
+): Promise<void> {
+  const message = deliveredMessage(deps.ctx, spec, state);
+  const itemId = spec.branch as string;
+  const tg = targetFor(spec, itemId);
+  const choice = tg ? resolvedChoice(deps.ctx, tg) : 'new';
+  const target = buildDeliverTarget(deps.ctx, itemId, choice, message);
+  let watch: TurnWatch | null = null;
+  try {
+    await deliver(deps.launch, target, (terminalId, requireSubmit) => {
+      watch = deps.turns.watch(terminalId, { requireSubmit });
+      deps.setPendingArchive(itemId, terminalId);
+    });
+    deps.closeDialog();
+    void (watch as TurnWatch | null)?.done.then((outcome: TurnOutcome) =>
+      onArchiveTurn(deps, itemId, outcome, choice),
+    );
+  } catch (err) {
+    // Same leak risk as `sendRebaseOrQueue`'s own catch, plus the same narrowing cast — `onArmed`
+    // may have already recorded a pending archive and armed a watch for the delivery that just
+    // failed.
+    (watch as TurnWatch | null)?.cancel();
+    deps.clearPendingArchive(itemId);
+    deps.setError(errMessage(err));
+  }
+}
+
+/** §0.16 steps 1-4: the initial "Archive" click, before any dialog exists yet — so a failure here
+ *  (the risk fetch itself, a blocked reason, or a direct no-risk archive) has no open dialog to
+ *  show it in and goes straight to `actionError`. Nothing at risk archives directly (mockup's own
+ *  `requestArchive`); otherwise opens the at-risk dialog with the fetched risk. */
+export async function requestArchive(deps: SendDialogDeps, item: string): Promise<void> {
+  let risk: ArchiveRisk;
+  try {
+    risk = await deps.fetchArchiveRisk(item);
+  } catch (err) {
+    deps.setActionError(errMessage(err));
+    return;
+  }
+  if (risk.blocked) {
+    deps.setActionError(`Can't archive: ${blockedMessage(risk.blocked)}`);
+    return;
+  }
+  if (risk.dirty.length === 0 && risk.unmerged === 0) {
+    try {
+      await deps.archive({ item, discard: false });
+    } catch (err) {
+      deps.setActionError(errMessage(err));
+    }
+    return;
+  }
+  deps.openDialog(archiveSpec(deps.ctx, item, risk));
+}
+
+/** §0.16 "Just delete" footer button — an in-dialog failure (§0.17: this one shows inside the
+ *  still-open dialog, not `actionError` — the user is still looking right at it). */
+export async function justDeleteArchive(deps: SendDialogDeps, item: string): Promise<void> {
+  try {
+    await deps.archive({ item, discard: true });
+    deps.closeDialog();
+  } catch (err) {
+    deps.setError(errMessage(err));
+  }
+}
+
 /** The dialog's own Send button — dispatches on `spec.kind`. */
 export async function sendDialog(
   deps: SendDialogDeps,
@@ -216,7 +370,7 @@ export async function sendDialog(
   if (spec.kind === 'rebase' || spec.kind === 'queue') return sendRebaseOrQueue(deps, spec, state);
   if (spec.kind === 'move') return sendMove(deps, spec, state);
   if (spec.kind === 'start') return sendStart(deps, spec, state);
-  throw new Error("sendDialog: 'archive' send path lands in this file's own §0.16 commit");
+  return sendArchive(deps, spec, state);
 }
 
 export type { TurnOutcome };

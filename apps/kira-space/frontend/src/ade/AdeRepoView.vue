@@ -94,6 +94,14 @@ function onRebaseAll(): void {
   if (!ctx) return;
   adeUiStore.openDialog(rebaseAllSpec(ctx));
 }
+
+// §0.17: a background failure (archive after Stop, blocked, ended) surfaces here, under the
+// `main` line — Space has no toast system, and by the time these land the dialog that started
+// them is already closed.
+const actionError = computed(() => adeActionsStore.actionError.get(props.codeRepoId) ?? null);
+function onDismissError(): void {
+  adeActionsStore.dismissError(props.codeRepoId);
+}
 </script>
 
 <template>
@@ -125,6 +133,19 @@ function onRebaseAll(): void {
           @rebase-all="onRebaseAll"
         />
       </div>
+      <Alert
+        v-if="actionError"
+        variant="destructive"
+        class="mx-4 my-2"
+        data-testid="ade-action-error"
+      >
+        <AlertDescription class="flex items-center gap-2">
+          <span class="flex-1">{{ actionError }}</span>
+          <Button variant="link" size="sm" data-testid="ade-action-error-dismiss" @click="onDismissError">
+            Dismiss
+          </Button>
+        </AlertDescription>
+      </Alert>
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />
   </div>
