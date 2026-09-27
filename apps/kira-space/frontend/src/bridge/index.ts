@@ -34,13 +34,21 @@ import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type {
+  AdeArchiveArgs,
+  AdeArchiveRisk,
   AdeCredentialRequest,
+  AdeItemArgs,
+  AdeLaunch,
   AdePr,
+  AdePrepareLaunchArgs,
   AdeRefreshResult,
   AdeRepoChangedEvent,
   AdeRepoPrs,
   AdeRepoSnapshot,
+  AdeSendArgs,
   AdeSessionsResult,
+  AdeSetQueuedAfterArgs,
+  AdeUpdateNewWorkArgs,
 } from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
@@ -70,6 +78,12 @@ function normalizeAdeRepoSnapshot(raw: AdeRepoSnapshot): AdeRepoSnapshot {
       conflicts: p.conflicts ?? [],
     })),
   };
+}
+
+/** P129 Part 4 §2.3: `ArchiveRisk`'s own `dirty` follows the same straight-passthrough shape as the
+ *  snapshot's own plan/colors/pairs fields above — normalized here, once. */
+function normalizeAdeArchiveRisk(raw: AdeArchiveRisk): AdeArchiveRisk {
+  return { ...raw, dirty: raw.dirty ?? [] };
 }
 
 function normalizeAdeRepoPrs(raw: AdeRepoPrs): AdeRepoPrs {
@@ -205,6 +219,22 @@ const spaceControl = {
   onAdeRepo: (cb: (event: AdeRepoChangedEvent) => void): (() => void) => on(CHANNEL.adeRepo, cb),
   onAdeCredential: (cb: (request: AdeCredentialRequest) => void): (() => void) =>
     on(CHANNEL.adeCredential, cb),
+
+  // P129 Part 4 §2.3: the six remaining `AdeService` members this part consumes (launch, delivery,
+  // archive-at-risk, archive, queue placement, new-work branch name) — `ForcePush` stays unbound
+  // (§0.6, Part 5's own first caller).
+  adePrepareLaunch: (args: AdePrepareLaunchArgs): Promise<AdeLaunch> =>
+    unwrap(AdeService.PrepareLaunch(args)).then((r) => trust<AdeLaunch>(r)),
+  adeSend: (args: AdeSendArgs): Promise<void> => unwrap(AdeService.Send(args)),
+  adeArchiveRisk: (args: AdeItemArgs): Promise<AdeArchiveRisk> =>
+    unwrap(AdeService.ArchiveRisk(args)).then((r) =>
+      normalizeAdeArchiveRisk(trust<AdeArchiveRisk>(r)),
+    ),
+  adeArchive: (args: AdeArchiveArgs): Promise<void> => unwrap(AdeService.Archive(args)),
+  adeSetQueuedAfter: (args: AdeSetQueuedAfterArgs): Promise<void> =>
+    unwrap(AdeService.SetQueuedAfter(args)),
+  adeUpdateNewWork: (args: AdeUpdateNewWorkArgs): Promise<void> =>
+    unwrap(AdeService.UpdateNewWork(args)),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

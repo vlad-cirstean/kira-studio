@@ -163,7 +163,7 @@ function projectOurView(view: ReturnType<typeof composeDialog>) {
     overridden: view.overridden,
     busyTitle: view.busyTitle,
     overrideLabel: view.overrideLabel,
-    busy: view.busy,
+    busy: view.busy.map((b) => ({ text: b.text })),
     sendLabel: view.sendLabel,
     isDraft: view.isDraft,
     canPush: view.canPush,

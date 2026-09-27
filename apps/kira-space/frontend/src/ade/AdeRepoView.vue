@@ -5,19 +5,27 @@ import { useIntervalFn } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useSettingsStore } from '../state/settings';
+import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import AdeMainLine from './AdeMainLine.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
+import { type DialogCtx, rebaseAllSpec } from './dialogCompose';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
+import { useAdeActionsStore } from './state/adeActions';
+import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
 import { useQueue } from './useQueue';
 
 // P129 Part 3 §2.7: queries for its own repo, `computed(() => useQueue({...}))`, sticky header and
-// `main` line — nothing below them in Part 3, the timeline is Part 5's.
+// `main` line — nothing below them in Part 3, the timeline is Part 5's. P129 Part 4 §2.7 adds:
+// `rebasing` into `useQueue`, the `AdeClaudeDialog` mount and its own `useDialogContext`, and
+// Rebase all wired from `AdeMainLine`.
 const props = defineProps<{ codeRepoId: string }>();
 
 const codeReposStore = useCodeReposStore();
 const settingsStore = useSettingsStore();
 const agentSessionsStore = useAgentSessionsStore();
+const adeUiStore = useAdeUiStore();
+const adeActionsStore = useAdeActionsStore();
 
 const snapshotQuery = useAdeSnapshot(() => props.codeRepoId);
 const prsQuery = useAdePrs(() => props.codeRepoId);
@@ -54,8 +62,38 @@ const view = computed(() => {
     prs: prsQuery.data.value,
     settings: settingsStore.ade,
     today: today.value,
+    rebasing: adeActionsStore.rebasingFor(props.codeRepoId),
   });
 });
+
+// §2.7: built once here, read by both the Rebase all opener below and `AdeClaudeDialog`'s own
+// `composeDialog` call (passed down as a prop) — `null` until the snapshot/queue view are loaded,
+// same guard `view` above already has.
+const dialogCtx = computed<DialogCtx | null>(() => {
+  const snapshot = snapshotQuery.data.value;
+  const queueView = view.value;
+  if (!snapshot || !queueView) return null;
+  return {
+    view: queueView,
+    snapshot,
+    sessions: repoSessions.value,
+    today: today.value,
+    repoRoot: codeReposStore.codeRepoRecord(props.codeRepoId)?.root ?? '',
+  };
+});
+
+// §0.20: shown iff there's a behind root to rebase and this repo has nothing already in flight.
+const canRebaseAll = computed(
+  () =>
+    (view.value?.behindRoots.length ?? 0) > 0 &&
+    adeActionsStore.rebasingFor(props.codeRepoId).size === 0,
+);
+
+function onRebaseAll(): void {
+  const ctx = dialogCtx.value;
+  if (!ctx) return;
+  adeUiStore.openDialog(rebaseAllSpec(ctx));
+}
 </script>
 
 <template>
@@ -83,8 +121,11 @@ const view = computed(() => {
         <AdeMainLine
           :main-name="snapshotQuery.data.value.main?.name ?? null"
           :behind-count="view?.behindRoots.length ?? 0"
+          :can-rebase-all="canRebaseAll"
+          @rebase-all="onRebaseAll"
         />
       </div>
     </template>
+    <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />
   </div>
 </template>

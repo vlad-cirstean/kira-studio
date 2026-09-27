@@ -1,0 +1,107 @@
+import type { QueryClient } from '@tanstack/vue-query';
+import { useMutation } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
+import type { MaybeRefOrGetter } from 'vue';
+import { toValue } from 'vue';
+import { control } from '../bridge/control';
+import { adePrsKey, adeSessionsKey, adeSnapshotKey } from './queries';
+import type {
+  AdeArchiveArgs,
+  AdeArchiveRisk,
+  AdeLaunch,
+  AdePrepareLaunchArgs,
+  AdeSendArgs,
+  AdeSetQueuedAfterArgs,
+  AdeUpdateNewWorkArgs,
+} from './wire';
+
+// P129 Part 4 §2.4: the TanStack layer over the six §2.3 control members, plus the archive-risk
+// fetch. `mutationFn` wraps one raw RPC each (Part 3's own `useAdeRefresh` shape) — delivery
+// *sequencing* (arming the turn watcher, per-root ordering, the draft's `UpdateNewWork`-before-
+// launch step) is `dialogFlow.ts`'s own job, injected these mutations' `mutateAsync` as plain
+// deps (`launch.ts`'s `LaunchDeps`, `dialogFlow.ts`'s `SendDialogDeps`) so it stays testable
+// without Vue. Every mutation's key is prefixed `['ade','deliver',repo]` so the dialog's Send
+// button can read one shared `useIsMutating` pending state across all of them (§2.4).
+
+function adeArchiveRiskKey(codeRepoId: string, item: string) {
+  return ['ade', 'archiveRisk', codeRepoId, item] as const;
+}
+
+/** Always fresh (`staleTime: 0`, §0.16 step 1) — a stale risk read could miss changes an agent just
+ *  made. The key still lets Part 6's header read the same cache entry once it lands. */
+export function fetchArchiveRisk(
+  qc: QueryClient,
+  codeRepoId: string,
+  item: string,
+): Promise<AdeArchiveRisk> {
+  return qc.fetchQuery({
+    queryKey: adeArchiveRiskKey(codeRepoId, item),
+    queryFn: (): Promise<AdeArchiveRisk> => control.adeArchiveRisk({ codeRepoId, item }),
+    staleTime: 0,
+  });
+}
+
+/** `['ade','deliver',repo]`'s own shared prefix (§2.4) — every mutation below nests one more
+ *  segment under it, so `useIsMutating({ mutationKey: ['ade','deliver',repo] })` (a fuzzy prefix
+ *  match, TanStack's own default) catches every one of them for that repo. */
+function deliverKey(codeRepoId: string, kind: string) {
+  return ['ade', 'deliver', codeRepoId, kind] as const;
+}
+
+export function useAdeSend(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'send'),
+    mutationFn: (args: AdeSendArgs): Promise<void> => control.adeSend(args),
+  }));
+}
+
+/** PrepareLaunch only — `launch.ts`'s own `deliver()` calls `terminalsStore.openTerminalSession`
+ *  itself right after, outside any mutation (a Pinia store action, not a cached RPC), so it can arm
+ *  the turn watcher in the gap between the two (§0.15). */
+export function useAdeLaunch(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'launch'),
+    mutationFn: (args: AdePrepareLaunchArgs): Promise<AdeLaunch> => control.adePrepareLaunch(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: adeSessionsKey, exact: true });
+    },
+  }));
+}
+
+export function useAdeArchive(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'archive'),
+    mutationFn: (args: AdeArchiveArgs): Promise<void> => control.adeArchive(args),
+    onSettled: () => {
+      const id = toValue(codeRepoId);
+      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+      void queryClient.invalidateQueries({ queryKey: adePrsKey(id), exact: true });
+    },
+  }));
+}
+
+export function useAdeSetQueuedAfter(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'setQueuedAfter'),
+    mutationFn: (args: AdeSetQueuedAfterArgs): Promise<void> => control.adeSetQueuedAfter(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+export function useAdeUpdateNewWork(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'updateNewWork'),
+    mutationFn: (args: AdeUpdateNewWorkArgs): Promise<void> => control.adeUpdateNewWork(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}

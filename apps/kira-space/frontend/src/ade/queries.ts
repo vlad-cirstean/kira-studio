@@ -7,6 +7,7 @@ import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
 import { useAdeUiStore } from './state/adeUi';
+import { adeTurns } from './turnWatch';
 import type { AdeRefreshResult, AdeRepoPrs, AdeRepoSnapshot, AdeSessionsResult } from './wire';
 
 // P129 Part 3 §0.11/§2.4: query keys follow queryClient.ts's flat `[domain, ...ids]` convention,
@@ -15,13 +16,15 @@ import type { AdeRefreshResult, AdeRepoPrs, AdeRepoSnapshot, AdeSessionsResult }
 // below): a missing invalidation should surface as a bug, not hide behind remount churn, and a
 // snapshot read is real git work per repo tab switch (§0.11's own reasoning).
 
-const adeSessionsKey = ['ade', 'sessions'] as const;
+// P129 Part 4 §2.4: exported so `mutations.ts`'s own `onSettled` invalidations target the exact
+// same keys these queries read — one key shape, never a second copy to drift out of sync.
+export const adeSessionsKey = ['ade', 'sessions'] as const;
 
-function adeSnapshotKey(codeRepoId: string) {
+export function adeSnapshotKey(codeRepoId: string) {
   return ['ade', 'snapshot', codeRepoId] as const;
 }
 
-function adePrsKey(codeRepoId: string) {
+export function adePrsKey(codeRepoId: string) {
   return ['ade', 'prs', codeRepoId] as const;
 }
 
@@ -127,6 +130,9 @@ export function installAdeSignals(queryClient: QueryClient): void {
   // linked-worktree dirty state Claude's edits leave behind) — the repo is looked up in the cached
   // `['ade','sessions']` data, never a second round trip.
   control.onAgentEvent((event) => {
+    // P129 Part 4 §0.15: every delivered-prompt watch (`adeActions`'s `sendDialog`/archive flow)
+    // shares this one subscription — `main.ts` stays unchanged (§0.15's own no-new-wiring rule).
+    adeTurns.onEvent(event);
     if (event.event !== 'Stop') return;
     const sessions = queryClient.getQueryData<AdeSessionsResult>(adeSessionsKey)?.sessions ?? [];
     const session = sessions.find((s) => s.terminalId === event.terminalId);

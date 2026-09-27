@@ -66,7 +66,7 @@ export interface DialogView {
   overridden: boolean;
   overrideLabel: string;
   busyTitle: string;
-  busy: { text: string }[];
+  busy: { text: string; kind: ActivityKind }[];
   message: string;
   edited: boolean;
   /** §0.14 step 12: a blank (trimmed) message disables Send — real-delivery guard the mockup
@@ -544,8 +544,11 @@ function startExistingLines(ctx: DialogCtx, spec: DialogSpec): string[] {
 // §0.10-§0.11: composeDialog
 // -------------------------------------------------------------------------------------------------
 
-/** The unedited template, per kind (mockup's own `lines` construction, lines 1664-1710). */
-function templateFor(ctx: DialogCtx, spec: DialogSpec, state: DialogState): string {
+/** The unedited template, per kind (mockup's own `lines` construction, lines 1664-1710). Exported
+ *  for `dialogFlow.ts`'s send-path: a start/move dialog's delivered message is always this template
+ *  (or the user's edited `msg`) for its one target — reusing this avoids duplicating the per-kind
+ *  dispatch `composeDialog` already encodes, and avoids misusing `messageForRoot` (rebase/queue only). */
+export function templateFor(ctx: DialogCtx, spec: DialogSpec, state: DialogState): string {
   if (spec.kind === 'rebase' || spec.kind === 'queue')
     return composeRebaseMessage(ctx, spec, state.push);
   if (spec.kind === 'archive') return archiveLines(ctx, spec).join('\n');
@@ -561,8 +564,8 @@ function busyListFor(
   ctx: DialogCtx,
   spec: DialogSpec,
   activity: ReadonlyMap<string, AgentActivity>,
-): { text: string }[] {
-  const busyList: { text: string }[] = [];
+): { text: string; kind: ActivityKind }[] {
+  const busyList: { text: string; kind: ActivityKind }[] = [];
   if (spec.kind !== 'rebase' && spec.kind !== 'queue') return busyList;
   for (const id of spec.ids ?? spec.roots ?? []) {
     const branch = branchOf(ctx, id);
@@ -572,6 +575,7 @@ function busyListFor(
       if (kind === 'working' || kind === 'waiting') {
         busyList.push({
           text: `${branch.branch} · ${sessionLabel(session)} · ${ACTIVITY_LABEL[kind]}`,
+          kind,
         });
       }
     }
@@ -601,8 +605,20 @@ function sendLabelFor(spec: DialogSpec, busyCount: number, override: boolean): s
   return 'Send to Claude';
 }
 
+/** §0.11/§0.14: the actual resolved choice for one target — a running session's own id, or `'new'`.
+ *  A stored `choice` no longer among the item's current running sessions falls back to the first
+ *  running option, else `'new'`. The single source of truth `targetsFor`'s own display reads and
+ *  `dialogFlow.ts`'s delivery both defer to, so a display fallback and an actual delivery target
+ *  can never disagree. */
+export function resolvedChoice(ctx: DialogCtx, tg: DialogTarget): string {
+  const running = runningSessionsForItem(ctx, tg.item);
+  if (!running.length) return 'new';
+  return running.some((s) => s.id === tg.choice) ? tg.choice : (running[0] as AdeSession).id;
+}
+
 /** §0.11: `options` recompute live off the item's current running sessions, else a lone `'new
- *  session'`; a stored `choice` no longer among them falls back to the first option. */
+ *  session'`; a stored `choice` no longer among them falls back to the first option
+ *  (`resolvedChoice`). */
 function targetsFor(ctx: DialogCtx, spec: DialogSpec): DialogTargetView[] {
   const rawTargets = spec.draft
     ? []
@@ -614,9 +630,7 @@ function targetsFor(ctx: DialogCtx, spec: DialogSpec): DialogTargetView[] {
     const opts = running.length
       ? running.map((s) => ({ id: s.id, label: sessionLabel(s) }))
       : [{ id: 'new', label: 'new session' }];
-    const chosenId = opts.some((o) => o.id === tg.choice)
-      ? tg.choice
-      : (opts[0] as (typeof opts)[number]).id;
+    const chosenId = resolvedChoice(ctx, tg);
     return {
       title: titleOfItem(ctx, tg.item),
       branch: branchNameOf(ctx, tg.item),

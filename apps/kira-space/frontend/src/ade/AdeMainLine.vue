@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
 import { computed } from 'vue';
 
 // P129 Part 3 §0.17/§2.7: mockup lines 96-105's own geometry (60px ruler gutter, 218px offset, a
 // 560px-max 30px pill) — kept exact so Part 4's "Rebase all" button and Part 5's timeline slot into
-// the same row/gutter without a relayout. Part 3 itself renders name and note only; "Rebase all" is
-// wired by Part 4 (its own row), never a disabled stub here (scope left out stays out).
-const props = defineProps<{ mainName: string | null; behindCount: number }>();
+// the same row/gutter without a relayout. P129 Part 4 §0.20/§2.7 adds the button itself, the one
+// in-part opener (§0.8) — every other opener's first UI caller is a later row.
+const props = defineProps<{
+  mainName: string | null;
+  behindCount: number;
+  /** §0.20: `view.behindRoots.length > 0 && rebasingFor(repo).size === 0` — this component stays
+   *  ignorant of `useQueue`/`adeActions`, the caller already knows both. */
+  canRebaseAll: boolean;
+}>();
+
+const emit = defineEmits<{ rebaseAll: [] }>();
 
 const note = computed(() => {
   if (props.mainName === null) return 'no main branch';
@@ -35,6 +44,16 @@ const noteClass = computed(() => {
         <span class="whitespace-nowrap text-kira-sm" :class="noteClass" data-testid="ade-main-note">{{
           note
         }}</span>
+        <Button
+          v-if="canRebaseAll"
+          variant="dialog"
+          size="sm"
+          class="ml-auto shrink-0 border-none bg-[#e8a33d] text-[#15161a] hover:bg-[#e8a33d]/80"
+          data-testid="ade-rebase-all"
+          @click="emit('rebaseAll')"
+        >
+          Rebase all
+        </Button>
       </div>
     </div>
   </div>
