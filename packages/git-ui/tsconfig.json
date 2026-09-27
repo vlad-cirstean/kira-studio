@@ -13,8 +13,11 @@
     "types": ["vite/client", "bun-types"],
     // P107 I2-27: *.test.ts's own testing-only import of @workbench/testing/unit/async
     // (deferred/sleep) — the same alias every frontend app's own tsconfig already gives it.
+    // P131 Part 1 §3.3: `@theme/*` reaches packages/theme/src for every git-ui compile path (a
+    // migrated dialog imports shadcn components from `@theme/components/ui/*`).
     "paths": {
-      "@workbench/*": ["../workbench/src/*"]
+      "@workbench/*": ["../workbench/src/*"],
+      "@theme/*": ["../theme/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue"]

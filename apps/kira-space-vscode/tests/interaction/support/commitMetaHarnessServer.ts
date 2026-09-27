@@ -45,6 +45,16 @@ export async function startCommitMetaHarnessServer(): Promise<HarnessServer> {
     // needs it applied for real, not a no-op stylesheet, since it asserts real computed
     // overflow/max-height.
     plugins: [vue(), tailwindcss()],
+    // P131 Part 1 §3.3: `commitMetaHarness.entry.ts` imports the webview's own `tailwind.css`,
+    // which reaches `packages/theme/src/tailwind-core.css`/`components/**` through the `@theme/*`
+    // alias — resolved here the same way `packages/git-ui/vite.config.ts` resolves it for the real
+    // webview build, since this harness runs its own small, independent Vite step rather than
+    // reusing that config (this file's own header comment).
+    resolve: {
+      alias: {
+        '@theme': resolve(__dirname, '..', '..', '..', '..', '..', 'packages', 'theme', 'src'),
+      },
+    },
     logLevel: 'warn',
     build: {
       write: false,

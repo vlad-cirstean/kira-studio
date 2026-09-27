@@ -165,6 +165,41 @@
     --vscode-scrollbarSlider-hoverBackground,
     rgba(100, 100, 100, 0.7)
   );
+
+  /* P131 Part 1 §3.3: every colour the webview's own --kira-* bridge
+     (apps/kira-space-vscode/src/webview/kira-bridge.css) needs but has no existing --kv-* tone to
+     alias — real workbench colour ids where VS Code exposes one, this file's own "one invented
+     literal" precedent (the badge-pr-merged/overlay tokens above) where it does not. Fallback
+     literals copy packages/theme/src/tokens.css's own values byte-for-byte, so an unthemed host
+     renders the identical tone Kira Studio/Space would. */
+  --kv-disabled-fg: var(--vscode-disabledForeground, #6e6e6e);
+  --kv-warn-fg: var(--vscode-editorWarning-foreground, #cca700);
+  --kv-ok-fg: var(--vscode-terminal-ansiGreen, #23d18b);
+  --kv-info-fg: var(--vscode-terminal-ansiBlue, #3794ff);
+  /* The connection-identity palette (Kira Studio's own --kira-conn-*, docs/design/kira-design-
+     system): one lightness/chroma for every hue so no connection outranks another. No workbench
+     colour id names "connection #N" -- literal copy, same as the graph-lane palette above. */
+  --kv-conn-red: #d78e88;
+  --kv-conn-orange: #d1966d;
+  --kv-conn-amber: #bca260;
+  --kv-conn-olive: #9fad6b;
+  --kv-conn-green: #7db485;
+  --kv-conn-teal: #5fb7a5;
+  --kv-conn-cyan: #58b4c4;
+  --kv-conn-blue: #7ba8dc;
+  --kv-conn-indigo: #979fdd;
+  --kv-conn-violet: #b296d2;
+  --kv-conn-magenta: #cb8eb6;
+  --kv-conn-grey: #9fa5ac;
+  /* CodeMirror/Monaco syntax palette (Kira Studio's own --kira-syntax-*) -- no VS Code workbench
+     colour id exposes editor token-scope colours to a webview, so this is a literal copy, same
+     reasoning as the connection palette just above. */
+  --kv-syntax-property: #9cdcfe;
+  --kv-syntax-string: #ce9178;
+  --kv-syntax-number: #b5cea8;
+  --kv-syntax-keyword: #569cd6;
+  --kv-syntax-function: #dcdcaa;
+  --kv-syntax-meta: #808080;
 }
 
 /* High-contrast themes draw explicit borders where other themes rely on background fills

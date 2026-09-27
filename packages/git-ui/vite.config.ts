@@ -27,7 +27,17 @@ export default defineConfig({
   base: './',
   // P110 A1: compiles GU/theme/tailwind.css's `kv:`-prefixed root, scanning packages/git-ui and
   // packages/kira-ui only (that file's own @source lines).
+  // P131 Part 1 §3.3: also compiles the webview's own second, unprefixed root
+  // (apps/kira-space-vscode/src/webview/tailwind.css), which imports packages/theme/src/
+  // tailwind-core.css and packages/theme/src/components/** by their `@theme/*` alias -- resolved
+  // here the same way both apps' own vite.config.ts factory (packages/workbench/src/
+  // viteAppConfig.ts) already resolves it for every other Tailwind root in this repo.
   plugins: [vue(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@theme': resolve(repoRoot, 'packages', 'theme', 'src'),
+    },
+  },
   build: {
     outDir: resolve(vscodeApp, 'dist', 'ui'),
     emptyOutDir: true,

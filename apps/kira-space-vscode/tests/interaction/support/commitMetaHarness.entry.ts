@@ -19,6 +19,10 @@ import { createApp, h, reactive } from 'vue';
 // own small Vite step (commitMetaHarnessServer.ts), not the shared packages/git-ui/vite.config.ts
 // bundle, so it reaches the component the same way any other file in this monorepo would.
 import DetailPaneVue from '../../../../../packages/git-ui/src/components/DetailPane.vue';
+// P131 Part 1 §3.3: the webview's own unprefixed root, imported before git-ui's own `kv:`-prefixed
+// theme below — so a migrated shadcn component under DetailPane's tree (Part 2 onward) renders
+// correctly here too, the same order webview/main.ts itself imports in.
+import '../../../src/webview/tailwind.css';
 // P110 A-fix: DetailPane.vue/CommitMeta.vue/FileTree.vue render entirely through `kv:` Tailwind
 // utilities now (P110 A14/A15) — this harness needs the real compiled theme chain applied for its
 // own geometry assertions (overflow/max-height) to mean anything, the same chain `main.ts`

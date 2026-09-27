@@ -20,6 +20,10 @@ import {
   type PersistedViewState,
   parsePersistedViewState,
 } from '@kira/git-ui';
+// P131 Part 1 §3.3: this webview's own unprefixed Tailwind root (preflight + the shared @theme
+// core, imported theme(inline), plus the --kira-*-from-`--kv-*` bridge) -- imported first, before
+// `mount()` renders anything, so every migrated dialog's shadcn classes resolve from first paint.
+import './tailwind.css';
 
 declare function acquireVsCodeApi<T = unknown>(): {
   getState(): T | undefined;

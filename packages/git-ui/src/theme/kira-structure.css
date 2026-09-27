@@ -28,6 +28,11 @@
   --kv-t-sm: calc(var(--kv-font-size) - 1px);
   --kv-t-md: var(--kv-font-size);
   --kv-t-lg: calc(var(--kv-font-size) + 1px);
+  /* P131 Part 1 §3.3: Kira Studio's own --kira-t-xl sizes empty-state headings, not controls, so
+     it stays the same fixed 20px literal here rather than a --kv-font-size derivation (its own
+     tokens.css comment: deriving it would grow a heading by the same absolute amount as body
+     copy, the wrong ratio). */
+  --kv-t-xl: 20px;
 
   /* G14 D7: control/bar heights now derive from the host's own --kv-font-size, with offsets
      chosen so every value below is byte-identical to the fixed px it replaces at the default
@@ -47,10 +52,28 @@
 
   --kv-radius-sm: 4px;
   --kv-radius-panel: 6px;
+  /* P131 Part 1 §3.3: the webview's own --kira-* bridge needs Kira Studio's full five-step radius
+     tier system (tokens.css's own --kira-radius-xs/-sm/-lg/-pill and the bare --kira-radius), not
+     just this file's own two-step sm/panel scale -- xs/lg/pill are new here, and the bare "panel"
+     tier aliases the existing --kv-radius-panel rather than duplicate its value. */
+  --kv-radius-xs: 2px;
+  --kv-radius: var(--kv-radius-panel);
+  --kv-radius-lg: 8px;
+  --kv-radius-pill: 10px;
 
   --kv-bar-h: calc(var(--kv-font-size) + 21px); /* 34px at 13px — see the height block above */
+  /* P131 Part 1 §3.3: Kira Studio's own --kira-statusbar-h/-titlebar-inset-left have no git-ui
+     analogue (this host draws no status bar or native title bar of its own) -- literal copies,
+     kept only so the webview's --kira-* bridge and check-tokens.sh's completeness guard resolve;
+     no dialog or shadcn control this phase touches ever renders either. */
+  --kv-statusbar-h: 20px;
+  --kv-titlebar-inset-left: 0px;
   --kv-border-width: 1px;
   --kv-control-inline-h: 14px; /* drawn inside a control or a bar: separator, tab rail */
+  /* P131 Part 1 §3.3: AutocompleteField's own completion-popup width cap (Kira Studio's
+     --kira-completion-max-w) -- no git-ui completion popup exists yet, kept for the same bridge/
+     guard-completeness reason as the two tokens above. */
+  --kv-completion-max-w: min(480px, 90vw);
 
   /* LAW 08 (docs/design/kira-design-system): "Mono is for data. If a string came out of a
      database — a value, an identifier, a query, a duration — it is mono. If the app wrote it, it
