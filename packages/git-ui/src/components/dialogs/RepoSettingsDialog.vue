@@ -34,12 +34,27 @@
  * (`PersistedViewState` owns it under `'vscode'`/`'harness'`, a view preference, not a repository
  * fact, D8's own rejected alternative explains why) — so it arrives as a plain prop/emit pair and
  * applies immediately, never joining `draft`/`save()`'s patch diff.
+ *
+ * P131 Part 1 §6.1/§6.2: the modal shell is shadcn's `Dialog`/`DialogContent` now. Every
+ * `KuiSelect` is `NativeSelect` (git-ui has no fancier dropdown primitive — same choice
+ * `StackDialog.vue`'s own parent picker makes), each still driven by an explicit
+ * `onXChange`-and-cast handler rather than a plain `v-model`, since `NativeSelect`'s own
+ * `modelValue` type (`AcceptableValue`) is wider than any one of these settings' own narrow
+ * union. The page-size field is `Input` with a manual `Number(...)` cast on
+ * `update:model-value` — `Input`'s internal `v-model` has no `.number` modifier of its own, so a
+ * plain `v-model.number` on the wrapping component would silently pass a string through instead
+ * (Vue only auto-casts `.number` for a native element's own `v-model`, not a component's).
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
-import type { KuiSelectOption } from '@kira/kira-ui';
-import { KuiButton, KuiDialog, KuiSelect } from '@kira/kira-ui';
-import { computed, reactive, watch } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { Textarea } from '@theme/components/ui/textarea';
+import { computed, reactive, useId, watch } from 'vue';
 import type { RepoSettingsState } from '../../state/repoSettings.ts';
 import type { DateFormat } from '../../state/viewState.ts';
 
@@ -65,7 +80,9 @@ const emit = defineEmits<{
   (e: 'update:dateFormat', value: DateFormat): void;
 }>();
 
-const dateFormatOptions: readonly KuiSelectOption[] = [
+type SelectOption = { readonly value: string; readonly label: string };
+
+const dateFormatOptions: readonly SelectOption[] = [
   { value: 'relative', label: 'Relative (3 days ago)' },
   { value: 'absolute', label: 'Absolute (2024-12-30 22:48)' },
 ];
@@ -105,19 +122,19 @@ const baseCandidatesText = computed({
   },
 });
 
-const graphScopeOptions: readonly KuiSelectOption[] = [
+const graphScopeOptions: readonly SelectOption[] = [
   { value: 'all', label: 'All refs' },
   { value: 'head', label: "Current HEAD's ancestry only" },
 ];
 
-const pullStrategyOptions: readonly KuiSelectOption[] = [
+const pullStrategyOptions: readonly SelectOption[] = [
   { value: 'auto', label: 'Auto (follow git configuration)' },
   { value: 'ff-only', label: 'Fast-forward only' },
   { value: 'merge', label: 'Merge' },
   { value: 'rebase', label: 'Rebase' },
 ];
 
-const logLevelOptions: readonly KuiSelectOption[] = [
+const logLevelOptions: readonly SelectOption[] = [
   { value: 'off', label: 'Off' },
   { value: 'error', label: 'Error' },
   { value: 'warn', label: 'Warn' },
@@ -136,6 +153,17 @@ function onPullStrategyChange(value: string): void {
 function onLogLevelChange(value: string): void {
   draft['kiraSpace.log.level'] = value as RepoSettingsSnapshot['kiraSpace.log.level'];
 }
+
+function onPageSizeChange(value: string | number): void {
+  draft['kiraSpace.graph.pageSize'] = Number(value);
+}
+
+const dateFormatId = useId();
+const pageSizeId = useId();
+const graphScopeId = useId();
+const baseCandidatesId = useId();
+const pullStrategyId = useId();
+const logLevelId = useId();
 
 function close(): void {
   emit('close');
@@ -184,125 +212,159 @@ async function save(): Promise<void> {
 </script>
 
 <template>
-  <KuiDialog :open="open" title="Repository settings" @close="close">
-    <!-- P72 §8.3/§9.1: dateFormat moved to Kira Space's own app-wide appearance.dateFormat
-         (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
-         remaining surface for it. -->
-    <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Display</h3>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-date-format">
-        Commit date
-        <KuiSelect
-          id="repo-settings-date-format"
-          :model-value="dateFormat"
-          :options="dateFormatOptions"
-          @update:model-value="onDateFormatChange"
-        />
-      </label>
-      <p class="kv:text-diff-deleted">This applies to every repository in this panel, not just this one.</p>
-    </section>
+  <Dialog :open="open" @update:open="(v) => !v && close()">
+    <DialogContent
+      :show-close-button="false"
+      :aria-describedby="undefined"
+      class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+    >
+      <DialogHeader>
+        <DialogTitle>Repository settings</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 overflow-y-auto">
+        <!-- P72 §8.3/§9.1: dateFormat moved to Kira Space's own app-wide appearance.dateFormat
+             (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
+             remaining surface for it. -->
+        <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Display</h3>
+          <label :for="dateFormatId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Commit date
+            <NativeSelect
+              :id="dateFormatId"
+              :model-value="dateFormat"
+              variant="bordered"
+              size="kira"
+              class="w-full"
+              @update:model-value="(v) => onDateFormatChange(v as string)"
+            >
+              <option v-for="opt in dateFormatOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </NativeSelect>
+          </label>
+          <p class="kv:text-diff-deleted">This applies to every repository in this panel, not just this one.</p>
+        </section>
 
-    <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Graph</h3>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Load more page size
-        <input
-          type="number"
-          v-model.number="draft['kiraSpace.graph.pageSize']"
-          :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
-          :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit kv:w-24"
-        />
-      </label>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-graph-scope">
-        Scope
-        <KuiSelect
-          id="repo-settings-graph-scope"
-          :model-value="draft['kiraSpace.graph.scope']"
-          :options="graphScopeOptions"
-          @update:model-value="onGraphScopeChange"
-        />
-      </label>
-    </section>
+        <section class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Graph</h3>
+          <label :for="pageSizeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Load more page size
+            <Input
+              :id="pageSizeId"
+              :model-value="draft['kiraSpace.graph.pageSize']"
+              type="number"
+              size="kira"
+              class="w-24"
+              :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
+              :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
+              @update:model-value="onPageSizeChange"
+            />
+          </label>
+          <label :for="graphScopeId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Scope
+            <NativeSelect
+              :id="graphScopeId"
+              :model-value="draft['kiraSpace.graph.scope']"
+              variant="bordered"
+              size="kira"
+              class="w-full"
+              @update:model-value="(v) => onGraphScopeChange(v as string)"
+            >
+              <option v-for="opt in graphScopeOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </NativeSelect>
+          </label>
+        </section>
 
-    <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Checkout</h3>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="draft['kiraSpace.checkout.autoStash']" />
-        Automatically stash local changes that block a branch switch
-      </label>
-      <p class="kv:text-diff-deleted">
-        The stash is tagged with the branch you switched FROM and is never popped back
-        automatically — bring it back deliberately from the stash list, even onto a different
-        branch. Off restores the old dialog (discard / stash and carry / cancel).
-      </p>
-    </section>
+        <section class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Checkout</h3>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="draft['kiraSpace.checkout.autoStash']" />
+            Automatically stash local changes that block a branch switch
+          </Label>
+          <p class="kv:text-diff-deleted">
+            The stash is tagged with the branch you switched FROM and is never popped back
+            automatically — bring it back deliberately from the stash list, even onto a different
+            branch. Off restores the old dialog (discard / stash and carry / cancel).
+          </p>
+        </section>
 
-    <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Stash</h3>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="draft['kiraSpace.stash.showInGraph']" />
-        Show stash entries as nodes in the commit graph
-      </label>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="draft['kiraSpace.stash.includeUntracked']" />
-        "Include untracked files" starts checked in the Stash dialog
-      </label>
-    </section>
+        <section class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Stash</h3>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="draft['kiraSpace.stash.showInGraph']" />
+            Show stash entries as nodes in the commit graph
+          </Label>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="draft['kiraSpace.stash.includeUntracked']" />
+            "Include untracked files" starts checked in the Stash dialog
+          </Label>
+        </section>
 
-    <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Branch review</h3>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
-        Candidate base branches (one per line, tried in order)
-        <textarea
-          v-model="baseCandidatesText"
-          rows="3"
-          class="kv:px-1 kv:py-0.5 kv:bg-panel kv:text-row-fg kv:border kv:border-panel-border kv:font-inherit"
-        ></textarea>
-      </label>
-    </section>
+        <section class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Branch review</h3>
+          <label :for="baseCandidatesId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Candidate base branches (one per line, tried in order)
+            <Textarea :id="baseCandidatesId" v-model="baseCandidatesText" rows="3" class="w-full" />
+          </label>
+        </section>
 
-    <section class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">GitHub</h3>
-      <label class="kv:flex kv:flex-row kv:items-center kv:gap-0.5 kv:my-1">
-        <input type="checkbox" v-model="draft['kiraSpace.github.enabled']" />
-        Show pull request status for this repository
-      </label>
-    </section>
+        <section class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">GitHub</h3>
+          <Label class="flex flex-row items-center gap-1 my-1">
+            <Checkbox v-model="draft['kiraSpace.github.enabled']" />
+            Show pull request status for this repository
+          </Label>
+        </section>
 
-    <section v-if="writeCapability" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Pull</h3>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-pull-strategy">
-        Strategy
-        <KuiSelect
-          id="repo-settings-pull-strategy"
-          :model-value="draft['kiraSpace.pull.strategy']"
-          :options="pullStrategyOptions"
-          @update:model-value="onPullStrategyChange"
-        />
-      </label>
-    </section>
+        <section v-if="writeCapability" class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Pull</h3>
+          <label :for="pullStrategyId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Strategy
+            <NativeSelect
+              :id="pullStrategyId"
+              :model-value="draft['kiraSpace.pull.strategy']"
+              variant="bordered"
+              size="kira"
+              class="w-full"
+              @update:model-value="(v) => onPullStrategyChange(v as string)"
+            >
+              <option v-for="opt in pullStrategyOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </NativeSelect>
+          </label>
+        </section>
 
-    <!-- P72 §8.3/§9.2: Kira Space now has its own independent, genuinely app-wide
-         advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
-         remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
-         genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
-    <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
-      <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Diagnostics</h3>
-      <label class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1" for="repo-settings-log-level">
-        Log level
-        <KuiSelect
-          id="repo-settings-log-level"
-          :model-value="draft['kiraSpace.log.level']"
-          :options="logLevelOptions"
-          @update:model-value="onLogLevelChange"
-        />
-      </label>
-    </section>
+        <!-- P72 §8.3/§9.2: Kira Space now has its own independent, genuinely app-wide
+             advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
+             remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
+             genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
+        <section v-if="host !== 'kira'" class="kv:my-2 kv:first:mt-1">
+          <h3 class="kv:m-0 kv:mb-0.5 kv:text-lg kv:font-semibold kv:text-row-fg">Diagnostics</h3>
+          <label :for="logLevelId" class="kv:flex kv:flex-col kv:gap-0.5 kv:my-1">
+            Log level
+            <NativeSelect
+              :id="logLevelId"
+              :model-value="draft['kiraSpace.log.level']"
+              variant="bordered"
+              size="kira"
+              class="w-full"
+              @update:model-value="(v) => onLogLevelChange(v as string)"
+            >
+              <option v-for="opt in logLevelOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </NativeSelect>
+          </label>
+        </section>
+      </div>
 
-    <template #actions>
-      <KuiButton variant="primary" @click="save">Save</KuiButton>
-      <KuiButton @click="close">Cancel</KuiButton>
-    </template>
-  </KuiDialog>
+      <DialogFooter class="justify-end gap-1">
+        <Button variant="dialog-primary" size="kira-lg" @click="save">Save</Button>
+        <Button variant="dialog" size="kira-lg" @click="close">Cancel</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
