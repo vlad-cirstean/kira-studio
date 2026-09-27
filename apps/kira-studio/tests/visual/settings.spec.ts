@@ -10,7 +10,6 @@ const sections = [
   'Data',
   'Cache',
   'Api',
-  'Scripts',
   'Claude Code',
   'Database MCP',
   'Advanced',
