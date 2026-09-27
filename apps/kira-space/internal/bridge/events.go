@@ -53,6 +53,16 @@ const (
 // renderer side. Its TS `CHANNEL` entry lands in Part 3 with its first consumer.
 const ChannelAdeSessions = "kira:ade:sessions"
 
+// ChannelAdeRepo/ChannelAdeCredential are P129 Part 2's own two push channels (§5.3) —
+// AdeRepoChanged (ade.go) broadcasts the first after a held repo's own git state or the queue's
+// stored rows change; AdeCredentialRequested (ade.go) delivers the second to whichever window is
+// driving the op that needs a credential (§6.5). Both Space-only, same "no Kira Studio equivalent"
+// reasoning as ChannelAdeSessions above.
+const (
+	ChannelAdeRepo       = "kira:ade:repo"
+	ChannelAdeCredential = "kira:ade:credential"
+)
+
 // The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own
 // channels of the same name, hoisted to repo-root internal/appevent.
 const (
