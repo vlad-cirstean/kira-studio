@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appshell"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
@@ -24,6 +25,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/internal/logging"
@@ -131,9 +133,51 @@ func main() {
 	settingsSvc := &bridge.SettingsService{Deps: deps}
 	layoutSvc := &bridge.LayoutService{Deps: deps}
 	tabsSvc := &bridge.TabsService{Deps: deps}
+	// terminalRegistry is shared by terminalSvc and adeTracker below (P129 Part 1 §4.3) — one
+	// Registry, since Tracker.Reconcile/Send both need the same live-session set and PTYs the
+	// terminal service itself opens.
+	terminalRegistry := terminal.NewRegistry()
+
+	// adeTracker is Kira Space's own agent session tracker (P129 Part 1 §4.4) — persists every
+	// Claude Code session this app spawns or resumes. Recover, before any window exists: a fresh
+	// Registry never has any of a previous process life's PTYs live, so every row that life left
+	// "running" is unconditionally stale.
+	adeTracker := ade.NewTracker(ade.TrackerDeps{
+		Store: repositories.AdeSessions, LiveAgents: terminalRegistry.AgentSessions,
+		WriteTerminal: terminalRegistry.Write, Now: time.Now,
+		OnChange: func() { bridge.AdeSessionsChanged(events) },
+	})
+	if err := adeTracker.Recover(); err != nil {
+		slog.Warn("ade: recover", "scope", "ade", "err", err)
+	}
+
+	// agentHooks is P129 Part 1 §4.3's own "always on" posture: the design has no toggle, and a
+	// start failure (curl missing, a bind conflict) is logged, never fatal — sessions still spawn
+	// and track, activity icons stay absent. SetHooks before any window exists, so Compose never
+	// races an unset hooks func with a real launch.
+	agentHooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
+		adeTracker.HandleEvent(ev)
+		bridge.EmitAgentEvent(emitter, ev)
+	}})
+	if err := agentHooks.Start(); err != nil {
+		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
+	}
+	adeTracker.SetHooks(agentHooks.ComposeLaunch)
+
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
-	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{Emit: emitter, Registry: terminal.NewRegistry()}}
+	// ComposeAgent (P129 Part 1 §4.1) rewrites every claude-code launch through adeTracker.Compose.
+	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
+		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
+	}}
+	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry}
+	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
+	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
+	// (P129 Part 1 §4.2 step 4).
+	terminalRegistry.OnChange = func() {
+		adeTracker.Reconcile()
+		bridge.AgentSessionsChanged(adeSvc)
+	}
 
 	// keepAwakeCtl/keepAwakeSvc are P116 G5's own addition — the title bar's keep-awake toggle,
 	// Kira Studio's own titlebar half (internal/keepawake.Toggle, shared since H3) with no
@@ -175,7 +219,17 @@ func main() {
 		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
 		// here since this app's own KeepAwakeService has no agent-reason recompute to also stop.
 		keepAwakeCtl.Close()
+		// terminalSvc.Shutdown() first: every PTY dies, and each one's own exit fires
+		// Registry.OnChange (Reconcile marks its row stopped) while the DB is still open. Then
+		// adeTracker.Close() flushes whatever last-active time is still only in memory, then
+		// agentHooks.Stop() (P129 Part 1 §4.3).
 		terminalSvc.Shutdown()
+		if err := adeTracker.Close(); err != nil {
+			slog.Warn("ade: close", "scope", "ade", "err", err)
+		}
+		if err := agentHooks.Stop(); err != nil {
+			slog.Warn("agent hooks: stop", "scope", "ade", "err", err)
+		}
 		detachGitPush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
@@ -216,6 +270,7 @@ func main() {
 			application.NewService(layoutSvc),
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
+			application.NewService(adeSvc),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
 			application.NewService(windowsSvc),

@@ -40,6 +40,19 @@ const (
 // opened it.
 const ChannelTerminal = appevent.ChannelTerminal
 
+// ChannelAgentSessions/ChannelAgentEvent are P127's own two channels, re-exported here now that
+// P129 gives this app its first real emitter for both (AdeService) — the same "re-export so no
+// call site outside the hoist has to change" precedent every other constant above follows.
+const (
+	ChannelAgentSessions = appevent.ChannelAgentSessions
+	ChannelAgentEvent    = appevent.ChannelAgentEvent
+)
+
+// ChannelAdeSessions is P129 Part 1's own push channel — Space-only (no Kira Studio equivalent:
+// it has no ade module), payload-free, invalidating AdeService.Sessions' own query on the
+// renderer side. Its TS `CHANNEL` entry lands in Part 3 with its first consumer.
+const ChannelAdeSessions = "kira:ade:sessions"
+
 // The five below are P116's own window-chrome-parity channels (G1-G5/G7) — Kira Studio's own
 // channels of the same name, hoisted to repo-root internal/appevent.
 const (
