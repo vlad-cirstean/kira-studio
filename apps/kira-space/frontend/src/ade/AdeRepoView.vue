@@ -9,8 +9,10 @@ import { useSettingsStore } from '../state/settings';
 import AdeAddPopover from './AdeAddPopover.vue';
 import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import AdeConfirmDialog from './AdeConfirmDialog.vue';
+import AdeDetailPanel from './AdeDetailPanel.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdeMainLine from './AdeMainLine.vue';
+import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import AdeTimeline from './AdeTimeline.vue';
 import { type DialogCtx, moveSpec, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
@@ -280,6 +282,40 @@ const dialogCtx = computed<DialogCtx | null>(() => {
   };
 });
 
+// P129 Part 6 §0.2/§0.3: the flex-row layout root — `rootEl`'s own live width feeds the panel's
+// "0 means half" default and its resize clamp. `itemsById` mirrors `AdeTimeline.vue`'s own lookup
+// (the Changes tab resolves conflict/shared partner ids to branch names, §2.3).
+const rootEl = ref<HTMLElement | null>(null);
+const { width: rootWidth } = useElementSize(rootEl);
+const itemsById = computed(() => new Map((view.value?.items ?? []).map((item) => [item.id, item])));
+
+const PANEL_MIN = 340;
+const panelMax = computed(() => Math.max(PANEL_MIN, rootWidth.value - PANEL_MIN));
+
+function clampPanelWidth(w: number): number {
+  return Math.max(PANEL_MIN, Math.min(panelMax.value, w));
+}
+
+/** Settings-resolved width — `0` means half the root's own width (§0.2's "default half width"). */
+const settledPanelWidth = computed(() => {
+  const stored = settingsStore.ade.panelWidth;
+  return clampPanelWidth(stored === 0 ? rootWidth.value / 2 : stored);
+});
+
+// Live override while dragging or repeating an arrow key — `null` once nothing overrides it, falling
+// back to the settings-resolved width above.
+const dragPanelWidth = ref<number | null>(null);
+const panelWidth = computed(() => dragPanelWidth.value ?? settledPanelWidth.value);
+
+function onPanelResize(w: number): void {
+  dragPanelWidth.value = w;
+}
+
+function onPanelCommit(w: number): void {
+  void settingsStore.patchSettings({ ade: { panelWidth: Math.round(clampPanelWidth(w)) } });
+  dragPanelWidth.value = null;
+}
+
 // §0.20: shown iff there's a behind root to rebase and this repo has nothing already in flight.
 const canRebaseAll = computed(
   () =>
@@ -353,7 +389,8 @@ function onDismissError(): void {
 </script>
 
 <template>
-  <div ref="scrollEl" class="flex min-h-0 flex-1 flex-col overflow-auto" data-testid="ade-repo-view">
+  <div ref="rootEl" class="flex min-h-0 flex-1">
+  <div ref="scrollEl" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto" data-testid="ade-repo-view">
     <template v-if="snapshotQuery.isError.value">
       <Alert variant="destructive" class="m-4" data-testid="ade-snapshot-error">
         <AlertTitle>Couldn't load this repository's agent queue</AlertTitle>
@@ -427,5 +464,22 @@ function onDismissError(): void {
     </template>
     <AdeClaudeDialog :code-repo-id="codeRepoId" :ctx="dialogCtx" />
     <AdeConfirmDialog />
+  </div>
+  <template v-if="view?.panel">
+    <AdePanelResizeHandle
+      :value="panelWidth"
+      :min="PANEL_MIN"
+      :max="panelMax"
+      @resize="onPanelResize"
+      @commit="onPanelCommit"
+    />
+    <AdeDetailPanel
+      :panel="view.panel"
+      :dialog-ctx="dialogCtx"
+      :code-repo-id="codeRepoId"
+      :items-by-id="itemsById"
+      :width="panelWidth"
+    />
+  </template>
   </div>
 </template>

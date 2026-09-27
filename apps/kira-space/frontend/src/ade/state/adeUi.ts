@@ -48,6 +48,9 @@ export const useAdeUiStore = defineStore('adeUi', () => {
      *  applies when a repo has no entry here, or its entry no longer names a live item. */
     selectedByRepo: {} as Record<string, string>,
     confirm: null as AdeConfirmState | null,
+    /** P129 Part 6 §0.20: the detail panel's own tab (mockup `state.tab`) — one across every repo,
+     *  like `dialog`, not per-repo (switching repo tabs keeps the same panel tab selected). */
+    panelTab: 'details' as 'details' | 'changes' | 'agents',
   });
 
   function setActiveRepo(id: string): void {
@@ -125,6 +128,10 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     if (state.confirm) state.confirm.error = message;
   }
 
+  function setPanelTab(tab: 'details' | 'changes' | 'agents'): void {
+    state.panelTab = tab;
+  }
+
   return {
     ...toRefs(state),
     setActiveRepo,
@@ -143,5 +150,6 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     openConfirm,
     closeConfirm,
     setConfirmError,
+    setPanelTab,
   };
 });
