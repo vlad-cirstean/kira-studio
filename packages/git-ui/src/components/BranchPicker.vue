@@ -2,8 +2,9 @@
 /**
  * `docs/plans/P6.md` W13: §6.2's `[branch ▾]` toolbar slot. P77 redesigns it from seven stacked
  * sections in one scroll context into a five-tab structure — Branches (local + remote sub-group),
- * Tags, Stashes (stack + global-bucket sub-group), Worktrees, Stacks — over one `KuiSegmented`
- * strip (§3). `pickerModel.ts` owns the fold (filter/order/cap) for every tab; this file renders
+ * Tags, Stashes (stack + global-bucket sub-group), Worktrees, Stacks — over one `ToggleGroup`
+ * strip (§3, `type="single"`, P131 Part 2). `pickerModel.ts` owns the fold (filter/order/cap) for
+ * every tab; this file renders
  * the strip, the filter box and the active tab's body, and still owns every ref-scoped write this
  * file has always owned (checkout, rename, delete, the stack-navigation row-menu arms) — `TagList`/
  * `StashList`/`GlobalStashList`/`WorktreeList`/`StackList` render their own tab's rows from an
@@ -14,34 +15,28 @@
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
-import type { KuiSegmentedOption } from '@kira/kira-ui';
-// `KuiButton`/`KuiSegmented` are plain (not `import type`) imports even though this file's own
-// script only ever reads `KuiButton` through `InstanceType<typeof KuiButton>` (the trigger's own
-// ref type) — that is still a genuine *value* read (`typeof` on an identifier requires the runtime
-// binding in scope), and the template's own `<KuiButton>`/`<KuiSegmented>` tags instantiate them as
-// components; biome's own static analysis sees neither use and would otherwise "fix" this to
-// `import type`, silently erasing the import — `biome.json`'s own `**/*.vue` override turns
-// `useImportType` off for exactly this class of false positive (P96 §5.2).
-import {
-  enabledNeighbour,
-  firstEnabled,
-  KuiButton,
-  KuiPopoverPanel,
-  KuiSearchInput,
-  KuiSegmented,
-  KuiTextInput,
-  kuiRowVariants,
-  type MenuItem,
-} from '@kira/kira-ui';
-import { onClickOutside, useEventListener } from '@vueuse/core';
-import { computed, nextTick, ref, watch } from 'vue';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
+import { cn } from '../lib/cn.ts';
+import { enabledNeighbour, firstEnabled, type MenuItem } from '../lib/menuModel.ts';
+import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
+import { REF_BADGE_CLASS } from './badgeClass.ts';
 import GlobalStashList from './GlobalStashList.vue';
 import {
   filterPickerInput,
@@ -146,11 +141,9 @@ const TAB_LABELS: Readonly<Record<PickerTab, string>> = {
 };
 
 const isOpen = ref(false);
-const rootEl = ref<HTMLElement | null>(null);
-// G34 D5/D14: `KuiButton` now exposes `focus()` (the same escape hatch `KuiSearchInput` already
-// has), so the trigger is a real `KuiButton` instead of the raw `<button>` this used to need.
-const triggerEl = ref<InstanceType<typeof KuiButton> | null>(null);
-const filterEl = ref<InstanceType<typeof KuiSearchInput> | null>(null);
+const triggerEl = useTemplateRef<{ $el: HTMLElement }>('triggerEl');
+const panelEl = ref<HTMLElement | null>(null);
+const filterEl = useTemplateRef<{ $el: HTMLElement }>('filterEl');
 const filter = ref('');
 const activeTab = ref<PickerTab>('branches');
 // P77 §7.3: the roving-tabindex list's own "current" row — `undefined` until the user presses an
@@ -240,11 +233,11 @@ const activeRowId = computed<string | undefined>(() => {
 async function focusRow(id: string | undefined): Promise<void> {
   if (id === undefined) return;
   await nextTick();
-  rootEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)?.focus();
+  panelEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)?.focus();
 }
 
-/** §7.2: `ArrowDown` from the filter box moves into the list — the same route
- *  `KuiSearchInput.vue`'s own forwarded `keydown` emit exists for. */
+/** §7.2: `ArrowDown` from the filter box moves into the list — bound directly on
+ *  `InputGroupInput`'s own `@keydown`, which falls through to the real `<input>`. */
 function onFilterKeydown(event: KeyboardEvent): void {
   if (event.key !== 'ArrowDown') return;
   const items = toMenuItems(model.value.rowIds);
@@ -281,7 +274,7 @@ function onRowsKeydown(event: KeyboardEvent): void {
     case 'ArrowUp':
       event.preventDefault();
       if (currentId === firstEnabled(items)) {
-        filterEl.value?.focus();
+        filterEl.value?.$el.focus();
         return;
       }
       focusedRowId.value = enabledNeighbour(items, currentId, -1);
@@ -309,7 +302,16 @@ function onRowsKeydown(event: KeyboardEvent): void {
 // instead of a raw @keydown on it.
 useEventListener(rowsScrollEl, 'keydown', onRowsKeydown);
 
-const tabOptions = computed<readonly KuiSegmentedOption[]>(() => [
+// P131 Part 2 §5.2: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
+// as a local type instead of importing one from kira-ui.
+interface PickerTabOption {
+  readonly id: PickerTab;
+  readonly icon: string;
+  readonly label: string;
+  readonly badge: number;
+}
+
+const tabOptions = computed<readonly PickerTabOption[]>(() => [
   {
     id: 'branches',
     icon: PICKER_TAB_ICONS.branches,
@@ -341,6 +343,11 @@ const knownRemotes = computed(() =>
   remoteNamesFrom(props.refs.remoteBranches.value.map((row) => row.shortName)),
 );
 
+// P131 Part 2 §5.2: reka's own PopoverContent Escape/outside-click dismissal replaces the
+// rootEl keydown listener and onClickOutside call this file used to own -- close()'s resets
+// (refMenu, renaming, forceDeleteCandidate, filter, capSteps) now run from the Popover's own
+// @update:open(false), reached either way (trigger click, Escape, outside click, or this file's
+// own explicit close() calls below).
 function close(): void {
   isOpen.value = false;
   refMenu.value = undefined;
@@ -348,26 +355,6 @@ function close(): void {
   forceDeleteCandidate.value = undefined;
   filter.value = '';
   capSteps.value = {};
-}
-
-// P105 §5.1: the wrapping div carries no interactive role of its own -- binds via VueUse instead
-// of a raw @keydown.escape on it.
-useEventListener(rootEl, 'keydown', (e) => {
-  if (e.key === 'Escape') close();
-});
-
-// P77 §7.2 fix: was `isOpen.value = !isOpen.value`, which opened the panel without ever calling
-// `open()` — the filter-focus fix below only ran for the palette's own `runUiAction` route
-// (§13), never for a plain trigger click, contradicting `open()`'s own doc comment ("both entry
-// points ... go through open()"). Routing the open half through `open()` (no `tab` argument, so
-// the click-trigger path keeps whatever tab was last active, unchanged) is what actually makes
-// that true.
-function toggle(): void {
-  if (isOpen.value) {
-    close();
-    return;
-  }
-  open();
 }
 
 // G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
@@ -378,21 +365,47 @@ function toggle(): void {
 function open(tab?: PickerTab): void {
   if (tab !== undefined) activeTab.value = tab;
   isOpen.value = true;
-  // §7.2: both entry points (this picker's own trigger click and `runUiAction`'s palette route,
-  // §13) go through `open()`, so the filter is focused on the next tick either way.
-  void nextTick(() => filterEl.value?.focus());
 }
 defineExpose({ open });
 
+/** The Popover's own `@update:open` -- fired for every dismissal (trigger click, Escape, outside
+ *  click) and every trigger-click open. `true` just tracks the boolean (the palette route's own
+ *  `open()` already set it directly); the filter-focus-on-open side effect lives in
+ *  `onOpenAutoFocus` below, so it fires for both routes alike, P77 §7.2's own requirement. */
+function onOpenChange(value: boolean): void {
+  if (value) isOpen.value = true;
+  else close();
+}
+
+/** §7.2: "filter focused on open" for both the click-trigger and palette (`open()`) routes --
+ *  `preventDefault()` skips reka's own default (the panel's first focusable element) so the
+ *  filter input wins regardless of where it sits in the panel. */
+function onOpenAutoFocus(e: Event): void {
+  e.preventDefault();
+  filterEl.value?.$el.focus();
+}
+
+/** W20: reka's own close-auto-focus fires after the panel's exit animation, which could steal
+ *  focus back from a dialog `runCheckout` opens in the meantime (`closeForCheckout` below already
+ *  moves focus to the trigger synchronously, before that animation even starts). Suppressed for
+ *  exactly that one call, not for every close. */
+let suppressCloseAutoFocus = false;
+function onCloseAutoFocus(e: Event): void {
+  if (!suppressCloseAutoFocus) return;
+  e.preventDefault();
+  suppressCloseAutoFocus = false;
+}
+
 /** W20: `close()` unmounts the whole panel, including whatever row button the click just
  *  focused — by the time `runCheckout` might open `CheckoutDialog.vue`, that button is gone and
- *  `useModalFocus`'s own invoker capture would land on nothing (the browser's own fallback,
- *  `<body>`). Moving focus to the trigger *first* — a stable control that survives the panel's
- *  own close — gives that capture something real to return to, the same "make sure a persisting
- *  anchor holds focus before the invoking control disappears" fix `RowContextMenu.vue`'s own W20
- *  change makes for the row menu. */
+ *  a dialog's own focus-return capture would land on nothing (the browser's own fallback,
+ *  `<body>`). Moving focus to the trigger *first*, synchronously — a stable control that survives
+ *  the panel's own close — gives that capture something real to return to. `suppressCloseAutoFocus`
+ *  stops reka's own close-auto-focus (which fires after the exit animation) from firing later and
+ *  stealing focus back from whatever dialog `runCheckout` opened in the meantime. */
 function closeForCheckout(): void {
-  triggerEl.value?.focus();
+  triggerEl.value?.$el.focus();
+  suppressCloseAutoFocus = true;
   close();
 }
 
@@ -459,10 +472,10 @@ async function onRefMenuSelect(id: string): Promise<void> {
   }
   if (id === 'renameRef') {
     renaming.value = { name: row.shortName, value: row.shortName };
-    // P105 §8: not the panel's first focusable element (case 2) — `autofocus` can't see the
-    // custom `role="dialog"` context, so it's focused explicitly once the input renders.
+    // P105 §8: not the panel's own open-auto-focus moment (the panel is already open, mid-row-
+    // menu-selection here) — focused explicitly once the rename input renders.
     void nextTick(() => {
-      rootEl.value?.querySelector<HTMLInputElement>('.kv-branch-rename-input')?.focus();
+      panelEl.value?.querySelector<HTMLInputElement>('.kv-branch-rename-input')?.focus();
     });
     return;
   }
@@ -556,10 +569,6 @@ async function submitRename(): Promise<void> {
   await props.ops.branchRename(pending.name, to);
 }
 
-onClickOutside(rootEl, () => {
-  if (isOpen.value) close();
-});
-
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
 // all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
 // finding #3: "visible" used to mean the repo's FULL branch list, not what `model` (above) actually
@@ -585,50 +594,84 @@ watch(visibleBranchNames, (names) => {
 </script>
 
 <template>
-  <div ref="rootEl" class="kv:relative">
-    <!-- G34 D5/D14: a real `KuiButton` — `closeForCheckout()`'s own W20 fix below calls real
-         `.focus()` on `triggerEl` before a dialog opens, and `KuiButton` now exposes that. -->
-    <KuiButton
-      ref="triggerEl"
-      class="kv-branch-trigger kv:max-w-50"
-      aria-haspopup="true"
-      :aria-expanded="isOpen"
-      v-kui-tooltip="refs.head.value?.kind === 'detached' ? refs.head.value.sha : triggerLabel"
-      @click="toggle"
-    >
-      <span class="codicon codicon-git-branch" aria-hidden="true"></span>
-      <span class="kv:truncate">{{ triggerLabel }}</span>
-      <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
-    </KuiButton>
+  <div class="kv:relative">
+    <Popover :open="isOpen" modal @update:open="onOpenChange">
+      <PopoverAnchor as-child>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <PopoverTrigger as-child>
+              <Button ref="triggerEl" variant="toolbar" size="kira" class="kv-branch-trigger max-w-50">
+                <span class="codicon codicon-git-branch" aria-hidden="true"></span>
+                <span class="kv:truncate">{{ triggerLabel }}</span>
+                <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{{ triggerLabel }}</TooltipContent>
+        </Tooltip>
+      </PopoverAnchor>
 
-    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="380" @close="close">
-    <div
-      class="kv:flex kv:flex-col kv:min-h-0 kv:max-h-[min(520px,var(--kui-float-max-h,520px))] kv:max-w-[var(--kui-float-max-w,380px)]"
-      role="dialog"
-      :aria-label="`${TAB_LABELS[activeTab]} picker`"
-    >
-      <KuiSegmented
-        class="kv-branch-tabs kv:mx-1 kv:mt-1 kv:mb-0"
-        :options="tabOptions"
-        :model-value="activeTab"
-        ariaLabel="Picker section"
-        @update:model-value="(id) => (activeTab = id as PickerTab)"
-      />
-      <KuiSearchInput
-        ref="filterEl"
-        class="kv:m-1"
-        v-model="filter"
-        :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
-        :ariaLabel="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
-        @keydown="onFilterKeydown"
-      />
-
-      <div
-        ref="rowsScrollEl"
-        class="kv:overflow-y-auto kv:min-h-0"
-        :aria-label="TAB_LABELS[activeTab]"
+      <PopoverContent
+        align="start"
+        class="w-95 p-0 gap-0"
+        :aria-label="`${TAB_LABELS[activeTab]} picker`"
+        @open-auto-focus="onOpenAutoFocus"
+        @close-auto-focus="onCloseAutoFocus"
       >
-        <template v-if="activeTab === 'branches'">
+        <div
+          ref="panelEl"
+          class="kv:flex kv:flex-col kv:min-h-0 kv:max-h-[min(520px,var(--reka-popover-content-available-height))]"
+        >
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="kira"
+            class="kv-branch-tabs mx-1 mt-1"
+            aria-label="Picker section"
+            :model-value="activeTab"
+            @update:model-value="(v) => v && (activeTab = v as PickerTab)"
+          >
+            <Tooltip v-for="tab in tabOptions" :key="tab.id">
+              <TooltipTrigger as-child>
+                <ToggleGroupItem :value="tab.id" :aria-label="`${tab.label} (${tab.badge})`">
+                  <span class="codicon" :class="tab.icon" aria-hidden="true"></span>
+                  <Badge variant="count" data-testid="picker-tab-badge">{{ tab.badge }}</Badge>
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent>{{ tab.label }}</TooltipContent>
+            </Tooltip>
+          </ToggleGroup>
+
+          <InputGroup variant="kira" class="m-1">
+            <InputGroupAddon>
+              <span class="codicon codicon-search" aria-hidden="true"></span>
+            </InputGroupAddon>
+            <InputGroupInput
+              ref="filterEl"
+              v-model="filter"
+              :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
+              :aria-label="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
+              @keydown="onFilterKeydown"
+            />
+            <InputGroupAddon v-if="filter" align="inline-end">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <InputGroupButton aria-label="Clear filter" @click="filter = ''">
+                    <span class="codicon codicon-close" aria-hidden="true"></span>
+                  </InputGroupButton>
+                </TooltipTrigger>
+                <TooltipContent>Clear filter</TooltipContent>
+              </Tooltip>
+            </InputGroupAddon>
+          </InputGroup>
+
+          <div
+            ref="rowsScrollEl"
+            class="kv:overflow-y-auto kv:min-h-0"
+            :aria-label="TAB_LABELS[activeTab]"
+          >
+            <AttributeTooltip :container="rowsScrollEl" />
+            <template v-if="activeTab === 'branches'">
         <section aria-label="Branches">
           <RefSectionHeader label="Branches" />
           <div
@@ -640,19 +683,22 @@ watch(visibleBranchNames, (names) => {
             :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
             <template v-if="renaming?.name === row.shortName">
-              <KuiTextInput
-                class="kv-branch-rename-input kv:flex-1"
+              <Input
                 v-model="renaming.value"
-                ariaLabel="Rename branch"
+                size="kira"
+                class="kv-branch-rename-input flex-1"
+                aria-label="Rename branch"
                 @keydown.enter="submitRename"
                 @keydown.escape="renaming = undefined"
               />
-              <KuiButton variant="icon" @click="submitRename">
-                <span class="codicon codicon-check" aria-hidden="true"></span>
-              </KuiButton>
+              <TooltipIconButton icon="check" label="Rename branch" @click="submitRename" />
             </template>
             <template v-else>
-              <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']" @click="checkoutBranch(row)">
+              <button
+                type="button"
+                :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+                @click="checkoutBranch(row)"
+              >
                 <span
                   class="kv:w-2.5 kv:text-focus"
                   :role="row.isHead ? 'img' : undefined"
@@ -664,27 +710,25 @@ watch(visibleBranchNames, (names) => {
                 <button
                   v-if="prFor(row.shortName) && openExternalCapability"
                   type="button"
-                  class="kv-badge kv-badge-pill kv-badge-pr"
-                  :class="`kv-badge-pr--${prFor(row.shortName)!.state}`"
-                  v-kui-tooltip="prTooltip(row.shortName)"
+                  :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                  :data-kira-tip="prTooltip(row.shortName)"
                   @click.stop="openPullRequest(prFor(row.shortName)!.number)"
                 >#{{ prFor(row.shortName)!.number }}</button>
                 <span
                   v-else-if="prFor(row.shortName)"
-                  class="kv-badge kv-badge-pill kv-badge-pr"
-                  :class="`kv-badge-pr--${prFor(row.shortName)!.state}`"
-                  v-kui-tooltip="prTooltip(row.shortName)"
+                  :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${prFor(row.shortName)!.state}`]"
+                  :data-kira-tip="prTooltip(row.shortName)"
                   >#{{ prFor(row.shortName)!.number }}</span
                 >
                 <span
                   v-if="row.checkedOutIn"
                   class="kv:text-sm kv:px-0.5 kv:border kv:border-dashed kv:border-panel-border kv:rounded-sm kv:text-muted-foreground"
-                  v-kui-tooltip="`Checked out in ${row.checkedOutIn}`"
+                  :data-kira-tip="`Checked out in ${row.checkedOutIn}`"
                 >
                   worktree
                 </span>
                 <span v-if="formatTrack(row.track)" class="kv:text-sm kv:text-muted-foreground">{{ formatTrack(row.track) }}</span>
-              </KuiButton>
+              </button>
               <RowActionsButton
                 @click="openRefMenuFromButton(row, $event)"
                 @contextmenu="openRefMenu(row, $event)"
@@ -696,8 +740,8 @@ watch(visibleBranchNames, (names) => {
             class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-base"
           >
             <span>“{{ forceDeleteCandidate }}” is not fully merged.</span>
-            <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
-            <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
+            <Button variant="danger" size="kira" @click="confirmForceDelete">Force delete</Button>
+            <Button variant="toolbar" size="kira" @click="forceDeleteCandidate = undefined">Cancel</Button>
           </div>
           <ShowMoreButton :hidden-count="model.branchesLocal.hiddenCount" @click="showMore('branchesLocal')" />
           <div v-if="model.branchesLocal.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No branches</div>
@@ -712,14 +756,15 @@ watch(visibleBranchNames, (names) => {
             :data-row-id="`remote:${row.refname}`"
             :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
           >
-            <KuiButton
-              :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']"
-              icon="codicon-cloud"
+            <button
+              type="button"
+              :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
               @click="checkoutRemote(row)"
             >
+              <span class="codicon codicon-cloud" aria-hidden="true"></span>
               <span class="kv:truncate">{{ row.shortName }}</span>
               <span class="kv:text-sm kv:text-muted-foreground">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
-            </KuiButton>
+            </button>
             <RowActionsButton
               @click="openRefMenuFromButton(row, $event)"
               @contextmenu="openRefMenu(row, $event)"
@@ -802,9 +847,10 @@ watch(visibleBranchNames, (names) => {
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />
-      </div>
-    </div>
-    </KuiPopoverPanel>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
 
     <RowContextMenu
       v-if="refMenu"
