@@ -972,3 +972,219 @@ test('selection: a row click, the agent icon, and a continuation row all select,
   await expect(selected('long')).toHaveCount(1);
   await expect(page.locator(`${dragBox('ade-day-band')}[data-ade-day="1"]`)).toBeInViewport();
 });
+
+// ---------------------------------------------------------------------------------------------
+// 11. Dependency nodes (P135 §4.7)
+// ---------------------------------------------------------------------------------------------
+
+test('dependency: no drag attributes, lands on the blocked item\'s day with a blue "needed" tag and chip, a drop on it falls through to the band', async ({
+  relaunch,
+}) => {
+  const blocked = fullBranch({ id: 'blocked', branch: 'feat/blocked', ahead: 1 });
+  const parkedX = fullBranch({ id: 'parked-x', branch: 'feat/parked', kind: 'parked' });
+  const snap = snapshot({
+    branches: [blocked, parkedX],
+    plan: plan({ blocked: '2026-10-08' }), // Thursday, offset 1.
+    dependencies: [
+      {
+        id: 'dep-1',
+        title: 'Vendor API',
+        waitingOn: '',
+        expectedBy: null,
+        createdAt: Date.now(),
+        blocks: ['blocked'],
+      },
+    ],
+  });
+
+  const { window: page, control } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      {
+        channel: IPC.adeSetPlan,
+        args: {
+          codeRepoId: REPO.id,
+          days: { 'parked-x': '2026-10-08' },
+          order: snap.plan.order.concat('parked-x'),
+        },
+        response: null,
+      },
+      ...snapshotControl(snap),
+    ],
+  });
+
+  const depBox = page.locator(`${dragBox('ade-stack-box')}[data-ade-lead="dep-1"]`);
+  await expect(depBox).toHaveAttribute('data-ade-dependency', '');
+  await expect(depBox).not.toHaveAttribute('data-ade-box');
+  await expect(depBox.locator('[data-ade-row-movable]')).toHaveCount(0);
+  // Unlinked to no date of its own, blocking "blocked" (day offset 1) — the dependency's own box
+  // lands on that same day.
+  await expect(depBox).toHaveAttribute('data-ade-day', '1');
+
+  const depBlock = page.locator(dragBox('ade-stack-block')).filter({ has: depBox });
+  await expect(depBlock.getByText('needed', { exact: false })).toBeVisible();
+
+  const chip = page.locator('[data-testid="ade-blocked-chip-blocked"]');
+  await expect(chip).toContainText('1');
+
+  // A drop on the dependency's own box falls through to the day band underneath it — no dialog,
+  // a direct SetPlan (§0.12's own no-drag-target rule for a dependency segment).
+  const parkedRow = page.locator(`${dragBox('ade-stack-row')}[data-ade-id="parked-x"]`);
+  await dragMouse(page, await centerOf(parkedRow), await centerOf(depBox));
+  await expect(page.locator('[data-testid="ade-dialog"]')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeSetPlan &&
+            (e.args as { days?: Record<string, string | null> } | undefined)?.days?.['parked-x'] ===
+              '2026-10-08',
+        ),
+    )
+    .toBe(true);
+});
+
+test('dependency: a later expectedBy than the blocked item\'s day shows "late" and the chip follows', async ({
+  relaunch,
+}) => {
+  const blocked = fullBranch({ id: 'blocked', branch: 'feat/blocked', ahead: 1 });
+  const snap = snapshot({
+    branches: [blocked],
+    plan: plan({ blocked: '2026-10-08' }), // Thursday, offset 1.
+    dependencies: [
+      {
+        id: 'dep-1',
+        title: 'Vendor API',
+        waitingOn: '',
+        expectedBy: '2026-10-12', // Monday, offset 5 — after the blocked item's own day.
+        createdAt: Date.now(),
+        blocks: ['blocked'],
+      },
+    ],
+  });
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [...bootControl(), ...snapshotControl(snap)],
+  });
+
+  const depBox = page.locator(`${dragBox('ade-stack-box')}[data-ade-lead="dep-1"]`);
+  const depBlock = page.locator(dragBox('ade-stack-block')).filter({ has: depBox });
+  await expect(depBlock.getByText('late', { exact: true })).toBeVisible();
+
+  const chip = page.locator('[data-testid="ade-blocked-chip-blocked"]');
+  await expect(chip).toContainText('1');
+});
+
+// ---------------------------------------------------------------------------------------------
+// 12. Jira line
+// ---------------------------------------------------------------------------------------------
+
+test('jira line: a linked item is 56px with a target="_blank" key link, an unlinked one stays 40px', async ({
+  relaunch,
+}) => {
+  const withJira = fullBranch({
+    id: 'with-jira',
+    branch: 'feat/with-jira',
+    ahead: 1,
+    jira: { key: 'ABC-123', url: 'https://issues.example.com/browse/ABC-123' },
+  });
+  const plain = fullBranch({ id: 'plain', branch: 'feat/plain', ahead: 1 });
+  const snap = snapshot({
+    branches: [withJira, plain],
+    plan: plan({ 'with-jira': TODAY_ISO, plain: TODAY_ISO }),
+  });
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [...bootControl(), ...snapshotControl(snap)],
+  });
+
+  const jiraRow = page.locator(`${dragBox('ade-stack-row')}[data-ade-id="with-jira"]`);
+  const plainRow = page.locator(`${dragBox('ade-stack-row')}[data-ade-id="plain"]`);
+
+  const jiraBox = await jiraRow.boundingBox();
+  const plainBox = await plainRow.boundingBox();
+  expect(jiraBox?.height).toBe(56);
+  expect(plainBox?.height).toBe(40);
+
+  const keyLink = jiraRow.locator('[data-testid="ade-row-jira"] a');
+  await expect(keyLink).toHaveText('ABC-123');
+  await expect(keyLink).toHaveAttribute('target', '_blank');
+  await expect(keyLink).toHaveAttribute('href', 'https://issues.example.com/browse/ABC-123');
+
+  await expect(plainRow.locator('[data-testid="ade-row-jira"]')).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------------------------
+// 13. Add popover: Dependency tab
+// ---------------------------------------------------------------------------------------------
+
+test('add: the Dependency tab creates one, selects it, and Blocks defaults to the selected item', async ({
+  relaunch,
+}) => {
+  const target = fullBranch({ id: 'target', branch: 'feat/target', ahead: 1 });
+  const snap = snapshot({ branches: [target], plan: plan({ target: TODAY_ISO }) });
+  const withDep = snapshot({
+    branches: [target],
+    plan: snap.plan,
+    dependencies: [
+      {
+        id: 'dep-1',
+        title: 'Vendor API',
+        waitingOn: 'their release',
+        expectedBy: null,
+        createdAt: Date.now(),
+        blocks: ['target'],
+      },
+    ],
+  });
+
+  const { window: page, control } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      { channel: IPC.adeAddDependency, response: 'dep-1' },
+      ...snapshotControl(withDep),
+    ],
+  });
+
+  // Select the item first — the default Blocks pick, §4.8's own rule.
+  await page.locator(`${dragBox('ade-stack-row')}[data-ade-id="target"]`).click();
+
+  await page.locator('[data-testid="ade-add-open"]').click();
+  const popover = page.locator('[data-testid="ade-add-popover"]');
+  await popover.locator('[data-testid="ade-add-tab-dependency"]').click();
+
+  await expect(popover.locator('[data-testid="ade-add-dependency-blocks"]')).toHaveValue('target');
+
+  await popover.locator('[data-testid="ade-add-dependency-title"]').fill('Vendor API');
+  await popover.locator('[data-testid="ade-add-dependency-waiting-on"]').fill('their release');
+  await popover.locator('[data-testid="ade-add-dependency-submit"]').click();
+  await expect(popover).toHaveCount(0);
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeAddDependency &&
+            (e.args as { title?: string; waitingOn?: string; blocks?: string[] } | undefined)
+              ?.title === 'Vendor API' &&
+            (e.args as { waitingOn?: string } | undefined)?.waitingOn === 'their release' &&
+            JSON.stringify((e.args as { blocks?: string[] } | undefined)?.blocks) ===
+              JSON.stringify(['target']),
+        ),
+    )
+    .toBe(true);
+
+  await expect(
+    page.locator(`${dragBox('ade-stack-row')}[data-ade-id="dep-1"][aria-selected="true"]`),
+  ).toHaveCount(1);
+});
