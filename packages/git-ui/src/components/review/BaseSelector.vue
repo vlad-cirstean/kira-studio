@@ -10,16 +10,13 @@
  * mirroring W14's "not offered for tags" rule on the row menu's own entry.
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
-import {
-  KuiButton,
-  KuiPopoverPanel,
-  KuiSearchInput,
-  kuiRowVariants,
-  useModalFocus,
-} from '@kira/kira-ui';
-import { onClickOutside, useEventListener } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { Button } from '@theme/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
+import { computed, ref, useTemplateRef } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
+import { cn } from '../../lib/cn.ts';
+import { rowVariants } from '../../lib/rowVariants.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
 
@@ -53,36 +50,20 @@ const triggerReason = computed(() => {
 });
 
 const isOpen = ref(false);
-const rootEl = ref<HTMLElement | null>(null);
 const filter = ref('');
+// P131 Part 3 §5.2: reka's modal Popover owns focus trap, outside-click and Escape, and returns
+// focus to the trigger on close — the same contract `useModalFocus`/`onClickOutside`/the rootEl
+// Escape listener existed to provide by hand.
+const filterEl = useTemplateRef<{ $el: HTMLElement }>('filterEl');
 
-// W17: focus returns to the header trigger when the panel closes, whichever way it closed
-// (Escape, an outside click, or picking a row) — `modalFocus.ts`'s own invoker-capture
-// composable, reused rather than hand-rolled (the plan's own wording for this bullet).
-// `rootEl` wraps the trigger button itself, so the invoker `useModalFocus` captures the instant
-// `isOpen` flips true is always the trigger — exactly what should get focus back on close.
-const { onKeydown: onModalKeydown } = useModalFocus(isOpen, rootEl);
+function open(): void {
+  isOpen.value = true;
+}
 
 function close(): void {
   isOpen.value = false;
   filter.value = '';
 }
-
-function toggle(): void {
-  isOpen.value = !isOpen.value;
-  if (!isOpen.value) filter.value = '';
-}
-
-onClickOutside(rootEl, () => {
-  if (isOpen.value) close();
-});
-
-// P105 §5.1: the wrapping div is not interactive -- both keydown listeners bind here via VueUse
-// instead of raw template attributes.
-useEventListener(rootEl, 'keydown', (e) => {
-  onModalKeydown(e);
-  if (e.key === 'Escape') close();
-});
 
 const sections = computed(() =>
   buildRefListSections(
@@ -111,76 +92,94 @@ function pick(ref: string): void {
   emit('select-base', ref);
 }
 
+/** §5.2: reka's own default (the panel's first focusable element) loses to the filter input
+ *  explicitly, mirroring BranchPicker.vue's own `onOpenAutoFocus`. */
+function onOpenAutoFocus(e: Event): void {
+  e.preventDefault();
+  filterEl.value?.$el.focus();
+}
 </script>
 
 <template>
-  <div ref="rootEl" class="kv:relative">
-    <KuiButton
-      class="kv:max-w-full"
-      aria-haspopup="true"
-      :aria-expanded="isOpen"
-      data-testid="base-selector-trigger"
-      @click="toggle"
-    >
-      <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
-      <span v-if="triggerReason" class="kv:text-muted-foreground kv:text-sm">{{ triggerReason }}</span>
-      <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
-    </KuiButton>
+  <div class="kv:relative">
+    <Popover modal :open="isOpen" @update:open="(o) => (o ? open() : close())">
+      <PopoverTrigger as-child>
+        <Button variant="toolbar" size="kira" class="max-w-full" data-testid="base-selector-trigger">
+          <span class="kv:truncate kv:font-semibold">{{ triggerLabel }}</span>
+          <span v-if="triggerReason" class="kv:text-muted-foreground kv:text-sm">{{ triggerReason }}</span>
+          <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
+        </Button>
+      </PopoverTrigger>
 
-    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="280" @close="close">
-    <div
-      class="kv:max-h-80 kv:flex kv:flex-col kv:min-h-0"
-      role="dialog"
-      aria-label="Choose a comparison base"
-    >
-      <KuiSearchInput
-        class="kv:m-1"
-        v-model="filter"
-        placeholder="Filter branches"
-        ariaLabel="Filter branches"
-      />
-      <div class="kv:overflow-auto kv:min-h-0">
-        <section v-if="suggested.length > 0" aria-label="Suggested">
-          <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">Suggested</div>
-          <KuiButton
-            v-for="candidate in suggested"
-            :key="candidate.ref"
-            :class="[kuiRowVariants(), 'kv:w-full']"
-            @click="pick(candidate.ref)"
-          >
-            <span class="kv:truncate">{{ candidate.ref }}</span>
-            <span class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ candidateReason(candidate) }}</span>
-          </KuiButton>
-        </section>
+      <PopoverContent
+        align="start"
+        class="w-70 p-0 gap-0"
+        aria-label="Choose a comparison base"
+        @open-auto-focus="onOpenAutoFocus"
+      >
+        <div class="kv:max-h-80 kv:flex kv:flex-col kv:min-h-0">
+          <InputGroup variant="kira" class="m-1">
+            <InputGroupAddon>
+              <span class="codicon codicon-search" aria-hidden="true"></span>
+            </InputGroupAddon>
+            <InputGroupInput
+              ref="filterEl"
+              v-model="filter"
+              placeholder="Filter branches"
+              aria-label="Filter branches"
+            />
+            <InputGroupAddon v-if="filter" align="inline-end">
+              <InputGroupButton aria-label="Clear filter" @click="filter = ''">
+                <span class="codicon codicon-close" aria-hidden="true"></span>
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <div class="kv:overflow-auto kv:min-h-0">
+            <section v-if="suggested.length > 0" aria-label="Suggested">
+              <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">Suggested</div>
+              <button
+                v-for="candidate in suggested"
+                :key="candidate.ref"
+                type="button"
+                :class="cn(rowVariants(), 'kv:w-full')"
+                @click="pick(candidate.ref)"
+              >
+                <span class="kv:truncate">{{ candidate.ref }}</span>
+                <span class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ candidateReason(candidate) }}</span>
+              </button>
+            </section>
 
-        <section aria-label="All branches">
-          <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">All branches</div>
-          <KuiButton
-            v-for="row in sections.branches.visible"
-            :key="row.refname"
-            :class="[kuiRowVariants(), 'kv:w-full']"
-            @click="pick(row.shortName)"
-          >
-            <span class="kv:truncate">{{ row.shortName }}</span>
-          </KuiButton>
-          <KuiButton
-            v-for="row in sections.remoteBranches.visible"
-            :key="row.refname"
-            :class="[kuiRowVariants(), 'kv:w-full']"
-            icon="codicon-cloud"
-            @click="pick(row.shortName)"
-          >
-            <span class="kv:truncate">{{ row.shortName }}</span>
-          </KuiButton>
-          <div
-            v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
-            class="kv:py-1 kv:px-2 kv:text-muted-foreground"
-          >
-            No matching branches
+            <section aria-label="All branches">
+              <div class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm kv:uppercase">All branches</div>
+              <button
+                v-for="row in sections.branches.visible"
+                :key="row.refname"
+                type="button"
+                :class="cn(rowVariants(), 'kv:w-full')"
+                @click="pick(row.shortName)"
+              >
+                <span class="kv:truncate">{{ row.shortName }}</span>
+              </button>
+              <button
+                v-for="row in sections.remoteBranches.visible"
+                :key="row.refname"
+                type="button"
+                :class="cn(rowVariants(), 'kv:w-full')"
+                @click="pick(row.shortName)"
+              >
+                <span class="codicon codicon-cloud" aria-hidden="true"></span>
+                <span class="kv:truncate">{{ row.shortName }}</span>
+              </button>
+              <div
+                v-if="sections.branches.visible.length === 0 && sections.remoteBranches.visible.length === 0"
+                class="kv:py-1 kv:px-2 kv:text-muted-foreground"
+              >
+                No matching branches
+              </div>
+            </section>
           </div>
-        </section>
-      </div>
-    </div>
-    </KuiPopoverPanel>
+        </div>
+      </PopoverContent>
+    </Popover>
   </div>
 </template>

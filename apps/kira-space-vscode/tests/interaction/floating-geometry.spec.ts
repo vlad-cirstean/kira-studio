@@ -9,12 +9,12 @@ import {
 import { type InteractionServer, startInteractionServer } from './support/server.ts';
 
 /**
- * G20 D9/§4.2, §7 item 4 / P131 Part 2: one representative geometry case per floating
+ * G20 D9/§4.2, §7 item 4 / P131 Parts 2-3: one representative geometry case per floating
  * mechanism this package uses over the review sidebar's existing fake-transport fixture
- * (`fakeReviewHost.ts`), rather than one per call site. The Tooltip and DropdownMenu cases now
- * exercise shadcn-vue's own reka-ui-backed components (`AttributeTooltip.vue`/`RowContextMenu.vue`
- * — converted off `packages/kira-ui`'s `KuiTooltip`/`KuiContextMenu` in P131 Part 2); the
- * BaseSelector case still exercises `KuiPopoverPanel`, unconverted until Part 3. F10's own finding
+ * (`fakeReviewHost.ts`), rather than one per call site. Every case here now exercises shadcn-vue's
+ * own reka-ui-backed components — Tooltip and DropdownMenu via `AttributeTooltip.vue`/
+ * `RowContextMenu.vue` (P131 Part 2), BaseSelector via reka's own `Popover`/`PopoverContent`
+ * (P131 Part 3). F10's own finding
  * that `webview-layout`'s dead-transport harness renders nothing beyond `.kv-app`'s empty shell
  * (re-confirmed directly against the current tree: the graph panel's pre-connect DOM has no
  * toolbar, no tooltip-carrying element at all — `AppToolbar` sits behind `v-if="repoState"`, which
@@ -134,9 +134,9 @@ test.describe('floating primitives — geometry', () => {
   });
 
   // D5: opening BaseSelector's dropdown near the right edge of a narrow viewport must keep the
-  // whole panel on-screen — proving KuiPopoverPanel's shift, the mechanism every one of the 7
-  // migrated dropdowns shares. Unconverted until Part 3 (BaseSelector.vue still owns this).
-  test('KuiPopoverPanel shifts back on-screen near a horizontal viewport edge', async ({
+  // whole panel on-screen — proving reka Popper's own shift, the mechanism every one of the 7
+  // migrated dropdowns shares.
+  test('BaseSelector Popover shifts back on-screen near a horizontal viewport edge', async ({
     page,
   }) => {
     await bootReview(page);
@@ -146,9 +146,9 @@ test.describe('floating primitives — geometry', () => {
     const triggerBox = await trigger.boundingBox();
     if (!triggerBox) throw new Error('base-selector-trigger has no box');
 
-    // Just enough room to the trigger's right for a sliver — KuiPopoverPanel's default
-    // placement ('bottom-start') grows rightward from the trigger's own left edge, forcing real
-    // overflow past a narrow viewport's right edge without shift().
+    // Just enough room to the trigger's right for a sliver — the Popover's default placement
+    // ('bottom-start'-equivalent, `align="start"`) grows rightward from the trigger's own left
+    // edge, forcing real overflow past a narrow viewport's right edge without shift().
     await page.setViewportSize({
       width: Math.ceil(triggerBox.x + triggerBox.width + 20),
       height: 700,
