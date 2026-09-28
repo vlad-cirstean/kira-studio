@@ -22,14 +22,12 @@ import type { DecorationRef } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
 import { laneClass } from '../graph/palette.ts';
 import { BADGE_ICONS } from '../icons/index.ts';
+import { REF_BADGE_CLASS } from './badgeClass.ts';
 
 /** §6.2: "a row with more than three badges collapses the overflow into a +N badge". */
 const MAX_VISIBLE_BADGES = 3;
 
-type BadgeShape = 'pill' | 'square';
-
 export interface BadgeSpec {
-  readonly shape: BadgeShape;
   readonly icon: string;
   /** Which `--kv-badge-*` token group this badge draws from — a CSS class, never a colour value
    *  read or computed here (B4: colours live only in the theme layer). */
@@ -56,7 +54,6 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
   switch (ref.kind) {
     case 'branch':
       return {
-        shape: 'pill',
         icon: BADGE_ICONS.localBranch,
         colorClass: 'kv-badge-local',
         text: ref.name,
@@ -67,7 +64,6 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       };
     case 'remoteBranch':
       return {
-        shape: 'pill',
         icon: BADGE_ICONS.remoteBranch,
         colorClass: 'kv-badge-remote',
         text: ref.name,
@@ -78,7 +74,6 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       };
     case 'tag':
       return {
-        shape: 'square',
         icon: BADGE_ICONS.tag,
         colorClass: 'kv-badge-tag',
         text: ref.name,
@@ -92,7 +87,6 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // (`StashList.vue`, `StashDialog.vue`) — not the bare "stash" P4 shipped, which could not
       // say *which* stash a badge on a non-`stash@{0}` row (P9 W12's own graph walk) belonged to.
       return {
-        shape: 'square',
         icon: BADGE_ICONS.stash,
         colorClass: 'kv-badge-stash',
         text: `stash@{${ref.index}}`,
@@ -109,7 +103,6 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
       // exist, rather than going undecorated (which would make a detached-HEAD commit visually
       // indistinguishable from an ordinary one — the opposite of what this column is for).
       return {
-        shape: 'pill',
         icon: BADGE_ICONS.localBranch,
         colorClass: 'kv-badge-local',
         text: 'HEAD',
@@ -175,7 +168,7 @@ function buildBadgeElement(
   stackInfoFor?: (branchName: string) => StackBadgeInfo | undefined,
 ): HTMLSpanElement {
   const badge = document.createElement('span');
-  const classes = ['kv-badge', `kv-badge-${spec.shape}`, spec.colorClass];
+  const classes = [REF_BADGE_CLASS, spec.colorClass];
   if (spec.dashed) classes.push('kv-badge-dashed');
   if (laneColor !== undefined) classes.push('kv-badge-lane-tinted', laneClass(laneColor));
   if (spec.refKind === 'branch' && spec.refName !== undefined) {
@@ -188,14 +181,13 @@ function buildBadgeElement(
   // — CommitGrid.vue's own `.kv-badge-current` rule.
   if (spec.isCurrentBranch) classes.push('kv-badge-current');
   badge.className = classes.join(' ');
-  // G21 D2: the full name always lives in `@kira/kira-ui`'s own tooltip attribute (a mouse-hover
-  // affordance) independent of whether the ~190px CSS truncation (kv-badge-label) actually clips
-  // this particular badge's text — `data-kui-tip`, not a native `title`, since this file is plain
-  // DOM code outside Vue and so cannot use the `v-kui-tooltip` directive itself; setting the same
-  // attribute the directive writes gets it picked up by the one document-level tooltip controller
-  // `App.vue`/`ReviewView.vue` each already mount. No `aria-label` alongside it: the visible label
-  // span below already gives this badge a real accessible name.
-  badge.setAttribute('data-kui-tip', spec.text);
+  // P131 Part 2: the full name lives in `data-kira-tip`, read by the one `AttributeTooltip`
+  // CommitGrid.vue mounts over its grid host — a mouse-hover affordance independent of whether the
+  // ~190px CSS truncation (kv-badge-label) actually clips this particular badge's text. This file
+  // is plain DOM code outside Vue, so it writes the attribute a real `Tooltip`/`TooltipTrigger`
+  // would otherwise carry, rather than using either directly. No `aria-label` alongside it: the
+  // visible label span below already gives this badge a real accessible name.
+  badge.setAttribute('data-kira-tip', spec.text);
 
   // `docs/plans/P7.md` W14: the one seam `CommitGrid.vue`'s `handleContextMenu` hit-tests for
   // (`closest("[data-ref-kind]")`) — present only for `branch`/`remoteBranch` (see `BadgeSpec`'s
@@ -235,8 +227,8 @@ function buildBadgeElement(
 
 function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
   const badge = document.createElement('span');
-  badge.className = 'kv-badge kv-badge-pill kv-badge-overflow';
-  badge.setAttribute('data-kui-tip', overflow.title);
+  badge.className = `${REF_BADGE_CLASS} kv-badge-overflow`;
+  badge.setAttribute('data-kira-tip', overflow.title);
   badge.textContent = `+${overflow.count}`;
   return badge;
 }
@@ -244,7 +236,7 @@ function buildOverflowBadge(overflow: OverflowSpec): HTMLSpanElement {
 // ---------------------------------------------------------------------------------------
 // G24 D9/D10.8: the per-commit graph indicator — one badge per commit, never one per associated
 // PR. Kept in this file (not a new module) since it is, structurally, a fifth badge kind sharing
-// every one of `buildBadgeElement`'s conventions (a `.kv-badge` pill, an icon, `data-kui-tip`) —
+// every one of `buildBadgeElement`'s conventions (`REF_BADGE_CLASS`, an icon, `data-kira-tip`) —
 // it just never goes through `badgeSpecFor`/`DecorationRef`, since a PR is not a ref decoration.
 // ---------------------------------------------------------------------------------------
 
@@ -294,13 +286,13 @@ export function buildPrBadge(
   if (best === undefined) return null;
 
   const badge = document.createElement(openExternalCapability ? 'button' : 'span');
-  badge.className = `kv-badge kv-badge-pill kv-badge-pr kv-badge-pr--${best.state}`;
+  badge.className = `${REF_BADGE_CLASS} kv-badge-pr kv-badge-pr--${best.state}`;
   if (badge instanceof HTMLButtonElement) {
     badge.type = 'button';
     badge.dataset.prNumber = String(best.number);
   }
   const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
-  badge.setAttribute('data-kui-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
+  badge.setAttribute('data-kira-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
 
   const label = document.createElement('span');
   label.className = 'kv-badge-label';
