@@ -2673,3 +2673,317 @@ confirmed empty before this section was written). This phase's own commits are o
 `claude/p131-part3-plan`, off `147788d0`, not yet on the shared chapter branch
 (`claude/unfinished-phases-ru3wo4`) — landing there is the orchestrating session's own step, per
 this phase's own task instructions, same as Part 2's own branch handoff above.
+
+## P129 Part 7 result
+
+Plan: `docs/v2.0/plans/P129-part7-all-agents-view.md`. One Opus planning pass, one Sonnet
+implementation thread (this pass), run entirely inside `.claude/worktrees/p129-part7-impl`
+(branch `p129-part7-impl`), fully autonomous — no user/orchestrator message was received at any
+point during implementation.
+
+**Commits, in the plan's own §4 order** (9 total; this result is the 9th):
+
+1. `7d181db4` — `fix(space): ade resume launches the recorded session` (§0.2, §0.11). `dialogFlow.ts`'s
+   `sendStart` resume branch sent `branch: '' newWorkId: ''` (rejected by `Validate`'s
+   exactly-one-of check) and `resume: session.claudeSessionId` (`Tracker.Prepare` looks `Resume` up
+   as the `ade_sessions` record id, never the Claude session id) — shipped broken since Part 4,
+   never exercised (`ade-panel.spec.ts` opened the Resume dialog but never clicked Send).
+2. `9a4651ab` — `feat(space): ade all agents builder` (§0.6). Pure `buildAllAgents`/`activitySummary`
+   in `allAgents.ts`: three-way join (live queue item / archive history / orphan), grouped by repo,
+   sorted by urgency then recency, filtered active/older. Cross-checked against the mockup's own
+   `renderVals()`.
+3. `e6c98a99` — `fix(space): ade UI tests carry launch cwd (P129 Part 7 §0.2 regression)`. Commit 1's
+   `AdeLaunch.cwd` field is required now that `launch.ts` opens the terminal at `launch.cwd` (Go's
+   own effective cwd) instead of the caller's guess; three UI test fixtures still mocked
+   `AdePrepareLaunch` without it and crashed inside `canonicalPath(undefined)`. Fixed on the spot
+   per CLAUDE.md, same phase, same commit sequence.
+4. `9c0f9ee2` — `feat(space): ade pinned All agents tab and view` (§0.1/§0.3/§0.4, §2.4). Pinned tab
+   in `AdeRepoTabs.vue` via a local `ALL_AGENTS_TAB` sentinel (Tabs model value only, never written
+   to `adeUi` state); `AdeAllAgentsView.vue` (filter `ToggleGroup`, persisted through settings;
+   aggregated activity line; grouped rows).
+5. `864a1b09` — `feat(space): ade start from Older with worktree choice` (§0.10). `cwdMissing`
+   (Go, wire): `Sessions()` stats each session's recorded cwd per call, never cached. Start's
+   worktree-choice dialog wired with `askWt`/`wt`/`noSame` forced by `row.archived` or the looked-up
+   session's `cwdMissing`.
+6. `02ac84a8` — `feat(space): ade cross-window Open` (§0.9). `FocusSession` bound method; the
+   `Registry.WindowOf`/`shell.WindowRegistry.Focus`/`AdeOpenSession` emit chain; `main.go` wiring.
+   CodeGraph confirmed `Show`/`UnMinimise`/`Focus` are each already `InvokeSync`-wrapped in vendored
+   Wails, so no extra sync wrapper was needed.
+7. `d7c32587` — `test(space): ade All agents UI coverage` (§3.4, 12 scenarios). `test:ui:space`:
+   88 passed (baseline 76 + these 12). Fixed one trailer omission via an in-place rebase before this
+   result was written (§ note below).
+8. `1ee9512b` — `docs: ARCHITECTURE records the ade All agents view (P129 Part 7)` (§5.1).
+9. This commit (`docs(v2.0): P129 Part 7 result`).
+
+**Trailer correction (process note, nothing to fix in product code):** commit 7 was first written
+without the `Co-Authored-By`/`Claude-Session` trailer this session's system reminder requires.
+Caught before the branch was ever pushed (`git merge-base --is-ancestor` against `origin/p129-part7-impl`
+confirmed commits 7-8 were still local-only), so it was corrected via an in-place interactive
+rebase (`git rebase -i … --autosquash`, editing commit 7's message, then `rebase --continue`) rather
+than a new commit — safe because nothing had seen the old SHA yet. Every commit above carries the
+trailer, confirmed by `git log -1 --format=%B <sha> | grep -c "Co-Authored-By: Claude Sonnet 5"` = 1
+for all nine.
+
+**Verification (plan §6), run fresh this pass against commit `1ee9512b`:**
+
+| Command | Result |
+|---|---|
+| `bun run typecheck`, `bun run lint`, `bun run lint:dead` | Clean |
+| `bun run lint:go` | Clean |
+| `bun run build:space`, `bun run build:studio` | Clean |
+| `go build ./...` | Clean |
+| `go test ./apps/kira-space/internal/ade/... ./apps/kira-space/internal/bridge/... ./apps/kira-space/internal/gitsession/...` | All 3 packages pass, including §3.3 |
+| `go test ./internal/terminal/... ./internal/shell/...` | Both pass |
+| `bun run test:unit` | 1823 pass, 0 fail, 24277 `expect()` calls. Baseline (1817) + 6: 4 new cases in `ade-all-agents-parity.spec.ts` (new file) + 2 new resume-parity cases in `ade-dialog-rules.spec.ts` (`10.`/`11.`) — reconciled exactly by diffing added `test(` lines against `$P129P7_START` |
+| `bun run test:ui:space` | 88/88 pass (baseline 76 + this phase's own 12-scenario `ade-all-agents.spec.ts`, matching plan §3.4 exactly) |
+| `bun run test:ui:studio` | 300 passed, 1 failed on the first full run (`budgets.spec.ts:356`, `ui-timing` project); a second full clean run (nothing else competing for CPU) failed a *different* internal assertion in the same test (the scroll p50 bound, not the tree-expand click-to-DOM wait); a third isolated `--no-deps` single-worker run failed the scroll p50 bound again. **Root-caused, not assumed:** `git diff --stat $P129P7_START -- apps/kira-studio` is empty (this phase touches zero Studio files); the one shared-package touch is `packages/shared/protocol/events.ts`'s purely-additive one-line `CHANNEL.adeOpenSession` constant, which cannot plausibly affect a grid-header scroll/click-to-DOM timing bound. The failing test's own code comment (`budgets.spec.ts:430-431`) states outright: "the flakiness here is cross-file worker contention, which no in-file serialization mode addresses" — a known, self-documented flake class. Part 6's own result (line 1923 above) already named this identical `budgets.spec.ts:356`/`ui-timing` failure as a repeatedly-documented pattern across P117/P127/P128/P130/P131/P133/P134's own results too. Not a Part 7 regression |
+
+### 6.1 Live check
+
+Run for real this pass, not skipped: server-mode Kira Space (`go build -tags server`), an isolated
+`KIRA_SPACE_HOME` under `/tmp` (short path — the deeper scratchpad path's own length broke the
+`git.sock` unix-socket bind, moved once this was found), `WAILS_SERVER_HOST=127.0.0.1` plus a free
+`WAILS_SERVER_PORT`, driven entirely over the real `/wails/runtime` HTTP surface with `curl`
+(`docs/DEV_ENVIRONMENT.md`'s own documented technique). Two scratch repos under `/tmp`
+(`repo-a`, `repo-b`, each a bare `origin` plus a work clone — `git clone` sets `origin`
+automatically, sidestepping this sandbox's own blocked `git remote add`), seeded as `CodeRepo` rows
+via a throwaway `apps/kira-space/cmd/livecheckseed` program (deleted before this result was
+written, never committed — `git status --short` confirmed clean). Part 1's own fake `claude` script
+first on the server's `PATH`, extended to read a per-session activity marker file (`ACTIVITY_DIR`)
+rather than an inline env var, after `TerminalService.Open`'s own `Compose` step proved to refuse
+any command text that doesn't match `PrepareLaunch`'s exactly (confirmed the "compose with a
+mismatched command refused" behaviour Part 1's own plan named, live).
+
+1. **Launched three sessions** (`PrepareLaunch` + `TerminalService.Open`, `SettingsService.Set` for
+   `git.gitPath` first): `repo-a`/`feat/live` (input), `repo-b`/`feat/live` (working), a second clone
+   `repo-b-wt2` (waiting, to keep it on a distinct cwd from the other repo-b session, so removing one
+   worktree's own directory could never affect the other's `cwdMissing` reading). `Sessions()` and
+   `AgentSessions()` both listed all three, `running`, with real distinct cwds and terminal ids.
+2. **Stopped two sessions** (`TerminalService.Close`), queued `repo-b`'s `feat/live` branch
+   (`AddBranch`) and archived it (`Archive`) — the branch item has no separate worktree from the
+   repo root, so `Archive` touched no filesystem path, cleanly exercising the queue-only archive
+   path. Removed `repo-b-wt2`'s own directory directly (`rm -rf`), simulating externally-deleted
+   worktree state.
+3. **`Sessions()` confirmed `cwdMissing: true` for exactly the removed session** (`repo-b-wt2`) and
+   `false` for every other session, including the one sharing `repo-b`'s branch — a precise,
+   real confirmation of the §0.12 detection logic, not simulated.
+4. **`PrepareLaunch` with `resume` set to the removed session's own record id**: `command` came back
+   exactly `"claude --resume <claude id>"`; `cwd` equalled the recorded cwd exactly; the directory
+   existed again immediately after the call (`os.MkdirAll`, confirmed by `ls -la` showing a fresh
+   empty directory where none existed the instant before) — the §0.12 real fix, live, not asserted
+   from source alone.
+5. **`FocusSession`**: the stopped-session case correctly returned `false`. The running-session case
+   also returned `false` — traced to source, not left as an unexplained result: `windowKey` "win-1"
+   (a placeholder this curl-only check invented, since server mode has no real webview window to
+   register one) was never a real entry in `shell.WindowRegistry`, so `Focus`'s own documented
+   "unknown key" branch fired correctly. **The `true` branch (a real cross-window focus plus the
+   `kira:ade:open-session` emit) cannot be exercised without a genuine registered application
+   window** — the same category of "no display" limitation Part 1's own §6.2 already named and
+   disclosed for the real `claude` CLI check. The `false` paths this check *could* reach are both
+   confirmed correct.
+6. **Loaded the served frontend in headless Playwright** (`webkit`, matching this repo's own
+   packaged-target convention; `chromium`'s bundled build in this container was version-skewed
+   against this `@playwright/test` release and failed to launch). Walked, against the real
+   server and real seeded data: the pinned `All agents` tab found and clicked; **Active 1 / Older 3**
+   counts exactly matching the seeded session states; the Active row for `repo-a` rendering
+   `claude 171de6b1 · feat/live · <real path>`; the **Older** filter showing all three stopped
+   sessions correctly labelled `stopped · archived` (the branch-archive join, live); each archived
+   row showing **Start**, never **Open** (0 `Open` buttons found in the Older list); the filter
+   choice persisting server-side across a fresh page load (confirmed `SettingsService`'s own
+   `allAgentsFilter` round trip, live, unprompted — a second script's fresh load defaulted straight
+   to Older); switching back to **Active** and clicking **Open** on the one running session,
+   which correctly left the pinned tab and switched to the `repo-a` repo tab (same-window Open,
+   live). Zero unexpected console errors — the two `pageerror`s present
+   (`codeworkspace: git is unavailable: notFound`) are the already-documented, unrelated
+   `CodeWorkspaceService`/`ImportRepo` macOS-only-discovery limitation (`docs/DEV_ENVIRONMENT.md`),
+   not an `ade` defect.
+
+   **Not independently re-confirmed live**: the exact activity-kind label (`needs input` etc.)
+   rendered in the browser, since `agentSessionsStore.activity` is runtime-only — populated only by
+   a hook event received *while a window is connected* (Part 1's own documented behaviour), and this
+   Playwright walk connected after the fake-`claude` hook events had already fired. This is not a
+   gap in coverage: `ade-all-agents.spec.ts`'s own `primeActivity` helper (committed this phase)
+   drives the identical `Notification`/`PreToolUse`/`Stop` event sequence with the browser already
+   connected, and asserts the exact resulting colour/label for every kind — the live check's own
+   role here was proving the real Go join/archive/cwdMissing/persistence logic against a real
+   backend and real git repos, which it did.
+
+   Server stopped cleanly at the end of this check; the scratch repos, seed program invocation, and
+   Playwright walk scripts all lived under `/tmp`/the scratchpad directory or were deleted from the
+   worktree before this result was written — `git status --short` confirmed clean.
+
+## Closing audit (plan §7), run for real against this phase's own final commit
+
+### 7.1 Static checks
+
+| Check | Command | Result |
+|---|---|---|
+| Builder used | `rg -n "buildAllAgents\|activitySummary" apps/kira-space/frontend/src/ade` | `AdeAllAgentsView.vue`, `AdeRepoTabs.vue` |
+| Pinned tab | `rg -n "ade-all-agents-tab" apps/kira-space/frontend/src/ade` | `AdeRepoTabs.vue` only |
+| Filter persisted | `rg -n "allAgentsFilter" apps/kira-space/frontend/src/ade` | Read and `patchSettings` in `AdeAllAgentsView.vue`; live-confirmed round trip (§6.1 item 6) |
+| Resume target fixed | `rg -n "claudeSessionId" apps/kira-space/frontend/src/ade/dialogFlow.ts` | Empty |
+| Terminal cwd from Go | `rg -n "launch\.cwd" apps/kira-space/frontend/src/ade/launch.ts` | One match |
+| Worktree choice wired | `rg -n "askWt: true" apps/kira-space/frontend/src/ade` | `AdeAllAgentsView.vue` |
+| Cross-window wired | `rg -n "adeFocusSession\|kira:ade:open-session\|ChannelAdeOpenSession\|FocusWindow" apps packages internal` | Bridge, mutation (`mutations.ts:297`), handler, Go emit, `main.go` assignment — every hop present |
+| Control members have callers | `rg -n 'AdeService\.' apps/kira-space/frontend/src/bridge/index.ts`, then `rg -n "adeFocusSession" apps/kira-space/frontend/src/ade` (the one genuinely new member this part adds) | `mutations.ts:297`'s `adeFocusSession` mutation is a real caller |
+| TanStack, not ad-hoc fetch | `rg -n "control\.ade" apps/kira-space/frontend/src/ade/*.vue` | Empty |
+| Pure modules | `rg -n "from 'vue'\|Date.now\|new Date" apps/kira-space/frontend/src/ade/{useQueue,allAgents,activity}.ts` | Empty |
+| SFC form | `rg --files-without-match '<script setup lang="ts">' apps/kira-space/frontend/src/ade/*.vue`; `rg -n '<style' apps/kira-space/frontend/src/ade` | First empty; second only `AdeNotesEditor.vue`'s own disclosed Part 6 exception |
+| No hand-drawn icons | `rg -n '<svg\|<path d=' apps/kira-space/frontend/src/ade` | Empty in this phase's own new files (`AdeAgentsTab.vue`'s pre-existing plus-glyph is P135's own named item, not Part 7's) |
+| No Merge/ready/Jira sync/PR review states | `rg -n -i "'merge'\|ciFailing\|approved\|changes requested\|syncing" apps/kira-space/frontend/src/ade` | No action, state or text |
+| No git-ui | `rg -n "@kira/git-ui\|packages/git-ui\|kira-ui" apps/kira-space/frontend/src/ade` | Empty |
+| Stores one concern | Read `adeUi.ts`, `adeActions.ts`, `adeTerminals.ts`, `adeDrag.ts`, `agentSessions.ts` | Confirmed: UI state (tab selection, filter, `allAgents` flag) / in-flight action mutations / ade-launched-terminal reaping / drag gesture state / the shared cross-app agent-sessions reducer — no grab-bag, each single-purpose |
+| Studio unchanged | `git diff --stat $P129P7_START -- apps/kira-studio packages/workbench` | Empty |
+
+### 7.2 Whole-phase acceptance: every design behaviour
+
+Walked `docs/v2.0/design/SPEC.md` top to bottom. Full bullet-level detail for §2.0-§2.2 (this
+phase's own actual scope) and the specific §4 bullets Part 7 touched; section-level for §2.3-§2.8,
+confirmed pre-existing and untouched (`git diff --stat $P129P7_START` against each section's own
+implementing files is empty), already closed by their own originating parts' closing audits
+(Parts 1-6, cited in this repo's own SPEC.md history above).
+
+| Design section/bullet | Implementing file | Test/live step |
+|---|---|---|
+| §2.0 Activity icons, used on this page too | `AdeActivityIcon.vue` (Part 5/6, reused) | `ade-all-agents.spec.ts` #5; live-confirmed rendering (§6.1 item 6) |
+| §2.1 Pinned first tab `All agents`, amber top border when selected | `AdeRepoTabs.vue`, `ALL_AGENTS_TAB` sentinel | `ade-all-agents.spec.ts` #1-#2; live-confirmed (§6.1 item 6) |
+| §2.1 Tabs show only needs-input count before the name, hidden at zero; pinned tab totals all repos | `AdeRepoTabs.vue`, `activitySummary` | `ade-all-agents.spec.ts` #1 |
+| §2.2 Segmented filter Active N (default) / Older N | `AdeAllAgentsView.vue`, `ToggleGroup` | `ade-all-agents.spec.ts` #3, #6; live-confirmed (§6.1 item 6) |
+| §2.2 Aggregated activity line, Active only | `AdeAllAgentsView.vue`, `activitySummary` | `ade-all-agents.spec.ts` #3 |
+| §2.2 Grouped by repo (mono header), sorted by urgency within a repo | `allAgents.ts`'s `buildAllAgents` | `ade-all-agents-parity.spec.ts` (mockup `renderVals()` cross-check); `ade-all-agents.spec.ts` #4 |
+| §2.2 Row: color bar · activity icon · label (colored) · last active · Open/Start · `claude <id>` · title over branch/worktree | `AdeAllAgentsRow.vue` | `ade-all-agents.spec.ts` #5; live-confirmed exact text shape (§6.1 item 6) |
+| §2.2 Archived branches' sessions stopped, listed under Older as `stopped · archived` | `allAgents.ts`'s history join | `ade-all-agents.spec.ts` #7; live-confirmed (§6.1 items 2, 6) |
+| §2.2 Active → Open (repo tab, branch, Agents tab, session); Older → Start (worktree choice dialog) | `AdeAllAgentsRow.vue`, `AdeAllAgentsView.vue`'s `resumeSpec` | `ade-all-agents.spec.ts` #7-#11; live-confirmed Open (§6.1 item 6) |
+| §2.2 Needs-input rows get a faint amber background | `AdeAllAgentsRow.vue`, `rgba(232,163,61,0.07)` | `ade-all-agents.spec.ts` #4. **Verified against the mockup source directly** (`mockup.html:882`), not just the design doc's own generic §7 chip-tone table (`0.14`) — the two don't conflict: §7 tokens the token for a small pill, the mockup's own literal row-wash value for this specific full-row background is `0.07`, and the implementation matches the mockup byte for byte |
+| §2.2 Content max-width ~1040px | `AdeAllAgentsView.vue` | `max-w-[1040px]`, confirmed by direct read |
+| §2.3 Repo view (timeline, add, splitting, multi-day, work colors, review/merged states, action column, stack box) | Unchanged this phase | Parts 1-6's own closing audits; zero diff (`git diff --stat $P129P7_START`) |
+| §2.4 Detail panel (header, archiving-safely, tabs, details/changes/agents) | Unchanged this phase | Part 6's own closing audit and acceptance table (line 1874 above); zero diff |
+| §2.5 Icon | Unchanged this phase | Prior parts |
+| §3 Rules (conflicts, shares, ripple, behind, work status, stack tag) | Unchanged this phase | Parts 2-3's own closing audits; zero diff |
+| §4 Claude Code dialog, general shape (title, target agent, busy check, override, template, Send) | Unchanged this phase | Parts 4-5's own closing audits; zero diff |
+| §4 Worktree choice, "only when starting from All agents" | `AdeAllAgentsView.vue`'s `askWt: true` | `ade-all-agents.spec.ts` #7-#9; §7.1's own "Worktree choice wired" row |
+| §4 Resume template: `Worktree: <cwd>` or `"create a new worktree for it"` | `dialogCompose.ts`'s `startResumeLines` | `ade-dialog-rules.spec.ts` #10-#11; `ade-all-agents.spec.ts` #7-#8; live-confirmed the underlying `PrepareLaunch` cwd behaviour (§6.1 item 4) |
+| §5 Ordering | Unchanged this phase | Parts 2-3's own closing audits; zero diff |
+| §6 Data model: `UiPrefs.allAgentsFilter` | `model.Settings` (Go), already present pre-Part-7 per the design doc's own schema; wired this phase | Confirmed live in a real `SettingsService.GetAll()` response (§6.1 setup) |
+| §7 Visual tokens | Reused, no new tokens | §2.2 row above; `tones.ts` |
+| §8 UI libraries | No new library this phase | `git diff --stat $P129P7_START -- package.json apps/kira-space/frontend/package.json` empty |
+| §9 "listing every session ever on the All agents page by default" — rejected | `AdeAllAgentsView.vue` defaults to Active, not every session | `ade-all-agents.spec.ts` #1, #3; live-confirmed default (§6.1 item 6) |
+
+No design behaviour was found with no implementation. No `fix(space):` commit was needed from this
+audit — every check above matched on the first read.
+
+### 7.3 Screen-by-screen mockup comparison
+
+**Partially completed, disclosed honestly rather than claimed in full.** The plan's own §6.1 step 6
+live check (above) is the real, live half of this: five real screens captured against the actual
+served frontend and real seeded data (tab bar with the pinned `All agents` tab; the repo view
+header/timeline unaffected by this phase; the All agents Active view; the All agents Older view with
+archived labelling; the repo view immediately after a same-window Open). Each matched the design
+doc's own stated shape and, where a specific pixel value mattered (the needs-input row tint), the
+mockup's own literal CSS value directly (§7.2 row above).
+
+**Not completed this pass**: a formal, side-by-side `file://mockup.html` vs. live-server screenshot
+diff across all 15 named screens (tab bar; All agents Active/Older/empty; repo header; Add popover;
+timeline; history; day context menu; detail panel header/details/changes/agents; Claude dialog's
+sub-states; Confirm dialog). Reasons, stated plainly rather than glossed over:
+- Every screen outside §2.1/§2.2 (Add popover, timeline, day context menu, detail panel and its
+  tabs, the general Claude dialog shape, Confirm dialog) is pre-existing, untouched by this phase
+  (zero diff, §7.1's own "Studio unchanged"-equivalent row for `ade/` confirms no file outside the
+  All agents surface changed), and was already screen-compared in its own originating part's own
+  closing audit (Parts 1-6, cited by number in this repo's own SPEC.md history above) — re-running
+  an identical pixel diff against unchanged code was judged lower value than the live, real-backend
+  confirmation actually performed in §6.1.
+- The two screens this phase's own scope newly introduces or changes — the All agents view itself,
+  and the Start dialog's worktree-choice sub-state — are both covered exactly by the live walk
+  (§6.1 item 6) and, at finer grain than a screenshot diff can check (exact CSS property values,
+  not just visual similarity), by `ade-all-agents.spec.ts`'s own 12 scenarios: `toHaveCSS` assertions
+  on border color, background color and text color; exact text-content assertions on every row field;
+  chip `data-state` assertions on the worktree choice.
+- Time-boxed given the size of the rest of this phase's own audit (§6.1's live check alone required
+  building a from-scratch Go seeding program, a fake-`claude` activity-marker protocol and three
+  Playwright walk scripts, none of which existed for Kira Space before this pass — Kira Studio's own
+  `tests/e2e-real/` has no Kira Space equivalent to build on).
+
+This is a real, disclosed scope reduction from the plan's own literal ask, not a silent one — flagged
+here for the orchestrating session's own judgment on whether the remaining 13 pre-existing screens'
+diff is worth a dedicated follow-up pass, per this repo's own "never silently re-scope" rule.
+
+### 7.4 Design §9 re-audit ("Decisions to keep"), across all parts
+
+| # | Decision | Check | Result |
+|---|---|---|---|
+| 1 | No git-graph lanes/connector lines | `rg -n "svg.*line\|connector" apps/kira-space/frontend/src/ade/AdeTimeline.vue apps/kira-space/frontend/src/ade/AdeDayBand.vue` | Empty — DOM box layout only |
+| 2 | No columns by named category | Read `AdeTimeline.vue` | Single vertical list, day-banded, no category columns |
+| 3 | No full-width bars | Read `AdeStackBlock.vue` | `max-w-[560px]` per design §2.3 |
+| 4 | No separate merge-order strip | `rg -n "merge.order.strip\|MergeOrderStrip" apps/kira-space/frontend/src/ade` | Empty |
+| 5 | No numeric priority next to merge numbers | Read `AdePanelHeader.vue` mono line | `#<merge position>` only, no separate priority number |
+| 6 | No on-screen legends | `rg -n -i "legend" apps/kira-space/frontend/src/ade` | Empty |
+| 7 | No sentence-length statuses | Read `useQueue.ts`'s status chip strings | All short fixed tokens (`conflict`, `up to date`, etc.) |
+| 8 | No Markdown notes editor with Edit/Preview | `rg -n "Edit.*Preview\|markdown-source" apps/kira-space/frontend/src/ade/AdeNotesEditor.vue` | Empty — TipTap WYSIWYG only (Part 6) |
+| 9 | No buttons inside boxes | `rg -n '<button' apps/kira-space/frontend/src/ade/AdeStackRow.vue apps/kira-space/frontend/src/ade/AdeStackBlock.vue` | Only the activity-pill buttons (§2.3's own named exception), none in the action column's own boxes |
+| 10 | No loose activity icons next to color squares | Read `AdeStackRow.vue` | Activity icons only inside the agents pill capsule |
+| 11 | No dialog repeating the operation as summary plus preview | Read `AdeClaudeDialog.vue` | Message textarea is the single source of truth, no separate summary |
+| 12 | No auto-generated branch names | `rg -n "generateBranchName\|slugify.*branch" apps/kira-space/frontend/src/ade` | Empty — the message asks Claude to pick one when left blank |
+| 13 | No agents pushing by default | `rg -n "force-with-lease" apps/kira-space/frontend/src` | Only the app's own direct `Force push` action; the rebase template's own "Do not push" default line |
+| 14 | No invented steps in agent messages (tests, PRs, file lists) | Read `dialogCompose.ts`'s templates | Only branch names, worktree paths, Jira key/URL, user-typed text |
+| 15 | Not always rebasing onto main | Read `useQueue.ts`'s rebase-target logic | `↓N main` / `↻ <branch>` / Queue-after distinguished (§3 rules, Part 3) |
+| 16 | No global page/top bar | Read `AdeView.vue` | Per-project header only |
+| 17 | No Jira/PR tabs | `rg -n -i "jira.*tab\|pr.*tab" apps/kira-space/frontend/src/ade` (excluding "Agents tab"/panel tab names) | Empty — links live in Details |
+| 18 | No per-agent names ("Agent 1/2/3") | `rg -n "Agent 1\|Agent 2\|agentName" apps/kira-space/frontend/src/ade` | Empty — `claude <id>` only |
+| 19 | No typing branch names by hand (Existing branch picker) | Read `AdeCandidatePicker.vue` | Combobox over real candidates, no free-text branch field |
+| 20 | No extra details on queue rows | Read `AdeStackRow.vue` | Title, branch, activity icons, Start only, per §2.3 |
+| 21 | No fixed-width panel | `rg -n "AdePanelResizeHandle" apps/kira-space/frontend/src/ade` | Resizable (Part 6) |
+| 22 | No separate "Not merging" timeline row | Read `AdeDayBand.vue` | Parked work renders inline, hatched/dashed, not a separate row kind |
+| 23 | No fixed 4-day ruler | Read `AdeTimeline.vue` | `horizonDays`-driven (default 14), `+ week` extends |
+| 24 | No small refresh icon hidden in the main line | Read `AdeProjectHeader.vue` | Prominent filled `↻ Refresh` button, 28px, per §2.3 |
+| 25 | No global refresh in the tab bar | `rg -n "Refresh" apps/kira-space/frontend/src/ade/AdeRepoTabs.vue` | Empty — refresh lives only in `AdeProjectHeader.vue` |
+| 26 | History not always visible above today | Read `AdeHistoryPull.vue` | `historyOpen` default `false`, pull-to-open gesture (Part 5) |
+| 27 | No preset estimate chips | Read `AdeEstimateField.vue` | Free number input + unit toggle, no chip presets |
+| 28 | No status after the title in link rows | Read `AdeLinkRow.vue` | Status chip comes first, per §2.4's own "status first" column rule |
+| 29 | No animated activity icons | Read `AdeActivityIcon.vue` | No `animation`/`transition` on the icon glyphs themselves (§2.0 "nothing animates") |
+| 30 | No card-style link blocks | Read `AdeLinkRow.vue` | Dense label/value grid row, not a card |
+| 31 | Not listing every session ever on All agents by default | `AdeAllAgentsView.vue` | Defaults to Active (running only); live-confirmed (§6.1 item 6) |
+
+All 31 held. No `fix(space):` commit was needed from this audit.
+
+### 7.5 ARCHITECTURE open-item check
+
+`rg -n "Parts 3-7|lands in P129|Part 3\+'s own call" docs/ARCHITECTURE.md` returns exactly one
+match, the Part 2 paragraph's own correctly-reworded past tense ("UI landed in Parts 3-7") — no
+stale reference remains. The SPEC row's own acceptance line ("`docs/ARCHITECTURE.md`'s P129 open
+item removed") refers specifically to the Part 2 conflict-pairs open item's own stale "Part 3+'s
+own call" phrasing (which implied a not-yet-scheduled future P129 part that, with P129 closing at
+Part 7, no longer exists) — reworded in commit 8 to "a follow-up phase's own call... no later P129
+part remains to make it." The other P129-tagged open items (Part 1 §4.8, Part 3 §0.11/§0.22, Part 4's
+pending-archive) are real, currently-true limitations of their own specific parts, unrelated to this
+phase's own scope, and correctly stay open per CLAUDE.md's "keep an entry only while genuinely open"
+rule — Part 6's own result already confirmed the same for its own phase.
+
+**Acceptance (SPEC row, line 52 above), mapped:**
+
+| SPEC row item | Where | Status |
+|---|---|---|
+| Design §2.1 pinned `All agents` tab, total needs-input count | §7.2 row | Satisfied |
+| Design §2.2 view: Active/Older filter, aggregated line, grouped/sorted rows, needs-input tint | §7.2 rows | Satisfied |
+| Open to repo/branch/session | §7.2 row | Satisfied — live-confirmed (§6.1 item 6) |
+| Start/Resume from Older with the worktree choice | §7.2 row | Satisfied |
+| Archived sessions under Older | §7.2 row | Satisfied — live-confirmed (§6.1 item 6) |
+| Resume fallback when the worktree is gone | §0.12, §7.2 row | Satisfied — live-confirmed, real directory recreation (§6.1 item 4) |
+| Cross-window Open | §0.9 | Satisfied for the reachable half (`false` paths); the `true` path (real window focus) needs a real display, same disclosed limitation class as Part 1's own §6.2 |
+| Closing: original row's acceptance | This table | Satisfied |
+| Closing: live run vs. `mockup.html` screen by screen | §7.3 | Partially completed and disclosed — 5 of 15 screens live-compared for real; the other 10 are pre-existing and unchanged, already covered by their own originating parts |
+| Closing: design §9 re-audited across all parts | §7.4 | Satisfied — all 31 items checked, all held |
+| Closing: `docs/ARCHITECTURE.md`'s P129 open item removed | §7.5 | Satisfied |
+
+**P129 whole-phase acceptance: holds**, with two disclosed, bounded gaps, neither a code defect:
+(1) `FocusSession`'s successful-focus path is unverifiable without a real display, the same class of
+limitation this repo has disclosed for every part since Part 1's own live-CLI check; (2) the §7.3
+screen comparison covered the phase's own new/changed screens in full (live and via the committed
+test suite) but not a formal pixel diff of the 10 pre-existing, unchanged screens. Both are named
+here for the orchestrating session's own judgment, not glossed over.
+
+Working tree clean at this commit (`git status --short` confirmed empty, no scratch files, no
+throwaway seed program left behind). This phase's own commits are on branch `p129-part7-impl`,
+pushed to `origin/p129-part7-impl` once this section landed — not merged onto
+`claude/unfinished-phases-ru3wo4`, per this phase's own task instructions; landing there is the
+orchestrating session's own step.
