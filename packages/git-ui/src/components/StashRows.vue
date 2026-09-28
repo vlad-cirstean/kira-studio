@@ -9,9 +9,10 @@ import type { StashEntry } from '@kira/git-ipc';
  * (Pop/Drop/`stashSaveGlobal` exist only on a real stack entry), so a selected id is bubbled up
  * via `menuSelect` for the caller's own `switch`.
  */
-import type { MenuSection } from '@kira/kira-ui';
-import { KuiButton, kuiRowVariants } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
+import { cn } from '../lib/cn.ts';
+import type { MenuSection } from '../lib/menuModel.ts';
+import { rowVariants } from '../lib/rowVariants.ts';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
@@ -93,33 +94,34 @@ function onMenuSelect(id: string): void {
     :key="entry.sha"
     class="kv-branch-row kv:flex kv:items-center kv:gap-0.5 kv:px-1"
     :class="{ 'kv:bg-hover': stash.selectedSha.value === entry.sha }"
-    v-kui-tooltip="rowModel(entry).rowTooltip"
+    :data-kira-tip="rowModel(entry).rowTooltip"
     :data-row-id="rowModel(entry).id"
     :tabindex="focusedRowId === rowModel(entry).id ? 0 : -1"
   >
-    <KuiButton
-      :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']"
-      icon="codicon-archive"
+    <button
+      type="button"
+      :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
       @click="select(entry)"
     >
+      <span class="codicon codicon-archive" aria-hidden="true"></span>
       <span v-if="rowModel(entry).badge" class="kv:whitespace-nowrap kv:font-data">{{ rowModel(entry).badge }}</span>
       <span
         v-if="rowModel(entry).origin"
         class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-origin kv:text-stash-origin-fg"
-        v-kui-tooltip="rowModel(entry).originTooltip"
+        :data-kira-tip="rowModel(entry).originTooltip"
         >{{ rowModel(entry).origin }}</span
       >
       <span
         v-if="rowModel(entry).auto"
         class="kv:whitespace-nowrap kv:text-sm kv:px-1 kv:rounded-sm kv:bg-stash-auto kv:text-stash-auto-fg"
-        v-kui-tooltip="'Created automatically by an auto-stashed checkout'"
+        data-kira-tip="Created automatically by an auto-stashed checkout"
         >auto</span
       >
-      <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
-      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-sm kv:opacity-80" v-kui-tooltip="'Includes untracked files'">-u</span>
+      <span class="kv-stash-message kv:flex-1 kv:min-w-0 kv:truncate" :data-kira-tip="rowModel(entry).messageTooltip">{{ rowModel(entry).message }}</span>
+      <span v-if="entry.includedUntracked" class="kv:font-data kv:text-sm kv:opacity-80" data-kira-tip="Includes untracked files">-u</span>
       <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
       <span class="kv:text-sm kv:text-muted-foreground kv:whitespace-nowrap">{{ formatRelativeDate(entry.timestamp) }}</span>
-    </KuiButton>
+    </button>
     <RowActionsButton
       @click="openMenuFromButton(entry, $event)"
       @contextmenu="openMenu(entry, $event)"

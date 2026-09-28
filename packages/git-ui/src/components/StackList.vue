@@ -15,9 +15,11 @@
  * `stack` prop at all (nothing else in this file ever read it).
  */
 import type { StackBranch } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
+import { REF_BADGE_CLASS, refBadgeClass } from './badgeClass.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
 import RefSectionHeader from './RefSectionHeader.vue';
 import ShowMoreButton from './ShowMoreButton.vue';
@@ -91,15 +93,17 @@ async function removeFromStack(branch: string): Promise<void> {
 
     <div v-for="group in stacks.visible" :key="group.summary.base" class="kv:mb-1">
       <div class="kv:flex kv:items-center kv:gap-0.5 kv:py-0.5 kv:px-1 kv:font-semibold kv:text-muted-foreground">
-        <span class="kv:flex-1 kv:min-w-0 kv:truncate" v-kui-tooltip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
-        <KuiButton
+        <span class="kv:flex-1 kv:min-w-0 kv:truncate" :data-kira-tip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
+        <Button
           v-if="writeCapability"
-          class="kv:ml-auto"
+          variant="toolbar"
+          size="kira"
+          class="ml-auto"
           :disabled="!group.summary.needsRestack"
           @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
         >
           Restack
-        </KuiButton>
+        </Button>
       </div>
 
       <div
@@ -111,56 +115,49 @@ async function removeFromStack(branch: string): Promise<void> {
         :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
         <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-          <span v-if="row.isHead" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Current branch'">●</span>
+          <span v-if="row.isHead" class="kv:text-sm kv:opacity-80" data-kira-tip="Current branch">●</span>
           <span class="kv:truncate">{{ row.name }}</span>
           <span
             v-if="row.stale"
-            class="kv-badge kv-badge-pill kv:bg-stack-stale kv:text-stack-stale-fg"
-            v-kui-tooltip="row.staleText"
+            :class="refBadgeClass('bg-(--kv-stack-stale-bg) text-(color:--kv-stack-stale-fg)')"
+            :data-kira-tip="row.staleText"
           >
             stale
           </span>
           <button
             v-if="row.pr && openExternalCapability"
             type="button"
-            class="kv-badge kv-badge-pill kv-badge-pr"
-            :class="`kv-badge-pr--${row.pr.state}`"
-            v-kui-tooltip="row.pr.title"
+            :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${row.pr.state}`]"
+            :data-kira-tip="row.pr.title"
             @click="openPullRequest(row.pr.number)"
           >
             {{ prBadgeLabel(row.pr) }}
           </button>
           <span
             v-else-if="row.pr"
-            class="kv-badge kv-badge-pill kv-badge-pr"
-            :class="`kv-badge-pr--${row.pr.state}`"
-            v-kui-tooltip="row.pr.title"
+            :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${row.pr.state}`]"
+            :data-kira-tip="row.pr.title"
           >
             {{ prBadgeLabel(row.pr) }}
           </span>
           <span v-if="row.trackText" class="kv:text-sm kv:text-muted-foreground">{{ row.trackText }}</span>
-          <span v-if="row.checkedOutIn" class="kv:text-sm kv:opacity-80" v-kui-tooltip="row.checkedOutIn">
+          <span v-if="row.checkedOutIn" class="kv:text-sm kv:opacity-80" :data-kira-tip="row.checkedOutIn">
             <span class="codicon codicon-repo" aria-hidden="true"></span>
           </span>
         </div>
-        <KuiButton
+        <TooltipIconButton
           v-if="writeCapability"
-          variant="icon"
-          v-kui-tooltip="'Set stack parent…'"
+          icon="list-tree"
+          label="Set stack parent…"
           aria-label="Set stack parent"
           @click="requestSetParent(row.name)"
-        >
-          <span class="codicon codicon-list-tree" aria-hidden="true"></span>
-        </KuiButton>
-        <KuiButton
+        />
+        <TooltipIconButton
           v-if="writeCapability"
-          variant="icon"
-          v-kui-tooltip="'Remove from stack'"
-          aria-label="Remove from stack"
+          icon="close"
+          label="Remove from stack"
           @click="removeFromStack(row.name)"
-        >
-          <span class="codicon codicon-close" aria-hidden="true"></span>
-        </KuiButton>
+        />
       </div>
     </div>
 
@@ -179,15 +176,13 @@ async function removeFromStack(branch: string): Promise<void> {
           <span class="kv:truncate">{{ row.name }}</span>
           <span class="kv:truncate kv:text-sm kv:text-diff-deleted">{{ row.orphanReason }}</span>
         </div>
-        <KuiButton
+        <TooltipIconButton
           v-if="writeCapability"
-          variant="icon"
-          v-kui-tooltip="'Set stack parent…'"
+          icon="list-tree"
+          label="Set stack parent…"
           aria-label="Set stack parent"
           @click="requestSetParent(row.name)"
-        >
-          <span class="codicon codicon-list-tree" aria-hidden="true"></span>
-        </KuiButton>
+        />
       </div>
     </div>
 

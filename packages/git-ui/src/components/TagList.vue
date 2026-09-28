@@ -8,8 +8,9 @@
  * this file's own template, not that one's.
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
-import { KuiButton, kuiRowVariants } from '@kira/kira-ui';
 import { computed } from 'vue';
+import { cn } from '../lib/cn.ts';
+import { rowVariants } from '../lib/rowVariants.ts';
 import type { OpsState } from '../state/ops.ts';
 import RefSectionHeader from './RefSectionHeader.vue';
 import RowActionsButton from './RowActionsButton.vue';
@@ -114,7 +115,11 @@ async function onRefMenuSelect(id: string): Promise<void> {
       :data-row-id="`tag:${row.refname}`"
       :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
     >
-      <KuiButton :class="[kuiRowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left']" @click="checkout(row)">
+      <button
+        type="button"
+        :class="cn(rowVariants(), 'kv-branch-row-main kv:flex-1 kv:min-w-0 kv:text-left')"
+        @click="checkout(row)"
+      >
         <span
           class="codicon codicon-tag"
           :class="{ 'kv:opacity-60': !row.annotation }"
@@ -125,12 +130,12 @@ async function onRefMenuSelect(id: string): Promise<void> {
         <span
           v-if="row.annotation"
           class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground"
-          v-kui-tooltip="row.annotation.subject"
+          :data-kira-tip="row.annotation.subject"
         >
           {{ row.annotation.subject }}
         </span>
         <span class="kv:font-data kv:text-sm kv:text-muted-foreground">{{ targetCommit(row) }}</span>
-      </KuiButton>
+      </button>
       <RowActionsButton
         @click="openRefMenuFromButton(row, $event)"
         @contextmenu="openRefMenu(row, $event)"

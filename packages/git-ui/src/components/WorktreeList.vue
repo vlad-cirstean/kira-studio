@@ -17,7 +17,10 @@
  * used to render `worktrees.entries.value` straight through, uncapped) — part of N1's fix.
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
-import { KuiButton, KuiDialog } from '@kira/kira-ui';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
@@ -120,13 +123,15 @@ async function confirmRemove(): Promise<void> {
 <template>
   <section aria-label="Worktrees">
     <RefSectionHeader label="Worktrees">
-      <KuiButton
+      <Button
         v-if="writeCapability"
-        class="kv:ml-auto"
+        variant="toolbar"
+        size="kira"
+        class="ml-auto"
         @click="emit('create-worktree')"
       >
         Create Worktree…
-      </KuiButton>
+      </Button>
     </RefSectionHeader>
     <div
       v-for="entry in section.visible"
@@ -136,75 +141,76 @@ async function confirmRemove(): Promise<void> {
       :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
     >
       <div class="kv-branch-row-main kv:flex kv:items-center kv:gap-0.5 kv:flex-1 kv:min-w-0 kv:text-left">
-        <span v-if="entry.isCurrent" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'This window'">●</span>
-        <span v-if="entry.isMain" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Main worktree'">M</span>
-        <span v-if="entry.locked" class="kv:text-sm kv:opacity-80" v-kui-tooltip="entry.locked.reason">
+        <span v-if="entry.isCurrent" class="kv:text-sm kv:opacity-80" data-kira-tip="This window">●</span>
+        <span v-if="entry.isMain" class="kv:text-sm kv:opacity-80" data-kira-tip="Main worktree">M</span>
+        <span v-if="entry.locked" class="kv:text-sm kv:opacity-80" :data-kira-tip="entry.locked.reason">
           <span class="codicon codicon-lock" aria-hidden="true"></span>
         </span>
-        <span v-if="entry.openElsewhere" class="kv:text-sm kv:opacity-80" v-kui-tooltip="'Open in another window'">
+        <span v-if="entry.openElsewhere" class="kv:text-sm kv:opacity-80" data-kira-tip="Open in another window">
           <span class="codicon codicon-window" aria-hidden="true"></span>
         </span>
-        <span class="kv:truncate" v-kui-tooltip="entry.path">{{ worktreeLabel(entry) }}</span>
+        <span class="kv:truncate" :data-kira-tip="entry.path">{{ worktreeLabel(entry) }}</span>
         <span class="kv:flex-1 kv:min-w-0 kv:truncate kv:text-sm kv:text-muted-foreground">{{ entry.path }}</span>
       </div>
-      <KuiButton
+      <TooltipIconButton
         v-if="writeCapability && !entry.isCurrent"
-        variant="icon"
-        v-kui-tooltip="'Switch to this worktree'"
-        aria-label="Switch to this worktree"
+        icon="arrow-swap"
+        label="Switch to this worktree"
         @click="switchTo(entry)"
-      >
-        <span class="codicon codicon-arrow-swap" aria-hidden="true"></span>
-      </KuiButton>
-      <KuiButton
+      />
+      <TooltipIconButton
         v-if="writeCapability && openWorktreeWindowCapability"
-        variant="icon"
-        v-kui-tooltip="'Open in new window'"
-        aria-label="Open in new window"
+        icon="empty-window"
+        label="Open in new window"
         @click="openInNewWindow(entry)"
-      >
-        <span class="codicon codicon-empty-window" aria-hidden="true"></span>
-      </KuiButton>
-      <KuiButton
+      />
+      <TooltipIconButton
         v-if="writeCapability && !entry.isMain && !entry.isCurrent"
-        variant="icon"
-        v-kui-tooltip="'Remove worktree'"
-        aria-label="Remove worktree"
+        icon="trash"
+        label="Remove worktree"
         @click="requestRemove(entry)"
-      >
-        <span class="codicon codicon-trash" aria-hidden="true"></span>
-      </KuiButton>
+      />
     </div>
     <ShowMoreButton :hidden-count="section.hiddenCount" @click="showMore" />
     <div v-if="section.visible.length === 0" class="kv:py-0.5 kv:px-2 kv:text-muted-foreground kv:text-sm">No worktrees</div>
 
-    <KuiDialog
-      :open="pendingRemove !== undefined"
-      :title="pendingRemove ? `Remove ${pendingRemove.entry.path}` : ''"
-      @close="cancelRemove"
-    >
-      <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
-        <p class="kv:text-diff-deleted">{{ blockerText(pendingRemove.preflight) }}</p>
-      </template>
-      <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
-        <p>
-          This worktree has uncommitted changes that will be permanently lost. Type
-          <code>{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
-        </p>
-        <input type="text" v-model="typedToken" />
-      </template>
-      <template #actions>
-        <KuiButton
-          v-if="pendingRemove?.preflight.verdict === 'dirty'"
-          variant="primary"
-          :disabled="!canConfirmRemove"
-          @click="confirmRemove"
-        >
-          Remove anyway
-        </KuiButton>
-        <KuiButton @click="cancelRemove">Cancel</KuiButton>
-      </template>
-    </KuiDialog>
+    <!-- P131 Part 2 §5: opens inside BranchPicker's own modal Popover panel (§5.2) -- reka's
+         modal content there prevents the panel dismissing under this nested Dialog. -->
+    <Dialog :open="pendingRemove !== undefined" @update:open="(v) => !v && cancelRemove()">
+      <DialogContent
+        :show-close-button="false"
+        :aria-describedby="undefined"
+        class="flex flex-col gap-0 p-3 w-120 max-w-[90vw] max-h-4/5"
+      >
+        <DialogHeader>
+          <DialogTitle>{{ pendingRemove ? `Remove ${pendingRemove.entry.path}` : '' }}</DialogTitle>
+        </DialogHeader>
+        <div class="min-h-0 overflow-y-auto">
+          <template v-if="pendingRemove?.preflight.verdict === 'blocked'">
+            <p class="kv:text-diff-deleted">{{ blockerText(pendingRemove.preflight) }}</p>
+          </template>
+          <template v-else-if="pendingRemove?.preflight.verdict === 'dirty'">
+            <p>
+              This worktree has uncommitted changes that will be permanently lost. Type
+              <code>{{ pendingRemove.preflight.confirmToken }}</code> to confirm.
+            </p>
+            <Input v-model="typedToken" size="kira" class="w-full" aria-label="Confirmation token" />
+          </template>
+        </div>
+        <DialogFooter class="justify-end gap-1">
+          <Button
+            v-if="pendingRemove?.preflight.verdict === 'dirty'"
+            variant="dialog-primary"
+            size="kira-lg"
+            :disabled="!canConfirmRemove"
+            @click="confirmRemove"
+          >
+            Remove anyway
+          </Button>
+          <Button variant="dialog" size="kira-lg" @click="cancelRemove">Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </section>
 </template>
 
