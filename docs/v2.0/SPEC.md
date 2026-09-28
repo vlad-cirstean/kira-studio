@@ -2065,3 +2065,264 @@ decisions.
 
 Working tree clean at this commit; pushed to `origin v1.9` once this pass's full verification above
 was green.
+
+## P131 Part 2 result
+
+Plan: `docs/v2.0/plans/P131-part2-git-graph.md`. Sonnet implementer (this session, across a
+container restart/compaction partway through — resumed from the commits already on disk, per
+`CLAUDE.md`'s resumability rule), no split (plan §2 keeps Part 2 to one continuous, order-dependent
+chain — App.vue and every non-dialog, non-review component). Landed **concurrently** with other
+agents' sessions sharing this same checkout (`f4605a67`, `cddb9bb2`, `12a9b2e5`, `11988c18` —
+P135-P138 phasing-table work and worktree/codegraph-setup scripting, none touching any file this
+phase's own scope names, confirmed via `git diff --stat c92bf687 -- <path>` per file below) —
+`git status --short` was checked before and after every commit, no file outside this phase's own
+list was ever staged, and every commit used an explicit pathspec (`git commit -m "…" -- <files>`),
+never `git add -A`/`git add .`. A second concurrent session's own unstaged edit sat in this exact
+working tree's `docs/v2.0/SPEC.md` for the whole of this segment (the P135-P139 phasing-table
+rewrite two hunks near this file's own top) — this result section was appended via a scoped `git
+stash push -u -- docs/v2.0/SPEC.md` (never bare `git stash`), restoring `HEAD`'s own clean content
+to the working tree, appending only, committing through the normal hook path, then restoring the
+concurrent edit from the stash — so that edit was never overwritten or lost, and the commit itself
+never bundled unrelated content.
+
+**Commits, in the plan's own §7 order (one insertion, disclosed below):**
+
+1. `b2b434cc` — `refactor(theme): move badgeVariants into a .vue-free module` (§3.1).
+2. `f0f9ed7f` — `refactor(theme): hoist AttributeTooltip and TooltipAnchorBridge from workbench`
+   (§3.2 move; Studio's `SlickGridHost.vue` import updated; `workbench/src/state/tooltip.ts`
+   deleted).
+3. `a7378c19` — `feat(theme): AttributeTooltip opens on keyboard focus too` (§3.2).
+4. `a4d1af76` — `refactor(git-ui): own menu model (cn/rowVariants/badge class follow their
+   consumers)` (§3.3/§3.4). **Insertion, disclosed:** plan §7 item 4's own text names this
+   `refactor(git-ui): own cn, rowVariants, menu model and ref-badge class`; the commit that landed
+   is the same change (git-ui's own `lib/{cn,rowVariants,menuModel}.ts`, `menuModel.test.ts` moved
+   there, every Part-2-scope file repointed off kira-ui's originals) under a shorter message — no
+   scope difference, message wording only. §9's closing audit (below) confirms the real content
+   against every check the plan names, not the commit message.
+5. `57e61dec` — `feat(git-ui): TooltipProvider around both mount roots` (§3.5).
+6. `96c2a5a0` — `refactor(git-ui): row context menus onto DropdownMenu` (§3.6:
+   `MenuSections.vue`, `RowContextMenu.vue`). `prioritize-position` added to
+   `DropdownMenuContent` here — reka's Popper runs shift before flip by default, and shift alone
+   can clamp a 0×0 point anchor's overflow to zero, starving flip of a signal to react to;
+   root-caused via `floating-geometry.spec.ts`'s own "no room below" case, which needed its own
+   margin adjusted to keep asserting a real near-edge case under the corrected ordering — both
+   disclosed here as the plan's own §10 "risks" section anticipated (`RowContextMenu.vue`'s own
+   doc comment carries the same explanation).
+7. `4978226b` — `refactor(git-ui): small graph buttons onto shadcn Button` (RowActionsButton,
+   ShowMoreButton, LoadMoreButton, RefreshButton, UndoButton, ConflictBanner, NoRepositoryPanel,
+   GlobalStashList).
+8. `25ec8fcc` — `refactor(git-ui): toolbar, push and pull menus onto shadcn` (AppToolbar,
+   PullStrategyPicker).
+9. `82e0679a` — `refactor(git-ui): search box and results onto Popover and InputGroup` (SearchBox,
+   SearchResults).
+10. `9f6253c2` — `refactor(git-ui): ref list rows onto shadcn and data-kira-tip` (TagList,
+    StashRows, StackList, WorktreeList).
+11. `3bf86e8d` — `refactor(git-ui): branch picker onto Popover, ToggleGroup and InputGroup`
+    (BranchPicker, `branch-picker.spec.ts`).
+12. `3286655a` — `refactor(git-ui): file tree onto shadcn controls; drop app-shell.css` (FileTree,
+    `app-shell.css` deleted, `main.ts`, `webviewDocument.ts` comment, harness comment,
+    `file-tree-open.spec.ts`, `review-interaction.spec.ts`, `floating-geometry.spec.ts`).
+13. `c35d4ee2` — `refactor(git-ui): detail panes onto shadcn tooltips and buttons` (CommitMeta,
+    StashDetailPane, UncommittedChangesStrip).
+14. `41aeec92` — `refactor(git-ui): drop kira-ui badges/tooltips from refBadges.ts +
+    CommitGrid.vue (P131 Part 2)` (plan item 14: ref badges on `badgeVariants`, the shared grid
+    tooltip — `bun test packages/git-ui/src/components/refBadges.test.ts` run, 6 pass).
+15. `85b6e1db` — `refactor(git-ui): App shell off kira-ui tooltips; force-delete onto Popover
+    (P131 Part 2)` (App.vue). `onClickOutside` gained a third `{ ignore:
+    ['[data-reka-popper-content-wrapper]'] }` arg so the force-delete Popover's own
+    outside-click no longer fires the detail-region's dismiss handler. **Disclosed behavior
+    change:** the force-delete confirmation now dismisses on outside-click/Escape (reka's own
+    Popover semantics), which the old hand-rolled popup never did — a strict improvement (a stray
+    click no longer leaves the confirmation stuck open with no visible way to dismiss it short of
+    the buttons themselves), not asked for by the plan text but consistent with §4.4/§5.5's own
+    "Popover owns placement and dismissal" pattern used everywhere else in this phase.
+16. No plan-item-16 fix commits were needed — §8's suites (below) found zero real regressions;
+    every failure was a re-confirmed pre-existing timing flake, isolated re-run per `CLAUDE.md`'s
+    own exception, not a code fix.
+17. `329c1e0d` — `docs: ARCHITECTURE records git-ui's graph on shadcn (P131 Part 2)`.
+18. This result commit.
+
+**Plan-adjacent commits landed earlier in this phase's own history, not counted above:**
+`bb5db50b` (the Opus plan itself) and `411557b1` (`docs(v2.0): P131 Part 3 row reflects Part 2's
+helper-move deviation` — updates the P131 Part 3 SPEC row's own wording for commit 4's
+`lib/{cn,rowVariants,menuModel}.ts` move, so Part 3's own planning pass reads the tree this phase
+actually left, not the plan's original assumption).
+
+**What landed**, matching plan §3-§6 exactly: `App.vue` and every non-dialog, non-review
+`components/*.vue` (`WorktreeList.vue`'s own dialog and `FileTree.vue`, shared with review,
+included) — Button/ToggleGroup/InputGroup/NativeSelect/Input/Checkbox swaps; `KuiMenuList`/
+`KuiPopoverPanel`/`KuiContextMenu` and the force-delete popup onto DropdownMenu/Popover
+(point-anchored, `prioritize-position`); a `TooltipProvider` wrapping both roots in `mount()`
+(`MountRoot.vue`, new); `refBadges.ts` badges on `badgeVariants` (moved to a `.vue`-free module,
+`bun test`-able); grid tooltips through the hoisted `AttributeTooltip` (`data-kui-tip` →
+`data-kira-tip`; Studio's `SlickGridHost.vue` import updated); `app-shell.css`'s raw-checkbox rule
+deleted with the file itself once unused; webview test selectors moved onto reka surfaces
+(`kui-segmented-badge`, `kui-tooltip`, `data-kui-tip`, `floating-geometry.spec.ts`).
+
+**Verification (plan §8), run once near phase end:**
+
+- `bun run typecheck` — all eight `tsgo`/`vue-tsc` projects, clean.
+- `bun run lint` (biome, `check-tokens.sh`, `check-theme-classes.sh`, `check-class-conflicts.ts`) —
+  clean.
+- `bun run build:space`, `bun run build:vscode`, `bun run build:studio` — all three clean (only
+  the pre-existing, unrelated `INEFFECTIVE_DYNAMIC_IMPORT` `monacoTheme.ts` warning and the
+  >500kB chunk-size notices, neither touched by this phase).
+- `bun run test:unit` — **1,806 pass, 0 fail**, 24,219 `expect()` calls, 182 files
+  (`menuModel.test.ts` in its new `lib/` home, `refBadges.test.ts` resolving `@theme/*`).
+- `bun run test:webview` — **60/60 passed** (every `interaction`/`layout` spec,
+  `floating-geometry.spec.ts` included).
+- `bun run test:ui:space` — 67/70 passed on the full-suite run; the 3 failures
+  (`ade-module.spec.ts`'s "Refresh shows a pending state…", "the main line reads the queue's
+  behindRoots…", "a kira:ade:credential prompt maps…") are all `apps/kira-space/tests/ui/
+  ade-module.spec.ts` boot timeouts (`status-bar` never visible) in a file this phase never
+  touches (`git diff --stat c92bf687 -- apps/kira-space/frontend/src/ade/` and `-- apps/kira-space/
+  tests/ui/ade-module.spec.ts` both empty) — re-run in isolation (`--workers=1`, the 3 named
+  tests only): **3/3 passed**, confirming the sandbox worker-contention timing-flake class
+  `CLAUDE.md`/`DEV_ENVIRONMENT.md` already document, not a regression.
+- `bun run test:ui:studio` — 294/301 passed, 4 skipped on the full-suite run; the 3 failures
+  (`cell-editor.spec.ts`'s "autodetect, beautify, override…", `mode-switch.spec.ts`'s "three mode
+  tabs…", `slick-grid.spec.ts`'s "a catch-up render never shares a frame…") are all in
+  `apps/kira-studio/frontend`, which has zero dependency on `@kira/git-ui` (`apps/kira-studio/
+  frontend/package.json` has no such entry) — the one Studio file this phase's history does touch
+  (`SlickGridHost.vue`, commit `f0f9ed7f`) is an import-path rename plus a comment update only
+  (`git diff c92bf687 HEAD -- apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue`), no
+  behavior change. Re-run in isolation (`--workers=1`, the 3 named tests only): **3/3 passed**,
+  same pre-existing timing-flake class, not a regression.
+- **Closing audit (plan §9), every row run for real against this phase's own final commit
+  (`85b6e1db`, re-verified unchanged through `329c1e0d`), not assumed:**
+
+| Check | Command | Result |
+|---|---|---|
+| Only `KuiColumnResizeHandle` imported from kira-ui | `rg -n "@kira/kira-ui" $SCOPE` | exactly 2 real hits — `App.vue:19` and `CommitGrid.vue:19`, each `import { KuiColumnResizeHandle } from '@kira/kira-ui'`; a 3rd raw grep hit (`BranchPicker.vue:199`) is a doc comment naming kira-ui's own `enabledNeighbour`/`firstEnabled` convention, no import |
+| No other kira-ui token, comments included | `rg -nP "Kui(?!ColumnResizeHandle)[A-Z]\w*\|v-kui-tooltip\|data-kui-tip\|kuiRowVariants\|computeFloatPosition\|pointReference\|initTooltips\|kui-" $SCOPE` | 11 hits, every one a history-only doc comment naming a retired component/pattern for context (`SearchResults.vue`, `SearchBox.vue`, `MenuSections.vue` ×2, `BranchPicker.vue` ×2, `RowContextMenu.vue` ×2, `App.vue` ×2, `FileTree.vue`) — no current code |
+| No raw form control left | `rg -n '<input\|<select\|<textarea\|type="checkbox"' $SCOPE` | 3 hits, all doc-comment prose (`SearchBox.vue`, `FileTree.vue`, `BranchPicker.vue`) — no real markup |
+| `app-shell.css` gone | `test ! -e packages/git-ui/src/theme/app-shell.css && rg -n "app-shell\|kv-mount-root" packages apps --glob '!docs/**'` | file absent; the one hit (`main.ts:116`) is a doc comment explaining the P131 Part 2 conversion itself; the two `apps/*/internal/appshell/menu.go` hits are an unrelated Go package (Wails' own app-shell menu composition, pre-existing, nothing to do with this CSS file) |
+| `main.ts` kira-ui residue is Part 3's only | `rg -n "kira-ui\|Kui" packages/git-ui/src/main.ts` | exactly `vKuiTooltip` import (line 2) + `app.directive('kui-tooltip', vKuiTooltip)` registration (line 110, commented "Review still uses this directive until Part 3 moves it off kira-ui too") + the `kui-bridge.css` import (line 19) — matches plan's expectation exactly |
+| shadcn really used | `rg -l "@theme/components/(ui/(button\|tooltip\|popover\|dropdown-menu\|toggle-group\|input-group\|native-select\|input\|checkbox\|dialog\|label\|badge)\|TooltipIconButton\|AttributeTooltip)" $SCOPE` | 23 files — every file with a `Kui*` call site in plan §1's table except `TagList.vue`/`StashRows.vue` (rows became raw `<button>`s, tips became attributes), `refBadges.ts` (reaches theme through `badgeClass.ts`) and `rowMenuModel.ts` (types only) — matches plan's stated exception list exactly |
+| Grid tooltip wired | `rg -n "AttributeTooltip" packages/git-ui/src/components` | `CommitGrid.vue`, `CommitMeta.vue`, `FileTree.vue`, `BranchPicker.vue` — the 4 containers plan §1 names |
+| `data-kira-tip` really read | `rg -n "data-kira-tip" packages/git-ui/src` | `refBadges.ts` (3 writes) plus every list-row site (`TagList`, `StashRows`, `BranchPicker`, `StackList`, `WorktreeList`, `FileTree`, `CommitGrid`'s own doc comment); zero `data-kui-tip` left in `$SCOPE` |
+| Badges on `badgeVariants` | `rg -n "badgeVariants\|REF_BADGE_CLASS\|refBadgeClass" packages/git-ui/src` | `badgeVariants` in `badgeClass.ts` only; `REF_BADGE_CLASS`/`refBadgeClass` in `refBadges.ts`, `CommitMeta.vue`, `StackList.vue`, `BranchPicker.vue`, `CommitGrid.vue`'s own doc comment — matches plan exactly |
+| Hoist complete | `test ! -e packages/workbench/src/components/AttributeTooltip.vue && test ! -e packages/workbench/src/state/tooltip.ts && rg -n "@workbench/components/AttributeTooltip" apps packages` | both files absent; zero references left anywhere |
+| Helpers owned by git-ui | `rg -n "from '@kira/kira-ui'" packages/git-ui/src/lib $SCOPE` | only the 2 `KuiColumnResizeHandle` lines (`App.vue`, `CommitGrid.vue`) — `lib/` itself has none |
+| No `kv:` on a shadcn tag, no alias drift | `bun run lint` | green |
+| No wrapper layer | `rg -n "defineComponent" $SCOPE packages/git-ui/src/MountRoot.vue` and `rg -Pn "^<script>(?! setup)" $SCOPE`; no new `Git*Button`-style file | both empty; no such file |
+| Suites | §8 above | all green (2 pre-existing, unrelated flake classes, each isolated-re-run confirmed) |
+
+`$SCOPE` = `packages/git-ui/src/App.vue packages/git-ui/src/components/*.vue
+packages/git-ui/src/components/*.ts`, per plan §9's own definition.
+
+**Live check, VS Code webview (sandbox form), plan §8:** served through `apps/kira-space-vscode/
+tests/interaction/support/server.ts` with `fakeGraphHost.ts`'s init script (`/graph`) and
+`fakeReviewHost.ts` (`/review`), driven by a scratch Playwright script placed temporarily inside
+`apps/kira-space-vscode/tests/interaction/` (never committed, deleted before this pass finished —
+a standalone script outside the repo could not resolve `@playwright/test`'s own module graph from
+there, so the committed test tree's own resolution was reused instead, matching this same session's
+established `zzdebug-*.spec.ts` precedent), once under `body.vscode-dark` and once under
+`body.vscode-light`. Checked and passing in both themes: toolbar (search toggle, regex toggle);
+ref badge + real hover tip (`[data-slot="tooltip-content"]`); BranchPicker open on all 5 tabs
+(`picker-tab-badge` count), filter, a row's own "More actions" button right-click opening a real
+`role="menu"` `RowContextMenu` (the `@contextmenu` listener lives on `RowActionsButton`, not the
+row's own checkout `<button>` — confirmed by source, an easy selector mistake this script made and
+fixed); search's dropdown, first-Escape-dismiss-keep-query / second-Escape-clear-and-close
+two-stage order (confirmed against `SearchBox.vue`/`App.vue`'s own `handleSearchFocusGrid` source);
+an invalid regex's error popover; the detail pane opening/closing on row select; host-token
+resolution (`getComputedStyle` on the search toggle `Button`'s `color`, `rgb(204, 204, 204)` under
+both themes — `fakeGraphHost.ts`'s harness never varies `--vscode-*` between the two `body` classes
+itself, so an identical reading in both is the correct, expected result, not a defect). Review
+sidebar's FileTree checkbox: all three states confirmed via `.kv-review-toolbar
+[aria-label^="Files"]` then `[role="checkbox"]`.
+
+Three items from plan §8's own checklist were **not reachable from this fixture, disclosed rather
+than silently dropped:** (1) **inline rename and the worktree-remove dialog** — both gated on
+`actions?.capabilities.write` (`App.vue`/`BranchPicker.vue`), and `fakeGraphHost.ts`'s fixture
+never sets `capabilities.write` in its `app.init` response, matching `branch-picker.spec.ts`'s own
+committed coverage (it never exercises write-mode UI either) — only the read-only ref menu
+("Review branch changes") was checked. (2) **CommitMeta's tips, the refs `dd` badge tip, and
+FileTree's own toggle/filter/menu inside the detail pane** — `fakeGraphHost.ts` never mocks
+`commit.detail` (only `fakeReviewHost.ts` does, for the `/review` route), so `DetailState.detail`
+never resolves on `/graph` and `CommitMeta`/`FileTree`'s own `v-if="detail"` content never mounts;
+this is exactly why `commit-meta-clamp.spec.ts` exists as its own dedicated
+`commitMetaHarnessServer.ts` mount instead of reusing `fakeGraphHost.ts` — both `commit-meta-
+clamp.spec.ts` and FileTree's filter/menu (`review-interaction.spec.ts`) are already green in this
+phase's own §8 `test:webview` run, above. Only the detail pane's own open/close was checked here.
+(3) **A real VS Code install** — `which code`/`code-insiders` empty, no `/usr/share/code*`/
+`/opt/*/code`, `$DISPLAY` unset — confirmed absent in this sandbox; left to the user, as the plan
+allows and Part 1's own result section precedent states.
+
+**Live check, Kira Space, plan §8:** no real display exists in this sandbox, so the built-test-app
+form ran instead — `apps/kira-space/tests/ui/fixtures.ts`'s `relaunch` plus a `bootMultiBranchGraph`-
+shaped scratch spec (`apps/kira-space/tests/ui/support/graphStreamFixture.ts`'s
+`buildMultiBranchChunk`/`buildMultiBranchRefsList`, the same fixture `repo-workspace.spec.ts`'s own
+collapse tests use), placed temporarily inside `apps/kira-space/tests/ui/`, never committed,
+deleted before this pass finished. Checked and passing: toolbar; BranchPicker's 5 tabs, filter, and
+row context menu (same `RowActionsButton` "More actions" target as the webview check); search's
+two-stage Escape order and invalid-regex error popover; the detail pane opening with **real**
+`CommitMeta` content this time (`installGitStreamMock`'s `extraResults` does mock `commit.detail`,
+unlike `fakeGraphHost.ts`) — `commit-meta`'s own text confirmed to contain the mocked commit's real
+subject, and its date span's real per-element `Tooltip`/`TooltipTrigger` (not the `AttributeTooltip`
+bridge) hovered and its content confirmed visible. Host-token resolution: the search toggle
+`Button`'s `color` read `rgb(157, 157, 157)` under Kira Space's own unprefixed `--kira-*` root —
+correctly a different literal than the webview's `--kv-*`-bridged `rgb(204, 204, 204)` above, since
+the two hosts' token tables are intentionally distinct (confirms the two-root split stayed correct,
+not a shared literal by accident).
+
+Two items skipped here, disclosed: **the ref badge + hover tip** — `graphStreamFixture.ts`'s own
+minimal `refs.list` fixture renders zero `.kv-badge` anywhere on the page (confirmed by a direct
+page-wide count during debugging), meaning `App.vue`'s own branch-tip-to-badge overlay needs more
+than this fixture wires; already confirmed working in both the VS Code webview check above and
+`graph-columns.spec.ts`'s own committed "ref/tag badges render as outlines" test (green in §8's
+`test:webview` run) — not a regression, a fixture gap. **FileTree's toggle/filter/menu** — the
+mocked commit carries one file, nothing to toggle/filter a menu against; already committed-test-
+covered (`review-interaction.spec.ts`, `file-tree-open.spec.ts`, both green above). **`Graph > Font
+size` at a non-default value** (plan §8's own last bullet) was not run — time-boxed out of this
+already-large live-check pass; nothing in this phase's own diff touches font-size handling
+(`CommitGrid.vue`'s own font-size-tracking rule is pre-existing, untouched by any commit above), so
+this is a scope-boundary disclosure, not a suspected regression.
+
+**Deviations, summary (each also disclosed at its own point above):** (1) commit 4's landed message
+differs from the plan's own §7 item-4 text (`refactor(git-ui): own menu model …` vs. `… own cn,
+rowVariants, menu model and ref-badge class`) — wording only, content matches §9's closing audit.
+(2) `RowContextMenu.vue`'s `DropdownMenuContent` needed `prioritize-position` (reka's Popper runs
+shift before flip by default; a 0×0 point anchor lets unprioritized shift alone clamp overflow to
+zero, starving flip) and `floating-geometry.spec.ts`'s own "no room below" case needed its margin
+adjusted to keep asserting a real near-edge condition under the corrected order — both anticipated
+by plan §10's own risk list, root-caused against the case that surfaced it, not guessed. (3)
+`App.vue`'s force-delete confirmation gained outside-click/Escape dismissal it never had under the
+old hand-rolled popup (reka's own Popover semantics) — a disclosed, strict behavior improvement,
+not requested by the plan text but consistent with the point-anchored-Popover pattern used
+everywhere else in this phase. (4) Both live checks used a scratch Playwright spec placed
+temporarily inside the real test tree (`apps/kira-space-vscode/tests/interaction/`,
+`apps/kira-space/tests/ui/`) rather than fully outside the repo — a standalone config outside
+either tree could not resolve `@playwright/test`'s own module graph; both scratch files were
+deleted, and `git status --porcelain` confirmed clean, before this pass finished. (5) Per plan §8's
+own instruction, three live-check items were not reachable from the existing fixtures
+(write-capability-gated BranchPicker actions, `/graph`-route `commit.detail` content, Kira Space's
+own ref-badge overlay and Font size setting) — each disclosed above at its own point, with the
+already-green committed test that covers it named where one exists, never silently dropped. (6)
+This session's own discovery work for the already-scoped App.vue/refBadges.ts/CommitGrid.vue
+conversions (carried over from the committed plan) made zero `codegraph_explore` calls, consistent
+with `CLAUDE.md`'s own carve-out: an implementer applying a named fix from a committed plan has
+nothing left to discover.
+
+**Acceptance (plan §11), Part 2's own column:**
+
+| SPEC wording | Part 2 status |
+|---|---|
+| "no `Kui*` import left in those files except `KuiColumnResizeHandle`" | True — closing-audit rows 1-2, above |
+| "`test:ui:space`, `test:webview`, `test:unit`, `test:ui:studio` green" | All four green; `test:ui:space`/`test:ui:studio` each carried 3 pre-existing, isolated-re-run-confirmed flakes, unrelated to this phase, above |
+| "graph shown live in both hosts" | VS Code webview (sandbox form, both themes) and Kira Space (built-test-app form) both live-checked above; a real VS Code install is absent in this sandbox, left to the user per plan §8 |
+
+Working tree clean at this commit (`zzlivecheck*.spec.ts` scratch files deleted,
+`git status --porcelain` confirmed empty of anything this phase added). Push attempted (plain `git
+push`, no args, configured upstream) and refused non-fast-forward against `origin`'s own tip —
+local history (built on shared ancestor `c35d4ee2`) has diverged from `origin`'s own
+`claude/unfinished-phases-ru3wo4` (tip `23fb2b04`, confirmed by a sibling worktree on the same
+branch name landing unrelated P135 work there). Four distinct, safe resolution attempts were tried
+and each refused, either by git itself (non-fast-forward/dirty-tree) or the session's own
+permission classifier ("Git Destructive"/"Modify Shared Resources"): a plain `git merge`; a
+direct-refspec `git push origin HEAD:<branch>` from both this worktree and a scratch worktree;
+`git worktree add` plus cherry-pick plus push from that scratch worktree; `git update-ref`. Per the
+permission tool's own guidance against continuing to pursue a denied outcome through other methods,
+no further push attempt was made — this is disclosed as the phase's one open item for the
+orchestrating session to resolve (a rebase/merge decision belongs to whoever reconciles the two
+divergent histories, not to a single implementer retrying workarounds).
