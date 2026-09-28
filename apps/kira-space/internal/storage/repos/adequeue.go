@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -414,6 +415,50 @@ func (r *AdeQueueRepo) AddNewWork(w model.AdeNewWork) (int, error) {
 	return slot, nil
 }
 
+// checkEstExtends is UpdateNewWork/SetBranchMeta's own guard (P135 §6.2): once an estimate is set,
+// a patch may only grow it, same unit. Unit is fixed — no h/d ratio to reconcile.
+func checkEstExtends(old, next string) error {
+	if old == "" {
+		return nil
+	}
+	if next == "" || next[len(next)-1] != old[len(old)-1] {
+		return ErrEstimateShrink
+	}
+	o, _ := strconv.ParseFloat(old[:len(old)-1], 64)
+	n, _ := strconv.ParseFloat(next[:len(next)-1], 64)
+	if n < o {
+		return ErrEstimateShrink
+	}
+	return nil
+}
+
+// execEstGuarded runs updateSQL in a transaction after checking checkEstExtends against the row's
+// current est (read with selectSQL) — the shared body UpdateNewWork/SetBranchMeta's own Est-patch
+// branch each call into.
+func execEstGuarded(db *sql.DB, selectSQL string, selectArgs []any, newEst, updateSQL string, updateArgs []any, label string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin %s: %w", label, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var old string
+	if err := tx.QueryRow(selectSQL, selectArgs...).Scan(&old); err != nil {
+		return fmt.Errorf("repos: select est for %s: %w", label, err)
+	}
+	if err := checkEstExtends(old, newEst); err != nil {
+		return err
+	}
+	res, err := tx.Exec(updateSQL, updateArgs...)
+	if err != nil {
+		return fmt.Errorf("repos: %s: %w", label, err)
+	}
+	if err := sqlitex.RequireOneRow(res, label); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // UpdateNewWork writes only the leaves the caller actually patched.
 func (r *AdeQueueRepo) UpdateNewWork(id string, patch model.AdeNewWorkPatch) error {
 	var sets []string
@@ -450,7 +495,12 @@ func (r *AdeQueueRepo) UpdateNewWork(id string, patch model.AdeNewWorkPatch) err
 		return nil
 	}
 	args = append(args, id)
-	res, err := r.DB.Exec(`UPDATE ade_new_work SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	updateSQL := `UPDATE ade_new_work SET ` + strings.Join(sets, ", ") + ` WHERE id = ?`
+	if patch.Est != nil {
+		return execEstGuarded(r.DB, `SELECT est FROM ade_new_work WHERE id = ?`, []any{id}, *patch.Est,
+			updateSQL, args, "ade new work "+id)
+	}
+	res, err := r.DB.Exec(updateSQL, args...)
 	if err != nil {
 		return fmt.Errorf("repos: update ade new work %s: %w", id, err)
 	}
@@ -495,7 +545,12 @@ func (r *AdeQueueRepo) SetBranchMeta(codeRepoID, branch string, patch model.AdeB
 		return nil
 	}
 	args = append(args, codeRepoID, branch)
-	res, err := r.DB.Exec(`UPDATE ade_branches SET `+strings.Join(sets, ", ")+` WHERE code_repo_id = ? AND branch = ?`, args...)
+	updateSQL := `UPDATE ade_branches SET ` + strings.Join(sets, ", ") + ` WHERE code_repo_id = ? AND branch = ?`
+	if patch.Est != nil {
+		return execEstGuarded(r.DB, `SELECT est FROM ade_branches WHERE code_repo_id = ? AND branch = ?`,
+			[]any{codeRepoID, branch}, *patch.Est, updateSQL, args, "ade branch "+branch)
+	}
+	res, err := r.DB.Exec(updateSQL, args...)
 	if err != nil {
 		return fmt.Errorf("repos: set ade branch meta %s: %w", branch, err)
 	}
