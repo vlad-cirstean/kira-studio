@@ -187,26 +187,15 @@ historical prose.
   apps' frontends' Wails-generated `@bindings/*` modules, and `go build ./...` (pre-push) fails
   separately on `//go:embed all:frontend/dist` finding no built frontend. **Run
   `sh scripts/prepare-worktree.sh` once per fresh worktree** (below) — it closes both gaps plus the
-  Linux-only `wails3` CLI build deps, idempotently. For a change confined to
+  Linux-only `wails3` CLI build deps, idempotently. `scripts/prepare-dev-environment.sh` runs it
+  together with `scripts/codegraph-setup.sh` (CodeGraph section, below) — the one command for a
+  worktree that also needs the code index. For a change confined to
   `packages/git-core`/`git-ipc`/`git-ui` where running the full script is disproportionate, verify
   instead with `bun run typecheck:git` (or the five `tsgo`/`vue-tsc` invocations it chains, run
   separately) plus each touched package's own `bun test`; the pre-commit hook itself still runs the
   unscoped `bun run typecheck`, so it fails regardless — its own header comments a `--no-verify`
   bypass for exactly that narrower case.
 
-## `scripts/prepare-worktree.sh` — fresh-worktree readiness, run once per worktree
-
-**Every new worktree (a Claude subagent's own worktree, or a human's fresh clone) runs
-`sh scripts/prepare-worktree.sh` before development starts.** It is the one script that gets a
-worktree from nothing to hooks-pass/`go build ./...`-succeeds/`bun run typecheck`-succeeds: Linux's
-`wails3` CLI build deps (checked with `pkg-config`, only installed if missing — never reinstalled
-on a worktree that already has them), `bun install`, `go mod download`, pinned `wails3` plus
-bindings codegen for both apps (via `scripts/setup.sh`), and a real `frontend/dist` per app (via
-`bun run build`) so the Go binaries' own `//go:embed` doesn't fail. Idempotent — safe to re-run,
-cheap once already done. Not part of `scripts/setup.sh` itself: that script is also `predev`/
-`prepackage`'s own dependency and stays scoped to the Bun/Go/`wails3`/bindings it's always covered;
-`prepare-worktree.sh` adds the frontend-build and apt-get steps `setup.sh` doesn't do, layered on
-top of it.
 - **A fresh `git worktree` in this container can check out an orphaned "Initial commit" scaffold
   instead of the real branch tip.** Hit by 5 of P79's 6 fix batches. It is a provisioning race, not
   data loss — the affected worktree holds nothing of value, confirmed by `git status` and an
@@ -447,7 +436,8 @@ runs once per worktree, before a Claude session is spawned into it — not a `Se
 It installs `@colbymchenry/codegraph` globally via `npm` if missing, then `codegraph sync .` (or
 `codegraph init .` on first run) and prints `codegraph status .`. Whoever provisions the worktree
 (the orchestrating session, before handing it to a subagent) runs it alongside
-`scripts/prepare-worktree.sh`. The index lives in `.codegraph/` (gitignored). `.mcp.json` registers
+`scripts/prepare-worktree.sh` — or both in one call via `scripts/prepare-dev-environment.sh`. The
+index lives in `.codegraph/` (gitignored). `.mcp.json` registers
 `codegraph serve --mcp`; its one tool is
 `codegraph_explore`, deferred until `ToolSearch` loads it. A `UserPromptSubmit` hook
 (`codegraph prompt-hook`) injects matching symbols into every prompt — this hook still fires
