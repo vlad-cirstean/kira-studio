@@ -2,6 +2,7 @@ package ade
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -805,6 +806,149 @@ func TestQueue_Snapshot_RebindsNewWorkAndReportsCandidates(t *testing.T) {
 	if _, found := findBranchFact(snap, "feat2a"); found {
 		t.Fatal("feat2a must not be auto-bound while ambiguous")
 	}
+}
+
+// --- P135: dependency link lifecycle across rebind, archive and resolve ---------------------
+
+// TestQueue_Dependencies_LinkLifecycle is a cross-table invariant over Rebind/Archive, not a CRUD
+// round-trip (CLAUDE.md's own unit-test bar) — a dependency's own blocker link must follow its
+// blocked item through a rebind, disappear on archive, refuse a non-blockable target, and be
+// deleted wholesale on resolve.
+func TestQueue_Dependencies_LinkLifecycle(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newQueueHarness(t)
+	_, dir := initQueueRepo(t)
+	h.addRepo("cr1", dir)
+	ctx := context.Background()
+
+	nw1, err := h.q.AddNewWork("cr1", NewWorkInput{Title: "Feature One"})
+	if err != nil {
+		t.Fatalf("AddNewWork(nw1): %v", err)
+	}
+
+	depID, err := h.q.AddDependency("cr1", DependencyInput{Title: "Vendor reply", Blocks: []string{nw1}})
+	if err != nil {
+		t.Fatalf("AddDependency: %v", err)
+	}
+
+	state, err := h.repos.AdeQueue.Load("cr1")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !hasBlocker(state.Blockers, depID, nw1) {
+		t.Fatal("expected a blocker link dep->nw1 right after AddDependency")
+	}
+
+	// Rebind nw1 onto a real branch (Snapshot's own auto-rebind, the exact-one-candidate path
+	// TestQueue_Snapshot_RebindsNewWorkAndReportsCandidates already exercises) — the link must
+	// follow. The heuristic only fires once a session names nw1 (firstSessionStart).
+	h.setSessions("cr1", SessionRef{
+		ID: "s1", NewWorkID: nw1, State: model.AdeSessionStateRunning, TerminalID: "t1",
+		StartedAt: time.Now().Add(-time.Minute).UnixMilli(),
+	})
+	addQueueWorktree(t, dir, "feat1", "main")
+	if _, err := h.q.Snapshot(ctx, "cr1"); err != nil {
+		t.Fatalf("Snapshot (rebind): %v", err)
+	}
+	state, err = h.repos.AdeQueue.Load("cr1")
+	if err != nil {
+		t.Fatalf("Load (after rebind): %v", err)
+	}
+	if hasBlocker(state.Blockers, depID, nw1) {
+		t.Fatal("blocker link should no longer key on nw1 after rebind")
+	}
+	if !hasBlocker(state.Blockers, depID, "feat1") {
+		t.Fatal("blocker link should follow the rebind onto feat1")
+	}
+
+	// Linking a review branch, or an archived branch, must refuse (ErrNotBlockable).
+	runGitQueue(t, dir, "branch", "b", "main")
+	if _, err := h.q.AddBranch(ctx, "cr1", "b", model.AdeBranchKindReview); err != nil {
+		t.Fatalf("AddBranch(b, review): %v", err)
+	}
+	if err := h.q.SetBlocker("cr1", depID, "b", true); !errors.Is(err, repos.ErrNotBlockable) {
+		t.Fatalf("SetBlocker(review branch) = %v, want ErrNotBlockable", err)
+	}
+	runGitQueue(t, dir, "branch", "c", "main")
+	if _, err := h.q.AddBranch(ctx, "cr1", "c", model.AdeBranchKindMine); err != nil {
+		t.Fatalf("AddBranch(c, mine): %v", err)
+	}
+	if err := h.q.Archive(ctx, "cr1", "c", false); err != nil {
+		t.Fatalf("Archive(c): %v", err)
+	}
+	if err := h.q.SetBlocker("cr1", depID, "c", true); !errors.Is(err, repos.ErrNotBlockable) {
+		t.Fatalf("SetBlocker(archived branch) = %v, want ErrNotBlockable", err)
+	}
+
+	// Archive feat1 (the still-blocked item) — its own link must be deleted, not just orphaned.
+	if err := h.q.Archive(ctx, "cr1", "feat1", false); err != nil {
+		t.Fatalf("Archive(feat1): %v", err)
+	}
+	state, err = h.repos.AdeQueue.Load("cr1")
+	if err != nil {
+		t.Fatalf("Load (after archive): %v", err)
+	}
+	if hasBlocker(state.Blockers, depID, "feat1") {
+		t.Fatal("blocker link should be deleted once its blocked item is archived")
+	}
+
+	// Resolve: sets resolved_at, deletes every remaining link, and the dependency surfaces in
+	// history with kind "dependency".
+	runGitQueue(t, dir, "branch", "d", "main")
+	if _, err := h.q.AddBranch(ctx, "cr1", "d", model.AdeBranchKindMine); err != nil {
+		t.Fatalf("AddBranch(d, mine): %v", err)
+	}
+	if err := h.q.SetBlocker("cr1", depID, "d", true); err != nil {
+		t.Fatalf("SetBlocker(d, link): %v", err)
+	}
+	if err := h.q.ResolveDependency("cr1", depID); err != nil {
+		t.Fatalf("ResolveDependency: %v", err)
+	}
+	state, err = h.repos.AdeQueue.Load("cr1")
+	if err != nil {
+		t.Fatalf("Load (after resolve): %v", err)
+	}
+	if hasBlocker(state.Blockers, depID, "d") {
+		t.Fatal("resolve should delete every remaining blocker link")
+	}
+	var resolved model.AdeDependency
+	found := false
+	for _, d := range state.Dependencies {
+		if d.ID == depID {
+			resolved, found = d, true
+		}
+	}
+	if !found || resolved.ResolvedAt == nil {
+		t.Fatal("dependency should be marked resolved, its row kept for history")
+	}
+
+	snap, err := h.q.Snapshot(ctx, "cr1")
+	if err != nil {
+		t.Fatalf("Snapshot (final): %v", err)
+	}
+	for _, dep := range snap.Dependencies {
+		if dep.ID == depID {
+			t.Fatal("resolved dependency should not appear in live Dependencies")
+		}
+	}
+	histFound := false
+	for _, hi := range snap.History {
+		if hi.Item == depID && hi.Kind == "dependency" {
+			histFound = true
+		}
+	}
+	if !histFound {
+		t.Fatal("resolved dependency should appear in history with kind dependency")
+	}
+}
+
+func hasBlocker(blockers []model.AdeBlocker, dependency, item string) bool {
+	for _, b := range blockers {
+		if b.Dependency == dependency && b.Item == item {
+			return true
+		}
+	}
+	return false
 }
 
 // --- 10: -race — concurrent Snapshot x8 with a Refresh and a SetPlan ------------------------
