@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { formatTimeAgo } from '@vueuse/core';
@@ -121,18 +122,7 @@ async function onSend(): Promise<void> {
         data-testid="ade-agents-new"
         @click="onNewSession"
       >
-        <svg
-          aria-hidden="true"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
+        <CodiconIcon name="add" :size="12" />
       </button>
     </div>
 
