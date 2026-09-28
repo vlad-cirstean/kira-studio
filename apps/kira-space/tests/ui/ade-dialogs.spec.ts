@@ -200,7 +200,12 @@ test('the Claude Code dialog: busy/override, push toggle, edit/reset, and Rebase
       { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO.id }, response: EMPTY_PRS },
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-a-new', sessionId: 'sess-a-new', command: 'claude' },
+        response: {
+          terminalId: 'term-a-new',
+          sessionId: 'sess-a-new',
+          command: 'claude',
+          cwd: '/tmp/wt/a2',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
       { channel: IPC.adeSend, response: null },

@@ -386,7 +386,12 @@ test('drag and drop: direct parked apply, the Move dialog (with SetPlan before S
       },
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-new', sessionId: 'sess-new', command: 'claude' },
+        response: {
+          terminalId: 'term-new',
+          sessionId: 'sess-new',
+          command: 'claude',
+          cwd: '/tmp/wt/new',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
       ...snapshotControl(snap),
@@ -700,7 +705,12 @@ test("start: the action column's ▶ Start opens the Start dialog, Send launches
       ...snapshotControl(snap),
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-s', sessionId: 'sess-s', command: 'claude' },
+        response: {
+          terminalId: 'term-s',
+          sessionId: 'sess-s',
+          command: 'claude',
+          cwd: '/tmp/wt/s',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
     ],
@@ -764,7 +774,12 @@ test('archive: Just delete on one merged branch, Send to Claude then archive on 
       },
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-m2', sessionId: 'sess-m2', command: 'claude' },
+        response: {
+          terminalId: 'term-m2',
+          sessionId: 'sess-m2',
+          command: 'claude',
+          cwd: '/tmp/wt/m2',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
       {

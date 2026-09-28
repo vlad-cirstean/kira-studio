@@ -1249,7 +1249,12 @@ test('reaper: a stopped session (sessions push plus terminal exit) closes its te
       ...snapshotControl(snap),
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-a', sessionId: 'sess-a', command: 'claude' },
+        response: {
+          terminalId: 'term-a',
+          sessionId: 'sess-a',
+          command: 'claude',
+          cwd: '/tmp/wt/a',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
       { channel: IPC.adeSessions, response: { sessions: [RUNNING] } },
