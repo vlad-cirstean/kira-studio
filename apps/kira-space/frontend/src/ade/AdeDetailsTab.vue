@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import AdeBlockerRow from './AdeBlockerRow.vue';
 import AdeCandidatePicker from './AdeCandidatePicker.vue';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
@@ -213,6 +214,12 @@ function onNotesSave(value: string): void {
       <AdeLinkRow v-bind="jiraRow" @edit="editingJira = true" @save="onJiraSave" />
       <AdeLinkRow v-if="prRowView" v-bind="prRowView" @edit="editingPr = true" @save="onPrSave" />
     </div>
+
+    <AdeBlockerRow
+      v-if="!panel.readOnly && panel.kind !== 'review'"
+      :panel="panel"
+      :code-repo-id="codeRepoId"
+    />
 
     <AdeEstimateField
       v-if="!panel.readOnly"

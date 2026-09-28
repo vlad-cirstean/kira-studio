@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@theme/components/ui/t
 import { computed } from 'vue';
 import AdeAgentsTab from './AdeAgentsTab.vue';
 import AdeChangesTab from './AdeChangesTab.vue';
+import AdeDependencyDetails from './AdeDependencyDetails.vue';
 import AdeDetailsTab from './AdeDetailsTab.vue';
 import AdePanelHeader from './AdePanelHeader.vue';
 import type { DialogCtx } from './dialogCompose';
@@ -48,7 +49,14 @@ const agentCountStyle = computed(() =>
   >
     <AdePanelHeader :panel="panel" :dialog-ctx="dialogCtx" :code-repo-id="codeRepoId" />
 
+    <AdeDependencyDetails
+      v-if="panel.dependency"
+      :panel="panel"
+      :dependency="panel.dependency"
+      :code-repo-id="codeRepoId"
+    />
     <Tabs
+      v-else
       :model-value="adeUiStore.panelTab"
       class="min-h-0 flex-1 gap-0"
       @update:model-value="onTabChange"
