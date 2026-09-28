@@ -409,6 +409,20 @@ func (r *Registry) AgentSessions() []AgentSession {
 	return out
 }
 
+// WindowOf returns id's own live session's window key, reading the byWindow index CloseWindow
+// already keys off of — AdeService.FocusSession's own lookup (P129 Part 7 §0.9): "is this session's
+// PTY owned by some window, and which one". false for an id with no live session.
+func (r *Registry) WindowOf(id string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for windowKey, ids := range r.byWindow {
+		if _, ok := ids[id]; ok {
+			return windowKey, true
+		}
+	}
+	return "", false
+}
+
 // CloseWindow closes every session opened under windowKey — a window's own close handler
 // (main.go's WindowClosing, §4's teardown table), so a terminal never outlives the window that
 // opened it even when the renderer never gets to ack.

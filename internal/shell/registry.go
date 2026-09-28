@@ -65,6 +65,23 @@ func (r *WindowRegistry) Count() int {
 	return len(r.entries)
 }
 
+// Focus brings key's own window to the front — AdeService.FocusSession's own cross-window Open
+// (P129 Part 7 §0.9). false for an unknown key (the window closed between the lookup and this
+// call). Show/UnMinimise/Focus each wrap their real work in application.InvokeSync internally
+// (vendored webview_window.go), so this is safe to call from any goroutine.
+func (r *WindowRegistry) Focus(key string) bool {
+	r.mu.Lock()
+	e, ok := r.entries[key]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+	e.win.Show()
+	e.win.UnMinimise()
+	e.win.Focus()
+	return true
+}
+
 // Any returns one live window, or nil if none is registered — attachDialogs' fallback for when
 // app.Window.Current() can't resolve a key window (F4's second half: a dialog used to always
 // attach to whichever window was created most recently, not the one that asked).

@@ -6,10 +6,12 @@ import { toValue } from 'vue';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
+import { useModeStore } from '../state/mode';
 import { useAdeUiStore } from './state/adeUi';
 import { adeTurns } from './turnWatch';
 import type {
   AdeCandidateBranch,
+  AdeOpenSessionEvent,
   AdeRefreshResult,
   AdeRepoPrs,
   AdeRepoSnapshot,
@@ -183,4 +185,14 @@ export function installAdeSignals(queryClient: QueryClient): void {
   });
 
   installAdeCredentialSignal();
+
+  // P129 Part 7 §0.9: FocusSession's own emit half — this window was just brought forward, so show
+  // what it named. `openSession` only when `itemId` is non-empty (an orphan row's own `''`, §0.6
+  // rule 3 — nothing to select, just the repo tab).
+  control.onAdeOpenSession((event: AdeOpenSessionEvent) => {
+    useModeStore().setMode('ade');
+    const adeUiStore = useAdeUiStore();
+    adeUiStore.showRepo(event.codeRepoId);
+    if (event.itemId) adeUiStore.openSession(event.codeRepoId, event.itemId, event.sessionId);
+  });
 }

@@ -43,10 +43,12 @@ import type {
   AdeCandidateBranch,
   AdeCredentialRequest,
   AdeDependencyArgs,
+  AdeFocusSessionArgs,
   AdeForcePushArgs,
   AdeForcePushResult,
   AdeItemArgs,
   AdeLaunch,
+  AdeOpenSessionEvent,
   AdePr,
   AdePrepareLaunchArgs,
   AdeRefreshResult,
@@ -280,6 +282,13 @@ const spaceControl = {
   adeResolveDependency: (args: AdeDependencyArgs): Promise<void> =>
     unwrap(AdeService.ResolveDependency(args)),
   adeSetBlocker: (args: AdeSetBlockerArgs): Promise<void> => unwrap(AdeService.SetBlocker(args)),
+
+  // P129 Part 7 §0.9: All agents' cross-window Open — `false` for every reason the caller's own
+  // local-window fallback already handles (§0.8), never a rejection.
+  adeFocusSession: (args: AdeFocusSessionArgs): Promise<boolean> =>
+    unwrap(AdeService.FocusSession(args)),
+  onAdeOpenSession: (cb: (event: AdeOpenSessionEvent) => void): (() => void) =>
+    on(CHANNEL.adeOpenSession, cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

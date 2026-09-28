@@ -441,6 +441,14 @@ func (t *Tracker) Send(sessionID, message string) error {
 	return nil
 }
 
+// Get returns id's own recorded session, nil if none exists — AdeService.FocusSession's own
+// lookup (P129 Part 7 §0.9), the same *model.AdeSession shape Prepare's own resume branch already
+// reads. No lastActive override (List's own): FocusSession only reads State/TerminalID, neither of
+// which that in-memory clock touches.
+func (t *Tracker) Get(id string) (*model.AdeSession, error) {
+	return t.deps.Store.Get(id)
+}
+
 // List returns every recorded session, newest last-active first, with the in-memory lastActive
 // clock overriding the stored value for a still-live record (the DB row is only refreshed on
 // Stop/SessionEnd/a grace-timeout stop/Close, so a live session's own freshest activity time

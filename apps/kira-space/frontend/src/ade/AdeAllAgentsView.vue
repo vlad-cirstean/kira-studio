@@ -12,6 +12,7 @@ import { ACTIVITY_LABEL, type ActivityKind } from './activity';
 import { type AllAgentsRepoInput, type AllAgentsRow, buildAllAgents } from './allAgents';
 import { type DialogCtx, resumeSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
+import { useAdeFocusSession } from './mutations';
 import { adePrsOptions, adeSnapshotOptions, useAdeSessions } from './queries';
 import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
@@ -103,14 +104,28 @@ const summaryEntries = computed(() => {
     .map((k) => ({ kind: k, count: s[k as 'input' | 'working' | 'waiting'], label: ACTIVITY_LABEL[k] }));
 });
 
-// §0.8: Open, same window only — `terminalsStore.terminalSession` is truthy exactly when this
-// window owns the row's own PTY. Cross-window Open (§0.9) lands in a later commit; until then a
-// foreign-window row's Open is a no-op here (the row still shows `Running in another window.` via
-// the Agents tab once the user reaches it another way).
-function onOpen(row: AllAgentsRow): void {
-  if (!terminalsStore.terminalSession(row.terminalId)) return;
+const focusSessionMutation = useAdeFocusSession();
+
+function openLocal(row: AllAgentsRow): void {
   adeUiStore.showRepo(row.codeRepoId);
   if (row.itemId !== null) adeUiStore.openSession(row.codeRepoId, row.itemId, row.sessionId);
+}
+
+// §0.8/§0.9: `terminalsStore.terminalSession` is truthy exactly when this window owns the row's
+// own PTY — that case goes straight to the local path. Everything else tries the owning window's
+// own FocusSession first (cross-window Open); a `false` result (the owner closed, or the session
+// stopped between render and click) falls back to the same local path, which then shows its
+// existing `Running in another window.` line until the next `kira:ade:sessions` refresh.
+function onOpen(row: AllAgentsRow): void {
+  if (terminalsStore.terminalSession(row.terminalId)) {
+    openLocal(row);
+    return;
+  }
+  void focusSessionMutation
+    .mutateAsync({ sessionId: row.sessionId, itemId: row.itemId ?? '' })
+    .then((focused) => {
+      if (!focused) openLocal(row);
+    });
 }
 
 // §0.10: the one dialog this view can open, for whichever repo Start was last clicked on — set only

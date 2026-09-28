@@ -178,6 +178,9 @@ func main() {
 	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
 	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
 	windows := shell.NewWindowRegistry()
+	// adeSvc.FocusWindow: the same two-step windowsSvc.OpenNewWindow (below) uses — FocusSession
+	// (P129 Part 7 §0.9) needs windows, which doesn't exist yet when adeSvc is constructed above.
+	adeSvc.FocusWindow = windows.Focus
 	closeFlush := shell.NewCloseFlushCoordinator(events)
 
 	beforeFlush := sync.OnceFunc(func() {

@@ -76,6 +76,10 @@ export const CHANNEL = {
   adeSessions: 'kira:ade:sessions',
   adeRepo: 'kira:ade:repo',
   adeCredential: 'kira:ade:credential',
+  // P129 Part 7 §0.9: All agents' cross-window Open — EmitTo'd to the one window FocusSession just
+  // brought forward, telling it which repo/item/session to show (bridge/ade.go's own
+  // ChannelAdeOpenSession).
+  adeOpenSession: 'kira:ade:open-session',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

@@ -188,6 +188,12 @@ type AdeService struct {
 	// Queue is P129 Part 2's own addition — the merge-queue's git-facts and persistence surface
 	// (internal/ade.Queue), nil in a fixture that only exercises Part 1's launch/tracking methods.
 	Queue *ade.Queue
+	// FocusWindow is P129 Part 7's own addition (§0.9) — main.go assigns it to
+	// shell.WindowRegistry.Focus once that registry exists (the same two-step
+	// windowsSvc.OpenNewWindow's own field uses), nil in a fixture that never calls FocusSession.
+	// A func field, not a method: Wails' binding generator only sees exported *methods* on the
+	// registered type (§1.7's FQN rule), so this never grows the bound-call surface.
+	FocusWindow func(key string) bool
 }
 
 // AgentSessions is the boot-time hydrate for the P127 agent-activity store (§1.1) — a window
@@ -208,6 +214,82 @@ func (s *AdeService) Sessions() (AdeSessionsResult, error) {
 		out[i] = toWireAdeSession(sess)
 	}
 	return AdeSessionsResult{Sessions: out}, nil
+}
+
+// AdeFocusSessionArgs is FocusSession's own argument shape (§0.9). ItemID is "" for an orphan row
+// (All agents §0.6 rule 3) — the caller then only wants the repo tab shown, not a specific item
+// selected.
+type AdeFocusSessionArgs struct {
+	SessionID string `json:"sessionId"`
+	ItemID    string `json:"itemId"`
+}
+
+func (a AdeFocusSessionArgs) Validate() error {
+	if a.SessionID == "" {
+		return ipcerr.New("E_INVALID", "sessionId is required")
+	}
+	if len(a.ItemID) > adeMaxBranchBytes {
+		return ipcerr.New("E_INVALID", "itemId is too long")
+	}
+	if strings.ContainsAny(a.ItemID, "\x00\n") {
+		return ipcerr.New("E_INVALID", "itemId must not contain NUL or newline")
+	}
+	return nil
+}
+
+// FocusSession is the All agents row's own cross-window Open (§0.9, §0.8's local-window fallback
+// covers the rest): sessionId's own terminal may be owned by a window other than the caller's, so
+// this brings that window forward and tells it what to show, rather than trying to attach a
+// TerminalHostView to a foreign id (Part 6 §0.18's own "never cross windows" rule). Returns false
+// — never an error — for every reason the caller's own local-window fallback already exists to
+// handle: the session already stopped, or its owning window closed between the row rendering and
+// the click.
+func (s *AdeService) FocusSession(args AdeFocusSessionArgs) (bool, error) {
+	if err := args.Validate(); err != nil {
+		return false, err
+	}
+	record, err := s.Tracker.Get(args.SessionID)
+	if err != nil {
+		return false, ipcerr.InternalErr(err)
+	}
+	if record == nil {
+		return false, adeTrackerError(ade.ErrSessionNotFound)
+	}
+	if record.State != model.AdeSessionStateRunning {
+		return false, nil
+	}
+	windowKey, ok := s.Registry.WindowOf(record.TerminalID)
+	if !ok {
+		return false, nil
+	}
+	if s.FocusWindow == nil || !s.FocusWindow(windowKey) {
+		return false, nil
+	}
+	AdeOpenSession(s.Deps.Events, windowKey, AdeOpenSessionEvent{
+		CodeRepoID: record.CodeRepoID, ItemID: args.ItemID, SessionID: args.SessionID,
+	})
+	return true, nil
+}
+
+// ChannelAdeOpenSession is FocusSession's own push channel (§0.9) — EmitTo'd to the window
+// FocusWindow just brought forward, telling it which repo/item/session to show. Space-only, no
+// Kira Studio equivalent (it has no ade module).
+const ChannelAdeOpenSession = "kira:ade:open-session"
+
+// AdeOpenSessionEvent is ChannelAdeOpenSession's own payload. ItemID is "" for an orphan row.
+type AdeOpenSessionEvent struct {
+	CodeRepoID string `json:"codeRepoId"`
+	ItemID     string `json:"itemId"`
+	SessionID  string `json:"sessionId"`
+}
+
+// AdeOpenSession is FocusSession's own emit half, split out to match every other Channel's own
+// named send-helper (AdeSessionsChanged/AdeRepoChanged/AdeCredentialRequested) — EmitTo, since this
+// is addressed to one specific window (the one FocusWindow just brought forward), never the focused
+// window or every window. Takes the bare Emitter, not *Events: AdeService only ever holds
+// Deps.Events (appcore.Emitter), never the app's own *Events wrapper the other three helpers take.
+func AdeOpenSession(e appcore.Emitter, windowKey string, payload AdeOpenSessionEvent) {
+	e.EmitTo(windowKey, ChannelAdeOpenSession, payload)
 }
 
 // adeTrackerError maps a Tracker sentinel error to E_INVALID with its own message (a caller

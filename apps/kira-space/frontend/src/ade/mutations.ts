@@ -13,6 +13,7 @@ import type {
   AdeArchiveRisk,
   AdeBindNewWorkArgs,
   AdeDependencyArgs,
+  AdeFocusSessionArgs,
   AdeForcePushArgs,
   AdeForcePushResult,
   AdeLaunch,
@@ -284,5 +285,15 @@ export function useAdeSetBlocker(codeRepoId: MaybeRefOrGetter<string>) {
         exact: true,
       });
     },
+  }));
+}
+
+/** P129 Part 7 §0.9: All agents' cross-window Open — not repo-scoped (`AdeFocusSessionArgs` names
+ *  the session, not a repo) and not part of any dialog's own pending state, so this has no
+ *  `deliverKey` and no `codeRepoId` param, unlike every mutation above. */
+export function useAdeFocusSession() {
+  return useMutation(() => ({
+    mutationKey: ['ade', 'focusSession'],
+    mutationFn: (args: AdeFocusSessionArgs): Promise<boolean> => control.adeFocusSession(args),
   }));
 }

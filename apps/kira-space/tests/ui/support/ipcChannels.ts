@@ -120,4 +120,7 @@ export const IPC = {
   adeUpdateDependency: 'kira:ade:updateDependency',
   adeResolveDependency: 'kira:ade:resolveDependency',
   adeSetBlocker: 'kira:ade:setBlocker',
+  // P129 Part 7 §3.4: the All agents view's own bound call and its push counterpart.
+  adeFocusSession: 'kira:ade:focusSession',
+  adeOpenSession: 'kira:ade:open-session',
 } as const;

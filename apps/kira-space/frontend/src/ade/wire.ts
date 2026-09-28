@@ -210,6 +210,21 @@ export interface AdeRepoChangedEvent {
   codeRepoId: string;
 }
 
+/** `AdeFocusSessionArgs` — `FocusSession`'s own args (P129 Part 7 §0.9). `itemId` is `''` for an
+ *  orphan row (no queue item to select, only the repo tab). */
+export interface AdeFocusSessionArgs {
+  sessionId: string;
+  itemId: string;
+}
+
+/** `kira:ade:open-session`'s own payload — `FocusSession`'s emit half, EmitTo'd to the window it
+ *  just focused. */
+export interface AdeOpenSessionEvent {
+  codeRepoId: string;
+  itemId: string;
+  sessionId: string;
+}
+
 // P129 Part 4 §2.3: the launch/archive wire mirrors — Part 3 left these six methods' request/result
 // shapes for their first consumer part (§0.10 of the Part 3 plan). Every field mirrors
 // `bridge/ade.go`'s own json tags exactly; not `omitempty` on the Go side stays required here too
