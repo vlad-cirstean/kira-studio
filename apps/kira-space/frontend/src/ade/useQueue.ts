@@ -27,7 +27,7 @@ import type {
 export const LATER = 9999;
 
 type Tone = 'amber' | 'red' | 'green' | 'blue' | 'purple' | 'grey';
-type ItemKind = 'mine' | 'review' | 'parked';
+type ItemKind = 'mine' | 'review' | 'parked' | 'dependency';
 
 // mockup line 579: work-item colors, assigned once server-side (Part 2's own `snapshot.colors`) —
 // this module only maps the assigned palette index back to a hex value, never assigns one itself.
@@ -53,6 +53,9 @@ const PALETTE = [
   '#d58c8c',
   '#a3aab4',
 ] as const;
+
+/** P135 §0/§4.5: a dependency's own fixed kind colour — not a palette slot (it has none). */
+export const DEPENDENCY_COLOR = '#4fb8c4';
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MO = [
@@ -121,6 +124,18 @@ export interface QueueItem {
   /** A review item's own author (mockup `b.owner`), `''` otherwise — P129 Part 5 §0.21's owner
    *  pill, the first UI consumer of the internal `Item.owner` this module already carried. */
   owner: string;
+  /** P135 §5.1: the inline Jira line, `null` when the item has no key. */
+  jira: { key: string; url: string } | null;
+  /** P135 §4.6: dependencies linking this item as a blocker (empty for a review item and for a
+   *  dependency itself). */
+  blockers: { id: string; title: string; late: boolean }[];
+  /** P135 §4.6: this item's own dependency facts, `null` for every non-dependency kind. */
+  dependency: {
+    waitingOn: string;
+    expectedBy: string | null;
+    neededBy: number | null;
+    late: boolean;
+  } | null;
 }
 
 export interface QueueStackMember {
@@ -133,6 +148,7 @@ interface QueueStack {
   members: QueueStackMember[];
   lead: string | null;
   parked: boolean;
+  dependency: boolean;
 }
 
 export interface QueueTag {
@@ -158,6 +174,8 @@ interface QueueCell {
   /** The segment's own final tag tip, on every cell (mockup 1175 gives every tag/info cell the
    *  block tip). */
   tip: string;
+  /** P135 §4.6: this cell's own blocker chip, `null` when the item has no linked dependency. */
+  blocked: { count: number; tone: 'blue' | 'red'; tip: string } | null;
 }
 
 export interface QueueSegment {
@@ -176,6 +194,7 @@ export interface QueueSegment {
   idx: number;
   cont: boolean;
   parked: boolean;
+  dependency: boolean;
   after: { id: string; file: string } | null;
   tag: QueueTag;
   action: QueueAction | null;
@@ -259,7 +278,8 @@ export interface QueuePanelAction {
     | 'rebaseStack'
     | 'queueAfter'
     | 'start'
-    | 'archive';
+    | 'archive'
+    | 'resolve';
   label: string;
   tone: 'primary' | 'purple' | 'red' | 'claude' | 'secondary';
   disabled: boolean;
@@ -331,6 +351,22 @@ export interface QueuePanel {
   running: QueuePanelSession[];
   stopped: { id: string; claudeSessionId: string; lastActiveAt: number }[];
   candidates: string[];
+  /** P135 §4.6: dependencies blocking this item, `[]` for a review item and for a dependency. */
+  blockers: { id: string; title: string; late: boolean }[];
+  /** P135 §4.6: live dependencies not yet linked to this item — `[]` for `readOnly` or `review`. */
+  blockerOptions: { id: string; title: string }[];
+  /** P135 §4.6: this panel's own dependency facts, `null` for every non-dependency kind. */
+  dependency: QueuePanelDependency | null;
+}
+
+export interface QueuePanelDependency {
+  title: string;
+  waitingOn: string;
+  expectedBy: string | null;
+  neededByLabel: string | null;
+  late: boolean;
+  lateTip: string;
+  blocks: { id: string; title: string }[];
 }
 
 export interface QueueView {
@@ -528,6 +564,8 @@ interface Item {
   files: readonly AdeFile[];
   dirty: readonly string[];
   jiraKey: string;
+  /** P135 §5.1: the Jira key's own link target, `''` for a dependency or a key-less item. */
+  jiraUrl: string;
   /** `branch.name` — the one user-settable display-title override (§0.4). */
   nameOverride: string;
   /** `branch.draftTitle` / `newWork.title`. */
@@ -535,6 +573,14 @@ interface Item {
   sessions: AdeSession[];
   owner: string;
   commits: readonly AdeCommit[];
+  /** P135 §4.6: dependency ids linking this item as a blocker — empty for a dependency itself. */
+  blockers: string[];
+  /** P135 §4.1: `''` for every non-dependency item. */
+  waitingOn: string;
+  /** P135 §4.1: ISO date or `null` — `null` for every non-dependency item too. */
+  expectedBy: string | null;
+  /** P135 §4.1: item ids this dependency blocks — `[]` for every non-dependency item. */
+  blocks: string[];
 }
 
 function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]): Item[] {
@@ -557,11 +603,16 @@ function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]):
       files: b.files,
       dirty: b.dirty.map((d) => d.path),
       jiraKey: b.jira.key,
+      jiraUrl: b.jira.url,
       nameOverride: b.name,
       draftTitle: b.draftTitle,
       sessions: sessions.filter((s) => b.branch !== '' && s.branch === b.branch),
       owner: b.owner,
       commits: b.commits,
+      blockers: [],
+      waitingOn: '',
+      expectedBy: null,
+      blocks: [],
     });
   }
   for (const w of snapshot.newWork) {
@@ -578,12 +629,49 @@ function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]):
       files: [],
       dirty: [],
       jiraKey: w.jira.key,
+      jiraUrl: w.jira.url,
       nameOverride: '',
       draftTitle: w.title,
       sessions: sessions.filter((s) => w.id !== '' && s.newWorkId === w.id),
       owner: '',
       commits: [],
+      blockers: [],
+      waitingOn: '',
+      expectedBy: null,
+      blocks: [],
     });
+  }
+  for (const dep of snapshot.dependencies) {
+    items.push({
+      id: dep.id,
+      kind: 'dependency',
+      draft: false,
+      branch: '',
+      base: '',
+      ahead: 0,
+      behind: 0,
+      merged: false,
+      est: '',
+      files: [],
+      dirty: [],
+      jiraKey: '',
+      jiraUrl: '',
+      nameOverride: '',
+      draftTitle: dep.title,
+      sessions: [],
+      owner: '',
+      commits: [],
+      blockers: [],
+      waitingOn: dep.waitingOn,
+      expectedBy: dep.expectedBy,
+      blocks: dep.blocks,
+    });
+  }
+  const byIdForBlockers = new Map(items.map((i) => [i.id, i] as const));
+  for (const dep of snapshot.dependencies) {
+    for (const blockedId of dep.blocks) {
+      byIdForBlockers.get(blockedId)?.blockers.push(dep.id);
+    }
   }
   return items;
 }
@@ -714,7 +802,7 @@ function buildStacks(
   parentOf: Map<string, string>,
   kids: Map<string, string[]>,
 ): QueueStack[] {
-  const merging = items.filter((b) => b.kind !== 'parked');
+  const merging = items.filter((b) => b.kind !== 'parked' && b.kind !== 'dependency');
   const stacks: QueueStack[] = [];
   for (const root of merging) {
     if (parentOf.has(root.id)) continue;
@@ -731,11 +819,25 @@ function buildStacks(
         break;
       }
     }
-    stacks.push({ root: root.id, members, lead, parked: false });
+    stacks.push({ root: root.id, members, lead, parked: false, dependency: false });
   }
   for (const b of items) {
     if (b.kind === 'parked') {
-      stacks.push({ root: b.id, members: [{ id: b.id, dep: 0 }], lead: b.id, parked: true });
+      stacks.push({
+        root: b.id,
+        members: [{ id: b.id, dep: 0 }],
+        lead: b.id,
+        parked: true,
+        dependency: false,
+      });
+    } else if (b.kind === 'dependency') {
+      stacks.push({
+        root: b.id,
+        members: [{ id: b.id, dep: 0 }],
+        lead: b.id,
+        parked: false,
+        dependency: true,
+      });
     }
   }
   return stacks;
@@ -781,6 +883,45 @@ function computeEffDay(
   return eff;
 }
 
+interface DependencyDay {
+  /** The earliest effective day among this dependency's linked, unmerged blocked items whose own
+   *  day is not Later — `undefined` when unlinked or every link is Later/merged. */
+  neededBy: number | undefined;
+  late: boolean;
+}
+
+/** P135 §4.4/§4.6: a dependency's own day never sits after the earliest day its blocked items need
+ *  it resolved by — overwrites each dependency's entry in `eff`, run right after `computeEffDay`. A
+ *  blocked item's own day never reads a dependency's day, so this stays acyclic. */
+function applyDependencyDays(
+  items: Item[],
+  eff: Map<string, number>,
+  cal: Calendar,
+  byId: Map<string, Item>,
+): Map<string, DependencyDay> {
+  const out = new Map<string, DependencyDay>();
+  for (const dep of items) {
+    if (dep.kind !== 'dependency') continue;
+    const needed = dep.blocks
+      .map((id) => byId.get(id))
+      .filter((b): b is Item => b !== undefined && !b.merged)
+      .map((b) => eff.get(b.id) as number)
+      .filter((d) => d !== LATER);
+    const neededBy = needed.length ? Math.min(...needed) : undefined;
+    const own = planDayOffset(cal, dep.expectedBy);
+    const day =
+      neededBy === undefined
+        ? (own ?? LATER)
+        : own === undefined
+          ? neededBy
+          : Math.min(own, neededBy);
+    const late = own !== undefined && ((neededBy !== undefined && own > neededBy) || own < 0);
+    eff.set(dep.id, day);
+    out.set(dep.id, { neededBy, late });
+  }
+  return out;
+}
+
 // -------------------------------------------------------------------------------------------------
 // §2.6 stage 8/9: segments per effective day, then merge order (mineSegs/extSegs/seq/mergeN)
 // -------------------------------------------------------------------------------------------------
@@ -798,6 +939,7 @@ interface Seg {
   idx: number;
   cont: boolean;
   parked: boolean;
+  dependency: boolean;
   placed: boolean;
   after: { id: string; file: string } | null;
 }
@@ -852,6 +994,7 @@ function segmentForBucket(
     end: days[days.length - 1] as number,
     span,
     parked: st.parked,
+    dependency: st.dependency,
     idx: si,
     cont: si > 0,
     pos: p0 >= 0 ? p0 : ps >= 0 ? ps + 0.01 * si : 999 + si,
@@ -897,8 +1040,11 @@ function buildMergeOrder(
   byId: Map<string, Item>,
   conflicts: Map<string, ConflictEntry[]>,
 ): { seq: Seg[]; mergeN: Map<string, number> } {
-  const mineSegs = segs.filter((g) => g.lead);
+  const mineSegs = segs.filter((g) => g.lead && !g.dependency);
   const extSegs = segs.filter((g) => !g.lead);
+  // P135 §4.6: a dependency's own segment never enters merge-order placement — its day is already
+  // fixed by `applyDependencyDays`, appended to `seq` as-is so bands/`boxOf` still see it.
+  const depSegs = segs.filter((g) => g.dependency);
   mineSegs.sort((a, b) => a.end - b.end || a.day - b.day || a.pos - b.pos);
 
   const seq: Seg[] = [];
@@ -926,6 +1072,7 @@ function buildMergeOrder(
       seq.push(o);
     }
   }
+  for (const dep of depSegs) seq.push(dep);
 
   const mergeN = new Map<string, number>();
   let n = 0;
@@ -984,7 +1131,8 @@ function computeAfter(
 ): void {
   for (let i = 0; i < seq.length; i++) {
     const g = seq[i] as Seg;
-    g.after = g.lead && !g.parked ? findAfterFor(g, seq, i, byId, sharedLookup) : null;
+    g.after =
+      g.lead && !g.parked && !g.dependency ? findAfterFor(g, seq, i, byId, sharedLookup) : null;
   }
 }
 
@@ -999,10 +1147,16 @@ interface StatusCtx {
   plan: AdePlan;
   rebasing: ReadonlySet<string>;
   pushing: ReadonlySet<string>;
+  depDays: Map<string, DependencyDay>;
 }
 
 function workStatus(id: string, ctx: StatusCtx): { label: string; tone: Tone } {
   const item = ctx.byId.get(id) as Item;
+  if (item.kind === 'dependency') {
+    return ctx.depDays.get(id)?.late
+      ? { label: 'late', tone: 'red' }
+      : { label: 'waiting', tone: 'grey' };
+  }
   if (item.merged) return { label: 'merged', tone: 'purple' };
   if (item.kind === 'parked') return { label: 'not merging', tone: 'grey' };
   if (item.kind === 'review') {
@@ -1033,6 +1187,7 @@ function workStatus(id: string, ctx: StatusCtx): { label: string; tone: Tone } {
 
 function branchStatusOf(id: string, ctx: StatusCtx): { label: string; tone: Tone } {
   const item = ctx.byId.get(id) as Item;
+  if (item.kind === 'dependency') return { label: '', tone: 'grey' };
   if (item.draft) return { label: 'not created', tone: 'grey' };
   if (item.merged) return { label: 'merged', tone: 'purple' };
   const root = rootOf(id, ctx.parentOf);
@@ -1219,6 +1374,39 @@ function tagForBehindAfterCont(
   return null;
 }
 
+/** Rung 0, dependency-only (§4.6): unlinked external wait, on-time need date, or late. Never an
+ *  action — a dependency resolves through its own panel, not a block action. */
+function dependencyTag(
+  g: Seg,
+  byId: Map<string, Item>,
+  depDays: Map<string, DependencyDay>,
+  cal: Calendar,
+): TagResult {
+  if (!g.dependency) return null;
+  const dep = byId.get(g.root) as Item;
+  const dd = depDays.get(dep.id);
+  const own = planDayOffset(cal, dep.expectedBy);
+  if (dd?.late) {
+    const tip =
+      own !== undefined && own < 0
+        ? 'expected date passed'
+        : `expected ${own !== undefined ? dayLabel(cal, own) : ''}, needed ${
+            dd.neededBy !== undefined ? dayLabel(cal, dd.neededBy) : 'Later'
+          }`;
+    return { tag: { label: 'late', tone: 'red', tip }, action: null };
+  }
+  if (dd?.neededBy !== undefined) {
+    return {
+      tag: { label: `needed ${dayLabel(cal, dd.neededBy)}`, tone: 'blue', tip: '' },
+      action: null,
+    };
+  }
+  return {
+    tag: { label: 'external', tone: 'grey', tip: 'external wait, no linked item' },
+    action: null,
+  };
+}
+
 function segmentTagAndAction(
   g: Seg,
   byId: Map<string, Item>,
@@ -1229,7 +1417,11 @@ function segmentTagAndAction(
   pushing: ReadonlySet<string>,
   selectedTitle: string,
   titleOfId: (id: string) => string,
+  depDays: Map<string, DependencyDay>,
+  cal: Calendar,
 ): { tag: QueueTag; action: QueueAction | null } {
+  const depTag = dependencyTag(g, byId, depDays, cal);
+  if (depTag) return depTag;
   const d = deriveSegState(g, byId, conflicts, rebasing);
   const early = tagForMergedParkedConflictRipple(
     g,
@@ -1264,21 +1456,51 @@ function segmentTagAndAction(
 const ARCHIVE_TIP =
   'Stop its agents, delete its worktree and hide it. The branch, notes and links are kept; it stays in history.';
 
+/** P135 §4.6: a blocked item's own chip facts — count of linked dependencies, red when any is
+ *  late else blue, one tip line per dependency. `null` when the item has no linked dependency. */
+function blockedChipFor(
+  item: Item,
+  byId: Map<string, Item>,
+  depDays: Map<string, DependencyDay>,
+  cal: Calendar,
+): { count: number; tone: 'blue' | 'red'; tip: string } | null {
+  if (item.blockers.length === 0) return null;
+  const lines: string[] = [];
+  let anyLate = false;
+  for (const depId of item.blockers) {
+    const dep = byId.get(depId);
+    if (!dep) continue;
+    const dd = depDays.get(depId);
+    if (dd?.late) anyLate = true;
+    const needed = dd?.neededBy !== undefined ? dayLabel(cal, dd.neededBy) : 'Later';
+    const own = planDayOffset(cal, dep.expectedBy);
+    const expected = own !== undefined ? dayLabel(cal, own) : 'none';
+    lines.push(`${dep.draftTitle} · needed ${needed} · expected ${expected}`);
+  }
+  return { count: item.blockers.length, tone: anyLate ? 'red' : 'blue', tip: lines.join('\n') };
+}
+
 function buildCells(
   g: Seg,
   byId: Map<string, Item>,
   eff: Map<string, number>,
   parentOf: Map<string, string>,
   cal: Calendar,
+  depDays: Map<string, DependencyDay>,
 ): QueueCell[] {
   const cells: QueueCell[] = g.members.map(() => ({
     tag: null,
     action: null,
     info: null,
     tip: '',
+    blocked: null,
   }));
   g.members.forEach((x, i) => {
     const item = byId.get(x.id) as Item;
+    if (item.kind !== 'dependency') {
+      const blocked = blockedChipFor(item, byId, depDays, cal);
+      if (blocked) cells[i] = { ...(cells[i] as QueueCell), blocked };
+    }
     if (item.merged) {
       if (i > 0)
         cells[i] = { ...(cells[i] as QueueCell), tag: { label: '✓ merged', tone: 'purple' } };
@@ -1327,7 +1549,7 @@ function buildHoursOn(
   for (const g of seq) {
     for (const x of g.members) {
       const item = byId.get(x.id) as Item;
-      if (item.kind === 'review') continue;
+      if (item.kind === 'review' || item.kind === 'dependency') continue;
       const e = parseEst(item.est, workdayHours, spanDayShare);
       if (!e) continue;
       if (e.days > 1 && g.day !== LATER) {
@@ -1402,11 +1624,16 @@ function historyDayOffset(
   return isoToDays(localDayOf(archivedAtMs)) - cal.todayDays;
 }
 
-/** Non-review member ids of a list of segments (mockup `idsOf`, line 1275). */
-function idsOfNonReview(segs: readonly Seg[], byId: Map<string, Item>): string[] {
+/** Non-review, non-dependency member ids of a list of segments (mockup `idsOf`, line 1275; P135
+ *  §4.6 excludes `dependency` too — renamed from `idsOfNonReview`). */
+function idsOfPlannable(segs: readonly Seg[], byId: Map<string, Item>): string[] {
   const out: string[] = [];
-  for (const g of segs)
-    for (const x of g.members) if (byId.get(x.id)?.kind !== 'review') out.push(x.id);
+  for (const g of segs) {
+    for (const x of g.members) {
+      const kind = byId.get(x.id)?.kind;
+      if (kind !== 'review' && kind !== 'dependency') out.push(x.id);
+    }
+  }
   return out;
 }
 
@@ -1559,7 +1786,8 @@ function buildBands(
   const historyByDay = new Map<number, { title: string; branch: string; how: string }[]>();
   for (const h of snapshot.history) {
     const d = historyDayOffset(h.archivedAt, cal, localDayOf);
-    const how = h.mergedAt != null ? 'merged · archived' : 'archived';
+    const how =
+      h.kind === 'dependency' ? 'resolved' : h.mergedAt != null ? 'merged · archived' : 'archived';
     const list = historyByDay.get(d);
     const entry = { title: h.title, branch: h.branch, how };
     if (list) list.push(entry);
@@ -1624,8 +1852,8 @@ function buildBands(
       isWorkedWeekend: flags.isWorkedWeekend,
       isEmpty,
       longLabel: dayLong(flags.iso, today),
-      overdueIds: idsOfNonReview(overdue, byId),
-      startIds: idsOfNonReview(startSegs, byId),
+      overdueIds: idsOfPlannable(overdue, byId),
+      startIds: idsOfPlannable(startSegs, byId),
       nextWorkDay: flags.nextWorkDay,
       nextWorkLabel: flags.nextWorkDay === null ? '' : dayLabel(cal, flags.nextWorkDay),
       nextWorkLong:
@@ -1711,6 +1939,7 @@ interface PanelCtx {
   spanDayShare: number;
   titleOfId: (id: string) => string;
   cal: Calendar;
+  depDays: Map<string, DependencyDay>;
 }
 
 /** Mockup lines 1385-1397 (§0.5-§0.7 for the design-only additions) — the panel's own action bar,
@@ -1846,6 +2075,9 @@ function buildPanelMono(
   seg: Seg | undefined,
   ctx: PanelCtx,
 ): string {
+  if (item.kind === 'dependency') {
+    return `${seg ? dayLabel(ctx.cal, seg.day) : ''} · external`;
+  }
   let pos: string;
   if (item.kind === 'mine') {
     if (item.merged) pos = 'merged';
@@ -1875,6 +2107,7 @@ function buildPanelBranchFrom(
       other.id !== selectedId &&
       !other.draft &&
       other.kind !== 'parked' &&
+      other.kind !== 'dependency' &&
       !ancestorsOf(other.id, ctx.parentOf).includes(selectedId)
     ) {
       opts.push({ value: other.id, label: other.branch || other.id });
@@ -1908,11 +2141,114 @@ function buildPanelAgents(
   return { running, stopped };
 }
 
+/** P135 §4.6: a dependency's own panel — header facts, a single Resolve action, no changes/running/
+ *  stopped/candidates (a dependency has no git of its own). */
+function buildDependencyPanel(selectedId: string, item: Item, ctx: PanelCtx): QueuePanel {
+  const seg = ctx.boxOf.get(selectedId);
+  const mono = buildPanelMono(selectedId, item, seg, ctx);
+  const dd = ctx.depDays.get(selectedId);
+  const own = planDayOffset(ctx.cal, item.expectedBy);
+  const late = dd?.late ?? false;
+  const lateTip = !late
+    ? ''
+    : own !== undefined && own < 0
+      ? 'expected date passed'
+      : `expected ${own !== undefined ? dayLabel(ctx.cal, own) : ''}, needed ${
+          dd?.neededBy !== undefined ? dayLabel(ctx.cal, dd.neededBy) : 'Later'
+        }`;
+  const dependency: QueuePanelDependency = {
+    title: ctx.titleOfId(selectedId),
+    waitingOn: item.waitingOn,
+    expectedBy: item.expectedBy,
+    neededByLabel: dd?.neededBy !== undefined ? dayLabel(ctx.cal, dd.neededBy) : null,
+    late,
+    lateTip,
+    blocks: item.blocks.map((id) => ({ id, title: ctx.titleOfId(id) })),
+  };
+  return {
+    id: selectedId,
+    kind: 'dependency',
+    draft: false,
+    isNewWork: false,
+    merged: false,
+    readOnly: false,
+    title: ctx.titleOfId(selectedId),
+    defaultTitle: item.draftTitle,
+    nameValue: item.draftTitle,
+    color: DEPENDENCY_COLOR,
+    status: workStatus(selectedId, ctx.statusCtx),
+    branchStatus: branchStatusOf(selectedId, ctx.statusCtx),
+    owner: '',
+    mono,
+    actions: [
+      {
+        kind: 'resolve',
+        label: 'Resolve',
+        tone: 'primary',
+        disabled: false,
+        tip: 'Marks it resolved and removes every link to a blocked item.',
+        targetIds: [selectedId],
+      },
+    ],
+    branch: { ref: '', from: null, fromOptions: null },
+    jira: { key: '', url: '' },
+    prUrl: '',
+    notes: '',
+    estimate: { num: '', unit: 'h', days: 0 },
+    changes: {
+      base: '',
+      ahead: 0,
+      behind: 0,
+      worktree: '',
+      dirtyCount: 0,
+      rippleText: '—',
+      rippleTone: 'grey',
+      conflicts: [],
+      shared: null,
+      dirty: [],
+      commits: [],
+      files: [],
+    },
+    running: [],
+    stopped: [],
+    candidates: [],
+    blockers: [],
+    blockerOptions: [],
+    dependency,
+  };
+}
+
+/** P135 §4.6: dependencies blocking this item, and (unless read-only) live dependencies still
+ *  linkable to it — split out of `buildPanel` purely to keep its own complexity down (same
+ *  rationale as `deriveSegState`/`deriveDayFlags` above), no behavior change. */
+function buildPanelBlockers(
+  item: Item,
+  readOnly: boolean,
+  ctx: PanelCtx,
+): {
+  blockers: { id: string; title: string; late: boolean }[];
+  blockerOptions: { id: string; title: string }[];
+} {
+  const blockers = item.blockers.map((depId) => {
+    const dd = ctx.depDays.get(depId);
+    return { id: depId, title: ctx.titleOfId(depId), late: dd?.late ?? false };
+  });
+  const blockerOptions = readOnly
+    ? []
+    : [...ctx.byId.values()]
+        .filter((o) => o.kind === 'dependency' && !item.blockers.includes(o.id))
+        .map((o) => ({ id: o.id, title: ctx.titleOfId(o.id) }));
+  return { blockers, blockerOptions };
+}
+
 /** Mockup `sel` (renderVals 1380-1653) — the selected item's own panel facts. */
 function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null {
   if (selectedId === null) return null;
   const item = ctx.byId.get(selectedId);
   if (!item) return null;
+  // P135 §4.6: a dependency has its own panel shape — `item.kind` is narrowed off `'dependency'`
+  // from here on, so `isNewWork` needs no separate exclusion for it.
+  if (item.kind === 'dependency') return buildDependencyPanel(selectedId, item, ctx);
 
   const isNewWork = item.branch === '';
   const rawBranch = ctx.snapshot.branches.find((b) => b.id === selectedId);
@@ -1956,6 +2292,8 @@ function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null
     : { from: null, fromOptions: null };
 
   const { running: runningSessions, stopped: stoppedSessions } = buildPanelAgents(item, ctx);
+  const readOnly = item.kind === 'review';
+  const { blockers, blockerOptions } = buildPanelBlockers(item, readOnly, ctx);
 
   return {
     id: selectedId,
@@ -1963,7 +2301,7 @@ function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null
     draft: item.draft,
     isNewWork,
     merged: item.merged,
-    readOnly: item.kind === 'review',
+    readOnly,
     title: ctx.titleOfId(selectedId),
     defaultTitle: panelDefaultTitle(item, ctx.prs),
     nameValue: item.branch ? item.nameOverride : item.draftTitle,
@@ -2001,6 +2339,9 @@ function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null
     running: runningSessions,
     stopped: stoppedSessions,
     candidates: rawNewWork?.branchCandidates ?? [],
+    blockers,
+    blockerOptions,
+    dependency: null,
   };
 }
 
@@ -2034,6 +2375,7 @@ export function useQueue(input: QueueInput): QueueView {
 
   const stacks = buildStacks(items, byId, parentOf, kids);
   const eff = computeEffDay(items, byId, parentOf, kids, planDay);
+  const depDays = applyDependencyDays(items, eff, cal, byId);
 
   const segsRaw = buildSegments(
     stacks,
@@ -2081,7 +2423,10 @@ export function useQueue(input: QueueInput): QueueView {
   }
   const selectedItem = selectedId !== null ? byId.get(selectedId) : undefined;
   const atRisk: QueueAtRisk | null =
-    selectedItem && !selectedItem.draft && selectedItem.kind !== 'review'
+    selectedItem &&
+    !selectedItem.draft &&
+    selectedItem.kind !== 'review' &&
+    selectedItem.kind !== 'dependency'
       ? (() => {
           const dirty = [...selectedItem.dirty];
           const unmerged = selectedItem.merged ? 0 : selectedItem.ahead;
@@ -2096,6 +2441,7 @@ export function useQueue(input: QueueInput): QueueView {
     plan: snapshot.plan,
     rebasing,
     pushing,
+    depDays,
   };
   const selectedTitle = selectedId !== null ? titleOfId(selectedId) : '';
 
@@ -2111,8 +2457,10 @@ export function useQueue(input: QueueInput): QueueView {
       pushing,
       selectedTitle,
       titleOfId,
+      depDays,
+      cal,
     );
-    const cells = buildCells(g, byId, eff, parentOf, cal);
+    const cells = buildCells(g, byId, eff, parentOf, cal, depDays);
     const infos: string[] = [];
     if (g.days.length > 1) infos.push(`${g.span}d → ${dayLabel(cal, g.end)}`);
     if (g.cont) {
@@ -2130,7 +2478,12 @@ export function useQueue(input: QueueInput): QueueView {
       const n = mergeN.get(x.id);
       if (n !== undefined) segMergeN[x.id] = n;
     }
-    const dragIds = g.members.filter((x) => byId.get(x.id)?.kind !== 'review').map((x) => x.id);
+    const dragIds = g.members
+      .filter((x) => {
+        const kind = byId.get(x.id)?.kind;
+        return kind !== 'review' && kind !== 'dependency';
+      })
+      .map((x) => x.id);
     return {
       stackRoot: g.stackRoot,
       root: g.root,
@@ -2144,6 +2497,7 @@ export function useQueue(input: QueueInput): QueueView {
       idx: g.idx,
       cont: g.cont,
       parked: g.parked,
+      dependency: g.dependency,
       after: g.after,
       tag: finalTag,
       action,
@@ -2192,11 +2546,14 @@ export function useQueue(input: QueueInput): QueueView {
     const title = titleOfId(item.id);
     const parent = parentOf.get(item.id);
     const parentBranch = parent !== undefined ? (byId.get(parent)?.branch ?? 'main') : 'main';
-    const branchText = item.draft
-      ? `no branch yet · from ${parentBranch}`
-      : title === item.branch
-        ? ''
-        : item.branch;
+    const branchText =
+      item.kind === 'dependency'
+        ? item.waitingOn
+        : item.draft
+          ? `no branch yet · from ${parentBranch}`
+          : title === item.branch
+            ? ''
+            : item.branch;
     const colorIndex = snapshot.colors[item.id] ?? 0;
     const acts = [...item.sessions]
       .map((s) => activityKind(s, input.activity))
@@ -2211,6 +2568,22 @@ export function useQueue(input: QueueInput): QueueView {
         lastActiveAt: s.lastActiveAt,
       }))
       .sort((a, b) => actRank(a.kind) - actRank(b.kind));
+    // P135 §4.6: this item's own dependency facts (kind === 'dependency' only) and the
+    // dependencies blocking it (any kind, usually empty).
+    const dd = depDays.get(item.id);
+    const dependency =
+      item.kind === 'dependency'
+        ? {
+            waitingOn: item.waitingOn,
+            expectedBy: item.expectedBy,
+            neededBy: dd?.neededBy ?? null,
+            late: dd?.late ?? false,
+          }
+        : null;
+    const blockers = item.blockers.map((depId) => {
+      const depDD = depDays.get(depId);
+      return { id: depId, title: titleOfId(depId), late: depDD?.late ?? false };
+    });
     return {
       id: item.id,
       kind: item.kind,
@@ -2218,13 +2591,19 @@ export function useQueue(input: QueueInput): QueueView {
       title,
       branch: item.branch,
       branchText,
-      color: PALETTE[colorIndex % PALETTE.length] as string,
+      color:
+        item.kind === 'dependency'
+          ? DEPENDENCY_COLOR
+          : (PALETTE[colorIndex % PALETTE.length] as string),
       status: workStatus(item.id, statusCtx),
       branchStatus: branchStatusOf(item.id, statusCtx),
       acts,
       estimate: parseEst(item.est, workdayHours, spanDayShare),
       agents,
       owner: item.owner,
+      jira: item.jiraKey !== '' ? { key: item.jiraKey, url: item.jiraUrl } : null,
+      blockers,
+      dependency,
     };
   });
 
@@ -2247,6 +2626,7 @@ export function useQueue(input: QueueInput): QueueView {
     spanDayShare,
     titleOfId,
     cal,
+    depDays,
   });
 
   return {

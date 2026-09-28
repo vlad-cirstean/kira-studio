@@ -1,9 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { prRow } from '../../frontend/src/ade/links';
 import { localIsoOfMs } from '../../frontend/src/ade/localDay';
-import { type QueueBand, type QueueSegment, useQueue } from '../../frontend/src/ade/useQueue';
+import {
+  LATER,
+  type QueueBand,
+  type QueueSegment,
+  useQueue,
+} from '../../frontend/src/ade/useQueue';
 import type {
   AdeBranch,
+  AdeDependency,
   AdeNewWork,
   AdePair,
   AdePlan,
@@ -91,6 +97,17 @@ function newWork(overrides: Partial<AdeNewWork> & Pick<AdeNewWork, 'id'>): AdeNe
     notes: '',
     jira: { key: '', url: '' },
     createdAt: 0,
+    ...overrides,
+  };
+}
+
+function dependency(overrides: Partial<AdeDependency> & Pick<AdeDependency, 'id'>): AdeDependency {
+  return {
+    title: 'Dep',
+    waitingOn: '',
+    expectedBy: null,
+    createdAt: 0,
+    blocks: [],
     ...overrides,
   };
 }
@@ -502,6 +519,128 @@ describe('ade-queue-rules', () => {
     test('neither on a review item: empty row', () => {
       const r = prRow(undefined, '');
       expect(r).toEqual({ url: '', number: null, chip: null, title: '' });
+    });
+  });
+
+  // P135 §4.4/§7 — the scheduling rule (several interacting inputs: link set, merged items, Later,
+  // expected date, past dates) is the only piece of the dependency kind this bar keeps a test for.
+  describe('dependency', () => {
+    test('unlinked with no date lands Later', () => {
+      const snap = snapshot({ dependencies: [dependency({ id: 'dep:1' })] });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(LATER);
+    });
+
+    test('unlinked with a date lands on it', () => {
+      const snap = snapshot({
+        dependencies: [dependency({ id: 'dep:1', expectedBy: '2026-09-25' })],
+      });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(3);
+    });
+
+    test("linked with no date lands on the blocked item's day", () => {
+      const snap = snapshot({
+        branches: [branch({ id: 'm1', branch: 'feat/m1', kind: 'mine' })],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1'] })],
+        plan: plan({ day: { m1: '2026-09-24' } }),
+      });
+      const v = view(snap);
+      expect(v.effDay.m1).toBe(2);
+      expect(v.effDay['dep:1']).toBe(2);
+    });
+
+    test("linked with a later date lands on the item's day and is late", () => {
+      const snap = snapshot({
+        branches: [branch({ id: 'm1', branch: 'feat/m1', kind: 'mine' })],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1'], expectedBy: '2026-09-30' })],
+        plan: plan({ day: { m1: '2026-09-24' } }),
+      });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(2);
+      expect(v.items.find((it) => it.id === 'dep:1')?.dependency?.late).toBe(true);
+    });
+
+    test('two blocked items take the earliest', () => {
+      const snap = snapshot({
+        branches: [
+          branch({ id: 'm1', branch: 'feat/m1', kind: 'mine' }),
+          branch({ id: 'm2', branch: 'feat/m2', kind: 'mine' }),
+        ],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1', 'm2'] })],
+        plan: plan({ day: { m1: '2026-09-27', m2: '2026-09-24' } }),
+      });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(2);
+    });
+
+    test('a merged blocked item is ignored', () => {
+      const snap = snapshot({
+        branches: [
+          branch({ id: 'm1', branch: 'feat/m1', kind: 'mine', merged: true }),
+          branch({ id: 'm2', branch: 'feat/m2', kind: 'mine' }),
+        ],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1', 'm2'] })],
+        plan: plan({ day: { m1: '2026-09-23', m2: '2026-09-27' } }),
+      });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(5);
+    });
+
+    test('a past date with no link is late', () => {
+      const snap = snapshot({
+        dependencies: [dependency({ id: 'dep:1', expectedBy: '2026-09-20' })],
+      });
+      const v = view(snap);
+      expect(v.effDay['dep:1']).toBe(-2);
+      expect(v.items.find((it) => it.id === 'dep:1')?.dependency?.late).toBe(true);
+    });
+
+    test('zero day hours', () => {
+      const snap = snapshot({ dependencies: [dependency({ id: 'dep:1' })] });
+      const v = view(snap);
+      expect(v.bands.find((b) => b.isLater)?.hours).toBe(0);
+    });
+
+    test('no mergeN', () => {
+      const snap = snapshot({ dependencies: [dependency({ id: 'dep:1' })] });
+      const v = view(snap);
+      const seg = v.segments.find((s) => s.stackRoot === 'dep:1');
+      expect(seg?.mergeN).toEqual({});
+    });
+
+    test('absent from dragIds, startIds, overdueIds', () => {
+      const snap = snapshot({
+        dependencies: [dependency({ id: 'dep:1', expectedBy: '2026-09-20' })],
+      });
+      const v = view(snap);
+      const seg = v.segments.find((s) => s.stackRoot === 'dep:1');
+      expect(seg?.dragIds).toEqual([]);
+      const band = v.bands.find((b) => b.day === -2);
+      expect(band?.startIds ?? []).not.toContain('dep:1');
+      expect(band?.overdueIds ?? []).not.toContain('dep:1');
+    });
+
+    test('blocked chip tone red only when late', () => {
+      const onTime = snapshot({
+        branches: [branch({ id: 'm1', branch: 'feat/m1', kind: 'mine' })],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1'] })],
+        plan: plan({ day: { m1: '2026-09-24' } }),
+      });
+      const onTimeView = view(onTime);
+      const onTimeSeg = onTimeView.segments.find((s) => s.members.some((m) => m.id === 'm1'));
+      const onTimeIdx = onTimeSeg?.members.findIndex((m) => m.id === 'm1') ?? -1;
+      expect(onTimeSeg?.cells[onTimeIdx]?.blocked?.tone).toBe('blue');
+
+      const late = snapshot({
+        branches: [branch({ id: 'm1', branch: 'feat/m1', kind: 'mine' })],
+        dependencies: [dependency({ id: 'dep:1', blocks: ['m1'], expectedBy: '2026-09-30' })],
+        plan: plan({ day: { m1: '2026-09-24' } }),
+      });
+      const lateView = view(late);
+      const lateSeg = lateView.segments.find((s) => s.members.some((m) => m.id === 'm1'));
+      const lateIdx = lateSeg?.members.findIndex((m) => m.id === 'm1') ?? -1;
+      expect(lateSeg?.cells[lateIdx]?.blocked?.tone).toBe('red');
     });
   });
 });

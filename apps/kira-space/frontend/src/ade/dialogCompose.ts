@@ -112,7 +112,7 @@ export interface DialogCtx {
 
 interface ViewItemLike {
   id: string;
-  kind: 'mine' | 'review' | 'parked';
+  kind: 'mine' | 'review' | 'parked' | 'dependency';
   draft: boolean;
   title: string;
   /** `''` for a draft with no branch yet (mockup's own `name: started || ''`, line 800) — the

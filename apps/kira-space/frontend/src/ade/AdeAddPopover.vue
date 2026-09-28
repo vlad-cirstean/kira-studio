@@ -56,7 +56,7 @@ const addingNewWork = ref(false);
 const startFromOptions = computed(() => [
   { value: 'main', label: 'main' },
   ...props.items
-    .filter((it) => !it.draft && it.kind !== 'parked')
+    .filter((it) => !it.draft && it.kind !== 'parked' && it.kind !== 'dependency')
     .map((it) => ({ value: it.branch, label: it.title })),
 ]);
 
