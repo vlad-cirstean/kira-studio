@@ -375,8 +375,9 @@ export interface AdeAddDependencyArgs {
   blocks: string[];
 }
 
-/** `AdeDependencyPatchArgs` — `expectedBy` of `''` clears the date. */
-export interface AdeDependencyPatch {
+/** `AdeDependencyPatchArgs` — `expectedBy` of `''` clears the date. Unexported, `AdeJiraPatch`'s own
+ *  convention: nothing outside this file imports it by name, only `AdeUpdateDependencyArgs`. */
+interface AdeDependencyPatch {
   title?: string;
   waitingOn?: string;
   expectedBy?: string;
