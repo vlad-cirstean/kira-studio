@@ -10,9 +10,10 @@
  * re-sorting.
  */
 import type { LineRange, ReviewComment } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
-import { computed } from 'vue';
-import { ACTION_ICONS } from '../../icons/index.ts';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { computed, useTemplateRef } from 'vue';
 import type { Capabilities } from '../../state/detailActions.ts';
 import type { ReviewCommentsState } from '../../state/reviewComments.ts';
 
@@ -65,6 +66,11 @@ function anchorTitle(c: ReviewComment): string | undefined {
       return undefined;
   }
 }
+
+// P131 Part 3 §5.3: one AttributeTooltip per list container, covering the anchor warning span's
+// data-kira-tip — MountRoot.vue's own TooltipProvider (Part 2 §3.5) covers every real
+// Tooltip/TooltipTrigger trio this file also uses.
+const listEl = useTemplateRef<HTMLElement>('list');
 </script>
 
 <template>
@@ -73,31 +79,27 @@ function anchorTitle(c: ReviewComment): string | undefined {
       <span class="kv:text-muted-foreground kv:text-sm" data-testid="review-comments-count">{{
         countLabel
       }}</span>
-      <KuiButton
+      <TooltipIconButton
         v-if="capabilities.clipboard"
-        variant="icon"
-        class="kv:ml-auto"
-        :icon="ACTION_ICONS.copy"
-        v-kui-tooltip="'Copy for AI'"
-        aria-label="Copy for AI"
+        icon="copy"
+        label="Copy for AI"
+        class="ml-auto"
         :disabled="reviewComments.comments.value.length === 0"
         @click="reviewComments.copyForAi()"
       />
-      <KuiButton
+      <TooltipIconButton
         v-if="!reviewComments.confirmingClear.value"
-        variant="icon"
-        :class="capabilities.clipboard ? '' : 'kv:ml-auto'"
-        :icon="ACTION_ICONS.clearAll"
-        v-kui-tooltip="'Clear all comments'"
-        aria-label="Clear all comments"
+        icon="clear-all"
+        label="Clear all comments"
+        :class="capabilities.clipboard ? '' : 'ml-auto'"
         :disabled="reviewComments.comments.value.length === 0 || reviewComments.pending.value"
         @click="reviewComments.confirmClear()"
       />
       <div v-else class="kv:flex kv:items-center kv:gap-1 kv:ml-auto kv:text-base">
-        <KuiButton @click="reviewComments.clear()">
+        <Button variant="toolbar" size="kira" @click="reviewComments.clear()">
           Confirm clear ({{ reviewComments.comments.value.length }})
-        </KuiButton>
-        <KuiButton @click="reviewComments.cancelClear()">Cancel</KuiButton>
+        </Button>
+        <Button variant="toolbar" size="kira" @click="reviewComments.cancelClear()">Cancel</Button>
       </div>
     </div>
 
@@ -106,8 +108,9 @@ function anchorTitle(c: ReviewComment): string | undefined {
     </p>
 
     <template v-else>
+      <template v-if="groups.length > 0">
       <div
-        v-if="groups.length > 0"
+        ref="list"
         class="kv:flex-1 kv:min-h-0 kv:overflow-auto"
         role="listbox"
         aria-label="Comments"
@@ -135,15 +138,13 @@ function anchorTitle(c: ReviewComment): string | undefined {
               <span
                 v-if="anchorTitle(c)"
                 class="codicon codicon-warning kv:text-diff-modified"
-                v-kui-tooltip="anchorTitle(c)"
+                :data-kira-tip="anchorTitle(c)"
                 :aria-label="anchorTitle(c)"
               ></span>
-              <KuiButton
-                variant="icon"
-                class="kv:ml-auto"
-                :icon="ACTION_ICONS.remove"
-                v-kui-tooltip="'Delete comment'"
-                aria-label="Delete comment"
+              <TooltipIconButton
+                icon="trash"
+                label="Delete comment"
+                class="ml-auto"
                 :disabled="reviewComments.pending.value"
                 @click.stop="reviewComments.remove(c.id)"
               />
@@ -152,6 +153,8 @@ function anchorTitle(c: ReviewComment): string | undefined {
           </div>
         </div>
       </div>
+      <AttributeTooltip :container="listEl" />
+      </template>
 
       <p v-else-if="!reviewComments.loading.value" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
         No comments yet — open a file from the Files tab and use the + in the diff's gutter.
