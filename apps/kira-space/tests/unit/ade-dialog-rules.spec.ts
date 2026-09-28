@@ -144,6 +144,7 @@ function session(overrides: Partial<AdeSession> & Pick<AdeSession, 'id' | 'branc
     terminalId: overrides.id,
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
     ...overrides,
   };
 }

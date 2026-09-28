@@ -112,6 +112,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
         terminalId,
         startedAt: 0,
         lastActiveAt: 0,
+        cwdMissing: false,
       });
       if (raw.state === 'running') {
         activity.set(terminalId, {

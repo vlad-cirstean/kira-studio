@@ -1028,6 +1028,7 @@ test('agents: tabs per running session, amber input tint, terminal host for this
     terminalId: '',
     startedAt: 0,
     lastActiveAt: Date.now() - 60_000,
+    cwdMissing: false,
   };
 
   // A running session with no local terminal — never opened in this window.
@@ -1042,6 +1043,7 @@ test('agents: tabs per running session, amber input tint, terminal host for this
     terminalId: 'term-elsewhere',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
 
   const withLaunched: AdeSession = {
@@ -1055,6 +1057,7 @@ test('agents: tabs per running session, amber input tint, terminal host for this
     terminalId: 'term-launched',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
 
   const { window: page, control } = await relaunch({
@@ -1196,6 +1199,7 @@ test("hand-off: clicking a stack row's agents-pill button selects the branch, op
     terminalId: 'term-a',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
   const snap = snapshot({ branches: [a, b], plan: plan({ a: TODAY_ISO, b: TODAY_ISO }) });
 
@@ -1239,6 +1243,7 @@ test('reaper: a stopped session (sessions push plus terminal exit) closes its te
     terminalId: 'term-a',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
   const STOPPED: AdeSession = { ...RUNNING, state: 'stopped', terminalId: '' };
 

@@ -9,7 +9,9 @@
 // or `Refresh`'s own zero-value error path), so the coercion lives once, at the one place raw JSON
 // enters this app, rather than a null check at every `useQueue()` call site.
 
-/** `AdeSessionWire` — `Sessions()`'s own list element; `terminalId` is `""` once stopped. */
+/** `AdeSessionWire` — `Sessions()`'s own list element; `terminalId` is `""` once stopped.
+ *  `cwdMissing` (P129 Part 7 §0.12): a fresh `os.Stat` per call, never cached — true when `cwd` no
+ *  longer exists as a directory. */
 export interface AdeSession {
   id: string;
   claudeSessionId: string;
@@ -21,6 +23,7 @@ export interface AdeSession {
   terminalId: string;
   startedAt: number;
   lastActiveAt: number;
+  cwdMissing: boolean;
 }
 
 export interface AdeSessionsResult {

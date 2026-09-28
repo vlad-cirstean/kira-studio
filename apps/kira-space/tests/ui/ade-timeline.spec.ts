@@ -174,6 +174,7 @@ test('render: separators, weekend/later ordering, continuation rows, overdue str
     terminalId: 'term-a',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
 
   const branches = [
@@ -954,6 +955,7 @@ test('selection: a row click, the agent icon, and a continuation row all select,
     terminalId: 'term-a',
     startedAt: 0,
     lastActiveAt: 0,
+    cwdMissing: false,
   };
 
   const snap = snapshot({

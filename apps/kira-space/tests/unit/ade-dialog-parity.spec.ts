@@ -597,6 +597,7 @@ describe('ade-dialog-parity — state variants (§3.1)', () => {
         terminalId: terminalWorking,
         startedAt: 0,
         lastActiveAt: 0,
+        cwdMissing: false,
       },
       {
         id: terminalIdle,
@@ -609,6 +610,7 @@ describe('ade-dialog-parity — state variants (§3.1)', () => {
         terminalId: terminalIdle,
         startedAt: 0,
         lastActiveAt: 0,
+        cwdMissing: false,
       },
     );
     wire.activity.set(terminalWorking, {

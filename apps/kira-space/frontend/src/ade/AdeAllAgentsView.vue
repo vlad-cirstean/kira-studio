@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useQueries } from '@tanstack/vue-query';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useSettingsStore } from '../state/settings';
 import { useTerminalsStore } from '../state/terminals';
 import AdeActivityIcon from './AdeActivityIcon.vue';
 import AdeAllAgentsRow from './AdeAllAgentsRow.vue';
+import AdeClaudeDialog from './AdeClaudeDialog.vue';
 import { ACTIVITY_LABEL, type ActivityKind } from './activity';
 import { type AllAgentsRepoInput, type AllAgentsRow, buildAllAgents } from './allAgents';
+import { type DialogCtx, resumeSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
 import { adePrsOptions, adeSnapshotOptions, useAdeSessions } from './queries';
 import { useAdeUiStore } from './state/adeUi';
@@ -21,8 +23,8 @@ import type { AdeRepoPrs, AdeRepoSnapshot } from './wire';
 // `AdeRepoView`'s own timeline, nothing here renders relative to a periodically-advancing clock — a
 // stale `today` by a day would only ever affect `useQueue`'s own bands/segments/effDay, none of
 // which `allAgents.ts`'s own row join reads (title/colour/branchText come from stages 1-2 only).
-// §0.10's dialog mount and Start handler land in Part 7's own next commit (cwdMissing, §0.10);
-// this commit wires the filter and same-window Open only (§0.8).
+// §0.8 wires same-window Open; cross-window Open (§0.9) lands in a later commit. §0.10 wires the
+// Start dialog for a non-running row.
 const codeReposStore = useCodeReposStore();
 const settingsStore = useSettingsStore();
 const adeUiStore = useAdeUiStore();
@@ -110,6 +112,46 @@ function onOpen(row: AllAgentsRow): void {
   adeUiStore.showRepo(row.codeRepoId);
   if (row.itemId !== null) adeUiStore.openSession(row.codeRepoId, row.itemId, row.sessionId);
 }
+
+// §0.10: the one dialog this view can open, for whichever repo Start was last clicked on — set only
+// on Start, never cleared after (`AdeClaudeDialog` itself gates on `adeUiStore.dialog`, matching
+// `AdeRepoView`'s own single-mount pattern; this view unmounts `AdeRepoView` while it shows, so only
+// one `AdeClaudeDialog` ever exists at a time).
+const dialogRepoId = ref<string | null>(null);
+
+const dialogCtx = computed<DialogCtx | null>(() => {
+  const input = reposInput.value.find((r) => r.codeRepoId === dialogRepoId.value);
+  if (!input?.view || !input.snapshot) return null;
+  return {
+    view: input.view,
+    snapshot: input.snapshot,
+    sessions: input.sessions,
+    today: today.value,
+    repoRoot: codeReposStore.codeRepoRecord(input.codeRepoId)?.root ?? '',
+  };
+});
+
+// §0.10: `forceNew` reads the session's own `archived`/`cwdMissing` directly (never threaded through
+// the pure builder's row shape, §0.6) — an orphan (`row.itemId === null`) has no queue item, so the
+// dialog's own branch target falls back to the session's `newWorkId` or its `branch` (mockup 887).
+function onStart(row: AllAgentsRow): void {
+  dialogRepoId.value = row.codeRepoId;
+  const ctx = dialogCtx.value;
+  const session = reposInput.value
+    .find((r) => r.codeRepoId === row.codeRepoId)
+    ?.sessions.find((s) => s.id === row.sessionId);
+  if (!ctx || !session) return;
+  const forceNew = row.archived || session.cwdMissing;
+  const itemId = row.itemId ?? (session.newWorkId || session.branch);
+  adeUiStore.openDialog(
+    resumeSpec(ctx, itemId, row.sessionId, {
+      askWt: true,
+      wt: forceNew ? 'new' : 'same',
+      noSame: forceNew,
+      title: 'Start Claude Code',
+    }),
+  );
+}
 </script>
 
 <template>
@@ -162,6 +204,7 @@ function onOpen(row: AllAgentsRow): void {
           :key="row.sessionId"
           :row="row"
           @open="onOpen"
+          @start="onStart"
         />
       </section>
 
@@ -169,5 +212,6 @@ function onOpen(row: AllAgentsRow): void {
         Nothing here.
       </p>
     </div>
+    <AdeClaudeDialog :code-repo-id="dialogRepoId ?? ''" :ctx="dialogCtx" />
   </div>
 </template>

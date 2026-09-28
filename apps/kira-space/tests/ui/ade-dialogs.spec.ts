@@ -81,6 +81,7 @@ const SESSION_A2: AdeSession = {
   terminalId: 'term-a2',
   startedAt: 0,
   lastActiveAt: 0,
+  cwdMissing: false,
 };
 
 const SESSION_B: AdeSession = {
@@ -94,6 +95,7 @@ const SESSION_B: AdeSession = {
   terminalId: 'term-b',
   startedAt: 0,
   lastActiveAt: 0,
+  cwdMissing: false,
 };
 
 const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };

@@ -52,7 +52,10 @@ func toWireAgentSessions(sessions []terminal.AgentSession) []AgentSessionWire {
 }
 
 // AdeSessionWire is model.AdeSession's own wire projection (§4.6) — TerminalID is "" once stopped,
-// mirroring the stored row exactly (never synthesised).
+// mirroring the stored row exactly (never synthesised). CwdMissing (P129 Part 7 §0.12) is the one
+// exception: a fresh os.Stat per Sessions() call, never stored — a worktree directory can be
+// deleted at any time outside this app (branch archive elsewhere, manual cleanup), so a cached bit
+// would go stale between refreshes.
 type AdeSessionWire struct {
 	ID              string `json:"id"`
 	ClaudeSessionID string `json:"claudeSessionId"`
@@ -64,14 +67,27 @@ type AdeSessionWire struct {
 	TerminalID      string `json:"terminalId"`
 	StartedAt       int64  `json:"startedAt"`
 	LastActiveAt    int64  `json:"lastActiveAt"`
+	CwdMissing      bool   `json:"cwdMissing"`
 }
 
 func toWireAdeSession(s model.AdeSession) AdeSessionWire {
 	return AdeSessionWire{
 		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, CodeRepoID: s.CodeRepoID, Branch: s.Branch,
 		NewWorkID: s.NewWorkID, Cwd: s.Cwd, State: s.State, TerminalID: s.TerminalID,
-		StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
+		StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt, CwdMissing: cwdMissing(s.Cwd),
 	}
+}
+
+// cwdMissing reports whether a session's own recorded cwd no longer exists as a directory — a
+// stat error other than "not exist" (permission, I/O) reads false, since Tracker.Prepare's own
+// resume fallback (§0.12) only ever recreates a genuinely-missing directory; this stays consistent
+// with that, rather than second-guessing an error the app can't act on differently.
+func cwdMissing(cwd string) bool {
+	info, err := os.Stat(cwd)
+	if err != nil {
+		return os.IsNotExist(err)
+	}
+	return !info.IsDir()
 }
 
 // AdeSessionsResult is Sessions' own return shape — every recorded session, newest-active first
