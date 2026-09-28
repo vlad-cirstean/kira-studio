@@ -51,3 +51,36 @@ export function needsInputByRepo(
   }
   return out;
 }
+
+/** P129 Part 7 §0.4: mockup `actSummary` (lines 674-678) — running sessions only, the three
+ *  "agent needs you" kinds; `idle` and `stopped` never show up in the aggregated line. */
+export function activitySummary(
+  sessions: readonly AdeSession[],
+  activity: ReadonlyMap<string, AgentActivity>,
+): { input: number; working: number; waiting: number } {
+  const out = { input: 0, working: 0, waiting: 0 };
+  for (const session of sessions) {
+    const kind = activityKind(session, activity);
+    if (kind === 'input') out.input += 1;
+    else if (kind === 'working') out.working += 1;
+    else if (kind === 'waiting') out.waiting += 1;
+  }
+  return out;
+}
+
+/** §0.6: `useQueue.ts`'s own sort order for an item's `acts`/`agents` — moved here so
+ *  `allAgents.ts`'s row sort (urgency) and `useQueue.ts` share one ranking, never two. */
+export function actRank(a: ActivityKind): number {
+  switch (a) {
+    case 'input':
+      return 0;
+    case 'working':
+      return 1;
+    case 'waiting':
+      return 2;
+    case 'idle':
+      return 3;
+    default:
+      return 4;
+  }
+}

@@ -1,5 +1,5 @@
 import type { Settings } from '../state/settingsDomain';
-import { type ActivityKind, activityKind, sessionLabel } from './activity';
+import { type ActivityKind, activityKind, actRank, sessionLabel } from './activity';
 import type {
   AdeCommit,
   AdeFile,
@@ -31,7 +31,9 @@ type ItemKind = 'mine' | 'review' | 'parked' | 'dependency';
 
 // mockup line 579: work-item colors, assigned once server-side (Part 2's own `snapshot.colors`) —
 // this module only maps the assigned palette index back to a hex value, never assigns one itself.
-const PALETTE = [
+// Exported: P129 Part 7's `allAgents.ts` reuses this exact table for an archived row's own colour
+// (`snapshot.colors[historyItem]`), so an item shows the same colour whether it's live or archived.
+export const PALETTE = [
   '#e07a4f',
   '#e3a53c',
   '#c9c23a',
@@ -121,6 +123,10 @@ export interface QueueItem {
   estimate: { hours: number; days: number } | null;
   /** Running sessions only (mockup `running(b)`), sorted by `actRank` — drives the agents pill. */
   agents: { sessionId: string; label: string; kind: ActivityKind; lastActiveAt: number }[];
+  /** P129 Part 7 §0.6: every joined session's own record id, any state — `allAgents.ts`'s own
+   *  session-to-item join (a live-item row, §0.6 rule 1). Additive; doesn't disturb the field-by-
+   *  field `ade-queue-parity.spec.ts` comparison. */
+  sessionIds: string[];
   /** A review item's own author (mockup `b.owner`), `''` otherwise — P129 Part 5 §0.21's owner
    *  pill, the first UI consumer of the internal `Item.owner` this module already carried. */
   owner: string;
@@ -2600,6 +2606,7 @@ export function useQueue(input: QueueInput): QueueView {
       acts,
       estimate: parseEst(item.est, workdayHours, spanDayShare),
       agents,
+      sessionIds: item.sessions.map((s) => s.id),
       owner: item.owner,
       jira: item.jiraKey !== '' ? { key: item.jiraKey, url: item.jiraUrl } : null,
       blockers,
@@ -2659,19 +2666,4 @@ export function dayLong(iso: string | null, today: string): string {
   const { month0, date } = civilFromDays(days);
   const dow = ((((days % 7) + 7) % 7) + 4) % 7; // 1970-01-01 (day 0) was a Thursday (index 4).
   return `${iso === today ? 'Today, ' : ''}${WD[dow]} ${date} ${MO[month0]}`;
-}
-
-function actRank(a: ActivityKind): number {
-  switch (a) {
-    case 'input':
-      return 0;
-    case 'working':
-      return 1;
-    case 'waiting':
-      return 2;
-    case 'idle':
-      return 3;
-    default:
-      return 4;
-  }
 }
