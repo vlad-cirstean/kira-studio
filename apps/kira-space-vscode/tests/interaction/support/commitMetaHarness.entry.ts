@@ -33,7 +33,6 @@ import '../../../src/webview/tailwind.css';
 import '../../../../../packages/git-ui/src/theme/tailwind.css';
 import '../../../../../packages/git-ui/src/theme/vscode-tokens.css';
 import '../../../../../packages/git-ui/src/theme/density.css';
-import '../../../../../packages/git-ui/src/theme/kui-bridge.css';
 import '../../../../../packages/git-ui/src/theme/kira-structure.css';
 
 const PARAGRAPH =

@@ -18,7 +18,7 @@ import {
  * builds). P131 Part 3 §6.2: every `Kui*` consumer (`KuiTooltip`, `KuiPopoverPanel`,
  * `KuiContextMenu`) is gone — the sole consumer left is `packages/workbench`'s own
  * `util/floatingPosition.ts`, which always passes its own `--kira-float-max-` prefix, so
- * `maxVarPrefix` is required rather than defaulting to a `--kui-*` name nothing reads any more.
+ * `maxVarPrefix` is required rather than defaulting to a kui-prefixed name nothing reads any more.
  */
 
 export interface FloatOptions {

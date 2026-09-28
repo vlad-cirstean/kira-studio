@@ -4,17 +4,16 @@
 # definition files. A grep-and-comm guard, not a dependency (stylelint is not in this repo's
 # toolchain) — its one known blind spot is a var() carrying a fallback (var(--x, red)), which is
 # legitimate and is skipped by construction (the pattern below only matches a var() whose closing
-# paren directly follows the property name). That blind spot is exactly right for the --kui- pass
-# below: every --kui-* reference across packages/kira-ui/src and packages/git-ui/src carries a
-# fallback on purpose (a host that has not loaded a bridge must still render something), so this
-# guard only catches a bridge-less *consumer* reference, never a definition site. P110 A8 deleted
-# packages/kira-ui/src/theme/controls.css entirely (kira-ui ships no component CSS of its own any
-# more); git-ui's own theme/kui-bridge.css is the sole --kui-* definition file left, referenced
-# below.
+# paren directly follows the property name).
 #
 # G34 D16: this is the guard that would have caught G34's own F5 (packages/git-ui/src/App.vue
 # referencing five --kv-* tokens outside the ancestor that used to define them) — there was no
 # --kv-* or --kui-* equivalent of this script before this phase.
+#
+# P131 Part 3 §6.5: the --kui-* layer (both kui-bridge.css definition files, and every Kui*
+# consumer that referenced them) is gone — check_layer's own "resolves to a real definition" shape
+# no longer applies (there is nothing left to define), so the kui- pass below is a zero-use guard
+# instead: any --kui- reference anywhere is a regression, full stop.
 set -e
 
 cd "$(dirname "$0")/.."
@@ -52,7 +51,6 @@ SPACE_SRC=apps/kira-space/frontend/src
 THEME_SRC=packages/theme/src
 WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
-KIRA_UI_SRC=packages/kira-ui/src
 
 # P103 (byte-identical tier, folded into P100 Part 2): tokens.css/base.css/primitives.css moved
 # out of apps/kira-studio/frontend/src/theme into packages/theme/src, shared verbatim by both
@@ -66,7 +64,16 @@ check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC" \
   "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css" kira
 check_layer 'kv-' "$GIT_UI_SRC" \
   "$GIT_UI_SRC/theme/vscode-tokens.css $GIT_UI_SRC/theme/density.css $GIT_UI_SRC/theme/kira-structure.css" kv
-check_layer 'kui-' "$KIRA_UI_SRC $GIT_UI_SRC" "$GIT_UI_SRC/theme/kui-bridge.css" kui
+
+kui_hits=$(grep -rnE --include='*.vue' --include='*.css' --include='*.ts' \
+  -- '--kui-' packages/git-ui/src packages/kira-ui/src packages/theme/src packages/workbench/src || true)
+if [ -n "$kui_hits" ]; then
+  echo "check-tokens: --kui-* is retired (P131 Part 3 §6.5) but still referenced:" >&2
+  echo "$kui_hits" >&2
+  STATUS=1
+else
+  echo "check-tokens: no --kui-* reference anywhere."
+fi
 
 # P131 Part 1 §3.3: the VS Code webview's own second unprefixed Tailwind root imports
 # packages/theme/src/tailwind-core.css's @theme block (and every shadcn component under

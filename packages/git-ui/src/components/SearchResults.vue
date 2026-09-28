@@ -45,9 +45,10 @@ const isEmpty = computed(() => props.model.sections.length === 0);
 
 /** P110 A17: `.kv-search-option`'s own gap/px are already exactly `rowVariants()`'s own
  *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly, not the retired
- *  `gap-kui-2`/`px-kui-3` names — same values, `--kui-space-2`/`--kui-space-3` bridged to
- *  the same `--kv-s-2`/`--kv-s-3` steps the default scale already equals). Only the vertical
- *  padding and the "active" (keyboard-highlighted, not a real `:hover`) background need adding —
+ *  `gap-kui-2`/`px-kui-3` names — same values, kira-ui's own kui-space-2/kui-space-3 custom
+ *  properties bridged to the same `--kv-s-2`/`--kv-s-3` steps the default scale already equals).
+ *  Only the vertical padding and the "active" (keyboard-highlighted, not a real `:hover`)
+ *  background need adding —
  *  through `cn()` since `kv:px-2` below replaces the variant's own `px-1.5` (different value,
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {

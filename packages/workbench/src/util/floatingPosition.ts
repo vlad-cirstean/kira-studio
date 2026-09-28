@@ -1,7 +1,7 @@
 // T1-15: this file used to carry its own copy of @kira/kira-ui's floatingPosition.ts, identical
-// but for the CSS custom-property prefix (`--kira-float-max-*` here, `--kui-float-max-*` there).
+// but for the CSS custom-property prefix (`--kira-float-max-*` here, a kui-prefixed one there).
 // @kira/kira-ui's own computeFloatPosition now REQUIRES that prefix (P131 Part 3 §6.2: its sole
-// other consumer is gone, so it no longer defaults to a `--kui-*` name), so this file's own
+// other consumer is gone, so it no longer defaults to a kui-prefixed name), so this file's own
 // FloatOptions omits it — every call below always supplies workbench's own prefix — and
 // re-exports the rest.
 import {

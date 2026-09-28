@@ -3,12 +3,10 @@
  * `--vscode-*` vocabulary — the names `theme/vscode-tokens.css`'s own `--kv-*` layer reads
  * (`var(--vscode-X, <VS Code Dark literal>)`). With no `--vscode-*` defined at all, every one of
  * those tokens falls back to its hardcoded VS Code Dark literal, and `git-ui` would render dark
- * inside a light Kira window regardless of Kira's own theme — this file is the fix, the same shape
- * `kui-bridge.css` already is for `packages/kira-ui`'s `--kui-*` vocabulary. Loaded from the same
- * entry point, beside it.
+ * inside a light Kira window regardless of Kira's own theme — this file is the fix.
  *
  * Every right-hand side is an existing `--kira-*` token (`theme/tokens.css`) or a `color-mix` over
- * one — no new colour is invented here, mirroring `kui-bridge.css`'s own header note. Several
+ * one — no new colour is invented here. Several
  * `--kira-*` names are themselves a direct port of the identical VS Code workbench colour id
  * (`tokens.css`'s own inline comments name the source id next to each token, e.g. --kira-bg next
  * to editor.background), which is what makes most of the mapping below exact rather than
@@ -44,8 +42,8 @@
   --vscode-editorGroupHeader-tabsBorder: var(--kira-border);
   --vscode-button-background: var(--kira-accent);
   --vscode-button-foreground: var(--kira-accent-fg);
-  /* No distinct hover shade exists in Kira's own token layer — `kui-bridge.css`'s own
-     `--kui-button-hover-bg: var(--kira-accent)` sets the same precedent for the same reason. */
+  /* No distinct hover shade exists in Kira's own token layer, so this maps onto the same base
+     accent as --vscode-button-background above. */
   --vscode-button-hoverBackground: var(--kira-accent);
   --vscode-button-secondaryBackground: var(--kira-bg-input);
   --vscode-button-secondaryForeground: var(--kira-fg);
