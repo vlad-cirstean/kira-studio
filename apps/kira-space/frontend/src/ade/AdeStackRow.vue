@@ -28,13 +28,14 @@ const emit = defineEmits<{
   openSession: [itemId: string, sessionId: string];
 }>();
 
-const movable = computed(() => props.item.kind !== 'review');
+const movable = computed(() => props.item.kind !== 'review' && props.item.kind !== 'dependency');
 const merged = computed(() => props.item.status.label === 'merged');
 const elbowColor = computed(() => (props.parentKind === 'review' ? '#7aa7ff' : '#5c606b'));
 
 const titleClass = computed(() => {
   if (props.item.kind === 'review') return 'text-[#93b6ff]';
   if (props.item.kind === 'parked') return 'text-[#b4b6bd]';
+  if (props.item.kind === 'dependency') return 'text-[#9fdde4]';
   return 'text-fg';
 });
 
@@ -71,6 +72,7 @@ function onPick(): void {
     data-testid="ade-stack-row"
     :data-ade-row-movable="movable ? '' : null"
     :data-ade-id="member.id"
+    :data-ade-kind="item.kind"
     role="option"
     tabindex="0"
     :aria-selected="selected"
@@ -91,7 +93,15 @@ function onPick(): void {
         }"
       />
     </span>
+    <CodiconIcon
+      v-if="item.kind === 'dependency'"
+      name="globe"
+      :size="11"
+      :style="{ color: item.color }"
+      class="shrink-0"
+    />
     <span
+      v-else
       class="size-2.5 shrink-0"
       :class="dotClass"
       :style="

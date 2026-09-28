@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed, ref } from 'vue';
 import AdeStackRow from './AdeStackRow.vue';
 import { TONE } from './tones';
@@ -46,6 +47,13 @@ const isMerged = computed(() => props.segment.tag.label === '✓ merged');
 
 const boxStyle = computed(() => {
   const solid = TONE[props.segment.tag.tone][2];
+  if (props.segment.dependency) {
+    return {
+      border: '1px dotted #4fb8c4',
+      borderLeft: '3px solid #4fb8c4',
+      background: 'rgba(79,184,196,0.07)',
+    };
+  }
   if (props.segment.parked) {
     return {
       border: '1px dashed #3a3e48',
@@ -82,7 +90,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
   <div
     class="flex items-start gap-2"
     data-testid="ade-stack-block"
-    data-ade-block
+    :data-ade-block="segment.dependency ? null : ''"
     :data-ade-drag-ids="segment.dragIds.join(',')"
   >
     <div class="flex w-[210px] shrink-0 flex-col pt-[3px]">
@@ -104,6 +112,14 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
           class="max-w-[120px] shrink truncate rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-semibold"
           :style="tagStyle(cell.tag.tone)"
           >{{ cell.tag.label }}</span
+        >
+        <span
+          v-if="cell.blocked"
+          :title="cell.blocked.tip"
+          :style="tagStyle(cell.blocked.tone)"
+          :data-testid="`ade-blocked-chip-${segment.members[i]?.id}`"
+          class="flex shrink-0 items-center gap-0.5 rounded-kira-sm px-1.5 py-0.5 text-kira-sm font-semibold"
+          ><CodiconIcon name="globe" :size="10" /> {{ cell.blocked.count }}</span
         >
         <span
           v-if="cell.info"
@@ -144,7 +160,8 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
       :style="boxStyle"
       :title="segment.tag.tip"
       data-testid="ade-stack-box"
-      data-ade-box
+      :data-ade-box="segment.dependency ? null : ''"
+      :data-ade-dependency="segment.dependency ? '' : null"
       :data-ade-lead="segment.lead ?? ''"
       :data-ade-day="segment.day"
     >
