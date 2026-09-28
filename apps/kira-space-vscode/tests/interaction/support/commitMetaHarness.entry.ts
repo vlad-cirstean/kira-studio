@@ -14,6 +14,7 @@
  * `detail`/`sha` are set directly, once, before mount).
  */
 import { CommitStore } from '@kira/git-core';
+import { TooltipProvider } from '@theme/components/ui/tooltip';
 import { createApp, h, reactive } from 'vue';
 // A relative import straight into packages/git-ui's own source — this harness is built by its
 // own small Vite step (commitMetaHarnessServer.ts), not the shared packages/git-ui/vite.config.ts
@@ -109,7 +110,15 @@ const detailState = reactive({
   setParentIndex(_index: number): void {},
 });
 
+// P131 Part 2 §3.5: DetailPane.vue (CommitMeta + FileTree) needs a TooltipProvider ancestor once
+// those files render reka's real Tooltip/TooltipTrigger/TooltipContent trio — the same props
+// mount()'s own MountRoot.vue gives both real hosts.
 const app = createApp({
-  render: () => h(DetailPaneVue, { detailState: detailState as never, store, actions }),
+  render: () =>
+    h(
+      TooltipProvider,
+      { delayDuration: 400, skipDelayDuration: 300, disableHoverableContent: true },
+      () => h(DetailPaneVue, { detailState: detailState as never, store, actions }),
+    ),
 });
 app.mount('#app');

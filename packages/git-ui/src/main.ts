@@ -4,6 +4,7 @@ import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
+import MountRoot from './MountRoot.vue';
 import type { ReviewTarget } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 // P110 A1: the prefixed Tailwind build (theme + utilities under `kv:`). Imported first so its
@@ -97,11 +98,18 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   performance.measure('kira:page-parsed', undefined, 'kira:page-parsed');
 
   const { view = 'graph', target, pendingUiAction, dateFormat, ...rest } = opts;
+  // P131 Part 2 §3.5: MountRoot wraps whichever root this mounts in the one TooltipProvider every
+  // Tooltip/TooltipTrigger/TooltipContent trio in this package needs — git-ui is its own Vue app,
+  // so neither host's own <App.vue> TooltipProvider reaches it.
   const app: VueApp =
     view === 'review'
-      ? createApp(ReviewView, { ...rest, target })
-      : createApp(AppRoot, { ...rest, pendingUiAction, dateFormat });
+      ? createApp(MountRoot, { root: ReviewView, rootProps: { ...rest, target } })
+      : createApp(MountRoot, {
+          root: AppRoot,
+          rootProps: { ...rest, pendingUiAction, dateFormat },
+        });
   // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
+  // Review still uses this directive until Part 3 moves it off kira-ui too.
   app.directive('kui-tooltip', vKuiTooltip);
   // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a
