@@ -14,17 +14,18 @@
  */
 
 import type { PullStrategy, PullStrategySource } from '@kira/git-ipc';
-import type { MenuSection } from '@kira/kira-ui';
-// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
-// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
-// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
-// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
-// and would otherwise "fix" this to `import type`, silently erasing the import — `biome.json`'s
-// own `**/*.vue` override turns `useImportType` off for exactly this class of false positive
-// (P96 §5.2).
-import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { computed, ref, watch } from 'vue';
+import type { MenuSection } from '../lib/menuModel.ts';
 import type { OpsState } from '../state/ops.ts';
+import MenuSections from './MenuSections.vue';
 import { describePullStrategySource, PULL_STRATEGY_LABELS } from './pullStrategyModel.ts';
 
 const props = defineProps<{
@@ -35,7 +36,6 @@ const props = defineProps<{
 }>();
 
 const isOpen = ref(false);
-const rootEl = ref<HTMLElement | null>(null);
 const preview = ref<{ strategy: PullStrategy; source: PullStrategySource } | undefined>(undefined);
 const previewLoading = ref(false);
 
@@ -50,11 +50,10 @@ const mainTitle = computed(() => {
 
 const STRATEGIES: readonly PullStrategy[] = ['ff-only', 'merge', 'rebase'];
 const DEFAULT_ID = 'pull-strategy-default';
-const menuListRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
-// G34 D8: driving `<KuiMenuList>` — one section, "Follow your configuration" (the live-resolved
+// G34 D8: driving `MenuSections` — one section, "Follow your configuration" (the live-resolved
 // preview as its `detail` line) plus the three explicit strategies. Row ids double as their own
-// `data-testid` (KuiMenuList derives one from the other), so `pull-strategy-default`/
+// `data-testid` (MenuSections derives one from the other), so `pull-strategy-default`/
 // `pull-strategy-<strategy>` are unchanged from before this adoption.
 const menuSections = computed<MenuSection[]>(() => [
   {
@@ -89,24 +88,13 @@ function onMenuSelect(id: string): void {
   void runWith(strategy);
 }
 
-function onDocumentClick(event: MouseEvent): void {
-  if (rootEl.value && !rootEl.value.contains(event.target as Node)) close();
-}
-
 function close(): void {
   isOpen.value = false;
-  document.removeEventListener('mousedown', onDocumentClick);
 }
 
-async function toggle(): Promise<void> {
-  if (isOpen.value) {
-    close();
-    return;
-  }
-  isOpen.value = true;
-  document.addEventListener('mousedown', onDocumentClick);
-  await nextTick();
-  menuListRef.value?.focusFirst();
+async function onOpenChange(value: boolean): Promise<void> {
+  isOpen.value = value;
+  if (!value) return;
   previewLoading.value = true;
   try {
     const pre = await props.ops.previewPullStrategy(props.branch);
@@ -122,10 +110,6 @@ watch(
     preview.value = undefined;
   },
 );
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onDocumentClick);
-});
 
 async function runDefault(): Promise<void> {
   close();
@@ -143,35 +127,40 @@ defineExpose({ run: runDefault });
 </script>
 
 <template>
-  <div ref="rootEl" class="kv:relative kv:inline-flex">
-    <KuiButton
-      icon="codicon-repo-pull"
-      class="kv:rounded-tr-none kv:rounded-br-none"
-      :disabled="disabled"
-      v-kui-tooltip="mainTitle"
-      data-testid="pull-button"
-      @click="runDefault"
-    >
-      {{ mainLabel }}
-    </KuiButton>
-    <KuiButton
-      icon="codicon-chevron-down"
-      class="kv:px-0.5 kv:border-l-0 kv:rounded-tl-none kv:rounded-bl-none"
-      :disabled="disabled"
-      aria-label="Pull strategy options"
-      :aria-expanded="isOpen"
-      data-testid="pull-strategy-trigger"
-      @click="toggle"
-    />
+  <div class="relative inline-flex">
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira"
+          class="rounded-r-none"
+          :disabled="disabled"
+          data-testid="pull-button"
+          @click="runDefault"
+        >
+          <CodiconIcon name="repo-pull" />
+          {{ mainLabel }}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ mainTitle }}</TooltipContent>
+    </Tooltip>
 
-    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="260" @close="close">
-      <KuiMenuList
-        ref="menuListRef"
-        :sections="menuSections"
-        label="Pull strategy"
-        @select="onMenuSelect"
-        @close="close"
-      />
-    </KuiPopoverPanel>
+    <DropdownMenu :open="isOpen" @update:open="onOpenChange">
+      <DropdownMenuTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          class="rounded-l-none border-l-0 px-0.5"
+          :disabled="disabled"
+          aria-label="Pull strategy options"
+          data-testid="pull-strategy-trigger"
+        >
+          <CodiconIcon name="chevron-down" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" class="w-65" aria-label="Pull strategy">
+        <MenuSections :sections="menuSections" @select="onMenuSelect" />
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>
 </template>

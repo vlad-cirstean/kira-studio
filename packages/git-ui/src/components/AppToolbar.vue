@@ -27,16 +27,17 @@
  * known at all: there is nothing to name in the tooltip and no useful default to pick.
  */
 import type { StashEntry } from '@kira/git-ipc';
-import type { MenuSection } from '@kira/kira-ui';
-// `KuiMenuList` is a plain (not `import type`) import even though this file's own script only
-// ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
-// (`typeof` on an identifier requires the runtime binding in scope), and the template's own
-// `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
-// and would otherwise "fix" this to `import type`, silently erasing the import — `biome.json`'s
-// own `**/*.vue` override turns `useImportType` off for exactly this class of false positive
-// (P96 §5.2).
-import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
-import { computed, nextTick, ref } from 'vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@theme/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { computed, ref } from 'vue';
+import type { MenuSection } from '../lib/menuModel.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -56,6 +57,7 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // `biome.json` for exactly this class of false positive, P96 §5.2); the template is the real
 // caller.
 import BranchPicker from './BranchPicker.vue';
+import MenuSections from './MenuSections.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type { PickerTab } from './pickerModel.ts';
 import RefreshButton from './RefreshButton.vue';
@@ -159,17 +161,9 @@ const pushPullDisabled = computed(
 );
 
 const isForcePushMenuOpen = ref(false);
-const pushMenuListRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
-async function toggleForcePushMenu(): Promise<void> {
-  isForcePushMenuOpen.value = !isForcePushMenuOpen.value;
-  if (!isForcePushMenuOpen.value) return;
-  await nextTick();
-  pushMenuListRef.value?.focusFirst();
-}
-
-// G34 D8: driving `<KuiMenuList>` — today, one item. `danger: true` is the same visual treatment
-// `variant="danger"` gave the hand-rolled `KuiButton` row it replaces.
+// G34 D8: driving `MenuSections` — today, one item. `danger: true` is the same visual treatment
+// `variant="destructive"` gives the DropdownMenuItem row it replaces.
 const pushMenuSections: readonly MenuSection[] = [
   {
     items: [
@@ -337,15 +331,21 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
         aria-hidden="true"
       ></span>
-      <KuiButton
-        icon="codicon-cloud-download"
-        :disabled="fetchDisabled"
-        v-kui-tooltip="`Fetch ${defaultRemote}`"
-        data-testid="fetch-button"
-        @click="doFetch"
-      >
-        Fetch
-      </KuiButton>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira"
+            :disabled="fetchDisabled"
+            data-testid="fetch-button"
+            @click="doFetch"
+          >
+            <CodiconIcon name="cloud-download" />
+            Fetch
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Fetch {{ defaultRemote }}</TooltipContent>
+      </Tooltip>
 
       <PullStrategyPicker
         v-if="currentBranch !== undefined"
@@ -356,40 +356,40 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         :disabled="pushPullDisabled"
       />
 
-      <div class="kv:relative kv:inline-flex">
-        <KuiButton
-          icon="codicon-repo-push"
-          class="kv:rounded-tr-none kv:rounded-br-none"
-          :disabled="pushPullDisabled"
-          v-kui-tooltip="`Push to ${defaultRemote}`"
-          data-testid="push-button"
-          @click="doPush"
-        >
-          Push
-        </KuiButton>
-        <KuiButton
-          icon="codicon-chevron-down"
-          class="kv:px-0.5 kv:border-l-0 kv:rounded-tl-none kv:rounded-bl-none"
-          :disabled="pushPullDisabled"
-          aria-label="Push options"
-          :aria-expanded="isForcePushMenuOpen"
-          data-testid="push-overflow-trigger"
-          @click="toggleForcePushMenu"
-        />
-        <KuiPopoverPanel
-          v-if="isForcePushMenuOpen"
-          anchor="right"
-          :width="160"
-          @close="isForcePushMenuOpen = false"
-        >
-          <KuiMenuList
-            ref="pushMenuListRef"
-            :sections="pushMenuSections"
-            label="Push options"
-            @select="onPushMenuSelect"
-            @close="isForcePushMenuOpen = false"
-          />
-        </KuiPopoverPanel>
+      <div class="relative inline-flex">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira"
+              class="rounded-r-none"
+              :disabled="pushPullDisabled"
+              data-testid="push-button"
+              @click="doPush"
+            >
+              <CodiconIcon name="repo-push" />
+              Push
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Push to {{ defaultRemote }}</TooltipContent>
+        </Tooltip>
+        <DropdownMenu v-model:open="isForcePushMenuOpen">
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              class="rounded-l-none border-l-0 px-0.5"
+              :disabled="pushPullDisabled"
+              aria-label="Push options"
+              data-testid="push-overflow-trigger"
+            >
+              <CodiconIcon name="chevron-down" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-40" aria-label="Push options">
+            <MenuSections :sections="pushMenuSections" @select="onPushMenuSelect" />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </template>
 
@@ -398,15 +398,21 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
         aria-hidden="true"
       ></span>
-      <KuiButton
-        icon="codicon-inbox"
-        :disabled="stashDisabled"
-        v-kui-tooltip="'Stash changes'"
-        data-testid="stash-changes-button"
-        @click="emit('stash-changes')"
-      >
-        Stash
-      </KuiButton>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira"
+            :disabled="stashDisabled"
+            data-testid="stash-changes-button"
+            @click="emit('stash-changes')"
+          >
+            <CodiconIcon name="inbox" />
+            Stash
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Stash changes</TooltipContent>
+      </Tooltip>
     </template>
 
     <!-- C10 §4.3/§14 OQ2: the toolbar hides every write affordance uniformly rather than
@@ -423,32 +429,27 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
 
     <span class="kv:flex-1" aria-hidden="true"></span>
 
-    <KuiButton
-      variant="icon"
-      icon="codicon-list-tree"
-      :active="collapseBranches"
+    <TooltipIconButton
+      icon="list-tree"
+      label="Collapse other branches"
       :aria-pressed="collapseBranches"
-      v-kui-tooltip="'Collapse other branches'"
-      aria-label="Collapse other branches"
+      class="aria-pressed:bg-field aria-pressed:text-fg"
       data-testid="graph-collapse-toggle"
       @click="emit('toggle-collapse-branches')"
     />
 
-    <KuiButton
-      variant="icon"
-      icon="codicon-search"
-      :active="searchOpen"
-      v-kui-tooltip="'Search'"
-      aria-label="Search"
+    <TooltipIconButton
+      icon="search"
+      label="Search"
+      :aria-pressed="searchOpen"
+      class="aria-pressed:bg-field aria-pressed:text-fg"
       data-testid="search-toggle-button"
       @click="emit('toggle-search')"
     />
 
-    <KuiButton
-      variant="icon"
-      icon="codicon-gear"
-      v-kui-tooltip="'Repository settings'"
-      aria-label="Repository settings"
+    <TooltipIconButton
+      icon="gear"
+      label="Repository settings"
       data-testid="repo-settings-button"
       @click="emit('open-repo-settings')"
     />
@@ -462,11 +463,11 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
            `animate-spin`. -->
       <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
       <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">{{ progressText }}</span>
-      <KuiButton
-        variant="icon"
-        icon="codicon-close"
+      <TooltipIconButton
+        icon="close"
+        :label="cancellable ? 'Cancel' : (cancelDisabledReason ?? '')"
         :disabled="!cancellable"
-        v-kui-tooltip="cancellable ? 'Cancel' : cancelDisabledReason"
+        disabled-trigger
         data-testid="remote-cancel"
         @click="doCancel"
       />
@@ -483,10 +484,9 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     >
       <span class="codicon codicon-loading kv:inline-block kv:animate-spin" aria-hidden="true"></span>
       <span class="kv:whitespace-nowrap kv:overflow-hidden kv:text-ellipsis kv:max-w-65">Preparing worktree…</span>
-      <KuiButton
-        variant="icon"
-        icon="codicon-close"
-        v-kui-tooltip="'Cancel'"
+      <TooltipIconButton
+        icon="close"
+        label="Cancel"
         data-testid="worktree-prepare-cancel"
         @click="doCancelWorktreePrepare"
       />
