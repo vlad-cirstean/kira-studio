@@ -2065,3 +2065,104 @@ decisions.
 
 Working tree clean at this commit; pushed to `origin v1.9` once this pass's full verification above
 was green.
+
+## P135 result
+
+Plan: `docs/v2.0/plans/P135-ade-icon-deps-jira-estimate.md`, already Opus-authored and verified
+before this pass started. Implemented on `claude/p135-ade-deps` (base `23fb2b04`, a separate branch
+from the shared chapter branch `claude/unfinished-phases-ru3wo4` per this session's own instruction,
+since a concurrent P131 Part 2 pass was committing there). 13 implementation/fix commits plus this
+result commit, the plan's §8 sequence in order.
+
+**Commits:**
+
+1. `13f95258` — `fix(ade): new-session button uses the add codicon` — deliverable (1).
+2. `ebcb9bb9` — `feat(ade): dependency storage (migration 0006, repo methods, link cleanup on
+   archive and rebind)`.
+3. `ed5cadb0` — `feat(ade): dependency facts in the snapshot and AdeService methods`.
+4. `4ca8fa24` — `test(ade): dependency link lifecycle across rebind, archive and resolve`.
+5. `1b3a1f37` — `feat(ade): dependency kind in useQueue: scheduling floor, tags, panel facts`.
+6. `55e8a64e` — `feat(ade): dependency boxes and blocked chips on the timeline`.
+7. `092f980e` — `feat(ade): dependency detail panel and blocker linking`.
+8. `055e487a` — `feat(ade): Dependency tab in the Add popover`.
+9. `30d592ec` — `feat(ade): Jira line on timeline rows` — deliverable (3).
+10. `39c87e90` — `feat(ade): estimate is extend-only once set` — deliverable (4), client and server
+    (`checkEstExtends`).
+11. `ed4e8512` — `test(ade): ui coverage for P135` — 6 new/rewritten UI scenarios across
+    `ade-panel.spec.ts`/`ade-timeline.spec.ts`.
+12. `fd487da8` — `fix(ade): AdeDependencyPatch stays unexported` — `bun run lint:dead`'s own finding
+    against commit 3's own addition, fixed same pass.
+13. `ee009746` — `docs: ARCHITECTURE records ade dependency nodes and extend-only estimate (P135)`.
+14. This result commit.
+
+**§9 verification, run in full:**
+
+- `bun run typecheck` — clean (8 parallel project checks).
+- `bun run lint` — clean (biome across 1562 files, `check-tokens`, `check-theme-classes`,
+  `check-class-conflicts`).
+- `bun run lint:dead` — clean after commit 12's fix; the run's remaining findings (`Duplicate
+  exports` in `apps/kira-studio/frontend/src/views/shared/page/columns.ts`,
+  `packages/git-core/src/graph/types.ts`, `packages/git-ui/src/components/rowMenuModel.ts`,
+  `packages/shared/domain/repo.ts`, `packages/shared/protocol/page.ts`, plus 9 `.vue`-extension/
+  ignored-dependency configuration hints) are pre-existing and outside this phase's own scope —
+  confirmed via `git diff --stat 23fb2b04 -- <those 5 files> knip.json`, empty: none of the five
+  files, or `knip.json` itself, were touched by any commit in this phase. Different subsystems
+  entirely (Kira Studio's own page view, `git-core`, `git-ui`, `packages/shared`), so per
+  `CLAUDE.md`'s own exception this stays unfixed here rather than pulled into scope; it needs its
+  own named follow-up phase in `SPEC.md` if the team wants it closed, not a line item folded into
+  this one.
+- `bun run build:space` — clean.
+- `go build ./...` — clean. `go vet ./...` — clean.
+- `go test ./apps/kira-space/internal/ade/... ./apps/kira-space/internal/bridge/...
+  ./apps/kira-space/internal/storage/...` — all packages `ok` (`ade`, `bridge`, `storage/repos`; the
+  other three `storage` subpackages carry no test files).
+- `bun run test:unit` — 1817 pass, 0 fail, 24236 `expect()` calls, across 182 files.
+- `bun run test:ui:space` — full suite, all 10 spec files, 76 pass, 0 fail (not just the `ade`
+  specs — `focus-ring`, `modules`, `repo-graph-lifecycle`, `repo-workspace`, `update-dialog`,
+  `window-chrome` included, confirming no cross-module regression).
+- Live sandbox check: not run — this sandbox has no real Wails runtime window to drive by hand; the
+  full `test:ui:space` run above (real browser, mocked control plane) is this environment's own
+  closest equivalent and is green.
+
+**§10 closing audit, run for real:**
+
+| Check | Command | Result |
+|---|---|---|
+| No hand-drawn icon | `rg -n '<svg\|<path d=' apps/kira-space/frontend/src/ade` | empty |
+| Codicon used | `rg -n 'CodiconIcon name="add"' apps/kira-space/frontend/src/ade/AdeAgentsTab.vue` | 1 hit (`:125`) |
+| No new dependency | `git diff --stat f4605a67 -- package.json bun.lock` | empty |
+| No git fact on a dependency | `rg -n -A8 'type DependencyFact struct' apps/kira-space/internal/ade/queue.go` | fields `ID, Title, WaitingOn`, `ExpectedBy`, `CreatedAt`, `Blocks` only |
+| Facts pipeline never sees one | `rg -n -i 'dependenc' apps/kira-space/internal/ade/facts.go` | empty |
+| No git in dependency methods | `rg -n -A25 'func \(q \*Queue\) (AddDependency\|UpdateDependency\|ResolveDependency\|SetBlocker)' apps/kira-space/internal/ade/queue.go \| rg 'openRepo\|gitsession\|worktree'` | 1 hit, a false positive of the 25-line window — `SetBlocker` is 7 lines long, and the `openRepo` call the window catches belongs to `BindNewWork`, the next function down, not to any of the four dependency methods (confirmed by reading `queue.go:1327-1391` directly: none of `AddDependency`/`UpdateDependency`/`ResolveDependency`/`SetBlocker` calls `openRepo`, `gitsession`, or touches a worktree) |
+| Excluded from merge, hours, drag | `rg -n "'dependency'" apps/kira-space/frontend/src/ade/useQueue.ts` | 23 hits, including `buildStacks`'s `merging` filter, `buildMergeOrder`'s `depSegs` split, `buildHoursOn`, `idsOfPlannable`, `atRisk`, the segment `dragIds` filter, `buildPanelBranchFrom`, `buildPanel` |
+| No Merge/ready/CI state added | `rg -n -i "'merge'\|ready\|ciFailing" $(git diff --name-only f4605a67 -- apps/kira-space/frontend/src/ade)` | every hit is the word "already" (matches `ready` as a substring) or this phase's own pre-existing comments documenting the deliberate absence of a `ready`/`ciFailing` rung — no genuine new state |
+| New members have callers | `rg -n 'adeAddDependency\|adeUpdateDependency\|adeResolveDependency\|adeSetBlocker' apps/kira-space/frontend/src/ade` | all 4 called from `mutations.ts`; supplementary check confirms each mutation's own hook (`useAdeAddDependency` via `adeActions.ts` → `AdeAddPopover.vue`; `useAdeUpdateDependency`/`useAdeSetBlocker` → `AdeDependencyDetails.vue`; `useAdeSetBlocker` → `AdeBlockerRow.vue`; `useAdeResolveDependency` → `AdePanelHeader.vue`) has a real component caller |
+| Service size | `rg -c '^func \(s \*AdeService\) [A-Z]' apps/kira-space/internal/bridge/ade.go` | 23 |
+| Migration registered | `rg -n '0006_p135_ade_dependencies' apps/kira-space/internal/storage/migrations/embed.go` | 1 hit |
+| Work-item ids refuse `dep:` | `rg -n 'validateAdeWorkItemID' apps/kira-space/internal/bridge/ade.go` | definition plus 9 call sites (`SetPlan` days/order, `SetQueuedAfter` item/after, `BindNewWork`, `SetBlocker`'s own `blocks item`, and others) — more coverage than the plan's own minimum of 4, no gap |
+| No Jira client | `rg -n -i 'jira' apps/kira-space/internal --glob '*.go' \| rg -i 'http\|client\|fetch'` | empty |
+| Row height shared | `rg -n 'rowHeightClass' apps/kira-space/frontend/src/ade` | `rowHeight.ts`, `AdeStackRow.vue`, `AdeStackBlock.vue` |
+| Estimate commits only when unlocked | `rg -n '@change' apps/kira-space/frontend/src/ade/AdeEstimateField.vue` | 1 real hit (`:97`, inside the unlocked branch), 1 comment mentioning it |
+| Server guard wired | `rg -n 'ErrEstimateShrink' apps/kira-space/internal` | repo sentinel declaration, `checkEstExtends`'s own two return sites, `adeQueueError`'s mapping in `bridge/ade.go` |
+| Suites | §9 above | all green |
+
+**Deviations from the plan.** Test placement: the plan's §7 listed the Add popover's Dependency tab
+scenario under `ade-dialogs.spec.ts`; the real Add-popover UI coverage already lives in
+`ade-timeline.spec.ts` (its own "Add popover" test 9), not `ade-dialogs.spec.ts` (which covers only
+the Claude Code send dialog) — the new Dependency-tab scenario was added there instead, matching the
+file the rest of that surface's tests already live in. No other deviation: every deliverable, the
+scheduling rule, the rendering rule, the estimate guard, and the test list match the plan as written.
+
+**Acceptance (SPEC row wording, mapped):**
+
+| SPEC row item | Where | Status |
+|---|---|---|
+| (1) Hand-drawn icon replaced with a codicon | `AdeAgentsTab.vue` | Satisfied — commit `13f95258`; closing-audit rows 1-2 |
+| (2) External dependency node: own item kind, minimal data, own timeline box, linkable as a blocker, scheduling rule stated and enforced | `ade_dependencies`/`ade_blockers` (migration `0006`), `useQueue.ts`'s `applyDependencyDays`, `AdeStackBlock.vue`'s dotted box | Satisfied — commits 2-8; the rule is exactly "never scheduled ahead of the earliest day a blocked item needs it resolved by" (`applyDependencyDays`); `ade-queue-rules.spec.ts`'s 11-case `dependency` block; `ade-timeline.spec.ts`'s 2 dependency scenarios; `ade-panel.spec.ts`'s 2 dependency-panel scenarios |
+| (2) Creation path via `AdeAddPopover.vue` | third `Dependency` tab | Satisfied — commit 8; `ade-timeline.spec.ts`'s "add: the Dependency tab" scenario |
+| (2) Never computes or shows git facts, merge position, conflicts, shares, PR/CI state | `facts.go` untouched; dependency methods never call `openRepo` | Satisfied — closing-audit rows 4-6 |
+| (3) Jira id/title on their own line, row height grows only for a Jira item | `AdeStackRow.vue`, `rowHeight.ts` | Satisfied — commit 9; `ade-timeline.spec.ts`'s "jira line" scenario (56px vs 40px, `target="_blank"`) |
+| (4) Estimate extend-only once set, fresh value still freely settable, hint keeps updating | `AdeEstimateField.vue`, `checkEstExtends` | Satisfied — commit 10; `ade-panel.spec.ts`'s rewritten estimate scenario |
+
+Working tree clean at this commit. Pushed to `origin claude/p135-ade-deps` (a new branch, not the
+shared chapter branch) once this pass's full verification above was green.
