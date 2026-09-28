@@ -133,6 +133,16 @@ type PairFact struct {
 	Conflicts []string
 }
 
+// DependencyFact is one live external dependency's own assembled facts (P135 §4.3) — no git field
+// of any kind: a dependency never has a branch, so it carries no ahead/behind, no merge state, no
+// PR/CI state.
+type DependencyFact struct {
+	ID, Title, WaitingOn string
+	ExpectedBy           *string
+	CreatedAt            int64
+	Blocks               []string
+}
+
 type HistoryItem struct {
 	Item, Kind, Title, Branch string
 	MergedAt                  *int64
@@ -159,6 +169,7 @@ type RepoSnapshot struct {
 	Colors           map[string]int
 	Pairs            []PairFact
 	History          []HistoryItem
+	Dependencies     []DependencyFact
 	LastFetchAt      *int64
 	AutofetchMinutes int
 	WorktreeBasePath string
@@ -550,7 +561,8 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 		Plan:             buildPlanFact(state.Plan, branchFacts),
 		Colors:           buildColors(state.Colors),
 		Pairs:            pairFactsOut,
-		History:          buildHistory(archivedBranches, state.NewWork),
+		History:          buildHistory(archivedBranches, state.NewWork, state.Dependencies),
+		Dependencies:     buildDependencyFacts(state),
 		LastFetchAt:      lastFetchAt,
 		AutofetchMinutes: autofetch,
 		WorktreeBasePath: entry.RepoSettings().WorktreeBasePath,
@@ -887,8 +899,9 @@ func buildNewWorkFacts(newWork []model.AdeNewWork, branchCandidates map[string][
 	return out
 }
 
-// buildHistory is every archived branch/new-work row, meta only, newest-archived first.
-func buildHistory(archivedBranches []model.AdeBranch, newWork []model.AdeNewWork) []HistoryItem {
+// buildHistory is every archived branch/new-work/resolved-dependency row, meta only,
+// newest-archived (or newest-resolved) first.
+func buildHistory(archivedBranches []model.AdeBranch, newWork []model.AdeNewWork, dependencies []model.AdeDependency) []HistoryItem {
 	var history []HistoryItem
 	for _, b := range archivedBranches {
 		title := b.Name
@@ -906,8 +919,38 @@ func buildHistory(archivedBranches []model.AdeBranch, newWork []model.AdeNewWork
 		}
 		history = append(history, HistoryItem{Item: w.ID, Kind: "newWork", Title: w.Title, ArchivedAt: *w.ArchivedAt})
 	}
+	for _, d := range dependencies {
+		if d.ResolvedAt == nil {
+			continue
+		}
+		history = append(history, HistoryItem{Item: d.ID, Kind: "dependency", Title: d.Title, ArchivedAt: *d.ResolvedAt})
+	}
 	sort.Slice(history, func(i, j int) bool { return history[i].ArchivedAt > history[j].ArchivedAt })
 	return history
+}
+
+// buildDependencyFacts is live (unresolved) dependencies only, sorted by creation, each with its
+// own Blocks list sorted for stable output (P135 §4.3) — never passed to facts.go, so it carries
+// no git field of any kind.
+func buildDependencyFacts(state repos.AdeQueueState) []DependencyFact {
+	blocksByDep := make(map[string][]string)
+	for _, bl := range state.Blockers {
+		blocksByDep[bl.Dependency] = append(blocksByDep[bl.Dependency], bl.Item)
+	}
+	out := make([]DependencyFact, 0, len(state.Dependencies))
+	for _, d := range state.Dependencies {
+		if d.ResolvedAt != nil {
+			continue
+		}
+		blocks := blocksByDep[d.ID]
+		sort.Strings(blocks)
+		out = append(out, DependencyFact{
+			ID: d.ID, Title: d.Title, WaitingOn: d.WaitingOn, ExpectedBy: d.ExpectedBy,
+			CreatedAt: d.CreatedAt, Blocks: blocks,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt < out[j].CreatedAt })
+	return out
 }
 
 func buildColors(rows []model.AdeColor) map[string]int {
@@ -1267,6 +1310,55 @@ func (q *Queue) SetPlan(codeRepoID string, days map[string]*string, order []stri
 
 func (q *Queue) SetQueuedAfter(codeRepoID, item, after string) error {
 	if err := q.deps.Store.SetQueuedAfter(codeRepoID, item, after); err != nil {
+		return err
+	}
+	q.notifyChanged(codeRepoID)
+	return nil
+}
+
+// DependencyInput is AddDependency's own argument bundle (P135 §4.3).
+type DependencyInput struct {
+	Title, WaitingOn, ExpectedBy string
+	Blocks                       []string
+}
+
+// AddDependency mints a fresh "dep:" id and stores it plus its blocker links — no openRepo, no
+// gitsession, no worktree: a dependency has no git identity of any kind.
+func (q *Queue) AddDependency(codeRepoID string, in DependencyInput) (string, error) {
+	id := "dep:" + uuid.NewString()
+	var expectedBy *string
+	if in.ExpectedBy != "" {
+		expectedBy = &in.ExpectedBy
+	}
+	d := model.AdeDependency{
+		ID: id, CodeRepoID: codeRepoID, Title: in.Title, WaitingOn: in.WaitingOn,
+		ExpectedBy: expectedBy, CreatedAt: q.deps.Now().UnixMilli(),
+	}
+	if err := q.deps.Store.AddDependency(d, in.Blocks); err != nil {
+		return "", err
+	}
+	q.notifyChanged(codeRepoID)
+	return id, nil
+}
+
+func (q *Queue) UpdateDependency(codeRepoID, id string, patch model.AdeDependencyPatch) error {
+	if err := q.deps.Store.UpdateDependency(codeRepoID, id, patch); err != nil {
+		return err
+	}
+	q.notifyChanged(codeRepoID)
+	return nil
+}
+
+func (q *Queue) ResolveDependency(codeRepoID, id string) error {
+	if err := q.deps.Store.ResolveDependency(codeRepoID, id, q.deps.Now().UnixMilli()); err != nil {
+		return err
+	}
+	q.notifyChanged(codeRepoID)
+	return nil
+}
+
+func (q *Queue) SetBlocker(codeRepoID, dependency, item string, linked bool) error {
+	if err := q.deps.Store.SetBlocker(codeRepoID, dependency, item, linked); err != nil {
 		return err
 	}
 	q.notifyChanged(codeRepoID)

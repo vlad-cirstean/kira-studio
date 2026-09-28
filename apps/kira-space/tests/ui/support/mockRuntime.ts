@@ -105,6 +105,12 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
   adeSetBranchMeta: 'AdeService.SetBranchMeta',
   adeBindNewWork: 'AdeService.BindNewWork',
+
+  // P135 §4.5: the four dependency-node bound calls (creation tab, detail panel, blocker linking).
+  adeAddDependency: 'AdeService.AddDependency',
+  adeUpdateDependency: 'AdeService.UpdateDependency',
+  adeResolveDependency: 'AdeService.ResolveDependency',
+  adeSetBlocker: 'AdeService.SetBlocker',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(

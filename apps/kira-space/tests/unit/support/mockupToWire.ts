@@ -289,6 +289,9 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
     colors,
     pairs,
     history,
+    // The mockup carries no dependency-node fixture data of its own (P135 is a real-app addition);
+    // every parity spec's own useQueue projection excludes the new fields (§11 of the plan).
+    dependencies: [],
     lastFetchAt: null,
     autofetchMinutes: 0,
     worktreeBasePath: `~/wt/${repo}`,

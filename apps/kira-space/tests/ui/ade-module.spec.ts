@@ -75,6 +75,7 @@ function emptySnapshot(codeRepoId: string, overrides: Record<string, unknown> = 
     colors: {},
     pairs: [],
     history: [],
+    dependencies: [],
     lastFetchAt: null,
     autofetchMinutes: 0,
     worktreeBasePath: '/tmp',

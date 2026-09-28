@@ -35,12 +35,14 @@ import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type {
   AdeAddBranchArgs,
+  AdeAddDependencyArgs,
   AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
   AdeBindNewWorkArgs,
   AdeCandidateBranch,
   AdeCredentialRequest,
+  AdeDependencyArgs,
   AdeForcePushArgs,
   AdeForcePushResult,
   AdeItemArgs,
@@ -53,9 +55,11 @@ import type {
   AdeRepoSnapshot,
   AdeSendArgs,
   AdeSessionsResult,
+  AdeSetBlockerArgs,
   AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
+  AdeUpdateDependencyArgs,
   AdeUpdateNewWorkArgs,
 } from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
@@ -85,6 +89,7 @@ function normalizeAdeRepoSnapshot(raw: AdeRepoSnapshot): AdeRepoSnapshot {
       shared: p.shared ?? [],
       conflicts: p.conflicts ?? [],
     })),
+    dependencies: (raw.dependencies ?? []).map((d) => ({ ...d, blocks: d.blocks ?? [] })),
   };
 }
 
@@ -267,6 +272,14 @@ const spaceControl = {
     unwrap(AdeService.AddBranch(args)).then((r) => trust<string>(r)),
   adeAddNewWork: (args: AdeAddNewWorkArgs): Promise<string> =>
     unwrap(AdeService.AddNewWork(args)).then((r) => trust<string>(r)),
+  // P135 §4.5: the four dependency-node calls (creation tab, detail panel, blocker linking).
+  adeAddDependency: (args: AdeAddDependencyArgs): Promise<string> =>
+    unwrap(AdeService.AddDependency(args)).then((r) => trust<string>(r)),
+  adeUpdateDependency: (args: AdeUpdateDependencyArgs): Promise<void> =>
+    unwrap(AdeService.UpdateDependency(args)),
+  adeResolveDependency: (args: AdeDependencyArgs): Promise<void> =>
+    unwrap(AdeService.ResolveDependency(args)),
+  adeSetBlocker: (args: AdeSetBlockerArgs): Promise<void> => unwrap(AdeService.SetBlocker(args)),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

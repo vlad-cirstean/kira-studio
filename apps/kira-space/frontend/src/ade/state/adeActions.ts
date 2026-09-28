@@ -13,6 +13,7 @@ import type { LaunchDeps } from '../launch';
 import {
   fetchArchiveRisk,
   useAdeAddBranch,
+  useAdeAddDependency,
   useAdeAddNewWork,
   useAdeArchive,
   useAdeForcePush,
@@ -24,7 +25,7 @@ import {
 } from '../mutations';
 import type { SetPlanArgs } from '../timelineOps';
 import { adeTurns } from '../turnWatch';
-import type { AdeAddNewWorkArgs } from '../wire';
+import type { AdeAddDependencyArgs, AdeAddNewWorkArgs } from '../wire';
 import { useAdeTerminalsStore } from './adeTerminals';
 import { useAdeUiStore } from './adeUi';
 import { useAgentSessionsStore } from './agentSessions';
@@ -117,6 +118,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
   const forcePushMutation = useAdeForcePush(currentRepoId);
   const addNewWorkMutation = useAdeAddNewWork(currentRepoId);
   const addBranchMutation = useAdeAddBranch(currentRepoId);
+  const addDependencyMutation = useAdeAddDependency(currentRepoId);
 
   function buildLaunchDeps(): LaunchDeps {
     return {
@@ -262,6 +264,16 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     return addBranchMutation.mutateAsync({ codeRepoId: repoId, branch, kind: '' });
   }
 
+  /** P135 §4.8: the Add popover's own Dependency tab — same "return the id" shape as `addNewWork`/
+   *  `addBranch`, the popover selects it and closes. */
+  async function addDependency(
+    repoId: string,
+    args: Omit<AdeAddDependencyArgs, 'codeRepoId'>,
+  ): Promise<string> {
+    currentRepoId.value = repoId;
+    return addDependencyMutation.mutateAsync({ codeRepoId: repoId, ...args });
+  }
+
   return {
     rebasingFor,
     sendDialog,
@@ -272,6 +284,7 @@ export const useAdeActionsStore = defineStore('adeActions', () => {
     forcePush,
     addNewWork,
     addBranch,
+    addDependency,
     actionError,
     dismissError,
   };

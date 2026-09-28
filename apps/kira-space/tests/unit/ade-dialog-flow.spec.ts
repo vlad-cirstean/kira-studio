@@ -205,6 +205,7 @@ function snapshot(overrides: Partial<AdeRepoSnapshot> = {}): AdeRepoSnapshot {
     colors: {},
     pairs: [],
     history: [],
+    dependencies: [],
     lastFetchAt: null,
     autofetchMinutes: 0,
     worktreeBasePath: '~/wt/repo',

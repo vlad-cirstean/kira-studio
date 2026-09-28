@@ -110,6 +110,7 @@ function snapshotFixture(): AdeRepoSnapshot {
     colors: {},
     pairs: [],
     history: [],
+    dependencies: [],
     lastFetchAt: null,
     autofetchMinutes: 0,
     worktreeBasePath: '/tmp/wt',
