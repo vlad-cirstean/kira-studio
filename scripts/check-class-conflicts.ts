@@ -21,8 +21,9 @@
  *   - Otherwise, split both the static tokens and every literal found in the `:class` expression
  *     (every string literal anywhere in the tree, plus every string/identifier object-property key
  *     — a class-toggle map's own class names) into two groups by the `kv:` prefix, since a `kv:`
- *     token merges through kira-ui's own `cn()` (git-ui's root uses the same prefix) and every
- *     other token merges through theme's own `cn()` (§3.1: "merge function per token").
+ *     token merges through git-ui's own `cn()` (`packages/git-ui/src/lib/cn.ts`, P131 Part 3 —
+ *     kira-ui's own copy is gone) and every other token merges through theme's own `cn()` (§3.1:
+ *     "merge function per token").
  *   - Fail 1 (static-conflict): merging a group's own static tokens against themselves changes the
  *     set (a same-group duplicate/self-conflict already sitting in the static class list).
  *   - Fail 2 (static-vs-conditional): merging a group's static tokens plus one conditional literal
@@ -30,8 +31,9 @@
  *
  * Registration self-check (§3.1, makes acceptance-2 self-enforcing): every `--text-*`/
  * `--spacing-*`/`--radius-*`/`--shadow-*`/`--animate-*`/`--leading-*` name declared in
- * `PT/base.css`'s and `KU/theme/tailwind-theme.css`'s own `@theme` blocks must sort into its own
- * twMerge group — asserted directly against the real merge functions, not by reading config.
+ * `PT/base.css`'s and git-ui's own `theme/tailwind.css`'s `@theme inline reference` block must
+ * sort into its own twMerge group — asserted directly against the real merge functions, not by
+ * reading config.
  *
  * Landed unwired (I2-3): run directly with `bun scripts/check-class-conflicts.ts`. Wired into
  * `bun run lint` at I2-9, once every hit its first run surfaces is fixed.
@@ -47,7 +49,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parse as parseSFC } from '@vue/compiler-sfc';
-import { cn as cnKv } from '../packages/kira-ui/src/cn';
+import { cn as cnKv } from '../packages/git-ui/src/lib/cn';
 import { cn } from '../packages/theme/src/lib/utils';
 
 const REPO_ROOT = join(import.meta.dir, '..');
@@ -58,7 +60,6 @@ const SCAN_DIRS = [
   'packages/theme/src',
   'packages/workbench/src',
   'packages/git-ui/src',
-  'packages/kira-ui/src',
 ];
 
 const GIT_UI_DIR = 'packages/git-ui/src';
@@ -495,7 +496,7 @@ function main(): void {
   // base.css into tailwind-core.css -- this self-check must follow, or it silently checks zero
   // names (a for-loop over an empty themeTokenNames() list, no error).
   checkRegistration('packages/theme/src/tailwind-core.css', false, hits);
-  checkRegistration('packages/kira-ui/src/theme/tailwind-theme.css', true, hits);
+  checkRegistration('packages/git-ui/src/theme/tailwind.css', true, hits);
 
   if (hits.length === 0) {
     console.log('check-class-conflicts: no conflicts found.');

@@ -47,7 +47,10 @@ const twMergeKv = extendTailwindMerge<'spacing' | 'radius' | 'shadow' | 'text' |
         'kui-icon-box',
       ],
       radius: ['kui', 'kui-float'],
-      shadow: ['float', 'kui-float'],
+      // P131 Part 3 §6.3/§6.4: `widget` (git-ui's own `theme/tailwind.css`, `--shadow-widget`) was
+      // never registered here — check-class-conflicts.ts's registration self-check, retargeted at
+      // this file's own theme/tailwind.css, caught the gap.
+      shadow: ['float', 'kui-float', 'widget'],
       // P110 I2-2: M1 -- `kv:text-kui-sm`/`-base` (kuiRowVariants, KuiTextInput) read as
       // colour utilities without these, and drop a static `kv:text-kui-fg`/`-selected-fg` colour
       // on the same element as a false same-group conflict. P110 I2-28: `codicon`
