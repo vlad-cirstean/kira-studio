@@ -12,8 +12,21 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@theme
 // every other call site converts to).
 import { useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
-import type { TooltipContent as TooltipContentShape } from '../state/tooltip';
 import TooltipAnchorBridge from './TooltipAnchorBridge.vue';
+
+/** P42 D19: the structured half of a tooltip — carried in a second attribute (`data-kira-tip-
+ *  parts`, this file's own `PARTS_ATTR`) so `data-kira-tip` itself stays the exact newline-joined
+ *  plain text it always was (the a11y mirror, and every existing Playwright assertion). A plain
+ *  string tooltip never sets this at all. */
+interface TooltipContentShape {
+  title: string;
+  meta?: string;
+  /** The data-type badge's own colour (columnTypeColor, theme/icons.ts) — the only caller of
+   *  `meta` today is a column-type hint, and the badge is what carries the colour visibly rather
+   *  than the plain a11y text these get joined into, so this never affects it. */
+  metaColor?: string;
+  body?: string;
+}
 
 const TIP_ATTR = 'data-kira-tip';
 const PARTS_ATTR = 'data-kira-tip-parts';

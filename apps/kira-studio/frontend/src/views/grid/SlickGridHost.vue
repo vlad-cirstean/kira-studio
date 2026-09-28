@@ -5,11 +5,11 @@ import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
-import AttributeTooltip from '@workbench/components/AttributeTooltip.vue';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
@@ -449,9 +449,10 @@ function keyLabelFor(
 
 // P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so tooltipAttrs (views/
 // shared/page/columns.ts, P107 T2-17) writes the same shape AttributeTooltip.vue's own bridge
-// (packages/workbench/src/components/) reads by hand: data-kira-tip (the plain, newline-joined
-// a11y text) and data-kira-tip-parts (the structured JSON a real TooltipContent would render) plus
-// aria-label — since no Vue component tree mounts over SlickGrid-owned DOM.
+// (packages/theme/src/components/, hoisted from packages/workbench/ at P131 Part 2) reads by
+// hand: data-kira-tip (the plain, newline-joined a11y text) and data-kira-tip-parts (the
+// structured JSON a real TooltipContent would render) plus aria-label — since no Vue component
+// tree mounts over SlickGrid-owned DOM.
 
 // The DESCRIBE-derived dataType (meta.columns) when it has loaded, else the page's own
 // ColumnDescriptor — mirrors DataGrid.vue's own dataTypeFor, so the header tooltip can never show
