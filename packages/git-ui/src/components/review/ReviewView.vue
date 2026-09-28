@@ -30,26 +30,18 @@ import type {
   UiActionKind,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import type { KuiSegmentedOption } from '@kira/kira-ui';
-// `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
-// ever reads it through `InstanceType<typeof KuiSearchInput>` — that is still a genuine *value*
-// read (`typeof` on an identifier requires the runtime binding in scope), and the template's own
-// `<KuiSearchInput>` tag instantiates it as a component; biome's own static analysis sees neither
-// use and would otherwise "fix" this to `import type`, silently erasing the import — `biome.json`'s
-// own `**/*.vue` override turns `useImportType` off for exactly this class of false positive
-// (P96 §5.2).
-import {
-  initTooltips,
-  KuiButton,
-  KuiSearchInput,
-  KuiSegmented,
-  KuiTextInput,
-  KuiTooltip,
-  kuiRowVariants,
-} from '@kira/kira-ui';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Badge } from '@theme/components/ui/badge';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
+import { cn } from '../../lib/cn.ts';
+import { rowVariants } from '../../lib/rowVariants.ts';
 import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
@@ -302,11 +294,11 @@ function onSwapBaseAndBranch(): void {
 const filterVisible = ref(false);
 // P105 §8: not inside any dialog — `autofocus` only fires once, on first render, so it can't
 // catch the input being revealed later by this toggle. Focus it explicitly instead.
-const toolbarEl = useTemplateRef<HTMLElement>('toolbarEl');
+const toolbarFilter = useTemplateRef<{ $el: HTMLElement }>('toolbarFilter');
 watch(filterVisible, (visible) => {
   if (!visible) return;
   void nextTick(() => {
-    toolbarEl.value?.querySelector<HTMLInputElement>('.kv-review-toolbar-filter')?.focus();
+    toolbarFilter.value?.$el.focus();
   });
 });
 function toggleFilterVisible(): void {
@@ -458,10 +450,6 @@ const filesActions = computed<DetailActions | undefined>(() => {
   };
 });
 
-// G20 D2: this root's own KuiTooltip instance and listener set, independent of App.vue's own
-// (two separate webview documents cannot share one singleton, G19 F3).
-let stopTooltips: (() => void) | null = null;
-
 onMounted(() => {
   // Mirrors `App.vue`'s own first-paint mark (§5.1 — W18's review-view perf metric measures from
   // this, not merely from `kira:page-parsed`). Unlike the graph panel there is no lane-layout
@@ -474,7 +462,6 @@ onMounted(() => {
   void bootstrap().catch((err: unknown) => {
     bootError.value = err instanceof Error ? err.message : String(err);
   });
-  stopTooltips = initTooltips();
 });
 
 function retryBootstrap(): void {
@@ -492,7 +479,6 @@ onBeforeUnmount(() => {
   refsState.dispose();
   bridge.dispose();
   document.removeEventListener('keydown', onDocumentKeydown);
-  stopTooltips?.();
 });
 
 // G12 D13: one panel-level filter/list-mode toolbar, replacing what used to be a separate
@@ -526,7 +512,7 @@ watch(
 // rule on the row menu's "Review branch changes" entry).
 // ---------------------------------------------------------------------------------------
 const branchFilter = ref('');
-const branchFilterInputRef = ref<InstanceType<typeof KuiSearchInput> | null>(null);
+const branchFilterInputRef = useTemplateRef<{ $el: HTMLElement }>('branchFilter');
 const branchSections = computed(() =>
   buildRefListSections(
     {
@@ -538,14 +524,12 @@ const branchSections = computed(() =>
   ),
 );
 
-// G21 D2: `KuiSearchInput`'s root element is a `<div>`, not the `<input>` a plain `autofocus`
-// attribute used to land on directly — its own `defineExpose`'d `focus()` is the replacement,
-// called once this "no branch" state actually renders (not merely once at this component's own
+// Focused once this "no branch" state actually renders (not merely once at this component's own
 // mount, which would fire long before the picker is ever shown).
 watch(
   () => !bootError.value && !!review.value && !noActiveRepo.value && !review.value.branch.value,
   (showingPicker) => {
-    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.focus());
+    if (showingPicker) void nextTick(() => branchFilterInputRef.value?.$el.focus());
   },
 );
 
@@ -605,14 +589,24 @@ const commitsCount = computed(() => {
 const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
 const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
 
+// P131 Part 3 §5.1: KuiSegmentedOption goes with KuiSegmented — this is the same shape, inlined
+// as a local type instead of importing one from kira-ui.
+interface ReviewToggleOption {
+  readonly id: string;
+  readonly icon: string;
+  readonly label: string;
+  readonly ariaLabel?: string;
+  readonly badge?: number;
+}
+
 // G14 D8 row 4: each pane button carries a count badge — GitLens's own count-badged section nodes.
-const panelOptions = computed<readonly KuiSegmentedOption[]>(() => [
+const panelOptions = computed<readonly ReviewToggleOption[]>(() => [
   { id: 'commits', icon: ACTION_ICONS.commits, label: 'Commits', badge: commitsCount.value },
   { id: 'files', icon: ACTION_ICONS.files, label: 'Files', badge: filesChangedCount.value },
   { id: 'comments', icon: ACTION_ICONS.comments, label: 'Comments', badge: commentsCount.value },
 ]);
 
-const listModeOptions: readonly KuiSegmentedOption[] = [
+const listModeOptions: readonly ReviewToggleOption[] = [
   { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
   { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
 ];
@@ -794,9 +788,8 @@ watch(
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
-    <!-- G20 D2: this root's own tooltip surface — independent of App.vue's (two separate webview
-         documents). -->
-    <KuiTooltip />
+    <!-- P131 Part 3 §5.1: MountRoot.vue's own TooltipProvider (Part 2 §3.5) already wraps this
+         root, so no tooltip surface of this component's own is needed. -->
     <span class="kv:sr-only" data-testid="connection-state">{{ connectionState }}</span>
     <div class="kv:sr-only" role="status" aria-live="polite" data-testid="live-announcements">
       {{ liveAnnouncement }}
@@ -810,13 +803,9 @@ watch(
     <template v-if="bootError">
       <div class="kv:flex kv:flex-col kv:gap-2 kv:p-3" data-testid="boot-error">
         <p class="kv:m-0 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
-        <KuiButton
-          class="kv:self-start kv:py-1 kv:px-3 kv:border-panel-border kv:rounded-sm kv:bg-panel kv:enabled:hover:bg-panel kv:text-row-fg kv:enabled:hover:text-row-fg"
-          data-testid="boot-retry"
-          @click="retryBootstrap"
-        >
+        <Button variant="dialog" size="kira" class="self-start" data-testid="boot-retry" @click="retryBootstrap">
           Retry
-        </KuiButton>
+        </Button>
       </div>
     </template>
 
@@ -840,23 +829,34 @@ watch(
         <p class="kv:m-0 kv:text-muted-foreground">
           Pick a branch to compare its commits against a base you choose or one we detect.
         </p>
-        <KuiSearchInput
-          ref="branchFilterInputRef"
-          v-model="branchFilter"
-          placeholder="Filter branches"
-          ariaLabel="Filter branches"
-        />
+        <InputGroup variant="kira">
+          <InputGroupAddon>
+            <span class="codicon codicon-search" aria-hidden="true"></span>
+          </InputGroupAddon>
+          <InputGroupInput
+            ref="branchFilter"
+            v-model="branchFilter"
+            placeholder="Filter branches"
+            aria-label="Filter branches"
+          />
+          <InputGroupAddon v-if="branchFilter" align="inline-end">
+            <InputGroupButton aria-label="Clear filter" @click="branchFilter = ''">
+              <span class="codicon codicon-close" aria-hidden="true"></span>
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
         <div class="kv:flex-1 kv:min-h-0 kv:overflow-auto">
           <div>
             <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Branches</div>
-            <KuiButton
+            <button
               v-for="row in branchSections.branches.visible"
               :key="row.refname"
-              :class="[kuiRowVariants(), 'kv:w-full kv:text-left']"
+              type="button"
+              :class="cn(rowVariants(), 'kv:w-full kv:text-left')"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
-            </KuiButton>
+            </button>
             <div
               v-if="branchSections.branches.visible.length === 0"
               class="kv:text-muted-foreground kv:py-0.5 kv:px-1"
@@ -866,14 +866,15 @@ watch(
           </div>
           <div>
             <div class="kv:pt-1 kv:pb-0.5 kv:text-muted-foreground kv:text-sm kv:uppercase">Remote branches</div>
-            <KuiButton
+            <button
               v-for="row in branchSections.remoteBranches.visible"
               :key="row.refname"
-              :class="[kuiRowVariants(), 'kv:w-full kv:text-left']"
+              type="button"
+              :class="cn(rowVariants(), 'kv:w-full kv:text-left')"
               @click="pickBranch(row.shortName)"
             >
               {{ row.shortName }}
-            </KuiButton>
+            </button>
           </div>
         </div>
       </div>
@@ -892,10 +893,9 @@ watch(
         class="kv:flex kv:flex-col kv:gap-0.5 kv:py-1 kv:px-1.5 kv:border-b kv:border-panel-border kv:shrink-0 kv:min-w-0"
       >
         <div class="kv:flex kv:items-center kv:gap-1 kv:min-w-0">
-          <KuiButton
-            :icon="ACTION_ICONS.back"
-            v-kui-tooltip="'Back to branch selection'"
-            aria-label="Back to branch selection"
+          <TooltipIconButton
+            icon="chevron-left"
+            label="Back to branch selection"
             data-testid="review-back-button"
             @click="goBackToSelection"
           />
@@ -917,10 +917,9 @@ watch(
               />
             </div>
           </div>
-          <KuiButton
-            :icon="ACTION_ICONS.swap"
-            v-kui-tooltip="'Swap branch and base'"
-            aria-label="Swap branch and base"
+          <TooltipIconButton
+            icon="arrow-swap"
+            label="Swap branch and base"
             data-testid="review-swap-button"
             @click="onSwapBaseAndBranch"
           />
@@ -938,42 +937,66 @@ watch(
            expanded row plus a third, separately-stateful copy in the Files pane. -->
       <div
         v-if="review.phase.value === 'listing'"
-        ref="toolbarEl"
         class="kv-review-toolbar kv:flex kv:items-center kv:gap-1.5 kv:h-bar kv:px-2 kv:border-b kv:border-panel-border kv:shrink-0"
       >
-        <KuiSegmented
-          :options="panelOptions"
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="kira"
           :model-value="review.pane.value"
-          ariaLabel="Review pane"
-          @update:model-value="onPaneChange"
-        />
+          aria-label="Review pane"
+          @update:model-value="(v) => v && onPaneChange(v as string)"
+        >
+          <Tooltip v-for="o in panelOptions" :key="o.id">
+            <TooltipTrigger as-child>
+              <ToggleGroupItem :value="o.id" :aria-label="`${o.label} (${o.badge})`">
+                <span :class="['codicon', o.icon]" aria-hidden="true" />
+                <Badge variant="count">{{ o.badge }}</Badge>
+              </ToggleGroupItem>
+            </TooltipTrigger>
+            <TooltipContent>{{ o.label }}</TooltipContent>
+          </Tooltip>
+        </ToggleGroup>
         <!-- G19 D6 (item 6): the always-rendered filter input is now gated behind a search-icon
              button — F6 found this the one filter in the app that did not already gate behind
-             opening something (BaseSelector.vue's own filter already does). `active` whenever the
-             input is revealed *or* a filter is already applied-but-collapsed, so an applied filter
-             still visibly signals itself even while hidden. -->
-        <KuiButton
-          :icon="ACTION_ICONS.search"
-          :active="filterVisible || filter.length > 0"
-          v-kui-tooltip="'Filter files'"
-          aria-label="Filter files"
+             opening something (BaseSelector.vue's own filter already does). `aria-pressed`
+             whenever the input is revealed *or* a filter is already applied-but-collapsed, so an
+             applied filter still visibly signals itself even while hidden. -->
+        <TooltipIconButton
+          icon="search"
+          label="Filter files"
+          :aria-pressed="filterVisible || filter.length > 0"
+          class="aria-pressed:bg-field aria-pressed:text-fg"
           data-testid="review-filter-toggle"
           @click="toggleFilterVisible"
         />
-        <KuiTextInput
+        <Input
           v-if="filterVisible"
-          class="kv:flex-1 kv:min-w-0 kv-review-toolbar-filter"
+          ref="toolbarFilter"
+          size="kira"
+          class="flex-1 min-w-0"
           placeholder="Filter files"
           aria-label="Filter files"
           :model-value="filter"
-          @update:model-value="filter = $event"
+          @update:model-value="filter = String($event)"
         />
-        <KuiSegmented
-          :options="listModeOptions"
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="kira"
           :model-value="listMode"
-          ariaLabel="File list display"
-          @update:model-value="(value) => (listMode = value as FileListMode)"
-        />
+          aria-label="File list display"
+          @update:model-value="(v) => v && (listMode = v as FileListMode)"
+        >
+          <Tooltip v-for="o in listModeOptions" :key="o.id">
+            <TooltipTrigger as-child>
+              <ToggleGroupItem :value="o.id" :aria-label="o.label">
+                <span :class="['codicon', o.icon]" aria-hidden="true" />
+              </ToggleGroupItem>
+            </TooltipTrigger>
+            <TooltipContent>{{ o.label }}</TooltipContent>
+          </Tooltip>
+        </ToggleGroup>
       </div>
 
       <div class="kv:flex-1 kv:min-h-0 kv:flex kv:flex-col">
@@ -1020,11 +1043,10 @@ watch(
             data-testid="review-stale-banner"
           >
             <span>This comparison has changed.</span>
-            <KuiButton
-              class="kv:justify-center kv:h-control kv:w-control kv:ml-auto kv:border-0 kv:rounded-sm kv:enabled:hover:bg-transparent kv:text-fg kv:enabled:hover:text-fg"
-              :icon="ACTION_ICONS.refresh"
-              v-kui-tooltip="'Refresh'"
-              aria-label="Refresh"
+            <TooltipIconButton
+              icon="refresh"
+              label="Refresh"
+              class="ml-auto"
               @click="review.acknowledgeStaleReview()"
             />
           </div>
@@ -1062,26 +1084,28 @@ watch(
             <!-- `kv-review-load-more-button` carries no styling of its own (verified: no rule ever
                  existed for it) — kept as a plain test-selector hook,
                  `review-commit-list-cap.spec.ts`'s own precedent. -->
-            <KuiButton class="kv-review-load-more-button" @click="revealMore">
+            <Button variant="toolbar" size="kira" class="kv-review-load-more-button" @click="revealMore">
               {{ revealMoreLabel() }}
-            </KuiButton>
+            </Button>
           </div>
           <!-- G16 D9: `remaining > 0` guards against F7's empty-range hole — an empty branch
                comparison never emits a chunk, so there is no server-side signal to correct here.
                Kept visible while loading so the affordance does not vanish mid-load.
                P110 A16: "Load more" stays plain text (its label carries a count), so this button
-               takes no cancellation classes — KuiButton's own default shape already matches. -->
+               takes no cancellation classes — Button's own toolbar variant already matches. -->
           <div
             v-else-if="!review.exhausted.value && (review.isLoadingMore.value || review.remaining.value > 0)"
             class="kv:flex kv:justify-center kv:py-1 kv:px-1.5 kv:shrink-0"
           >
-            <KuiButton
+            <Button
+              variant="toolbar"
+              size="kira"
               class="kv-review-load-more-button"
               :disabled="review.isLoadingMore.value"
               @click="handleLoadMore"
             >
               {{ loadMoreLabel() }}
-            </KuiButton>
+            </Button>
           </div>
         </template>
 
