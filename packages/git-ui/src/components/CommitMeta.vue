@@ -20,10 +20,14 @@
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
 import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
+import { REF_BADGE_CLASS } from './badgeClass.ts';
 import { formatAbsoluteDate, formatRelativeDate } from './dateFormat.ts';
 import { appendLinkifiedText } from './linkify.ts';
 import { openAllChangesAnnounced } from './openAllChangesAnnounced.ts';
@@ -310,45 +314,57 @@ const prIcon = computed(() => {
     "
     data-testid="commit-meta"
   >
+    <AttributeTooltip :container="decorationEl" />
+
     <div class="kv:flex kv:items-start kv:justify-between kv:gap-1">
       <h2 class="kv-meta-subject kv:m-0 kv:text-lg kv:font-semibold">{{ detail.subject }}</h2>
-      <KuiButton
-        variant="icon"
-        icon="codicon-diff-multiple"
-        v-kui-tooltip="'Open all changes'"
-        aria-label="Open all changes"
+      <TooltipIconButton
+        icon="diff-multiple"
+        label="Open all changes"
         data-testid="open-all-changes-button"
         @click="openAllChanges"
       />
     </div>
 
     <p class="kv:m-0 kv:flex kv:items-center kv:gap-0.5 kv:text-muted-foreground kv:text-sm">
-      <span v-kui-tooltip="formatAbsoluteDate(detail.committer.timestamp)">{{
-        formatRelativeDate(detail.committer.timestamp)
-      }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span>{{ formatRelativeDate(detail.committer.timestamp) }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ formatAbsoluteDate(detail.committer.timestamp) }}</TooltipContent>
+      </Tooltip>
       <span class="kv:shrink-0" aria-hidden="true">·</span>
-      <button
-        v-if="actions.capabilities.clipboard"
-        type="button"
-        class="kv:font-data kv:text-inherit kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:hover:underline"
-        v-kui-tooltip="'Copy full SHA'"
-        aria-label="Copy full SHA"
-        data-testid="commit-meta-sha"
-        @click="copySha"
-      >
-        {{ shortSha }}
-      </button>
+      <Tooltip v-if="actions.capabilities.clipboard">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="kv:font-data kv:text-inherit kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:hover:underline"
+            aria-label="Copy full SHA"
+            data-testid="commit-meta-sha"
+            @click="copySha"
+          >
+            {{ shortSha }}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Copy full SHA</TooltipContent>
+      </Tooltip>
       <code v-else class="kv:font-data" data-testid="commit-meta-sha">{{ shortSha }}</code>
-      <button
-        v-if="prIcon && actions.capabilities.openExternal"
-        type="button"
-        class="codicon codicon-github kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:text-lg kv:leading-none"
-        :class="PR_ICON_CLASS[prIcon.state]"
-        v-kui-tooltip="`#${prIcon.number} ${prIcon.title} — ${prIcon.stateLabel}`"
-        :aria-label="`Open pull request #${prIcon.number} on GitHub`"
-        data-testid="commit-meta-pr-icon"
-        @click="openPullRequest(prIcon.number)"
-      />
+      <Tooltip v-if="prIcon && actions.capabilities.openExternal">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="codicon codicon-github kv:bg-transparent kv:border-0 kv:p-0 kv:cursor-pointer kv:text-lg kv:leading-none"
+            :class="PR_ICON_CLASS[prIcon!.state]"
+            :aria-label="`Open pull request #${prIcon!.number} on GitHub`"
+            data-testid="commit-meta-pr-icon"
+            @click="openPullRequest(prIcon!.number)"
+          >
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{
+          `#${prIcon!.number} ${prIcon!.title} — ${prIcon!.stateLabel}`
+        }}</TooltipContent>
+      </Tooltip>
     </p>
 
     <p
@@ -358,12 +374,14 @@ const prIcon = computed(() => {
       class="kv-meta-body kv:m-0 kv:mt-1 kv:whitespace-normal"
     ></p>
 
-    <KuiButton
-      class="kv-meta-body-toggle kv:mt-0.5 kv:border-0 kv:p-0 kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:text-base kv:cursor-pointer kv:hover:underline"
+    <Button
+      variant="link"
+      size="kira"
+      class="kv-meta-body-toggle mt-0.5 h-auto p-0 justify-start text-focus text-kira-lg"
       @click="expanded = !expanded"
     >
       {{ expanded ? 'Show less' : 'Show more' }}
-    </KuiButton>
+    </Button>
 
     <div v-if="expanded" class="kv-meta-expanded kv:flex kv:flex-col kv:gap-1 kv:mt-1">
       <p class="kv-meta-identity kv:m-0 kv:text-sm kv:text-muted-foreground">
@@ -405,7 +423,7 @@ const prIcon = computed(() => {
               :key="pr.number"
               class="kv:flex kv:items-center kv:gap-0.5"
             >
-              <span class="kv-badge kv-badge-pill kv-badge-pr" :class="`kv-badge-pr--${pr.state}`">
+              <span :class="[REF_BADGE_CLASS, 'kv-badge-pr', `kv-badge-pr--${pr.state}`]">
                 {{ pr.stateLabel }}
               </span>
               <button

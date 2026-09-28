@@ -15,6 +15,7 @@
  * composition against it when `path` is not among the primary sha's changed files.
  */
 import type { CommitStore } from '@kira/git-core';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { StashState } from '../state/stash.ts';
@@ -62,9 +63,12 @@ function onOpenFile(index: number, pinned: boolean): void {
       <div class="kv:py-2 kv:px-3 kv:border-b kv:border-panel-border">
         <p class="kv:m-0 kv:mb-0.5 kv:font-semibold kv:break-words">{{ entry.message }}</p>
         <p class="kv:m-0 kv:text-sm kv:text-muted-foreground">
-          <span v-kui-tooltip="formatAbsoluteDate(entry.timestamp)">{{
-            formatRelativeDate(entry.timestamp)
-          }}</span>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span>{{ formatRelativeDate(entry.timestamp) }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ formatAbsoluteDate(entry.timestamp) }}</TooltipContent>
+          </Tooltip>
           <span> · based on <code>{{ entry.baseSha.slice(0, 7) }}</code></span>
           <span v-if="entry.baseSubject"> {{ entry.baseSubject }}</span>
           <span v-if="entry.includedUntracked" class="kv:ml-1 kv:font-data kv:opacity-80">-u</span>

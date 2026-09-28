@@ -30,6 +30,7 @@
  * `select`, which `App.vue` routes to `WorkingDetailState.select(true)` — the IPC method the
  * original v1 note said this needed, `working.detail`, now exists.
  */
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { GEOMETRY, graphColumnWidth } from '../graph/geometry.ts';
 import { laneClass } from '../graph/palette.ts';
@@ -154,12 +155,16 @@ const tooltipText = computed(() => {
         />
       </svg>
     </div>
-    <span
-      v-kui-tooltip="tooltipText"
-      class="kv:min-w-0 kv:truncate kv:text-muted-foreground kv:text-sm"
-      data-testid="uncommitted-strip-label"
-    >
-      {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
-    </span>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <span
+          class="kv:min-w-0 kv:truncate kv:text-muted-foreground kv:text-sm"
+          data-testid="uncommitted-strip-label"
+        >
+          {{ totalCount }} uncommitted {{ totalCount === 1 ? 'change' : 'changes' }}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent class="whitespace-pre-line">{{ tooltipText }}</TooltipContent>
+    </Tooltip>
   </button>
 </template>
