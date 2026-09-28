@@ -178,5 +178,5 @@ scripts/demo-dbs/sqlite/*.sqlite
 # never packaged (the embedded instance is the app's own executable, C3 §3.2).
 apps/kira-studio/bin/
 
-# CodeGraph local index (machine-local, rebuilt by .claude/hooks/session-start.sh)
+# CodeGraph local index (machine-local, rebuilt by scripts/codegraph-setup.sh)
 .codegraph/
