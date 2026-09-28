@@ -10,8 +10,8 @@
 # referencing five --kv-* tokens outside the ancestor that used to define them) — there was no
 # --kv-* or --kui-* equivalent of this script before this phase.
 #
-# P131 Part 3 §6.5: the --kui-* layer (both kui-bridge.css definition files, and every Kui*
-# consumer that referenced them) is gone — check_layer's own "resolves to a real definition" shape
+# P131 Part 3 §6.5: the --kui-* layer (both copies of kira-ui's own token-bridge file, and every
+# Kui* consumer that referenced them) is gone — check_layer's own "resolves to a real definition" shape
 # no longer applies (there is nothing left to define), so the kui- pass below is a zero-use guard
 # instead: any --kui- reference anywhere is a regression, full stop.
 set -e
