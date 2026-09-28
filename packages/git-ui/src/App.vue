@@ -16,14 +16,9 @@ import type { CommitRecord, FileChangeKind, TipRef } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import {
-  computeFloatPosition,
-  initTooltips,
-  KuiButton,
-  KuiColumnResizeHandle,
-  KuiTooltip,
-  pointReference,
-} from '@kira/kira-ui';
+import { KuiColumnResizeHandle } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { onClickOutside } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
@@ -959,22 +954,10 @@ const renameRefDialogState = ref<{ open: boolean; currentName: string }>({
   currentName: '',
 });
 const forceDeleteRefCandidate = ref<{ name: string; x: number; y: number } | undefined>(undefined);
-// G20 D4: real flip/shift positioning for the force-delete popup, which previously bound raw
-// click-point coordinates straight into `left`/`top` with zero clamping (F7) — this is a one-off,
-// single-use popup, so it gets a small watch here rather than a new shared component.
-const forceDeletePanelEl = ref<HTMLElement | null>(null);
-const forceDeletePanelStyle = ref({ left: '-9999px', top: '-9999px' });
-watch(forceDeleteRefCandidate, async (candidate) => {
-  if (!candidate) return;
-  forceDeletePanelStyle.value = { left: '-9999px', top: '-9999px' };
-  await nextTick();
-  const el = forceDeletePanelEl.value;
-  if (!el) return;
-  const { left, top } = await computeFloatPosition(pointReference(candidate.x, candidate.y), el, {
-    placement: 'bottom-start',
-  });
-  forceDeletePanelStyle.value = { left: `${left}px`, top: `${top}px` };
-});
+// P131 Part 2 §5.5: reka's own Popper flip/shift positioning replaces the hand-rolled
+// computeFloatPosition watch (G20 D4) — Popover owns placement now, this file only owns the
+// candidate/open state. `cancelEl` is the open-auto-focus target (never the destructive button).
+const cancelEl = ref<InstanceType<typeof Button> | null>(null);
 
 function handleGridRefContextMenu(detail: {
   kind: 'branch' | 'remoteBranch';
@@ -1641,9 +1624,18 @@ function onDocumentKeydown(event: KeyboardEvent): void {
 // dismissal). P108 F12: a template ref scoped to this instance's own overlay `<aside>` — the old
 // `document.querySelector('[data-testid="detail-region"]')` resolved the first match in the whole
 // document, which could belong to a different graph tab's own mount.
-onClickOutside(overlayDetailRegionEl, () => {
-  if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
-});
+onClickOutside(
+  overlayDetailRegionEl,
+  () => {
+    if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
+  },
+  // P131 Part 2 §5.5: a FileTree row menu (RowContextMenu, DropdownMenu) can open while the
+  // overlay drawer is showing — reka teleports its content to `document.body`, outside
+  // `overlayDetailRegionEl`, so picking an item would otherwise read as an outside click and
+  // close the drawer mid-action. `[data-reka-popper-content-wrapper]` is Radix parity's own
+  // wrapper attribute on every Popper-positioned surface (tooltip, dropdown, popover).
+  { ignore: ['[data-reka-popper-content-wrapper]'] },
+);
 
 function scheduleBreakpointUpdate(): void {
   if (breakpointRaf !== 0) return;
@@ -1692,10 +1684,6 @@ const hasSelection = computed(
   () => selection.row.value >= 0 || workingState.selected.value || selectionIsStash.value,
 );
 
-// G20 D2: this root's own KuiTooltip instance and listener set — independent of ReviewView.vue's
-// (two separate webview documents cannot share one singleton, G19 F3).
-let stopTooltips: (() => void) | null = null;
-
 onMounted(() => {
   document.addEventListener('keydown', onDocumentKeydown);
   if (rootEl.value) {
@@ -1703,14 +1691,12 @@ onMounted(() => {
     breakpointObserver = new ResizeObserver(scheduleBreakpointUpdate);
     breakpointObserver.observe(rootEl.value);
   }
-  stopTooltips = initTooltips();
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
-  stopTooltips?.();
   unsubscribeUiAction();
   unsubscribeReconnect();
   graphView.dispose();
@@ -1736,9 +1722,6 @@ onBeforeUnmount(() => {
     :data-connection-state="connectionState"
     :style="{ '--kv-tree-indent': treeIndent }"
   >
-    <!-- G20 D2: this root's own tooltip surface — mounted unconditionally, alongside the other
-         always-present elements below. -->
-    <KuiTooltip />
     <!-- Unconditional, present from first paint regardless of which of the four content states
          below is showing (or whether bootstrap() has resolved a repoState at all yet) — the old
          live-data strip carried this testid unconditionally too (inside its own always-rendered
@@ -1769,18 +1752,9 @@ onBeforeUnmount(() => {
       data-testid="boot-error"
     >
       <p class="kv:m-0 kv:max-w-120 kv:text-muted-foreground">Kira Space isn't reachable — {{ bootError }}</p>
-      <!-- Cancels KuiButton's own default-variant background/text/hover so the retry action here
-           keeps this panel's plain panel-bg/app-fg look (this button's own established
-           override, unaffected by hovering — same effect the old unlayered `.kv-boot-error
-           button` descendant rule had, since it always beat KuiButton's own layered hover
-           utility regardless of hover state). -->
-      <KuiButton
-        class="kv:py-1 kv:px-3 kv:border kv:border-panel-border kv:rounded-sm kv:bg-panel kv:text-fg kv:enabled:hover:bg-panel kv:enabled:hover:text-fg"
-        data-testid="boot-retry"
-        @click="retryBootstrap"
-      >
+      <Button variant="dialog" size="kira" data-testid="boot-retry" @click="retryBootstrap">
         Retry
-      </KuiButton>
+      </Button>
     </div>
     <template v-else-if="repoState">
       <!-- P108 F8: bootstrap() keeps going after repoState is set — through persisted repo.open,
@@ -1795,13 +1769,15 @@ onBeforeUnmount(() => {
         data-testid="boot-error-banner"
       >
         <span>Kira Space isn't reachable — {{ bootError }}</span>
-        <KuiButton
-          class="kv:ml-auto kv:py-0.5 kv:px-2 kv:border kv:border-panel-border kv:rounded-sm kv:bg-panel kv:text-fg kv:enabled:hover:bg-panel kv:enabled:hover:text-fg"
+        <Button
+          variant="dialog"
+          size="kira"
+          class="ml-auto"
           data-testid="boot-error-banner-retry"
           @click="retryBootstrap"
         >
           Retry
-        </KuiButton>
+        </Button>
       </div>
 
       <GitBlockedPanel v-if="repoState.git.value.kind !== 'ok'" :status="repoState.git.value" />
@@ -1992,16 +1968,44 @@ onBeforeUnmount(() => {
              from this template under this v-if, not from the package, so VS Code (write: true)
              keeps every one of them unchanged. -->
         <template v-if="actions?.capabilities.write">
-          <div
-            v-if="forceDeleteRefCandidate"
-            ref="forceDeletePanelEl"
-            class="kv:flex kv:items-center kv:gap-1 kv:py-1 kv:px-2 kv:bg-overlay kv:text-base kv:fixed kv:z-[var(--kui-z-popover,20)] kv:border kv:border-panel-border kv:rounded-sm kv:shadow-widget"
-            :style="forceDeletePanelStyle"
+          <!-- P131 Part 2 §5.5: Popover replaces the hand-rolled fixed-position panel + watch
+               (G20 D4) — reka's own flip/shift positioning, plus outside-click and Escape
+               dismissal it did not have before. Open auto-focus lands on Cancel, never on the
+               destructive button. Behaviour change, disclosed (plan §0 table). -->
+          <Popover
+            :open="!!forceDeleteRefCandidate"
+            @update:open="(v) => !v && (forceDeleteRefCandidate = undefined)"
           >
-            <span>“{{ forceDeleteRefCandidate.name }}” is not fully merged.</span>
-            <KuiButton variant="danger" @click="confirmForceDeleteRef">Force delete</KuiButton>
-            <KuiButton @click="forceDeleteRefCandidate = undefined">Cancel</KuiButton>
-          </div>
+            <PopoverAnchor as-child>
+              <span
+                class="fixed size-0"
+                aria-hidden="true"
+                :style="{ left: `${forceDeleteRefCandidate?.x ?? 0}px`, top: `${forceDeleteRefCandidate?.y ?? 0}px` }"
+              />
+            </PopoverAnchor>
+            <PopoverContent
+              align="start"
+              :side-offset="0"
+              class="w-auto flex-row items-center gap-1 px-2 py-1"
+              @open-auto-focus="
+                (e) => {
+                  e.preventDefault();
+                  cancelEl?.$el.focus();
+                }
+              "
+            >
+              <span>“{{ forceDeleteRefCandidate?.name }}” is not fully merged.</span>
+              <Button variant="danger" size="kira" @click="confirmForceDeleteRef">Force delete</Button>
+              <Button
+                ref="cancelEl"
+                variant="toolbar"
+                size="kira"
+                @click="forceDeleteRefCandidate = undefined"
+              >
+                Cancel
+              </Button>
+            </PopoverContent>
+          </Popover>
           <RenameRefDialog
             :open="renameRefDialogState.open"
             :current-name="renameRefDialogState.currentName"
