@@ -1,5 +1,4 @@
 import type { EventPayload, HostKind, Transport, UiActionKind } from '@kira/git-ipc';
-import { vKuiTooltip } from '@kira/kira-ui';
 import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
@@ -105,9 +104,6 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
           root: AppRoot,
           rootProps: { ...rest, pendingUiAction, dateFormat },
         });
-  // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
-  // Review still uses this directive until Part 3 moves it off kira-ui too.
-  app.directive('kui-tooltip', vKuiTooltip);
   // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
   // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a
   // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
