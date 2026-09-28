@@ -19,14 +19,22 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
-import type { KuiSegmentedOption } from '@kira/kira-ui';
-import { KuiSegmented } from '@kira/kira-ui';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
 import FileTree from '../FileTree.vue';
+
+// P131 Part 3 §5.5: KuiSegmentedOption goes with KuiSegmented — this is the same shape, inlined
+// as a local type instead of importing one from kira-ui.
+interface DiffModeOption {
+  readonly id: ReviewDiffMode;
+  readonly icon: string;
+  readonly label: string;
+}
 
 const props = defineProps<{
   reviewFiles: ReviewFilesState;
@@ -38,7 +46,7 @@ const props = defineProps<{
   filter: string;
 }>();
 
-const diffModeOptions: readonly KuiSegmentedOption[] = [
+const diffModeOptions: readonly DiffModeOption[] = [
   { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'Since review' },
   { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'Full range' },
 ];
@@ -97,12 +105,23 @@ function onToggleReviewed(path: string): void {
       <!-- G12 D12/D16: which two revisions a click opens in VS Code's diff editor — the one real
            capability removing DiffView would otherwise have lost. -->
       <div class="kv:flex kv:items-center kv:gap-1.5 kv:py-0.5 kv:px-2 kv:border-b kv:border-panel-border kv:font-ui">
-        <KuiSegmented
-          :options="diffModeOptions"
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="kira"
           :model-value="reviewFiles.diffMode.value"
-          ariaLabel="What to compare"
-          @update:model-value="(value) => reviewFiles.setDiffMode(value as ReviewDiffMode)"
-        />
+          aria-label="What to compare"
+          @update:model-value="(v) => v && reviewFiles.setDiffMode(v as ReviewDiffMode)"
+        >
+          <Tooltip v-for="o in diffModeOptions" :key="o.id">
+            <TooltipTrigger as-child>
+              <ToggleGroupItem :value="o.id" :aria-label="o.label">
+                <span :class="['codicon', o.icon]" aria-hidden="true" />
+              </ToggleGroupItem>
+            </TooltipTrigger>
+            <TooltipContent>{{ o.label }}</TooltipContent>
+          </Tooltip>
+        </ToggleGroup>
         <span v-if="deltaStatusText" class="kv:ml-auto kv:text-muted-foreground kv:text-sm">{{ deltaStatusText }}</span>
       </div>
       <p v-if="reviewFiles.diffError.value" class="kv:m-0 kv:p-3 kv:text-error">
