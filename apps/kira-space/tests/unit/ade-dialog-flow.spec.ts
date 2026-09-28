@@ -285,6 +285,7 @@ function fakeLaunch(
         terminalId: `term-${launchCount}`,
         sessionId: `sess-${launchCount}`,
         command: 'claude',
+        cwd: args.cwd,
       };
     },
     openTerminalSession: async () => {},
@@ -453,7 +454,7 @@ describe('dialogFlow', () => {
       ...launch,
       adePrepareLaunch: async (args) => {
         calls.push(`launch:${args.newWorkId}`);
-        return { terminalId: 'term-1', sessionId: 'sess-1', command: 'claude' };
+        return { terminalId: 'term-1', sessionId: 'sess-1', command: 'claude', cwd: args.cwd };
       },
     };
     await sendDialog(

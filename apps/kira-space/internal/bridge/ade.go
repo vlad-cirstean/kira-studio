@@ -95,27 +95,34 @@ type AdePrepareLaunchArgs struct {
 // discipline every other Args.Validate in this app follows. It does not check that CodeRepoID or
 // Resume actually name an existing row; PrepareLaunch does that against the store, where the
 // answer can change between calls.
+//
+// P129 Part 7 §0.2/§2.3: a resume (Resume != "") skips the branch/newWorkId and cwd checks below —
+// the record Resume names governs all three (ade.Tracker.Prepare reads them off the stored row,
+// never off these args), and the record's own cwd may legitimately not exist yet (§0.12's own
+// recreate-if-missing fallback). CodeRepoID and the message-length check still apply.
 func (a AdePrepareLaunchArgs) Validate() error {
 	if a.CodeRepoID == "" {
 		return ipcerr.New("E_INVALID", "codeRepoId is required")
 	}
-	if (a.Branch == "") == (a.NewWorkID == "") {
-		return ipcerr.New("E_INVALID", "exactly one of branch/newWorkId is required")
-	}
-	if a.Branch != "" {
-		if len(a.Branch) > adeMaxBranchBytes {
-			return ipcerr.New("E_INVALID", "branch is too long")
+	if a.Resume == "" {
+		if (a.Branch == "") == (a.NewWorkID == "") {
+			return ipcerr.New("E_INVALID", "exactly one of branch/newWorkId is required")
 		}
-		if strings.ContainsAny(a.Branch, "\x00\n") {
-			return ipcerr.New("E_INVALID", "branch must not contain NUL or newline")
+		if a.Branch != "" {
+			if len(a.Branch) > adeMaxBranchBytes {
+				return ipcerr.New("E_INVALID", "branch is too long")
+			}
+			if strings.ContainsAny(a.Branch, "\x00\n") {
+				return ipcerr.New("E_INVALID", "branch must not contain NUL or newline")
+			}
 		}
-	}
-	if !filepath.IsAbs(a.Cwd) {
-		return ipcerr.New("E_INVALID", "cwd must be an absolute path")
-	}
-	info, err := os.Stat(a.Cwd)
-	if err != nil || !info.IsDir() {
-		return ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
+		if !filepath.IsAbs(a.Cwd) {
+			return ipcerr.New("E_INVALID", "cwd must be an absolute path")
+		}
+		info, err := os.Stat(a.Cwd)
+		if err != nil || !info.IsDir() {
+			return ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
+		}
 	}
 	if len(a.Message) > adeMaxMessageBytes {
 		return ipcerr.New("E_INVALID", "message is too long")
@@ -124,11 +131,14 @@ func (a AdePrepareLaunchArgs) Validate() error {
 }
 
 // AdePrepareLaunchResult is PrepareLaunch's own return shape — the renderer mounts
-// TerminalHostView for TerminalID with Command and launchKind: 'claude-code' (§4.2 step 2).
+// TerminalHostView for TerminalID with Command and launchKind: 'claude-code' (§4.2 step 2). Cwd is
+// P129 Part 7 §0.12: the effective cwd (args.Cwd for a new launch, the recorded — and possibly
+// just-recreated — cwd for a resume); the renderer opens the terminal there, never at its own guess.
 type AdePrepareLaunchResult struct {
 	TerminalID string `json:"terminalId"`
 	SessionID  string `json:"sessionId"`
 	Command    string `json:"command"`
+	Cwd        string `json:"cwd"`
 }
 
 // AdeSendArgs is Send's own argument shape. SessionID is the ade_sessions record id (a stable
@@ -189,7 +199,7 @@ func (s *AdeService) Sessions() (AdeSessionsResult, error) {
 func adeTrackerError(err error) error {
 	switch err {
 	case ade.ErrSessionNotFound, ade.ErrSessionWrongRepo, ade.ErrSessionRunning,
-		ade.ErrSessionNotRunning, ade.ErrCommandMismatch:
+		ade.ErrSessionNotRunning, ade.ErrCommandMismatch, ade.ErrResumeCwdNotDir:
 		return ipcerr.New("E_INVALID", err.Error())
 	default:
 		return ipcerr.InternalErr(err)
@@ -218,7 +228,9 @@ func (s *AdeService) PrepareLaunch(args AdePrepareLaunchArgs) (AdePrepareLaunchR
 	if err != nil {
 		return AdePrepareLaunchResult{}, adeTrackerError(err)
 	}
-	return AdePrepareLaunchResult{TerminalID: res.TerminalID, SessionID: res.SessionID, Command: res.Command}, nil
+	return AdePrepareLaunchResult{
+		TerminalID: res.TerminalID, SessionID: res.SessionID, Command: res.Command, Cwd: res.Cwd,
+	}, nil
 }
 
 // Send forwards a message to sessionId's own live terminal (§4.5) — a bracketed paste followed by

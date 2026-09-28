@@ -129,14 +129,22 @@ function branchOf(ctx: DialogCtx, id: string): AdeBranch | undefined {
 }
 
 /** A draft's own `''` (mockup: unstarted `name`) beats falling back to the raw id — `moveLines`'s
- *  `before` sibling can itself be a not-yet-started draft (§3.1 discovery). */
+ *  `before` sibling can itself be a not-yet-started draft (§3.1 discovery). P129 Part 7 §0.11: an
+ *  archived item is gone from `view.items` entirely, so the matching `snapshot.history` entry is
+ *  the next fallback, before the raw id — an archived branch's dialog target block then still names
+ *  the real branch, not its own opaque item id. */
 function branchNameOf(ctx: DialogCtx, id: string): string {
   const item = itemsById(ctx).get(id);
-  return item ? item.branch : id;
+  if (item) return item.branch;
+  const hist = ctx.snapshot.history.find((h) => h.item === id);
+  return hist ? hist.branch : id;
 }
 
 function titleOfItem(ctx: DialogCtx, id: string): string {
-  return itemsById(ctx).get(id)?.title ?? id;
+  const item = itemsById(ctx).get(id);
+  if (item) return item.title;
+  const hist = ctx.snapshot.history.find((h) => h.item === id);
+  return hist ? hist.title : id;
 }
 
 function lastSegment(name: string): string {
@@ -520,12 +528,21 @@ function startDraftLines(ctx: DialogCtx, spec: DialogSpec, branchNameInput: stri
   return lines;
 }
 
+/** P129 Part 7 §0.11: `spec.resume` is the `ade_sessions` record id (§0.2) — the mockup's own `4hex`
+ *  id text on a real resume was always the *Claude* session id's own short form, `sessionLabel`'s own
+ *  `claudeSessionId.slice(0, 8)`, and the worktree line is a real resume's own recorded cwd, never
+ *  `wtOf`'s branch-name guess. Both fall back to `branchNameOf`/`wtOf` only when the session record
+ *  itself can no longer be found (stale dialog, sessions list refreshed out from under it). */
 function startResumeLines(ctx: DialogCtx, spec: DialogSpec): string[] {
   const itemId = spec.branch as string;
-  const bName = branchNameOf(ctx, itemId);
+  const session = ctx.sessions.find((s) => s.id === spec.resume);
+  const bName = session ? session.branch : branchNameOf(ctx, itemId);
+  const idText = session ? session.claudeSessionId.slice(0, 8) : (spec.resume ?? '');
   const wtLine =
-    spec.askWt && spec.wt === 'new' ? 'create a new worktree for it' : wtOf(ctx, itemId);
-  return [`Resume session ${spec.resume}.`, `- Branch: ${bName}`, `- Worktree: ${wtLine}`];
+    spec.askWt && spec.wt === 'new'
+      ? 'create a new worktree for it'
+      : session?.cwd || wtOf(ctx, itemId);
+  return [`Resume session ${idText}.`, `- Branch: ${bName}`, `- Worktree: ${wtLine}`];
 }
 
 function startExistingLines(ctx: DialogCtx, spec: DialogSpec): string[] {

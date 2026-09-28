@@ -24,7 +24,9 @@ interface DeliverLaunchTarget {
   branch: string;
   newWorkId: string;
   cwd: string;
-  /** An existing session's Claude id to resume, else `''` for a new session. */
+  /** An existing session's own `ade_sessions` record id to resume, else `''` for a new session —
+   *  `ade.Tracker.Prepare` looks `Resume` up as the record id, never the Claude session id (P129
+   *  Part 7 §0.2: this comment previously said "Claude id", which was the actual bug). */
   resume: string;
   message: string;
 }
@@ -78,10 +80,13 @@ export async function deliver(
     message: target.message,
   });
   onArmed(launch.terminalId, false);
+  // P129 Part 7 §0.12: open at the Go side's own effective cwd, not this target's own guess — a
+  // resume's recorded cwd (`launch.cwd`) can differ from `target.cwd` (§0.9's fallback rebuilds it
+  // when the worktree directory is gone).
   await deps.openTerminalSession(
     launch.terminalId,
     target.codeRepoId,
-    target.cwd,
+    launch.cwd,
     80,
     24,
     launch.command,

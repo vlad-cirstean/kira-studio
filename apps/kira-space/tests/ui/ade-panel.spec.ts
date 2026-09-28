@@ -1064,7 +1064,17 @@ test('agents: tabs per running session, amber input tint, terminal host for this
       ...snapshotControl(snap),
       {
         channel: IPC.adePrepareLaunch,
-        response: { terminalId: 'term-launched', sessionId: 'sess-launched', command: 'claude' },
+        // P129 Part 7 §0.2: this single snapshot answers both PrepareLaunch calls below (the "+"
+        // launch, then the Resume Send) — the mock's own "list.length === 1" shortcut answers every
+        // call on a channel with exactly one registered snapshot, regardless of its own args, so a
+        // second call needs no separate literal-args fixture (this call's full args, message
+        // included, can't be reproduced as a literal without real fragility).
+        response: {
+          terminalId: 'term-launched',
+          sessionId: 'sess-launched',
+          command: 'claude',
+          cwd: '/tmp/wt/a',
+        },
       },
       { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
       {
@@ -1072,12 +1082,6 @@ test('agents: tabs per running session, amber input tint, terminal host for this
         response: { sessions: [SESSION_STOPPED, SESSION_ELSEWHERE, withLaunched] },
       },
       { channel: IPC.adeSend, response: null },
-      // No second adePrepareLaunch snapshot: the Resume click below only opens the dialog (its own
-      // "Resume Claude Code" title), never clicks Send — PrepareLaunch is never called a second time.
-      // With exactly one snapshot on this channel, the mock answers it regardless of its own args
-      // (the mock's own "list.length === 1" shortcut) — a second entry here would force exact-args
-      // matching on both, and this call's full AdePrepareLaunchArgs (cwd/message included) can't be
-      // reproduced as a literal fixture without real fragility.
     ],
   });
 
@@ -1149,6 +1153,27 @@ test('agents: tabs per running session, amber input tint, terminal host for this
     .getByRole('button', { name: 'Resume' })
     .click();
   await expect(dialog).toContainText('Resume Claude Code');
+
+  // P129 Part 7 §0.2: clicking Send on the Resume dialog was never exercised before this part — it
+  // shipped broken (branch/newWorkId both '', resume set to the Claude session id, which
+  // `Tracker.Prepare` looks up as the record id and never finds). Confirm it now delivers with the
+  // stopped record's own id/branch/newWorkId/cwd, and that PrepareLaunch is actually called a second
+  // time (the single `adePrepareLaunch` snapshot above answers both calls regardless of args).
+  await dialog.locator('[data-testid="ade-dialog-send"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.adePrepareLaunch).length)
+    .toBe(2);
+  const resumeCall = control.log().filter((e) => e.channel === IPC.adePrepareLaunch)[1] as {
+    args?: { resume?: string; branch?: string; newWorkId?: string; cwd?: string };
+  };
+  expect(resumeCall.args?.resume).toBe('sess-stopped');
+  expect(resumeCall.args?.branch).toBe('feat/a');
+  expect(resumeCall.args?.newWorkId).toBe('');
+  expect(resumeCall.args?.cwd).toBe('/tmp/wt/a');
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.terminalOpen).length)
+    .toBe(2);
 });
 
 // ---------------------------------------------------------------------------------------------

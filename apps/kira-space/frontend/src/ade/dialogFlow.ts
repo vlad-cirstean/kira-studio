@@ -202,16 +202,21 @@ async function sendStart(
         () => {},
       );
     } else if (spec.resume) {
+      // §0.2: the record `spec.resume` names, not the Claude session id — `Tracker.Prepare` looks
+      // `Resume` up as the `ade_sessions` record id. A session no longer in `ctx.sessions` (deleted,
+      // or a stale dialog left open across a sessions refresh) throws here rather than delivering a
+      // launch the relaxed `Validate` would otherwise accept with an empty branch/newWorkId/cwd.
       const session = deps.ctx.sessions.find((s) => s.id === spec.resume);
+      if (!session) throw new Error('Session not found');
       await deliver(
         deps.launch,
         {
           kind: 'launch',
           codeRepoId: deps.ctx.snapshot.codeRepoId,
-          branch: '',
-          newWorkId: '',
-          cwd: session?.cwd ?? deps.ctx.repoRoot,
-          resume: session?.claudeSessionId ?? '',
+          branch: session.branch,
+          newWorkId: session.newWorkId,
+          cwd: session.cwd,
+          resume: session.id,
           message,
         },
         () => {},

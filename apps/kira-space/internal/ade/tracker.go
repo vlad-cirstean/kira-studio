@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -35,6 +36,10 @@ var (
 	ErrSessionRunning    = errors.New("ade: session is already running")
 	ErrSessionNotRunning = errors.New("ade: session is not running")
 	ErrCommandMismatch   = errors.New("ade: composed command does not match the prepared command")
+	// ErrResumeCwdNotDir is P129 Part 7 §0.12: a resume's recorded cwd exists but is a file, not a
+	// directory — recreating it (the missing-cwd fallback below) would be unsafe, so Prepare refuses
+	// outright rather than guessing.
+	ErrResumeCwdNotDir = errors.New("ade: resume cwd exists and is not a directory")
 )
 
 // TrackerDeps is everything Tracker needs from the rest of the app — a plain struct of seams, the
@@ -93,11 +98,14 @@ type PrepareArgs struct {
 
 // PrepareResult is Prepare's own return shape — bridge/ade.go's AdePrepareLaunchResult. SessionID
 // is the Claude session id (stable across Compose but not across a /clear inside the session);
-// Command is the base launch, without hooks or a prompt — Compose adds both.
+// Command is the base launch, without hooks or a prompt — Compose adds both. Cwd is the effective
+// cwd (P129 Part 7 §0.12): args.Cwd for a new launch, existing.Cwd (recreated if missing) for a
+// resume — the caller opens the terminal there, so the PTY and the record always agree.
 type PrepareResult struct {
 	TerminalID string
 	SessionID  string
 	Command    string
+	Cwd        string
 }
 
 // Tracker is Kira Space's own agent session tracker (§4.4) — one instance, constructed in main.go
@@ -207,9 +215,21 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		}
 		recordID = existing.ID
 		claudeSessionID = existing.ClaudeSessionID
-		// Resume always uses the recorded cwd (P129 Part 1 plan §0: the archived-worktree fallback
-		// is Part 7's own decision), never args.Cwd — a session must not appear to resume somewhere
-		// it never ran.
+		// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
+		// somewhere it never ran. §0.12: if that worktree directory was since removed (the branch
+		// archived, or the folder deleted by hand), recreate it empty rather than fail — the dialog
+		// forces "new worktree" for this case (§0.10), so the message itself tells Claude to create
+		// one there. The folder-trust entry stays keyed by this same path, so no new trust prompt.
+		if info, err := os.Stat(existing.Cwd); err != nil {
+			if !os.IsNotExist(err) {
+				return PrepareResult{}, fmt.Errorf("ade: prepare: stat resume cwd: %w", err)
+			}
+			if err := os.MkdirAll(existing.Cwd, 0o755); err != nil {
+				return PrepareResult{}, fmt.Errorf("ade: prepare: recreate resume cwd: %w", err)
+			}
+		} else if !info.IsDir() {
+			return PrepareResult{}, ErrResumeCwdNotDir
+		}
 		cwd = existing.Cwd
 		branch = existing.Branch
 		newWorkID = existing.NewWorkID
@@ -233,7 +253,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
 
-	return PrepareResult{TerminalID: terminalID, SessionID: claudeSessionID, Command: command}, nil
+	return PrepareResult{TerminalID: terminalID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
 }
 
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open

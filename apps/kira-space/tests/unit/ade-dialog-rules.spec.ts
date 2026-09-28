@@ -7,6 +7,7 @@ import {
   type DialogState,
   messageForRoot,
   rebaseSpec,
+  resumeSpec,
   startSpec,
   wtOf,
 } from '../../frontend/src/ade/dialogCompose';
@@ -384,5 +385,68 @@ describe('ade-dialog-rules', () => {
     const view = composeDialog(ctx, spec, DEFAULT_STATE, activity);
     expect(view.busy).toEqual([]);
     expect(view.blocked).toBe(false);
+  });
+
+  // P129 Part 7 §0.11: the mockup can't reach this — `resumeSpec`'s own `sessionId` is always a
+  // real `ade_sessions` record id in the real app, but the mockup has only one id concept, so
+  // `ade-dialog-parity.spec.ts`'s own oracle never exercises a found-session lookup. These do.
+  test('10. resume: the target block names the real session (id/branch/cwd), not the raw record id', () => {
+    const snap = snapshot({ branches: [branch({ id: 'a', branch: 'feat/a', kind: 'mine' })] });
+    const sess = session({
+      id: 'rec-1',
+      claudeSessionId: 'cs-12345678-abcd',
+      branch: 'feat/a',
+      cwd: '/tmp/wt/a',
+      state: 'stopped',
+    });
+    const ctx = ctxFor(snap, [sess]);
+    const spec = resumeSpec(ctx, 'a', 'rec-1');
+    const view = composeDialog(ctx, spec, DEFAULT_STATE, NO_ACTIVITY);
+    expect(view.message).toContain('Resume session cs-12345.');
+    expect(view.message).toContain('- Branch: feat/a');
+    expect(view.message).toContain('- Worktree: /tmp/wt/a');
+
+    // askWt/wt: 'new' still overrides to the "create a new worktree" line even with a found session.
+    const forceNewSpec = resumeSpec(ctx, 'a', 'rec-1', { askWt: true, wt: 'new', noSame: true });
+    const forceNewView = composeDialog(ctx, forceNewSpec, DEFAULT_STATE, NO_ACTIVITY);
+    expect(forceNewView.message).toContain('- Worktree: create a new worktree for it');
+
+    // The record no longer exists (deleted, or a stale dialog outliving a sessions refresh) — falls
+    // back to the item's own branch/`wtOf`, and the raw id text, rather than throwing.
+    const goneSpec = resumeSpec(ctx, 'a', 'rec-gone');
+    const goneView = composeDialog(ctx, goneSpec, DEFAULT_STATE, NO_ACTIVITY);
+    expect(goneView.message).toContain('Resume session rec-gone.');
+    expect(goneView.message).toContain('- Branch: feat/a');
+    expect(goneView.message).toContain(`- Worktree: ${wtOf(ctx, 'a')}`);
+  });
+
+  test('11. resume of an archived item: branch/title fall back to the matching history entry', () => {
+    const snap = snapshot({
+      history: [
+        {
+          item: 'archived-1',
+          kind: 'mine',
+          title: 'Old feature',
+          branch: 'feat/old',
+          mergedAt: null,
+          archivedAt: 1,
+        },
+      ],
+    });
+    const sess = session({
+      id: 'rec-2',
+      claudeSessionId: 'cs-87654321-zzzz',
+      branch: 'feat/old',
+      newWorkId: '',
+      cwd: '/tmp/wt/old',
+      state: 'stopped',
+    });
+    const ctx = ctxFor(snap, [sess]);
+    const spec = resumeSpec(ctx, 'archived-1', 'rec-2', { askWt: true, wt: 'new', noSame: true });
+    const view = composeDialog(ctx, spec, DEFAULT_STATE, NO_ACTIVITY);
+    // Branch comes from the found session (§0.11), not the history entry — both agree here, but the
+    // point is `startResumeLines` never throws or falls through to the raw id for an archived item.
+    expect(view.message).toContain('- Branch: feat/old');
+    expect(view.message).toContain('- Worktree: create a new worktree for it');
   });
 });

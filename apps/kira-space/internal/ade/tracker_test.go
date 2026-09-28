@@ -1,6 +1,8 @@
 package ade
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -232,7 +234,13 @@ func TestTracker_ResumeWrongRepoRefused(t *testing.T) {
 
 func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	tr, _, live, clock, repoID := newTestTracker(t)
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo/original"})
+	// A real, existing directory (unlike the bare "/repo" other cases in this file use): the resume
+	// branch now os.Stat()s the recorded cwd (§0.12), so this needs to be an actual path.
+	original := filepath.Join(t.TempDir(), "original")
+	if err := os.MkdirAll(original, 0o755); err != nil {
+		t.Fatalf("mkdir original: %v", err)
+	}
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: original})
 	sessions, _ := tr.List()
 	recordID := sessions[0].ID
 
@@ -247,15 +255,76 @@ func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	if resumeRes.SessionID != res.SessionID {
 		t.Fatalf("resume claude session id = %q, want reused %q", resumeRes.SessionID, res.SessionID)
 	}
+	if resumeRes.Cwd != original {
+		t.Fatalf("resume result cwd = %q, want the originally recorded cwd %q", resumeRes.Cwd, original)
+	}
 	if _, _, err := tr.Compose(resumeRes.TerminalID, resumeRes.Command); err != nil {
 		t.Fatalf("Compose resume: %v", err)
 	}
 	sessions, _ = tr.List()
-	if sessions[0].Cwd != "/repo/original" {
+	if sessions[0].Cwd != original {
 		t.Fatalf("cwd after resume = %q, want the originally recorded cwd", sessions[0].Cwd)
 	}
 	if sessions[0].ID != recordID {
 		t.Fatalf("record id changed across resume: got %q, want %q", sessions[0].ID, recordID)
+	}
+}
+
+// TestPrepareResumeRecreatesMissingCwd is P129 Part 7 §0.12/§3.3: a stopped record whose worktree
+// directory was since removed (branch archived, or the folder deleted by hand) resumes anyway —
+// Prepare recreates the directory empty and returns it as PrepareResult.Cwd — while a recorded cwd
+// that exists but is a plain file refuses outright (ErrResumeCwdNotDir).
+func TestPrepareResumeRecreatesMissingCwd(t *testing.T) {
+	tr, _, live, clock, repoID := newTestTracker(t)
+	missing := filepath.Join(t.TempDir(), "gone", "worktree")
+	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: missing})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+
+	live.remove(res.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	if err := os.RemoveAll(missing); err != nil {
+		t.Fatalf("remove worktree dir: %v", err)
+	}
+	if _, err := os.Stat(missing); !os.IsNotExist(err) {
+		t.Fatalf("precondition: %q should not exist, stat err = %v", missing, err)
+	}
+
+	resumeRes, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Resume: recordID})
+	if err != nil {
+		t.Fatalf("Prepare resume with missing cwd: %v", err)
+	}
+	if resumeRes.Cwd != missing {
+		t.Fatalf("resume result cwd = %q, want recreated %q", resumeRes.Cwd, missing)
+	}
+	info, err := os.Stat(missing)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("cwd not recreated as a directory: stat = %v, err = %v", info, err)
+	}
+
+	// A second record whose recorded cwd is a plain file, not a directory: refused outright. Prepare
+	// never validates Cwd for a *new* launch (bridge/ade.go's Validate does, at the wire boundary),
+	// so recording a file path this way is enough to set the case up without a store-mutation seam.
+	fileCwd := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(fileCwd, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write file cwd: %v", err)
+	}
+	res2 := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "other", Cwd: fileCwd})
+	sessions, _ = tr.List()
+	var recordID2 string
+	for _, s := range sessions {
+		if s.ID != recordID {
+			recordID2 = s.ID
+		}
+	}
+	live.remove(res2.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "other", Resume: recordID2}); err != ErrResumeCwdNotDir {
+		t.Fatalf("resume with a file cwd: err = %v, want ErrResumeCwdNotDir", err)
 	}
 }
 

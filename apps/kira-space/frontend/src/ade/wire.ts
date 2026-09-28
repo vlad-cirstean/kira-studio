@@ -224,11 +224,14 @@ export interface AdePrepareLaunchArgs {
 }
 
 /** `AdePrepareLaunchResult` — `command` is the base launch (no hooks/prompt yet); the renderer's own
- *  `openTerminalSession` call is what actually spawns it (§0.14). */
+ *  `openTerminalSession` call is what actually spawns it (§0.14). `cwd` (P129 Part 7 §0.12) is the
+ *  effective cwd — `args.Cwd` for a new launch, the recorded (and possibly just-recreated) cwd for a
+ *  resume — always what `launch.ts`'s `deliver` opens the terminal at. */
 export interface AdeLaunch {
   terminalId: string;
   sessionId: string;
   command: string;
+  cwd: string;
 }
 
 /** `AdeSendArgs` — `sessionId` is the `ade_sessions` record id, not the Claude session id. */
