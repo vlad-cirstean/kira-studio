@@ -12,10 +12,11 @@ import type {
   RefKind,
   StashEntry,
 } from '@kira/git-ipc';
-// G19 D3b: MenuItem/MenuSection now live in @kira/kira-ui — the shapes are identical by
-// construction, just re-exported from here so every existing importer of `./rowMenuModel.ts`
-// keeps working unchanged.
-import type { MenuItem, MenuSection } from '@kira/kira-ui';
+// P131 Part 2 §3.3: MenuItem/MenuSection live in this package's own lib/menuModel.ts (git-ui's
+// own copy of kira-ui's contextMenuModel.ts) — the shapes are identical by construction, just
+// re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
+// unchanged.
+import type { MenuItem, MenuSection } from '../lib/menuModel.ts';
 import { applyMenuLabel, originLabel } from './stashListModel.ts';
 
 export type { MenuSection };
@@ -136,7 +137,7 @@ export function buildReviewRowMenu(clipboardEnabled: boolean): MenuSection[] {
 /**
  * `docs/plans/G19.md` D7: `FileTree.vue`'s right-click "Copy path" menu — one item, deliberately
  * not the two-affordance duplication `ReviewCommitRow.vue` used to carry (removed by this same
- * decision) — built directly against `@kira/kira-ui`'s own `MenuItem` type from the start,
+ * decision) — built directly against this package's own `lib/menuModel.ts`'s `MenuItem` type from the start,
  * matching every other menu-building function in this file. G21 D11: this is now the one copy-
  * path affordance in every tree, not only the review-styled ones it started out scoped to.
  *

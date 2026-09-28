@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  enabledNeighbour,
-  firstEnabled,
-  flattenItems,
-  type MenuSection,
-} from './contextMenuModel.ts';
+import { enabledNeighbour, firstEnabled, flattenItems, type MenuSection } from './menuModel.ts';
 
 function item(id: string, disabled = false) {
   return { id, label: id, disabled, disabledReason: disabled ? 'nope' : undefined };
