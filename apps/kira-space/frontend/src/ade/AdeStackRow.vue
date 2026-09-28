@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
 import AdeAgentsPill from './AdeAgentsPill.vue';
+import { rowHeightClass } from './rowHeight';
 import type { QueueItem, QueueStackMember } from './useQueue';
 
 // P129 Part 5 §0.21: one stack row (mockup `rowFor`, 1096-1129) — elbow, colour square, agents
@@ -66,9 +67,9 @@ function onPick(): void {
 
 <template>
   <div
-    class="flex h-10 w-full items-center gap-2 border-l-3 px-2.5"
+    class="flex w-full items-center gap-2 border-l-3 px-2.5"
     :style="rowStyle"
-    :class="movable ? 'cursor-grab' : 'cursor-default'"
+    :class="[rowHeightClass(item), movable ? 'cursor-grab' : 'cursor-default']"
     data-testid="ade-stack-row"
     :data-ade-row-movable="movable ? '' : null"
     :data-ade-id="member.id"
@@ -130,21 +131,42 @@ function onPick(): void {
       <CodiconIcon name="lock" :size="10" />
       {{ item.owner }}
     </span>
-    <button
-      type="button"
-      class="flex h-full min-w-0 flex-1 flex-col justify-center border-none bg-transparent text-left"
-      :aria-label="`Open ${item.title}`"
-      @click.stop="onPick"
-    >
-      <span class="truncate text-kira-md font-semibold leading-4" :class="titleClass">{{
-        item.title
-      }}</span>
-      <span
-        v-if="item.branchText"
-        class="truncate font-data text-kira-sm leading-[14px]"
-        :class="[item.draft ? 'italic text-[#9a9ca5]' : 'text-[#7c7f88]']"
-        >{{ item.branchText }}</span
+    <div class="flex min-w-0 flex-1 flex-col justify-center">
+      <button
+        type="button"
+        class="flex min-w-0 flex-col border-none bg-transparent text-left"
+        :aria-label="`Open ${item.title}`"
+        @click.stop="onPick"
       >
-    </button>
+        <span class="truncate text-kira-md font-semibold leading-4" :class="titleClass">{{
+          item.title
+        }}</span>
+        <span
+          v-if="item.branchText"
+          class="truncate font-data text-kira-sm leading-[14px]"
+          :class="[item.draft ? 'italic text-[#9a9ca5]' : 'text-[#7c7f88]']"
+          >{{ item.branchText }}</span
+        >
+      </button>
+      <span
+        v-if="item.jira"
+        class="flex min-w-0 items-center gap-1.5 text-kira-sm leading-[14px]"
+        data-testid="ade-row-jira"
+      >
+        <a
+          v-if="item.jira.url"
+          :href="item.jira.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="shrink-0 font-data text-[#7aa7ff] hover:underline"
+          @click.stop
+          >{{ item.jira.key }}</a
+        >
+        <span v-else class="shrink-0 font-data text-[#7aa7ff]">{{ item.jira.key }}</span>
+        <span v-if="item.title !== item.jira.key" class="truncate text-[#9a9ca5]">{{
+          item.title
+        }}</span>
+      </span>
+    </div>
   </div>
 </template>

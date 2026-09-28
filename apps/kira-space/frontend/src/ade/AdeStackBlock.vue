@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed, ref } from 'vue';
 import AdeStackRow from './AdeStackRow.vue';
+import { rowHeightClass } from './rowHeight';
 import { TONE } from './tones';
 import type { QueueItem, QueueSegment, QueueTag } from './useQueue';
 import type { DropResult } from './useTimelineDrag';
@@ -97,7 +98,8 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
       <div
         v-for="(cell, i) in segment.cells"
         :key="segment.members[i]?.id ?? i"
-        class="flex h-10 min-w-0 items-center justify-end gap-1.5"
+        class="flex min-w-0 items-center justify-end gap-1.5"
+        :class="rowHeightClass(items[i])"
       >
         <span
           v-if="i === 0"
