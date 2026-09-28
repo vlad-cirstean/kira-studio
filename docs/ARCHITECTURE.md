@@ -2175,7 +2175,8 @@ never decoded (P86's own privacy rule, restated in Known open items below) — o
 `ScheduleWakeup` by name can.
 
 **Kira Space's own agent runtime — spawning and tracking the Claude Code sessions its "agent merge
-queue" UI opens — is `apps/kira-space/internal/ade` (P129 Part 1; the UI itself is Parts 3-7).**
+queue" UI opens — is `apps/kira-space/internal/ade` (P129 Part 1; the UI itself landed in Parts
+3-7).**
 `ade.Tracker` is one instance, shared by `internal/terminal.BoundService.ComposeAgent` (the launch
 hook below), `terminal.Registry.OnChange` (`Reconcile`), `agenthooks.Manager`'s own `OnEvent`
 (`HandleEvent`), and `AdeService` (`bridge/ade.go`, bound as `PrepareLaunch`/`Send`/`Sessions`/
@@ -2197,11 +2198,25 @@ here):** closing the window that hosts a running Claude Code session kills its P
 terminal, and the record reads `stopped` — resumable (`claude --resume`, always in the session's own
 recorded cwd, never wherever the resuming call happens to run) but not literally still running
 behind the closed window. Changing PTY lifetime scope to survive a window close is out of this
-phase's own scope.
+phase's own scope. **P129 Part 7 §0.12: a resume's recorded cwd can itself be gone** (an old
+worktree removed outside the app) — `Tracker.Prepare` `os.Stat`s it first and `os.MkdirAll`s it back
+if missing, so `claude --resume` still finds its transcript at the same project-key path (and the
+folder-trust entry keyed by that path needs no new prompt); a path that exists but is not a
+directory returns `ErrResumeCwdNotDir` (`E_INVALID`). The dialog itself forces `new worktree` for
+that case (`AdeAllAgentsView`'s `forceNew`), so the message tells Claude to create one — the app
+itself never runs `git worktree add`. `AdePrepareLaunchResult.Cwd` is the effective cwd either way
+(the recreated recorded one on resume, `args.Cwd` otherwise), and `deliver` opens the terminal there
+rather than at the renderer's own guess, so the PTY and the record always agree. The wire session
+carries `cwdMissing` (one `os.Stat` per record per `Sessions()` call, never cached), which
+`AdeAllAgentsRow`'s own Start reads to force that same `new worktree` choice for a stopped session
+whose worktree is already gone, same as an archived one. **Unverified:** a real `claude` CLI's own
+cross-directory resume behaviour was never confirmed against the fallback above (the planning pass's
+own probe was stopped by this sandbox's permission classifier) — the live check only ever runs
+against Part 1's fake `claude` on `PATH`.
 
 **The "agent merge queue"'s own git facts and persistence — `apps/kira-space/internal/ade/queue.go`
-and `facts.go` (P129 Part 2; UI in Parts 3-7) — is a second, separate service from `ade.Tracker`
-above, sharing only the package and the `ade_sessions` table.** `ade_branches`/`ade_new_work`/
+and `facts.go` (P129 Part 2; UI landed in Parts 3-7) — is a second, separate service from
+`ade.Tracker` above, sharing only the package and the `ade_sessions` table.** `ade_branches`/`ade_new_work`/
 `ade_plan`/`ade_colors` (migration `0005`) hold a queued item's own meta; every fact the board shows
 (ahead/behind, files, commits, dirty state, merged, conflicts) is recomputed on every `Snapshot`,
 never cached to disk. The facts pipeline runs in order: `BranchInventory` resolves each item to a
@@ -2699,7 +2714,15 @@ fix, since `AdeMainLine` renders `main` verbatim.
 Part 3's read-only view.** Part 6's detail panel now wires the last opener: `resumeSpec`'s caller is
 the Agents tab's own Stopped list (its per-row Resume button), and the activity-icon click Part 5
 left as selection-only now calls `adeUi.openSession`, which selects the item, switches to the
-Agents tab, and picks that session's own terminal tab in one store call — Rebase all (Part 4), Queue
+Agents tab, and picks that session's own terminal tab in one store call. **P129 Part 7 §0.2/§0.11
+fixed a resume that had shipped broken and unexercised since this part:** `sendStart`'s `resume`
+branch now looks the record up in `ctx.sessions` and delivers `{ resume: session.id, branch:
+session.branch, newWorkId: session.newWorkId, cwd: session.cwd }` — the delivery target is the
+`ade_sessions` record, never the Claude session id `Tracker.Prepare` could never resolve — and
+`startResumeLines` reads that same session (`Resume session <8-char id>.`, its own branch, and the
+recorded cwd on the Worktree line, `create a new worktree for it` only when the dialog's own
+`askWt && wt === 'new'`), falling back to `branchNameOf`/`wtOf` only once the record itself is gone
+from a stale dialog. Rebase all (Part 4), Queue
 after and Move (a stack box's own action, `AdeStackBlock`), Start new/existing work (the action
 column's `▶ Start`), and the archive-at-risk dialog's trigger (the action column's Archive) already
 reached `dialogFlow.ts` from a real caller since Part 5. `ade/dialogCompose.ts` is a pure,
@@ -2793,7 +2816,11 @@ focused is dropped rather than resetting its content mid-typing, since nothing b
 ever changes `notes` server-side. The Agents tab (`AdeAgentsTab.vue`) mounts `TerminalHostView` only
 for a session whose terminal this window itself opened (`terminalsStore.terminalSession(id)`
 truthy) — a session running in another window shows a plain cross-window notice instead, never a
-second PTY for the same id; `AdeAgentsTab` is also the first `ade/` caller to mount an xterm at all,
+second PTY for the same id. **P129 Part 7 §0.9 adds cross-window Open** (the All agents view's own
+row action, and any later caller): the notice still stays exactly as it was for a session the user
+reaches without going through Open (the Agents tab's own terminal-tab picker, most directly) —
+Open itself now tries to bring the owning window forward first, so the notice is a fallback, not a
+dead end. `AdeAgentsTab` is also the first `ade/` caller to mount an xterm at all,
 so `ade/state/adeTerminals.ts` (one Pinia store, one concern) reaps this window's own stopped ade
 terminals — nothing else in `ade/` ever called `closeTerminalSession`/`cleanupTabRuntime`, so a
 stopped session's `byTabId` entry, drain queue and xterm instance would otherwise outlive the
@@ -2801,6 +2828,44 @@ session for the app's life. `adeUi.agentTabByItem` falls back to the first runni
 item has no pick yet (mockup parity — starting a new session does not itself pick its tab); the
 activity-icon hand-off (`adeUi.openSession`) is the one caller that does pick it, alongside
 selecting the item and switching to the Agents tab.
+
+**Kira Space's `ade` pinned "All agents" tab (P129 Part 7, the last P129 part) is a cross-repo view
+over the same per-repo data every repo tab already fetches — no new Go endpoint.** `adeUi.allAgents`
+(runtime only, default `false`) is a plain boolean, not a sentinel id inside `activeRepoId`:
+`AdeRepoView` is keyed and fed by that field and its own records watch resets any id it doesn't
+recognise, so a sentinel would need a guard there a flag doesn't. `showAllAgents()` sets only the
+flag; `activeRepoId` is left exactly as `showRepo` last set it (the mockup's own `lastRepo`) — read
+again the moment `showRepo` is next called, never exposed anywhere while the pinned tab shows
+(`AdeRepoTabs`'s own `Tabs` model value renders the pinned tab's own sentinel regardless of it, and
+`AdeRepoView` itself is unmounted). `activity.ts`'s `activitySummary`/`actRank` are the tab's own
+count and the row sort's own urgency ranking, kept out of any tab markup so **P137's later move of
+this trigger into the shared `TabStrip`'s pinned slot** carries no logic with it, only the count and
+a store action. `allAgents.ts` (no Vue import, no clock read) is the pure per-session row join: a
+session already attached to a `useQueue` item (`QueueItem.sessionIds`, a Part 7 addition) is live;
+else a `snapshot.history` entry matching the session's own branch or `newWorkId` is archived
+(`stopped · archived`, forced to `new worktree` on Start); else it is an orphan (its branch was
+removed outside the app), title falling back to the branch name. Rows sort within a repo by
+`actRank`, ties by `lastActiveAt` descending — the mockup ties by fixture order, which has no
+real-data equivalent. The view drives one `useQueries` (snapshot + PRs, same keys/options
+`adeSnapshotOptions`/`adePrsOptions` factor out for `AdeRepoView`'s own composables, so the cache is
+shared) and one `useQueue()` per repo that has at least one session — a repo never opened this
+session has nothing for the join to show and its own group is empty regardless, so it pays nothing.
+The Active/Older filter is `settingsStore.ade.allAgentsFilter` (Part 2's own settings leaf),
+written through the same `patchSettings` path `ade.panelWidth` uses. Open, same window
+(`terminalsStore.terminalSession(row.terminalId)` truthy): `showRepo` then `openSession`, or
+`showRepo` alone for an orphan. Open, cross-window (§0.9 above): `AdeService.FocusSession` looks
+the record up, confirms it is `running`, resolves its terminal's own window key
+(`terminal.Registry.WindowOf`) and brings that window forward (`shell.WindowRegistry.Focus` —
+`Show`/`UnMinimise`/`Focus` on the `*application.WebviewWindow`, each already `InvokeSync`-wrapped
+internally so calling them off the main goroutine is safe), then `EmitTo`s
+`kira:ade:open-session` at it; a `false` result (the owning window closed, or the session stopped,
+between render and click) falls back to the same local path, which then shows the ordinary
+cross-window notice until the next sessions refresh. Start from Older (row action `start`, a stopped
+session): opens the Claude dialog with `askWt: true` and `noSame` forced whenever the row is
+archived or its `cwdMissing` — design §2.4's "restarting an archived session only offers `new
+worktree`" and §0.12's cwd-recreation fallback share the one `noSame` flag. `AdeAllAgentsView`
+mounts one `AdeClaudeDialog` for whichever repo Start was last clicked on, since `AdeRepoView` (and
+its own dialog mount) is unmounted while this view shows.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -4329,8 +4394,9 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   set) before reporting `conflicts`; a rename or delete on one side names a path the other side
   never touched, so the intersection is empty and the conflict is silently dropped from the pair's
   `conflicts` list even though `merge-tree` itself saw it. Closing this needs surfacing merge-tree's
-  own conflicted paths outside the `shared` filter as a different signal (Part 3+'s own call, since
-  it changes the wire shape `pairs` promises).
+  own conflicted paths outside the `shared` filter as a different signal (a follow-up phase's own
+  call, since it changes the wire shape `pairs` promises — P129 closed at Part 7, so no later P129
+  part remains to make it).
 
 - **A linked worktree's own dirty state is refreshed only on `Snapshot`/`ArchiveRisk`, an explicit
   `Refresh`, or a session's own `Stop` (P129 Part 3 §0.11/§0.22 narrows P129 Part 2 §6.3/§9) — never
