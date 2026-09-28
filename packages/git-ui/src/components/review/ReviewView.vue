@@ -589,8 +589,8 @@ const commitsCount = computed(() => {
 const filesChangedCount = computed(() => reviewFiles.value?.files.value.length ?? 0);
 const commentsCount = computed(() => reviewComments.value?.comments.value.length ?? 0);
 
-// P131 Part 3 §5.1: KuiSegmentedOption goes with KuiSegmented — this is the same shape, inlined
-// as a local type instead of importing one from kira-ui.
+// P131 Part 3 §5.1: a local option shape for the ToggleGroup rows below — matches
+// BranchPicker.vue's own PickerTabOption precedent, not a shared package export.
 interface ReviewToggleOption {
   readonly id: string;
   readonly icon: string;

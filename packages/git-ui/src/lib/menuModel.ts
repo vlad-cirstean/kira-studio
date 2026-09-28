@@ -16,8 +16,9 @@ export interface MenuItem {
   /** An accessible description for a disabled item — wired to `aria-describedby`, not only a
    *  hover-only `title` (kept from `RowContextMenu.vue`'s own precedent). */
   readonly disabledReason: string | undefined;
-  /** A codicon class name (e.g. `'codicon-git-branch'`), rendered inside a `KuiIconBox`. Optional
-   *  so every pre-existing `MenuItem` producer keeps typechecking unchanged. */
+  /** A codicon class name (e.g. `'codicon-git-branch'`), rendered inside the row's own icon slot
+   *  (`MenuSections.vue`). Optional so every pre-existing `MenuItem` producer keeps typechecking
+   *  unchanged. */
   readonly icon?: string;
   /** Renders the item in the danger (destructive) visual treatment — matching the toolbar's own
    *  existing `.kv-push-menu-item` danger-colour precedent. Optional, defaults to `false`. */

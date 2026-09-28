@@ -196,10 +196,11 @@ watch(filter, () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// §7.3: roving focus over the active tab's own rows, via `@kira/kira-ui`'s `enabledNeighbour`/
-// `firstEnabled` — the same wrap-around neighbour walk `KuiMenuList` uses. Those take
-// `MenuItem[]`; `model.rowIds` is the narrower `{id, disabled}[]` §9 already produces as a
-// by-product, so `toMenuItems` pads it with the fields neither function actually reads.
+// §7.3: roving focus over the active tab's own rows, via this package's own `lib/menuModel.ts`
+// `enabledNeighbour`/`firstEnabled` — the same wrap-around neighbour walk kira-ui's own
+// (now-deleted) KuiMenuList used. Those take `MenuItem[]`; `model.rowIds` is the narrower
+// `{id, disabled}[]` §9 already produces as a by-product, so `toMenuItems` pads it with the
+// fields neither function actually reads.
 // ---------------------------------------------------------------------------------------
 function toMenuItems(rowIds: PickerModel['rowIds']): MenuItem[] {
   return rowIds.map((r) => ({

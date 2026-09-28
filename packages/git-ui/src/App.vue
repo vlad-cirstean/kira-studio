@@ -646,10 +646,9 @@ function handleSearchFocusGrid(): void {
 const searchRowEl = ref<HTMLDivElement | null>(null);
 const searchBoxRef = ref<InstanceType<typeof SearchBox> | null>(null);
 
-/** G-UX D9: opens the search row and focuses it on the next tick (`KuiSearchInput`'s exposed
- *  `focus()`, forwarded through `SearchBox.vue`'s own identical `defineExpose`) — a tick is
- *  needed since the row (and the input inside it) do not exist in the DOM until this reactive
- *  change renders. */
+/** G-UX D9: opens the search row and focuses it on the next tick (`SearchBox.vue`'s own exposed
+ *  `focus()`) — a tick is needed since the row (and the input inside it) do not exist in the DOM
+ *  until this reactive change renders. */
 function openSearch(): void {
   searchOpen.value = true;
   void nextTick(() => searchBoxRef.value?.focus());

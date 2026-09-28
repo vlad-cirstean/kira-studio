@@ -28,8 +28,8 @@ import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewFilesState } from '../../state/reviewFiles.ts';
 import FileTree from '../FileTree.vue';
 
-// P131 Part 3 §5.5: KuiSegmentedOption goes with KuiSegmented — this is the same shape, inlined
-// as a local type instead of importing one from kira-ui.
+// P131 Part 3 §5.5: a local option shape for the ToggleGroup below — matches BranchPicker.vue's
+// own PickerTabOption precedent, not a shared package export.
 interface DiffModeOption {
   readonly id: ReviewDiffMode;
   readonly icon: string;

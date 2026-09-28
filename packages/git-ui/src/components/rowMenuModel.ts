@@ -12,9 +12,9 @@ import type {
   RefKind,
   StashEntry,
 } from '@kira/git-ipc';
-// P131 Part 2 §3.3: MenuItem/MenuSection live in this package's own lib/menuModel.ts (git-ui's
-// own copy of kira-ui's contextMenuModel.ts) — the shapes are identical by construction, just
-// re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
+// P131 Part 2 §3.3: MenuItem/MenuSection live in this package's own lib/menuModel.ts (originally
+// a copy of kira-ui's own contextMenuModel.ts, now gone along with KuiContextMenu -- P131 Part 3
+// §6.1) -- re-exported from here so every existing importer of `./rowMenuModel.ts` keeps working
 // unchanged.
 import type { MenuItem, MenuSection } from '../lib/menuModel.ts';
 import { applyMenuLabel, originLabel } from './stashListModel.ts';
