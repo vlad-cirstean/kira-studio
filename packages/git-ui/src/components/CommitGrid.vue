@@ -17,6 +17,7 @@
  */
 import type { CommitRecord, RowPlan } from '@kira/git-core';
 import { KuiColumnResizeHandle } from '@kira/kira-ui';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -1264,6 +1265,10 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          its siblings, absolutely positioned over it via `.kv-commit-grid`'s own `position:
          relative` above, not descendants a `new SlickGrid(host.value, ...)` call would delete. -->
     <div ref="host" class="kv-grid-host kv:h-full kv:w-full"></div>
+    <!-- P131 Part 2 §5.1: ref and PR badges (refBadges.ts) write `data-kira-tip` on plain DOM they
+         build outside Vue -- this one hoisted trigger, a sibling of `host` (never inside it:
+         SlickGrid's own `init()` empties `host`), covers every badge in every cell. -->
+    <AttributeTooltip :container="host" />
     <!-- G21 D6b: an off-screen probe carrying .kv-cell-date's own font-affecting rules, purely so
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
@@ -1561,47 +1566,18 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   flex-shrink: 0;
 }
 
-/* P7 (git graph polish): chips read as real buttons now — boxy (a small, button-matching
-   radius, not the old fully-rounded pill), a bolder colored border, and text pinned to
-   `--kv-badge-fg` (VS Code's own generic "text on a colored badge" token, white in virtually
-   every real theme) always, regardless of kind. Every kind below now fills its own background
-   with a `color-mix(... , black)` of its existing `-fg` hue rather than staying transparent-
-   outline, specifically so a fixed white/near-white label stays legible against it in both the
-   dark and light theme variants (`vscode-tokens.css`'s own light-theme block already redefines
-   these same `-fg` tokens per theme — darkening them here for a fill adapts automatically,
-   no new tokens needed). */
-/* P72 §6.3: type and box now derive from the same scale `.kv-cell-message`'s own subject text
-   uses (`--kv-t-md`/`--kv-h-xs`, kira-structure.css) — the badge label used to sit three points
-   smaller than the message text beside it, by literal. `box-sizing: border-box` (§6.2 i): without
-   it `.kv-badge` occupies `16 + 2 + 2 = 20px` inside its own `16px` track — invisible while the
-   track was a bigger literal, real the moment it derives from the same token as the badge's own
-   height. Scoped to `.kv-badge` alone, not a package-wide reset — see this file's own doc comment
-   at the top of this block for why that would be out of scope. */
+/* P131 Part 2 §5.1: the shape split — `badgeVariants({ variant: 'chip' })` (via `REF_BADGE_CLASS`,
+   `badgeClass.ts`) now owns display/gap/padding/height/line-height/color/border/box-sizing/
+   appearance/font-family/margin and the radius (P7's boxy, button-matching chip; the old fully-
+   rounded pill and its `.kv-badge-pill`/`.kv-badge-square` split are gone, since shadcn's own
+   `chip` variant covers every kind uniformly — never `.kv-badge-square`'s own rectangle). This
+   rule keeps only what `badgeVariants` cannot own: the graph-scale font size, on the same
+   `--kv-t-md`/`--kv-h-xs` (kira-structure.css) scale `.kv-cell-message`'s own subject text uses
+   (P72 §6.3) — a size `check_font_scale` would reject as an arbitrary literal on unprefixed
+   markup, so it stays here rather than folding into the shared `badgeClass.ts` every unprefixed
+   `REF_BADGE_CLASS` consumer (BranchPicker, StackList, CommitMeta) also uses. */
 .kv-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 0 5px;
-  height: var(--kv-h-xs);
-  line-height: var(--kv-h-xs);
   font-size: var(--kv-t-md);
-  white-space: nowrap;
-  color: var(--kv-badge-fg);
-  border: 2px solid transparent;
-  box-sizing: border-box;
-  /* P74 §3.3: a badge is sometimes a `<button>` now (`refBadges.ts`'s `buildPrBadge`,
-     `BranchPicker.vue`/`StackList.vue`'s own PR badges) — `background-color`/`border-color` on the
-     `-pr--<state>` classes below already win over the UA button stylesheet by cascade origin, but
-     `appearance`/`font-family`/`margin` do not, so those three are reset here once for every badge
-     rather than per interactive site. A no-op for the far more common `<span>` badge. */
-  appearance: none;
-  font-family: inherit;
-  margin: 0;
-}
-
-.kv-badge-pill,
-.kv-badge-square {
-  border-radius: var(--kv-radius-sm);
 }
 
 .kv-badge-dashed {
