@@ -111,6 +111,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeUpdateDependency: 'AdeService.UpdateDependency',
   adeResolveDependency: 'AdeService.ResolveDependency',
   adeSetBlocker: 'AdeService.SetBlocker',
+
+  // P129 Part 7 §0.9: cross-window Open's own bound call — `kira:ade:open-session` (the emit half)
+  // is a push channel, not a bound call, so it needs no FQN entry here (only `emitWailsEvent`).
+  adeFocusSession: 'AdeService.FocusSession',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
