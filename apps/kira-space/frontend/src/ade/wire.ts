@@ -131,6 +131,17 @@ interface AdeHistoryItem {
   archivedAt: number;
 }
 
+/** `AdeDependencyWire` — one live external dependency's own assembled facts (P135 §4.4). No git
+ *  field of any kind: a dependency never has a branch. */
+export interface AdeDependency {
+  id: string;
+  title: string;
+  waitingOn: string;
+  expectedBy: string | null;
+  createdAt: number;
+  blocks: string[];
+}
+
 /** `AdeRepoSnapshot` — the queue board's own full read (§5.1 of Part 2's plan). */
 export interface AdeRepoSnapshot {
   codeRepoId: string;
@@ -145,6 +156,7 @@ export interface AdeRepoSnapshot {
   colors: Record<string, number>;
   pairs: AdePair[];
   history: AdeHistoryItem[];
+  dependencies: AdeDependency[];
   lastFetchAt?: number | null;
   autofetchMinutes: number;
   worktreeBasePath: string;
@@ -351,4 +363,39 @@ export interface AdeAddNewWorkArgs {
   startFrom: string;
   notes: string;
   est: string;
+}
+
+/** `AdeAddDependencyArgs` — `blocks` names the items linked as blocked by this dependency at
+ *  creation (P135 §4.4). */
+export interface AdeAddDependencyArgs {
+  codeRepoId: string;
+  title: string;
+  waitingOn: string;
+  expectedBy: string;
+  blocks: string[];
+}
+
+/** `AdeDependencyPatchArgs` — `expectedBy` of `''` clears the date. */
+export interface AdeDependencyPatch {
+  title?: string;
+  waitingOn?: string;
+  expectedBy?: string;
+}
+
+export interface AdeUpdateDependencyArgs {
+  codeRepoId: string;
+  id: string;
+  patch: AdeDependencyPatch;
+}
+
+export interface AdeDependencyArgs {
+  codeRepoId: string;
+  id: string;
+}
+
+export interface AdeSetBlockerArgs {
+  codeRepoId: string;
+  dependency: string;
+  item: string;
+  linked: boolean;
 }

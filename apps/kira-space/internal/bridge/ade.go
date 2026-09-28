@@ -365,16 +365,28 @@ type AdeRepoSnapshot struct {
 	GitRepoID  string   `json:"gitRepoId"`
 	Main       *AdeMain `json:"main,omitempty"`
 	// Remote is P129 Part 4 §2.2's own addition — the repo's own default remote, empty when none.
-	Remote           string           `json:"remote"`
-	Branches         []AdeBranchWire  `json:"branches"`
-	NewWork          []AdeNewWorkWire `json:"newWork"`
-	Plan             AdePlanWire      `json:"plan"`
-	Colors           map[string]int   `json:"colors"`
-	Pairs            []AdePair        `json:"pairs"`
-	History          []AdeHistoryItem `json:"history"`
-	LastFetchAt      *int64           `json:"lastFetchAt,omitempty"`
-	AutofetchMinutes int              `json:"autofetchMinutes"`
-	WorktreeBasePath string           `json:"worktreeBasePath"`
+	Remote           string              `json:"remote"`
+	Branches         []AdeBranchWire     `json:"branches"`
+	NewWork          []AdeNewWorkWire    `json:"newWork"`
+	Plan             AdePlanWire         `json:"plan"`
+	Colors           map[string]int      `json:"colors"`
+	Pairs            []AdePair           `json:"pairs"`
+	History          []AdeHistoryItem    `json:"history"`
+	Dependencies     []AdeDependencyWire `json:"dependencies"`
+	LastFetchAt      *int64              `json:"lastFetchAt,omitempty"`
+	AutofetchMinutes int                 `json:"autofetchMinutes"`
+	WorktreeBasePath string              `json:"worktreeBasePath"`
+}
+
+// AdeDependencyWire is ade.DependencyFact's own wire projection (P135 §4.4) — no git field of any
+// kind.
+type AdeDependencyWire struct {
+	ID         string   `json:"id"`
+	Title      string   `json:"title"`
+	WaitingOn  string   `json:"waitingOn"`
+	ExpectedBy *string  `json:"expectedBy,omitempty"`
+	CreatedAt  int64    `json:"createdAt"`
+	Blocks     []string `json:"blocks"`
 }
 
 type AdeCandidateBranch struct {
@@ -495,6 +507,22 @@ func toWireAdeHistory(items []ade.HistoryItem) []AdeHistoryItem {
 	return out
 }
 
+func toWireAdeDependency(d ade.DependencyFact) AdeDependencyWire {
+	blocks := d.Blocks
+	if blocks == nil {
+		blocks = []string{}
+	}
+	return AdeDependencyWire{ID: d.ID, Title: d.Title, WaitingOn: d.WaitingOn, ExpectedBy: d.ExpectedBy, CreatedAt: d.CreatedAt, Blocks: blocks}
+}
+
+func toWireAdeDependencies(deps []ade.DependencyFact) []AdeDependencyWire {
+	out := make([]AdeDependencyWire, len(deps))
+	for i, d := range deps {
+		out[i] = toWireAdeDependency(d)
+	}
+	return out
+}
+
 func toWireAdeSnapshot(s ade.RepoSnapshot) AdeRepoSnapshot {
 	branches := make([]AdeBranchWire, len(s.Branches))
 	for i, b := range s.Branches {
@@ -507,7 +535,8 @@ func toWireAdeSnapshot(s ade.RepoSnapshot) AdeRepoSnapshot {
 	return AdeRepoSnapshot{
 		CodeRepoID: s.CodeRepoID, GitRepoID: s.GitRepoID, Main: toWireAdeMain(s.Main), Remote: s.Remote,
 		Branches: branches, NewWork: newWork, Plan: toWireAdePlan(s.Plan), Colors: s.Colors,
-		Pairs: toWireAdePairs(s.Pairs), History: toWireAdeHistory(s.History), LastFetchAt: s.LastFetchAt,
+		Pairs: toWireAdePairs(s.Pairs), History: toWireAdeHistory(s.History),
+		Dependencies: toWireAdeDependencies(s.Dependencies), LastFetchAt: s.LastFetchAt,
 		AutofetchMinutes: s.AutofetchMinutes, WorktreeBasePath: s.WorktreeBasePath,
 	}
 }
@@ -591,6 +620,31 @@ func validateAdeItemID(value, field string) error {
 	return nil
 }
 
+// validateAdeDependencyID checks a value naming a dependency: validateAdeItemID plus the "dep:"
+// prefix (P135 §4.4).
+func validateAdeDependencyID(value, field string) error {
+	if err := validateAdeItemID(value, field); err != nil {
+		return err
+	}
+	if !strings.HasPrefix(value, "dep:") {
+		return ipcerr.New("E_INVALID", field+" must be a dependency id")
+	}
+	return nil
+}
+
+// validateAdeWorkItemID checks a value naming a branch or new-work item, never a dependency:
+// validateAdeItemID plus refusing the "dep:" prefix (P135 §4.4) — a dependency never gets a plan
+// row, a queue-after link or an archive, even from a hand-built call.
+func validateAdeWorkItemID(value, field string) error {
+	if err := validateAdeItemID(value, field); err != nil {
+		return err
+	}
+	if strings.HasPrefix(value, "dep:") {
+		return ipcerr.New("E_INVALID", field+" must not be a dependency id")
+	}
+	return nil
+}
+
 func validateAdeName(value, field string) error {
 	if len(value) > adeMaxNameBytes {
 		return ipcerr.New("E_INVALID", field+" is too long")
@@ -662,7 +716,9 @@ func adeQueueError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, repos.ErrQueued) || errors.Is(err, repos.ErrArchived) {
+	if errors.Is(err, repos.ErrQueued) || errors.Is(err, repos.ErrArchived) ||
+		errors.Is(err, repos.ErrNotBlockable) || errors.Is(err, repos.ErrDependencyGone) ||
+		errors.Is(err, repos.ErrEstimateShrink) {
 		return ipcerr.New("E_INVALID", err.Error())
 	}
 	return ipcerr.InternalErr(err)
@@ -905,7 +961,7 @@ func (a AdeSetPlanArgs) Validate() error {
 		return ipcerr.New("E_INVALID", "codeRepoId is required")
 	}
 	for item, day := range a.Days {
-		if err := validateAdeItemID(item, "days item"); err != nil {
+		if err := validateAdeWorkItemID(item, "days item"); err != nil {
 			return err
 		}
 		if day != nil {
@@ -915,7 +971,7 @@ func (a AdeSetPlanArgs) Validate() error {
 		}
 	}
 	for _, item := range a.Order {
-		if err := validateAdeItemID(item, "order item"); err != nil {
+		if err := validateAdeWorkItemID(item, "order item"); err != nil {
 			return err
 		}
 	}
@@ -932,13 +988,13 @@ func (a AdeSetQueuedAfterArgs) Validate() error {
 	if a.CodeRepoID == "" {
 		return ipcerr.New("E_INVALID", "codeRepoId is required")
 	}
-	if err := validateAdeItemID(a.Item, "item"); err != nil {
+	if err := validateAdeWorkItemID(a.Item, "item"); err != nil {
 		return err
 	}
 	if a.After == "" {
 		return nil
 	}
-	if err := validateAdeItemID(a.After, "after"); err != nil {
+	if err := validateAdeWorkItemID(a.After, "after"); err != nil {
 		return err
 	}
 	if a.After == a.Item {
@@ -995,7 +1051,7 @@ func (a AdeItemArgs) Validate() error {
 	if a.CodeRepoID == "" {
 		return ipcerr.New("E_INVALID", "codeRepoId is required")
 	}
-	return validateAdeItemID(a.Item, "item")
+	return validateAdeWorkItemID(a.Item, "item")
 }
 
 type AdeArchiveArgs struct {
@@ -1008,7 +1064,129 @@ func (a AdeArchiveArgs) Validate() error {
 	if a.CodeRepoID == "" {
 		return ipcerr.New("E_INVALID", "codeRepoId is required")
 	}
-	return validateAdeItemID(a.Item, "item")
+	return validateAdeWorkItemID(a.Item, "item")
+}
+
+// AdeAddDependencyArgs is AddDependency's own argument shape (P135 §4.4). Blocks names the items
+// linked as blocked by this dependency at creation, at most 50.
+type AdeAddDependencyArgs struct {
+	CodeRepoID string   `json:"codeRepoId"`
+	Title      string   `json:"title"`
+	WaitingOn  string   `json:"waitingOn"`
+	ExpectedBy string   `json:"expectedBy"`
+	Blocks     []string `json:"blocks"`
+}
+
+const adeMaxDependencyBlocks = 50
+
+func (a AdeAddDependencyArgs) Validate() error {
+	if a.CodeRepoID == "" {
+		return ipcerr.New("E_INVALID", "codeRepoId is required")
+	}
+	if a.Title == "" {
+		return ipcerr.New("E_INVALID", "title is required")
+	}
+	if err := validateAdeName(a.Title, "title"); err != nil {
+		return err
+	}
+	if err := validateAdeNotes(a.WaitingOn); err != nil {
+		return err
+	}
+	if a.ExpectedBy != "" {
+		if err := validateAdeISODate(a.ExpectedBy); err != nil {
+			return err
+		}
+	}
+	if len(a.Blocks) > adeMaxDependencyBlocks {
+		return ipcerr.New("E_INVALID", "blocks has too many items")
+	}
+	for _, item := range a.Blocks {
+		if err := validateAdeWorkItemID(item, "blocks item"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AdeDependencyPatchArgs is UpdateDependency's own patch shape (§4.4) — pointer fields, present
+// only when the caller means to change them. ExpectedBy of "" clears the date.
+type AdeDependencyPatchArgs struct {
+	Title      *string `json:"title,omitempty"`
+	WaitingOn  *string `json:"waitingOn,omitempty"`
+	ExpectedBy *string `json:"expectedBy,omitempty"`
+}
+
+func (p AdeDependencyPatchArgs) validate() error {
+	if p.Title != nil {
+		if *p.Title == "" {
+			return ipcerr.New("E_INVALID", "title is required")
+		}
+		if err := validateAdeName(*p.Title, "title"); err != nil {
+			return err
+		}
+	}
+	if p.WaitingOn != nil {
+		if err := validateAdeNotes(*p.WaitingOn); err != nil {
+			return err
+		}
+	}
+	if p.ExpectedBy != nil && *p.ExpectedBy != "" {
+		if err := validateAdeISODate(*p.ExpectedBy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p AdeDependencyPatchArgs) toModel() model.AdeDependencyPatch {
+	return model.AdeDependencyPatch{Title: p.Title, WaitingOn: p.WaitingOn, ExpectedBy: p.ExpectedBy}
+}
+
+type AdeUpdateDependencyArgs struct {
+	CodeRepoID string                 `json:"codeRepoId"`
+	ID         string                 `json:"id"`
+	Patch      AdeDependencyPatchArgs `json:"patch"`
+}
+
+func (a AdeUpdateDependencyArgs) Validate() error {
+	if a.CodeRepoID == "" {
+		return ipcerr.New("E_INVALID", "codeRepoId is required")
+	}
+	if err := validateAdeDependencyID(a.ID, "id"); err != nil {
+		return err
+	}
+	return a.Patch.validate()
+}
+
+// AdeDependencyArgs names one dependency (Resolve).
+type AdeDependencyArgs struct {
+	CodeRepoID string `json:"codeRepoId"`
+	ID         string `json:"id"`
+}
+
+func (a AdeDependencyArgs) Validate() error {
+	if a.CodeRepoID == "" {
+		return ipcerr.New("E_INVALID", "codeRepoId is required")
+	}
+	return validateAdeDependencyID(a.ID, "id")
+}
+
+// AdeSetBlockerArgs links or unlinks one dependency to one work item (P135 §4.4).
+type AdeSetBlockerArgs struct {
+	CodeRepoID string `json:"codeRepoId"`
+	Dependency string `json:"dependency"`
+	Item       string `json:"item"`
+	Linked     bool   `json:"linked"`
+}
+
+func (a AdeSetBlockerArgs) Validate() error {
+	if a.CodeRepoID == "" {
+		return ipcerr.New("E_INVALID", "codeRepoId is required")
+	}
+	if err := validateAdeDependencyID(a.Dependency, "dependency"); err != nil {
+		return err
+	}
+	return validateAdeWorkItemID(a.Item, "item")
 }
 
 type AdeProvideCredentialArgs struct {
@@ -1172,6 +1350,44 @@ func (s *AdeService) Archive(ctx context.Context, args AdeArchiveArgs) error {
 		return err
 	}
 	return adeQueueError(s.Queue.Archive(ctx, args.CodeRepoID, args.Item, args.Discard))
+}
+
+// AddDependency creates a new external dependency, optionally linking it as a blocker of the given
+// items at creation (P135 §4.4). No openRepo, no git access of any kind.
+func (s *AdeService) AddDependency(args AdeAddDependencyArgs) (string, error) {
+	if err := args.Validate(); err != nil {
+		return "", err
+	}
+	id, err := s.Queue.AddDependency(args.CodeRepoID, ade.DependencyInput{
+		Title: args.Title, WaitingOn: args.WaitingOn, ExpectedBy: args.ExpectedBy, Blocks: args.Blocks,
+	})
+	if err != nil {
+		return "", adeQueueError(err)
+	}
+	return id, nil
+}
+
+func (s *AdeService) UpdateDependency(args AdeUpdateDependencyArgs) error {
+	if err := args.Validate(); err != nil {
+		return err
+	}
+	return adeQueueError(s.Queue.UpdateDependency(args.CodeRepoID, args.ID, args.Patch.toModel()))
+}
+
+// ResolveDependency ends a dependency's lifecycle (§4.2): sets resolved_at, deletes its links,
+// moves it to History. No confirmation, no "unresolve".
+func (s *AdeService) ResolveDependency(args AdeDependencyArgs) error {
+	if err := args.Validate(); err != nil {
+		return err
+	}
+	return adeQueueError(s.Queue.ResolveDependency(args.CodeRepoID, args.ID))
+}
+
+func (s *AdeService) SetBlocker(args AdeSetBlockerArgs) error {
+	if err := args.Validate(); err != nil {
+		return err
+	}
+	return adeQueueError(s.Queue.SetBlocker(args.CodeRepoID, args.Dependency, args.Item, args.Linked))
 }
 
 // ProvideCredential answers a pending kira:ade:credential prompt (§6.5) — true when requestId

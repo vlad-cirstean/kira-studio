@@ -7,19 +7,23 @@ import { control } from '../bridge/control';
 import { adeCandidatesKey, adePrsKey, adeSessionsKey, adeSnapshotKey } from './queries';
 import type {
   AdeAddBranchArgs,
+  AdeAddDependencyArgs,
   AdeAddNewWorkArgs,
   AdeArchiveArgs,
   AdeArchiveRisk,
   AdeBindNewWorkArgs,
+  AdeDependencyArgs,
   AdeForcePushArgs,
   AdeForcePushResult,
   AdeLaunch,
   AdePrepareLaunchArgs,
   AdeRepoSnapshot,
   AdeSendArgs,
+  AdeSetBlockerArgs,
   AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
+  AdeUpdateDependencyArgs,
   AdeUpdateNewWorkArgs,
 } from './wire';
 
@@ -224,6 +228,61 @@ export function useAdeAddBranch(codeRepoId: MaybeRefOrGetter<string>) {
       const id = toValue(codeRepoId);
       void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
       void queryClient.invalidateQueries({ queryKey: adeCandidatesKey(id), exact: true });
+    },
+  }));
+}
+
+// P135 §4.5: the four dependency-node mutations (creation tab, detail panel, blocker linking) —
+// shaped like useAdeAddNewWork/useAdeUpdateNewWork above, one repo-snapshot invalidation each.
+
+export function useAdeAddDependency(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'addDependency'),
+    mutationFn: (args: AdeAddDependencyArgs): Promise<string> => control.adeAddDependency(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+export function useAdeUpdateDependency(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'updateDependency'),
+    mutationFn: (args: AdeUpdateDependencyArgs): Promise<void> => control.adeUpdateDependency(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+export function useAdeResolveDependency(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'resolveDependency'),
+    mutationFn: (args: AdeDependencyArgs): Promise<void> => control.adeResolveDependency(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+export function useAdeSetBlocker(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'setBlocker'),
+    mutationFn: (args: AdeSetBlockerArgs): Promise<void> => control.adeSetBlocker(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
     },
   }));
 }
