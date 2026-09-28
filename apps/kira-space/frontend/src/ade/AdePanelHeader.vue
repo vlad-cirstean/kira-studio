@@ -2,10 +2,11 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
 import { type DialogCtx, rebaseSpec, specForQueueAction, startSpec } from './dialogCompose';
+import { useAdeResolveDependency } from './mutations';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 import { chipStyle, TONE } from './tones';
-import type { QueuePanel, QueuePanelAction } from './useQueue';
+import { DEPENDENCY_COLOR, type QueuePanel, type QueuePanelAction } from './useQueue';
 
 // P129 Part 6 §0.5/§0.22: the panel's own header — colour dot, work-status chip, title, mono fact
 // line, review banner, action row (mockup 276-297). Actions dispatch straight to `adeUi.openDialog`/
@@ -20,6 +21,7 @@ const props = defineProps<{
 
 const adeUiStore = useAdeUiStore();
 const adeActionsStore = useAdeActionsStore();
+const resolveDependency = useAdeResolveDependency(() => props.codeRepoId);
 
 const dotClass = computed(() => {
   if (props.panel.kind === 'review') return 'rounded-[3px] border-2';
@@ -69,8 +71,17 @@ function actionStyle(action: QueuePanelAction): Record<string, string> {
  *  mockup's own `forcePush`/`requestArchive` calls. Titles reuse the action's own `label` (already
  *  the mockup's `short()`-form text, e.g. "Rebase onto oauth-e2e") except the two static-title
  *  kinds, which match the plan's literal wording. */
-function onActionClick(action: QueuePanelAction): void {
+/** P135 §4.7: Resolve needs no `dialogCtx` (no git, no dialog) — handled ahead of that guard. */
+async function onActionClick(action: QueuePanelAction): Promise<void> {
   if (action.disabled) return;
+  if (action.kind === 'resolve') {
+    await resolveDependency.mutateAsync({
+      codeRepoId: props.codeRepoId,
+      id: action.targetIds[0] as string,
+    });
+    adeUiStore.select(props.codeRepoId, '');
+    return;
+  }
   const ctx = props.dialogCtx;
   if (!ctx) return;
   switch (action.kind) {
@@ -111,7 +122,14 @@ function onActionClick(action: QueuePanelAction): void {
     data-testid="ade-panel-header"
   >
     <div class="flex items-center gap-2">
-      <span class="size-3 shrink-0" :class="dotClass" :style="dotStyle" />
+      <CodiconIcon
+        v-if="panel.kind === 'dependency'"
+        name="globe"
+        :size="12"
+        :style="{ color: DEPENDENCY_COLOR }"
+        class="shrink-0"
+      />
+      <span v-else class="size-3 shrink-0" :class="dotClass" :style="dotStyle" />
       <span class="shrink-0" :style="statusChipStyle">{{ panel.status.label }}</span>
       <h3 class="min-w-0 flex-1 truncate text-kira-lg font-semibold" data-testid="ade-panel-title">
         {{ panel.title }}
@@ -138,9 +156,11 @@ function onActionClick(action: QueuePanelAction): void {
         class="h-[26px] shrink-0 whitespace-nowrap rounded px-2.5 text-kira-sm font-semibold disabled:cursor-default disabled:opacity-60"
         :style="actionStyle(action)"
         :data-testid="`ade-panel-action-${action.kind}`"
-        @click="onActionClick(action)"
+        @click="void onActionClick(action)"
       >
-        {{ action.label }}
+        <CodiconIcon v-if="action.kind === 'resolve'" name="pass" :size="12" class="mr-1 inline" />{{
+          action.label
+        }}
       </button>
     </div>
   </div>
