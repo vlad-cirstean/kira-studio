@@ -16,6 +16,15 @@ import (
 var (
 	ErrQueued   = errors.New("repos: item is already queued")
 	ErrArchived = errors.New("repos: item has already been archived")
+	// ErrNotBlockable is SetBlocker's own sentinel (P135 §4.2) — the target item is not a live
+	// mine/parked branch or live new work (a review branch, an archived item, or another dependency).
+	ErrNotBlockable = errors.New("repos: item cannot be blocked")
+	// ErrDependencyGone is UpdateDependency/ResolveDependency/SetBlocker's own sentinel — the
+	// dependency id does not exist, or was already resolved.
+	ErrDependencyGone = errors.New("repos: dependency not found, or already resolved")
+	// ErrEstimateShrink is SetBranchMeta/UpdateNewWork's own sentinel (P135 §6.2) — once an estimate
+	// is set, a patch may only grow it (same unit).
+	ErrEstimateShrink = errors.New("repos: estimate can only grow once set")
 )
 
 // maxColorSlots is §0.13's own slot count (0-19).
@@ -25,14 +34,18 @@ const adeBranchColumns = `code_repo_id, branch, kind, name, draft_title, start_f
 const adeNewWorkColumns = `id, code_repo_id, title, jira_key, jira_url, start_from, notes, est, branch_name, created_at, archived_at`
 const adePlanColumns = `code_repo_id, item, day, position, queued_after`
 const adeColorColumns = `code_repo_id, item, slot`
+const adeDependencyColumns = `id, code_repo_id, title, waiting_on, expected_by, created_at, resolved_at`
+const adeBlockerColumns = `code_repo_id, dependency, item`
 
-// AdeQueueState is Load's own return shape — every row of all four ade_* tables for one repo, read
+// AdeQueueState is Load's own return shape — every row of all six ade_* tables for one repo, read
 // in one transaction.
 type AdeQueueState struct {
-	Branches []model.AdeBranch
-	NewWork  []model.AdeNewWork
-	Plan     []model.AdePlanRow
-	Colors   []model.AdeColor
+	Branches     []model.AdeBranch
+	NewWork      []model.AdeNewWork
+	Plan         []model.AdePlanRow
+	Colors       []model.AdeColor
+	Dependencies []model.AdeDependency
+	Blockers     []model.AdeBlocker
 }
 
 // AdeQueueRepo reads and writes ade_branches/ade_new_work/ade_plan/ade_colors (P129 Part 2 §2.2) —
@@ -101,6 +114,32 @@ func scanAdeColorRow(row rowScanner) (model.AdeColor, error) {
 	return c, nil
 }
 
+func scanAdeDependencyRow(row rowScanner) (model.AdeDependency, error) {
+	var d model.AdeDependency
+	var expectedBy sql.NullString
+	var resolvedAt sql.NullInt64
+	if err := row.Scan(&d.ID, &d.CodeRepoID, &d.Title, &d.WaitingOn, &expectedBy, &d.CreatedAt, &resolvedAt); err != nil {
+		return model.AdeDependency{}, err
+	}
+	if expectedBy.Valid {
+		v := expectedBy.String
+		d.ExpectedBy = &v
+	}
+	if resolvedAt.Valid {
+		v := resolvedAt.Int64
+		d.ResolvedAt = &v
+	}
+	return d, nil
+}
+
+func scanAdeBlockerRow(row rowScanner) (model.AdeBlocker, error) {
+	var b model.AdeBlocker
+	if err := row.Scan(&b.CodeRepoID, &b.Dependency, &b.Item); err != nil {
+		return model.AdeBlocker{}, err
+	}
+	return b, nil
+}
+
 // Load reads every row of all four tables for codeRepoID, in one read transaction — Queue.Snapshot's
 // own first step.
 func (r *AdeQueueRepo) Load(codeRepoID string) (AdeQueueState, error) {
@@ -146,10 +185,31 @@ func (r *AdeQueueRepo) Load(codeRepoID string) (AdeQueueState, error) {
 		return AdeQueueState{}, fmt.Errorf("repos: load ade colors: %w", err)
 	}
 
+	depRows, err := tx.Query(`SELECT `+adeDependencyColumns+` FROM ade_dependencies WHERE code_repo_id = ?`, codeRepoID)
+	dependencies, err := sqlitex.QueryAll(depRows, err, func(rows *sql.Rows) (model.AdeDependency, bool, error) {
+		d, err := scanAdeDependencyRow(rows)
+		return d, true, err
+	})
+	if err != nil {
+		return AdeQueueState{}, fmt.Errorf("repos: load ade dependencies: %w", err)
+	}
+
+	blockerRows, err := tx.Query(`SELECT `+adeBlockerColumns+` FROM ade_blockers WHERE code_repo_id = ?`, codeRepoID)
+	blockers, err := sqlitex.QueryAll(blockerRows, err, func(rows *sql.Rows) (model.AdeBlocker, bool, error) {
+		b, err := scanAdeBlockerRow(rows)
+		return b, true, err
+	})
+	if err != nil {
+		return AdeQueueState{}, fmt.Errorf("repos: load ade blockers: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return AdeQueueState{}, fmt.Errorf("repos: commit ade queue load: %w", err)
 	}
-	return AdeQueueState{Branches: branches, NewWork: newWork, Plan: plan, Colors: colors}, nil
+	return AdeQueueState{
+		Branches: branches, NewWork: newWork, Plan: plan, Colors: colors,
+		Dependencies: dependencies, Blockers: blockers,
+	}, nil
 }
 
 // checkNotQueuedOrArchived refuses AddBranch/Rebind/BindNewWork for a branch id already present in
@@ -169,6 +229,59 @@ func checkNotQueuedOrArchived(tx *sql.Tx, codeRepoID, branch string) error {
 		return ErrArchived
 	default:
 		return ErrQueued
+	}
+}
+
+// checkBlockable is SetBlocker's own eligibility check (P135 §4.2): item must be a live
+// (non-archived) mine/parked branch, or live new work. A review branch (someone else's, read-only
+// here), an archived item, or another dependency all fail.
+func checkBlockable(tx *sql.Tx, codeRepoID, item string) error {
+	var kind string
+	var archivedAt sql.NullInt64
+	err := tx.QueryRow(
+		`SELECT kind, archived_at FROM ade_branches WHERE code_repo_id = ? AND branch = ?`, codeRepoID, item,
+	).Scan(&kind, &archivedAt)
+	switch {
+	case err == nil:
+		if archivedAt.Valid || kind == model.AdeBranchKindReview {
+			return ErrNotBlockable
+		}
+		return nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("repos: check ade blockable %s: %w", item, err)
+	}
+
+	err = tx.QueryRow(
+		`SELECT archived_at FROM ade_new_work WHERE code_repo_id = ? AND id = ?`, codeRepoID, item,
+	).Scan(&archivedAt)
+	switch {
+	case err == nil:
+		if archivedAt.Valid {
+			return ErrNotBlockable
+		}
+		return nil
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrNotBlockable
+	default:
+		return fmt.Errorf("repos: check ade blockable %s: %w", item, err)
+	}
+}
+
+// checkDependencyLive confirms id names a still-live (unresolved) dependency.
+func checkDependencyLive(tx *sql.Tx, codeRepoID, id string) error {
+	var resolvedAt sql.NullInt64
+	err := tx.QueryRow(
+		`SELECT resolved_at FROM ade_dependencies WHERE code_repo_id = ? AND id = ?`, codeRepoID, id,
+	).Scan(&resolvedAt)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrDependencyGone
+	case err != nil:
+		return fmt.Errorf("repos: check ade dependency %s: %w", id, err)
+	case resolvedAt.Valid:
+		return ErrDependencyGone
+	default:
+		return nil
 	}
 }
 
@@ -512,6 +625,9 @@ func (r *AdeQueueRepo) Archive(codeRepoID, item string, at int64) error {
 	); err != nil {
 		return fmt.Errorf("repos: archive ade item %s: clear queued after: %w", item, err)
 	}
+	if _, err := tx.Exec(`DELETE FROM ade_blockers WHERE code_repo_id = ? AND item = ?`, codeRepoID, item); err != nil {
+		return fmt.Errorf("repos: archive ade item %s: delete blockers: %w", item, err)
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos: commit archive ade item %s: %w", item, err)
 	}
@@ -567,11 +683,157 @@ func (r *AdeQueueRepo) Rebind(codeRepoID, newWorkID, branch, kind string, now in
 	if _, err := tx.Exec(`UPDATE ade_sessions SET branch = ?, new_work_id = '' WHERE new_work_id = ?`, branch, newWorkID); err != nil {
 		return fmt.Errorf("repos: rebind: rekey ade sessions: %w", err)
 	}
+	if _, err := tx.Exec(`UPDATE ade_blockers SET item = ? WHERE code_repo_id = ? AND item = ?`, branch, codeRepoID, newWorkID); err != nil {
+		return fmt.Errorf("repos: rebind: rekey ade blockers: %w", err)
+	}
 	if _, err := tx.Exec(`DELETE FROM ade_new_work WHERE code_repo_id = ? AND id = ?`, codeRepoID, newWorkID); err != nil {
 		return fmt.Errorf("repos: rebind: delete new work %s: %w", newWorkID, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos: commit rebind %s: %w", newWorkID, err)
+	}
+	return nil
+}
+
+// AddDependency inserts a new dependency row plus its blocker links, in one transaction. Each
+// entry of blocks must pass checkBlockable, or the whole call fails.
+func (r *AdeQueueRepo) AddDependency(d model.AdeDependency, blocks []string) error {
+	if err := d.Validate(); err != nil {
+		return fmt.Errorf("repos: %w", err)
+	}
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin add ade dependency: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err := tx.Exec(
+		`INSERT INTO ade_dependencies (id, code_repo_id, title, waiting_on, expected_by, created_at, resolved_at)
+		 VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+		d.ID, d.CodeRepoID, d.Title, d.WaitingOn, d.ExpectedBy, d.CreatedAt,
+	); err != nil {
+		return fmt.Errorf("repos: insert ade dependency %s: %w", d.ID, err)
+	}
+	for _, item := range blocks {
+		if err := checkBlockable(tx, d.CodeRepoID, item); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO ade_blockers (code_repo_id, dependency, item) VALUES (?, ?, ?)`,
+			d.CodeRepoID, d.ID, item,
+		); err != nil {
+			return fmt.Errorf("repos: insert ade blocker %s/%s: %w", d.ID, item, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit add ade dependency %s: %w", d.ID, err)
+	}
+	return nil
+}
+
+// UpdateDependency writes only the leaves the caller actually patched, and only onto a still-live
+// dependency. ExpectedBy of "" writes NULL (clears the date).
+func (r *AdeQueueRepo) UpdateDependency(codeRepoID, id string, patch model.AdeDependencyPatch) error {
+	var sets []string
+	var args []any
+	if patch.Title != nil {
+		sets = append(sets, "title = ?")
+		args = append(args, *patch.Title)
+	}
+	if patch.WaitingOn != nil {
+		sets = append(sets, "waiting_on = ?")
+		args = append(args, *patch.WaitingOn)
+	}
+	if patch.ExpectedBy != nil {
+		if *patch.ExpectedBy == "" {
+			sets = append(sets, "expected_by = NULL")
+		} else {
+			sets = append(sets, "expected_by = ?")
+			args = append(args, *patch.ExpectedBy)
+		}
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	args = append(args, codeRepoID, id)
+	res, err := r.DB.Exec(
+		`UPDATE ade_dependencies SET `+strings.Join(sets, ", ")+` WHERE code_repo_id = ? AND id = ? AND resolved_at IS NULL`,
+		args...,
+	)
+	if err != nil {
+		return fmt.Errorf("repos: update ade dependency %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos: update ade dependency %s rows affected: %w", id, err)
+	}
+	if n == 0 {
+		return ErrDependencyGone
+	}
+	return nil
+}
+
+// ResolveDependency sets resolved_at and deletes the dependency's own blocker links — the
+// lifecycle end (§4.2): no confirmation, no "unresolve".
+func (r *AdeQueueRepo) ResolveDependency(codeRepoID, id string, now int64) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin resolve ade dependency %s: %w", id, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := checkDependencyLive(tx, codeRepoID, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		`UPDATE ade_dependencies SET resolved_at = ? WHERE code_repo_id = ? AND id = ?`, now, codeRepoID, id,
+	); err != nil {
+		return fmt.Errorf("repos: resolve ade dependency %s: %w", id, err)
+	}
+	if _, err := tx.Exec(
+		`DELETE FROM ade_blockers WHERE code_repo_id = ? AND dependency = ?`, codeRepoID, id,
+	); err != nil {
+		return fmt.Errorf("repos: resolve ade dependency %s: delete blockers: %w", id, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit resolve ade dependency %s: %w", id, err)
+	}
+	return nil
+}
+
+// SetBlocker links or unlinks dependency to item. Linking re-checks both that the dependency is
+// still live and that item is still blockable; unlinking is unconditional (a link removal never
+// fails on eligibility).
+func (r *AdeQueueRepo) SetBlocker(codeRepoID, dependency, item string, linked bool) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin set ade blocker %s/%s: %w", dependency, item, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := checkDependencyLive(tx, codeRepoID, dependency); err != nil {
+		return err
+	}
+	if linked {
+		if err := checkBlockable(tx, codeRepoID, item); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO ade_blockers (code_repo_id, dependency, item) VALUES (?, ?, ?)`,
+			codeRepoID, dependency, item,
+		); err != nil {
+			return fmt.Errorf("repos: link ade blocker %s/%s: %w", dependency, item, err)
+		}
+	} else {
+		if _, err := tx.Exec(
+			`DELETE FROM ade_blockers WHERE code_repo_id = ? AND dependency = ? AND item = ?`,
+			codeRepoID, dependency, item,
+		); err != nil {
+			return fmt.Errorf("repos: unlink ade blocker %s/%s: %w", dependency, item, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit set ade blocker %s/%s: %w", dependency, item, err)
 	}
 	return nil
 }

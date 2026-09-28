@@ -1,6 +1,9 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // AdeBranchKindMine/Review/Parked are ade_branches.kind's own CHECK constraint values (P129 Part 2
 // §2.1) — §0.11: AddBranch defaults to Mine when the tip commit's author is the local git user,
@@ -130,4 +133,47 @@ type AdeNewWorkPatch struct {
 	Notes      *string `json:"notes,omitempty"`
 	Est        *string `json:"est,omitempty"`
 	BranchName *string `json:"branchName,omitempty"`
+}
+
+// AdeDependency is one row of `ade_dependencies` (P135 §4.1/§0) — an external wait with no branch,
+// no git facts, no plan row and no colour slot. Id "dep:" || uuid, so it never collides with a
+// branch name or a "nw:" new-work id.
+type AdeDependency struct {
+	ID         string  `json:"id"`
+	CodeRepoID string  `json:"codeRepoId"`
+	Title      string  `json:"title"`
+	WaitingOn  string  `json:"waitingOn"`
+	ExpectedBy *string `json:"expectedBy,omitempty"`
+	CreatedAt  int64   `json:"createdAt"`
+	ResolvedAt *int64  `json:"resolvedAt,omitempty"`
+}
+
+// Validate asserts the identity/shape fields no SQL constraint covers by itself.
+func (d AdeDependency) Validate() error {
+	if d.CodeRepoID == "" {
+		return fmt.Errorf("model: ade dependency: codeRepoId is required")
+	}
+	if !strings.HasPrefix(d.ID, "dep:") {
+		return fmt.Errorf("model: ade dependency: id %q must have the dep: prefix", d.ID)
+	}
+	if d.Title == "" {
+		return fmt.Errorf("model: ade dependency %q: title is required", d.ID)
+	}
+	return nil
+}
+
+// AdeBlocker is one row of `ade_blockers` — a (dependency, item) link. Item is a branch name or a
+// "nw:" new-work id; no FK (two possible target tables), checked in the repo layer instead.
+type AdeBlocker struct {
+	CodeRepoID string `json:"codeRepoId"`
+	Dependency string `json:"dependency"`
+	Item       string `json:"item"`
+}
+
+// AdeDependencyPatch is UpdateDependency's own patch shape (§4.2) — pointer fields, present only
+// when the caller means to change them. ExpectedBy of "" writes NULL (clears the date).
+type AdeDependencyPatch struct {
+	Title      *string `json:"title,omitempty"`
+	WaitingOn  *string `json:"waitingOn,omitempty"`
+	ExpectedBy *string `json:"expectedBy,omitempty"`
 }
