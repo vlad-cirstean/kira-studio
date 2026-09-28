@@ -16,7 +16,7 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import { TransportError } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import { useEventListener } from '@vueuse/core';
 import { computed, ref, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
@@ -60,8 +60,8 @@ const dateText = computed(() =>
 
 /** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this
  *  header; a click on it is not a request to expand the row. Guarded here rather than stopped at
- *  each action. P75 §2.3: "Open in graph" is a plain `KuiButton` now (no more `command:` anchor
- *  VS Code's own bubble-phase link interceptor needed to see), but the guard stays — it is still
+ *  each action. P75 §2.3: "Open in graph" is a plain button now (no more `command:` anchor VS
+ *  Code's own bubble-phase link interceptor needed to see), but the guard stays — it is still
  *  correct for keeping either action's click from also toggling the row. */
 function onRowClick(event: MouseEvent): void {
   if ((event.target as Element | null)?.closest('.kv-review-row-actions')) return;
@@ -249,22 +249,18 @@ function onOpenFile(index: number, pinned: boolean): void {
           focused ? 'kv:opacity-100' : 'kv:opacity-0 kv:group-hover:opacity-100 kv:group-focus-within:opacity-100',
         ]"
       >
-        <KuiButton
-          variant="icon"
-          icon="codicon-diff-multiple"
-          v-kui-tooltip="'Open all changes'"
-          aria-label="Open all changes"
+        <TooltipIconButton
+          icon="diff-multiple"
+          label="Open all changes"
           @click="openAllChanges"
         />
-        <!-- P75 §2.3: a real KuiButton now — no more command: anchor VS Code's own bubble-phase
+        <!-- P75 §2.3: a real button now — no more command: anchor VS Code's own bubble-phase
              link interceptor needed to observe directly, since the reveal is a bridge request.
              onRowClick's own .kv-review-row-actions guard above still keeps this click from also
              toggling the row. -->
-        <KuiButton
-          variant="icon"
-          icon="codicon-git-commit"
-          v-kui-tooltip="'Open in graph'"
-          aria-label="Open in graph"
+        <TooltipIconButton
+          icon="git-commit"
+          label="Open in graph"
           @click="revealInGraph"
         />
       </span>
