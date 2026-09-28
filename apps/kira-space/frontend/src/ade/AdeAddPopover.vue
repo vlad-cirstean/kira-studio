@@ -38,11 +38,14 @@ const adeActionsStore = useAdeActionsStore();
 const adeUiStore = useAdeUiStore();
 
 const open = ref(false);
-const activeTab = ref<'new' | 'existing'>('new');
+const activeTab = ref<'new' | 'existing' | 'dependency'>('new');
 
 function onOpenChange(value: boolean): void {
   open.value = value;
-  if (value) activeTab.value = 'new';
+  if (value) {
+    activeTab.value = 'new';
+    resetDependency();
+  }
 }
 
 // --- New work tab (mockup 1357) ------------------------------------------------------------------
@@ -115,6 +118,47 @@ async function pick(branch: string): Promise<void> {
     pickingBranch.value = null;
   }
 }
+
+// --- Dependency tab (P135 §4.8) ----------------------------------------------------------------
+
+const depTitle = ref('');
+const depWaitingOn = ref('');
+const depExpectedBy = ref('');
+const depBlocks = ref('');
+const addingDependency = ref(false);
+
+/** Live `mine`/`parked` branches and new work — `checkBlockable`'s own repo-side rule (never
+ *  `review`, never another `dependency`). */
+const blockOptions = computed(() =>
+  props.items.filter((it) => it.kind === 'mine' || it.kind === 'parked'),
+);
+
+function resetDependency(): void {
+  depTitle.value = '';
+  depWaitingOn.value = '';
+  depExpectedBy.value = '';
+  const selected = adeUiStore.selectedByRepo[props.codeRepoId];
+  depBlocks.value = selected && blockOptions.value.some((it) => it.id === selected) ? selected : '';
+}
+
+const canAddDependency = computed(() => depTitle.value.trim() !== '');
+
+async function submitDependency(): Promise<void> {
+  if (!canAddDependency.value || addingDependency.value) return;
+  addingDependency.value = true;
+  try {
+    const id = await adeActionsStore.addDependency(props.codeRepoId, {
+      title: depTitle.value.trim(),
+      waitingOn: depWaitingOn.value,
+      expectedBy: depExpectedBy.value,
+      blocks: depBlocks.value ? [depBlocks.value] : [],
+    });
+    adeUiStore.select(props.codeRepoId, id);
+    open.value = false;
+  } finally {
+    addingDependency.value = false;
+  }
+}
 </script>
 
 <template>
@@ -126,12 +170,15 @@ async function pick(branch: string): Promise<void> {
       <Tabs
         :model-value="activeTab"
         class="gap-0"
-        @update:model-value="(v) => (activeTab = v as 'new' | 'existing')"
+        @update:model-value="(v) => (activeTab = v as 'new' | 'existing' | 'dependency')"
       >
         <TabsList class="w-full p-1">
           <TabsTrigger value="new" class="flex-1" data-testid="ade-add-tab-new">New work</TabsTrigger>
           <TabsTrigger value="existing" class="flex-1" data-testid="ade-add-tab-existing"
             >Existing branch</TabsTrigger
+          >
+          <TabsTrigger value="dependency" class="flex-1" data-testid="ade-add-tab-dependency"
+            >Dependency</TabsTrigger
           >
         </TabsList>
         <TabsContent value="new" class="flex flex-col gap-2 p-2.5">
@@ -185,6 +232,32 @@ async function pick(branch: string): Promise<void> {
               </CommandGroup>
             </CommandList>
           </Command>
+        </TabsContent>
+        <TabsContent value="dependency" class="flex flex-col gap-2 p-2.5">
+          <Input v-model="depTitle" placeholder="Title" data-testid="ade-add-dependency-title" />
+          <Textarea
+            v-model="depWaitingOn"
+            placeholder="Waiting on (optional)"
+            data-testid="ade-add-dependency-waiting-on"
+          />
+          <Input
+            v-model="depExpectedBy"
+            type="date"
+            data-testid="ade-add-dependency-expected-by"
+          />
+          <NativeSelect v-model="depBlocks" data-testid="ade-add-dependency-blocks">
+            <option value="">None</option>
+            <option v-for="opt in blockOptions" :key="opt.id" :value="opt.id">
+              {{ opt.title }}
+            </option>
+          </NativeSelect>
+          <Button
+            :disabled="!canAddDependency || addingDependency"
+            data-testid="ade-add-dependency-submit"
+            @click="submitDependency"
+          >
+            {{ addingDependency ? 'Adding…' : 'Add dependency' }}
+          </Button>
         </TabsContent>
       </Tabs>
     </PopoverContent>
