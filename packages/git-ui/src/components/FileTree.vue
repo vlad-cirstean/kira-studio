@@ -20,19 +20,20 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import type { FileChange, ReviewFileStatus } from '@kira/git-ipc';
-import type { KuiSegmentedOption } from '@kira/kira-ui';
-import {
-  cn,
-  KuiButton,
-  KuiContextMenu,
-  KuiSearchInput,
-  KuiSegmented,
-  KuiSelect,
-  kuiRowVariants,
-} from '@kira/kira-ui';
-import { computed, nextTick, ref, watch } from 'vue';
+import { CheckIcon, MinusIcon } from '@lucide/vue';
+import AttributeTooltip from '@theme/components/AttributeTooltip.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { ACTION_ICONS } from '../icons/index.ts';
 import { setiIconFor } from '../icons/setiFileIcon.ts';
+import { cn } from '../lib/cn.ts';
+import { rowVariants } from '../lib/rowVariants.ts';
 import type { FileListMode } from '../state/detail.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import { exactCount, formatChangeCount } from './countFormat.ts';
@@ -48,6 +49,7 @@ import {
   STATUS_COLOR_CLASS,
   STATUS_LETTERS,
 } from './fileTreeModel.ts';
+import RowContextMenu from './RowContextMenu.vue';
 import { buildFileRowMenu } from './rowMenuModel.ts';
 
 const props = defineProps<{
@@ -102,7 +104,15 @@ const emit = defineEmits<{
   (e: 'toggleReviewed', path: string): void;
 }>();
 
-const listModeOptions: readonly KuiSegmentedOption[] = [
+// P131 Part 2 §5.6: KuiSegmentedOption goes with KuiSegmented -- this is the same shape, inlined
+// as a local type instead of importing one from kira-ui.
+interface ListModeOption {
+  readonly id: FileListMode;
+  readonly icon: string;
+  readonly label: string;
+}
+
+const listModeOptions: readonly ListModeOption[] = [
   { id: 'tree', icon: ACTION_ICONS.listTree, label: 'Tree view' },
   { id: 'flat', icon: ACTION_ICONS.listFlat, label: 'Flat view' },
 ];
@@ -233,25 +243,24 @@ function rowKey(row: FileTreeRow): string {
   return row.kind === 'directory' ? `dir:${row.node.path}` : `file:${row.node.path}`;
 }
 
-/** P110 A15: replaces the old `[kuiRowVariants(), 'kv-file-tree-row', {...}]` array binding.
- *  `kuiRowVariants({ selected })` already renders byte-identically to the file's own retired
- *  `.kv-row-selected`/hover rules (`kui-bridge.css`'s `--kui-selected-*`/`--kui-hover-bg` map to
- *  the exact same `--kv-row-selected-*`/`--kv-row-hover-bg` tokens) — no separate selected class
- *  needed. `cn()` cancels the variant's own `px-kui-3` (6px) with this row's real 2px/8px padding
- *  (`.kv-file-tree-row`'s own padding shorthand always fully overrode it, unlayered). The focus
- *  ring is `group-focus-within` (the container below carries `kv:group`) applied only to the one
- *  row `index === focusedRow` names — reproducing the old
- *  `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused` compound selector.
+/** P110 A15, retokened onto git-ui's own `rowVariants` (P131 Part 2 §4.2). `rowVariants({
+ *  selected })` renders byte-identically to the file's own retired `.kv-row-selected`/hover
+ *  rules — no separate selected class needed. `cn()` cancels the variant's own horizontal
+ *  padding with this row's real 2px/8px padding (`.kv-file-tree-row`'s own padding shorthand
+ *  always fully overrode it, unlayered). The focus ring is `group-focus-within` (the container
+ *  below carries `kv:group`) applied only to the one row `index === focusedRow` names —
+ *  reproducing the old `.kv-file-tree-rows:focus-within .kv-file-tree-row.kv-row-focused`
+ *  compound selector.
  *
  *  P110 A-fix: `.kv-file-tree-row` itself is kept, as a bare literal (no CSS of its own —
  *  tailwind-merge passes an unrecognized class straight through) — several Playwright specs
- *  outside this package's own tests (file-tree-open/review-interaction/kui-floating-geometry)
+ *  outside this package's own tests (file-tree-open/review-interaction/floating-geometry)
  *  select rows by this class name; dropping it broke them. */
 function rowClass(row: FileTreeRow, index: number): string {
   const selected = row.kind === 'file' && row.node.fileIndex === props.selectedFile;
   return cn(
     'kv-file-tree-row',
-    kuiRowVariants({ selected }),
+    rowVariants({ selected }),
     'kv:py-0.5 kv:px-2',
     index === focusedRow.value
       ? 'kv:group-focus-within:outline kv:group-focus-within:outline-1 kv:group-focus-within:outline-focus kv:group-focus-within:-outline-offset-1'
@@ -475,6 +484,17 @@ function reviewToggleTitle(path: string): string {
   const kind = reviewStatusFor(path)?.kind ?? 'none';
   return kind === 'none' ? 'Mark reviewed' : 'Mark unreviewed';
 }
+function reviewCheckboxState(path: string): boolean | 'indeterminate' {
+  const kind = reviewStatusFor(path)?.kind;
+  if (kind === 'full') return true;
+  if (kind === 'partial') return 'indeterminate';
+  return false;
+}
+
+// P131 Part 2 §5.6: biome's noLabelWithoutControl can't see through NativeSelect's
+// `inheritAttrs: false` to the native `<select>` it renders -- an explicit for/id pair keeps the
+// same association (same fix as StackDialog.vue's own parent picker).
+const parentSelectId = useId();
 </script>
 
 <template>
@@ -492,30 +512,53 @@ function reviewToggleTitle(path: string): string {
          drops every attrs-fallthrough class a caller passes — `DetailPane.vue`'s own `class` prop
          on its `<FileTree>` usage (P110 A15: now `kv:flex-auto kv:min-h-0 kv:border-y
          kv:border-panel-border`) never reached this component's root at all before this move. -->
+    <!-- P131 Part 2 §5.6: one hoisted AttributeTooltip for every row's data-kira-tip span --
+         treeEl always names whichever of the two row containers below is currently mounted. -->
+    <AttributeTooltip :container="treeEl" />
     <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-1 kv:px-5 kv:pb-4 kv:text-base">
-      <span>Diffing against</span>
-      <KuiSelect
+      <Label :for="parentSelectId">Diffing against</Label>
+      <NativeSelect
+        :id="parentSelectId"
         :model-value="String(parentIndex)"
-        :options="parentSelectOptions"
-        ariaLabel="Diffing against"
-        @update:model-value="onParentChange"
-      />
+        variant="bordered"
+        size="kira"
+        @update:model-value="(value) => onParentChange(String(value))"
+      >
+        <option v-for="option in parentSelectOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </NativeSelect>
     </div>
 
     <div v-if="showToolbar !== false" class="kv:flex kv:gap-2 kv:px-4 kv:pb-2">
-      <KuiSearchInput
-        class="kv:flex-1 kv:min-w-0"
-        :model-value="filterInput"
-        placeholder="Filter files"
-        ariaLabel="Filter files"
-        @update:model-value="onFilterInput"
-      />
-      <KuiSegmented
-        :options="listModeOptions"
+      <InputGroup variant="kira" class="flex-1 min-w-0">
+        <InputGroupAddon>
+          <span class="codicon codicon-search" aria-hidden="true"></span>
+        </InputGroupAddon>
+        <InputGroupInput
+          :model-value="filterInput"
+          placeholder="Filter files"
+          aria-label="Filter files"
+          @update:model-value="(value: string | number) => onFilterInput(String(value))"
+        />
+      </InputGroup>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="kira"
+        aria-label="File list display"
         :model-value="listMode"
-        ariaLabel="File list display"
-        @update:model-value="(value) => emit('update:listMode', value as FileListMode)"
-      />
+        @update:model-value="(v) => v && emit('update:listMode', v as FileListMode)"
+      >
+        <Tooltip v-for="option in listModeOptions" :key="option.id">
+          <TooltipTrigger as-child>
+            <ToggleGroupItem :value="option.id" :aria-label="option.label">
+              <span class="codicon" :class="option.icon" aria-hidden="true"></span>
+            </ToggleGroupItem>
+          </TooltipTrigger>
+          <TooltipContent>{{ option.label }}</TooltipContent>
+        </Tooltip>
+      </ToggleGroup>
     </div>
 
     <div
@@ -554,36 +597,39 @@ function reviewToggleTitle(path: string): string {
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
           <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
+            <span class="kv:text-diff-added" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv:text-diff-deleted" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="kv:text-diff-deleted" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
         </template>
         <template v-else>
           <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-               +N/-N counts' own width and crowded the pane's scrollbar. A real checkbox (not a
-               toggle button) so the partial state gets a correct native `aria-checked="mixed"` for
-               free, and `.prevent` because the server's answer is this control's only state
-               (`ReviewFilesState.mark` applies `result.review`, not an optimistic local toggle). -->
-          <input
+               +N/-N counts' own width and crowded the pane's scrollbar. A real Checkbox (not a
+               toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
+               and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)
+               because the server's answer is this control's only state (`ReviewFilesState.mark`
+               applies `result.review`, not an optimistic local toggle). -->
+          <Checkbox
             v-if="reviewStates"
-            type="checkbox"
-            class="kv:shrink-0"
-            :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
-            :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
-            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
+            class="shrink-0"
+            :model-value="reviewCheckboxState(row.node.change.path)"
             :aria-label="reviewToggleTitle(row.node.change.path)"
-            @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
-          />
+            :data-kira-tip="reviewToggleTitle(row.node.change.path)"
+            @click.stop
+            @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
+          >
+            <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
+            <CheckIcon v-else />
+          </Checkbox>
           <span
             class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv:overflow-hidden kv:text-ellipsis" v-kui-tooltip="fileTitle(row.node.change)">
+          <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
@@ -600,40 +646,42 @@ function reviewToggleTitle(path: string): string {
             >
               <span
                 class="kv:text-diff-added"
-                v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
+                :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
                 class="kv:text-diff-deleted"
-                v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+                :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
               class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
-              v-kui-tooltip="fileTitle(row.node.change)"
+              :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
             >
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
             class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
-            v-kui-tooltip="'Changed since you reviewed it'"
+            data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
           ></span>
         </template>
       </div>
 
-      <KuiButton
+      <Button
         v-if="capped.hiddenCount > 0"
-        class="kv:w-full kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:border-0 kv:border-t kv:border-panel-border kv:p-1 kv:cursor-pointer"
+        variant="link"
+        size="kira"
+        class="text-focus w-full border-t border-border p-1 h-auto justify-start"
         @click="capLifted = true"
       >
         Show all {{ rows.length }} files
-      </KuiButton>
+      </Button>
 
-      <KuiContextMenu
+      <RowContextMenu
         v-if="fileMenuState"
         :sections="fileMenuSections"
         :x="fileMenuState.x"
@@ -677,36 +725,39 @@ function reviewToggleTitle(path: string): string {
           <span class="kv:font-ui kv:font-semibold kv:truncate">{{ row.node.name }}</span>
           <span class="kv:ml-auto kv:text-muted-foreground kv:font-ui kv:text-sm kv:flex kv:gap-1">
             {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
-            <span class="kv:text-diff-added" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
+            <span class="kv:text-diff-added" :data-kira-tip="`${exactCount(row.node.additions)} additions`"
               >+{{ formatChangeCount(row.node.additions) }}</span
             >
-            <span class="kv:text-diff-deleted" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
+            <span class="kv:text-diff-deleted" :data-kira-tip="`${exactCount(row.node.deletions)} deletions`"
               >-{{ formatChangeCount(row.node.deletions) }}</span
             >
           </span>
         </template>
         <template v-else>
           <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
-               +N/-N counts' own width and crowded the pane's scrollbar. A real checkbox (not a
-               toggle button) so the partial state gets a correct native `aria-checked="mixed"` for
-               free, and `.prevent` because the server's answer is this control's only state
-               (`ReviewFilesState.mark` applies `result.review`, not an optimistic local toggle). -->
-          <input
+               +N/-N counts' own width and crowded the pane's scrollbar. A real Checkbox (not a
+               toggle button) so the partial state gets a correct `aria-checked="mixed"` for free,
+               and `.stop` (not `.prevent` -- reka's own control has no native default to prevent)
+               because the server's answer is this control's only state (`ReviewFilesState.mark`
+               applies `result.review`, not an optimistic local toggle). -->
+          <Checkbox
             v-if="reviewStates"
-            type="checkbox"
-            class="kv:shrink-0"
-            :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
-            :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
-            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
+            class="shrink-0"
+            :model-value="reviewCheckboxState(row.node.change.path)"
             :aria-label="reviewToggleTitle(row.node.change.path)"
-            @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
-          />
+            :data-kira-tip="reviewToggleTitle(row.node.change.path)"
+            @click.stop
+            @update:model-value="() => emit('toggleReviewed', row.node.change.path)"
+          >
+            <MinusIcon v-if="reviewCheckboxState(row.node.change.path) === 'indeterminate'" />
+            <CheckIcon v-else />
+          </Checkbox>
           <span
             class="kv-file-tree-icon kv:shrink-0 kv:size-4 kv:mask-contain kv:mask-no-repeat kv:mask-center"
             :style="fileIconStyle(row.node.path)"
             aria-hidden="true"
           ></span>
-          <span class="kv:overflow-hidden kv:text-ellipsis" v-kui-tooltip="fileTitle(row.node.change)">
+          <span class="kv:overflow-hidden kv:text-ellipsis" :data-kira-tip="fileTitle(row.node.change)">
             <template v-if="renameDisplay(row.node.change)">
               {{ renameDisplay(row.node.change)?.from }}
               <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
@@ -726,40 +777,42 @@ function reviewToggleTitle(path: string): string {
             >
               <span
                 class="kv:text-diff-added"
-                v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
+                :data-kira-tip="`${exactCount(row.node.change.additions ?? 0)} additions`"
                 >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
               >
               <span
                 class="kv:text-diff-deleted"
-                v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+                :data-kira-tip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
                 >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
               >
             </span>
             <span
               class="kv-file-tree-status kv:min-w-[1ch] kv:font-data kv:text-sm kv:font-semibold kv:leading-none kv:shrink-0 kv:saturate-160 kv:contrast-115"
               :class="statusClass(row.node.change)"
-              v-kui-tooltip="fileTitle(row.node.change)"
+              :data-kira-tip="fileTitle(row.node.change)"
               >{{ statusLetter(row.node.change) }}</span
             >
           </span>
           <span
             v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
             class="kv:shrink-0 kv:size-1 kv:rounded-full kv:bg-diff-modified"
-            v-kui-tooltip="'Changed since you reviewed it'"
+            data-kira-tip="Changed since you reviewed it"
             aria-hidden="true"
           ></span>
         </template>
       </div>
 
-      <KuiButton
+      <Button
         v-if="capped.hiddenCount > 0"
-        class="kv:w-full kv:bg-transparent kv:enabled:hover:bg-transparent kv:text-focus kv:enabled:hover:text-focus kv:border-0 kv:border-t kv:border-panel-border kv:p-1 kv:cursor-pointer"
+        variant="link"
+        size="kira"
+        class="text-focus w-full border-t border-border p-1 h-auto justify-start"
         @click="capLifted = true"
       >
         Show all {{ rows.length }} files
-      </KuiButton>
+      </Button>
 
-      <KuiContextMenu
+      <RowContextMenu
         v-if="fileMenuState"
         :sections="fileMenuSections"
         :x="fileMenuState.x"

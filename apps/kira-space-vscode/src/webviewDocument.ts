@@ -54,8 +54,9 @@ export interface WebviewDocumentOptions {
 
 /** The document template and CSP assembly, byte-identical to what `renderHtml` emitted before
  *  this extraction (G16 §7.1 item 7 checks this). No style rule is added here for `html`, `body`
- *  or `#app` (G16 D3) — that height chain lives in `packages/git-ui/src/theme/app-shell.css`
- *  instead, loaded through the built stylesheet `styleUrls` already lists. */
+ *  or `#app` (G16 D3) — that height chain is applied as `kv:`-prefixed classes by
+ *  `packages/git-ui/src/main.ts`'s own `mount()` (P110 A19), not a stylesheet this document
+ *  links. */
 export function buildWebviewDocument(opts: WebviewDocumentOptions): string {
   const { scriptUrl, styleUrls, cspSource, view, bootstrap, nonce } = opts;
 

@@ -108,9 +108,10 @@ test.describe('review sidebar interaction', () => {
     await expect(row).toHaveAttribute('aria-expanded', 'false');
   });
 
-  // P75 §4: the tri-state checkbox — a native `:checked`/`:indeterminate` pair, not a third colour
-  // on a two-state toggle button (the control this replaced). `review.files`'s three fixture rows
-  // (none/partial/full) exercise all three DOM states at once.
+  // P75 §4 / P131 Part 2: the tri-state checkbox — reka's own `aria-checked` pair
+  // (`"true"`/`"false"`/`"mixed"`), not a third colour on a two-state toggle button (the control
+  // this replaced). `review.files`'s three fixture rows (none/partial/full) exercise all three
+  // states at once.
   test("the Files pane's reviewed control is a checkbox with three states", async ({ page }) => {
     await bootReview(page);
 
@@ -126,18 +127,18 @@ test.describe('review sidebar interaction', () => {
       hasText: FAKE_REVIEW_FILE_FULL.split('/').pop(),
     });
 
-    const noneBox = noneRow.locator('input[type="checkbox"]');
-    const partialBox = partialRow.locator('input[type="checkbox"]');
-    const fullBox = fullRow.locator('input[type="checkbox"]');
+    const noneBox = noneRow.locator('[role="checkbox"]');
+    const partialBox = partialRow.locator('[role="checkbox"]');
+    const fullBox = fullRow.locator('[role="checkbox"]');
 
     await expect(noneBox).not.toBeChecked();
-    await expect(noneBox).toHaveJSProperty('indeterminate', false);
+    await expect(noneBox).toHaveAttribute('aria-checked', 'false');
 
     await expect(partialBox).not.toBeChecked();
-    await expect(partialBox).toHaveJSProperty('indeterminate', true);
+    await expect(partialBox).toHaveAttribute('aria-checked', 'mixed');
 
     await expect(fullBox).toBeChecked();
-    await expect(fullBox).toHaveJSProperty('indeterminate', false);
+    await expect(fullBox).toHaveAttribute('aria-checked', 'true');
   });
 
   // D11a (item 11): the corrected, single-step "back to branch selection" — reach the listing

@@ -59,9 +59,16 @@ function onCloseAutoFocus(e: Event): void {
         aria-hidden="true"
       />
     </DropdownMenuTrigger>
+    <!-- P131 Part 2: `prioritize-position` reorders reka's Popper middleware to flip before shift
+         (its default order runs shift first). With a 0x0 point anchor, unprioritized shift alone
+         can clamp the overflow to zero by pinning the panel's edge right at the anchor -- leaving
+         flip nothing to react to, so a click with very little room below never flips above and
+         instead renders a near-unusable, scrolled-to-fit sliver. Root-caused via
+         floating-geometry.spec.ts's own "no room below" case. -->
     <DropdownMenuContent
       align="start"
       :side-offset="0"
+      prioritize-position
       class="min-w-45 max-w-80"
       :aria-label="title ?? label"
       @close-auto-focus="onCloseAutoFocus"

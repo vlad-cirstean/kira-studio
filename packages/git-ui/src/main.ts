@@ -10,9 +10,6 @@ import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 // P110 A1: the prefixed Tailwind build (theme + utilities under `kv:`). Imported first so its
 // `@theme inline reference` mappings are available to every utility class generated below.
 import './theme/tailwind.css';
-// G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
-// every other stylesheet layers onto.
-import './theme/app-shell.css';
 import './icons/codicon.css';
 import './theme/vscode-tokens.css';
 import './theme/density.css';
@@ -128,15 +125,13 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   document.body.classList.add('kv:h-full', 'kv:m-0', 'kv:p-0', 'kv:overflow-hidden');
   // The other half of the chain — the class and the rule are useless apart, and they live in two
   // places because the class must follow whatever container the host hands us, not a naming
-  // convention two packages have to agree on. `kv-mount-root` itself now carries no CSS of its
-  // own (P110 A19) — kept as a bare selector hook for app-shell.css's own checkbox pseudo-element
-  // rules (`.kv-mount-root input[type="checkbox"]`, which stay CSS per the plan).
-  container.classList.add('kv-mount-root', 'kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
+  // convention two packages have to agree on.
+  container.classList.add('kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
   app.mount(container);
   return {
     unmount(): void {
       app.unmount();
-      container.classList.remove('kv-mount-root', 'kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
+      container.classList.remove('kv:h-full', 'kv:w-full', 'kv:overflow-hidden');
     },
     setVisible(visible: boolean): void {
       graphVisible.value = visible;

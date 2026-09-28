@@ -335,7 +335,6 @@ check_font_scale() {
     -- "$kv_css" "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*|<!--)' |
     grep -v "^${commit_grid}:" || true)
-  kv_css_hits=$(_font_scale_anchor "$kv_css_hits" "${GIT_UI_SRC}/theme/app-shell.css" 1)
   if [ -n "$kv_css_hits" ]; then
     echo "check-theme-classes: kv chrome font-size: not on the four-value scale -- replace with $hint:" >&2
     echo "$kv_css_hits" >&2
