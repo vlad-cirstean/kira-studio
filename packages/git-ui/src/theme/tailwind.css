@@ -2,8 +2,9 @@
  * P110 A1: git-ui's own prefixed Tailwind v4 root. git-ui mounts into Kira Space's document
  * (main.ts), which compiles its own unprefixed Tailwind root — two roots sharing one document
  * would duplicate/collide on unprefixed utility names, so every utility this package's templates
- * use reads `kv:...`. `source(none)` + the explicit `@source` lines below scan only this package
- * and `@kira/kira-ui` (never the host app).
+ * use reads `kv:...`. `source(none)` + the explicit `@source` line below scans only this package
+ * (P131 Part 3 §6.2: no surviving `@kira/kira-ui` file carries a utility class, so its own
+ * `@source` line is gone too).
  *
  * No preflight: the VS Code webview relies on its own platform defaults, and Kira Space already
  * ships its own preflight from its own Tailwind root.
@@ -31,7 +32,6 @@
 @import "tailwindcss/theme" layer(theme) prefix(kv);
 @import "tailwindcss/utilities" layer(utilities) prefix(kv) source(none);
 @source "../";
-@source "../../../kira-ui/src";
 
 @theme inline reference {
   --color-*: initial;
@@ -148,10 +148,3 @@
   --spacing-row-comfortable: var(--kv-row-height-comfortable);
   --spacing-tree-indent: var(--kv-tree-indent);
 }
-
-/* P110 A2: kira-ui's own theme partial — maps its `--kui-*` vocabulary onto `--color-kui-*`/
-   `--spacing-kui-*`/etc. so `Kui*` components can use `kv:` utilities under this same prefixed
-   build without ever depending on git-ui's own token names. Imported after the block above, not
-   before: its own namespace resets (`--color-*: initial` etc.) apply to every `@theme` block
-   processed so far, so an import placed earlier would have its mappings wiped by them. */
-@import "@kira/kira-ui/theme/tailwind-theme.css";

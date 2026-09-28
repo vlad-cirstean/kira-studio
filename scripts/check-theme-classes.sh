@@ -73,29 +73,22 @@ check_class_in_attrs() {
   fi
 }
 
-# check_kui_class <retired-name> <replacement>
-# P110 C1: A3-A8 retired every `controls.css` selector in favour of `kv:` utilities/cva variants
-# directly on the owning `Kui*` component (A8 deleted `controls.css` itself). Scoped to GU/KU
-# (`kui-*` names only ever lived there) and, like check_class_in_attrs, to real `class="..."` /
-# `:class="..."` attribute values only -- not check_class's broader scan. Two reasons, both real
-# survivors verified by grep, not assumed:
-#   1. A3-A8's own commits document the retired selectors inline as `class="kui-x"`-shaped prose in
-#      JSDoc comments (KuiIconBox.vue, KuiMenuList.vue, KuiButton.vue, rowVariants.ts, ...) -- a
-#      whole-file scan would fail on that documentation, not a regression. Comment lines (a `*`
-#      continuation or `//`) are excluded.
-#   2. Several retired names collide with real, ongoing non-class identifiers: `kui-icon-box` is
-#      also a real `cn.ts` spacing-scale token name, `kui-tooltip`/`kui-segmented-badge` are also a
-#      real directive name/`TOOLTIP_ID`/`data-testid`. None of those are `class="..."` attribute
-#      values, so the attribute scope leaves them alone.
-check_kui_class() {
-  name="$1"
-  replacement="$2"
+# check_no_kui_class
+# P131 Part 3 §6.3: every `kui-*` class the C1-era `check_kui_class` guarded one name at a time is
+# gone from GU/KU along with the `Kui*` components that carried them -- `kira-ui/src` keeps only
+# `KuiColumnResizeHandle.vue` (its own literal `kui-column-resize-handle` hook class, the sole
+# surviving exception) and `floatingPosition.ts`, neither Tailwind-scanned. One guard replaces the
+# 30 individual `check_kui_class` calls: any `kui-[a-z-]+` token in a `class="..."`/`:class="..."`
+# value is a regression, full stop. Same attribute scope and comment-line exclusion as the retired
+# per-name checks it replaces.
+check_no_kui_class() {
   hits=$(grep -rnP --include='*.vue' --include='*.ts' \
     -- '(?::?class)="[^"]*"' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
-    grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
+    grep -P '(?<![-\w])kui-[a-z-]+(?![-\w])' |
+    grep -vP '(?<![-\w])kui-column-resize-handle(?![-\w])' || true)
   if [ -n "$hits" ]; then
-    echo "check-theme-classes: retired kui-* class '$name' still used -- replace with '$replacement':" >&2
+    echo "check-theme-classes: retired kui-* class still used -- replace with a shadcn-vue component from @theme/components/ui:" >&2
     echo "$hits" >&2
     STATUS=1
   fi
@@ -116,7 +109,7 @@ _gu_ku_hits() {
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
   ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -v "^${KIRA_UI_SRC}/cn.ts:" |
+    grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "(?<![-\\w])${name}(?![-\\w])" || true)
   printf '%s\n%s\n' "$vue_hits" "$ts_hits" | grep -v '^$' || true
@@ -321,7 +314,7 @@ check_font_scale() {
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "$kv_class" || true)
   kv_ts_hits=$(grep -rnP --include='*.ts' "$GIT_UI_SRC" "$KIRA_UI_SRC" 2>/dev/null |
-    grep -v "^${KIRA_UI_SRC}/cn.ts:" |
+    grep -v "^${GIT_UI_SRC}/lib/cn.ts:" |
     grep -vP '^[^:]+:[0-9]+:\s*(\*|//|/\*)' |
     grep -P "$kv_class" || true)
   kv_hits=$(printf '%s\n%s\n' "$kv_vue_hits" "$kv_ts_hits" | grep -v '^$' | grep -v codicon || true)
@@ -472,41 +465,9 @@ check_class_all 'def-table' 'w-full border-collapse text-kira-md'
 check_class_all 'def-head-row' 'per-th px-1.5 py-1 bg-elevated border-b border-border-strong text-muted-foreground text-kira-sm whitespace-nowrap (plus border-r border-border except the last column)'
 check_class_all 'def-row' 'border-b border-border hover:bg-hover'
 
-# P110 A3: KuiButton/KuiIconBox onto cva variants + kv: utilities.
-check_kui_class 'kui-button' 'kuiButtonVariants({ variant, active }) (packages/kira-ui/src/KuiButton.vue)'
-check_kui_class 'kui-button-count' 'the count span'"'"'s own kv: utilities on KuiButton.vue'
-check_kui_class 'kui-icon-box' 'KuiIconBox (packages/kira-ui/src/KuiIconBox.vue)'
-# P110 A4: KuiTextInput/KuiSearchInput/KuiSelect onto kv: utilities.
-check_kui_class 'kui-search-input' 'kv: utilities on KuiSearchInput.vue'
-check_kui_class 'kui-search-input-icon' 'kv: utilities on KuiSearchInput.vue'
-check_kui_class 'kui-search-input-field' 'kv: utilities on KuiSearchInput.vue'
-check_kui_class 'kui-search-input-clear' 'kv: utilities on KuiSearchInput.vue'
-check_kui_class 'kui-select' 'kv: utilities on KuiSelect.vue'
-check_kui_class 'kui-select-field' 'kv: utilities on KuiSelect.vue'
-check_kui_class 'kui-select-chevron' 'kv: utilities on KuiSelect.vue'
-# P110 A5: KuiMenuList/KuiContextMenu onto cva, exported kuiRowVariants.
-check_kui_class 'kui-row' 'kuiRowVariants() (packages/kira-ui/src/rowVariants.ts)'
-check_kui_class 'kui-menu-list' 'kv: utilities on KuiMenuList.vue'
-check_kui_class 'kui-menu-item' 'kuiRowVariants() (packages/kira-ui/src/rowVariants.ts)'
-check_kui_class 'kui-menu-item-label' 'kv: utilities on KuiMenuList.vue'
-check_kui_class 'kui-menu-item-detail' 'kv: utilities on KuiMenuList.vue'
-check_kui_class 'kui-menu-heading' 'kv: utilities on KuiMenuList.vue'
-check_kui_class 'kui-menu-separator' 'kv: utilities on KuiMenuList.vue'
-check_kui_class 'kui-menu-root' 'kv: utilities on KuiContextMenu.vue'
-check_kui_class 'kui-visually-hidden' 'kv: utilities on KuiMenuList.vue'
-# P110 A6: KuiTooltip/KuiPopoverPanel/KuiDialog onto kv: utilities.
-check_kui_class 'kui-tooltip' 'kv: utilities on KuiTooltip.vue'
-check_kui_class 'kui-popover-backdrop' 'kv: utilities on KuiPopoverPanel.vue'
-check_kui_class 'kui-popover' 'kv: utilities on KuiPopoverPanel.vue'
-check_kui_class 'kui-modal-backdrop' 'kv: utilities on KuiDialog.vue'
-check_kui_class 'kui-modal' 'kv: utilities on KuiDialog.vue'
-check_kui_class 'kui-modal-title' 'kv: utilities on KuiDialog.vue'
-check_kui_class 'kui-modal-body' 'kv: utilities on KuiDialog.vue'
-check_kui_class 'kui-modal-actions' 'kv: utilities on KuiDialog.vue'
-# P110 A7: KuiSegmented onto cva/kv: utilities.
-check_kui_class 'kui-segmented' 'kv: utilities on KuiSegmented.vue'
-check_kui_class 'kui-segmented-button' 'kuiSegmentedButtonVariants() (packages/kira-ui/src/KuiSegmented.vue)'
-check_kui_class 'kui-segmented-badge' 'kv: utilities on KuiSegmented.vue'
+# P131 Part 3 §6.3: every Kui* component (and the kui-* classes it carried) is gone from GU/KU --
+# one guard replaces the 30 individual P110 A3-A7 check_kui_class calls above.
+check_no_kui_class
 
 # P110 I2-35: one spinner speed, Tailwind's own default `animate-spin` (1s) -- retires the app's
 # own 0.7s `--animate-kira-spin` token and codicon's own 1.5s stepped `codicon-modifier-spin`.
@@ -602,7 +563,7 @@ check_class_all 'section-subhead' 'dropped -- had zero CSS backing (see settings
 # (DataToolbar.vue's and SettingsShell.vue's own doc comments narrating pre-P110 history) that a
 # whole-file scan false-positives on -- ground truth over the plan's own categorization, same
 # discipline this migration has used throughout.
-check_class_in_attrs_all 'p-seg' 'KuiSegmented (packages/kira-ui/src/KuiSegmented.vue)'
+check_class_in_attrs_all 'p-seg' 'ToggleGroup (packages/theme/src/components/ui/toggle-group)'
 check_class_all 'has-stepper' 'NumberStepperInput (packages/theme/src/NumberStepperInput.vue)'
 check_class_all 'ph-active' 'NumberStepperInput'"'"'s own placeholder-active styling'
 # `sugg-*`: already folded into p-completion-row/-label/-detail well before 6f6853c1 (23f37c46) --
@@ -619,7 +580,7 @@ check_class_in_attrs_all 'stepper' 'NumberStepperInput'
 check_class_in_attrs_all 'ph' 'NumberStepperInput'"'"'s own placeholder-active styling'
 check_class_in_attrs_all 'big' 'size-6 (or the local equivalent) on Empty/EmptyMedia'
 check_class_in_attrs_all 'edited' 'a local per-cell edited-state class/data attribute'
-check_class_in_attrs_all 'segmented' 'KuiSegmented (packages/kira-ui/src/KuiSegmented.vue)'
+check_class_in_attrs_all 'segmented' 'ToggleGroup (packages/theme/src/components/ui/toggle-group)'
 check_class_in_attrs_all 'split' 'a local split-pane class/data attribute'
 check_class_in_attrs_all 'splitter' 'a local splitter-track class/data attribute'
 # `bordered` excluded deliberately: a legitimate NativeSelect `variant` PROP VALUE

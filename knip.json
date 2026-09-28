@@ -130,7 +130,8 @@
     },
     "packages/kira-ui": {
       // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
-      "entry": ["src/**/*.test.ts"],
+      // entry: src/**/*.test.ts dropped (P131 Part 3 §6.2): tooltip.test.ts, its sole match, is
+      // gone along with KuiTooltip.vue.
       "project": ["src/**/*.{ts,vue}"]
     }
   }

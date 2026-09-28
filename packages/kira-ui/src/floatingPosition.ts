@@ -15,10 +15,10 @@ import {
  * G20 D1: `packages/kira-ui`'s own floating-positioning primitive — a fresh reimplementation of
  * `apps/kira-studio/frontend/src/theme/floatingPosition.ts`'s `computeFloatPosition`/
  * `pointReference`, not a cross-app import (the two frontends are separate apps with separate
- * builds). Every consumer in this package (`KuiTooltip`, `KuiPopoverPanel`, `KuiContextMenu`)
- * builds on this one module so the same offset→flip→shift→size middleware chain, the same
- * `strategy: 'fixed'` choice, and the same `--kui-float-max-*` size-cap contract are shared here
- * exactly as they already are on the app side.
+ * builds). P131 Part 3 §6.2: every `Kui*` consumer (`KuiTooltip`, `KuiPopoverPanel`,
+ * `KuiContextMenu`) is gone — the sole consumer left is `packages/workbench`'s own
+ * `util/floatingPosition.ts`, which always passes its own `--kira-float-max-` prefix, so
+ * `maxVarPrefix` is required rather than defaulting to a `--kui-*` name nothing reads any more.
  */
 
 export interface FloatOptions {
@@ -32,19 +32,11 @@ export interface FloatOptions {
   /** `shift()`'s own viewport-clamp padding, in px. Default `4`. */
   padding?: number;
   /** CSS custom-property prefix `size()`'s own middleware writes onto the floating element
-   *  (`-w`/`-h` appended) — default `'--kui-float-max-'` (T1-15: `packages/workbench`'s own
-   *  callers pass `'--kira-float-max-'`, that package's own token prefix, rather than this
-   *  package hardcoding a second prefix or workbench re-deriving the whole middleware chain
-   *  itself). */
-  maxVarPrefix?: string;
+   *  (`-w`/`-h` appended) — a consumer opts in by reading the two properties it produces
+   *  (`max-height: var(<prefix>h)`); a surface that already fits is unaffected, since these are
+   *  only ever a maximum. */
+  maxVarPrefix: string;
 }
-
-/** The default CSS custom-property prefix — a consumer opts in by reading the two properties it
- *  produces (`max-height: var(--kui-float-max-h)`); a surface that already fits is unaffected,
- *  since these are only ever a maximum. */
-const DEFAULT_MAX_VAR_PREFIX = '--kui-float-max-';
-export const FLOAT_MAX_WIDTH_VAR = `${DEFAULT_MAX_VAR_PREFIX}w`;
-export const FLOAT_MAX_HEIGHT_VAR = `${DEFAULT_MAX_VAR_PREFIX}h`;
 
 function setIfChanged(el: HTMLElement, prop: string, px: number): void {
   const next = `${Math.max(0, Math.round(px))}px`;
@@ -54,10 +46,10 @@ function setIfChanged(el: HTMLElement, prop: string, px: number): void {
 export async function computeFloatPosition(
   reference: ReferenceElement,
   floatingEl: HTMLElement,
-  opts: FloatOptions = {},
+  opts: FloatOptions,
 ): Promise<{ left: number; top: number }> {
   const padding = opts.padding ?? 4;
-  const prefix = opts.maxVarPrefix ?? DEFAULT_MAX_VAR_PREFIX;
+  const prefix = opts.maxVarPrefix;
   const middleware: Middleware[] = [offset(opts.offset ?? 4)];
   if (opts.flip ?? true) middleware.push(flip());
   middleware.push(shift({ padding }));

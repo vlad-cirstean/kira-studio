@@ -112,8 +112,9 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   // G16 D1/D2 (P110 A19): the document-level height chain, converted from app-shell.css's bare
   // `html, body` selector to classes applied here rather than in the extension host's emitted
   // document (`webviewDocument.ts`) — that file lives in `apps/kira-space-vscode/src`, outside
-  // `theme/tailwind.css`'s own `@source` scan (`packages/git-ui/src`/`kira-ui/src` only), so a
-  // class literal there would never compile. `mount()` already owns this chain (this file's own
+  // `theme/tailwind.css`'s own `@source` scan (`packages/git-ui/src` only, P131 Part 3 §6.2: the
+  // kira-ui `@source` is gone, no surviving kira-ui file carries a utility class), so a class
+  // literal there would never compile. `mount()` already owns this chain (this file's own
   // original doc comment: "a document-owning bootstrap, not a widget factory"); JS classes here
   // are the same ownership, not a new one. Never removed on unmount: `html`/`body` are the
   // document's own elements, not scoped to any one mount — the same permanence the CSS rule had.
