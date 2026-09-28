@@ -5,7 +5,7 @@ import { type DialogCtx, rebaseSpec, specForQueueAction, startSpec } from './dia
 import { useAdeResolveDependency } from './mutations';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
-import { chipStyle, TONE } from './tones';
+import { CLAUDE_BUTTON_STYLE, chipStyle, TONE } from './tones';
 import { DEPENDENCY_COLOR, type QueuePanel, type QueuePanelAction } from './useQueue';
 
 // P129 Part 6 §0.5/§0.22: the panel's own header — colour dot, work-status chip, title, mono fact
@@ -55,7 +55,7 @@ const reviewNote = computed(
 // styles (`▶ Start agent`'s `#d97757` background, `btnG`'s bordered/transparent secondary Archive).
 function actionStyle(action: QueuePanelAction): Record<string, string> {
   if (action.tone === 'claude') {
-    return { background: '#d97757', color: '#1a0f0a', border: 'none' };
+    return CLAUDE_BUTTON_STYLE;
   }
   if (action.tone === 'secondary') {
     return { background: 'transparent', color: '#e8e6e1', border: '1px solid #3a3e48' };

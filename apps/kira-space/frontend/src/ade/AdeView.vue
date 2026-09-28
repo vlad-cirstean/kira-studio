@@ -10,6 +10,7 @@ import {
 } from '@theme/components/ui/empty';
 import { ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
+import AdeAllAgentsView from './AdeAllAgentsView.vue';
 import AdeRepoTabs from './AdeRepoTabs.vue';
 import AdeRepoView from './AdeRepoView.vue';
 import { useAdeUiStore } from './state/adeUi';
@@ -63,8 +64,9 @@ async function onImport(): Promise<void> {
     </template>
     <template v-else>
       <AdeRepoTabs />
+      <AdeAllAgentsView v-if="adeUiStore.allAgents" />
       <AdeRepoView
-        v-if="adeUiStore.activeRepoId"
+        v-else-if="adeUiStore.activeRepoId"
         :key="adeUiStore.activeRepoId"
         :code-repo-id="adeUiStore.activeRepoId"
       />

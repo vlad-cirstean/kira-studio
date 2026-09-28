@@ -42,6 +42,13 @@ export const useAdeUiStore = defineStore('adeUi', () => {
     /** Runtime only, never persisted (§0.15) — defaults to the first imported repo at the call
      *  site (`AdeView.vue`), not here, so this store stays ignorant of `codeReposStore`. */
     activeRepoId: '' as string,
+    /** P129 Part 7 §0.3: whether the pinned "All agents" tab is showing, instead of a sentinel
+     *  value inside `activeRepoId` — `AdeRepoView` is keyed and fed by that field, and the records
+     *  watch resets any id it doesn't recognise, so a flag is the only shape that needs no guard
+     *  there. Runtime only, default `false` (matches the mockup's own initial `repo: 'web-app'`,
+     *  a real repo). `activeRepoId` keeps meaning "a real repo id" and doubles as the mockup's own
+     *  `lastRepo` while this is `true`. */
+    allAgents: false as boolean,
     refreshNote: {} as Record<string, AdeRefreshNote>,
     dialog: null as AdeDialogState | null,
     /** §0.6: the timeline's own row selection, per repo — `useQueue`'s own first-item default
@@ -59,6 +66,18 @@ export const useAdeUiStore = defineStore('adeUi', () => {
 
   function setActiveRepo(id: string): void {
     state.activeRepoId = id;
+  }
+
+  /** P129 Part 7 §0.3: picking a real repo tab — leaves the pinned tab. */
+  function showRepo(id: string): void {
+    state.activeRepoId = id;
+    state.allAgents = false;
+  }
+
+  /** P129 Part 7 §0.3: picking the pinned "All agents" tab — `activeRepoId` (the mockup's own
+   *  `lastRepo`) is left exactly as it was. */
+  function showAllAgents(): void {
+    state.allAgents = true;
   }
 
   function select(codeRepoId: string, id: string): void {
@@ -151,6 +170,8 @@ export const useAdeUiStore = defineStore('adeUi', () => {
   return {
     ...toRefs(state),
     setActiveRepo,
+    showRepo,
+    showAllAgents,
     select,
     recordRefresh,
     openDialog,

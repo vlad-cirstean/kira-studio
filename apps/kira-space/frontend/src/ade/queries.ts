@@ -52,22 +52,34 @@ export function useAdeSessions() {
   });
 }
 
-export function useAdeSnapshot(codeRepoId: MaybeRefOrGetter<string>) {
-  return useQuery(() => ({
-    queryKey: adeSnapshotKey(toValue(codeRepoId)),
-    queryFn: (): Promise<AdeRepoSnapshot> => control.adeRepoSnapshot(toValue(codeRepoId)),
+/** P129 Part 7 §0.5: the option shape `useAdeSnapshot` below and `AdeAllAgentsView`'s own
+ *  `useQueries` call (one entry per repo with at least one session) both consume — one key shape,
+ *  one cache entry per repo, shared between the repo tab and the All agents view. */
+export function adeSnapshotOptions(codeRepoId: string) {
+  return {
+    queryKey: adeSnapshotKey(codeRepoId),
+    queryFn: (): Promise<AdeRepoSnapshot> => control.adeRepoSnapshot(codeRepoId),
     staleTime: Number.POSITIVE_INFINITY,
-    enabled: toValue(codeRepoId) !== '',
-  }));
+    enabled: codeRepoId !== '',
+  };
+}
+
+export function useAdeSnapshot(codeRepoId: MaybeRefOrGetter<string>) {
+  return useQuery(() => adeSnapshotOptions(toValue(codeRepoId)));
+}
+
+/** P129 Part 7 §0.5: `useAdePrs`'s own option factory, same sharing rule as `adeSnapshotOptions`. */
+export function adePrsOptions(codeRepoId: string) {
+  return {
+    queryKey: adePrsKey(codeRepoId),
+    queryFn: (): Promise<AdeRepoPrs> => control.adeRepoPrs(codeRepoId),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: codeRepoId !== '',
+  };
 }
 
 export function useAdePrs(codeRepoId: MaybeRefOrGetter<string>) {
-  return useQuery(() => ({
-    queryKey: adePrsKey(toValue(codeRepoId)),
-    queryFn: (): Promise<AdeRepoPrs> => control.adeRepoPrs(toValue(codeRepoId)),
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: toValue(codeRepoId) !== '',
-  }));
+  return useQuery(() => adePrsOptions(toValue(codeRepoId)));
 }
 
 /** §0.19: `staleTime: 0` — a candidate list must reflect whatever the user pushed a moment ago

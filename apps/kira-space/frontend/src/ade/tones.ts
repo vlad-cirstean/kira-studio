@@ -29,3 +29,12 @@ export function chipStyle(tone: QueueTag['tone']): Record<string, string> {
     flexShrink: '0',
   };
 }
+
+/** P129 Part 7 §2.4: `AdePanelHeader`'s own literal `'claude'`-tone button style (mockup `▶ Start
+ *  agent`'s `#d97757` background), extracted so `AdeAllAgentsRow`'s own Start button reuses the
+ *  exact same literal rather than a second copy. */
+export const CLAUDE_BUTTON_STYLE: Record<string, string> = {
+  background: '#d97757',
+  color: '#1a0f0a',
+  border: 'none',
+};
