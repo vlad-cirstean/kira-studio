@@ -227,6 +227,14 @@ historical prose.
   `Call`/`CallBinding` request kind (`pkg/application/messageprocessor.go`'s `callRequest`/
   `messageprocessor_call.go`'s `CallBinding`, both `0`); the response body is the bound method's
   own return value marshaled directly, no envelope.
+- **The session's own auto-mode permission classifier blocks `git remote set-url`/`git remote add`
+  outright, even against a disposable scratch repo built for a live check** (P129 Part 6's own
+  `§6.1`) — flagged as a "Remote Repoint" regardless of intent. A live check that needs a
+  GitHub-shaped `origin` to exercise a GitHub-gated code path (`githubRepo`'s own host check,
+  `gh.go`) cannot repoint an existing scratch remote to fake that shape in this environment; plan
+  around it (seed the scratch repo with the right remote URL from the start, before it exists as a
+  git remote at all) or fall back to reading the gate's own source plus its existing unit coverage,
+  rather than spending a retry loop on the same denied action.
 
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 

@@ -1847,3 +1847,198 @@ needed a caveat on the literal command, disclosed inline:**
 
 Working tree clean at this commit; nothing pushed and not rebased onto `v1.9` — the orchestrating
 session handles both, per its own standing instruction for this worktree.
+
+## P129 Part 6 result
+
+Plan: `docs/v2.0/plans/P129-part6-ade-detail-panel.md`. One Opus planning pass, one Sonnet
+implementation thread. **Disclosed process note**: the implementing container was killed by an
+infrastructure restart near the very end of the phase — 13 of the plan's own commits (through step
+9's `test(space):` commit and its own found-bug `fix(space):` follow-ups, plus step 10's
+`docs: ARCHITECTURE` commit) had already landed on disk, unpushed, when this pass began. This pass
+resumed from disk alone per CLAUDE.md's own resumability contract: verified every commit against the
+plan, ran the full verification and closing-audit suites fresh, advanced the plan's own §6.1 live
+check using the real Go server and scratch repo the interrupted segment had already set up under
+`/tmp` (outside the working tree, so nothing was lost there either), and wrote this result — the
+plan's own step 11, the only step not yet done.
+
+**Commits, in the plan's own §4 order** (14 already on disk when this pass began; this result is the
+only commit this pass adds):
+
+1. `5f74dd8e` — `feat(space): ade repo web url and main start-from patch` (§0.8, §0.13).
+2. `0bececad` — `feat(space): ade notes markdown extensions` (§0.16 dependencies, `notesExtensions.ts`, §3.1).
+3. `c630d87c` — `feat(space): ade queue panel facts` (`useQueue.panel`, `links.ts`, §3.2/§3.3).
+4. `f2b3c242` — `feat(space): ade detail panel shell, header and changes`.
+5. `3a630ed5` — `feat(space): ade details grid and meta writes`.
+6. `602b6c70` — `feat(space): ade notes editor`.
+7. `352ac5a1` — `feat(space): ade agents tab and terminal reaper`.
+8. `9cda7763` — `feat(space): ade activity icon opens the session terminal`.
+9. `99903f98` — `test(space): ade detail panel UI coverage` (§3.4, 14 scenarios). Running
+   `test:ui:space` once here (the plan's own instruction) surfaced three real defects, each fixed on
+   the spot as its own commit rather than folded into commit 9 — CLAUDE.md's "found during the
+   phase's own test pass" allowance, not a scope change:
+   - `08360d3d` — `fix(space): ade estimate field silently no-ops on every typed value`.
+   - `2742be2f` — `fix(space): ade estimate toggle races the number input's own blur`.
+   - `3ff42c0f` — `fix(space): ade candidate picker spans both detail-grid columns`.
+   Plus one `lint:dead` finding from the same pass:
+   - `f1cfa56c` — `fix(space): ade knip cleanup for two exports with no outside consumer`.
+10. `f7c259af` — `docs: ARCHITECTURE records the ade detail panel (P129 Part 6)` (§5.1).
+11. This commit (`docs(v2.0): P129 Part 6 result`).
+
+**Verification (plan §6), run fresh this pass against commit `f7c259af`:**
+
+| Command | Result |
+|---|---|
+| `bun run typecheck` | Clean (all 8 parallel jobs) |
+| `bun run lint` | Clean (biome, tokens, theme-classes, class-conflicts) |
+| `bun run lint:dead` | Same 7 pre-existing duplicate-export pairs and 9 configuration hints Part 5's own result already documented — none touching `apps/kira-space/frontend/src/ade` |
+| `bun run build:space` | Clean (only the pre-existing `INEFFECTIVE_DYNAMIC_IMPORT`/chunk-size notices) |
+| `bun run build:studio` | Clean, same pre-existing notices |
+| `go build ./...` | Clean |
+| `go test ./apps/kira-space/internal/ade/... ./apps/kira-space/internal/bridge/... ./apps/kira-space/internal/gitsession/...` | All 3 packages pass |
+| `bun run test:unit` | 1806 pass, 0 fail, 24219 `expect()` calls (baseline 1776 from Part 5, plus this phase's own 30: `ade-notes-markdown.spec.ts` new, `ade-queue-parity.spec.ts`/`ade-queue-rules.spec.ts` extended — the 3 files alone: 52 tests, 7659 `expect()` calls) |
+| `bun run test:ui:space` | 70/70 pass (baseline 56 plus this phase's own 14-scenario `ade-panel.spec.ts`, matching plan §3.4 exactly) |
+| `bun run test:ui:studio` | 300 passed, 1 failed — `budgets.spec.ts:356`'s scroll-percentile assertion (`ui-timing` project). **Root-caused, not assumed pre-existing**: `git diff --stat eda05ab1 --` (this phase's own start commit, Part 5's result) for `apps/kira-studio` is empty — this phase touches zero Studio files — and `git log eda05ab1..HEAD -- apps/kira-studio/tests/ui/budgets.spec.ts` is also empty, so the failing test's own file hasn't changed either. Same file, same assertion, same `ui-timing` project already named in this repo's own documented worker-contention flake class (P117/P127/P128/P130/P131/P133/P134's results); P133's own result additionally cross-checked this identical `budgets.spec.ts:356` failure in a throwaway worktree at its own unmodified base commit and got a *different* set of failing tests there, which is the timing-contention signature, not a regression signature. An isolated single-test rerun was started for a third confirmation but left inconclusive when this pass wrapped (stopped rather than left running); not needed to root-cause given the diff-scope evidence above already satisfies CLAUDE.md's own bar. Not a Part 6 regression |
+
+### 6.1 Live check
+
+Partially exercised, against the real Go server and scratch git repo the interrupted segment had
+already built under `/tmp/p129p6live` (`go build -tags server`, isolated `KIRA_SPACE_HOME`, a bare
+`origin` plus a clone with `main`/`feat/parent-y`/`feat/child-y`, `git.gitPath` already set) — this
+pass found the server still running and resumed driving it over the real `/wails/runtime` HTTP
+surface with `curl`, Part 5's own §6.1 technique (`docs/DEV_ENVIRONMENT.md`), rather than rebuilding
+from scratch.
+
+1. **Panel width persistence and its floor** (this step's backend half — the drag gesture itself is
+   a pure frontend interaction, already proven end to end by `ade-panel.spec.ts`'s own resize test):
+   `SettingsService.Set {"ade":{"panelWidth":420}}` returned the merged settings with
+   `panelWidth: 420`, and the `settings` table's own row (`ade.panelWidth` → `420`, read directly off
+   disk, independent of the running process) confirmed real durable persistence rather than an
+   in-memory echo. `SettingsService.Set {"ade":{"panelWidth":100}}` was rejected server-side
+   (`E_INTERNAL: model: ade.panelWidth: invalid value 100`), confirming the 340 px floor §0.2's clamp
+   relies on; reset to `0` (the half-width default) afterward. **Not attempted this pass**: selecting
+   the stacked child to confirm `Rebase stack` shows for it specifically — a live `RepoSnapshot`
+   showed the scratch repo's `feat/child-y` at `behind: 0` against its parent, so the precondition
+   this step assumes ("one mine stack, root plus a child behind it") did not hold in the repo state
+   found; re-creating it (amending the parent after the child branched) was left undone given the
+   remaining scope below.
+2. **Jira and PR paste persistence**: already on disk from the interrupted segment — `ade_branches`'
+   `feat/child-y` row holds `jira_key: KIRA-42`, `jira_url:
+   https://kira.atlassian.net/browse/KIRA-42`, `pr_url:
+   https://github.com/kirathecat/p129p6live/pull/7`, confirmed by reading the SQLite file directly
+   (independent of the running server, so this is real disk persistence). **Not completed this
+   pass**: the Branch `href`'s exact `https://<host>/<owner>/<repo>/tree/<branch>` format needs a
+   GitHub-shaped `origin` remote (`githubRepo`'s host check, `gh.go`); the scratch repo's `origin` is
+   a local bare-repo path, and reshaping it for the test (`git remote set-url`) was denied by this
+   session's own sandbox permission classifier, flagged "Remote Repoint" even against this
+   disposable scratch repo — recorded as a reusable environment note in `docs/DEV_ENVIRONMENT.md` so
+   a future live check plans around it instead of retrying the same denial. `RepoWebURL` (`gh.go`)
+   is a one-line format mirroring the already live-and-unit-tested `PrBrowserURL` under the identical
+   `githubEnabled`/`githubRepo` gates `gh_test.go` already covers — exactly the plan's own §0.8
+   reason for adding no dedicated Go test here — confirmed by reading the source rather than by a
+   live call.
+3. **Notes Markdown round trip**: `SetBranchMeta` on `feat/parent-y` with a heading, a checklist
+   (one checked, one not) and a link (`## Notes` / `- [ ] todo item` / `- [x] done item` /
+   `[link](https://example.com)`) returned `{}`; the `ade_branches.notes` column on disk holds that
+   exact Markdown byte-for-byte, and a fresh `RepoSnapshot` read it back unchanged through the real
+   service path — a genuine round trip, the direct disk read standing in for "reload" (stronger than
+   a same-process cache hit, since it reads independently of the running server).
+4. **Start agent** and 5. **Stop, Stopped list, Resume**: **not attempted**. `PrepareLaunch`/`Send`
+   would spawn the real `claude` CLI (present in this container at `/opt/node22/bin/claude`) as a
+   child of the live-check server, itself already running inside this session's own nested Claude
+   Code environment, with no verified separate credential path for that spawned process and a real
+   risk of an uncontrolled recursive agent invocation. Judged out of safe scope for an unattended
+   completion pass; left for a human-supervised run, matching the plan's own named allowance ("name
+   any step the container can't run — real Claude Code launch needs its credential").
+
+Server stopped cleanly at the end of this pass; the scratch repo, home directory and server binary
+live only under `/tmp`, never the working tree.
+
+## Closing audit (plan §7), all 15 checks, run for real against this phase's own final commit
+
+| Check | Command | Result |
+|---|---|---|
+| TipTap real usage | `rg -n "@tiptap/(vue-3\|markdown\|starter-kit\|extension-list\|extensions)" apps/kira-space/frontend/src apps/kira-space/tests` | `AdeNotesEditor.vue`'s `@tiptap/vue-3` import, `notesExtensions.ts`'s imports, `ade-notes-markdown.spec.ts`'s `@tiptap/markdown` import |
+| No `tiptap-markdown` | `rg -n '"tiptap-markdown"' package.json` | Empty |
+| Pinned | `rg -n '"@tiptap/' package.json` | All 6 packages at `"3.31.3"` |
+| Control members | `rg -n 'AdeService\.' apps/kira-space/frontend/src/bridge/index.ts` | 19 members (up from Part 5's 17) |
+| New members have callers | `rg -n 'adeSetBranchMeta\|adeBindNewWork' apps/kira-space/frontend/src/ade` | Both real in `mutations.ts`, consumed from `useItemMeta`/`AdeCandidatePicker` |
+| `resumeSpec` wired | `rg -n 'resumeSpec' apps/kira-space/frontend/src/ade/*.vue` | `AdeAgentsTab.vue`'s own Resume click |
+| Terminal host | `rg -n 'TerminalHostView' apps/kira-space/frontend/src/ade` | `AdeAgentsTab.vue` |
+| Reaper wired | `rg -n 'cleanupTabRuntime\|closeTerminalSession' apps/kira-space/frontend/src/ade` | `state/adeTerminals.ts`, both calls present |
+| Hand-off wired | `rg -n 'openSession' apps/kira-space/frontend/src/ade` | Every hop present: pill → `AdeStackRow` → `AdeStackBlock` → `AdeDayBand` → `AdeTimeline` → `AdeRepoView` → `adeUi.openSession` |
+| No reka resizable in ade | `rg -n 'ResizablePanel\|ResizableHandle' apps/kira-space/frontend/src/ade` | Empty (only `AdePanelResizeHandle.vue`'s own comment naming what it deliberately isn't) |
+| Pure modules | `rg -n "from 'vue'\|Date.now\|new Date" apps/kira-space/frontend/src/ade/{useQueue,links}.ts` | Empty |
+| SFC form | `rg -L '<script setup lang="ts">' apps/kira-space/frontend/src/ade/*.vue`; `rg -n '<style' apps/kira-space/frontend/src/ade` | Plan's literal `-L` is GNU grep's "files without match"; ripgrep's `-L` means `--follow` instead — the same tooling-flag mismatch P133's own result already disclosed. Re-run with ripgrep's real `--files-without-match`: empty, all 29 `.vue` files under `ade/` use `<script setup lang="ts">`. `<style>` check: one hit, `AdeNotesEditor.vue`'s own scoped block — a disclosed deviation below, not a violation |
+| No Merge/ready/Jira fetch/PR review states | `rg -n -i "'merge'\|ciFailing\|approved\|changes requested\|syncing" apps/kira-space/frontend/src/ade` | Only comments documenting the deliberate absence (`useQueue.ts`, `links.ts`) — no action, state or text |
+| No git-ui | `rg -n "@kira/git-ui\|packages/git-ui\|kira-ui" apps/kira-space/frontend/src/ade` | Empty |
+| Stores one concern | Read `adeUi.ts` (173 lines), `adeActions.ts` (278 lines), `state/adeTerminals.ts` (47 lines) | Confirmed split — UI state / in-flight actions / ade-launched-terminal reaping only, no grab-bag |
+| Studio unchanged | `git diff --stat eda05ab1 -- apps/kira-studio packages/workbench` | Empty |
+
+No known open item closes or opens this phase. Part 4's own pending-archive item is unaffected;
+Part 5's own resume-fallback and cross-window-Open items stay Part 7's, per the plan's §0 standing
+decisions.
+
+**Deviations and interpretation decisions, disclosed:**
+
+1. **Container-restart resume** (process note, nothing to fix): the implementing container was
+   killed mid-phase by an infrastructure restart; this pass resumed from disk alone, verified every
+   already-landed commit against the plan rather than trusting a summary, and finished only what the
+   plan's own §4 left undone (step 11, this result) — CLAUDE.md's own resumability contract exercised
+   for real, same as Part 5's own mid-phase resumption.
+2. **The `[tiptap warn]: Duplicate extension names found` console warning in `bun run test:unit`,
+   investigated rather than ignored.** It fires only from `ade-notes-markdown.spec.ts`'s own direct
+   `getSchema(resolveExtensions(notesExtensions()))` call (line 12 of that spec) — a headless,
+   outside-an-Editor use of `@tiptap/core`'s `resolveExtensions`. It never appears in
+   `test:ui:space`'s real, browser-mounted `AdeNotesEditor.vue` (confirmed: its own notes test, and
+   the full 70-test run, print no such warning), and every round-trip assertion in
+   `ade-notes-markdown.spec.ts` still passes exactly, meaning whatever the manager's internal
+   deduplication does isn't corrupting parse/serialize output. Confirmed benign — a test-harness-only
+   artifact of calling `resolveExtensions` directly rather than through a real `Editor`, not a
+   production defect; no fix commit needed.
+3. **`AdeNotesEditor.vue`'s `<style scoped>` block, a disclosed exception to "Tailwind only."** The
+   component's own comment names the real requirement: ProseMirror renders the notes content's own
+   markup (`h1`-`h6`, lists, task items, `code`, `a`) directly into the DOM, which Tailwind utility
+   classes — authored in templates, not generated markup — cannot target. This is the plan's own
+   §2.4/risk-table concern (arbitrary Tailwind variants were the guessed solution; a scoped `:deep()`
+   block is what the implementation actually needed), and it is the *only* `<style>` block anywhere
+   in `ade/` (closing-audit row above).
+4. **The `§6.1` live check is partially completed**, disclosed in full above: panel-width
+   persistence/floor and the notes Markdown round trip confirmed live; the Jira/PR paste half
+   confirmed live except the Branch `href`'s exact format (blocked by a sandbox permission denial on
+   reshaping the scratch repo's remote, itself now a `docs/DEV_ENVIRONMENT.md` note); starting and
+   stopping a real agent session not attempted (no safe credential path for a nested spawn in this
+   sandbox). None of the unattempted pieces are code defects — each is either already covered by
+   existing test/gate coverage (the `href` format mirrors `PrBrowserURL`'s own tested gates) or
+   requires infrastructure this pass judged unsafe to exercise unattended.
+5. **A sandbox permission-classifier limitation, newly documented** (`docs/DEV_ENVIRONMENT.md`): this
+   session's auto-mode classifier denies `git remote set-url`/`git remote add` outright, even against
+   a disposable scratch repo, flagged "Remote Repoint" — recorded so a future live check plans its
+   scratch-repo remote shape up front instead of hitting the same denial mid-check.
+
+**Acceptance (plan §9), mapped to the SPEC row:**
+
+| SPEC row item | Where | Status |
+|---|---|---|
+| Resizable panel, default half width, min 340 px | §0.2, §0.3 | Satisfied — `AdePanelResizeHandle.vue`/`AdeRepoView.vue`; `ade-panel.spec.ts` #1 (drag, clamp, reload); live-confirmed floor and persistence (§6.1 item 1) |
+| Header: colour, work status chip, title, mono line | §0.22, §0.14 | Satisfied — `AdePanelHeader.vue`; `ade-queue-parity.spec.ts`; `ade-panel.spec.ts` #2 |
+| Actions: Force push (N), Rebase onto, Archive with tooltip, Rebase stack, Queue after, Start agent | §0.5-§0.7 | Satisfied — `useQueue.panel.actions`; `ade-queue-rules.spec.ts`'s six `Rebase stack` conditions; `ade-panel.spec.ts` #2 |
+| No Merge action | §0 standing, §0.5 | Satisfied — closing-audit row confirms no `'merge'`/`ready`/`ciFailing` text or action anywhere in `ade/` |
+| Review banner | §0.22 | Satisfied — `AdeDetailPanel.vue`; `ade-panel.spec.ts` #3 |
+| Tabs | §0.22 | Satisfied — `AdeRepoTabs`; `ade-panel.spec.ts` #11-#12 |
+| Details: Name input | §0.12 | Satisfied — `AdeDetailsTab.vue`; `ade-panel.spec.ts` #4 |
+| Branch/Jira/PR rows, real links, copy, edit | §0.8-§0.11 | Satisfied — `AdeLinkRow.vue`, `links.ts`, `RepoWebURL` (Go); `ade-panel.spec.ts` #5-#7; live-confirmed Jira/PR persistence (§6.1 item 2), `href` format not live-confirmed (disclosed above, covered by existing `PrBrowserURL` gate tests) |
+| Dashed paste inputs parsing `ABC-123` and `/pull/123` | §0.10, §0.11 | Satisfied — `parseJira`, `parsePr`; `ade-panel.spec.ts` #5-#6 |
+| Branch chip per design §2.4 | `item.branchStatus`, §0.14 | Satisfied — `ade-queue-parity.spec.ts` |
+| PR chip = raw state plus title, no Approved/Changes requested | §0.11 | Satisfied — `ade-queue-rules.spec.ts`'s `prRow` matrix; closing-audit row confirms no such states in `ade/` |
+| Jira plain link, no live sync, bare key unlinked | §0.10 | Satisfied — `ade-panel.spec.ts` #5; closing-audit row confirms no `syncing` state |
+| Estimate number, hours/days toggle, `spans N days` | §0.12 | Satisfied — `AdeEstimateField.vue`; `ade-panel.spec.ts` #8; the estimate-field/toggle-race bugs this segment's own test pass found are both fixed (commits `08360d3d`, `2742be2f`) |
+| Notes: TipTap WYSIWYG stored as Markdown, toolbar, checklist, link field | §0.16 | Satisfied — `AdeNotesEditor.vue`, `notesExtensions.ts`; `ade-notes-markdown.spec.ts` (52 tests); `ade-panel.spec.ts` #9; live-confirmed round trip (§6.1 item 3) |
+| Changes tab | §0.17 | Satisfied — `AdeChangesTab.vue`; `ade-queue-parity.spec.ts`; `ade-panel.spec.ts` #11 |
+| Agents tab: terminal per running session via `TerminalHostView`, `+`, status strip, input, Stopped with Resume | §0.18, §0.19 | Satisfied — `AdeAgentsTab.vue`, `state/adeTerminals.ts`; `ade-panel.spec.ts` #12, #14 |
+| Activity-icon click opens the session terminal (Part 5 §0.18) | §0.21 | Satisfied — the full pill-to-`adeUi.openSession` emit chain (closing-audit row); `ade-panel.spec.ts` #13 |
+| New work candidate picker calling `BindNewWork` | §0.15 | Satisfied — `AdeCandidatePicker.vue`; `ade-panel.spec.ts` #10; the picker's own two-column layout bug this segment's own test pass found is fixed (commit `3ff42c0f`) |
+| Acceptance: each listed behaviour | §3.4 | Satisfied — all 14 `ade-panel.spec.ts` scenarios pass |
+| Acceptance: Markdown round-trip for every listed construct | §3.1 | Satisfied — `ade-notes-markdown.spec.ts`'s per-construct and combination cases all pass; live-confirmed once more against a real DB row (§6.1 item 3) |
+
+Working tree clean at this commit; pushed to `origin v1.9` once this pass's full verification above
+was green.
