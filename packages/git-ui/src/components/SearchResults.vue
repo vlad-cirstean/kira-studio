@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P11.md` W12: the grouped dropdown `SearchBox.vue` renders inside its own panel
+ * `docs/plans/P11.md` W12: the grouped dropdown `SearchBox.vue` renders inside its own `Popover`
  * (the same nesting `BranchPicker.vue` uses for `TagList.vue`/`StashList.vue`) — refs first
  * (local / remote / tag subsections, each labelled), then commits, each hit showing its kind and,
  * when it matched somewhere other than the subject or ref name, a field label. `role="listbox"`
@@ -12,13 +12,20 @@
  * Keyboard (arrow-key nav, `Enter` to select, `Escape` to close) lives in `SearchBox.vue` — the
  * element that actually holds focus throughout — not here; this file only reflects
  * `highlightedId` back as `aria-selected` and forwards a click as `select`.
+ *
+ * P131 Part 2 §5.3: positioning, backdrop and Escape/click-outside handling all moved onto
+ * `SearchBox.vue`'s own `Popover` — this file no longer owns any of that (its own outer box
+ * classes, `w-105`/`max-h-90`/`overflow-y-auto`/`py-0.5`, moved onto `PopoverContent` there too),
+ * rendering only the inner listbox content.
  */
-import { cn, computeFloatPosition, KuiButton, kuiRowVariants } from "@kira/kira-ui";
-import { computed, nextTick, onMounted, ref } from "vue";
-import { formatRelativeDate } from "./dateFormat.ts";
-import { SEARCH_LISTBOX_ID } from "./searchListboxId.ts";
-import type { SearchOption, SearchResultsModel } from "./searchResultsModel.ts";
-import { fieldLabel } from "./searchResultsModel.ts";
+import { Button } from '@theme/components/ui/button';
+import { computed } from 'vue';
+import { cn } from '../lib/cn.ts';
+import { rowVariants } from '../lib/rowVariants.ts';
+import { formatRelativeDate } from './dateFormat.ts';
+import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
+import type { SearchOption, SearchResultsModel } from './searchResultsModel.ts';
+import { fieldLabel } from './searchResultsModel.ts';
 
 const props = defineProps<{
   model: SearchResultsModel;
@@ -36,34 +43,7 @@ const emit = defineEmits<{
 
 const isEmpty = computed(() => props.model.sections.length === 0);
 
-// G20 D5, deviation: the plan's own file-by-file table calls for wrapping this in
-// `KuiPopoverPanel`, like the other 6 dropdowns — but this one, uniquely among the 7, is an ARIA
-// combobox listbox (see the file's own doc comment): `SearchBox.vue`'s `<input>` must keep real
-// DOM focus the whole time this is open, and its own Escape handling (a two-stage
-// dismiss-then-clear, OQ5) is bound directly to that input, not to a document-level listener.
-// `KuiPopoverPanel`'s own document-level, capture-phase Escape handler would intercept every
-// Escape keystroke before it ever reaches the input's own bubble-phase handler, silently
-// replacing that two-stage behaviour with a plain close — the exact "positioning-coupled
-// interaction logic" §7 item 2 anticipated as a reason to special-case one of the 7 rather than
-// force it through the shared wrapper. Positioned directly via `computeFloatPosition` instead —
-// real flip/shift, no backdrop, no Escape/click-outside handling of its own (both already live in
-// `SearchBox.vue`, untouched) — anchored to this component's own DOM parent (`SearchBox.vue`'s
-// `rootEl`), the same "read the wrapper, no prop needed" trick `KuiPopoverPanel` itself uses.
-const resultsEl = ref<HTMLElement | null>(null);
-const resultsStyle = ref({ left: '-9999px', top: '-9999px' });
-
-async function reposition(): Promise<void> {
-  await nextTick();
-  const el = resultsEl.value;
-  const anchor = el?.parentElement;
-  if (!el || !anchor) return;
-  const { left, top } = await computeFloatPosition(anchor, el, { placement: 'bottom-start' });
-  resultsStyle.value = { left: `${left}px`, top: `${top}px` };
-}
-
-onMounted(() => void reposition());
-
-/** P110 A17: `.kv-search-option`'s own gap/px are already exactly `kuiRowVariants()`'s own
+/** P110 A17: `.kv-search-option`'s own gap/px are already exactly `rowVariants()`'s own
  *  `gap-1`/`px-1.5` (P110 I2-29: the default spacing scale directly, not the retired
  *  `gap-kui-2`/`px-kui-3` names — same values, `--kui-space-2`/`--kui-space-3` bridged to
  *  the same `--kv-s-2`/`--kv-s-3` steps the default scale already equals). Only the vertical
@@ -72,7 +52,7 @@ onMounted(() => void reposition());
  *  same property; §1.3). */
 function optionClass(option: SearchOption): string {
   return cn(
-    kuiRowVariants(),
+    rowVariants(),
     'kv:px-2 kv:py-0.5',
     option.id === props.highlightedId ? 'kv:bg-hover' : '',
   );
@@ -80,12 +60,7 @@ function optionClass(option: SearchOption): string {
 </script>
 
 <template>
-  <div
-    ref="resultsEl"
-    class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:w-105 kv:max-h-90 kv:overflow-y-auto kv:py-0.5 kv:bg-panel kv:text-fg kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float"
-    data-testid="search-results"
-    :style="resultsStyle"
-  >
+  <div data-testid="search-results">
     <!-- ARIA's listbox role only permits `option`/`group` children (`aria-required-children`) —
          the status line, section titles and options live inside this inner listbox div; the
          stale hint, footers and the body-search button are its *siblings*, not its children. -->
@@ -174,13 +149,15 @@ function optionClass(option: SearchOption): string {
     >
       {{ model.tailNotice }}
     </div>
-    <KuiButton
+    <Button
       v-if="showBodySearchAffordance"
-      class="kv:block kv:w-full kv:text-left"
+      variant="toolbar"
+      size="kira"
+      class="w-full justify-start"
       data-testid="search-body-button"
       @click="emit('runBodySearch')"
     >
       Search message bodies
-    </KuiButton>
+    </Button>
   </div>
 </template>

@@ -45,22 +45,26 @@
  * now, alongside the toggle-closed gesture (`Ctrl/Cmd+F` a second time) and the new
  * `Ctrl+Alt+F` VS Code keybinding, none of which this component needs to know about.
  *
- * G-UX D9: the main query input is `KuiSearchInput` now, not a raw `<input>` — G21's own
- * "duplication G19 D3a/G21 D2 closed at its source" argument finally reaches this file too, now
- * that `KuiSearchInput` (`packages/kira-ui`) carries the ARIA/keydown passthrough props a
- * combobox needs (its own doc comment explains why they had to be added rather than assumed).
+ * P131 Part 2 §5.3: the dropdown and the regex error now share one non-modal shadcn `Popover`
+ * (mutually exclusive — the error means `compiled.kind` failed, the dropdown needs it `'ok'`),
+ * anchored to this row via `PopoverAnchor`. The row's own two-stage Escape and the input's real
+ * DOM focus stay exactly as this file's own doc comment above describes — the popover's own
+ * dismissal (Escape/outside-click) is wired to defer to them rather than fight them (`@escape-
+ * key-down`/`@interact-outside`/`@focus-outside` below), the ARIA combobox contract's real focus
+ * requirement unchanged.
  */
 import type { SearchScope } from '@kira/git-core';
-import type { KuiSelectOption } from '@kira/kira-ui';
-// `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
-// ever reads it through `InstanceType<typeof KuiSearchInput>` (`searchInputRef`) — the template's
-// own `<KuiSearchInput>` tag instantiates it as a component; biome's static analysis sees neither
-// use and would otherwise "fix" this to `import type`, silently erasing the import —
-// `biome.json`'s own `**/*.vue` override turns `useImportType` off for exactly this class of
-// false positive (P96 §5.2).
-import { computeFloatPosition, KuiButton, KuiSearchInput, KuiSelect } from '@kira/kira-ui';
-import { onClickOutside } from '@vueuse/core';
-import { computed, nextTick, ref, watch } from 'vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
 import SearchResults from './SearchResults.vue';
@@ -79,36 +83,9 @@ const emit = defineEmits<{
 }>();
 
 const rootEl = ref<HTMLElement | null>(null);
-const searchInputRef = ref<InstanceType<typeof KuiSearchInput> | null>(null);
+const searchInputEl = useTemplateRef<{ $el: HTMLElement }>('searchInputEl');
 
 const ERROR_ID = 'kv-search-error';
-
-// G20 D5, deviation: the plan's own file-by-file table calls for wrapping `.kv-search-error` in
-// `KuiPopoverPanel` like the other 6 dropdowns — but that component's backdrop is a full-viewport,
-// `position: fixed` click-catcher (by design, for a user-opened menu). This element is a passive
-// inline validation message that appears/disappears as a side effect of typing a regex, never
-// something the user affirmatively "opens" — wrapping it in that backdrop would block every other
-// click in the UI (the graph, the toolbar) for as long as a regex error happens to be showing,
-// a real interaction regression the plan's own read of this file (as one of "7 dropdowns," all
-// assumed click-triggered) did not surface. Positioned directly via `computeFloatPosition`
-// instead — real flip/shift, no backdrop, no Escape/click-outside handling of its own (it was
-// never modal) — mirroring `App.vue`'s own one-off force-delete-popup treatment (D4) rather than
-// `KuiPopoverPanel`.
-const errorEl = ref<HTMLElement | null>(null);
-const errorStyle = ref({ left: '-9999px', top: '-9999px' });
-watch(
-  () => props.search.error.value,
-  async (error) => {
-    if (!error) return;
-    errorStyle.value = { left: '-9999px', top: '-9999px' };
-    await nextTick();
-    const anchor = rootEl.value;
-    const el = errorEl.value;
-    if (!anchor || !el) return;
-    const { left, top } = await computeFloatPosition(anchor, el, { placement: 'bottom-start' });
-    errorStyle.value = { left: `${left}px`, top: `${top}px` };
-  },
-);
 
 /** The inline `n of N` indicator mirrors exactly what `Enter`/`Shift+Enter` step through —
  *  commit matches (judgment call 6) — so it is hidden entirely in `Refs` scope, where there is
@@ -144,6 +121,28 @@ const resultsModel = computed(() =>
 const dropdownVisible = computed(
   () => props.search.compiled.value.kind === 'ok' && !dropdownDismissed.value,
 );
+
+// P131 Part 2 §5.3: one non-modal Popover shows whichever of the two applies -- the dropdown or
+// the regex error -- they are mutually exclusive (results need compiled.kind === 'ok', the error
+// means it failed).
+const popoverOpen = computed(() => !!props.search.error.value || dropdownVisible.value);
+
+function onPopoverOpenChange(value: boolean): void {
+  if (value) return;
+  // The error is passive and clears only when the query changes (not on dismissal) -- ignore a
+  // reka-driven close while it is showing, matching the old computeFloatPosition treatment's own
+  // "no Escape/click-outside handling of its own" for this element.
+  if (props.search.error.value) return;
+  dropdownDismissed.value = true;
+}
+
+// A click/focus move inside this component's own row (the input, the option toggles, the scope
+// select, the close button) must not count as "outside" the popover -- it is the anchor itself,
+// portaled content included would otherwise get a doubled close.
+function ignoreOwnRow(e: CustomEvent<{ originalEvent: PointerEvent | FocusEvent }>): void {
+  const target = e.detail.originalEvent.target as Node | null;
+  if (target && rootEl.value?.contains(target)) e.preventDefault();
+}
 
 const highlightedOption = computed<SearchOption | undefined>(
   () => resultsModel.value.flatOptions[highlightedIndex.value],
@@ -220,115 +219,119 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-const scopeOptions: readonly KuiSelectOption[] = [
-  { value: 'both', label: 'Both' },
-  { value: 'commits', label: 'Commits' },
-  { value: 'refs', label: 'Refs' },
-];
-
 function onScopeChange(value: string): void {
   props.search.scope.value = value as SearchScope;
 }
 
-onClickOutside(rootEl, () => {
-  if (dropdownVisible.value) dropdownDismissed.value = true;
-});
-
-defineExpose({ focus: () => searchInputRef.value?.focus() });
+defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
 </script>
 
 <template>
-  <div ref="rootEl" class="kv:relative kv:flex-1 kv:min-w-0">
-    <div class="kv:flex kv:items-center kv:gap-1">
-      <KuiSearchInput
-        ref="searchInputRef"
-        class="kv:flex-1 kv:min-w-0"
-        :model-value="search.text.value"
-        placeholder="Search"
-        ariaLabel="Search"
-        role="combobox"
-        aria-haspopup="listbox"
-        data-testid="search-input"
-        :aria-expanded="dropdownVisible && resultsModel.sections.length > 0"
-        :aria-controls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
-        :ariaActivedescendant="highlightedOption?.id"
-        :aria-describedby="search.error.value ? ERROR_ID : undefined"
-        :aria-invalid="!!search.error.value"
-        @update:model-value="onInput"
-        @keydown="onKeydown"
-      />
-      <section class="kv:flex kv:gap-0.25" aria-label="Search options">
-        <KuiButton
-          icon="codicon-case-sensitive"
-          class="kv:text-muted-foreground kv:text-sm"
-          :active="search.caseSensitive.value"
-          :aria-pressed="search.caseSensitive.value"
-          v-kui-tooltip="'Match case'"
-          aria-label="Match case"
-          data-testid="search-toggle-case"
-          @click="search.caseSensitive.value = !search.caseSensitive.value"
-        />
-        <KuiButton
-          icon="codicon-whole-word"
-          class="kv:text-muted-foreground kv:text-sm"
-          :active="search.wholeWord.value"
-          :aria-pressed="search.wholeWord.value"
-          v-kui-tooltip="'Match whole word'"
-          aria-label="Match whole word"
-          data-testid="search-toggle-whole-word"
-          @click="search.wholeWord.value = !search.wholeWord.value"
-        />
-        <KuiButton
-          icon="codicon-regex"
-          class="kv:text-muted-foreground kv:text-sm"
-          :active="search.regex.value"
-          :aria-pressed="search.regex.value"
-          v-kui-tooltip="'Use regular expression'"
-          aria-label="Use regular expression"
-          data-testid="search-toggle-regex"
-          @click="search.regex.value = !search.regex.value"
-        />
-      </section>
-      <KuiSelect
-        class="kv:text-sm"
-        ariaLabel="Search scope"
-        data-testid="search-scope"
-        :model-value="search.scope.value"
-        :options="scopeOptions"
-        @update:model-value="onScopeChange"
-      />
-      <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
-      <KuiButton
-        variant="icon"
-        icon="codicon-close"
-        v-kui-tooltip="'Close search'"
-        aria-label="Close search"
-        data-testid="search-close-button"
-        @click="emit('close')"
-      />
-    </div>
-    <div
-      v-if="search.error.value"
-      :id="ERROR_ID"
-      ref="errorEl"
-      class="kv:fixed kv:z-[var(--kui-z-popover,20)] kv:max-w-[var(--kui-float-max-w,none)] kv:py-0.5 kv:px-1 kv:bg-panel kv:text-error kv:border kv:border-border-strong kv:rounded-lg kv:shadow-float kv:text-sm"
-      role="alert"
-      data-testid="search-error"
-      :style="errorStyle"
+  <Popover :open="popoverOpen" @update:open="onPopoverOpenChange">
+    <PopoverAnchor as-child>
+      <div ref="rootEl" class="kv:relative kv:flex-1 kv:min-w-0">
+        <div class="kv:flex kv:items-center kv:gap-1">
+          <InputGroup variant="kira" class="flex-1 min-w-0" data-testid="search-input">
+            <InputGroupAddon>
+              <CodiconIcon name="search" :size="13" />
+            </InputGroupAddon>
+            <InputGroupInput
+              ref="searchInputEl"
+              :model-value="search.text.value"
+              placeholder="Search"
+              aria-label="Search"
+              role="combobox"
+              tabindex="0"
+              aria-haspopup="listbox"
+              :aria-expanded="dropdownVisible && resultsModel.sections.length > 0"
+              :aria-controls="dropdownVisible ? SEARCH_LISTBOX_ID : undefined"
+              :aria-activedescendant="highlightedOption?.id"
+              :aria-describedby="search.error.value ? ERROR_ID : undefined"
+              :aria-invalid="!!search.error.value"
+              @update:model-value="onInput"
+              @keydown="onKeydown"
+            />
+            <InputGroupAddon v-if="search.text.value" align="inline-end">
+              <InputGroupButton aria-label="Clear search" @click="search.text.value = ''">
+                <CodiconIcon name="close" :size="12" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <section class="kv:flex kv:gap-0.25" aria-label="Search options">
+            <TooltipIconButton
+              icon="case-sensitive"
+              label="Match case"
+              :aria-pressed="search.caseSensitive.value"
+              class="aria-pressed:bg-field aria-pressed:text-fg"
+              data-testid="search-toggle-case"
+              @click="search.caseSensitive.value = !search.caseSensitive.value"
+            />
+            <TooltipIconButton
+              icon="whole-word"
+              label="Match whole word"
+              :aria-pressed="search.wholeWord.value"
+              class="aria-pressed:bg-field aria-pressed:text-fg"
+              data-testid="search-toggle-whole-word"
+              @click="search.wholeWord.value = !search.wholeWord.value"
+            />
+            <TooltipIconButton
+              icon="regex"
+              label="Use regular expression"
+              :aria-pressed="search.regex.value"
+              class="aria-pressed:bg-field aria-pressed:text-fg"
+              data-testid="search-toggle-regex"
+              @click="search.regex.value = !search.regex.value"
+            />
+          </section>
+          <NativeSelect
+            variant="bordered"
+            size="kira"
+            aria-label="Search scope"
+            data-testid="search-scope"
+            :model-value="search.scope.value"
+            @update:model-value="(v) => onScopeChange(v as string)"
+          >
+            <option value="both">Both</option>
+            <option value="commits">Commits</option>
+            <option value="refs">Refs</option>
+          </NativeSelect>
+          <span v-if="countLabel" class="kv:px-0.5 kv:text-muted-foreground kv:text-sm kv:whitespace-nowrap" data-testid="search-count">{{ countLabel }}</span>
+          <TooltipIconButton icon="close" label="Close search" data-testid="search-close-button" @click="emit('close')" />
+        </div>
+      </div>
+    </PopoverAnchor>
+
+    <PopoverContent
+      align="start"
+      :side-offset="2"
+      class="p-0 gap-0 w-105"
+      @open-auto-focus.prevent
+      @close-auto-focus.prevent
+      @escape-key-down="(e) => e.preventDefault()"
+      @interact-outside="ignoreOwnRow"
+      @focus-outside="ignoreOwnRow"
     >
-      {{ search.error.value }}
-    </div>
-    <SearchResults
-      v-if="dropdownVisible"
-      :model="resultsModel"
-      :highlighted-id="highlightedOption?.id"
-      :searching="search.searching.value"
-      :tail-stale="search.tailStale.value"
-      :show-body-search-affordance="showBodySearchAffordance"
-      @select="selectOption"
-      @hover="(option) => (highlightedIndex = resultsModel.flatOptions.indexOf(option))"
-      @run-body-search="search.runBodySearch()"
-    />
-  </div>
+      <div
+        v-if="search.error.value"
+        :id="ERROR_ID"
+        role="alert"
+        data-testid="search-error"
+        class="kv:py-0.5 kv:px-1 kv:text-error kv:text-sm"
+      >
+        {{ search.error.value }}
+      </div>
+      <SearchResults
+        v-else
+        :model="resultsModel"
+        :highlighted-id="highlightedOption?.id"
+        :searching="search.searching.value"
+        :tail-stale="search.tailStale.value"
+        :show-body-search-affordance="showBodySearchAffordance"
+        @select="selectOption"
+        @hover="(option) => (highlightedIndex = resultsModel.flatOptions.indexOf(option))"
+        @run-body-search="search.runBodySearch()"
+      />
+    </PopoverContent>
+  </Popover>
 </template>
 
