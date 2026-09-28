@@ -19,9 +19,10 @@
  * that emit to this component's exposed `refresh()`, so both paths share one implementation and
  * one `hasPendingChange` state.
  */
-import { KuiButton } from '@kira/kira-ui';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
-import { ACTION_ICONS } from '../icons/index.ts';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { RepoState } from '../state/repo.ts';
 
@@ -62,26 +63,27 @@ defineExpose({ refresh: doRefresh });
 </script>
 
 <template>
-  <!-- KuiButton's own icon renders through KuiIconBox internally (no class passthrough to the
-       inner `.codicon` span), so spinning it needs an arbitrary descendant-selector variant here
-       rather than a class placed directly on the icon (§1.1 rung 4). Pre-approved spinner change
-       (§1.4/§6.4): the stepped 1.5s rotation becomes Tailwind's smooth 1s `animate-spin`. -->
-  <KuiButton
-    :icon="ACTION_ICONS.refresh"
-    variant="icon"
-    :class="[
-      'kv:relative kv:disabled:cursor-default kv:disabled:opacity-70',
-      { 'kv:[&_.codicon]:animate-spin': isRefreshing },
-    ]"
-    :disabled="isBusy"
-    v-kui-tooltip="tooltip"
-    aria-label="Refresh"
-    @click="doRefresh"
-  >
-    <span
-      v-if="hasPendingChange"
-      class="kv:absolute kv:top-0.75 kv:right-0.75 kv:size-1.5 kv:rounded-full kv:bg-focus"
-      aria-hidden="true"
-    ></span>
-  </KuiButton>
+  <!-- The icon is now a direct Button child, so the spin class goes straight on it — no more
+       arbitrary descendant-selector workaround. Pre-approved spinner change (§1.4/§6.4): the
+       stepped 1.5s rotation becomes Tailwind's smooth 1s `animate-spin`. -->
+  <Tooltip>
+    <TooltipTrigger as-child>
+      <Button
+        variant="toolbar"
+        size="kira-icon"
+        class="relative disabled:opacity-70"
+        :disabled="isBusy"
+        aria-label="Refresh"
+        @click="doRefresh"
+      >
+        <CodiconIcon name="refresh" :class="{ 'animate-spin': isRefreshing }" />
+        <span
+          v-if="hasPendingChange"
+          class="absolute top-0.75 right-0.75 size-1.5 rounded-full bg-focus"
+          aria-hidden="true"
+        ></span>
+      </Button>
+    </TooltipTrigger>
+    <TooltipContent>{{ tooltip }}</TooltipContent>
+  </Tooltip>
 </template>

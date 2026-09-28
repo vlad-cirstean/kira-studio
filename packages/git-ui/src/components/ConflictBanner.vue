@@ -20,7 +20,7 @@
  * still announces on appearance (the whole point) without demanding attention indefinitely.
  */
 import { describeInProgress } from '@kira/git-core';
-import { KuiButton } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 
@@ -107,36 +107,43 @@ const PATH_DISPLAY_CAP = 20;
 
       <span class="kv:flex-1"></span>
 
-      <KuiButton
+      <Button
         v-if="resolveConflictEnabled"
+        variant="toolbar"
+        size="kira"
         :disabled="inProgress.unmergedCount === 0 || busyAction !== undefined"
         @click="onResolve"
       >
         Resolve in VS Code
-      </KuiButton>
-      <KuiButton
+      </Button>
+      <Button
         v-if="writeCapability && inProgress.canContinue"
+        variant="toolbar"
+        size="kira"
         :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
       >
         Continue
-      </KuiButton>
-      <KuiButton
+      </Button>
+      <Button
         v-if="writeCapability && inProgress.canSkip"
+        variant="toolbar"
+        size="kira"
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
         Skip
-      </KuiButton>
-      <KuiButton
+      </Button>
+      <Button
         v-if="writeCapability && inProgress.canAbort"
         variant="danger"
+        size="kira"
         :disabled="busyAction !== undefined"
         @click="onAbort"
       >
         Abort
-      </KuiButton>
+      </Button>
     </div>
 
     <p

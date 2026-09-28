@@ -5,17 +5,19 @@
 // (graphView/pageSize, an Alt-click "load everything" mode, a Cancel affordance) — a different
 // shape for a different kind of list. `@click` reaches the caller's own `showMore` through this
 // component's single-root attrs fallthrough.
-import { KuiButton } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
 import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 
 defineProps<{ hiddenCount: number }>();
 </script>
 
 <template>
-  <KuiButton
+  <Button
     v-if="hiddenCount > 0"
-    class="kv:block kv:w-full kv:text-left kv:py-0.5 kv:px-2 kv:border-0 kv:text-sm kv:enabled:hover:bg-transparent kv:enabled:hover:underline"
+    variant="link"
+    size="kira"
+    class="w-full justify-start px-2 py-0.5 h-auto text-muted-foreground"
   >
     Show {{ Math.min(REF_LIST_SECTION_CAP, hiddenCount) }} more ({{ hiddenCount }} remaining)
-  </KuiButton>
+  </Button>
 </template>

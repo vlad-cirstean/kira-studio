@@ -10,7 +10,7 @@ import type { RepoCandidate } from '@kira/git-ipc';
  * VS Code's one-repo-per-window model).
  */
 import { TransportError } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
 import { onMounted, ref } from 'vue';
 import { STATE_ICONS } from '../icons/index.ts';
 import type { RepoState } from '../state/repo.ts';
@@ -71,13 +71,15 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
              loop, a worktree switch elsewhere) is in flight — `RepoState.open`'s own sequence
              token already discards whichever one loses the race, but a second click before that
              is just wasted work and a confusing "which one did I pick" moment. -->
-        <KuiButton
-          class="kv:w-full kv:text-left kv:overflow-hidden kv:text-ellipsis kv:whitespace-nowrap"
+        <Button
+          variant="toolbar"
+          size="kira"
+          class="w-full justify-start truncate"
           :disabled="repoState.opening.value"
           @click="openCandidate(candidate)"
         >
           {{ candidate.label }}
-        </KuiButton>
+        </Button>
       </li>
     </ul>
     <template v-else>
@@ -92,9 +94,15 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
         Kira Space follows the folders open in this VS Code window. None of them is a Git
         repository — open one with File → Open Folder.
       </p>
-      <KuiButton v-if="refreshError" data-testid="no-repository-retry" @click="refreshCandidates">
+      <Button
+        v-if="refreshError"
+        variant="toolbar"
+        size="kira"
+        data-testid="no-repository-retry"
+        @click="refreshCandidates"
+      >
         Retry
-      </KuiButton>
+      </Button>
     </template>
     <p
       v-if="pickError"

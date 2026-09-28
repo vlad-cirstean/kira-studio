@@ -9,7 +9,8 @@
  * Deliberately has no live region of its own: W14 owns "one polite live region" announcing both
  * load-more and refresh outcomes, and a second region here would fight it (plan lines ~1325-6).
  */
-import { KuiButton } from '@kira/kira-ui';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { GraphViewState } from '../state/graphView.ts';
 
@@ -60,22 +61,27 @@ function handleCancel(): void {
     v-if="!graphView.exhausted.value && (isLoading || graphView.remaining.value > 0)"
     class="kv:flex kv:items-center kv:justify-center kv:gap-1 kv:py-1 kv:px-2 kv:shrink-0"
   >
-    <KuiButton
-      :disabled="isLoading"
-      v-kui-tooltip="'Alt-click to load everything remaining — this keeps every loaded commit in memory.'"
-      @click="handlePress"
-    >
-      {{ buttonLabel }}
-    </KuiButton>
-    <!-- G34: the default `KuiButton` box already matches this shape; Cancel keeps its one genuine
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira" :disabled="isLoading" @click="handlePress">
+          {{ buttonLabel }}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        Alt-click to load everything remaining — this keeps every loaded commit in memory.
+      </TooltipContent>
+    </Tooltip>
+    <!-- G34: the toolbar Button box already matches this shape; Cancel keeps its one genuine
          distinction, the underline. -->
-    <KuiButton
+    <Button
       v-if="isLoading"
-      class="kv:underline"
+      variant="toolbar"
+      size="kira"
+      class="underline"
       aria-label="Cancel loading"
       @click="handleCancel"
     >
       Cancel
-    </KuiButton>
+    </Button>
   </div>
 </template>

@@ -15,7 +15,7 @@
  * file's own doc comment.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
-import { KuiButton } from '@kira/kira-ui';
+import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import type { PickerList } from './pickerModel.ts';
@@ -93,12 +93,10 @@ async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
 <template>
   <section aria-label="Global stash">
     <RefSectionHeader label="Global stash">
-      <KuiButton
+      <TooltipIconButton
         v-if="writeCapability"
-        variant="icon"
-        icon="codicon-add"
-        v-kui-tooltip="'Save to global stash…'"
-        aria-label="Save to global stash…"
+        icon="add"
+        label="Save to global stash…"
         @click="emit('saveGlobalStash')"
       />
     </RefSectionHeader>

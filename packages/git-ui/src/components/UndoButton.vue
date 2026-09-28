@@ -11,7 +11,9 @@
  * for a reset, per hard part 1's own table) rather than staying the single fixed string this file
  * used to render inline.
  */
-import { KuiButton } from '@kira/kira-ui';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { composeUndoTooltip } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 
@@ -31,26 +33,32 @@ async function undo(): Promise<void> {
 
 <template>
   <div v-if="writeCapability && ops.undoSlot.value" class="kv:flex kv:items-center kv:gap-0.5">
-    <KuiButton
-      icon="codicon-discard"
-      v-kui-tooltip="composeUndoTooltip(ops.undoSlot.value.label)"
-      :disabled="ops.busy.value"
-      @click="undo"
-    >
-      {{ ops.undoSlot.value.label }}
-    </KuiButton>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira" :disabled="ops.busy.value" @click="undo">
+          <CodiconIcon name="discard" />
+          {{ ops.undoSlot.value.label }}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ composeUndoTooltip(ops.undoSlot.value.label) }}</TooltipContent>
+    </Tooltip>
     <!-- G34 D5: the plan's own icon-only/text split names this call site as icon-only (its `ghost`
          predates both real classes) — it is not: the slot holds real multi-character sha text, not
-         an icon, so `variant="icon"`'s fixed square width would clip it. Dropped to the plain
+         an icon, so an icon-only button's fixed square width would clip it. Dropped to the plain
          default, the same call the "Show more"/"Show less" toggle gets for the identical reason. -->
-    <KuiButton
-      v-if="clipboardEnabled"
-      class="kv:font-data kv:text-sm kv:text-muted-foreground kv:cursor-copy"
-      v-kui-tooltip="`Copy recovery SHA ${ops.undoSlot.value.recoverySha}`"
-      @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
-    >
-      {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
-    </KuiButton>
+    <Tooltip v-if="clipboardEnabled">
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira"
+          class="font-data text-kira-sm text-muted-foreground cursor-copy"
+          @click="copy(ops.undoSlot.value.recoverySha, 'recovery SHA')"
+        >
+          {{ ops.undoSlot.value.recoverySha.slice(0, 7) }}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Copy recovery SHA {{ ops.undoSlot.value.recoverySha }}</TooltipContent>
+    </Tooltip>
     <span v-else class="kv:font-data kv:text-sm kv:text-muted-foreground kv:cursor-copy">{{
       ops.undoSlot.value.recoverySha.slice(0, 7)
     }}</span>
