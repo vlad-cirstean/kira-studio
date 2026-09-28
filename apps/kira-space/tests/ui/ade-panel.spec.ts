@@ -1,5 +1,6 @@
 import type {
   AdeBranch,
+  AdeDependency,
   AdeNewWork,
   AdePair,
   AdePlan,
@@ -83,6 +84,17 @@ function newWork(overrides: Partial<AdeNewWork> & Pick<AdeNewWork, 'id' | 'title
 
 function pair(overrides: Partial<AdePair> & Pick<AdePair, 'a' | 'b'>): AdePair {
   return { shared: [], conflicts: [], ...overrides };
+}
+
+function dependency(overrides: Partial<AdeDependency> & Pick<AdeDependency, 'id'>): AdeDependency {
+  return {
+    title: 'Dependency',
+    waitingOn: '',
+    expectedBy: null,
+    createdAt: Date.now(),
+    blocks: [],
+    ...overrides,
+  };
 }
 
 function plan(day: Record<string, string | null>, overrides: Partial<AdePlan> = {}): AdePlan {
@@ -699,12 +711,13 @@ test('branch link: href is webUrl/tree/<encoded>, click opens it externally, the
 // 8. Estimate
 // ---------------------------------------------------------------------------------------------
 
-test('estimate: 3 plus days writes 3d and shows the multi-day hint, toggling to hours writes 3h', async ({
+test('estimate: settable in hours or days; once set, extend-only (P135 §6.1)', async ({
   relaunch,
 }) => {
   const a = fullBranch({ id: 'a', branch: 'feat/a' });
   const snap = snapshot({ branches: [a], plan: plan({ a: TODAY_ISO }) });
   const withEst3d = snapshot({ branches: [{ ...a, est: '3d' }], plan: snap.plan });
+  const withEst5d = snapshot({ branches: [{ ...a, est: '5d' }], plan: snap.plan });
 
   const { window: page, control } = await relaunch({
     clockTime: CLOCK_TIME,
@@ -714,12 +727,13 @@ test('estimate: 3 plus days writes 3d and shows the multi-day hint, toggling to 
       { channel: IPC.adeSetBranchMeta, response: null },
       ...snapshotControl(withEst3d),
       { channel: IPC.adeSetBranchMeta, response: null },
-      ...snapshotControl(withEst3d),
+      ...snapshotControl(withEst5d),
     ],
   });
 
   await select(page, 'a');
   const estimateUnit = page.locator('fieldset[aria-label="Estimate unit"]');
+  // Fresh value, settable in either unit before it's set — days chosen here.
   await page.locator('#ade-est-num').fill('3');
   await estimateUnit.getByRole('button', { name: 'days' }).click();
   await expect
@@ -736,20 +750,37 @@ test('estimate: 3 plus days writes 3d and shows the multi-day hint, toggling to 
     .toBe(true);
   await expect(page.getByText('spans')).toBeVisible();
 
-  await estimateUnit.getByRole('button', { name: 'hours' }).click();
+  // Once set: the toggle is gone, the total is read-only.
+  await expect(estimateUnit).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-estimate-total"]')).toHaveText('3d');
+
+  // Typing into Extend by and blurring writes nothing on its own.
+  const setBranchMetaCallsBefore = control
+    .log()
+    .filter((e) => e.channel === IPC.adeSetBranchMeta).length;
+  const extendInput = page.locator('[data-testid="ade-estimate-extend"]');
+  await extendInput.fill('2');
+  await extendInput.blur();
+  await page.waitForTimeout(100);
+  expect(control.log().filter((e) => e.channel === IPC.adeSetBranchMeta).length).toBe(
+    setBranchMetaCallsBefore,
+  );
+
+  // Extend adds to the total and the hint updates.
+  await page.locator('[data-testid="ade-estimate-extend-submit"]').click();
   await expect
-    .poll(
-      () =>
-        control
-          .log()
-          .filter(
-            (e) =>
-              e.channel === IPC.adeSetBranchMeta &&
-              JSON.stringify((e.args as { patch?: unknown } | undefined)?.patch) ===
-                JSON.stringify({ est: '3h' }),
-          ).length,
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeSetBranchMeta &&
+            JSON.stringify((e.args as { patch?: unknown } | undefined)?.patch) ===
+              JSON.stringify({ est: '5d' }),
+        ),
     )
-    .toBeGreaterThan(0);
+    .toBe(true);
+  await expect(page.locator('[data-testid="ade-estimate-total"]')).toHaveText('5d');
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -1058,7 +1089,11 @@ test('agents: tabs per running session, amber input tint, terminal host for this
   await expect(page.locator('[data-testid="ade-agents-stopped-row"]')).toBeVisible();
 
   // "+" launches a new session — the Start dialog, then Send calls PrepareLaunch + terminalOpen.
-  await page.locator('[data-testid="ade-agents-new"]').click();
+  // P135 deliverable (1): the button renders the codicon glyph, no hand-drawn SVG.
+  const newSessionButton = page.locator('[data-testid="ade-agents-new"]');
+  await expect(newSessionButton.locator('.codicon-add')).toHaveCount(1);
+  await expect(newSessionButton.locator('svg')).toHaveCount(0);
+  await newSessionButton.click();
   const dialog = page.locator('[data-testid="ade-dialog"]');
   await expect(dialog).toContainText('Start Claude Code');
   await dialog.locator('[data-testid="ade-dialog-send"]').click();
@@ -1211,4 +1246,178 @@ test('reaper: a stopped session (sessions push plus terminal exit) closes its te
   await emitWailsEvent(page, IPC.adeSessionsChanged, {});
 
   await expect.poll(() => control.log().some((e) => e.channel === IPC.terminalClose)).toBe(true);
+});
+
+// ---------------------------------------------------------------------------------------------
+// 15. Dependency panel (P135 §4.7)
+// ---------------------------------------------------------------------------------------------
+
+test('dependency panel: edits title, waiting-on and expected-by, Resolve moves it to history', async ({
+  relaunch,
+}) => {
+  const dep = dependency({ id: 'dep-1', title: 'Vendor API', waitingOn: 'their release' });
+  const snap = snapshot({ dependencies: [dep] });
+  const snapLate = snapshot({
+    dependencies: [{ ...dep, expectedBy: '2026-09-01' }], // Past TODAY_ISO — late with no blocks.
+  });
+  const snapResolved = snapshot({
+    dependencies: [],
+    history: [
+      {
+        item: 'dep-1',
+        kind: 'dependency',
+        title: 'Vendor API',
+        branch: '',
+        archivedAt: Date.now(),
+        mergedAt: null,
+      },
+    ],
+  });
+
+  const { window: page, control } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      { channel: IPC.adeUpdateDependency, response: null },
+      ...snapshotControl(snap),
+      ...snapshotControl(snap),
+      ...snapshotControl(snapLate),
+      { channel: IPC.adeResolveDependency, response: null },
+      ...snapshotControl(snapResolved),
+    ],
+  });
+
+  await select(page, 'dep-1');
+  const details = page.locator('[data-testid="ade-dependency-details"]');
+  await expect(details).toBeVisible();
+
+  const nameInput = page.locator('[data-testid="ade-dependency-name-input"]');
+  await nameInput.fill('Vendor API v2');
+  await nameInput.blur();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeUpdateDependency &&
+            JSON.stringify((e.args as { patch?: unknown } | undefined)?.patch) ===
+              JSON.stringify({ title: 'Vendor API v2' }),
+        ),
+    )
+    .toBe(true);
+
+  const waitingOnInput = page.locator('[data-testid="ade-dependency-waiting-on-input"]');
+  await waitingOnInput.fill('their next release');
+  await waitingOnInput.blur();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeUpdateDependency &&
+            JSON.stringify((e.args as { patch?: unknown } | undefined)?.patch) ===
+              JSON.stringify({ waitingOn: 'their next release' }),
+        ),
+    )
+    .toBe(true);
+
+  const expectedByInput = page.locator('[data-testid="ade-dependency-expected-by-input"]');
+  await expectedByInput.fill('2026-09-01');
+  await expectedByInput.dispatchEvent('change');
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeUpdateDependency &&
+            JSON.stringify((e.args as { patch?: unknown } | undefined)?.patch) ===
+              JSON.stringify({ expectedBy: '2026-09-01' }),
+        ),
+    )
+    .toBe(true);
+  await expect(page.locator('[data-testid="ade-dependency-late"]')).toBeVisible();
+
+  await page.locator('[data-testid="ade-panel-action-resolve"]').click();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeResolveDependency &&
+            (e.args as { codeRepoId?: string; id?: string } | undefined)?.id === 'dep-1',
+        ),
+    )
+    .toBe(true);
+  await expect(page.locator('[data-testid="ade-detail-panel"]')).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------------------------
+// 16. Blocked-by (P135 §4.7)
+// ---------------------------------------------------------------------------------------------
+
+test('blocked-by: a blocked item panel shows the chip, unlink removes it, Link relinks it', async ({
+  relaunch,
+}) => {
+  const a = fullBranch({ id: 'a', branch: 'feat/a' });
+  const dep = dependency({ id: 'dep-1', title: 'Vendor API', blocks: ['a'] });
+  const snapLinked = snapshot({ branches: [a], plan: plan({ a: TODAY_ISO }), dependencies: [dep] });
+  const snapUnlinked = snapshot({
+    branches: [a],
+    plan: plan({ a: TODAY_ISO }),
+    dependencies: [{ ...dep, blocks: [] }],
+  });
+
+  const { window: page, control } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snapLinked),
+      { channel: IPC.adeSetBlocker, response: null },
+      ...snapshotControl(snapUnlinked),
+      ...snapshotControl(snapLinked),
+    ],
+  });
+
+  await select(page, 'a');
+  const blockerRow = page.locator('[data-testid="ade-blocker-row"]');
+  await expect(blockerRow).toBeVisible();
+  const chip = page.locator('[data-testid="ade-blocker-chip-dep-1"]');
+  await expect(chip).toContainText('Vendor API');
+
+  await page.locator('[data-testid="ade-blocker-unlink-dep-1"]').click();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeSetBlocker &&
+            (e.args as { dependency?: string; item?: string; linked?: boolean } | undefined)
+              ?.dependency === 'dep-1' &&
+            (e.args as { item?: string } | undefined)?.item === 'a' &&
+            (e.args as { linked?: boolean } | undefined)?.linked === false,
+        ),
+    )
+    .toBe(true);
+  await expect(chip).toHaveCount(0);
+
+  await page.locator('[data-testid="ade-blocker-link-open"]').click();
+  await page.locator('[data-testid="ade-blocker-link-option-dep-1"]').click();
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeSetBlocker &&
+            (e.args as { linked?: boolean } | undefined)?.linked === true,
+        ),
+    )
+    .toBe(true);
+  await expect(chip).toBeVisible();
 });
