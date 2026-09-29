@@ -29,7 +29,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@theme/com
 // ref below still names SplitterPanel directly. No value import: the template uses the
 // ResizablePanel/ResizablePanelGroup wrappers above.
 import type { SplitterPanel } from 'reka-ui';
-import { computed, ref, useSlots, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import DockResizeHandle from './DockResizeHandle.vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
@@ -37,12 +37,11 @@ import TabStrip from './TabStrip.vue';
 interface Props {
   projectVisible: boolean;
   projectWidth: number;
-  opsVisible?: boolean;
-  opsHeight?: number;
+  opsVisible: boolean;
+  opsHeight: number;
   /** P129 Part 3 §0.13: hides the tab-strip row for a `layout: 'full'` module (Kira Space's own
-   *  `ade`, which renders its own view in `#main` instead of tab-scoped `MainView`) — both
-   *  `hasDock` branches below render this row unconditionally otherwise. Default `true`: Kira
-   *  Studio passes nothing, so its own geometry is unchanged. */
+   *  `ade`, which renders its own view in `#main` instead of tab-scoped `MainView`). Default
+   *  `true`: Kira Studio passes nothing, so its own geometry is unchanged. */
   tabStripVisible?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), { tabStripVisible: true });
@@ -51,19 +50,10 @@ const emit = defineEmits<{
   'resize-ops': [size: number];
 }>();
 
-const slots = useSlots();
-// Risk §11 (WorkbenchShell hazard, carried over): `#dock` present vs. absent is a **structural**
-// choice — Kira Studio always passes `#dock` (gating its own visibility inside with `opsVisible`),
-// Kira Space never passes it at all (until its own dock, P132 Part 2) — so Kira Space's tree never
-// mounts a dock or its resize handle at all, matching today.
-const hasDock = computed(() => !!slots.dock);
-
 const OPS_MIN_PX = 100;
 const OPS_MAX_PX = 500;
-// 200: defaultLayout's own operations.height (@shared/domain/layout) — the pre-measurement seed
-// before a real opsHeight prop ever arrives.
 const dockHeight = computed(() =>
-  Math.min(OPS_MAX_PX, Math.max(OPS_MIN_PX, props.opsHeight ?? 200)),
+  Math.min(OPS_MAX_PX, Math.max(OPS_MIN_PX, props.opsHeight)),
 );
 const dockDragging = ref(false);
 
@@ -150,7 +140,7 @@ function onOpsResize(px: number): void {
       </ResizablePanel>
     </ResizablePanelGroup>
 
-    <template v-if="hasDock && opsVisible">
+    <template v-if="opsVisible">
       <DockResizeHandle
         :height="dockHeight"
         :min="OPS_MIN_PX"
@@ -168,11 +158,10 @@ function onOpsResize(px: number): void {
     </template>
 
     <!-- The old grid template stayed four rows (main/splitops/ops/status) whether or not ops was
-         open when hasDock — even a collapsed splitops/ops row consumed its own row-gap. mt-1 (4px,
-         two more 2px row-gaps) reproduces that reserved space exactly; gap-0.5 above already
-         accounts for one. Kira Space (no #dock slot) never adds it, matching its own two-row grid
-         exactly. -->
-    <div class="shrink-0 h-statusbar" :class="{ 'mt-1': hasDock }" data-testid="status-bar">
+         open — even a collapsed splitops/ops row consumed its own row-gap. mt-1 (4px, two more
+         2px row-gaps) reproduces that reserved space exactly; gap-0.5 above already accounts for
+         one. Both apps mount a dock, so it is unconditional. -->
+    <div class="shrink-0 h-statusbar mt-1" data-testid="status-bar">
       <slot name="status" />
     </div>
   </div>
