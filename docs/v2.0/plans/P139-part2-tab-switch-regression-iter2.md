@@ -141,3 +141,55 @@ new `DataView` subtree (`initialize` reads `getComputedStyle` on the container).
 **A remount cannot reach 50 ms p95 on this 4 vCPU sandbox, on either engine.** Chromium, with no
 stylesheet penalty at all, measures p95 58-62 ms for the same remount; Vue work alone is ~29 ms of
 it.
+
+### 1.7 Final design in the real spec
+
+Probe build = `035bbbeb` + `ba41ec3f` + "vars" (§3.2) + Tailwind fallback dropped at build time by
+§3.3's PostCSS plugin (built CSS: 0 `margin-trim` hits). Unmodified `budgets.spec.ts`,
+`--project=ui-timing --no-deps -g "interaction budgets" --repeat-each=3`, load average 0.96:
+
+| Metric | p50 ms | p95 ms |
+|---|---|---|
+| cell to editor | 17-18 | 29-36 |
+| cached tab switch | **84-91** | **126-151** |
+| cached tree expand | 18-19 | 25-27 |
+| console keystroke (`.visible` selector, unfixed) | 112-113 | 117-149 |
+
+All 3 passed, `consoleErrors` empty. Same probe build: `--project=visual` 14/14 pass (no pixel change
+from the dropped fallback); `slick-grid.spec.ts` + `console*` specs 41/43 pass. The 2 failures are the
+per-grid `<style>` leak checks (`slick-grid.spec.ts:534`, `:663`): the static sheet survives
+teardown by design (§3.6 rewrites them). With the fallback gone, WebKit still resolves
+`--tw-border-style` to `solid` on a `.border` element: `CSS.registerProperty` exists and
+`@property` initial values apply.
+
+`getMaxSupportedCssHeight` cached per page (constant per engine): p50 99-105 / p95 122-200 versus
+102-112 / 135-148 without. Inside noise; declined.
+
+### 1.8 Revert dry run
+
+Throwaway worktree off `p139-part2-plan` HEAD (`ba41ec3f` on top): `git revert --no-commit` of
+`b700f108`, `23d8d080`, `22ed279f`, `6213106c`, in that order, applies without conflict. The result
+diffs against `035bbbeb` exactly as `ba41ec3f` alone does (apps and packages trees).
+
+### 1.9 Sandbox WebKit versus shipping WKWebView
+
+The product ships macOS 14+, arm64 only (ARCHITECTURE.md Shell row): WKWebView, Safari 17+ engine.
+
+Knowable here:
+
+- The mechanism is WebCore, not port code. A sheet removal or CSSOM rule mutation schedules a
+  full-document style rebuild; an appended sheet with its text in place takes the additive path. WPE
+  and WKWebView share that code, so SlickGrid's per-grid sheet costs a full rebuild per mount on a Mac
+  too. Only the per-rebuild cost differs.
+- The Tailwind fallback (§1.4) needs "WebKit without `margin-trim`". Safari 17 has `margin-trim`, so
+  the fallback is dead CSS on the shipping target. Only this sandbox engine matches it.
+- Chromium, same sandbox, same remount: p95 58-75 ms (§1.5, §1.6). The 4 vCPU sandbox cannot hold a
+  full `DataView` remount under 50 ms p95 even with no stylesheet penalty.
+
+Not knowable here: the absolute rebuild cost and remount time on Apple Silicon WKWebView. PERF.md
+§2.1's Mac figures (tab switch p95 6.5 ms) predate `SlickGridHost.vue` and the Wails port.
+
+Verify on a Mac (PERF.md §3 manual procedures, packaged build, Web Inspector timeline):
+`CSS.supports('margin-trim: inline')` is `true`; tab switch between `big_rows` and `wide_table`,
+median and p95 of 20; count of full style recalcs per switch in the timeline (expect none from
+SlickGrid after §3.2).
