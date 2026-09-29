@@ -162,10 +162,9 @@ declare global {
     __kiraCacheStats?: () => Promise<CacheStats>;
     __kiraTreeConnectionIds?: () => string[];
     /**
-     * Playwright-only hook (tests/e2e/budgets.spec.ts) — DataGrid.vue calls this, if a test has set
-     * it, at the start of its scroll-driven work (inside its own coalescing rAF callback, after the
-     * browser's native scroll-event-dispatch and rAF scheduling have both already resolved), so a
-     * scroll-response budget can measure the app's actual work independent of display refresh rate.
+     * Playwright-only hook (tests/ui/budgets.spec.ts) — KiraSlickGrid.render() calls this, if a test
+     * has set it, at entry, so a scroll-response budget measures the app's render work independent
+     * of display refresh rate and SlickGrid's scrollRenderThrottling wait.
      */
     __kiraGridScrollWorkStart?: (t: number) => void;
     /**

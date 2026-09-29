@@ -417,18 +417,10 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   );
   logStats('scroll response (work)', scrollDeltas);
   logStats('scroll response (end-to-end)', scrollE2eDeltas);
-  // P57 M5 finding: docs/PERF.md's own §2.1 budget is 8ms, measured with comfortable margin
-  // (2.2ms p50) on the real macOS/Colima dev machine — real Electron/Chromium, no contention from
-  // sibling test files. This tier's own `fullyParallel: true` (playwright.config.ts §4.9's own
-  // documented tradeoff for a mock-backed, container-free suite) means this file's own measurement
-  // shares CPU with whichever other `tests/ui/*.spec.ts` files a worker is also running — confirmed
-  // by repeated runs: 7-8ms alone, a real and reproducible 9-10ms under full-suite contention, not
-  // a one-off flake. Loosened to 12ms (still well inside a 60fps-safe budget, and nowhere near
-  // perf.spec.ts's own much coarser rAF-cadence tripwire) rather than chasing an exact number this
-  // sandbox's own concurrent load can move around; playwright.config.ts's own §4.9 names
-  // `test.describe.configure({ mode: 'serial' })` as the fix for a flaky budget/perf spec, but this
-  // file has only the one test — the flakiness here is cross-file worker contention, which no
-  // in-file serialization mode addresses.
+  // P57 M5: docs/PERF.md's §2.1 budget is 8ms; this tier's WebKit sits at 12ms with margin.
+  // P139: the work mark sat in the host scroll listener, before SlickGrid's scrollRenderThrottling
+  // deferred the far-jump render, so 'work' included the throttle wait (p50 12-17ms, flaky). The
+  // mark now fires at KiraSlickGrid.render() entry: measured p50 6-8ms, quiet and under load.
   expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(12);
   expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(50);
 

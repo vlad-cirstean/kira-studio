@@ -761,12 +761,12 @@ let scrollEventSeq = 0;
 // why the dedupe makes pulling from velocity() itself safe.
 const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
 
-// §6 D9 — called from the host's own viewport scroll listener, the same logical point
-// markScrollWork marks in DataGrid.vue today (before the render work, after the browser's own
-// scheduling hops). P22 iter2-scroll-gaps D1: the render timing itself is reported by
-// scrollTrace.noteRenderMs(), called from KiraSlickGrid's own `render()` override
-// (kiraSlickGrid.ts) — not from getRenderedRange, which only computes the range and runs *before*
-// the work that override times has happened.
+// §6 D9 — the host's own viewport scroll listener. The test-only scroll-work mark
+// (`__kiraGridScrollWorkStart`) lives in KiraSlickGrid's `render()` override, not here: SlickGrid's
+// `scrollRenderThrottling` defers a far-jump render past this listener, so a mark here times the
+// throttle wait, not render work. P22 iter2-scroll-gaps D1: render timing is reported by
+// scrollTrace.noteRenderMs() from that same override — not from getRenderedRange, which only
+// computes the range and runs *before* the work that override times has happened.
 function onViewportScroll(): void {
   const el = viewportEl;
   if (!el) return;
@@ -776,7 +776,6 @@ function onViewportScroll(): void {
   if (fkPreview.value) closeFkPreview();
   const now = performance.now();
   scrollTrace.noteScrollEvent(el.scrollTop, now);
-  window.__kiraGridScrollWorkStart?.(now);
   scrollEventSeq++;
   // P22 iter2-onset D1: still the sampler's other driver, unchanged in effect — but now a no-op
   // whenever velocity() already pulled this very position a moment earlier, from inside the

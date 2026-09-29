@@ -27,6 +27,7 @@ import * as scrollTrace from './scrollTrace';
 // re-declaration of the same handful of `__kira*` hooks, for the identical cross-program reason.
 declare global {
   interface Window {
+    __kiraGridScrollWorkStart?: (t: number) => void;
     __kiraGridTuning?: {
       leadFramesOverride?: number;
       maxLeadPxOverride?: number;
@@ -548,6 +549,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  timing wraps the whole call, chase-scheduled catch-ups included. */
   override render(): void {
     const start = performance.now();
+    window.__kiraGridScrollWorkStart?.(start);
     super.render();
     scrollTrace.noteRenderMs(performance.now() - start);
   }

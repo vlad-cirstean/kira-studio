@@ -76,7 +76,7 @@ export function measureClickToDom(
 }
 
 export interface ScrollResponseDeltas {
-  /** DataGrid.vue's own __kiraGridScrollWorkStart mark → MutationObserver callback (see below). */
+  /** `KiraSlickGrid.render()` entry's __kiraGridScrollWorkStart mark → MutationObserver callback (see below). */
   workDeltas: number[];
   /** The original end-to-end number: synchronous trigger → MutationObserver callback (D5/D6). */
   e2eDeltas: number[];
@@ -100,9 +100,10 @@ export interface ScrollResponseDeltas {
  * vsync floor D6 says a rAF-based measurement "can never" escape, on an environment with no real
  * 120Hz cadence to synthesize.
  *
- * The work-only delta starts its clock at DataGrid.vue's own __kiraGridScrollWorkStart mark
- * (apps/kira-studio/frontend/src/main.ts's Window augmentation; called from the top of onScroll's rAF callback,
- * after both scheduling hops have already resolved and neither app code path takes) instead of at
+ * The work-only delta starts its clock at the __kiraGridScrollWorkStart mark
+ * (apps/kira-studio/frontend/src/main.ts's Window augmentation; called from the top of
+ * `KiraSlickGrid.render()`, after the browser's scheduling hops and SlickGrid's own
+ * scrollRenderThrottling wait have already resolved) instead of at
  * the synchronous property write, while keeping the same MutationObserver-based end signal. If no
  * mark ever arrives for a step (mark is only set once a test defines the hook, so this shouldn't
  * happen when called from budgets.spec.ts, but would if this were reused without wiring it up),

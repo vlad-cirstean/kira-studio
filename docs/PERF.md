@@ -20,7 +20,7 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 
 | §2 budget | Metric actually measured | Where | Automated? |
 |---|---|---|---|
-| Grid scroll frame ≤ 8 ms (12 ms on the `tests/ui/` tier, see §2.1) | app-work delta (DataGrid.vue's own scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
+| Grid scroll frame ≤ 8 ms (12 ms on the `tests/ui/` tier, see §2.1) | app-work delta (`KiraSlickGrid.render()` entry's scroll-work mark → DOM committed), **p50** over 20 steps on a 10 000-row page (see methodology note below) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, horizontal axis (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` (60 cols x 5000 rows) | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Row window stays coalesced to <= 1 re-render/frame during sustained fast scroll (P22 D1) | `notifiesPerFrame` <= 1 at 40/100/200/456 px/frame; `uncoveredPx` === 0 at 40-100 px/frame | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1a** |
@@ -118,8 +118,8 @@ environment's history.
 **macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
 macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
 where the Xvfb container above hit it on only about half — motivated
-`tests/e2e/support/measure.ts`'s work/e2e split (`61ba523`): gating on the work delta — DataGrid.vue's
-own scroll-work mark to DOM-committed, which excludes both frame-scheduling hops described above —
+`tests/e2e/support/measure.ts`'s work/e2e split (`61ba523`): gating on the work delta — the
+scroll-work mark (now `KiraSlickGrid.render()` entry, P139) to DOM-committed, which excludes both frame-scheduling hops described above —
 removes exactly the compositor-cadence noise this paragraph diagnosed. The table above reflects
 that gate; scroll response now passes on this same macOS machine (work p50=2.2 ms, e2e p50 still
 logged at 4.8 ms for comparison).
@@ -146,6 +146,11 @@ came from):
 | Cached tree expand | ~4 ms | ~10 ms | ≤ 50 ms (p95) | pass |
 | Console keystroke → completion popup | ~13 ms | ~20 ms | ≤ 50 ms (p50) | pass |
 | `perf.spec.ts` rAF scroll frame time | 34-47 ms | 37-54 ms | < 80 ms (secondary tripwire; see note) | pass |
+
+P139: the scroll-work mark moved from the host scroll listener to `KiraSlickGrid.render()` entry.
+SlickGrid's `scrollRenderThrottling` defers a far-jump render past that listener, so the old mark
+timed the throttle wait. Scroll response (`big_rows`) work p50 is now 6-8 ms, p95 9-22 ms, quiet and
+under load.
 
 **Two budgets needed a documented adjustment for this tier, neither for app-work reasons:**
 
