@@ -133,19 +133,19 @@ function onOpsResize(px: number): void {
         :hit-area-margins="{ coarse: 8, fine: 4 }"
       />
 
-      <ResizablePanel
-        class="flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg"
-        data-testid="main-panel"
-        :order="2"
-      >
-        <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
-             the tab's own breathing room from this row's border-bottom, not a margin tacked
-             on after it. -->
-        <div v-if="tabStripVisible" class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
-          <slot name="tab-strip"><TabStrip /></slot>
-        </div>
-        <div class="flex-1 min-h-0" data-testid="main-view">
-          <slot name="main"><MainView /></slot>
+      <!-- Border/rounding stay on the inner div: a border on the panel itself shifts reka's px-to-%
+           conversion for the project panel by ~0.4px (visual snapshots caught it). -->
+      <ResizablePanel class="min-w-0" data-testid="main-panel" :order="2">
+        <div class="h-full flex flex-col min-w-0 min-h-0 overflow-hidden rounded-kira border border-border bg-bg">
+          <!-- Taller than a tab (--kira-h-md, 26px) by design (h-tabbar) — the extra height is
+               the tab's own breathing room from this row's border-bottom, not a margin tacked
+               on after it. -->
+          <div v-if="tabStripVisible" class="h-tabbar min-h-0 overflow-hidden shrink-0 border-b border-border bg-chrome" data-testid="tab-strip">
+            <slot name="tab-strip"><TabStrip /></slot>
+          </div>
+          <div class="flex-1 min-h-0" data-testid="main-view">
+            <slot name="main"><MainView /></slot>
+          </div>
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
