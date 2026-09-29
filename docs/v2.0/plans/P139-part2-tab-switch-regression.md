@@ -481,7 +481,7 @@ Per assertion, against PERF.md §1 and §2.1:
 | `:802` cached tab switch p95 | `<= 1000` | `<= 50` restored | 8-9 ms p95 with per-tab `KeepAlive` (§1.8 K) |
 | `:820` cached tree expand p95 | `<= 1000` | `<= 50` restored | 24-39 ms p95 (§1.1); SPEC row: 21-43 ms |
 | `:846` keystroke p50 | `<= 1000` | `<= 50` restored | popup on screen 27-32 ms after keydown (§1.5) |
-| `:847` keystroke max | `<= 1000` | `<= 200` restored | pre-port bound (`9ee240f0`^); 20-sample max stays near p50 |
+| `:847` keystroke max | `<= 1000` | `<= 200` restored | pre-port bound (`9ee240f0`^); on screen at 27-32 ms in every probe keystroke (§1.5) |
 
 No bound stays wider. Each `logStats` label and section header already says the restored value.
 
@@ -502,3 +502,159 @@ No bound stays wider. Each `logStats` label and section header already says the 
 Studio keeps up to 5 `data` tabs alive per `host.keepAlive`, per-tab `KeepAlive`, closed or evicted
 tabs truly unmount. In the RepoGraph paragraph (`:3577-3580`), "in either app" is still true for
 `RepoGraphView` (Space sets no `keepAlive`); make that explicit so the sentence stays true.
+
+### 3.7 Specs that relied on "every switch remounts"
+
+Two specs pin fixes for a remount with the tab's runtime (meta, mask state) still cached. After
+§3.1 a plain switch reactivates instead, so they would silently stop covering the cold path. Keep
+each spec's existing switch step (it now covers reactivation, §3.3). Add a real remount after it:
+evict the tab past the warm cap, then click back.
+
+- New helper `apps/kira-studio/tests/ui/support/evictWarmTab.ts`:
+  `evictWarmDataTab(page, openPath)` opens `WARM_DATA_TABS` (5, comment names
+  `workbench/host.ts`'s `keepAlive.max`) new data tabs on `openPath` via
+  `menu-item-open-data-new-tab`, waiting for each grid header. The original tab is then the least
+  recently used, so it is evicted and unmounts.
+- `slick-grid.spec.ts` "P22 postscript" test (~`:1427-1506`): after the existing switch-back
+  asserts, call the helper, click the first tab, repeat the badge / select-zone / nav-button
+  asserts. Rewrite the header comment (`:1418-1426`): the workaround is gone (§3.4); the test
+  covers reactivation and a cached-meta remount.
+- `mask-preview.spec.ts` M7 #5 block (~`:280-305`): same shape, preview still on across the
+  eviction remount. Rewrite `:283-285`'s "remounts on every tab switch" comment.
+- Scroll restore, new coverage (§1.9 makes it a real regression risk): in the same
+  `slick-grid.spec.ts` test, before switching away, scroll the first tab's viewport to a nonzero
+  `scrollTop`/`scrollLeft`. After switching back, assert both equal (`expect.poll` on the
+  `.slick-viewport` values) and that `grid-row` count is > 0. Repeat after the eviction remount
+  (persisted-state path). No other spec checks grid scroll across a switch.
+
+## 4. File ownership (one sequential implementer)
+
+No split. §3.1-§3.4 are one order-dependent chain: the spec edits in §3.7 assume the `KeepAlive`
+behaviour, and one full `test:ui:studio` run verifies them together.
+
+| File | Change | Step |
+|---|---|---|
+| `packages/workbench/src/tabs/warmTabs.ts` (new) | `nextWarmIds` | 1 |
+| `packages/workbench/src/tabs/warmTabs.test.ts` (new) | 5 cases (§3.1) | 1 |
+| `packages/workbench/src/host.ts` | `WorkbenchKeepAlive`, `keepAlive?` | 2 |
+| `packages/workbench/src/components/MainView.vue` | per-tab `KeepAlive` | 2 |
+| `apps/kira-studio/frontend/src/workbench/host.ts` | `keepAlive: { kinds: ['data'], max: 5 }` | 2 |
+| `apps/kira-studio/frontend/src/views/grid/DataView.vue` | activate/deactivate (§3.2) | 3 |
+| `packages/workbench/src/shortcuts/commands.ts` | header comment | 3 |
+| `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue` | §3.3 hooks, scroll tracking (step 4); B2 (step 5) | 4, 5 |
+| `apps/kira-studio/frontend/src/views/shared/slick/scrollTrace.ts` | `registerGrid` comment | 4 |
+| `apps/kira-studio/tests/ui/support/evictWarmTab.ts` (new) | helper | 6 |
+| `apps/kira-studio/tests/ui/slick-grid.spec.ts` | eviction remount, scroll restore, comment | 6 |
+| `apps/kira-studio/tests/ui/mask-preview.spec.ts` | eviction remount, comment | 6 |
+| `apps/kira-studio/tests/ui/budgets.spec.ts` | `measureKeyToPopup`, `:833-841` waits (step 7); 5 bounds (step 8) | 7, 8 |
+| `docs/PERF.md` | §3.6 edits, measured numbers | 9 |
+| `docs/ARCHITECTURE.md` | two sentences (§3.6) | 9 |
+| `docs/v2.0/SPEC.md` | `## P139 Part 2 result` | 10 |
+
+## 5. Ordered commit steps
+
+Each commit passes the pre-commit hook normally; never `--no-verify`. Fast checks per commit
+(`bun run lint`, `bun run typecheck`, `bun run test:unit` for step 1). Run the expensive suite once,
+at §6. Push the implementation branch after each commit (resumability); never the chapter branch.
+
+1. `feat(workbench): warm-tab LRU for kept-alive views` — `warmTabs.ts` plus its test.
+2. `perf(workbench): keep warm data tabs alive per tab` — host field, `MainView.vue`, Studio host.
+   Before committing, run `budgets.spec.ts` alone once
+   (`bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing --no-deps -g "interaction budgets"`,
+   after `bun run build:test:studio`) and confirm tab switch p95 < 50 in its log line. The `<= 1000`
+   bound still stands at this step.
+3. `fix(studio): data view commands follow tab activation` — §3.2.
+4. `fix(studio): grid deactivates and restores on tab reactivation` — §3.3, scroll tracking
+   included.
+5. `perf(studio): build SlickGrid columns once per mount` — §3.4.
+6. `test(studio): cover grid remount by warm-tab eviction and scroll restore` — §3.7. Run
+   `slick-grid.spec.ts` and `mask-preview.spec.ts` alone (`--project=ui`) before committing.
+7. `test(studio): time keystroke to on-screen suggest popup` — §3.5.
+8. `test(studio): restore PERF.md interaction budgets in budgets.spec.ts` — §3.6 table, five
+   assertions.
+9. `docs: P139 Part 2 budgets and warm data tabs` — PERF.md and ARCHITECTURE.md, numbers from §6.
+   Land after §6's three runs; fix commits for anything §6 finds land before it.
+10. `docs(v2.0): P139 Part 2 result` — SPEC.md result section: every run's numbers (§6 list),
+    commit list, any open point still open.
+
+## 6. Verification
+
+Run with no other session, build or test in the container. Record `uptime` before each run.
+
+1. **Pre-check**, quiet: `ui-timing` alone, `--repeat-each=3`. Record the four budgets' p50/p95.
+2. **3 consecutive full `bun run test:ui:studio` runs.** A full run is ~9 min, over the Bash
+   tool's 10 min cap with no margin, and a container restart kills background runs. So run each
+   full run in the foreground as chunks, same build, back to back:
+   ```sh
+   bun run build:test:studio
+   bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=1/2 2>&1 | tee /tmp/p139p2-run1-a.log
+   bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --shard=2/2 2>&1 | tee /tmp/p139p2-run1-b.log
+   bunx playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing --no-deps 2>&1 | tee /tmp/p139p2-run1-t.log
+   ```
+   Give each Bash call `timeout: 600000`. If a shard nears the cap, use `--shard=k/3`. A run
+   counts only if all its chunks pass. Any failure resets the count to 0: root-cause and fix it
+   (CLAUDE.md, pre-existing or not), commit, rebuild, restart the count.
+3. Per run record: cell to editor, tab switch, tree expand p50/p95, keystroke p50/max, and the
+   `uptime` load average.
+4. **A breached 50 ms bound is a root-cause task, not a widening.** Re-run once under recorded
+   load average < 2. If it still fails, find what the window covers (§1.2 method: marks, not
+   guesses), fix it, and record it. A bound may only go wider with measured evidence that the
+   budget, not the code, is wrong, written in this plan's result section and raised to the
+   orchestrator before landing.
+5. `bun run test:unit` (includes `warmTabs.test.ts`), `bun run lint`, `bun run typecheck`.
+6. `bun run test:ui:space` once: `MainView.vue` is shared, Space must be unchanged. Chunk the same
+   way if it exceeds the cap.
+7. Manual check in the Studio test build (one pass, record in result): open 7 data tabs, switch
+   among them, close the active one and a background one, confirm no console error and Find /
+   Refresh act on the visible tab.
+
+## 7. Closing audit
+
+```sh
+rg -n 'toBeLessThanOrEqual\(1000\)' apps/kira-studio/tests/ui/budgets.spec.ts     # empty
+rg -n 'toBeLessThanOrEqual\((50|200)\)' apps/kira-studio/tests/ui/budgets.spec.ts # 5 hits: :765 :802 :820 :846 :847 area
+rg -n "suggest-widget\.visible" apps/kira-studio/tests/ui/budgets.spec.ts         # only the explanatory comment
+rg -n 'KeepAlive' packages/workbench/src/components/MainView.vue                  # the v-for KeepAlive
+rg -n 'keepAlive' apps/kira-studio/frontend/src/workbench/host.ts apps/kira-space/frontend/src/workbench/host.ts  # Studio only
+rg -n 'nextWarmIds' packages/workbench/src                                          # warmTabs.ts, its test, MainView.vue
+rg -n 'explicitInitialization: true' apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue  # 1 hit
+rg -n 'grid\.init\(\)' apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue                # 1 hit
+rg -n 'onActivated|onDeactivated' apps/kira-studio/frontend/src/views/grid/DataView.vue apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue  # both files
+rg -n 'lastScroll' apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue       # onViewportScroll, persistScroll, onActivated, onDeactivated, mount seed
+rg -n 'mounted only while|ever mounted at a time|remounts on every tab switch|at most one grid is ever mounted' apps packages  # empty
+rg -n 'evictWarmDataTab' apps/kira-studio/tests/ui                                  # helper + 2 specs
+git diff 035bbbeb --stat -- apps/kira-space                                         # empty
+```
+
+## 8. Risks
+
+- **Retained memory.** Up to 5 warm grids plus their Monaco cell editors stay in memory. Bounded
+  by the cap; `leaks.spec.ts` opens 20 data tabs and checks store retention on close, which now
+  also exercises eviction. Store retention is unchanged: close still drops page stores first.
+- **Deactivated watchers.** A background tab's `pageVersion`/meta/appearance watches still run
+  against a detached grid. A detached grid does no style or layout work, so this is cheap. A future
+  watch that reads layout (scroll into view, focus) would silently no-op while deactivated;
+  §3.3's activation `resizeCanvas()` / `refreshSearchLayer()` repaint covers today's set.
+- **Hook order on close of the active tab.** Both `onDeactivated` and `onUnmounted` run. Every
+  disposer is idempotent (`registerCommand` disposer, `Map.delete`, guarded `unregisterGrid`) and
+  §3.3's `onDeactivated` guards `grid` non-null.
+- **Focus.** Reactivation does not restore focus to the grid; a remount did not either. The search
+  box no longer autofocuses on return (§3.3). Specs that relied on either surface in §6.
+- **Inline edit on switch away is cancelled** (parity). Committing instead would be a behaviour
+  change; not made here.
+- **B2 header controls.** Header listeners now subscribe before the first build. The eviction case
+  in §3.7 is the regression guard for the workaround's original bug.
+- **Thin margins** on cell to editor and tree expand (§0 item 6). §6 item 4 governs a breach.
+- **Cold switch still ~200 ms on WebKit** (first open, evicted tab). Not gated (§0 item 4).
+
+## 9. Acceptance
+
+- Cached tab switch p95 <= 50 ms measured in every §6 run (prototype: 8-9 ms).
+- `budgets.spec.ts` assertions match their section headers: `:765`, `:802`, `:820` p95 <= 50;
+  keystroke p50 <= 50 and max <= 200. No `<= 1000` left.
+- `ui-timing` and `ui` pass on 3 consecutive full `bun run test:ui:studio` runs (chunked, §6),
+  numbers recorded in the result. `bun run test:ui:space` passes once.
+- Closed and evicted data tabs truly unmount (eviction specs green, `leaks.spec.ts` green).
+- Scroll position survives switch away and back, and eviction remount (§3.7 asserts).
+- PERF.md §1/§2.1 and the keystroke note corrected; ARCHITECTURE.md records the warm-tab rule.
+- §7 audit clean. §0 items raised to the orchestrator/user.
