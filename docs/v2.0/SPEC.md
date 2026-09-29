@@ -3118,6 +3118,78 @@ log, plan §2.6) untouched. Pushed on branch `p132-part1-impl`, not merged.
 - Space diff: `state/layout.ts`, 3 comment lines.
 - SFC check uses `grep -L`. `rg -L` means `--follow`, not files-without-match.
 
+## P132 Part 2 result
+
+Plan: `docs/v2.0/plans/P132-part2-space-op-log.md`. One sequential Sonnet implementer, no split, in
+worktree `p132-part2-plan` off `900f0df6`. Pushed on branch `p132-part2-plan`, not merged. Row scope
+unchanged.
+
+**Commits, plan §8 order:**
+
+1. `0fbc4cc2` — `feat(space): in-memory op log ring`. `internal/oplog`, 3 Go tests.
+2. `6309f9c3` — `feat(space): log gitsession writes to op log`. Hooks on `RunOp`, `UndoRun`
+   (`connLabel`), `RunRemote` (non-nil conn), `RunRestack`; 4 `noteWrite` sites; 4 Go tests.
+3. `61f1af9b` — `feat(space): OpsService, op update push and operations menu item`. Bindings
+   regenerated, not committed: `apps/kira-space/.gitignore` ignores `frontend/bindings`.
+4. `161182fe` — `refactor(workbench): core toggle-operations channel; menu and hydrate fixes`. 1 unit test.
+5. `1fe13dbc` — `feat(space): operations dock`.
+6. `44039c1d` — `refactor(workbench): shell always mounts dock`. `hasDock` gone.
+7. `78b27223` — `test(space): operations dock and menu toggle`. 5 new `operations.spec.ts` tests plus 1 in
+   `window-chrome.spec.ts`.
+8. Verification: no `fix:` commits needed.
+9. `docs: Kira Space op log` (`ARCHITECTURE.md`), then this commit.
+
+**Test counts (before -> after):** `test:unit` 1830 -> 1831 (+1 hydrate-rejection case).
+`test:ui:space` 95 -> 101 (+6). `test:visual:space` 4 -> 4. Go: `internal/oplog` 0 -> 3,
+`gitsession/oplog_test.go` 0 -> 4. `go test -race` clean on `oplog`, `gitsession`, `gitrpc`, `bridge`,
+`appshell`, `appevent`, `ade`; `go test ./apps/kira-space/internal/...` clean. `test:ui:studio`: 299
+passed, 1 failed (`cell-editor.spec.ts:332`, 60s grid-cell timeout under full-suite load; solo 3 of
+3 pass, spec untouched), then `ui-timing` ran separately: `perf.spec.ts` passed, `budgets.spec.ts:356`
+(p50 15ms vs 12ms) and `slick-grid.spec.ts:896` (218ms vs 150ms) failed. Both are the known
+wall-clock flakes, tracked separately, not chased. Studio operations specs (incl. full-width
+bounding box) passed in the full run.
+
+**Deviations from the plan:**
+
+- `spaceOpRecordSchema` stays module-local in `opsDomain.ts` (type export only, like `tabDomain.ts`);
+  the bridge uses `trust`, like every sibling method. Plan §3.6 claimed siblings parse through a schema; none do.
+- Operations wrapper reads filter and status from the store (`opsStore.filterText`,
+  `statusFilter`), not local refs: `visibleOps` needs them there, as in Studio.
+- Plan §3.2 named `conn.go:3-6` as the stale package comment; it lives in `registry.go`. Fixed there.
+- `startOp` uses `repoWorkingDir` (bare repos use the git dir) for `repoRoot`.
+
+**Disclosed gaps:**
+
+- `gitsock` `TestIntegration_AddThenListRoundTrips` failed once in one of 5 full-package Go runs
+  (`comments_test.go:81`, `review.comment.add` error response). Not reproducible: 15 solo repeats and
+  4 further package runs pass. `Registry.OpLog` is nil there and the path is a review comment RPC, so
+  this change is not implicated. Root cause not found.
+- macOS: Cmd+J firing the native menu item is untested (tests drive
+  `kira:menu:toggle-operations-panel` through `emitWailsEvent`). WKWebView dock geometry unverified
+  (Chromium and WebKitGTK only). A real paired VS Code client label is covered only through
+  `Conn.ClientLabel` in Go tests. Plan §9.
+- Bindings are gitignored, so plan step 3's "commit generated output" produced nothing to commit.
+  Regenerated with `wails3 task common:generate:bindings`; `opsservice.ts` and `oplog/models.ts` exist locally.
+
+**Open points carried from the plan (§0), still open:**
+
+- `RunRestack` is logged: SPEC row and Part 1 §0.4 include it, the task prompt read "excluding
+  RunRestack". Dropping it is one `startOp` call plus its test row. Needs the user's call.
+- Native connection label renamed `"This window"` to `"Kira Space"`. Also changes the undo tooltip
+  (`gitpreflight/undo.go:37`) to "(window: Kira Space)". Flagged to the user.
+- Space status bar shifts 4px (unconditional `mt-1`). No Space visual baseline covers the shell.
+- One process-global ring shown in every window; Clear is per window. History does not persist.
+
+**Closing audit (plan §10), run against the final tree:** all rows pass. `hasDock`: no hits.
+`createOpLogStore` in `state/ops.ts`: 1. `<OpLogPanel` in `OperationsPanel.vue`: 1; `<style`: none;
+`<script setup lang="ts">`: 1. `appevent.go` channel constants: 2. Literal `"kira:op:update"`/
+`"kira:menu:toggle-operations-panel"` under `apps/*/internal`: none. J-key handlers in Space: none.
+Studio `bridge/index.ts` `onToggleOperationsPanel`: none. `noteWrite(` 4 call sites plus definition;
+`startOp(` 4 entry points plus definition. `oplog`/`OpsService` under `internal/ade`: none.
+`"This window"` in non-test Space Go: none. `package.json`/`go.mod`/`go.sum` diff: empty. Real callers:
+`useOpsStore` (`main.ts`, `OperationsPanel.vue`), `AttachOpLog` (`main.go`), `OnUpdate`
+(`AttachOpLog`), `opsRecent`/`opsCancel`/`onOpUpdate` (`state/ops.ts`), `OpsService` (`main.go`).
+
 ## P136 result
 
 Plan: `docs/v2.0/plans/P136-top5-my-work-timeline.md`. Implemented on `p136-plan` (base `96a3d644`),
