@@ -212,3 +212,293 @@ The 112 ms p50 measures Monaco's constant, not app work.
 
 **Cell to editor, tree expand:** no regression. Both pass 50 ms today (§1.1); only the bound is
 wrong.
+
+## 3. Fix design
+
+Two independent code fixes plus one measurement fix:
+
+- Stop remounting warm data tabs: per-tab `KeepAlive` (§3.1-§3.3). Measured 5-6 / 8-9 ms (§1.8 K).
+- Build SlickGrid columns once per mount (§3.4). Speeds every remaining cold mount, 321 to 201 ms
+  p50 (§1.8 B2).
+- Wait on the popup's on-screen state, not Monaco's 100 ms class timer (§3.5).
+
+Declined, with the measured reason:
+
+- **Rewrite SlickGrid's per-grid CSS strategy** (`insertRule` with final values, one shared sheet,
+  adopted sheet, custom properties). Every stylesheet API costs one 53-65 ms full recalc on WebKit
+  (§1.7). A remount needs at least a removal plus an insertion, ~110 ms. It cannot reach 50 ms.
+- **Replace SlickGrid.** Out of scope, and the cost is WebKit's stylesheet invalidation, not the
+  library's work (Chromium mounts the same grid in 7-12 ms).
+- **`v-show` on every data tab.** Leaves N hidden grids in the document. Strict locators such as
+  `[data-testid="data-grid"]` and `grid-header-cell` would match several nodes across specs. The
+  budget's "header cell present" check would also pass before any switch, since hidden headers
+  stay in the document.
+- **One `<KeepAlive :include :max>` around the existing `<component>`.** `KeepAlive` prunes only
+  by component name or LRU `max`, never by key. A closed tab's `DataView` would stay cached
+  (listeners, grid, closures over dropped runtime) until LRU pressure evicted it.
+- **Wider bound.** The budget is right; the code was wrong (§2).
+
+### 3.1 `MainView.vue`: per-tab `KeepAlive`, host opt-in
+
+`packages/workbench/src/host.ts`, new optional host field:
+
+```ts
+export interface WorkbenchKeepAlive<K extends string> {
+  /** Kinds whose view is deactivated, not unmounted, on a switch away. */
+  readonly kinds: readonly K[];
+  /** Warm tabs kept; least recently activated evicted first. */
+  readonly max: number;
+}
+
+export interface WorkbenchHost<WK extends string, R extends TabLike> extends TabStripHost<WK, R> {
+  // ...existing fields...
+  readonly keepAlive?: WorkbenchKeepAlive<R['kind']>;
+}
+```
+
+`apps/kira-studio/frontend/src/workbench/host.ts` `createWorkbenchHost()` adds
+`keepAlive: { kinds: ['data'], max: 5 }`. Kira Space's host is untouched.
+
+New pure module `packages/workbench/src/tabs/warmTabs.ts`:
+
+```ts
+/** Next warm-tab list. Order stays stable (insertion order): reordering would move a kept-alive
+ *  subtree in the DOM, which is itself a detach/attach. */
+export function nextWarmIds(
+  prev: readonly string[],
+  activeId: string | null, // null when the active tab is not a warm kind
+  liveIds: ReadonlySet<string>,
+  lastUsed: Map<string, number>, // mutated: stamps activeId, drops dead ids
+  stamp: number,
+  max: number,
+): string[];
+```
+
+Rules, in order:
+
+1. Drop every id not in `liveIds` (closed tabs), and drop it from `lastUsed`.
+2. If `activeId` is set, stamp it in `lastUsed`, and append it if absent.
+3. While the list exceeds `max`, remove the id with the oldest stamp. Never remove `activeId`.
+4. Return `prev` itself when nothing changed, so the ref write is a no-op.
+
+`MainView.vue`:
+
+```vue
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { useWorkbenchHost } from '../host';
+import { nextWarmIds } from '../tabs/warmTabs';
+
+const host = useWorkbenchHost();
+const activeTab = computed(/* unchanged */);
+
+const keepAlive = host.keepAlive;
+const isWarm = (kind: string): boolean => keepAlive?.kinds.includes(kind) ?? false;
+const warmIds = ref<string[]>([]);
+const lastUsed = new Map<string, number>();
+let stamp = 0;
+
+// flush 'pre' (default) runs before this component's render in the same tick, so the active
+// tab's KeepAlive exists on the render that shows it.
+watch(
+  [() => activeTab.value?.id ?? null, () => host.tabs.tabs.map((t) => t.id).join('\n')],
+  ([activeId]) => {
+    if (!keepAlive) return;
+    const warmActive = activeId && activeTab.value && isWarm(activeTab.value.kind) ? activeId : null;
+    warmIds.value = nextWarmIds(
+      warmIds.value, warmActive, new Set(host.tabs.tabs.map((t) => t.id)), lastUsed, ++stamp, keepAlive.max,
+    );
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <template v-if="activeTab">
+    <KeepAlive v-for="id in warmIds" :key="id">
+      <component :is="host.views[activeTab.kind]" v-if="id === activeTab.id" :tab="activeTab" />
+    </KeepAlive>
+    <component
+      :is="host.views[activeTab.kind]"
+      v-if="!isWarm(activeTab.kind)"
+      :key="activeTab.id"
+      :tab="activeTab"
+    />
+  </template>
+  <slot v-else name="empty" />
+</template>
+```
+
+Behaviour:
+
+- Switch between warm tabs: old `KeepAlive` child flips to a comment vnode (deactivate, DOM moved
+  to storage), new one activates or mounts. No SlickGrid work, no stylesheet change.
+- Close a warm tab: its id leaves `warmIds`, its `KeepAlive` unmounts, and `KeepAlive` truly
+  unmounts the cached instance: `onUnmounted` runs the existing teardown (`destroy(true)` etc.).
+- Evict past `max`: same path as close.
+- Non-warm kinds (and every Space tab): exactly today's keyed `<component>`.
+- Mode switch (Studio `studio`/`api`): active tab becomes non-warm or null; warm data tabs stay
+  deactivated and cached (still capped).
+- A tab record for an inactive id is never read: the child is `v-if`-false. The active one gets
+  `activeTab` as today.
+
+`warmTabs.ts` gets one unit test, `packages/workbench/src/tabs/warmTabs.test.ts` (already under
+`bun run test:unit`'s `packages/workbench/src` root). It qualifies under CLAUDE.md's "cache
+eviction with interacting rules": LRU order, liveness pruning, never-evict-active, stable order and
+the unchanged-returns-`prev` rule interact. Cases: eviction picks the oldest stamp, not list
+position; a closed id is dropped before eviction counts; the active id survives `max: 1`; order
+unchanged after re-activating an old id; no-op returns the same array.
+
+### 3.2 `DataView.vue`: command registration follows activation
+
+`registerCommand` (`packages/workbench/src/shortcuts/commands.ts`) is last-writer-wins per id, and
+its disposer deletes only its own handler. Today `onMounted` registers `view.find`,
+`view.refresh`, `data.generate` (`:161-177`); `onUnmounted` disposes (`:179-181`). Under
+`KeepAlive` a deactivated data tab would keep `data.generate` registered for a console tab, and a
+reactivated one would lose Find/Refresh to whichever view mounted last.
+
+Change:
+
+- Extract `activate()`: the runtime load check (`:162-164`) plus the three registrations.
+- Extract `deactivate()`: run and clear `unregisterCommands`.
+- `onMounted(activate)`, `onUnmounted(deactivate)` as today.
+- `onDeactivated(() => { deactivate(); deactivated = true; })`.
+- `onActivated(() => { if (!deactivated) return; deactivated = false; activate(); })`. The flag
+  makes the first-mount `onActivated` call a no-op, so the component stays correct with or
+  without a `KeepAlive` ancestor.
+
+The load check on reactivation matters: `onConnectionState` drops page stores of a background tab
+(`dropPageStoresForTab`), which today reloads on remount. Rewrite the D11 comment (`:165-167`):
+"registered only while its tab is active" (mounted-and-active, not mounted). Same one-line fix to
+`commands.ts`'s header comment ("Exactly one ... is ever mounted" becomes "active").
+
+### 3.3 `SlickGridHost.vue`: deactivate and reactivate the grid
+
+A descendant's `onActivated` does not fire when the descendant mounts after its `KeepAlive` root
+already activated (the host mounts later behind the reconnect gate). Same `deactivated` flag
+pattern as §3.2: `onMounted` keeps the full init; `onActivated` runs only after a real
+deactivation.
+
+`onDeactivated` (guard on `grid` non-null; when the active tab closes, `onDeactivated` and
+`onUnmounted` both run, order not guaranteed):
+
+1. `closeFkPreview()` (anchor point is gone, as in `onUnmounted`).
+2. `grid.getEditorLock().cancelCurrentEdit()`: parity with today, where `destroy(true)` cancelled
+   an open inline edit on switch away.
+3. `persistScroll.cancel()`, then write the tracked position (item below) with
+   `tabsStore.patchDataTabState`. The detached viewport reads 0 (§1.9).
+4. `resizeObserver.disconnect()` (keep the instance): no 0x0 `resizeCanvas` that empties rows
+   (§1.8).
+5. `unregisterGridHost(props.tabId)`; `scrollTrace.unregisterGrid(viewportEl)`. `scrollTrace` holds
+   one module-level target ("at most one grid is ever mounted": now "active"; fix its comment).
+6. `deactivated = true`.
+
+`onActivated` (after the flag check):
+
+1. Reassign `editorCtx.readValue`/`commit` to this instance's closures (`:1973-1975`; extract to a
+   `bindEditorCtx()` used by both hooks). Another grid may have mounted meanwhile.
+2. Restore `viewportEl.scrollTop`/`scrollLeft` from the tracked position, then
+   `scrollVelocityTracker.seed(...)` as `onMounted` does (`:2143`).
+3. `grid.resizeCanvas()`: remeasures and re-renders the visible band (rows emptied while detached,
+   or changed by a background `pageVersion` bump).
+4. `resizeObserver.observe(el)`. Its initial notification repeats `resizeCanvas()` once: measured
+   4-23 ms for both calls together (§1.8), outside the measured window. Accept it; do not add a
+   skip flag.
+5. `scrollTrace.registerGrid(viewportEl, '.slick-row')`; `registerGridHost(props.tabId, ...)`, then
+   the same `consumeCellFocus` / `requestCellFocus` sequence as `onMounted` (`:2200-2204`): a
+   request made while deactivated went pending, and no `pageVersion` bump will consume it.
+6. `refreshSearchLayer()`: the search state may have changed while the grid was detached.
+
+Scroll tracking: add `lastScroll = { top, left }`, written in `onViewportScroll` (`:772`, it
+already reads `el.scrollTop`, add `scrollLeft`) and seeded where `onMounted` restores from tab
+state (`:2132-2135`). `persistScroll` writes `lastScroll` instead of reading `el` (`:793`). This
+also closes the §1.9 hazard of a timer firing after detach.
+
+Watchers stay live while deactivated. They act on state, and a detached grid does no style or
+layout work, so they are cheap. `pageVersion`, meta, appearance and width watches that run
+meanwhile leave the grid model current; `resizeCanvas()` at activation paints it. A tab closed while
+deactivated follows today's close-of-active-tab ordering: store drops runtime, then the Vue flush
+unmounts. The watches already guard `!grid || !dataSource` and a missing page.
+
+`kiraSlickGrid.ts`'s document capture-phase `scroll` listener stays bound per warm grid (at most 5).
+Its handler is two containment checks and does nothing for a detached grid. Accepted as audited.
+
+`CellEditorDock`/`MonacoHost` need no change: `automaticLayout: true` (`MonacoHost.vue:372`) relays
+out on reattach. `SearchToolbar.vue` autofocuses only on mount: a reactivated tab with search open
+no longer steals focus into the search box. That is the correct behaviour for a return to an
+unchanged tab; §6 catches any spec that relied on it.
+
+### 3.4 `SlickGridHost.vue`: one column build per mount
+
+Measured as prototype B2 (§1.8): 321 to 201 ms p50 cold mount, `consoleErrors` empty, headers carry
+`data-column`.
+
+- Grid options: `explicitInitialization: false` becomes `true` (~`:2063`).
+- Call `grid.init()` right after the last `eventHandler.subscribe` / `subscribeRangeSelecting`
+  (~`:2090`), before the P104 §6.4 block that reads the header panes.
+- Delete `rebuildAndSetColumns()` in `onMounted` (`:2129`) and its workaround comment
+  (~`:2105-2128`). The header listeners it compensated for are now subscribed before the only
+  build. Keep `rebuildAndSetColumns` itself: the meta/appearance/width watches still call it.
+- `slick-grid.spec.ts`'s switch-away-and-back test (~`:1424-1500`) pins the header select zone
+  and sort indicators this workaround existed for. With §3.1 in place, that switch no longer
+  remounts. Make it still cover a real remount: close and reopen the tab (or open it fresh) before
+  asserting the header controls, in addition to the switch.
+
+### 3.5 Keystroke metric: on-screen popup, not the `.visible` timer
+
+`measureKeyToPopup` (`budgets.spec.ts:328-354`) waits for `.suggest-widget.visible`. Replace the
+predicate with one in-page function used both to resolve the probe and to confirm the popup is
+hidden between keystrokes:
+
+```ts
+// Monaco adds `.visible` 100 ms after the widget is on screen (SuggestWidget._show's
+// setTimeout, onDidShow); suggest.css styles nothing on it.
+function suggestPopupShown(): boolean {
+  const w = document.querySelector<HTMLElement>('.suggest-widget');
+  if (!w || getComputedStyle(w).visibility !== 'visible' || w.offsetHeight === 0) return false;
+  return w.querySelector('.monaco-list-row') !== null;
+}
+```
+
+- `MutationObserver` options add `'style'` to `attributeFilter` (Monaco toggles visibility through
+  inline style).
+- Page-side, inline the predicate in each `evaluate` (no cross-context function passing).
+- The `:833-841` warm-up and Escape waits switch from the `.suggest-widget.visible` locator to
+  `expect.poll(() => page.evaluate(suggestPopupShown-inline)).toBe(true|false)`. Otherwise a still
+  visible widget would resolve the probe at 0 ms.
+- Update the `:333-336` comment accordingly. PERF.md §1 row `:31` metric text follows (§3.6).
+
+This is a measurement fix, not a bound fix: PERF.md's budget is "completion popup visible", and
+the popup is visible at 27-32 ms (§1.5).
+
+### 3.6 Bounds and docs
+
+Per assertion, against PERF.md §1 and §2.1:
+
+| Assertion | Today | New | Evidence |
+|---|---|---|---|
+| `:765` cell to editor p95 | `<= 1000` | `<= 50` restored | 37-41 ms p95 unmodified (§1.1); SPEC row: 23-33 ms |
+| `:802` cached tab switch p95 | `<= 1000` | `<= 50` restored | 8-9 ms p95 with per-tab `KeepAlive` (§1.8 K) |
+| `:820` cached tree expand p95 | `<= 1000` | `<= 50` restored | 24-39 ms p95 (§1.1); SPEC row: 21-43 ms |
+| `:846` keystroke p50 | `<= 1000` | `<= 50` restored | popup on screen 27-32 ms after keydown (§1.5) |
+| `:847` keystroke max | `<= 1000` | `<= 200` restored | pre-port bound (`9ee240f0`^); 20-sample max stays near p50 |
+
+No bound stays wider. Each `logStats` label and section header already says the restored value.
+
+`docs/PERF.md`:
+
+- §1 row `:31`: metric text becomes "last keypress to `.suggest-widget` on screen (computed
+  `visibility: visible`, a list row rendered)", with one clause on why not `.visible`.
+- §2.1 rows `:47-50`: this sandbox's numbers from §6's runs, labelled with the environment (as
+  the `:60` note does). Keystroke budget cell becomes `<= 50 ms (p50)`.
+- Replace the `:60-65` note: the `<= 1000` gate came from the P57 M5 port (`9ee240f0`); before it
+  the spec asserted p50 <= 50 / max <= 200; the 113 ms was Monaco's `.visible` timer.
+- M5 table `:145`: note that ~48/85 ms measured `DataGrid.vue`, before `SlickGridHost.vue`
+  (`d01b082e`).
+- New short paragraph: cold switch (first open, evicted tab) on WebKit ~200 ms p50 after §3.4,
+  not gated, cause §1.7.
+
+`docs/ARCHITECTURE.md`: in the `MainView.vue` paragraph (`:1360-1368`) add one sentence: Kira
+Studio keeps up to 5 `data` tabs alive per `host.keepAlive`, per-tab `KeepAlive`, closed or evicted
+tabs truly unmount. In the RepoGraph paragraph (`:3577-3580`), "in either app" is still true for
+`RepoGraphView` (Space sets no `keepAlive`); make that explicit so the sentence stays true.
