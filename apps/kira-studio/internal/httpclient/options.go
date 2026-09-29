@@ -49,7 +49,6 @@ type resolved struct {
 	ephemeral        bool
 }
 
-
 // normalize resolves every field to a concrete value, clamping to the same bounds
 // packages/shared/domain/settings.ts's REQUEST_TIMEOUT_MS_RANGE/MAX_RESPONSE_MB_RANGE/
 // MAX_REDIRECTS_RANGE state — a value out of range reaches here only via a hand-edited or

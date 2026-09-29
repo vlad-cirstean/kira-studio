@@ -221,7 +221,7 @@ func TestClassifyStashPop_PassesThroughShaIndexTarget(t *testing.T) {
 // ---------------------------------------------------------------------------------------
 
 var cleanCheckout = gitpreflight.CheckoutPreflight{
-	Target: gitpreflight.CheckoutTarget{Kind: "branch", Name: "topic"},
+	Target:   gitpreflight.CheckoutTarget{Kind: "branch", Name: "topic"},
 	Detaches: false, CreatesTracking: nil, Carried: []string{}, Blockers: []gitpreflight.CheckoutBlocker{},
 	Verdict: "clean", Routes: []string{},
 }

@@ -301,13 +301,13 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, f
 			continue
 		}
 		return &trackedConn{Conn: entry.conn, entry: entry}, func() {
-				// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
-				// RunWithAbortRace goroutine started under this acquisition has actually finished
-				// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
-				// this wait short in practice, but it must never be skipped.
-				entry.inFlight.Wait()
-				entry.mu.Unlock()
-			}, nil
+			// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
+			// RunWithAbortRace goroutine started under this acquisition has actually finished
+			// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
+			// this wait short in practice, but it must never be skipped.
+			entry.inFlight.Wait()
+			entry.mu.Unlock()
+		}, nil
 	}
 }
 

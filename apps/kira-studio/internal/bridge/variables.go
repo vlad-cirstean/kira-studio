@@ -3,8 +3,8 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // VariablesService is P5 D19 — the CollectionsService/QueriesService shape (a typed-struct

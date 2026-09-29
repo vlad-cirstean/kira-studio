@@ -139,7 +139,7 @@ func TestBuildStacks_Fork(t *testing.T) {
 	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
 		Config: map[string]gitpreflight.StackConfigEntry{
-			"feat1": {Branch: "feat1", Parent: "main"},
+			"feat1":  {Branch: "feat1", Parent: "main"},
 			"feat2a": {Branch: "feat2a", Parent: "feat1"},
 			"feat2b": {Branch: "feat2b", Parent: "feat1"},
 		},

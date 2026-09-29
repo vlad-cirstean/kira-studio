@@ -6,8 +6,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // GitSock and GitBroker are the two one-method-ish seams this service needs from

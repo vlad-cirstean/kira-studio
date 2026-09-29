@@ -134,7 +134,6 @@ func DefaultBounds(work *application.Rect) (width, height int) {
 	return width, height
 }
 
-
 // boundsFromRect converts Wails' int-fielded Rect (webview_window.go's Bounds()) to the
 // float64-fielded WindowBounds a WindowStore persists — split out so the conversion is testable
 // without a live *application.WebviewWindow.
