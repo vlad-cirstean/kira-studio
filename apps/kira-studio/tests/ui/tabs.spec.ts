@@ -303,3 +303,67 @@ test('the tab strip scrolls once tabs overflow it (P31 D6/D7)', async ({ relaunc
     })
     .toBe(true);
 });
+
+async function dragTab(
+  page: import('@playwright/test').Page,
+  source: import('@playwright/test').Locator,
+  target: import('@playwright/test').Locator,
+): Promise<void> {
+  const from = await source.boundingBox();
+  const to = await target.boundingBox();
+  if (!from || !to) throw new Error('dragTab: chip has no box');
+  const fx = from.x + from.width / 2;
+  const fy = from.y + from.height / 2;
+  // Aim past the target's midpoint in the drag direction so Sortable's swap threshold is met.
+  const tx = to.x + to.width * (to.x < from.x ? 0.25 : 0.75);
+  const ty = to.y + to.height / 2;
+  await page.mouse.move(fx, fy);
+  await page.mouse.down();
+  await page.mouse.move(fx + 10, fy, { steps: 5 });
+  await page.mouse.move(tx, ty, { steps: 15 });
+  await page.mouse.move(tx, ty, { steps: 2 });
+  // Sortable's fallback mode emulates dragover on a 50ms interval, one swap per tick.
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+}
+
+test('tab strip: drag reorders tabs; click, middle-click and close still work (P137)', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await createAndConnect(page);
+  const orderItemsRow = await findRow(page, ORDER_ITEMS_PATH);
+  for (let i = 0; i < 3; i++) {
+    await orderItemsRow.click({ button: 'right' });
+    await page.click('[data-testid="menu-item-open-data-new-tab"]');
+  }
+  const chips = page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]');
+  await expect(chips).toHaveCount(3);
+  const rowOrder = () =>
+    chips.evaluateAll((els) => els.map((el) => el.getAttribute('data-tab-id')));
+  const [a, b, c] = (await rowOrder()) as string[];
+
+  await dragTab(page, tabLocator(page, c), tabLocator(page, a));
+  await expect.poll(rowOrder).toEqual([c, a, b]);
+  await expect(page.locator('[data-testid="tab"].opacity-50')).toHaveCount(0);
+  await expect
+    .poll(() => {
+      const saves = control.log().filter((e) => e.channel === IPC.tabsSave);
+      const args = saves[saves.length - 1]?.args as { tabs: { id: string }[] } | undefined;
+      return args?.tabs.map((t) => t.id) ?? null;
+    })
+    .toEqual([c, a, b]);
+
+  await dragTab(page, tabLocator(page, c), tabLocator(page, b));
+  await expect.poll(rowOrder).toEqual([a, b, c]);
+  await expect(page.locator('[data-testid="tab"].opacity-50')).toHaveCount(0);
+
+  await tabLocator(page, a).locator('button').first().click();
+  await expect(tabLocator(page, a)).toHaveAttribute('data-active', 'true');
+  await tabLocator(page, b).locator('button').first().click({ button: 'middle' });
+  await expect(tabLocator(page, b)).toHaveCount(0);
+  await expect.poll(rowOrder).toEqual([a, c]);
+  await tabLocator(page, a).locator('[data-testid="tab-close"]').click();
+  await expect(tabLocator(page, a)).toHaveCount(0);
+  await expect.poll(rowOrder).toEqual([c]);
+});
