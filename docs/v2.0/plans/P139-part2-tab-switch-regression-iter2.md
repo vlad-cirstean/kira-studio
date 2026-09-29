@@ -86,3 +86,58 @@ pseudo-element then carries ~68 `--tw-*` custom properties. That doubles per-ele
 
 Safari has shipped `margin-trim` since 16.4, so real macOS WKWebView should not match this fallback.
 Not verifiable here (§6).
+
+### 1.5 Option E experiments: tab switch with a real remount
+
+Every row below remounts `DataView` and SlickGrid on each switch (no caching). "Single build" is
+`ba41ec3f` (columns built once per mount), applied in every row after the first. "Vars" is a probe
+of §3.1's design: `KiraSlickGrid` overrides `createCssRules`/`removeCssRules`/`applyColumnWidths`;
+column `left`/`right` read `var(--ks-l<i>)`/`var(--ks-r<i>)` from one static sheet appended once
+(additive path), values set as custom properties on the grid container. No per-grid sheet, no rule
+mutation. Header/cell lefts checked equal. "No TW fallback" deletes the one `@supports` block of
+§1.4 at runtime.
+
+| Engine | Variant | to DOM p50 / p95 ms | to 2nd rAF p50 / p95 ms |
+|---|---|---|---|
+| WebKit | `035bbbeb` baseline | 279-341 / 324-494 | 338-399 / 401-549 |
+| WebKit | single build | 192-218 / 233-262 | 246-268 / 278-330 |
+| WebKit | single build + CSS containment (`contain: strict`, `layout style paint`, `content-visibility: auto`, `will-change`; on `main-view`, `data-grid`, all regions) | 170-220 / 214-317 | 229-270 / 266-407 |
+| WebKit | single build + vars | 133-139 / 170-212 | 170-183 / 227-247 |
+| WebKit | single build + vars + no TW fallback | **99-106 / 136-162** | 140-157 / 204-235 |
+| Chromium | single build | 49-52 / 67-71 | 65-70 / 88-99 |
+| Chromium | single build + vars | **46-50 / 58-62** | 54-64 / 75-83 |
+
+Containment changes nothing measurable: the stylesheet-change microbenchmarks stay at 51-71 ms under
+every variant. WebKit's full rebuild restyles every element whatever the containment; `contain`
+scopes layout and paint only.
+
+Shadow root (candidate 2): a sheet appended or mutated inside a shadow root costs 0-1 ms (§1.2).
+It would work, but needs the grid's whole subtree in a shadow tree with every app sheet adopted
+into it, and every `document.querySelector` on grid DOM (app code, specs, measure helpers) changed.
+"Vars" gets the same scoping with no shadow tree, so the shadow root is declined.
+
+### 1.6 Where a remount spends time after the fixes
+
+Marks in `DataView`/`SlickGridHost` setup, mount and unmount, median of 16 switches, ms from click:
+
+| Stage | WebKit, vars + no TW fallback | Chromium, vars |
+|---|---|---|
+| click to `DataView` setup | 7 | 3 |
+| `DataView` setup to `SlickGridHost` setup | 18 | 13 |
+| `SlickGridHost` setup to old-tab unmount start | 19 | 12 |
+| old `SlickGridHost` + `DataView` unmount | 3 | 1 |
+| `new KiraSlickGrid(...)` | 30 (10-53) | 3 |
+| `grid.init()` | 29 (10-51) | 11 |
+| `grid.render()` | 5 | 2 |
+| rest of `onMounted`, observer resolve | 9 | 6 |
+| **total** | **113** | **47** |
+
+Vue component work (setup, render, DOM create, unmount): ~47 ms WebKit, ~29 ms Chromium. SlickGrid
+self time per switch, WebKit, vars + no TW fallback: `getViewportWidth` 8.7 (3 calls, forced
+layout), `getMaxSupportedCssHeight` 6.9 (1 call, forced layout, constant per engine),
+`handleScroll` 4.4, rest < 2 each. `new KiraSlickGrid` includes the first style and layout of the
+new `DataView` subtree (`initialize` reads `getComputedStyle` on the container).
+
+**A remount cannot reach 50 ms p95 on this 4 vCPU sandbox, on either engine.** Chromium, with no
+stylesheet penalty at all, measures p95 58-62 ms for the same remount; Vue work alone is ~29 ms of
+it.
