@@ -110,7 +110,7 @@ function onJustDelete(): void {
     >
       <DialogHeader>
         <span class="flex items-center gap-2">
-          <CodiconIcon name="robot" :size="16" class="text-[#d97757]" />
+          <CodiconIcon name="robot" :size="16" class="text-primary" />
           <DialogTitle>{{ view.title }}</DialogTitle>
         </span>
       </DialogHeader>

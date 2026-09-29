@@ -176,19 +176,19 @@ function onStart(row: AllAgentsRow): void {
         <ToggleGroup
           type="single"
           :model-value="filter"
-          class="rounded-kira border border-[#2a2d35] bg-[#1b1d22] p-[3px]"
+          class="rounded-kira border border-border bg-elevated p-[3px]"
           data-testid="ade-all-agents-filter"
           @update:model-value="onFilterChange"
         >
           <ToggleGroupItem
             value="active"
-            class="h-7 rounded-kira-sm px-3 text-kira-sm font-semibold data-[state=on]:bg-[#2a2c33] data-[state=on]:text-fg"
+            class="h-7 rounded-kira-sm px-3 text-kira-sm font-semibold data-[state=on]:text-fg"
           >
             Active {{ allAgents.activeN }}
           </ToggleGroupItem>
           <ToggleGroupItem
             value="older"
-            class="h-7 rounded-kira-sm px-3 text-kira-sm font-semibold data-[state=on]:bg-[#2a2c33] data-[state=on]:text-fg"
+            class="h-7 rounded-kira-sm px-3 text-kira-sm font-semibold data-[state=on]:text-fg"
           >
             Older {{ allAgents.olderN }}
           </ToggleGroupItem>
@@ -197,7 +197,7 @@ function onStart(row: AllAgentsRow): void {
           <span
             v-for="entry in summaryEntries"
             :key="entry.kind"
-            class="inline-flex items-center gap-1.5 text-kira-sm text-[#c9c7c2]"
+            class="inline-flex items-center gap-1.5 text-kira-sm text-fg"
           >
             <AdeActivityIcon :kind="entry.kind" />{{ entry.count }} {{ entry.label }}
           </span>
@@ -211,7 +211,7 @@ function onStart(row: AllAgentsRow): void {
         data-testid="ade-all-agents-group"
         :data-repo-id="group.codeRepoId"
       >
-        <div class="mb-1 border-b border-[#22252c] px-3 pb-1.5">
+        <div class="mb-1 border-b border-border px-3 pb-1.5">
           <h3 class="m-0 font-data text-kira-md font-semibold">{{ group.name }}</h3>
         </div>
         <AdeAllAgentsRow
@@ -223,7 +223,7 @@ function onStart(row: AllAgentsRow): void {
         />
       </section>
 
-      <p v-if="allAgents.groups.length === 0" class="p-3 text-kira-sm text-[#9a9ca5]">
+      <p v-if="allAgents.groups.length === 0" class="p-3 text-kira-sm text-muted-foreground">
         Nothing here.
       </p>
     </div>
