@@ -3,8 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed, ref } from 'vue';
 import AdeStackRow from './AdeStackRow.vue';
 import { rowHeightClass } from './rowHeight';
-import { TONE } from './tones';
-import type { QueueItem, QueueSegment, QueueTag } from './useQueue';
+import { CLAUDE_BUTTON_STYLE, TONE, TONE_INK } from './tones';
+import { DEPENDENCY_COLOR, type QueueItem, type QueueSegment, type QueueTag } from './useQueue';
 import type { DropResult } from './useTimelineDrag';
 import { useTimelineDrag } from './useTimelineDrag';
 
@@ -50,26 +50,27 @@ const boxStyle = computed(() => {
   const solid = TONE[props.segment.tag.tone][2];
   if (props.segment.dependency) {
     return {
-      border: '1px dotted #4fb8c4',
-      borderLeft: '3px solid #4fb8c4',
+      border: `1px dotted ${DEPENDENCY_COLOR}`,
+      borderLeft: `3px solid ${DEPENDENCY_COLOR}`,
       background: 'rgba(79,184,196,0.07)',
     };
   }
   if (props.segment.parked) {
     return {
-      border: '1px dashed #3a3e48',
-      background: 'repeating-linear-gradient(135deg, #17181c 0 7px, #1c1d22 7px 14px)',
+      border: '1px dashed var(--kira-border-strong)',
+      background:
+        'repeating-linear-gradient(135deg, var(--kira-bg-chrome) 0 7px, var(--kira-bg) 7px 14px)',
       borderLeft: `3px solid ${solid}`,
     };
   }
   const border = isRipple.value
-    ? '2px solid #e8a33d'
+    ? `2px solid ${TONE.amber[2]}`
     : isMerged.value
       ? '1px solid rgba(163,113,247,0.55)'
       : props.segment.cont
-        ? '1px dashed #3a3e48'
-        : '1px solid #2a2d35';
-  return { border, borderLeft: `3px solid ${solid}`, background: '#1a1c21' };
+        ? '1px dashed var(--kira-border-strong)'
+        : '1px solid var(--kira-border)';
+  return { border, borderLeft: `3px solid ${solid}`, background: 'var(--kira-bg-elevated)' };
 });
 
 function tagStyle(tone: QueueTag['tone']): { background: string; color: string } {
@@ -81,7 +82,7 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
   const solid = TONE[tone][2];
   return {
     background: solid,
-    color: tone === 'purple' ? '#ffffff' : '#15161a',
+    color: TONE_INK[tone],
     opacity: disabled ? '0.5' : '1',
   };
 }
@@ -147,8 +148,8 @@ function actionButtonStyle(tone: QueueTag['tone'], disabled: boolean): Record<st
           class="h-[22px] shrink-0 whitespace-nowrap rounded-kira-sm px-2.5 text-kira-sm font-semibold"
           :style="
             cell.action.kind === 'archive'
-              ? { background: '#a371f7', color: '#ffffff' }
-              : { background: '#d97757', color: '#1a0f0a' }
+              ? { background: TONE.purple[2], color: TONE_INK.purple }
+              : CLAUDE_BUTTON_STYLE
           "
           :data-testid="`ade-cell-action-${cell.action.kind}-${cell.action.id}`"
           @click="emit('cellAction', cell.action)"

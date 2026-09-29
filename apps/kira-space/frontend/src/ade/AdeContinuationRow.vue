@@ -14,17 +14,17 @@ const emit = defineEmits<{ pick: [lead: string, startDay: number] }>();
   <button
     type="button"
     :title="span.tip"
-    class="ml-[218px] flex h-7 max-w-140 items-center gap-2 rounded-kira-sm border border-dashed border-[#34373f] border-l-3 bg-transparent px-2.5 text-left text-kira-sm text-muted-foreground"
+    class="ml-[218px] flex h-7 max-w-140 items-center gap-2 rounded-kira-sm border border-dashed border-border-strong border-l-3 bg-transparent px-2.5 text-left text-kira-sm text-muted-foreground"
     :style="{ borderLeftColor: span.color }"
     data-testid="ade-continuation-row"
     @click="emit('pick', span.lead, span.startDay)"
   >
-    <span class="text-[#7c7f88]">↳</span>
+    <span class="text-subtle">↳</span>
     <span
       class="whitespace-nowrap"
-      :class="span.isEnd ? 'text-[#f0b85c]' : 'text-[#7c7f88]'"
+      :class="span.isEnd ? 'text-[#f0b85c]' : 'text-subtle'"
       >{{ span.note }}</span
     >
-    <span class="min-w-0 flex-1 truncate font-semibold text-[#c9c7c2]">{{ span.title }}</span>
+    <span class="min-w-0 flex-1 truncate font-semibold text-fg">{{ span.title }}</span>
   </button>
 </template>

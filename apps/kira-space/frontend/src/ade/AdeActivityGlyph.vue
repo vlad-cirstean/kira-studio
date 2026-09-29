@@ -47,8 +47,8 @@ const dot = computed(() => {
     <span
       v-else-if="kind === 'idle'"
       :class="dot"
-      class="m-0.5 inline-block rounded-full border-[1.5px] border-[#7c7f88]"
+      class="m-0.5 inline-block rounded-full border-[1.5px] border-subtle"
     />
-    <span v-else class="m-[3px] inline-block size-1.5 rounded-[2px] bg-[#4a4d56]" />
+    <span v-else class="m-[3px] inline-block size-1.5 rounded-[2px] bg-disabled" />
   </span>
 </template>

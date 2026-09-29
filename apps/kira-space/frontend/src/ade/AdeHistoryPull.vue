@@ -23,7 +23,7 @@ const text = computed(() => {
 <template>
   <button
     type="button"
-    class="relative my-0.5 ml-15 flex h-7 w-[calc(100%-60px)] items-center justify-center gap-2 overflow-hidden rounded-kira-sm border border-dashed border-[#3a3e48] bg-transparent text-kira-sm text-muted-foreground"
+    class="relative my-0.5 ml-15 flex h-7 w-[calc(100%-60px)] items-center justify-center gap-2 overflow-hidden rounded-kira-sm border border-dashed border-border-strong bg-transparent text-kira-sm text-muted-foreground"
     data-testid="ade-history-pull"
     @click="emit('open')"
   >

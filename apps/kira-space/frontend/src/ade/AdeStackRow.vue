@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
 import AdeAgentsPill from './AdeAgentsPill.vue';
 import { rowHeightClass } from './rowHeight';
+import { TONE } from './tones';
 import type { QueueItem, QueueStackMember } from './useQueue';
 
 // P129 Part 5 §0.21: one stack row (mockup `rowFor`, 1096-1129) — elbow, colour square, agents
@@ -13,8 +14,8 @@ import type { QueueItem, QueueStackMember } from './useQueue';
 const props = defineProps<{
   member: QueueStackMember;
   item: QueueItem;
-  /** The row's own parent item kind, `null` with no parent — decides the elbow colour (mockup
-   *  `pd && pd.kind === 'review' ? '#7aa7ff' : '#5c606b'`). */
+  /** The row's own parent item kind, `null` with no parent — decides the elbow colour (blue tone
+   *  solid under a review, grey tone solid otherwise). */
   parentKind: QueueItem['kind'] | null;
   /** This segment's own first row, on a continuation segment (mockup `g.cont && g.m[0].id === x.id`)
    *  — its elbow is dashed rather than solid. */
@@ -31,7 +32,7 @@ const emit = defineEmits<{
 
 const movable = computed(() => props.item.kind !== 'review' && props.item.kind !== 'dependency');
 const merged = computed(() => props.item.status.label === 'merged');
-const elbowColor = computed(() => (props.parentKind === 'review' ? '#7aa7ff' : '#5c606b'));
+const elbowColor = computed(() => TONE[props.parentKind === 'review' ? 'blue' : 'grey'][2]);
 
 const titleClass = computed(() => {
   if (props.item.kind === 'review') return 'text-[#93b6ff]';
@@ -41,7 +42,7 @@ const titleClass = computed(() => {
 });
 
 const rowStyle = computed(() => {
-  if (props.selected) return { background: '#26272d', borderLeftColor: '#e8a33d' };
+  if (props.selected) return { background: 'var(--kira-hover)', borderLeftColor: 'var(--primary)' };
   if (merged.value) return { background: 'rgba(163,113,247,0.08)', borderLeftColor: 'transparent' };
   if (props.item.kind === 'review') {
     return {
@@ -144,7 +145,7 @@ function onPick(): void {
         <span
           v-if="item.branchText"
           class="truncate font-data text-kira-sm leading-[14px]"
-          :class="[item.draft ? 'italic text-[#9a9ca5]' : 'text-[#7c7f88]']"
+          :class="[item.draft ? 'italic text-muted-foreground' : 'text-subtle']"
           >{{ item.branchText }}</span
         >
       </button>
@@ -158,12 +159,12 @@ function onPick(): void {
           :href="item.jira.url"
           target="_blank"
           rel="noopener noreferrer"
-          class="shrink-0 font-data text-[#7aa7ff] hover:underline"
+          class="shrink-0 font-data text-info hover:underline"
           @click.stop
           >{{ item.jira.key }}</a
         >
-        <span v-else class="shrink-0 font-data text-[#7aa7ff]">{{ item.jira.key }}</span>
-        <span v-if="item.title !== item.jira.key" class="truncate text-[#9a9ca5]">{{
+        <span v-else class="shrink-0 font-data text-info">{{ item.jira.key }}</span>
+        <span v-if="item.title !== item.jira.key" class="truncate text-muted-foreground">{{
           item.title
         }}</span>
       </span>

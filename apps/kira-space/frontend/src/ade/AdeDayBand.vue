@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import AdeContinuationRow from './AdeContinuationRow.vue';
 import AdeStackBlock from './AdeStackBlock.vue';
+import { TONE } from './tones';
 import type { QueueBand, QueueItem, QueueSegment, QueueSpan } from './useQueue';
 import type { DropResult } from './useTimelineDrag';
 import { useTimelineDrag } from './useTimelineDrag';
@@ -49,38 +50,38 @@ const greyed = computed(() => props.band.isWeekend || props.band.isDayOff);
 
 const rowBorderClass = computed(() =>
   props.band.isMonday || props.band.isToday || props.band.isLater
-    ? 'border-t border-t-[#34373f]'
-    : 'border-t border-dashed border-t-[#202227]',
+    ? 'border-t border-t-border-strong'
+    : 'border-t border-dashed border-t-border',
 );
 
 const rowBg = computed(() => {
   // §0.12: the drop highlight wins over every other band tint while it applies.
-  if (showDragHighlight.value) return 'rgba(232,163,61,0.1)';
+  if (showDragHighlight.value) return 'color-mix(in srgb, var(--kira-focus) 10%, transparent)';
   if (greyed.value) {
-    return 'repeating-linear-gradient(135deg, rgba(255,255,255,0.018) 0 6px, transparent 6px 12px)';
+    return 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--kira-fg) 2%, transparent) 0 6px, transparent 6px 12px)';
   }
   if (props.band.isOverdue) return 'rgba(232,163,61,0.04)';
-  if (props.band.isPast) return 'rgba(255,255,255,0.012)';
+  if (props.band.isPast) return 'color-mix(in srgb, var(--kira-fg) 1.5%, transparent)';
   return 'transparent';
 });
 
 const rulerBorderColor = computed(() => {
-  if (props.band.isToday) return '#e8a33d';
-  if (props.band.isPast || greyed.value) return '#2a2d35';
-  return '#3a3e48';
+  if (props.band.isToday) return TONE.amber[2];
+  if (props.band.isPast || greyed.value) return 'var(--kira-border)';
+  return 'var(--kira-border-strong)';
 });
 
 const labelColor = computed(() => {
-  if (greyed.value) return '#4f525b';
-  if (props.band.isOverdue) return '#f0b85c';
-  if (props.band.isEmpty || props.band.isPast) return '#6b6f7a';
-  return '#e8e6e1';
+  if (greyed.value) return 'var(--kira-fg-subtle)';
+  if (props.band.isOverdue) return TONE.amber[1];
+  if (props.band.isEmpty || props.band.isPast) return 'var(--kira-fg-subtle)';
+  return 'var(--kira-fg)';
 });
 
 const subColor = computed(() => {
-  if (greyed.value) return '#4f525b';
-  if (props.band.hours > props.band.capacity && !props.band.isLater) return '#f28b7d';
-  return '#9a9ca5';
+  if (greyed.value) return 'var(--kira-fg-subtle)';
+  if (props.band.hours > props.band.capacity && !props.band.isLater) return TONE.red[1];
+  return 'var(--kira-fg-muted)';
 });
 
 const sub = computed(() => {
@@ -99,7 +100,7 @@ const overflowNote = computed(() => {
   return `${over}h over ${props.band.capacity}h`;
 });
 
-const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
+const tickColor = computed(() => (props.band.isToday ? TONE.amber[2] : 'var(--kira-bg)'));
 </script>
 
 <template>
@@ -107,7 +108,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
        nested interactive rows/buttons of its own, so it can't itself take a click/button role. -->
   <div
     class="flex"
-    :class="[rowBorderClass, showDragHighlight ? 'outline outline-dashed outline-[#e8a33d]' : '']"
+    :class="[rowBorderClass, showDragHighlight ? 'outline outline-dashed outline-focus' : '']"
     :style="{ background: rowBg }"
     data-testid="ade-day-band"
     data-ade-band
@@ -148,7 +149,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
       >
         <span class="font-bold text-[#c3a3fb]">✓</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm text-[#c3a3fb]">{{ h.how }}</span>
-        <span class="min-w-0 truncate font-semibold text-[#c9c7c2]">{{ h.title }}</span>
+        <span class="min-w-0 truncate font-semibold text-fg">{{ h.title }}</span>
         <span class="min-w-0 truncate font-data text-kira-sm">{{ h.branch }}</span>
       </div>
       <div

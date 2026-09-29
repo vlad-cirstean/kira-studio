@@ -9,7 +9,7 @@ const emit = defineEmits<{ toggle: [] }>();
 
 <template>
   <div
-    class="flex items-center gap-1.5 px-3.5 pb-1 text-kira-sm text-[#9a9ca5]"
+    class="flex items-center gap-1.5 px-3.5 pb-1 text-kira-sm text-muted-foreground"
     data-testid="ade-my-work-toggle"
   >
     <template v-if="!expanded">

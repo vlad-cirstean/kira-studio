@@ -13,7 +13,7 @@ function onDate(e: Event): void {
 
 <template>
   <div
-    class="ml-15 mb-1.5 flex items-center gap-2.5 rounded-kira-sm border border-[#2f323b] bg-[#1b1d22] px-2.5 py-1.5 text-kira-sm"
+    class="ml-15 mb-1.5 flex items-center gap-2.5 rounded-kira-sm border border-border-strong bg-elevated px-2.5 py-1.5 text-kira-sm"
     data-testid="ade-history-bar"
   >
     <span class="font-semibold">History</span>
@@ -21,14 +21,14 @@ function onDate(e: Event): void {
     <input
       id="ade-go-to-date"
       type="date"
-      class="h-6 rounded border border-[#3a3e48] bg-transparent px-1.5 text-kira-sm text-[#c9c7c2]"
+      class="h-6 rounded border border-border-strong bg-transparent px-1.5 text-kira-sm text-fg"
       style="color-scheme: dark"
       @input="onDate"
     />
     <span class="flex-1" />
     <button
       type="button"
-      class="h-6 rounded border border-[#3a3e48] bg-transparent px-2.5 text-kira-sm text-[#c9c7c2]"
+      class="h-6 rounded border border-border-strong bg-transparent px-2.5 text-kira-sm text-fg"
       data-testid="ade-hide-history"
       @click="emit('hide')"
     >
@@ -36,7 +36,7 @@ function onDate(e: Event): void {
     </button>
     <button
       type="button"
-      class="h-6 rounded bg-[#e8a33d] px-2.5 text-kira-sm font-semibold text-[#15161a]"
+      class="h-6 rounded bg-primary px-2.5 text-kira-sm font-semibold text-primary-foreground"
       data-testid="ade-current-work"
       @click="emit('current')"
     >

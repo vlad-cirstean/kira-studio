@@ -223,7 +223,7 @@ async function submitDependency(): Promise<void> {
                   <span class="shrink-0 text-muted-foreground">·</span>
                   <span
                     class="shrink-0 rounded-kira-sm px-1 text-kira-sm"
-                    :class="c.mine ? 'bg-[#23252b]' : 'text-[#7aa7ff]'"
+                    :class="c.mine ? 'bg-field' : 'text-[#7aa7ff]'"
                     >{{ c.mine ? 'you' : c.author }}</span
                   >
                   <span class="shrink-0 text-muted-foreground">·</span>
