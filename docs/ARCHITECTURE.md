@@ -1364,7 +1364,13 @@ with an `#empty` slot fallback for "no active tab" — each app passes its own f
 own registry; Kira Space: `GitStart.vue`) — replacing what used to be a nine-branch `v-if`/
 `v-else-if` chain. `TabStrip.vue` reads the same `TAB_KINDS` registry for its icon/title/rail/
 context-menu instead of branching on `tab.kind` itself, and no longer imports `project/state/tree` at
-all. Adding a tab
+all. `TabStrip` reads the narrow `TabStripHost` seam (`host.ts`): optional `host` prop, falls back
+to the injected `WorkbenchHost`, which extends it. Optional capabilities (close*, duplicate, promote,
+preview, `moveTab`) hide their affordance when absent. `#tab-leading` slot renders before the title;
+kind flag `pinnedTitle` makes a pinned chip labelled, not icon-only. Reorder is `vue-draggable-plus`
+`useDraggable` in `forceFallback` mode on the scrolling row only (pinned chips sit outside it), bound
+to an id mirror so the library reverts its own DOM move; `onUpdate` commits once per drop via
+`moveTab`. Adding a tab
 kind means one registry entry each in `state/tabKinds.ts` and `workbench/tabViews.ts`, not editing
 a dispatch chain in three files — `'http-request'` (P2) is the first kind to actually exercise
 that promise, and the first Api-mode kind at all: `TAB_KIND_MODE['http-request']` is `'api'`,
@@ -2703,7 +2709,8 @@ workspace (C10)" below).
 union paragraph above) — a full-area view, no left panel, no tab strip, replacing P128's own
 placeholder.** `apps/kira-space/frontend/src/ade/`: `AdeView.vue` (the module's `FullModeDef.view`
 — repo tabs plus the active repo's own view, or an empty state when no repository is imported yet)
-mounts `AdeRepoTabs.vue` (one tab per imported repository, a needs-input badge summing every
+mounts `AdeRepoTabs.vue` (renders the shared `TabStrip` through `useAdeTabStripHost.ts`, one tab per imported repository, no
+close, no reorder: repo order is `code_repos.sort_order`, no reorder path; a needs-input badge summing every
 `attention`-phase session in that repo — every running session's own repo, not only a queued item's,
 `ade/activity.ts`'s own `needsInputByRepo`) and `AdeRepoView.vue` (that repo's sticky
 `AdeProjectHeader.vue` + `AdeMainLine.vue`; the timeline itself is Part 5's). `ade/useQueue.ts` is a
@@ -2788,7 +2795,8 @@ reflects immediately rather than waiting on the round trip. The DnD model is `vu
 than the HTML5 drag API SortableJS otherwise prefers, chosen because Playwright can drive
 `forceFallback` with a plain `mouse.move`/`down`/`up` sequence while HTML5 DnD has no such hook.
 `useTimelineDrag.ts` binds `useDraggable` with no `v-model` list — every sortable is a pass-through
-that leaves the DOM order alone and reports `onEnd`; the actual drop target comes from
+that leaves the DOM order alone and reports `onEnd` (`TabStrip.vue` also uses it, but with a bound
+id list, since its reorder commits through `moveTab`); the actual drop target comes from
 `AdeTimeline.vue`'s own hit-test (`useElementByPoint`/`useMouse` from VueUse, `closest`ing
 `[data-ade-box]` then `[data-ade-band]`), never from Sortable's own index, since a fallback clone
 can land the pointer over stale DOM. A review row carries no `data-ade-row-movable`, so grabbing it
@@ -2857,11 +2865,11 @@ over the same per-repo data every repo tab already fetches — no new Go endpoin
 recognise, so a sentinel would need a guard there a flag doesn't. `showAllAgents()` sets only the
 flag; `activeRepoId` is left exactly as `showRepo` last set it (the mockup's own `lastRepo`) — read
 again the moment `showRepo` is next called, never exposed anywhere while the pinned tab shows
-(`AdeRepoTabs`'s own `Tabs` model value renders the pinned tab's own sentinel regardless of it, and
+(`useAdeTabStripHost.ts` reports the pinned tab's own sentinel as active regardless of it, and
 `AdeRepoView` itself is unmounted). `activity.ts`'s `activitySummary`/`actRank` are the tab's own
-count and the row sort's own urgency ranking, kept out of any tab markup so **P137's later move of
-this trigger into the shared `TabStrip`'s pinned slot** carries no logic with it, only the count and
-a store action. `allAgents.ts` (no Vue import, no clock read) is the pure per-session row join: a
+count and the row sort's own urgency ranking, kept out of any tab markup. The pinned `All agents`
+tab is the shared `TabStrip`'s pinned slot: kind `ade-all-agents`, labelled (`pinnedTitle`), count
+in `#tab-leading`. `allAgents.ts` (no Vue import, no clock read) is the pure per-session row join: a
 session already attached to a `useQueue` item (`QueueItem.sessionIds`, a Part 7 addition) is live;
 else a `snapshot.history` entry matching the session's own branch or `newWorkId` is archived
 (`stopped · archived`, forced to `new worktree` on Start); else it is an orphan (its branch was
