@@ -7,7 +7,8 @@ import (
 
 // AdeBranchKindMine/Review/Parked are ade_branches.kind's own CHECK constraint values (P129 Part 2
 // §2.1) — §0.11: AddBranch defaults to Mine when the tip commit's author is the local git user,
-// else Review; SetBranchMeta only ever toggles between Mine and Parked.
+// else Review; SetBranchMeta only ever toggles between Mine and Parked. SetWorkType (P136) is the
+// one path into Review after add.
 const (
 	AdeBranchKindMine   = "mine"
 	AdeBranchKindReview = "review"
@@ -24,6 +25,47 @@ func ValidAdeBranchKind(v string) bool {
 	}
 }
 
+// AdeWorkType* are the user-chosen work types (P136), ade_branches.work_type's CHECK values.
+// Investigate and Work pair with kind mine/parked; Review and Test pair with kind review.
+const (
+	AdeWorkTypeWork        = "work"
+	AdeWorkTypeInvestigate = "investigate"
+	AdeWorkTypeReview      = "review"
+	AdeWorkTypeTest        = "test"
+)
+
+// ValidAdeWorkType mirrors ade_branches.work_type's own CHECK constraint.
+func ValidAdeWorkType(v string) bool {
+	switch v {
+	case AdeWorkTypeWork, AdeWorkTypeInvestigate, AdeWorkTypeReview, AdeWorkTypeTest:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidAdeNewWorkType mirrors ade_new_work.work_type's own CHECK: a draft has no owner to review.
+func ValidAdeNewWorkType(v string) bool {
+	return v == AdeWorkTypeWork || v == AdeWorkTypeInvestigate
+}
+
+// DefaultAdeWorkType is the work type a freshly added item of kind gets.
+func DefaultAdeWorkType(kind string) string {
+	if kind == AdeBranchKindReview {
+		return AdeWorkTypeReview
+	}
+	return AdeWorkTypeWork
+}
+
+// AdeWorkTypeFitsKind is the kind/work-type invariant: review and test pair with kind review,
+// work and investigate with mine or parked.
+func AdeWorkTypeFitsKind(workType, kind string) bool {
+	if kind == AdeBranchKindReview {
+		return workType == AdeWorkTypeReview || workType == AdeWorkTypeTest
+	}
+	return workType == AdeWorkTypeWork || workType == AdeWorkTypeInvestigate
+}
+
 // AdeBranch is one row of `ade_branches` (P129 Part 2 §2.1) — a queued branch's own meta: kind,
 // title override, links, estimate, notes (Markdown), and lifecycle timestamps. Keyed
 // (CodeRepoID, Branch), never a synthetic id — a branch's own short name is stable, and git's own
@@ -32,6 +74,7 @@ type AdeBranch struct {
 	CodeRepoID string `json:"codeRepoId"`
 	Branch     string `json:"branch"`
 	Kind       string `json:"kind"`
+	WorkType   string `json:"workType"`
 	Name       string `json:"name"`
 	DraftTitle string `json:"draftTitle"`
 	StartFrom  string `json:"startFrom"`
@@ -58,6 +101,9 @@ func (b AdeBranch) Validate() error {
 	if !ValidAdeBranchKind(b.Kind) {
 		return fmt.Errorf("model: ade branch %q: invalid kind %q", b.Branch, b.Kind)
 	}
+	if !ValidAdeWorkType(b.WorkType) || !AdeWorkTypeFitsKind(b.WorkType, b.Kind) {
+		return fmt.Errorf("model: ade branch %q: work type %q does not fit kind %q", b.Branch, b.WorkType, b.Kind)
+	}
 	return nil
 }
 
@@ -68,6 +114,7 @@ type AdeNewWork struct {
 	ID         string `json:"id"`
 	CodeRepoID string `json:"codeRepoId"`
 	Title      string `json:"title"`
+	WorkType   string `json:"workType"`
 	JiraKey    string `json:"jiraKey"`
 	JiraURL    string `json:"jiraUrl"`
 	StartFrom  string `json:"startFrom"`
@@ -89,6 +136,9 @@ func (w AdeNewWork) Validate() error {
 	}
 	if w.Title == "" && w.JiraKey == "" {
 		return fmt.Errorf("model: ade new work %q: title or jiraKey is required", w.ID)
+	}
+	if !ValidAdeNewWorkType(w.WorkType) {
+		return fmt.Errorf("model: ade new work %q: invalid work type %q", w.ID, w.WorkType)
 	}
 	return nil
 }

@@ -26,13 +26,18 @@ var (
 	// ErrEstimateShrink is SetBranchMeta/UpdateNewWork's own sentinel (P135 §6.2) — once an estimate
 	// is set, a patch may only grow it (same unit).
 	ErrEstimateShrink = errors.New("repos: estimate can only grow once set")
+	// ErrWorkTypeBlocked is SetWorkType's own sentinel (P136 §3.3) — a blocked item cannot become
+	// review or test (checkBlockable never lets a review item be blocked).
+	ErrWorkTypeBlocked = errors.New("repos: unlink its dependencies before marking it review or test")
+	// ErrWorkTypeInvalid is SetWorkType's own sentinel — new work has no owner to review or test.
+	ErrWorkTypeInvalid = errors.New("repos: new work can only be to work or to investigate")
 )
 
 // maxColorSlots is §0.13's own slot count (0-19).
 const maxColorSlots = 20
 
-const adeBranchColumns = `code_repo_id, branch, kind, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at`
-const adeNewWorkColumns = `id, code_repo_id, title, jira_key, jira_url, start_from, notes, est, branch_name, created_at, archived_at`
+const adeBranchColumns = `code_repo_id, branch, kind, work_type, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at`
+const adeNewWorkColumns = `id, code_repo_id, title, work_type, jira_key, jira_url, start_from, notes, est, branch_name, created_at, archived_at`
 const adePlanColumns = `code_repo_id, item, day, position, queued_after`
 const adeColorColumns = `code_repo_id, item, slot`
 const adeDependencyColumns = `id, code_repo_id, title, waiting_on, expected_by, created_at, resolved_at`
@@ -61,7 +66,7 @@ func scanAdeBranchRow(row rowScanner) (model.AdeBranch, error) {
 	var hadCommits int
 	var mergedAt, archivedAt sql.NullInt64
 	if err := row.Scan(
-		&b.CodeRepoID, &b.Branch, &b.Kind, &b.Name, &b.DraftTitle, &b.StartFrom, &b.JiraKey,
+		&b.CodeRepoID, &b.Branch, &b.Kind, &b.WorkType, &b.Name, &b.DraftTitle, &b.StartFrom, &b.JiraKey,
 		&b.JiraURL, &b.PrURL, &b.Est, &b.Notes, &b.AddedAt, &hadCommits, &mergedAt, &archivedAt,
 	); err != nil {
 		return model.AdeBranch{}, err
@@ -82,7 +87,7 @@ func scanAdeNewWorkRow(row rowScanner) (model.AdeNewWork, error) {
 	var w model.AdeNewWork
 	var archivedAt sql.NullInt64
 	if err := row.Scan(
-		&w.ID, &w.CodeRepoID, &w.Title, &w.JiraKey, &w.JiraURL, &w.StartFrom, &w.Notes, &w.Est,
+		&w.ID, &w.CodeRepoID, &w.Title, &w.WorkType, &w.JiraKey, &w.JiraURL, &w.StartFrom, &w.Notes, &w.Est,
 		&w.BranchName, &w.CreatedAt, &archivedAt,
 	); err != nil {
 		return model.AdeNewWork{}, err
@@ -367,9 +372,9 @@ func (r *AdeQueueRepo) AddBranch(codeRepoID string, b model.AdeBranch) (int, err
 		return 0, err
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO ade_branches (code_repo_id, branch, kind, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
-		codeRepoID, b.Branch, b.Kind, b.Name, b.DraftTitle, b.StartFrom, b.JiraKey, b.JiraURL,
+		`INSERT INTO ade_branches (code_repo_id, branch, kind, work_type, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+		codeRepoID, b.Branch, b.Kind, b.WorkType, b.Name, b.DraftTitle, b.StartFrom, b.JiraKey, b.JiraURL,
 		b.PrURL, b.Est, b.Notes, b.AddedAt, boolToInt(b.HadCommits),
 	); err != nil {
 		return 0, fmt.Errorf("repos: insert ade branch %s: %w", b.Branch, err)
@@ -400,9 +405,9 @@ func (r *AdeQueueRepo) AddNewWork(w model.AdeNewWork) (int, error) {
 		return 0, err
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO ade_new_work (id, code_repo_id, title, jira_key, jira_url, start_from, notes, est, branch_name, created_at, archived_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-		w.ID, w.CodeRepoID, w.Title, w.JiraKey, w.JiraURL, w.StartFrom, w.Notes, w.Est, w.BranchName, w.CreatedAt,
+		`INSERT INTO ade_new_work (id, code_repo_id, title, work_type, jira_key, jira_url, start_from, notes, est, branch_name, created_at, archived_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+		w.ID, w.CodeRepoID, w.Title, w.WorkType, w.JiraKey, w.JiraURL, w.StartFrom, w.Notes, w.Est, w.BranchName, w.CreatedAt,
 	); err != nil {
 		return 0, fmt.Errorf("repos: insert ade new work %s: %w", w.ID, err)
 	}
@@ -518,7 +523,7 @@ func (r *AdeQueueRepo) SetBranchMeta(codeRepoID, branch string, patch model.AdeB
 		args = append(args, *patch.Name)
 	}
 	if patch.Kind != nil {
-		sets = append(sets, "kind = ?")
+		sets = append(sets, "kind = ?", "work_type = CASE WHEN work_type IN ('review', 'test') THEN 'work' ELSE work_type END")
 		args = append(args, *patch.Kind)
 	}
 	if patch.JiraKey != nil {
@@ -555,6 +560,76 @@ func (r *AdeQueueRepo) SetBranchMeta(codeRepoID, branch string, patch model.AdeB
 		return fmt.Errorf("repos: set ade branch meta %s: %w", branch, err)
 	}
 	return sqlitex.RequireOneRow(res, "ade branch "+branch)
+}
+
+// SetWorkType sets an item's user-chosen work type and derives its kind (P136 §3.3): review/test
+// make a branch kind review, work/investigate make it mine (parked stays parked). New work only
+// takes work/investigate. Refuses review/test while the item has blocker links.
+func (r *AdeQueueRepo) SetWorkType(codeRepoID, item, workType string) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin set ade work type: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if strings.HasPrefix(item, "nw:") {
+		if !model.ValidAdeNewWorkType(workType) {
+			return ErrWorkTypeInvalid
+		}
+		res, err := tx.Exec(
+			`UPDATE ade_new_work SET work_type = ? WHERE code_repo_id = ? AND id = ? AND archived_at IS NULL`,
+			workType, codeRepoID, item,
+		)
+		if err != nil {
+			return fmt.Errorf("repos: set ade new work type %s: %w", item, err)
+		}
+		if err := sqlitex.RequireOneRow(res, "ade new work "+item); err != nil {
+			return err
+		}
+		return commitSetWorkType(tx, item)
+	}
+
+	var oldKind string
+	err = tx.QueryRow(
+		`SELECT kind FROM ade_branches WHERE code_repo_id = ? AND branch = ? AND archived_at IS NULL`, codeRepoID, item,
+	).Scan(&oldKind)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("sqlitex: no ade branch %s", item)
+	case err != nil:
+		return fmt.Errorf("repos: read ade branch kind %s: %w", item, err)
+	}
+	kind := model.AdeBranchKindReview
+	if workType == model.AdeWorkTypeWork || workType == model.AdeWorkTypeInvestigate {
+		kind = model.AdeBranchKindMine
+		if oldKind == model.AdeBranchKindParked {
+			kind = model.AdeBranchKindParked
+		}
+	}
+	if kind == model.AdeBranchKindReview && oldKind != model.AdeBranchKindReview {
+		var one int
+		err := tx.QueryRow(`SELECT 1 FROM ade_blockers WHERE code_repo_id = ? AND item = ? LIMIT 1`, codeRepoID, item).Scan(&one)
+		switch {
+		case err == nil:
+			return ErrWorkTypeBlocked
+		case !errors.Is(err, sql.ErrNoRows):
+			return fmt.Errorf("repos: check ade blockers %s: %w", item, err)
+		}
+	}
+	if _, err := tx.Exec(
+		`UPDATE ade_branches SET kind = ?, work_type = ? WHERE code_repo_id = ? AND branch = ?`,
+		kind, workType, codeRepoID, item,
+	); err != nil {
+		return fmt.Errorf("repos: set ade work type %s: %w", item, err)
+	}
+	return commitSetWorkType(tx, item)
+}
+
+func commitSetWorkType(tx *sql.Tx, item string) error {
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit set ade work type %s: %w", item, err)
+	}
+	return nil
 }
 
 // SetPlan upserts each patched item's day and rewrites every item's position 0..n-1 from order —
@@ -719,10 +794,14 @@ func (r *AdeQueueRepo) Rebind(codeRepoID, newWorkID, branch, kind string, now in
 		return err
 	}
 
+	workType := model.DefaultAdeWorkType(kind)
+	if kind == model.AdeBranchKindMine {
+		workType = w.WorkType
+	}
 	if _, err := tx.Exec(
-		`INSERT INTO ade_branches (code_repo_id, branch, kind, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at)
-		 VALUES (?, ?, ?, '', ?, ?, ?, ?, '', ?, ?, ?, 0, NULL, NULL)`,
-		codeRepoID, branch, kind, w.Title, w.StartFrom, w.JiraKey, w.JiraURL, w.Est, w.Notes, now,
+		`INSERT INTO ade_branches (code_repo_id, branch, kind, work_type, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at)
+		 VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, '', ?, ?, ?, 0, NULL, NULL)`,
+		codeRepoID, branch, kind, workType, w.Title, w.StartFrom, w.JiraKey, w.JiraURL, w.Est, w.Notes, now,
 	); err != nil {
 		return fmt.Errorf("repos: rebind: insert ade branch %s: %w", branch, err)
 	}

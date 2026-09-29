@@ -1254,7 +1254,10 @@ func (q *Queue) AddBranch(ctx context.Context, codeRepoID, branch, kindOverride 
 		return "", err
 	}
 	kind := resolveKind(row, userEmail, kindOverride)
-	b := model.AdeBranch{CodeRepoID: codeRepoID, Branch: branch, Kind: kind, AddedAt: q.deps.Now().UnixMilli()}
+	b := model.AdeBranch{
+		CodeRepoID: codeRepoID, Branch: branch, Kind: kind, WorkType: model.DefaultAdeWorkType(kind),
+		AddedAt: q.deps.Now().UnixMilli(),
+	}
 	if _, err := q.deps.Store.AddBranch(codeRepoID, b); err != nil {
 		return "", err
 	}
@@ -1274,8 +1277,8 @@ func (q *Queue) AddNewWork(codeRepoID string, in NewWorkInput) (string, error) {
 	}
 	id := "nw:" + uuid.NewString()
 	w := model.AdeNewWork{
-		ID: id, CodeRepoID: codeRepoID, Title: in.Title, JiraKey: in.JiraKey, JiraURL: in.JiraURL,
-		StartFrom: startFrom, Notes: in.Notes, Est: in.Est, CreatedAt: q.deps.Now().UnixMilli(),
+		ID: id, CodeRepoID: codeRepoID, Title: in.Title, WorkType: model.AdeWorkTypeWork,
+		JiraKey: in.JiraKey, JiraURL: in.JiraURL, StartFrom: startFrom, Notes: in.Notes, Est: in.Est, CreatedAt: q.deps.Now().UnixMilli(),
 	}
 	if _, err := q.deps.Store.AddNewWork(w); err != nil {
 		return "", err
