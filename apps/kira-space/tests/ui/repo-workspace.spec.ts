@@ -228,12 +228,12 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
 test('a repo workspace: search streams results out of order and opens a match', async ({
   relaunch,
 }) => {
-  const { window: page } = await relaunch({
+  const { window: page, control } = await relaunch({
     control: [
       { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
       { channel: IPC.codeWorkspaceListFiles, args: { id: REPO.id }, response: FILE_LISTING },
       readFileSnap('a.ts', 'export const a = 1;\n'),
-      { channel: IPC.codeWorkspaceStartSearch, response: { searchId: 'search-1' } },
+      { channel: IPC.codeWorkspaceStartSearch, response: { searchId: 'search-1' }, hold: true },
     ],
   });
 
@@ -245,7 +245,8 @@ test('a repo workspace: search streams results out of order and opens a match', 
   await queryInput.press('Enter');
 
   // 'b.ts' arrives first — enumeration order, not path order — but the store's own binary insert
-  // (D11) must still land it after 'a.ts' once both are in.
+  // (D11) must still land it after 'a.ts' once both are in. The start's reply is held until after
+  // this first batch, pinning the order that used to drop it: event before reply.
   await emitWailsEvent(page, IPC.codeSearch, {
     searchId: 'search-1',
     seq: 0,
@@ -269,6 +270,7 @@ test('a repo workspace: search streams results out of order and opens a match', 
     ],
     done: false,
   });
+  control.release(IPC.codeWorkspaceStartSearch);
   await expect(page.locator('[data-testid="repo-search-file-row"]')).toHaveCount(1);
 
   await emitWailsEvent(page, IPC.codeSearch, {

@@ -147,9 +147,18 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
     unsubscribe = control.onCodeSearch(handleCodeSearchEvent);
   }
 
+  // A Wails event can overtake the bound StartSearch call's own reply; hold it until the start
+  // resolves (same shape as createOpLogStore's F7 buffer).
+  const earlyEvents: CodeSearchEvent[] = [];
+  let startsInFlight = 0;
+
   function handleCodeSearchEvent(event: CodeSearchEvent): void {
     const repoId = repoBySearchId.get(event.searchId);
-    if (!repoId) return; // A superseded (D8) or already-finished search's late batch is dropped.
+    if (!repoId) {
+      // A superseded (D8) or already-finished search's late batch is dropped.
+      if (startsInFlight > 0) earlyEvents.push(event);
+      return;
+    }
     const state = byRepo.get(repoId);
     if (!state || state.searchId !== event.searchId) return;
 
@@ -194,6 +203,7 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
     state.running = true;
     state.searchId = null;
 
+    startsInFlight++;
     try {
       const { searchId } = await control.codeWorkspaceStartSearch(repoId, {
         query: state.query,
@@ -206,6 +216,9 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
     } catch (err) {
       state.running = false;
       state.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      startsInFlight--;
+      for (const held of earlyEvents.splice(0)) handleCodeSearchEvent(held);
     }
   }
 
