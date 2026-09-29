@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/metrics"
 )
@@ -75,6 +76,13 @@ const (
 	ChannelAppMetrics         = appevent.ChannelAppMetrics
 )
 
+// P132 Part 2's op log channels, hoisted to internal/appevent (shared with Kira Studio's own
+// bridge).
+const (
+	ChannelToggleOperationsPanel = appevent.ChannelToggleOperationsPanel
+	ChannelOpUpdate              = appevent.ChannelOpUpdate
+)
+
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
 // Studio's own bridge.Events (internal/bridge/events.go), trimmed: this app has no
 // Connections/Oplog/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely from the
@@ -95,5 +103,13 @@ func NewEvents(e appevent.Emitter) *Events {
 func (ev *Events) AttachMetrics(m *metrics.Ticker) (detach func()) {
 	return m.OnSample(func(sample metrics.Sample) {
 		ev.emit.Emit(ChannelAppMetrics, sample)
+	})
+}
+
+// AttachOpLog broadcasts every op record change to every window: one process-wide log, so a write
+// from any window or client is every window's news.
+func (ev *Events) AttachOpLog(l *oplog.Log) (detach func()) {
+	return l.OnUpdate(func(r oplog.Record) {
+		ev.emit.Emit(ChannelOpUpdate, r)
 	})
 }

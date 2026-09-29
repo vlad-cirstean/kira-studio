@@ -20,7 +20,7 @@ const (
 	ChannelImportPostman          = "kira:menu:import-postman"
 	ChannelImportDataGrip         = "kira:menu:import-datagrip"
 	ChannelToggleProjectPanel     = appevent.ChannelToggleProjectPanel
-	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
+	ChannelToggleOperationsPanel  = appevent.ChannelToggleOperationsPanel
 	ChannelCommandPalette         = "kira:menu:command-palette"
 	ChannelTabNext                = appevent.ChannelTabNext
 	ChannelTabPrev                = appevent.ChannelTabPrev
@@ -37,7 +37,7 @@ const (
 	ChannelConnectionsChanged     = "kira:connections:changed"
 	ChannelSettingsChanged        = appevent.ChannelSettingsChanged
 	ChannelLayoutChanged          = appevent.ChannelLayoutChanged
-	ChannelOpUpdate               = "kira:op:update"
+	ChannelOpUpdate               = appevent.ChannelOpUpdate
 	ChannelAppMetrics             = appevent.ChannelAppMetrics
 	ChannelSchemaChanged          = "kira:schema:changed"
 	// ChannelGrpcCall is P11 D8's own new push channel — a server-streaming call's coalesced

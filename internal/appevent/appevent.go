@@ -76,4 +76,7 @@ const (
 	// window-addressed.
 	ChannelAgentSessions = "kira:agent:sessions"
 	ChannelAgentEvent    = "kira:agent:event"
+	// P132 Part 2's hoist: Space's op log dock shares Studio's toggle channel and update push.
+	ChannelToggleOperationsPanel = "kira:menu:toggle-operations-panel"
+	ChannelOpUpdate              = "kira:op:update"
 )

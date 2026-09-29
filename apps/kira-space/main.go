@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -112,6 +113,7 @@ func main() {
 	emitter, attachEmitter := shell.NewDeferredEmitter()
 	deps := appcore.Deps{Repos: repositories, Events: emitter, GitRegistry: gitRegistry}
 	events := bridge.NewEvents(emitter)
+	detachOpLog := events.AttachOpLog(git.opLog)
 
 	browserOpener, attachBrowser := shell.NewDeferredBrowser()
 	rawDialogs, attachDialogs := shell.NewDeferredDialogs()
@@ -194,6 +196,7 @@ func main() {
 		// swaps a bundle the user quit away from. After hand-off this is a no-op.
 		updateInstaller.Cancel()
 		detachMetrics()
+		detachOpLog()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
 		// here since this app's own KeepAwakeService has no agent-reason recompute to also stop.
@@ -246,6 +249,7 @@ func main() {
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
 			application.NewService(adeSvc),
+			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
 			application.NewService(windowsSvc),
@@ -349,6 +353,7 @@ type gitWired struct {
 	askpassBroker *gitaskpass.Broker
 	router        *gitrpc.Router
 	sock          *gitsock.Server
+	opLog         *oplog.Log
 }
 
 // acquireSingleInstance is F7's app-wide single-instance guard, called before storage.Open — a
@@ -519,6 +524,9 @@ func wireGit(repositories *repos.Repos) gitWired {
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
 	gitRegistry := gitsession.NewRegistry(gitRunner)
+	// Set before gitSock.Start: a paired VS Code client can run a write the moment the socket is up.
+	opLog := oplog.New()
+	gitRegistry.OpLog = opLog
 	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
 		s, err := repositories.Settings.GetAll()
 		if err != nil {
@@ -558,6 +566,6 @@ func wireGit(repositories *repos.Repos) gitWired {
 	}
 	return gitWired{
 		runner: gitRunner, discovery: gitDiscovery, registry: gitRegistry,
-		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock,
+		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock, opLog: opLog,
 	}
 }

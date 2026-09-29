@@ -30,6 +30,7 @@ func BuildTemplate(appName string, isDev bool) []shell.Section {
 
 	viewItems := []shell.Item{
 		{Kind: shell.ItemEmit, Label: "Toggle Project Panel", Accelerator: shell.Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
+		{Kind: shell.ItemEmit, Label: "Toggle Operations Panel", Accelerator: shell.Shortcuts["view.toggleOperationsPanel"].Accelerator(), Channel: bridge.ChannelToggleOperationsPanel},
 	}
 	if isDev {
 		viewItems = append(viewItems,

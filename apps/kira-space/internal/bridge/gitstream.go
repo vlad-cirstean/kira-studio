@@ -22,7 +22,7 @@ const GitStreamName = "git"
 // pairing here to trust (docs/v1.5/plans/C10-git-graph-native.md §3.2).
 const (
 	nativeClientID = "kira-native"
-	nativeLabel    = "This window"
+	nativeLabel    = "Kira Space"
 )
 
 // maxGitStreamFrameBytes reuses gitsock's own 8 MiB cap (gitsock/frame.go) — the graph-chunk blobs
