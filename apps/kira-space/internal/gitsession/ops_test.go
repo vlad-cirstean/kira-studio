@@ -590,7 +590,7 @@ func TestRunOp_GlobalStashRemove_UndoReplaysExactlyOneUpdateRef(t *testing.T) {
 		t.Fatalf("got %d global entries after remove, want 0: %+v", len(entriesAfterRemove), entriesAfterRemove)
 	}
 
-	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
 	if err != nil {
 		t.Fatalf("UndoRun: %v", err)
 	}
@@ -662,7 +662,7 @@ func TestUndoRun_InvalidatesRefsCache(t *testing.T) {
 		t.Fatal("feature should be absent immediately after RunOp branchDelete")
 	}
 
-	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
 	if err != nil {
 		t.Fatalf("UndoRun: %v", err)
 	}

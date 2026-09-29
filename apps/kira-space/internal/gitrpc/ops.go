@@ -72,7 +72,7 @@ func (r *Router) handleUndoRun(ctx context.Context, c *gitsession.Conn, params j
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p UndoRunParams) (gitsession.OpResult, error) {
-			result, err := entry.UndoRun(context.WithoutCancel(ctx), p.ID)
+			result, err := entry.UndoRun(context.WithoutCancel(ctx), c.ClientLabel, p.ID)
 			if err != nil {
 				return gitsession.OpResult{}, mapGitError(err)
 			}

@@ -1118,6 +1118,7 @@ func (e *RepoEntry) runWriteArgvList(ctx context.Context, argvList [][]string) (
 	failedAt = -1
 	err = e.Repo.Write(ctx, func(ctx context.Context) error {
 		for i, argv := range argvList {
+			e.noteWrite(ctx, argv)
 			res, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 				Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
 				// G8 D6: see runWriteArgv's own identical comment.
@@ -1154,11 +1155,14 @@ func (e *RepoEntry) runWriteArgvList(ctx context.Context, argvList [][]string) (
 //     table, not merely whether Prepare happened to build a record, is what keeps the policy in one
 //     place (D6).
 //  6. Return OpResult{ok, error, undo (attributed for conn), head, inProgress}.
-func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op OpRequest) (OpResult, error) {
+func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op OpRequest) (result OpResult, runErr error) {
 	spec, ok := opTable[op.Kind]
 	if !ok {
 		return OpResult{}, ErrUnservedOpKind{Kind: op.Kind}
 	}
+	logOp := e.startOp(op.Kind, connLabel)
+	defer func() { finishOpResult(logOp, result, runErr) }()
+	ctx = withOp(ctx, logOp)
 
 	prep, err := spec.Prepare(ctx, e, conn, connLabel, op)
 	if err != nil {
@@ -1263,7 +1267,11 @@ func (e *RepoEntry) UndoPeek(conn ConnID) *gitpreflight.UndoSlotSnapshot {
 // entry's own cat-file batch session (§7.12's "so the user can recover manually even after the
 // slot is cleared" only holds if a stale sha is refused rather than replayed against something
 // else), then the replay argv list in order — the same read-back/error-mapping shape as RunOp.
-func (e *RepoEntry) UndoRun(ctx context.Context, id string) (OpResult, error) {
+func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result OpResult, runErr error) {
+	logOp := e.startOp("undo", connLabel)
+	defer func() { finishOpResult(logOp, result, runErr) }()
+	ctx = withOp(ctx, logOp)
+
 	record := e.undo.Take(id)
 	if record == nil {
 		return e.undoRunFailure(ctx, "NotFound", "This undo is no longer available.")

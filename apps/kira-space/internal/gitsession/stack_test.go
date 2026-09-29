@@ -477,7 +477,7 @@ func TestRunOp_StackSet_UndoRestoresPreviousParent(t *testing.T) {
 		t.Fatalf("RunOp: result=%+v err=%v", result, err)
 	}
 
-	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
 	if err != nil {
 		t.Fatalf("UndoRun: %v", err)
 	}
@@ -621,7 +621,7 @@ func TestRunOp_BranchDelete_ReparentsChildren(t *testing.T) {
 	// pre-existing gap in UndoRun predating this phase, noted rather than papered over here) and
 	// via a fresh refs read for feat1's own existence, exactly what a real client's next
 	// stack.list after the watcher's own refsChanged signal would see.
-	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
 	if err != nil {
 		t.Fatalf("UndoRun: %v", err)
 	}
@@ -892,7 +892,7 @@ func TestRunRestack_UndoReplayOrder(t *testing.T) {
 		t.Fatalf("RunRestack: result=%+v err=%v", result, err)
 	}
 
-	undoResult, err := entry.UndoRun(ctx, result.Undo.ID)
+	undoResult, err := entry.UndoRun(ctx, "test-client-label", result.Undo.ID)
 	if err != nil {
 		t.Fatalf("UndoRun: %v", err)
 	}

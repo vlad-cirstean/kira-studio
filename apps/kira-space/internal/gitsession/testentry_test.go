@@ -6,6 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
@@ -16,6 +17,7 @@ import (
 type testEntryOpts struct {
 	runner gitclient.Runner // nil means gitclient.NewExecRunner()
 	store  *gitreview.Store // wired as registry.Review when non-nil (incremental_test.go)
+	opLog  *oplog.Log       // wired as registry.OpLog when non-nil (oplog_test.go)
 	script string           // sets RepoSettingsGet's WorktreePrepareScript when non-empty (worktree_test.go)
 }
 
@@ -33,6 +35,7 @@ func newTestEntry(t *testing.T, connID ConnID, repoDir string, opts testEntryOpt
 	if opts.store != nil {
 		registry.Review = opts.store
 	}
+	registry.OpLog = opts.opLog
 	if opts.script != "" {
 		registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
 			s := model.DefaultGitRepoSettings()

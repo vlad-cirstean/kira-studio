@@ -11,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
@@ -157,6 +158,9 @@ type RepoEntry struct {
 	// exactly like remoteOp/prepare.
 	restack opSlot
 
+	// opLog is the app-wide op log; nil turns logging off.
+	opLog *oplog.Log
+
 	done chan struct{}
 }
 
@@ -170,7 +174,7 @@ func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
 	review *gitreview.Store, ghClient *ghclient.Client, isOpen func(string) bool,
-	skipInitialAutoFetch bool,
+	skipInitialAutoFetch bool, opLog *oplog.Log,
 ) *RepoEntry {
 	e := &RepoEntry{
 		Summary:         summary,
@@ -190,6 +194,7 @@ func newRepoEntry(
 		gh:              newGhState(),
 		ghClient:        ghClient,
 		isOpen:          isOpen,
+		opLog:           opLog,
 		done:            make(chan struct{}),
 	}
 	// C14-3: seeds hasNonQuietAcquirer's own answer — a construction reached via Acquire starts

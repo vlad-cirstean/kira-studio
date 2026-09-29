@@ -1,8 +1,8 @@
 // Package gitsession owns SPEC §6's session model: Registry (a refcounted, per-repo set of shared
 // RepoEntry state) and Conn (one accepted connection's private holds and event delivery). It
-// imports gitclient, gitpreflight, gitreview and stdlib only — no bridge, no rpcstream, no gitsock
-// — so it stays a domain package internal/layering_test.go's auto-enumerated check covers without
-// an exemption. G11 adds Registry.Review (a *gitreview.Store, D3): the one place this package
+// imports gitclient, gitpreflight, gitreview, ghclient, storage/model, oplog and stdlib only — no
+// bridge, no rpcstream, no gitsock — so it stays a domain package internal/layering_test.go's
+// auto-enumerated check covers without an exemption. G11 adds Registry.Review (a *gitreview.Store, D3): the one place this package
 // reaches beyond gitclient's own family, and still nowhere near bridge.
 package gitsession
 
@@ -14,6 +14,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
@@ -82,6 +83,10 @@ type Registry struct {
 	// real Discovery+Runner pair; tests override it with a Client built over a fake/counting
 	// ghclient.Runner (F13: gh is never actually installed in this container).
 	Gh *ghclient.Client
+
+	// OpLog records user-initiated writes (RunOp, UndoRun, RunRemote with a conn, RunRestack).
+	// Nil turns logging off. Set before the first Acquire.
+	OpLog *oplog.Log
 
 	mu      sync.Mutex
 	entries map[string]*slot
@@ -166,7 +171,7 @@ func (reg *Registry) acquire(
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
 		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh, reg.IsOpen,
-		skipInitialAutoFetch,
+		skipInitialAutoFetch, reg.OpLog,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil

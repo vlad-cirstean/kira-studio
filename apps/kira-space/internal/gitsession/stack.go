@@ -630,6 +630,7 @@ func buildRestackUndo(conn ConnID, connLabel, base string, origBranch, origHeadS
 func (e *RepoEntry) runRestackSpawn(ctx context.Context, argv []string) (gitclient.Result, error) {
 	var res gitclient.Result
 	err := e.Repo.Write(ctx, func(wctx context.Context) error {
+		e.noteWrite(wctx, argv)
 		r, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
 			Env: []string{"GIT_SEQUENCE_EDITOR=true"}, Setsid: true,
@@ -674,7 +675,11 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 //  6. Set the undo slot ONLY on a fully successful restack, INCLUDING the head restore (D8/D11);
 //     read back head + in-progress, ALWAYS, success or failure.
 //  7. Release the slot (deferred) and return.
-func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (RestackResult, error) {
+func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (result RestackResult, runErr error) {
+	logOp := e.startOp("restack", connLabelOf(conn))
+	defer func() { finishRestackResult(logOp, result, runErr) }()
+	ctx = withOp(ctx, logOp)
+
 	opCtx, cancel := context.WithCancel(ctx)
 	if !e.restack.claim("restack", cancel, true) {
 		cancel()
@@ -682,7 +687,10 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 			Kind: "OperationInProgress", Message: "another restack is already running on this repository",
 		})
 	}
+	logOp.SetCancel(e.CancelRestack)
+	// Unregister the cancel before freeing the slot: a late cancel must never hit the next op.
 	defer func() {
+		logOp.ClearCancel()
 		e.restack.release()
 		cancel()
 	}()

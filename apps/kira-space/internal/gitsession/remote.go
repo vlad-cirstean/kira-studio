@@ -12,6 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/oplog"
 )
 
 // CancelRemote is remote.cancel's own entry point. SPEC §6's own "active remote op (≤1)" box is
@@ -133,6 +134,7 @@ func (e *RepoEntry) withAskpass(ctx context.Context, conn *Conn, deps RemoteDeps
 // needs against ANOTHER remote op. Setsid (D6, opted in here and nowhere else in this chapter's
 // already-shipped code) keeps the child off any controlling terminal.
 func (e *RepoEntry) runRemoteSpawn(ctx context.Context, argv, env []string, onStderr func([]byte)) (gitclient.Result, error) {
+	e.noteWrite(ctx, argv)
 	return gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 		Dir: repoWorkingDir(e.Summary), Args: argv, Env: env, OnStderr: onStderr, Setsid: true,
 	})
@@ -277,7 +279,14 @@ func (e *RepoEntry) remoteResultNoSpawn(ctx context.Context, opErr *RemoteOpErro
 //     5/6/7: per-kind spawn, below — fetch/push family/pull.
 //  8. read back head + in-progress, ALWAYS — success, failure or cancellation.
 //  9. release the slot (deferred, so it holds across every early return) and return.
-func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpParams, deps RemoteDeps) (RemoteOpResult, error) {
+func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpParams, deps RemoteDeps) (result RemoteOpResult, runErr error) {
+	// A nil conn is auto-fetch: background, never logged.
+	var logOp *oplog.Op
+	if conn != nil {
+		logOp = e.startOp(params.Kind, conn.ClientLabel)
+		defer func() { finishRemoteResult(logOp, result, runErr) }()
+		ctx = withOp(ctx, logOp)
+	}
 	opCtx, cancel := context.WithCancel(ctx)
 	if !e.remoteOp.claim(params.Kind, cancel, false) {
 		cancel()
@@ -285,7 +294,9 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 			Kind: "OperationInProgress", Message: "another remote operation is already running on this repository",
 		})
 	}
+	// Unregister the cancel before freeing the slot: a late cancel must never hit the next op.
 	defer func() {
+		logOp.ClearCancel()
 		e.remoteOp.release()
 		cancel()
 	}()
@@ -369,6 +380,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	switch params.Kind {
 	case "fetch":
 		e.remoteOp.setKillable(true)
+		logOp.SetCancel(e.CancelRemote)
 		updates, opErr, spawnErr = e.runFetch(ctx, opCtx, conn, deps, params, onStderr)
 	case "push", "forcePush", "deleteRemoteBranch":
 		updates, opErr, spawnErr = e.runPushFamily(opCtx, conn, deps, params, forcePushRemoteBranch, onStderr)
@@ -500,6 +512,7 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 // own (D18).
 func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	e.remoteOp.setKillable(true)
+	opFrom(roCtx).SetCancel(e.CancelRemote)
 
 	// G32 round-3 functional-correctness review, finding #1: fetch/merge/rebase must target the
 	// branch's OWN upstream-side name (resolveUpstreamRemoteBranch), not assume it shares the local
@@ -541,6 +554,7 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 
 	// Past this point the op is a local write and is never killable again (D19).
 	e.remoteOp.setKillable(false)
+	opFrom(roCtx).ClearCancel()
 
 	// G32 round-3 functional-correctness review, finding #2: RunOp's own undo slot is invalidated
 	// by every LOCAL write it performs (D6's "the very next operation clears it," SPEC §7.12) — a
@@ -593,6 +607,7 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 			return nil
 		}
 
+		e.noteWrite(wctx, integrateArgv)
 		res, rerr := gitclient.Run(wctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
 			Dir: repoWorkingDir(e.Summary), Args: integrateArgv, ReadOnly: false,
 			// G8 D6 (F6): this is a local write (merge/rebase), not the fetch above — a signing
