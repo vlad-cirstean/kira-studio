@@ -18,7 +18,7 @@
         class="h-control-sm inline-flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-sm cursor-pointer border-0 bg-none hover:bg-hover"
         data-testid="caret-status"
       >
-        <span class="font-data xs text-muted-foreground">no selection</span>
+        <span class="font-data text-muted-foreground">no selection</span>
       </span>
       <slot name="left-extra" />
     </div>
