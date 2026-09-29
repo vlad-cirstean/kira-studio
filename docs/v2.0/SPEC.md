@@ -2987,3 +2987,47 @@ throwaway seed program left behind). This phase's own commits are on branch `p12
 pushed to `origin/p129-part7-impl` once this section landed — not merged onto
 `claude/unfinished-phases-ru3wo4`, per this phase's own task instructions; landing there is the
 orchestrating session's own step.
+
+## P126 result
+
+Plan: `docs/v2.0/plans/P126-space-data-font-size.md`. This pass implemented only the plan's §6
+("Lands now, independent of §4"), per the plan's own closing instruction. §5's fix and its
+`test:ui:space` guard are explicitly out of scope until §4 exists.
+
+**Commits:**
+
+1. `7c58945a` — `refactor(workbench): drop dead xs class from status bar` — removed the dead `xs`
+   class from `packages/workbench/src/components/StatusBar.vue:21`. Reconfirmed before deleting
+   (grep across every built CSS chunk in both apps' `frontend/dist`): no chunk defines a `.xs`
+   rule; the node keeps computing 11px from its parent's `text-kira-sm` regardless.
+2. `3d5419a2` — `docs: Kira Space server-tag recipe` — added a "Kira Space real backend in a
+   sandbox" subsection to `docs/DEV_ENVIRONMENT.md`, documenting `go build -tags server`, seeding
+   `windows('main')` plus a `code_repos` row before `/?window=main` (otherwise
+   `internal/appstorage/tabs.go:117` fails `unknown window: main`), and that git discovery is
+   darwin-only (`apps/kira-space/internal/gitclient/discovery.go`), needing a local-only,
+   never-committed `Locate` patch to exercise real git in this recipe.
+
+Pre-commit hook (biome, `check-tokens`/`check-theme-classes`/`check-class-conflicts`, full
+`typecheck` across every project) passed clean on both commits, no `--no-verify`.
+
+**Diagnostic pass: no defect found anywhere this sandbox can reach.** The Opus planning pass (not
+this implementation pass) ran the live measurement, not a static read: real Go server-mode
+backend, a real scratch git repo, real Settings UI, both WebKit and Chromium, `getComputedStyle`
+on every visible text node, plus changing Data font size live through Settings (20 → 12 → 9 → 12,
+plan §2's own table). Every node measured, every run, both engines: exactly the configured px, no
+node below 11px anywhere, applied live with no stale value. Plan §3 then traced every remaining
+macOS-only layer by reading source (WKWebView zoom clamps, `-apple-system` vs. `Menlo` face,
+`git.graphFontSize` override) and found no defect there either. Full evidence tables:
+`docs/v2.0/plans/P126-space-data-font-size.md` §2 and §3.
+
+**Root cause: still open.** The one unexercised layer is the macOS host itself — this is a Linux
+sandbox, and no VM/emulation/platform-override stand-in for real WKWebView was attempted, per the
+task's own instruction. Plan §4 lays out the exact live measurement needed (an inspectable
+`dev:space` or `devtools`-tagged build, Safari Develop console script, `sqlite3` read of the user's
+own `~/.kira-space/kira.db`), and §5 maps each possible result to its fix site. Both need either
+the user's own Mac or a session running on one.
+
+**P126 is not complete. It is blocked on plan §4's live macOS measurement — nothing else.** §6 is
+the only part of this phase that could land without a Mac, and it has landed. No §5 fix, no
+`test:ui:space` guard spec: both are explicitly gated on §4's output existing first, and neither
+was attempted here.
