@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { connColorVar } from '@theme/connColor';
 import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
-import { type TabLike, useWorkbenchHost } from '../host';
+import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { copyText } from '../util/clipboard';
 import { wheelToHorizontal } from '../util/wheelScroll';
@@ -20,7 +20,9 @@ import { wheelToHorizontal } from '../util/wheelScroll';
 // divergence (Kira Studio: the Terminal module's own plain-session menu; Kira Space: one repo-root
 // terminal, no menu) — not a lookup a host hook can express cleanly, so it stays a `#new-tab` slot,
 // each app supplying its own button exactly as before.
-const host = useWorkbenchHost();
+// Read once: a host object is stable for the component's life (both apps and ade build it once).
+const props = defineProps<{ host?: TabStripHost<string, TabLike> }>();
+const host: TabStripHost<string, TabLike> = props.host ?? useWorkbenchHost();
 const contextMenuStore = useContextMenuStore();
 
 // P110 I2-20: `.tab-chip.is-attention::after`'s generated pseudo-element dot, as a conditional
@@ -53,15 +55,62 @@ function onClick(tab: TabLike): void {
   host.tabs.activateTab(tab.id);
 }
 
-// §6.1: a pinned tab has no middle-click close.
+// §6.1: a pinned tab has no middle-click close; nor does a host without `closeTab`.
 function onMiddleClick(tab: TabLike): void {
   if (isPinned(tab)) return;
-  host.tabs.closeTab(tab.id);
+  host.tabs.closeTab?.(tab.id);
 }
 
 function onClose(e: MouseEvent, tab: TabLike): void {
   e.stopPropagation();
-  host.tabs.closeTab(tab.id);
+  host.tabs.closeTab?.(tab.id);
+}
+
+function isPreview(tab: TabLike): boolean {
+  return host.tabs.isPreview?.(tab.id) ?? false;
+}
+
+// Each close item exists only when the host supplies its capability.
+function closeItems(tab: TabLike): MenuItem[] {
+  const { closeTab, closeOthers, closeToTheRight, closeAll } = host.tabs;
+  const items: MenuItem[] = [];
+  if (closeTab) {
+    items.push({
+      type: 'item',
+      id: 'close',
+      label: 'Close',
+      icon: 'close',
+      // P21 D13: `tab.close` always closes the *active* tab, not the clicked one — printed anyway
+      // (VS Code does the same on this exact row) since it's the keyboard route to this command.
+      shortcut: 'tab.close',
+      run: () => closeTab(tab.id),
+    });
+  }
+  if (closeOthers) {
+    items.push({
+      type: 'item',
+      id: 'close-others',
+      label: 'Close others',
+      run: () => closeOthers(tab.id),
+    });
+  }
+  if (closeToTheRight) {
+    items.push({
+      type: 'item',
+      id: 'close-to-the-right',
+      label: 'Close to the right',
+      run: () => closeToTheRight(tab.id),
+    });
+  }
+  if (closeAll) {
+    items.push({
+      type: 'item',
+      id: 'close-all',
+      label: 'Close all',
+      run: () => closeAll(host.activeWorkspace.value),
+    });
+  }
+  return items;
 }
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
@@ -80,43 +129,22 @@ function onContextMenu(e: MouseEvent, tab: TabLike): void {
     ]);
     return;
   }
+  const closeGroup = closeItems(tab);
+  const { duplicateTab } = host.tabs;
   const items: MenuItem[] = [
-    {
-      type: 'item',
-      id: 'close',
-      label: 'Close',
-      icon: 'close',
-      // P21 D13: `tab.close` always closes the *active* tab, not the clicked one — printed anyway
-      // (VS Code does the same on this exact row) since it's the keyboard route to this command.
-      shortcut: 'tab.close',
-      run: () => host.tabs.closeTab(tab.id),
-    },
-    {
-      type: 'item',
-      id: 'close-others',
-      label: 'Close others',
-      run: () => host.tabs.closeOthers(tab.id),
-    },
-    {
-      type: 'item',
-      id: 'close-to-the-right',
-      label: 'Close to the right',
-      run: () => host.tabs.closeToTheRight(tab.id),
-    },
-    {
-      type: 'item',
-      id: 'close-all',
-      label: 'Close all',
-      run: () => host.tabs.closeAll(host.activeWorkspace.value),
-    },
-    { type: 'separator' },
-    {
-      type: 'item',
-      id: 'duplicate-tab',
-      label: 'Duplicate tab',
-      icon: 'copy',
-      run: () => void host.tabs.duplicateTab(tab.id),
-    },
+    ...closeGroup,
+    ...(closeGroup.length > 0 ? [{ type: 'separator' } as const] : []),
+    ...(duplicateTab
+      ? [
+          {
+            type: 'item',
+            id: 'duplicate-tab',
+            label: 'Duplicate tab',
+            icon: 'copy',
+            run: () => void duplicateTab(tab.id),
+          } as const,
+        ]
+      : []),
     {
       type: 'item',
       id: 'copy-name',
@@ -179,7 +207,7 @@ function onDragStart(id: string): void {
 function onDragOver(id: string): void {
   const from = dragId.value;
   if (from === null || from === id) return;
-  host.tabs.moveTab(from, id);
+  host.tabs.moveTab?.(from, id);
   // F6: `dragId` tracks the *dragged* tab throughout the whole gesture, never the hovered one --
   // reassigning it to `id` here (the old code) meant the next dragover moved whatever tab had just
   // been hovered, not the tab the user is actually dragging, and `is-dragging` (below, matched
@@ -227,32 +255,56 @@ useEventListener(stripRef, 'dragend', onDragEnd);
       class="h-full flex items-center gap-0.5 shrink-0 pl-1"
       data-testid="tab-strip-pinned"
     >
-      <Tooltip v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
-        <TooltipTrigger as-child>
-          <button
-            type="button"
-            :class="tabChipVariants({ active: tab.active, size: 'icon' })"
-            data-testid="tab"
-            :data-tab-id="tab.id"
-            :data-tab-kind="tab.kind"
-            :data-active="tab.active"
-            data-pinned="true"
-            :draggable="false"
-            :aria-label="titleFor(tab)"
-            @click="onClick(tab)"
-            @contextmenu.prevent="onContextMenu($event, tab)"
-          >
-            <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
-            <span
-              v-else
-              class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
-              :style="icon.fileStyle"
-              aria-hidden="true"
-            />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{ titleFor(tab) }}</TooltipContent>
-      </Tooltip>
+      <template v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
+        <button
+          v-if="host.kinds[tab.kind]?.pinnedTitle"
+          type="button"
+          :class="tabChipVariants({ active: tab.active })"
+          data-testid="tab"
+          :data-tab-id="tab.id"
+          :data-tab-kind="tab.kind"
+          :data-active="tab.active"
+          data-pinned="true"
+          :aria-label="titleFor(tab)"
+          @click="onClick(tab)"
+          @contextmenu.prevent="onContextMenu($event, tab)"
+        >
+          <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
+          <span
+            v-else
+            class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
+            :style="icon.fileStyle"
+            aria-hidden="true"
+          />
+          <slot name="tab-leading" :tab="tab" />
+          <span class="tab-title truncate min-w-0">{{ titleFor(tab) }}</span>
+        </button>
+        <Tooltip v-else>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              :class="tabChipVariants({ active: tab.active, size: 'icon' })"
+              data-testid="tab"
+              :data-tab-id="tab.id"
+              :data-tab-kind="tab.kind"
+              :data-active="tab.active"
+              data-pinned="true"
+              :aria-label="titleFor(tab)"
+              @click="onClick(tab)"
+              @contextmenu.prevent="onContextMenu($event, tab)"
+            >
+              <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="shrink-0" />
+              <span
+                v-else
+                class="shrink-0 tab-file-icon w-3.5 h-3.5 text-muted-foreground mask-contain mask-no-repeat mask-center"
+                :style="icon.fileStyle"
+                aria-hidden="true"
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ titleFor(tab) }}</TooltipContent>
+        </Tooltip>
+      </template>
       <span class="self-stretch shrink-0 w-px my-1 mr-0.5 bg-border" aria-hidden="true"></span>
     </div>
     <div
@@ -278,7 +330,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         :data-tab-id="tab.id"
         :data-tab-kind="tab.kind"
         :data-active="tab.active"
-        :data-preview="host.tabs.isPreview(tab.id)"
+        :data-preview="isPreview(tab)"
         data-pinned="false"
         :data-color="host.railColorFor(tab)"
         :style="{ '--kira-rail': connColorVar(host.railColorFor(tab)) }"
@@ -289,7 +341,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
           type="button"
           class="flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer"
           @click="onClick(tab)"
-          @dblclick="host.tabs.promoteTab(tab.id)"
+          @dblclick="host.tabs.promoteTab?.(tab.id)"
           @auxclick.middle="onMiddleClick(tab)"
           @contextmenu.prevent="onContextMenu($event, tab)"
         >
@@ -300,13 +352,14 @@ useEventListener(stripRef, 'dragend', onDragEnd);
             :style="icon.fileStyle"
             aria-hidden="true"
           />
+          <slot name="tab-leading" :tab="tab" />
           <Tooltip v-if="indicatorFor(tab)">
             <TooltipTrigger as-child>
               <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="shrink-0 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
           </Tooltip>
-          <span class="tab-title truncate min-w-0" :class="{ italic: host.tabs.isPreview(tab.id) }">{{
+          <span class="tab-title truncate min-w-0" :class="{ italic: isPreview(tab) }">{{
             titleFor(tab)
           }}</span>
           <Tooltip v-if="badgeFor(tab)">
@@ -322,6 +375,7 @@ useEventListener(stripRef, 'dragend', onDragEnd);
           </Tooltip>
         </button>
         <button
+          v-if="host.tabs.closeTab"
           type="button"
           class="tab-close shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 rounded-kira-sm hover:bg-hover"
           :class="tab.active ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'"

@@ -46,11 +46,35 @@ export interface WorkbenchTabsHost<WK extends string, R extends TabLike> {
  *  `RepoTreeRow.vue`'s own seti-icon `mask-image` style object for a `repo-file` tab. */
 export type TabIconRender = { codicon: string } | { fileStyle: Record<string, string> };
 
-export interface WorkbenchHost<WK extends string, R extends TabLike> {
+/** What `TabStrip.vue` reads of a kind. A capability a host omits hides the matching affordance. */
+export interface TabStripKind<R extends TabLike> {
+  pinned?: true;
+  /** A pinned chip of this kind shows its title, not icon-only. */
+  pinnedTitle?: true;
+  title(tab: R): string;
+  menuExtras(tab: R): MenuItem[];
+}
+
+export interface TabStripTabs<WK extends string, R extends TabLike> {
+  readonly activeIdByWorkspace: Record<WK, string | null>;
+  tabsForWorkspace(key: WK): R[];
+  activateTab(id: string): void;
+  isPreview?(id: string): boolean;
+  promoteTab?(id: string): void;
+  closeTab?(id: string): void;
+  closeOthers?(id: string): void;
+  closeToTheRight?(id: string): void;
+  closeAll?(key: WK): void;
+  duplicateTab?(id: string): unknown;
+  moveTab?(fromId: string, toId: string): void;
+}
+
+/** The narrow seam `TabStrip.vue` consumes: `WorkbenchHost` extends it, and a module with its own
+ *  tab model (ade) implements only this. */
+export interface TabStripHost<WK extends string, R extends TabLike> {
   readonly activeWorkspace: ComputedRef<WK>;
-  readonly tabs: WorkbenchTabsHost<WK, R>;
-  readonly kinds: TabKindRegistry<R['kind'], R, unknown, unknown, MenuItem>;
-  readonly views: TabViewMap<R['kind']>;
+  readonly tabs: TabStripTabs<WK, R>;
+  readonly kinds: { readonly [kind: string]: TabStripKind<R> | undefined };
   iconFor(tab: R): TabIconRender;
   railColorFor(tab: R): string | undefined;
   /** Appended after the six generic context-menu items and the tab kind's own `menuExtras` —
@@ -75,6 +99,12 @@ export interface WorkbenchHost<WK extends string, R extends TabLike> {
    *  `createTabsStore`'s hook surface needed more than the plan's own two-hook sketch — not named
    *  in the plan's own condensed `WorkbenchHost` table, but load-bearing for pixel parity. */
   tabIndicator?(tab: R): { icon: string; tooltip: string } | null;
+}
+
+export interface WorkbenchHost<WK extends string, R extends TabLike> extends TabStripHost<WK, R> {
+  readonly tabs: WorkbenchTabsHost<WK, R>;
+  readonly kinds: TabKindRegistry<R['kind'], R, unknown, unknown, MenuItem>;
+  readonly views: TabViewMap<R['kind']>;
 }
 
 // An InjectionKey carries one concrete type; each app's real WK/R instantiation is narrowed back
