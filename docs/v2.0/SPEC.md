@@ -3401,3 +3401,63 @@ Dark theme reads near-identical. Runs deterministic (before baseline re-run: 0 d
 `color-mix()` and `/20` opacity already ship in the app but were checked only in Playwright WebKit.
 Comparison used sandbox fonts both sides, so a relative diff only. Live `ade` on real repos not
 run; mocked control only.
+
+## P139 Part 1 result
+
+Plan: `docs/v2.0/plans/P139-flaky-timing-and-gofmt.md`. Implemented on `p139-plan` (base
+`05451f80`), one commit per §5 step. Part 2 split off (cached tab switch regression, own row above).
+
+**Commits:** `d22740ae` scroll-work mark to `KiraSlickGrid.render()` entry; `0d965076` tab-switch
+selector; `43166c3e` select-all bypass (P22 D6); `c4b6a0fe` doc-comment rewording; `1f6f4821`
+`gofmt -w`; `41bc0608` `formatters: gofmt` in `.golangci.yml`; `8e347b7c` search event buffer plus
+`hold` spec; `e2b1319a` ade write-only count; `6bc08013` SPEC split; `2fe6acd7` Monaco word
+suggestions (found by the full runs, below); `732e44e2` stale comment cleanup from the audit.
+
+**Root causes and measured before/after (budgets unchanged: 12 ms, 150 ms, 80 ms):**
+
+- `budgets.spec.ts:432`: mark sat before SlickGrid's `scrollRenderThrottling`. Work p50 12-17 ms to
+  6-8 ms (quiet and loaded); full runs 6-7 ms.
+- `budgets.spec.ts:797`: synthetic `click()` hit a `<div>` with no handler. Now targets the inner
+  button; 2 of 2 timeouts gone.
+- `slick-grid.spec.ts:896`: model range push cost 80-130 ms of real work. Bypass: wide 4-12 ms, tall
+  3-27 ms, T7 19-36 ms.
+- `perf.spec.ts:119`: no code cause, no change. p95 41-59 ms across 20+ runs.
+- `repo-workspace.spec.ts:228`: real app race, event before `StartSearch` reply dropped. Baseline 4 of
+  30 fail; `hold` spec fails 100% without the fix, 120 of 120 pass with it (quiet and under load).
+- `ade-panel.spec.ts:430`: not reproduced (0 of 160 baseline, 120 of 120 after). Assertion tightened
+  to count writes only.
+- `gofmt`: 23 files at step 5 plus 3 in step 4 (26 total; row named 4). 12 already-corrupted comment
+  lines repaired. `gofmt -l apps/ internal/` empty; `lint:go` 0 issues with the formatter enabled.
+
+**Acceptance:**
+
+- `bun run test:ui:studio` (304 tests, ~9 min): 3 consecutive passes on the final tree (runs 6-8,
+  each 304 passed, all four `ui-timing` tests green; run 4 also 304 passed). Scroll work p50 6-7 ms,
+  perf p95 43-48 ms in those runs.
+- Stability specs `--repeat-each=60 --workers=4`, both specs: 120 of 120 quiet, 120 of 120 under 4
+  busy loops. `test:ui:space` 101 passed. `test:unit` 1831 pass. `go vet` and `go test` for touched
+  Go packages clean.
+- Closing audit (§7): 14 greps run; all pass (see disclosed list for two literal-match notes).
+
+**Found by full runs, fixed:** run 3 failed `sql-schema.spec.ts:439` (a `ui` test, so `ui-timing`
+never ran). Cause: a cold SQL console (`autocomplete` on, no source) left Monaco's word-based
+suggestions on; a stale-word widget appeared mid-typing (3 of 40 fail alone). `MonacoHost.vue` now
+sets `wordBasedSuggestions: 'off'` whenever `autocomplete` is on; 80 of 80 pass after, 96 related
+specs pass.
+
+**Disclosed:**
+
+- Run 5 failed `http-timeline.spec.ts:316` with `Page crashed`; `dmesg` shows a segfault in
+  `libWPEWebKit` (`ThreadedCompositor`, `segfault at 0`) at that moment. Engine crash, not test
+  logic: repeats of that test alone gave 1 crash (another segfault logged) in 180 runs, 179 passes.
+  Genuinely out of scope (Playwright WebKit build). Rerun passed; run 5 not counted in the 3.
+- Cached tab switch p50 292-357 ms, p95 338-510 ms against the 50 ms PERF.md budget, hidden by the
+  1000 ms bound: unfixed, tracked as P139 Part 2.
+- Audit grep `kira-cell-selected'\)\.count` still hits `slick-grid.spec.ts:1810`: the shift-click
+  range check, correct as is (a range goes through the model). The plan's four select-all sites are
+  converted.
+- Select-all semantics (plan §8): Shift+arrow after select-all extends from the active cell. Visual
+  check of fill and perimeter edges done via computed styles (fill `rgb(4, 57, 94)`, gutter
+  unpainted, edge shadows present); no baseline screenshot committed.
+- `perf.spec.ts` stays load-sensitive (73 ms measured under synthetic load against 80).
+- No `docs/ARCHITECTURE.md` change: the plan called for none.
