@@ -140,3 +140,27 @@ line (a doc-comment code block, kept verbatim), then `gofmt -w`.
 **`golangci-lint`:** `bun run lint:go` (v2.13.2 built with go1.27.1, cache cleaned): **0 issues**.
 Enabling `formatters: enable: [gofmt]` in `.golangci.yml` (probe, reverted) reports exactly the 26
 files as `gofmt` issues. That block is the regression guard: `pre-push` already runs `lint:go`.
+
+### 2.5 Kira Space stability specs — code read (measurements in §1.4)
+
+**`repo-workspace.spec.ts:228`** (`repo-search-file-row` not rendered). Real race, app and test.
+`useRepoSearchStore.startRepoSearch` (`apps/kira-space/frontend/src/repo/state/search.ts:183-210`)
+registers `repoBySearchId.set(searchId, repoId)` only after `await
+control.codeWorkspaceStartSearch(…)` resolves. `handleCodeSearchEvent` (`:150-154`) drops any event
+whose `searchId` is not registered yet. The test emits its first `codeSearch` batch right after
+`press('Enter')`, never waiting for the start call to resolve. When the mock's HTTP response lands
+after the emitted event, the batch is dropped and the row never renders.
+
+The app has the same window. Go `CodeWorkspaceService.StartSearch`
+(`apps/kira-space/internal/bridge/codeworkspace.go:507-560`) starts the scan goroutine before it
+returns the handle, and `searchCoalescer.finish` emits the terminal event immediately on
+completion. A small worktree can finish before the bound call's response reaches JS: every batch
+plus `done` dropped, the panel stuck `running`. Nothing orders a Wails event behind a bound-call
+response.
+
+**`ade-panel.spec.ts:430`** (name: Esc reverts without a write). Suspected race in the last
+assertion. `expect(control.log().length).toBe(writesBefore)` counts every bound call, not writes
+(`packages/workbench/src/testing/ui/mockRuntime.ts:302` logs each call). `writesBefore` is read
+once `adeUpdateNewWork` shows in the log; the follow-up snapshot refresh
+(`adeRepoSnapshot`/`adeRepoPrs`, `snapshotControl(renamedSnap)`) lands after that write resolves.
+If the refresh lands after `writesBefore` is read, the count grows without any write.
