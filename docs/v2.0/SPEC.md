@@ -3192,3 +3192,67 @@ Five existing UI scenarios lost rows to the cap. They expand first through `test
   Studio code untouched.
 
 **Needs its own row:** none.
+
+## P137 result
+
+Plan: `docs/v2.0/plans/P137-ade-tabstrip-vue-draggable.md`. Implemented on `p137-plan` (base
+`ff77106d`), one commit per §8 step.
+
+**Commits:** `c9c35989` TabStripHost seam; `7878c31a` drag-reorder on `vue-draggable-plus`;
+`3266be80` drag tests (Studio, Space); `145b1280` ade repo tabs on `TabStrip`; `13fa651a` ade tab
+strip test; `c33f71f2` tooltip wait fix; `22e1a12c` ARCHITECTURE.
+
+**Shipped:**
+
+- `TabStrip.vue` takes optional `host` prop (`TabStripHost`), falls back to `useWorkbenchHost()`.
+  Absent capability hides its affordance. `#tab-leading` slot. `pinnedTitle` kind flag gives a
+  labelled pinned chip.
+- Native DnD gone. `useDraggable` on the scrolling row, `forceFallback`, bound id mirror, one
+  `moveTab` per drop. Pinned chips outside the sortable.
+- `AdeRepoTabs.vue` rewritten onto `TabStrip` (name kept, `AdeView.vue` unchanged) through
+  `useAdeTabStripHost.ts`. Needs-input counts fill `#tab-leading`. No close, no reorder.
+- Test ids `ade-repo-tab`/`ade-all-agents-tab` replaced by `[data-testid="tab"]` with
+  `data-tab-kind`/`data-tab-id`. Active state is `data-active`.
+
+**Tests (before/after):**
+
+- Studio `ui`: 299 to 300 (+1 drag). Space `ui`: 93 to 95 (+2: file-tab drag, ade strip).
+- Unit 1830 to 1830, 0 fail. Studio visual 14 pass, Space visual 4 pass.
+- `typecheck`, `lint:all` (incl. knip) clean.
+- Studio `ui` first run: 1 failure, `document-view-readonly.spec.ts:72`, 1s tooltip wait under a
+  loaded pool; passes alone. Fixed in `c33f71f2` (3s).
+- Studio `ui-timing`: 2 of 4 fail per run, a different pair each run (`budgets.spec.ts:432` p50
+  20ms vs 12ms; `slick-grid.spec.ts:896` 157ms vs 150ms; earlier `perf.spec.ts`). Sandbox wall-clock
+  noise, grid code untouched. Same known flakes P136 result lists. Not fixed: budgets are
+  machine-bound.
+
+**Closing audit (§10), all pass:**
+
+- Native DnD in `TabStrip.vue`: `rg 'draggable="|:draggable|drag(start|over|end|enter|leave)|DragEvent|dataTransfer'` empty.
+- Library caller: `useDraggable(` at `TabStrip.vue:211`, import at `:7`.
+- `moveTab` only in `onUpdate` path (`:209-226`).
+- Bespoke tab markup: `rg "components/ui/tabs'|TabsTrigger|TabsList"` in `AdeRepoTabs.vue` empty.
+  File kept, not deleted (plan §3.4).
+- `TabStrip` used by `AdeRepoTabs.vue`; `useAdeTabStripHost` defined plus one caller.
+- `extends TabStripHost`: 1 hit. Old test ids: empty. Hex literals, `<style`: empty.
+- `git diff ff77106d -- package.json bun.lock '**/package.json'`: empty. `createTabsStore.ts`
+  untouched.
+
+**Disclosed visual and keyboard changes (ade tab bar):**
+
+- Dropped: amber `border-top-color`, `#2a2d35` right border, `#d97757` icon tint. Active is now
+  the shared chip style.
+- Lost reka `Tabs` arrow-key roving and `role="tab"`. Chips are Tab-focusable buttons.
+
+**Gaps a Linux sandbox cannot verify:**
+
+- Drag feel in WebKitGTK/WKWebView (Wails) and macOS trackpad drag. Tests ran in Chromium and
+  Playwright WebKit, mouse only.
+- Live-ade run against real repos not done; mocked control only.
+- Sortable fallback mode emulates dragover on a 50ms tick. A test drag needs hover time before
+  `mouse.up` (300ms used).
+
+**Open points, not acted on:**
+
+- (a) ade repo drag-reorder needs a persisted repo order path shared with the Git panel.
+- (b) Migrate `useDragReorder`'s three consumers to `vue-draggable-plus`.
