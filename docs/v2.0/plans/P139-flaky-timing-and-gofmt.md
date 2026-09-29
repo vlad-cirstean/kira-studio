@@ -117,3 +117,26 @@ path (no CSS yet): **3-7 ms first click, 1-4 ms repeats**, 3/3 runs.
 
 **Cause: code cost at 60-100 % of the gate on a quiet machine; any noise crosses it.** Fix: D6's
 bypass, as designed. Budget stays 150 ms.
+
+### 2.4 `gofmt` — no gate runs it; drift is 26 files, not 4
+
+Go 1.27.1 (`go.mod:3`, `/usr/local/go/bin/gofmt`). `gofmt -l apps/` lists **24 files** today, not
+the row's 4; `gofmt -l .` adds 2 under `internal/` (26 total). Nothing in the hooks runs `gofmt`:
+`.githooks/pre-commit` runs `bun run lint`/`typecheck` (no Go), `.githooks/pre-push` runs
+`bun run lint:go` (`golangci-lint run`), and `.golangci.yml` enables linters only, no
+`formatters:` block. So drift lands silently.
+
+| Kind | Files | `gofmt -w` safe? |
+|---|---|---|
+| Import sort (`internal/ipcerr` placed between `apps/…` imports) | 18: `apps/kira-space/internal/bridge/gitclients.go`; Studio `internal/bridge/{collections,connections,customscripts,datagrip,filters,grpchistory,http,http_test,layout,maskrules,ops,queries,responsehistory,schema,tree,variables}.go`; `internal/dbmcp/render.go` | yes |
+| Alignment / blank line / indent | 5: `apps/kira-space/internal/gitpreflight/{stack_test,stash_test}.go` (map/struct key alignment), `apps/kira-studio/internal/httpclient/options.go` and `internal/shell/window.go` (double blank line), `apps/kira-studio/internal/adapters/postgres/client.go:304-310` (closure body over-indented one tab) | yes |
+| Doc-comment `''` rewrite | 3: `apps/kira-space/internal/gitaskpass/broker.go:121` (`'\''`), `apps/kira-studio/internal/adapters/errors.go:173` (`r[i] == '\''`), `internal/terminal/session.go:35` (`` `trap '' HUP` ``) | **no** |
+
+The third kind is a trap. Go 1.19+ doc-comment reformatting turns `''` into `”` (U+201D).
+`gofmt -w` would print `'\”` where the comment documents the shell idiom `'\''`: wrong content.
+Fix by rewording so no `''` pair sits in doc-comment prose: move the literal onto its own indented
+line (a doc-comment code block, kept verbatim), then `gofmt -w`.
+
+**`golangci-lint`:** `bun run lint:go` (v2.13.2 built with go1.27.1, cache cleaned): **0 issues**.
+Enabling `formatters: enable: [gofmt]` in `.golangci.yml` (probe, reverted) reports exactly the 26
+files as `gofmt` issues. That block is the regression guard: `pre-push` already runs `lint:go`.
