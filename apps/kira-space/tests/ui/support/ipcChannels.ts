@@ -39,6 +39,11 @@ export const IPC = {
   keepAwakeSetManual: 'kira:keepAwake:setManual',
   keepAwake: 'kira:keepAwake:changed',
   appMetrics: 'kira:app:metrics',
+  // P132 Part 2: the operations dock's own toggle, bound calls and push.
+  toggleOperationsPanel: 'kira:menu:toggle-operations-panel',
+  opsRecent: 'kira:ops:recent',
+  opsCancel: 'kira:ops:cancel',
+  opUpdate: 'kira:op:update',
 
   // P119: Kira Studio's own three update channels — same values as its own ipcChannels.ts.
   updateStatus: 'kira:update:status',

@@ -56,15 +56,18 @@ test('the title bar has a New window button, rightmost of the action row, that c
   await expect(newWindow).toBeVisible();
   await expect(newWindow).toContainText('New window');
 
-  // DOM order: Repositories, Settings, keep-awake, New window (TitleBar.vue's own render order).
+  // DOM order: Repositories, Operations, Settings, keep-awake, New window (TitleBar.vue's own
+  // render order).
   const testIds = await window
     .locator(
-      '[data-testid="toggle-project-panel"], [data-testid="open-settings"], ' +
-        '[data-testid="toggle-keep-awake"], [data-testid="new-window"]',
+      '[data-testid="toggle-project-panel"], [data-testid="toggle-operations-panel"], ' +
+        '[data-testid="open-settings"], [data-testid="toggle-keep-awake"], ' +
+        '[data-testid="new-window"]',
     )
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
   expect(testIds).toEqual([
     'toggle-project-panel',
+    'toggle-operations-panel',
     'open-settings',
     'toggle-keep-awake',
     'new-window',
@@ -165,6 +168,18 @@ test('kira:menu:toggle-project-panel toggles the project panel', async ({ relaun
 
   await emitWailsEvent(window, IPC.toggleProjectPanel, undefined);
   await expect(panel).toBeVisible();
+});
+
+test('kira:menu:toggle-operations-panel toggles the operations dock', async ({ relaunch }) => {
+  const { window } = await relaunch();
+  const dock = window.locator('[data-testid="operations-panel"]');
+  await expect(dock).toHaveCount(0);
+
+  await emitWailsEvent(window, IPC.toggleOperationsPanel, undefined);
+  await expect(dock).toBeVisible();
+
+  await emitWailsEvent(window, IPC.toggleOperationsPanel, undefined);
+  await expect(dock).toHaveCount(0);
 });
 
 test('kira:menu:tab-next activates the next tab in the active workspace', async ({ relaunch }) => {

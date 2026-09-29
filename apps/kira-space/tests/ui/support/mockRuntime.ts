@@ -74,6 +74,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   windowsEnsure: 'WindowsService.Ensure',
   windowsSetMode: 'WindowsService.SetMode',
 
+  // P132 Part 2: the operations dock's own two bound calls.
+  opsRecent: 'OpsService.Recent',
+  opsCancel: 'OpsService.Cancel',
+
   // P119: the in-app update dialog's three bound calls.
   updateStatus: 'UpdateService.Status',
   updateInstall: 'UpdateService.InstallUpdate',
@@ -143,6 +147,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
   [IPC.settingsSet]: JSON.stringify(defaultSettings),
   [IPC.gitClientsList]: '[]',
+  // P132 Part 2: main.ts's bootstrap() hydrates the op log on every boot.
+  [IPC.opsRecent]: '[]',
+  [IPC.opsCancel]: 'null',
   [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
   [IPC.gitVsixStatus]: JSON.stringify({
     bundled: false,
