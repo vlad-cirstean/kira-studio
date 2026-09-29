@@ -10,6 +10,7 @@ import type {
 } from '../../frontend/src/ade/wire';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
+import { showAllWork } from './support/ade';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -330,6 +331,7 @@ test('header: action labels open the right dialog title; Force push and merged A
       ...snapshotControl(snap),
     ],
   });
+  await showAllWork(page);
 
   const dialog = page.locator('[data-testid="ade-dialog"]');
 
@@ -1324,6 +1326,7 @@ test('dependency panel: edits title, waiting-on and expected-by, Resolve moves i
       ...snapshotControl(snapResolved),
     ],
   });
+  await showAllWork(page);
 
   await select(page, 'dep-1');
   const details = page.locator('[data-testid="ade-dependency-details"]');
@@ -1457,4 +1460,101 @@ test('blocked-by: a blocked item panel shows the chip, unlink removes it, Link r
     )
     .toBe(true);
   await expect(chip).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------------------------
+// P136. Work type
+// ---------------------------------------------------------------------------------------------
+
+test('work type: a branch lists four kinds; To test writes SetWorkType; a stored test item reads back', async ({
+  relaunch,
+}) => {
+  const a = fullBranch({ id: 'a', branch: 'feat/a', ahead: 1 });
+  const t = fullBranch({
+    id: 'rt',
+    branch: 'feat/rt',
+    kind: 'review',
+    workType: 'test',
+    owner: 'alice',
+    authorEmail: 'alice@example.com',
+    isMine: false,
+  });
+  const snap = snapshot({ branches: [a, t], plan: plan({ a: TODAY_ISO, rt: TODAY_ISO }) });
+
+  const { window: page, control } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      { channel: IPC.adeSetWorkType, response: null },
+      ...snapshotControl(snap),
+    ],
+  });
+
+  const field = page.locator('[data-testid="ade-work-type"]');
+  await select(page, 'a');
+  await expect(field.locator('option')).toHaveCount(4);
+  await expect(field).toHaveValue('work');
+  await field.selectOption('test');
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.adeSetWorkType &&
+            JSON.stringify(e.args) ===
+              JSON.stringify({ codeRepoId: REPO.id, item: 'a', workType: 'test' }),
+        ),
+    )
+    .toBe(true);
+
+  await select(page, 'rt');
+  await expect(field).toHaveValue('test');
+  await expect(field).toBeEnabled();
+  await expect(page.locator('[data-testid="ade-panel-header"]')).toContainText('test');
+  await expect(page.locator('[data-testid="ade-panel-mono"]')).toContainText('alice · test');
+  await expect(page.locator('[data-testid="ade-name-input"]')).toHaveCount(0);
+});
+
+test('work type: a draft offers two kinds; review and test are disabled while blocked; a refused write shows the error and reverts', async ({
+  relaunch,
+}) => {
+  const blocked = fullBranch({ id: 'blocked', branch: 'feat/blocked', ahead: 1 });
+  const free = fullBranch({ id: 'free', branch: 'feat/free', ahead: 1 });
+  const dep = dependency({ id: 'dep-1', title: 'Vendor API', blocks: ['blocked'] });
+  const snap = snapshot({
+    branches: [blocked, free],
+    newWork: [newWork({ id: 'draft1', title: 'Draft one' })],
+    plan: plan({ draft1: TODAY_ISO, blocked: TODAY_ISO, free: TODAY_ISO }),
+    dependencies: [dep],
+  });
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      {
+        channel: IPC.adeSetWorkType,
+        error: { code: 'E_INVALID', message: 'work type refused' },
+      },
+    ],
+  });
+
+  const field = page.locator('[data-testid="ade-work-type"]');
+
+  await select(page, 'draft1');
+  await expect(field.locator('option')).toHaveCount(2);
+
+  await select(page, 'blocked');
+  await expect(field.locator('option[value="review"]')).toBeDisabled();
+  await expect(field.locator('option[value="test"]')).toBeDisabled();
+  await expect(field.locator('option[value="investigate"]')).toBeEnabled();
+
+  await select(page, 'free');
+  await field.selectOption('review');
+  await expect(page.locator('[data-testid="ade-work-type-error"]')).toBeVisible();
+  await expect(field).toHaveValue('work');
 });

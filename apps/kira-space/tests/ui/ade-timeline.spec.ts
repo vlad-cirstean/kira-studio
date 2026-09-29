@@ -9,6 +9,7 @@ import type {
 } from '../../frontend/src/ade/wire';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
+import { showAllWork } from './support/ade';
 import { IPC } from './support/ipcChannels';
 import type { ControlSnapshot } from './support/types';
 
@@ -217,6 +218,7 @@ test('render: separators, weekend/later ordering, continuation rows, overdue str
       ...snapshotControl(snap),
     ],
   });
+  await showAllWork(page);
 
   // Today band, Later band last, the day-range controls sit right above Later.
   await expect(page.locator(`${dragBox('ade-day-band')}[data-ade-day="0"]`)).toContainText('Today');
@@ -399,6 +401,7 @@ test('drag and drop: direct parked apply, the Move dialog (with SetPlan before S
       ...snapshotControl(snap),
     ],
   });
+  await showAllWork(page);
 
   const day1Band = `${dragBox('ade-day-band')}[data-ade-day="1"]`;
   const day2Band = `${dragBox('ade-day-band')}[data-ade-day="2"]`;
@@ -1032,6 +1035,7 @@ test('dependency: no drag attributes, lands on the blocked item\'s day with a bl
       ...snapshotControl(snap),
     ],
   });
+  await showAllWork(page);
 
   const depBox = page.locator(`${dragBox('ade-stack-box')}[data-ade-lead="dep-1"]`);
   await expect(depBox).toHaveAttribute('data-ade-dependency', '');
@@ -1205,4 +1209,195 @@ test('add: the Dependency tab creates one, selects it, and Blocks defaults to th
   await expect(
     page.locator(`${dragBox('ade-stack-row')}[data-ade-id="dep-1"][aria-selected="true"]`),
   ).toHaveCount(1);
+});
+
+// ---------------------------------------------------------------------------------------------
+// P136. Top-5 "my work" cap
+// ---------------------------------------------------------------------------------------------
+
+const CAP_DAYS = [
+  '2026-10-07',
+  '2026-10-08',
+  '2026-10-09',
+  '2026-10-12',
+  '2026-10-13',
+  '2026-10-14',
+  '2026-10-15',
+];
+
+function capRows(page: import('@playwright/test').Page) {
+  return page.locator(dragBox('ade-stack-row'));
+}
+
+test('my work cap: 5 of 7 stacks, earliest first; show more reveals the rest; hours unchanged; a tab switch resets', async ({
+  relaunch,
+}) => {
+  const mine = CAP_DAYS.map((_, i) =>
+    fullBranch({
+      id: `m${i}`,
+      branch: `feat/m${i}`,
+      ahead: 1,
+      ...(i === 5 ? { est: '3h' } : {}),
+    }),
+  );
+  const parked = fullBranch({ id: 'pk', branch: 'feat/pk', kind: 'parked' });
+  const snap = snapshot({
+    branches: [...mine, parked],
+    plan: plan({ ...Object.fromEntries(CAP_DAYS.map((d, i) => [`m${i}`, d])), pk: TODAY_ISO }),
+    dependencies: [
+      {
+        id: 'dep-link',
+        title: 'Linked dep',
+        waitingOn: 'vendor',
+        expectedBy: null,
+        createdAt: Date.now(),
+        blocks: ['m1'],
+      },
+      {
+        id: 'dep-free',
+        title: 'Free dep',
+        waitingOn: 'vendor',
+        expectedBy: null,
+        createdAt: Date.now(),
+        blocks: [],
+      },
+    ],
+  });
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      ...snapshotControl(snap),
+      ...snapshotControl(snap),
+    ],
+  });
+
+  const toggle = page.locator('[data-testid="ade-show-more"]');
+  const hiddenBand = page.locator(`${dragBox('ade-day-band')}[data-ade-day="7"]`);
+  await expect(page.locator('[data-testid="ade-timeline"]')).toBeVisible();
+  await expect(capRows(page)).toHaveCount(6);
+  for (const id of ['m0', 'm1', 'm2', 'm3', 'm4', 'dep-link']) {
+    await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="${id}"]`)).toHaveCount(1);
+  }
+  for (const id of ['m5', 'm6', 'pk', 'dep-free']) {
+    await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="${id}"]`)).toHaveCount(0);
+  }
+  await expect(toggle).toHaveText('Show 4 more');
+  // The cap is presentation only: a hidden stack's hours still land in its own band.
+  await expect(hiddenBand).toContainText('3h');
+
+  await toggle.click();
+  await expect(capRows(page)).toHaveCount(10);
+  await expect(toggle).toHaveText('Show top 5 only');
+  await expect(hiddenBand).toContainText('3h');
+
+  await toggle.click();
+  await expect(capRows(page)).toHaveCount(6);
+
+  await toggle.click();
+  await expect(capRows(page)).toHaveCount(10);
+  await page.locator('[data-testid="ade-all-agents-tab"]').click();
+  await expect(page.locator('[data-testid="ade-all-agents-view"]')).toBeVisible();
+  await page.locator(`[data-testid="ade-repo-tab"][data-repo-id="${REPO.id}"]`).click();
+  await expect(page.locator('[data-testid="ade-show-more"]')).toHaveText('Show 4 more');
+  await expect(capRows(page)).toHaveCount(6);
+});
+
+test('my work cap: a review item and a branch-less draft count as my work', async ({
+  relaunch,
+}) => {
+  const review = fullBranch({
+    id: 'rv',
+    branch: 'feat/rv',
+    kind: 'review',
+    owner: 'alice',
+    authorEmail: 'alice@example.com',
+    isMine: false,
+  });
+  const kid = fullBranch({ id: 'rv-kid', branch: 'feat/rv-kid', base: 'rv', ahead: 1 });
+  const others = ['a', 'b', 'c'].map((n) => fullBranch({ id: n, branch: `feat/${n}`, ahead: 1 }));
+  const later = fullBranch({ id: 'later', branch: 'feat/later', ahead: 1 });
+  const snap = snapshot({
+    branches: [review, kid, ...others, later],
+    newWork: [
+      {
+        id: 'draft-1',
+        title: 'Dated draft',
+        workType: 'work',
+        startFrom: '',
+        branchName: '',
+        est: '',
+        notes: '',
+        jira: { key: '', url: '' },
+        createdAt: Date.now(),
+      },
+    ],
+    plan: plan({
+      'draft-1': TODAY_ISO,
+      rv: '2026-10-08',
+      'rv-kid': '2026-10-08',
+      a: '2026-10-09',
+      b: '2026-10-12',
+      c: '2026-10-13',
+      later: '2026-10-15',
+    }),
+  });
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [...bootControl(), ...snapshotControl(snap)],
+  });
+
+  await expect(page.locator('[data-testid="ade-timeline"]')).toBeVisible();
+  await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="draft-1"]`)).toHaveCount(1);
+  await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="rv"]`)).toHaveCount(1);
+  await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="rv-kid"]`)).toHaveCount(1);
+  await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="later"]`)).toHaveCount(0);
+  await expect(page.locator('[data-testid="ade-show-more"]')).toHaveText('Show 1 more');
+});
+
+test('my work cap: selecting a hidden item reveals the list once', async ({ relaunch }) => {
+  const mine = CAP_DAYS.map((_, i) => fullBranch({ id: `m${i}`, branch: `feat/m${i}`, ahead: 1 }));
+  const snap = snapshot({
+    branches: mine,
+    plan: plan(Object.fromEntries(CAP_DAYS.map((d, i) => [`m${i}`, d]))),
+  });
+  const candidates: AdeCandidateBranch[] = [
+    { name: 'feat/m6', author: 'me', lastCommitAt: Date.now(), remoteOnly: false, mine: true },
+  ];
+
+  const { window: page } = await relaunch({
+    clockTime: CLOCK_TIME,
+    control: [
+      ...bootControl(),
+      ...snapshotControl(snap),
+      { channel: IPC.adeCandidateBranches, args: { codeRepoId: REPO.id }, response: candidates },
+      { channel: IPC.adeAddBranch, response: 'm6' },
+      ...snapshotControl(snap),
+    ],
+  });
+
+  const toggle = page.locator('[data-testid="ade-show-more"]');
+  await expect(toggle).toHaveText('Show 2 more');
+  await expect(capRows(page)).toHaveCount(5);
+
+  await page.locator('[data-testid="ade-add-open"]').click();
+  const popover = page.locator('[data-testid="ade-add-popover"]');
+  await popover.locator('[data-testid="ade-add-tab-existing"]').click();
+  await popover.locator('[data-testid="ade-add-candidate"][data-branch="feat/m6"]').click();
+  await expect(popover).toHaveCount(0);
+
+  await expect(capRows(page)).toHaveCount(7);
+  await expect(toggle).toHaveText('Show top 5 only');
+  await expect(page.locator(`${dragBox('ade-stack-row')}[data-ade-id="m6"]`)).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  // Once per id: collapsing keeps the list collapsed even though m6 stays selected.
+  await toggle.click();
+  await expect(capRows(page)).toHaveCount(5);
+  await expect(toggle).toHaveText('Show 2 more');
 });
