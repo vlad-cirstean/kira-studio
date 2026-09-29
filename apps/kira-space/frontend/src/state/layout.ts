@@ -11,4 +11,7 @@ import { control } from '../bridge/control';
 // P103 Part 2 (§5.3): the shared skeleton now lives in
 // packages/workbench/src/state/createLayoutStore.ts — this app has nothing to add, so this
 // store's own public surface is unchanged from before this phase.
+//
+// P132 Part 1 (§2.5): the core store now also exposes toggleOperationsPanel/setOperationsHeight —
+// Kira Space's own Operations dock lands in Part 2, unused here until then.
 export const useLayoutStore = createLayoutStore(control, () => ({}));

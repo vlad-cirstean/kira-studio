@@ -4,12 +4,14 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 
 // P103 Part 2 (§5.3): hoisted from Kira Studio's own state/layout.ts (P100 Part 2's comment on
-// Kira Space's copy: "ported unchanged"). The two apps' cores were already identical — Kira
-// Space's UI has no operations panel or cell editor, so its store never exposed
-// toggleOperationsPanel/setCellEditorHeight/setOperationsHeight, even though `Layout` (the one
-// shared schema, @shared/domain/layout) still carries those fields and round-trips them
-// untouched. `extend` reproduces exactly that: Kira Space passes none, so its store's own public
-// surface is unchanged from before this phase.
+// Kira Space's copy: "ported unchanged"). The two apps' cores were already identical — `Layout`
+// (the one shared schema, @shared/domain/layout) carries panel.operations/panel.cellEditor for
+// both apps regardless of which UI surfaces them.
+//
+// P132 Part 1 (§2.5): toggleOperationsPanel/setOperationsHeight moved into the core return below —
+// Kira Space gets its own Operations dock in Part 2, so both apps' stores expose them now. Studio's
+// `extend` keeps only setCellEditorHeight; Space's `() => ({})` is unchanged and now exposes both
+// through the core.
 
 const WRITE_DEBOUNCE_MS = 150;
 
@@ -115,6 +117,15 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       patchLayout({ panel: { project: { width: minWidth } } });
     }
 
+    // P132 Part 1 (§2.5): hoisted from Studio's own state/layout.ts — the Operations panel's
+    // toggle/height, now on the core so Kira Space's own dock (Part 2) can use them too.
+    function toggleOperationsPanel(): void {
+      patchLayout({ panel: { operations: { visible: !state.panel.operations.visible } } });
+    }
+    function setOperationsHeight(height: number): void {
+      patchLayout({ panel: { operations: { height } } });
+    }
+
     const extra = extend({ state, patchLayout });
 
     return {
@@ -123,6 +134,8 @@ export function createLayoutStore<E extends Record<string, unknown> = Record<str
       toggleProjectPanel,
       setProjectWidth,
       ensureReviewPanelWidth,
+      toggleOperationsPanel,
+      setOperationsHeight,
       ...extra,
     };
   });
