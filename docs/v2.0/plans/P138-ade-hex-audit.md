@@ -25,7 +25,7 @@ grep -rnoE '[a-z-]+-\[#[^]]*\]' apps/kira-space/frontend/src/ade/              #
   **5 comments reworded** (no literal left).
 - Kept set: **57 distinct values** (§2). Every one is in use after P138. It is the gate allowlist.
 - 21 remapped sites carry a kept *value* in a chrome *role* (amber accent, error text, link blue,
-  grey-tone surface). The value gate cannot see those; §10 of the plan greps them explicitly.
+  grey-tone surface). The value gate cannot see those; §11 of the plan greps them explicitly.
 
 Legend: **kept** = literal stays (tone/palette data). **remap** = replaced by the named utility or
 `var()`. **normalize to kept** = off-canon variant replaced by the named kept value. **comment
@@ -556,7 +556,7 @@ with only kept literals (no edit needed): `AdeMainLine.vue`, `useQueue.ts`.
 | 84 | `#15161a` | kept | tone ink: ink on amber/red/green/blue/grey solid |
 | 84 | `#ffffff` | kept | tone ink: ink on purple solid |
 | 150 | `#a371f7` | kept | purple tone solid; read as TONE.purple[2] (archive cell action) |
-| 150 | `#ffffff` | kept | purple ink; read through toneInk('purple') |
+| 150 | `#ffffff` | kept | purple ink; read as TONE_INK.purple |
 | 151 | `#1a0f0a` | remap | CLAUDE_BUTTON_STYLE |
 | 151 | `#d97757` | remap | CLAUDE_BUTTON_STYLE (Start cell action reuses the shared style) |
 
