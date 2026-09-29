@@ -114,3 +114,39 @@ screen at ~30 ms. The spec's selector measures Monaco's constant, not app work.
 - `MainView.vue` never kept data tabs alive. `KeepAlive` existed only for `RepoGraphView`
   (`d9938756`) and was removed with the git module (`dd3ec622`). Every tab switch has always
   remounted `DataView` (`:key="activeTab.id"`).
+
+### 1.7 More on WebKit stylesheet cost
+
+Further microbenchmarks, same page, median of 8, each op followed by one layout read:
+
+| Op | WebKit | Chromium |
+|---|---|---|
+| append empty `<style>` then `insertRule` | 65 ms | 0.3 ms |
+| append `<style>` with text | 58 ms | 0.3 ms |
+| `insertRule` / `deleteRule` on an existing sheet | 54-56 ms | 0.3 ms |
+| remove a `<style>` | 55 ms | 0.3 ms |
+| `sheet.disabled = true` | 57 ms | 0.3 ms |
+| `adoptedStyleSheets` `replaceSync` | 53-63 ms | 0.3 ms |
+| custom property on `main-view` container | 32 ms | 4 ms |
+
+Every stylesheet change costs one full-document style recalc on WebKit. Disabling the largest
+sheet (1 235 rules) leaves it at 55 ms; hiding `main-view` (`display: none`) halves it to 26 ms. The
+cost scales with rendered elements, not rule count. No stylesheet API is cheap on WebKit, so
+rewriting SlickGrid's rule strategy (`insertRule` with final values, text replace, adopted sheet,
+custom properties) cannot get a remount under 50 ms: one remount needs at least the old sheet's
+removal plus the new sheet's insertion, ~110 ms. Declined for that measured reason.
+
+### 1.8 Prototypes (probe build, reverted)
+
+| Prototype | cached tab switch p50 / p95 | switch to 2nd rAF p50 / p95 |
+|---|---|---|
+| none (baseline) | 321 / 389 ms | 383 / 438 ms |
+| K: `KeepAlive :max="10"` around `MainView.vue`'s `<component>` | **5-6 / 8-9 ms** | 68-81 / 92-114 ms |
+| B2: `explicitInitialization: true`, subscribe, `grid.init()`, no `rebuildAndSetColumns()` in `onMounted` | 201 / 304 ms | 251 / 317 ms |
+
+Idle double-rAF (frame cadence alone): p50 25 ms. Under K, post-switch SlickGrid work is
+`resizeCanvas` x2 (4-23 ms incl.): the `ResizeObserver` fires for the detached grid (0x0) and the
+re-inserted one. The re-inserted grid rebuilds its rows (34-78 `appendCellHtml`) because the 0x0
+pass emptied them. Rest of the ~45 ms over idle is style/layout/paint of the re-inserted subtree.
+B2 passes the probe with `consoleErrors` empty and headers carrying `data-column`, so the header
+listener runs on the first (now only) build.
