@@ -191,6 +191,12 @@ function kindFor(m: MonacoModule, type?: EditorCompletionKind): CompletionItemKi
   }
 }
 
+// Word-based suggestions stay off whenever completion is this host's own: with `autocomplete` on
+// and no source (a cold SQL console), Monaco's default popped a stale-word suggestion mid-typing.
+function wordBasedSuggestions(): 'off' | undefined {
+  return props.autocomplete || props.completionSources?.length ? 'off' : undefined;
+}
+
 // §4.8: registered per host instance, model-scoped (returning empty suggestions for any other
 // model) — Monaco's provider registry is global per language id, so an unscoped registration would
 // leak one pane's completions into every other pane of the same language.
@@ -387,7 +393,7 @@ function applyBaseOptions(): ConstructionOptions {
     suggestOnTriggerCharacters: Boolean(props.autocomplete),
     acceptSuggestionOnEnter: 'off',
     tabCompletion: 'on',
-    wordBasedSuggestions: props.completionSources?.length ? 'off' : undefined,
+    wordBasedSuggestions: wordBasedSuggestions(),
     occurrencesHighlight: 'off',
     hover: { delay: 400, above: true },
     fontFamily: settingsStore.appearance.fontFamily,
@@ -545,7 +551,7 @@ watch(
     editor?.updateOptions({
       quickSuggestions: Boolean(props.autocomplete),
       suggestOnTriggerCharacters: Boolean(props.autocomplete),
-      wordBasedSuggestions: props.completionSources?.length ? 'off' : undefined,
+      wordBasedSuggestions: wordBasedSuggestions(),
     });
     registerProviders(mod, monacoLanguageIdFor(props.language));
   },
