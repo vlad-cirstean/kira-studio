@@ -150,7 +150,9 @@ function settingsSetCalls(
 }
 
 function repoTab(page: Page, repoId: string) {
-  return page.locator(`[data-testid="ade-repo-tab"][data-repo-id="${repoId}"]`);
+  return page.locator(
+    `[data-testid="ade-repo-tabs"] [data-testid="tab"][data-tab-kind="ade-repo"][data-tab-id="${repoId}"]`,
+  );
 }
 
 function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
@@ -158,7 +160,9 @@ function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
 }
 
 function allAgentsTab(page: Page) {
-  return page.locator('[data-testid="ade-all-agents-tab"]');
+  return page.locator(
+    '[data-testid="ade-repo-tabs"] [data-testid="tab"][data-tab-kind="ade-all-agents"]',
+  );
 }
 
 function agentRow(page: Page, sessionId: string) {
@@ -397,8 +401,9 @@ test('1. pinned tab: first, labelled All agents, shows the cross-repo needs-inpu
   const { window: page } = await relaunch({ clockTime: CLOCK_TIME, control: fullControl() });
   await primeActivity(page);
 
-  const tabs = page.locator('[data-testid="ade-repo-tab"], [data-testid="ade-all-agents-tab"]');
-  await expect(tabs.first()).toHaveAttribute('data-testid', 'ade-all-agents-tab');
+  await expect(
+    page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab"]').first(),
+  ).toHaveAttribute('data-tab-kind', 'ade-all-agents');
   await expect(allAgentsTab(page)).toContainText('All agents');
   // Only `sess-input` (repo alpha) reads `input` — the count is the sum across both repos, which a
   // single contributor still exercises (the sum itself, not a same-repo-only bug, is what §0.4
@@ -433,7 +438,7 @@ test('2. selecting the pinned tab shows the amber-bordered All agents view; a re
   await openAllAgents(page);
   await expect(page.locator('[data-testid="ade-all-agents-view"]')).toBeVisible();
   await expect(page.locator('[data-testid="ade-repo-view"]')).toHaveCount(0);
-  await expect(allAgentsTab(page)).toHaveCSS('border-top-color', 'rgb(232, 163, 61)');
+  await expect(allAgentsTab(page)).toHaveAttribute('data-active', 'true');
 
   await repoTab(page, REPO_A.id).click();
   await expect(page.locator('[data-testid="ade-repo-view"]')).toBeVisible();
@@ -745,7 +750,7 @@ test('10. open, local terminal: repo tab active, item selected, Agents tab on th
   await openAllAgents(page);
   await agentRowAction(page, 'sess-local').click();
 
-  await expect(repoTab(page, REPO_A.id)).toHaveAttribute('data-state', 'active');
+  await expect(repoTab(page, REPO_A.id)).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('feat/a');
   await expect(page.locator('[data-testid="ade-panel-tab-agents"]')).toHaveAttribute(
     'data-state',
@@ -790,7 +795,7 @@ test('11. open, foreign terminal: FocusSession is called; kira:ade:open-session 
   });
 
   await expect(modeTab(page, 'ade')).toHaveClass(/is-active/);
-  await expect(repoTab(page, REPO_B.id)).toHaveAttribute('data-state', 'active');
+  await expect(repoTab(page, REPO_B.id)).toHaveAttribute('data-active', 'true');
   await expect(page.locator('[data-testid="ade-panel-title"]')).toContainText('feat/waiting');
   await expect(page.locator('[data-testid="ade-panel-tab-agents"]')).toHaveAttribute(
     'data-state',

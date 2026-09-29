@@ -1298,9 +1298,15 @@ test('my work cap: 5 of 7 stacks, earliest first; show more reveals the rest; ho
 
   await toggle.click();
   await expect(capRows(page)).toHaveCount(10);
-  await page.locator('[data-testid="ade-all-agents-tab"]').click();
+  await page
+    .locator('[data-testid="ade-repo-tabs"] [data-testid="tab"][data-tab-kind="ade-all-agents"]')
+    .click();
   await expect(page.locator('[data-testid="ade-all-agents-view"]')).toBeVisible();
-  await page.locator(`[data-testid="ade-repo-tab"][data-repo-id="${REPO.id}"]`).click();
+  await page
+    .locator(
+      `[data-testid="ade-repo-tabs"] [data-testid="tab"][data-tab-kind="ade-repo"][data-tab-id="${REPO.id}"]`,
+    )
+    .click();
   await expect(page.locator('[data-testid="ade-show-more"]')).toHaveText('Show 4 more');
   await expect(capRows(page)).toHaveCount(6);
 });

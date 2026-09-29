@@ -12,7 +12,9 @@ import { emitWailsEvent } from './support/mockRuntime';
 // same minute a fixture's `lastFetchAt` was built against.
 
 function repoTab(page: Page, repoId: string) {
-  return page.locator(`[data-testid="ade-repo-tab"][data-repo-id="${repoId}"]`);
+  return page.locator(
+    `[data-testid="ade-repo-tabs"] [data-testid="tab"][data-tab-kind="ade-repo"][data-tab-id="${repoId}"]`,
+  );
 }
 
 function modeTab(page: Page, mode: 'git' | 'terminal' | 'ade') {
