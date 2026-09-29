@@ -60,11 +60,16 @@ interface AdeJira {
   url: string;
 }
 
+/** User-chosen work type (P136): `work`/`investigate` pair with kind mine/parked, `review`/`test`
+ *  with kind review. */
+export type AdeWorkType = 'work' | 'investigate' | 'review' | 'test';
+
 /** `AdeBranchWire` — one queued branch's own assembled facts. */
 export interface AdeBranch {
   id: string;
   branch: string;
   kind: string;
+  workType: AdeWorkType;
   name: string;
   draftTitle: string;
   startFrom: string;
@@ -99,6 +104,7 @@ export interface AdeBranch {
 export interface AdeNewWork {
   id: string;
   title: string;
+  workType: AdeWorkType;
   startFrom: string;
   branchName: string;
   est: string;
@@ -319,6 +325,12 @@ export interface AdeBranchMetaPatch {
   prUrl?: string;
   est?: string;
   notes?: string;
+}
+
+export interface AdeSetWorkTypeArgs {
+  codeRepoId: string;
+  item: string;
+  workType: AdeWorkType;
 }
 
 export interface AdeSetBranchMetaArgs {

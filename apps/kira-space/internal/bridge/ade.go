@@ -405,6 +405,7 @@ type AdeBranchWire struct {
 	ID             string      `json:"id"`
 	Branch         string      `json:"branch"`
 	Kind           string      `json:"kind"`
+	WorkType       string      `json:"workType"`
 	Name           string      `json:"name"`
 	DraftTitle     string      `json:"draftTitle"`
 	StartFrom      string      `json:"startFrom"`
@@ -438,6 +439,7 @@ type AdeBranchWire struct {
 type AdeNewWorkWire struct {
 	ID               string   `json:"id"`
 	Title            string   `json:"title"`
+	WorkType         string   `json:"workType"`
 	StartFrom        string   `json:"startFrom"`
 	BranchName       string   `json:"branchName"`
 	Est              string   `json:"est"`
@@ -578,7 +580,7 @@ func toWireAdeJira(j ade.Jira) AdeJira {
 
 func toWireAdeBranch(b ade.BranchFact) AdeBranchWire {
 	return AdeBranchWire{
-		ID: b.ID, Branch: b.Branch, Kind: b.Kind, Name: b.Name, DraftTitle: b.DraftTitle,
+		ID: b.ID, Branch: b.Branch, Kind: b.Kind, WorkType: b.WorkType, Name: b.Name, DraftTitle: b.DraftTitle,
 		StartFrom: b.StartFrom, Exists: b.Exists, Ref: b.Ref, Tip: b.Tip, Owner: b.Owner,
 		AuthorEmail: b.AuthorEmail, IsMine: b.IsMine, LastCommitAt: b.LastCommitAt, Base: b.Base,
 		Ahead: b.Ahead, Behind: b.Behind, Merged: b.Merged, MergedAt: b.MergedAt, Worktree: b.Worktree,
@@ -591,7 +593,7 @@ func toWireAdeBranch(b ade.BranchFact) AdeBranchWire {
 
 func toWireAdeNewWork(w ade.NewWorkFact) AdeNewWorkWire {
 	return AdeNewWorkWire{
-		ID: w.ID, Title: w.Title, StartFrom: w.StartFrom, BranchName: w.BranchName, Est: w.Est,
+		ID: w.ID, Title: w.Title, WorkType: w.WorkType, StartFrom: w.StartFrom, BranchName: w.BranchName, Est: w.Est,
 		Notes: w.Notes, Jira: toWireAdeJira(w.Jira), CreatedAt: w.CreatedAt,
 		BranchCandidates: w.BranchCandidates,
 	}
@@ -828,7 +830,8 @@ func adeQueueError(err error) error {
 	}
 	if errors.Is(err, repos.ErrQueued) || errors.Is(err, repos.ErrArchived) ||
 		errors.Is(err, repos.ErrNotBlockable) || errors.Is(err, repos.ErrDependencyGone) ||
-		errors.Is(err, repos.ErrEstimateShrink) {
+		errors.Is(err, repos.ErrEstimateShrink) || errors.Is(err, repos.ErrWorkTypeBlocked) ||
+		errors.Is(err, repos.ErrWorkTypeInvalid) {
 		return ipcerr.New("E_INVALID", err.Error())
 	}
 	return ipcerr.InternalErr(err)
@@ -994,7 +997,7 @@ func (a AdeUpdateNewWorkArgs) Validate() error {
 }
 
 // AdeBranchMetaPatchArgs is SetBranchMeta's own patch shape — Kind only ever "mine"/"parked" here
-// (§0.11: SetBranchMeta never turns a branch back into "review").
+// (§0.11: SetBranchMeta never turns a branch back into "review"; SetWorkType is the review path).
 type AdeBranchMetaPatchArgs struct {
 	Name  *string       `json:"name,omitempty"`
 	Kind  *string       `json:"kind,omitempty"`
@@ -1058,6 +1061,26 @@ func (a AdeSetBranchMetaArgs) Validate() error {
 		return err
 	}
 	return a.Patch.validate()
+}
+
+// AdeSetWorkTypeArgs is SetWorkType's own argument shape (P136 §3.5).
+type AdeSetWorkTypeArgs struct {
+	CodeRepoID string `json:"codeRepoId"`
+	Item       string `json:"item"`
+	WorkType   string `json:"workType"`
+}
+
+func (a AdeSetWorkTypeArgs) Validate() error {
+	if a.CodeRepoID == "" {
+		return ipcerr.New("E_INVALID", "codeRepoId is required")
+	}
+	if err := validateAdeWorkItemID(a.Item, "item"); err != nil {
+		return err
+	}
+	if !model.ValidAdeWorkType(a.WorkType) {
+		return ipcerr.New("E_INVALID", "workType must be work, investigate, review or test")
+	}
+	return nil
 }
 
 type AdeSetPlanArgs struct {
@@ -1391,6 +1414,13 @@ func (s *AdeService) SetBranchMeta(args AdeSetBranchMetaArgs) error {
 		return err
 	}
 	return adeQueueError(s.Queue.SetBranchMeta(args.CodeRepoID, args.Branch, args.Patch.toModel()))
+}
+
+func (s *AdeService) SetWorkType(args AdeSetWorkTypeArgs) error {
+	if err := args.Validate(); err != nil {
+		return err
+	}
+	return adeQueueError(s.Queue.SetWorkType(args.CodeRepoID, args.Item, args.WorkType))
 }
 
 func (s *AdeService) SetPlan(args AdeSetPlanArgs) error {

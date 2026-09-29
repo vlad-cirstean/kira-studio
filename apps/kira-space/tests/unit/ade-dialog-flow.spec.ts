@@ -144,6 +144,7 @@ function branch(
   overrides: Partial<AdeBranch> & Pick<AdeBranch, 'id' | 'branch' | 'kind'>,
 ): AdeBranch {
   return {
+    workType: overrides.kind === 'review' ? 'review' : 'work',
     name: '',
     draftTitle: '',
     startFrom: '',
@@ -178,6 +179,7 @@ function branch(
 
 function newWork(overrides: Partial<AdeNewWork> & Pick<AdeNewWork, 'id'>): AdeNewWork {
   return {
+    workType: 'work',
     title: '',
     startFrom: '',
     branchName: '',

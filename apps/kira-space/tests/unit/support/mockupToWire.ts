@@ -131,6 +131,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
       id: b.id,
       branch: b.name,
       kind: b.kind,
+      workType: b.kind === 'review' ? 'review' : 'work',
       name: (s.names?.[b.id] as string) || '',
       draftTitle: '',
       startFrom: b.base === 'main' ? '' : b.base,
@@ -173,6 +174,7 @@ export function mockupToWire(comp: MockupComponent, repo: string): MockupToWireR
   const newWork: AdeNewWork[] = ((s.newWork?.[repo] as RawItem[]) ?? []).map((dr) => ({
     id: dr.id,
     title: dr.title || '',
+    workType: 'work',
     startFrom: dr.base === 'main' ? '' : dr.base,
     branchName: '',
     est: (s.est?.[dr.id] as string | undefined) ?? dr.est ?? '',

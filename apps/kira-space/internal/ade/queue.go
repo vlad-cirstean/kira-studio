@@ -98,33 +98,33 @@ type Jira struct{ Key, URL string }
 // resolved to neither a local nor a remote-tracking ref (§0.14): every git-derived field below
 // stays zero-valued and only the stored meta (Kind/Name/.../AddedAt) is real.
 type BranchFact struct {
-	ID, Branch, Kind, Name, DraftTitle, StartFrom string
-	Exists                                        bool
-	Ref, Tip                                      string
-	Owner, AuthorEmail                            string
-	IsMine                                        bool
-	LastCommitAt                                  int64
-	Base                                          string // parent item id, "" = main
-	Ahead, Behind                                 int
-	Merged                                        bool
-	MergedAt                                      *int64
-	Worktree                                      string
-	Files                                         []FileDelta
-	Commits                                       []Commit
-	CommitCount                                   int
-	Dirty                                         []DirtyEntry
-	Upstream                                      string
-	UpstreamAhead, UpstreamBehind                 int
-	Jira                                          Jira
-	PrURL, Est, Notes                             string
-	AddedAt                                       int64
+	ID, Branch, Kind, WorkType, Name, DraftTitle, StartFrom string
+	Exists                                                  bool
+	Ref, Tip                                                string
+	Owner, AuthorEmail                                      string
+	IsMine                                                  bool
+	LastCommitAt                                            int64
+	Base                                                    string // parent item id, "" = main
+	Ahead, Behind                                           int
+	Merged                                                  bool
+	MergedAt                                                *int64
+	Worktree                                                string
+	Files                                                   []FileDelta
+	Commits                                                 []Commit
+	CommitCount                                             int
+	Dirty                                                   []DirtyEntry
+	Upstream                                                string
+	UpstreamAhead, UpstreamBehind                           int
+	Jira                                                    Jira
+	PrURL, Est, Notes                                       string
+	AddedAt                                                 int64
 }
 
 type NewWorkFact struct {
-	ID, Title, StartFrom, BranchName, Est, Notes string
-	Jira                                         Jira
-	CreatedAt                                    int64
-	BranchCandidates                             []string
+	ID, Title, WorkType, StartFrom, BranchName, Est, Notes string
+	Jira                                                   Jira
+	CreatedAt                                              int64
+	BranchCandidates                                       []string
 }
 
 type PairFact struct {
@@ -726,7 +726,7 @@ func (q *Queue) computeBranchFacts(ctx context.Context, sc *snapshotContext, act
 func (q *Queue) computeOneBranchFact(ctx context.Context, sc *snapshotContext, b model.AdeBranch) (fact BranchFact, pi *pairItem, hadCommitsNew, mergedNew bool, err error) {
 	r := sc.refByItem[b.Branch]
 	fact = BranchFact{
-		ID: b.Branch, Branch: b.Branch, Kind: b.Kind, Name: b.Name, DraftTitle: b.DraftTitle,
+		ID: b.Branch, Branch: b.Branch, Kind: b.Kind, WorkType: b.WorkType, Name: b.Name, DraftTitle: b.DraftTitle,
 		StartFrom: b.StartFrom, Jira: Jira{Key: b.JiraKey, URL: b.JiraURL},
 		PrURL: b.PrURL, Est: b.Est, Notes: b.Notes, AddedAt: b.AddedAt, MergedAt: b.MergedAt,
 	}
@@ -890,7 +890,7 @@ func buildNewWorkFacts(newWork []model.AdeNewWork, branchCandidates map[string][
 			continue
 		}
 		out = append(out, NewWorkFact{
-			ID: w.ID, Title: w.Title, StartFrom: w.StartFrom, BranchName: w.BranchName,
+			ID: w.ID, Title: w.Title, WorkType: w.WorkType, StartFrom: w.StartFrom, BranchName: w.BranchName,
 			Est: w.Est, Notes: w.Notes, Jira: Jira{Key: w.JiraKey, URL: w.JiraURL}, CreatedAt: w.CreatedAt,
 			BranchCandidates: branchCandidates[w.ID],
 		})
@@ -1297,6 +1297,14 @@ func (q *Queue) UpdateNewWork(codeRepoID, id string, patch model.AdeNewWorkPatch
 
 func (q *Queue) SetBranchMeta(codeRepoID, branch string, patch model.AdeBranchMetaPatch) error {
 	if err := q.deps.Store.SetBranchMeta(codeRepoID, branch, patch); err != nil {
+		return err
+	}
+	q.notifyChanged(codeRepoID)
+	return nil
+}
+
+func (q *Queue) SetWorkType(codeRepoID, item, workType string) error {
+	if err := q.deps.Store.SetWorkType(codeRepoID, item, workType); err != nil {
 		return err
 	}
 	q.notifyChanged(codeRepoID)

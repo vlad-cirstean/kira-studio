@@ -24,6 +24,7 @@ import type {
   AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
+  AdeSetWorkTypeArgs,
   AdeUpdateDependencyArgs,
   AdeUpdateNewWorkArgs,
 } from './wire';
@@ -126,6 +127,21 @@ export function useAdeSetBranchMeta(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setBranchMeta'),
     mutationFn: (args: AdeSetBranchMetaArgs): Promise<void> => control.adeSetBranchMeta(args),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(toValue(codeRepoId)),
+        exact: true,
+      });
+    },
+  }));
+}
+
+/** P136: the details panel's work-type dropdown. Go derives `kind` from it, so the snapshot
+ *  (read-only rules, blockable, status) needs a fresh read. */
+export function useAdeSetWorkType(codeRepoId: MaybeRefOrGetter<string>) {
+  return useMutation(() => ({
+    mutationKey: deliverKey(toValue(codeRepoId), 'setWorkType'),
+    mutationFn: (args: AdeSetWorkTypeArgs): Promise<void> => control.adeSetWorkType(args),
     onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: adeSnapshotKey(toValue(codeRepoId)),

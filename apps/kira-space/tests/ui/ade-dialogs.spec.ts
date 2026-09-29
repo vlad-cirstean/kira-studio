@@ -29,6 +29,7 @@ const REPO = {
 function fullBranch(overrides: Partial<AdeBranch> & Pick<AdeBranch, 'id' | 'branch'>): AdeBranch {
   return {
     kind: 'mine',
+    workType: overrides.kind === 'review' ? 'review' : 'work',
     name: '',
     draftTitle: '',
     startFrom: '',

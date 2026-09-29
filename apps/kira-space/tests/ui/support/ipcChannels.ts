@@ -115,6 +115,7 @@ export const IPC = {
   // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
   adeSetBranchMeta: 'kira:ade:setBranchMeta',
   adeBindNewWork: 'kira:ade:bindNewWork',
+  adeSetWorkType: 'kira:ade:setWorkType',
   // P135 §4.5: the four dependency-node bound calls (creation tab, detail panel, blocker linking).
   adeAddDependency: 'kira:ade:addDependency',
   adeUpdateDependency: 'kira:ade:updateDependency',

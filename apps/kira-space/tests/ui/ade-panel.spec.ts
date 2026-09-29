@@ -39,6 +39,7 @@ const EMPTY_PRS: AdeRepoPrs = { kind: 'ok', branches: {}, webUrl: '' };
 function fullBranch(overrides: Partial<AdeBranch> & Pick<AdeBranch, 'id' | 'branch'>): AdeBranch {
   return {
     kind: 'mine',
+    workType: overrides.kind === 'review' ? 'review' : 'work',
     name: '',
     draftTitle: '',
     startFrom: '',
@@ -72,6 +73,7 @@ function fullBranch(overrides: Partial<AdeBranch> & Pick<AdeBranch, 'id' | 'bran
 
 function newWork(overrides: Partial<AdeNewWork> & Pick<AdeNewWork, 'id' | 'title'>): AdeNewWork {
   return {
+    workType: 'work',
     startFrom: '',
     branchName: '',
     est: '',

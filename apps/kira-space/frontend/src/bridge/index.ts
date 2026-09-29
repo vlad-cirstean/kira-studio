@@ -61,6 +61,7 @@ import type {
   AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
+  AdeSetWorkTypeArgs,
   AdeUpdateDependencyArgs,
   AdeUpdateNewWorkArgs,
 } from '../ade/wire';
@@ -255,6 +256,7 @@ const spaceControl = {
   // (`BindNewWork`).
   adeSetBranchMeta: (args: AdeSetBranchMetaArgs): Promise<void> =>
     unwrap(AdeService.SetBranchMeta(args)),
+  adeSetWorkType: (args: AdeSetWorkTypeArgs): Promise<void> => unwrap(AdeService.SetWorkType(args)),
   adeBindNewWork: (args: AdeBindNewWorkArgs): Promise<void> => unwrap(AdeService.BindNewWork(args)),
 
   // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
