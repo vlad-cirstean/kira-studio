@@ -5,6 +5,7 @@ import AdeCandidatePicker from './AdeCandidatePicker.vue';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
 import AdeNotesEditor from './AdeNotesEditor.vue';
+import AdeWorkTypeField from './AdeWorkTypeField.vue';
 import { branchWebUrl, prRow } from './links';
 import { useAdeBindNewWork } from './mutations';
 import { useAdeUiStore } from './state/adeUi';
@@ -202,6 +203,8 @@ function onNotesSave(value: string): void {
       <span v-else class="flex h-7 items-center px-2 text-kira-md font-semibold text-[#c9c7c2]">{{
         panel.title
       }}</span>
+
+      <AdeWorkTypeField :panel="panel" :code-repo-id="codeRepoId" />
 
       <AdeLinkRow v-bind="branchRow" @base="onBaseChange" />
       <AdeCandidatePicker

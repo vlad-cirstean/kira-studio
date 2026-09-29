@@ -8,6 +8,7 @@ import type {
   AdeRepoPrs,
   AdeRepoSnapshot,
   AdeSession,
+  AdeWorkType,
 } from './wire';
 
 // P129 Part 3 §2.6: a pure port of `docs/v2.0/design/mockup.html`'s `renderVals()` (lines 789-1813)
@@ -108,6 +109,9 @@ export interface QueueInput {
 export interface QueueItem {
   id: string;
   kind: ItemKind;
+  /** P136: the user-chosen work type; `'work'` for a dependency. */
+  workType: AdeWorkType;
+  merged: boolean;
   draft: boolean;
   title: string;
   /** The branch ref name, `''` for a draft with no branch yet. */
@@ -310,6 +314,7 @@ export interface QueuePanelSession {
 export interface QueuePanel {
   id: string;
   kind: ItemKind;
+  workType: AdeWorkType;
   draft: boolean;
   /** `true` only for a new-work draft with no branch yet (§0.14/§0.15's own "new work" concept) —
    *  distinct from `draft`, which also covers a real branch whose git ref doesn't exist yet. */
@@ -557,6 +562,7 @@ function spanDays(cal: Calendar, start: number, n: number): number[] {
 interface Item {
   id: string;
   kind: ItemKind;
+  workType: AdeWorkType;
   draft: boolean;
   /** `''` for a draft — no branch yet. */
   branch: string;
@@ -595,6 +601,7 @@ function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]):
     items.push({
       id: b.id,
       kind: b.kind as ItemKind,
+      workType: b.workType,
       // §0.10: real branches list only carries items already bound to a branch name; `exists`
       // tracks whether that ref is actually present in git yet (distinct from title/status
       // "draft" wording, which the mockup's own new-work-only concept covers) — see the phase
@@ -625,6 +632,7 @@ function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]):
     items.push({
       id: w.id,
       kind: 'mine',
+      workType: w.workType,
       draft: true,
       branch: '',
       base: w.startFrom,
@@ -651,6 +659,7 @@ function buildItems(snapshot: AdeRepoSnapshot, sessions: readonly AdeSession[]):
     items.push({
       id: dep.id,
       kind: 'dependency',
+      workType: 'work',
       draft: false,
       branch: '',
       base: '',
@@ -1156,6 +1165,10 @@ interface StatusCtx {
   depDays: Map<string, DependencyDay>;
 }
 
+function reviewLabel(item: Pick<Item, 'workType'>): 'review' | 'test' {
+  return item.workType === 'test' ? 'test' : 'review';
+}
+
 function workStatus(id: string, ctx: StatusCtx): { label: string; tone: Tone } {
   const item = ctx.byId.get(id) as Item;
   if (item.kind === 'dependency') {
@@ -1168,7 +1181,7 @@ function workStatus(id: string, ctx: StatusCtx): { label: string; tone: Tone } {
   if (item.kind === 'review') {
     return ctx.conflicts.get(id)?.length
       ? { label: 'conflict', tone: 'red' }
-      : { label: 'review', tone: 'blue' };
+      : { label: reviewLabel(item), tone: 'blue' };
   }
   if (item.draft) return { label: 'not started', tone: 'grey' };
   const root = rootOf(id, ctx.parentOf);
@@ -2093,7 +2106,7 @@ function buildPanelMono(
       pos = `${day}${span} #${ctx.mergeN.get(selectedId) ?? ''}`;
     }
   } else if (item.kind === 'review') {
-    pos = `${item.owner} · review`;
+    pos = `${item.owner} · ${reviewLabel(item)}`;
   } else {
     pos = `${seg ? dayLabel(ctx.cal, seg.day) : ''} · not merging`;
   }
@@ -2174,6 +2187,7 @@ function buildDependencyPanel(selectedId: string, item: Item, ctx: PanelCtx): Qu
   return {
     id: selectedId,
     kind: 'dependency',
+    workType: 'work',
     draft: false,
     isNewWork: false,
     merged: false,
@@ -2304,6 +2318,7 @@ function buildPanel(selectedId: string | null, ctx: PanelCtx): QueuePanel | null
   return {
     id: selectedId,
     kind: item.kind,
+    workType: item.workType,
     draft: item.draft,
     isNewWork,
     merged: item.merged,
@@ -2593,6 +2608,8 @@ export function useQueue(input: QueueInput): QueueView {
     return {
       id: item.id,
       kind: item.kind,
+      workType: item.workType,
+      merged: item.merged,
       draft: item.draft,
       title,
       branch: item.branch,
