@@ -317,6 +317,22 @@ historical prose.
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
 
+## Kira Space real backend in a sandbox — server-tag recipe (P126)
+
+Build: `go build -tags server ./apps/kira-space/...` (Wails v3/Go's own `server` platform, above),
+temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
+
+- **Seed `windows('main')` plus a `code_repos` row before navigating to `/?window=main`.** A server
+  build serves bound calls over TCP with no webview and no native shell — nothing creates the
+  `windows` row a real GUI boot would. Without it the boot call fails `unknown window: main`
+  (`internal/appstorage/tabs.go:117`). Insert both rows into the SQLite DB under `KIRA_SPACE_HOME`
+  directly before the first request.
+- **Git discovery is darwin-only** (`apps/kira-space/internal/gitclient/discovery.go`,
+  `NewPlatformLocator`): on any other `runtime.GOOS`, `unsupportedLocator.Locate` always returns
+  `false`, so real git features never come up in this recipe as shipped. Exercising them needs a
+  throwaway local patch to `Locate` returning a real `git` binary path — **never commit that
+  patch**; revert it before finishing the session, same as any other sandbox-only workaround.
+
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
 This container ships only Chromium preinstalled. `bunx playwright install webkit` downloads the
