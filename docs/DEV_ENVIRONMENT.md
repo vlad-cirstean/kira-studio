@@ -181,21 +181,18 @@ historical prose.
   `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
-- **A fresh worktree fails `bun run typecheck`/the pre-commit hook on any change**, even after
-  `bun install` — `typecheck:web:studio`/`typecheck:space-web`/`typecheck:tests:studio`/
-  `typecheck:space-tests`/`typecheck:unit:studio`/`typecheck:space-unit` all resolve one of the two
-  apps' frontends' Wails-generated `@bindings/*` modules, and `go build ./...` (pre-push) fails
-  separately on `//go:embed all:frontend/dist` finding no built frontend. **Run
-  `sh scripts/prepare-worktree.sh` once per fresh worktree** (below) — it closes both gaps plus the
-  Linux-only `wails3` CLI build deps, idempotently. `scripts/prepare-dev-environment.sh` runs it
-  together with `scripts/codegraph-setup.sh` (CodeGraph section, below) — the one command for a
-  worktree that also needs the code index. For a change confined to
-  `packages/git-core`/`git-ipc`/`git-ui` where running the full script is disproportionate, verify
-  instead with `bun run typecheck:git` (or the five `tsgo`/`vue-tsc` invocations it chains, run
-  separately) plus each touched package's own `bun test`; the pre-commit hook itself still runs the
-  unscoped `bun run typecheck`, so it fails regardless — its own header comments a `--no-verify`
-  bypass for exactly that narrower case.
-
+- **A fresh worktree fails `bun run typecheck`/the pre-commit hook on a git-only change**, even
+  after `bun install` — `typecheck:web:studio`/`typecheck:space-web`/`typecheck:tests:studio`/
+  `typecheck:space-tests`/`typecheck:unit:studio`/`typecheck:space-unit` all resolve one of the two apps'
+  frontends' Wails-generated `@bindings/*` modules, which need `scripts/setup.sh`'s full Go+`wails3`
+  install and codegen (below) **for both apps**, unrelated to `packages/git-*`. For a change confined
+  to `packages/git-core`/`git-ipc`/`git-ui`, verify with `bun run typecheck:git` (or the five
+  `tsgo`/`vue-tsc` invocations it chains, run separately) plus each touched package's own `bun test`
+  instead of the full `typecheck` — that's the real coverage for those packages, and running full
+  `setup.sh` for both apps just to commit a git-only fix is disproportionate. The pre-commit hook
+  itself still runs the unscoped `bun run typecheck`, so it fails regardless; its own header
+  comments a `--no-verify` bypass for exactly this — a change proven correct by the scoped checks
+  above, blocked only by an unrelated, unset-up workspace.
 - **A fresh `git worktree` in this container can check out an orphaned "Initial commit" scaffold
   instead of the real branch tip.** Hit by 5 of P79's 6 fix batches. It is a provisioning race, not
   data loss — the affected worktree holds nothing of value, confirmed by `git status` and an
@@ -431,15 +428,11 @@ P110 iter2 used this for `empty` and for `resizable`'s `ResizablePanel`/`Resizab
 
 ## CodeGraph — the code index in this environment
 
-`CLAUDE.md` says how to navigate with CodeGraph; this is the setup. **`scripts/codegraph-setup.sh`
-runs once per worktree, before a Claude session is spawned into it — not a `SessionStart` hook.**
-It installs `@colbymchenry/codegraph` globally via `npm` if missing, then `codegraph sync .` (or
-`codegraph init .` on first run) and prints `codegraph status .`. Whoever provisions the worktree
-(the orchestrating session, before handing it to a subagent) runs it alongside
-`scripts/prepare-worktree.sh` — or both in one call via `scripts/prepare-dev-environment.sh`. The
-index lives in `.codegraph/` (gitignored). `.mcp.json` registers
-`codegraph serve --mcp`; its one tool is
+`CLAUDE.md` says how to navigate with CodeGraph; this is the setup. `.claude/hooks/session-start.sh`
+(a `SessionStart` hook in `.claude/settings.json`) runs only when `CLAUDE_CODE_REMOTE=true`: it
+installs `@colbymchenry/codegraph` globally via `npm` if missing, then `codegraph sync .` (or
+`codegraph init .` on first run) and prints `codegraph status .`. The index lives in
+`.codegraph/` (gitignored). `.mcp.json` registers `codegraph serve --mcp`; its one tool is
 `codegraph_explore`, deferred until `ToolSearch` loads it. A `UserPromptSubmit` hook
-(`codegraph prompt-hook`) injects matching symbols into every prompt — this hook still fires
-per-message regardless of how the index got built. If a worktree was never provisioned with
-`scripts/codegraph-setup.sh` (a manual clone, say), run it by hand once before relying on the index.
+(`codegraph prompt-hook`) injects matching symbols into every prompt. Outside a remote session
+none of this runs — install and `codegraph init .` by hand.

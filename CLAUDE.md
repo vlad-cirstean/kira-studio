@@ -290,6 +290,5 @@ CLI just because it's not visible yet; search for it.
   symbols' source plus the call paths between them, including dynamic-dispatch hops grep can't
   follow.
 
-`scripts/codegraph-setup.sh` installs the `codegraph` binary and builds/syncs the index once per
-worktree, before a Claude session is spawned into it (not a session hook — `docs/DEV_ENVIRONMENT.md`
-has the setup) — that's build tooling, not how code gets navigated; navigation is the MCP tool above.
+`.claude/hooks/session-start.sh` installs the `codegraph` binary and builds/syncs the index every
+session — that's build tooling, not how code gets navigated; navigation is the MCP tool above.
