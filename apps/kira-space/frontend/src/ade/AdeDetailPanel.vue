@@ -34,16 +34,14 @@ function onTabChange(v: string | number): void {
 }
 
 // Mockup `tabs` (line 1645): the Agents count pill shows even at zero, just muted.
-const agentCountStyle = computed(() =>
-  props.panel.running.length > 0
-    ? { background: 'rgba(217,119,87,0.18)', color: '#e8a07f' }
-    : { background: '#23252b', color: '#9a9ca5' },
+const agentCountClass = computed(() =>
+  props.panel.running.length > 0 ? 'bg-primary/20 text-fg' : 'bg-field text-muted-foreground',
 );
 </script>
 
 <template>
   <aside
-    class="flex min-h-0 flex-col bg-[#16171b]"
+    class="flex min-h-0 flex-col bg-chrome"
     :style="style"
     data-testid="ade-detail-panel"
   >
@@ -62,29 +60,29 @@ const agentCountStyle = computed(() =>
       @update:model-value="onTabChange"
     >
       <TabsList
-        class="h-[34px] w-full shrink-0 justify-start gap-0 rounded-none border-b border-[#2a2d35] bg-transparent px-2 py-0"
+        class="h-[34px] w-full shrink-0 justify-start gap-0 rounded-none border-b border-border bg-transparent px-2 py-0"
       >
         <TabsTrigger
           value="details"
           data-testid="ade-panel-tab-details"
-          class="h-full rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-[#9a9ca5] data-[state=active]:border-b-[#e8a33d] data-[state=active]:font-semibold data-[state=active]:text-fg"
+          class="h-full rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-muted-foreground data-[state=active]:border-b-primary data-[state=active]:font-semibold data-[state=active]:text-fg"
         >
           Details
         </TabsTrigger>
         <TabsTrigger
           value="changes"
           data-testid="ade-panel-tab-changes"
-          class="h-full rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-[#9a9ca5] data-[state=active]:border-b-[#e8a33d] data-[state=active]:font-semibold data-[state=active]:text-fg"
+          class="h-full rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-muted-foreground data-[state=active]:border-b-primary data-[state=active]:font-semibold data-[state=active]:text-fg"
         >
           Changes
         </TabsTrigger>
         <TabsTrigger
           value="agents"
           data-testid="ade-panel-tab-agents"
-          class="flex h-full items-center rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-[#9a9ca5] data-[state=active]:border-b-[#e8a33d] data-[state=active]:font-semibold data-[state=active]:text-fg"
+          class="flex h-full items-center rounded-none border-b-2 border-transparent px-2.5 text-kira-sm font-medium text-muted-foreground data-[state=active]:border-b-primary data-[state=active]:font-semibold data-[state=active]:text-fg"
         >
           Agents
-          <span class="ml-1.5 rounded-full px-1.5 text-kira-sm" :style="agentCountStyle">{{
+          <span class="ml-1.5 rounded-full px-1.5 text-kira-sm" :class="agentCountClass">{{
             panel.running.length
           }}</span>
         </TabsTrigger>

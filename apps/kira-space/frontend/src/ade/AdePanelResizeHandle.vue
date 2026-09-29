@@ -77,10 +77,10 @@ function onKeydown(e: KeyboardEvent): void {
     :aria-valuemin="min"
     :aria-valuemax="max"
     tabindex="0"
-    class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center border-l border-[#2a2d35] bg-[#16171b]"
+    class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center border-l border-border bg-chrome"
     data-testid="ade-panel-resize-handle"
     @keydown="onKeydown"
   >
-    <span class="h-7 w-0.5 rounded-[1px] bg-[#3a3e48]" />
+    <span class="h-7 w-0.5 rounded-[1px] bg-border-strong" />
   </div>
 </template>

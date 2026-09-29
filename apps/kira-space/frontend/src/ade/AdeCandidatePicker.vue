@@ -35,6 +35,6 @@ function onUse(): void {
       <option v-for="name in candidates" :key="name" :value="name">{{ name }}</option>
     </NativeSelect>
     <Button variant="dialog" size="sm" class="h-6 shrink-0 px-2" @click="onUse">Use branch</Button>
-    <span v-if="error" class="text-kira-sm text-[#f28b7d]">{{ error }}</span>
+    <span v-if="error" class="text-kira-sm text-error">{{ error }}</span>
   </div>
 </template>

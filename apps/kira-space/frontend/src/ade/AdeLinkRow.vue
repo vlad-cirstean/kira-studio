@@ -81,7 +81,7 @@ function onSave(): void {
 
 <template>
   <template v-if="label">
-    <span class="text-kira-sm text-[#9a9ca5]">{{ label }}</span>
+    <span class="text-kira-sm text-muted-foreground">{{ label }}</span>
   </template>
   <div class="flex h-7 min-w-0 items-center gap-2">
     <template v-if="showLink">
@@ -96,10 +96,10 @@ function onSave(): void {
         >{{ refText }}</a
       >
       <span v-else class="shrink-0 max-w-[55%] truncate font-data text-kira-sm">{{ refText }}</span>
-      <span class="min-w-0 flex-1 truncate text-kira-sm text-[#7c7f88]">{{ title }}</span>
+      <span class="min-w-0 flex-1 truncate text-kira-sm text-subtle">{{ title }}</span>
       <button
         type="button"
-        class="size-[22px] shrink-0 rounded text-[#9a9ca5]"
+        class="size-[22px] shrink-0 rounded text-muted-foreground"
         :aria-label="`Copy ${label} link`"
         title="Copy link"
         @click="onCopy"
@@ -109,7 +109,7 @@ function onSave(): void {
       <button
         v-if="editable"
         type="button"
-        class="size-[22px] shrink-0 rounded text-[#9a9ca5]"
+        class="size-[22px] shrink-0 rounded text-muted-foreground"
         :aria-label="`Edit ${label} link`"
         title="Edit"
         @click="emit('edit')"
@@ -119,7 +119,7 @@ function onSave(): void {
     </template>
     <template v-if="showBase">
       <span :title="statusTip" :style="chipStyle(statusTone)">{{ status }}</span>
-      <label class="text-kira-sm text-[#9a9ca5]" for="ade-draft-base">from</label>
+      <label class="text-kira-sm text-muted-foreground" for="ade-draft-base">from</label>
       <NativeSelect
         id="ade-draft-base"
         :model-value="baseValue"
@@ -128,7 +128,7 @@ function onSave(): void {
       >
         <option v-for="opt in baseOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </NativeSelect>
-      <span class="min-w-0 truncate text-kira-sm text-[#7c7f88]">branch created on Start</span>
+      <span class="min-w-0 truncate text-kira-sm text-subtle">branch created on Start</span>
     </template>
     <template v-if="showInput">
       <label class="sr-only" :for="`ade-link-${label}`">{{ label }} link</label>
@@ -141,7 +141,7 @@ function onSave(): void {
       <Button variant="dialog" size="sm" class="h-6 shrink-0 px-2" @click="onSave">Save</Button>
     </template>
   </div>
-  <span v-if="error" class="col-start-2 text-kira-sm text-[#f28b7d]" data-testid="ade-link-row-error">{{
+  <span v-if="error" class="col-start-2 text-kira-sm text-error" data-testid="ade-link-row-error">{{
     error
   }}</span>
 </template>

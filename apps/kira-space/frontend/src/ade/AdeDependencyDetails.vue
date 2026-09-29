@@ -91,7 +91,7 @@ function unlink(id: string): void {
     data-testid="ade-dependency-details"
   >
     <div class="flex flex-col gap-1">
-      <label for="ade-dependency-name" class="text-kira-sm text-[#9a9ca5]">Name</label>
+      <label for="ade-dependency-name" class="text-kira-sm text-muted-foreground">Name</label>
       <Input
         id="ade-dependency-name"
         v-model="nameDraft"
@@ -102,7 +102,7 @@ function unlink(id: string): void {
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="ade-dependency-waiting-on" class="text-kira-sm text-[#9a9ca5]">Waiting on</label>
+      <label for="ade-dependency-waiting-on" class="text-kira-sm text-muted-foreground">Waiting on</label>
       <Textarea
         id="ade-dependency-waiting-on"
         v-model="waitingOnDraft"
@@ -113,7 +113,7 @@ function unlink(id: string): void {
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="ade-dependency-expected-by" class="text-kira-sm text-[#9a9ca5]">Expected by</label>
+      <label for="ade-dependency-expected-by" class="text-kira-sm text-muted-foreground">Expected by</label>
       <Input
         id="ade-dependency-expected-by"
         v-model="expectedByDraft"
@@ -131,7 +131,7 @@ function unlink(id: string): void {
     </p>
 
     <div class="flex flex-col gap-1.5">
-      <span class="text-kira-sm text-[#9a9ca5]">Blocks</span>
+      <span class="text-kira-sm text-muted-foreground">Blocks</span>
       <div
         v-if="dependency.blocks.length"
         class="flex flex-wrap gap-1.5"

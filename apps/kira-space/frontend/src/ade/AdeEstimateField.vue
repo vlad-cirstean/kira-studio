@@ -60,7 +60,7 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
 
 <template>
   <div class="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-x-2.5">
-    <label for="ade-est-num" class="text-kira-sm text-[#9a9ca5]">Estimate</label>
+    <label for="ade-est-num" class="text-kira-sm text-muted-foreground">Estimate</label>
     <div v-if="locked" class="flex h-7 items-center gap-1.5">
       <span class="font-data text-kira-sm text-fg" data-testid="ade-estimate-total"
         >{{ estimate.num }}{{ estimate.unit }}</span
@@ -74,7 +74,7 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
         class="h-6 w-14 font-data text-kira-sm"
         data-testid="ade-estimate-extend"
       />
-      <span class="text-kira-sm text-[#9a9ca5]">{{ estimate.unit === 'd' ? 'days' : 'hours' }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{ estimate.unit === 'd' ? 'days' : 'hours' }}</span>
       <Button
         type="button"
         size="sm"
@@ -84,7 +84,7 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
       >
         Extend
       </Button>
-      <span class="text-kira-sm text-[#9a9ca5]">{{ hint }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
     <div v-else class="flex h-7 items-center gap-1.5">
       <Input
@@ -98,14 +98,14 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
       />
       <fieldset
         aria-label="Estimate unit"
-        class="m-0 flex gap-0.5 rounded-kira-sm border border-[#2f323b] bg-[#1b1d22] p-0.5"
+        class="m-0 flex gap-0.5 rounded-kira-sm border border-border-strong bg-elevated p-0.5"
       >
         <!-- mousedown.prevent: without it, clicking a toggle button blurs the number input first,
              firing its own @change/commit with the STALE unit, before this button's click runs. -->
         <button
           type="button"
           class="rounded px-2 py-0.5 text-kira-sm"
-          :class="unit === 'h' ? 'bg-[#2f323b] text-fg' : 'text-[#9a9ca5]'"
+          :class="unit === 'h' ? 'bg-field text-fg' : 'text-muted-foreground'"
           :aria-pressed="unit === 'h'"
           @mousedown.prevent
           @click="pickUnit('h')"
@@ -115,7 +115,7 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
         <button
           type="button"
           class="rounded px-2 py-0.5 text-kira-sm"
-          :class="unit === 'd' ? 'bg-[#2f323b] text-fg' : 'text-[#9a9ca5]'"
+          :class="unit === 'd' ? 'bg-field text-fg' : 'text-muted-foreground'"
           :aria-pressed="unit === 'd'"
           @mousedown.prevent
           @click="pickUnit('d')"
@@ -123,9 +123,9 @@ const hint = computed(() => (props.estimate.days > 1 ? `spans ${props.estimate.d
           days
         </button>
       </fieldset>
-      <span class="text-kira-sm text-[#9a9ca5]">{{ hint }}</span>
+      <span class="text-kira-sm text-muted-foreground">{{ hint }}</span>
     </div>
-    <span v-if="error" class="col-start-2 text-kira-sm text-[#f28b7d]" data-testid="ade-estimate-error">{{
+    <span v-if="error" class="col-start-2 text-kira-sm text-error" data-testid="ade-estimate-error">{{
       error
     }}</span>
   </div>

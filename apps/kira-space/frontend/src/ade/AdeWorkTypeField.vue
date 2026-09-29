@@ -36,7 +36,7 @@ async function onChange(value: unknown): Promise<void> {
 </script>
 
 <template>
-  <label for="ade-work-type" class="text-kira-sm text-[#9a9ca5]">Kind</label>
+  <label for="ade-work-type" class="text-kira-sm text-muted-foreground">Kind</label>
   <div class="flex min-w-0 flex-col gap-0.5">
     <NativeSelect
       id="ade-work-type"
@@ -55,7 +55,7 @@ async function onChange(value: unknown): Promise<void> {
         {{ o.label }}
       </option>
     </NativeSelect>
-    <span v-if="error" class="text-kira-sm text-[#f28b7d]" data-testid="ade-work-type-error">{{
+    <span v-if="error" class="text-kira-sm text-error" data-testid="ade-work-type-error">{{
       error
     }}</span>
   </div>

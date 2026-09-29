@@ -58,7 +58,7 @@ function link(id: string): void {
     class="flex flex-col gap-1"
     data-testid="ade-blocker-row"
   >
-    <span class="text-kira-sm text-[#9a9ca5]">Blocked by</span>
+    <span class="text-kira-sm text-muted-foreground">Blocked by</span>
     <div class="flex flex-wrap items-center gap-1.5">
       <Badge
         v-for="b in panel.blockers"

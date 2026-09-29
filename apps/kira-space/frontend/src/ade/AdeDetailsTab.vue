@@ -188,19 +188,19 @@ function onNotesSave(value: string): void {
     data-testid="ade-details-tab"
   >
     <div class="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
-      <label for="ade-work-name" class="text-kira-sm text-[#9a9ca5]">Name</label>
+      <label for="ade-work-name" class="text-kira-sm text-muted-foreground">Name</label>
       <input
         v-if="!panel.readOnly"
         id="ade-work-name"
         v-model="nameDraft"
         :placeholder="panel.defaultTitle"
-        class="h-7 rounded-kira-sm border border-transparent bg-[#1b1d22] px-2 text-kira-md font-semibold text-fg"
+        class="h-7 rounded-kira-sm border border-transparent bg-field px-2 text-kira-md font-semibold text-fg"
         data-testid="ade-name-input"
         @blur="commitName"
         @keydown.enter="commitName"
         @keydown.esc="revertName"
       />
-      <span v-else class="flex h-7 items-center px-2 text-kira-md font-semibold text-[#c9c7c2]">{{
+      <span v-else class="flex h-7 items-center px-2 text-kira-md font-semibold text-fg">{{
         panel.title
       }}</span>
 
@@ -232,6 +232,6 @@ function onNotesSave(value: string): void {
     />
 
     <AdeNotesEditor :notes="panel.notes" :item-id="panel.id" @save="onNotesSave" />
-    <span v-if="meta.errors.notes" class="text-kira-sm text-[#f28b7d]">{{ meta.errors.notes }}</span>
+    <span v-if="meta.errors.notes" class="text-kira-sm text-error">{{ meta.errors.notes }}</span>
   </div>
 </template>

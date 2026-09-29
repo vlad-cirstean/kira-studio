@@ -178,19 +178,19 @@ function keepFocus(e: MouseEvent): void {
 </script>
 
 <template>
-  <div class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-[#2f323b] bg-[#121316]">
+  <div class="flex min-h-35 flex-1 flex-col overflow-hidden rounded-kira-sm border border-border-strong bg-bg">
     <div
       role="toolbar"
       aria-label="Formatting"
-      class="flex shrink-0 items-center gap-0.5 border-b border-[#22252c] bg-[#16171b] px-1.5 py-1"
+      class="flex shrink-0 items-center gap-0.5 border-b border-border bg-chrome px-1.5 py-1"
     >
-      <span class="px-1.5 text-kira-sm text-[#9a9ca5]">Notes</span>
+      <span class="px-1.5 text-kira-sm text-muted-foreground">Notes</span>
       <button
         v-for="btn in toolbar"
         :key="btn.label"
         type="button"
         class="flex h-6 min-w-[26px] items-center justify-center rounded px-1 text-kira-sm"
-        :class="btn.active ? 'bg-[#2f323b] text-fg' : 'text-[#c9c7c2]'"
+        :class="btn.active ? 'bg-field text-fg' : 'text-fg'"
         :aria-label="btn.label"
         :aria-pressed="btn.active"
         :title="btn.label"
@@ -260,23 +260,23 @@ function keepFocus(e: MouseEvent): void {
   gap: 0.4em;
 }
 :deep(.ade-notes-prose li[data-checked='true'] > div) {
-  color: #7c7f88;
+  color: var(--kira-fg-subtle);
   text-decoration: line-through;
 }
 :deep(.ade-notes-prose code) {
   border-radius: 3px;
-  background: #1b1d22;
+  background: var(--kira-bg-input);
   padding: 0.1em 0.3em;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
 }
 :deep(.ade-notes-prose a) {
-  color: #7aa7ff;
+  color: var(--kira-info);
 }
 :deep(.ade-notes-prose p.is-editor-empty:first-child::before) {
   float: left;
   height: 0;
-  color: #6b6f7a;
+  color: var(--kira-fg-subtle);
   content: attr(data-placeholder);
   pointer-events: none;
 }

@@ -14,6 +14,7 @@ import type { DialogCtx } from './dialogCompose';
 import { resumeSpec, startSpec } from './dialogCompose';
 import { useAdeSend } from './mutations';
 import { useAdeUiStore } from './state/adeUi';
+import { TONE } from './tones';
 import type { QueuePanel, QueuePanelSession } from './useQueue';
 
 // P129 Part 6 §0.18: the Agents tab (mockup 409-441) — one terminal tab per running session, a
@@ -63,9 +64,9 @@ function onResume(sessionId: string): void {
 
 const statusBarStyle = computed(() => {
   if (activeSession.value?.kind === 'input') {
-    return { color: '#f0b85c', background: 'rgba(232,163,61,0.08)' };
+    return { color: TONE.amber[1], background: 'rgba(232,163,61,0.08)' };
   }
-  return { color: '#9a9ca5', background: 'transparent' };
+  return { color: 'var(--kira-fg-muted)', background: 'transparent' };
 });
 
 function lastActive(ms: number): string {
@@ -90,11 +91,11 @@ async function onSend(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col bg-[#0b0c0e]" data-testid="ade-agents-tab">
+  <div class="flex min-h-0 flex-1 flex-col bg-bg" data-testid="ade-agents-tab">
     <div
       role="tablist"
       aria-label="Claude Code sessions"
-      class="flex shrink-0 border-b border-[#22252c] bg-[#101114]"
+      class="flex shrink-0 border-b border-border bg-chrome"
     >
       <button
         v-for="session in panel.running"
@@ -102,11 +103,11 @@ async function onSend(): Promise<void> {
         type="button"
         role="tab"
         :aria-selected="session.id === activeSessionId"
-        class="flex h-[30px] items-center gap-1.5 border-0 border-r border-[#22252c] px-3 font-data text-kira-sm"
+        class="flex h-[30px] items-center gap-1.5 border-0 border-r border-border px-3 font-data text-kira-sm"
         :class="
           session.id === activeSessionId
-            ? 'bg-[#0b0c0e] text-fg shadow-[inset_0_2px_0_#d97757]'
-            : 'bg-transparent text-[#9a9ca5]'
+            ? 'bg-bg text-fg shadow-[inset_0_2px_0_var(--primary)]'
+            : 'bg-transparent text-muted-foreground'
         "
         :data-testid="`ade-agent-tab-${session.id}`"
         @click="pickTab(session.id)"
@@ -116,7 +117,7 @@ async function onSend(): Promise<void> {
       </button>
       <button
         type="button"
-        class="flex w-8 shrink-0 items-center justify-center border-0 bg-transparent text-[#9a9ca5]"
+        class="flex w-8 shrink-0 items-center justify-center border-0 bg-transparent text-muted-foreground"
         aria-label="New Claude Code session"
         title="New session"
         data-testid="ade-agents-new"
@@ -128,7 +129,7 @@ async function onSend(): Promise<void> {
 
     <template v-if="activeSession">
       <div
-        class="flex shrink-0 items-center gap-2 border-b border-[#22252c] px-3 py-1.5 text-kira-sm"
+        class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-kira-sm"
         :style="statusBarStyle"
       >
         <AdeActivityGlyph :kind="activeSession.kind" :size="14" />
@@ -145,9 +146,9 @@ async function onSend(): Promise<void> {
         :deps="terminalModule.host"
         class="min-h-0 flex-1"
       />
-      <div v-else class="flex-1 px-3.5 py-3 text-kira-sm text-[#9a9ca5]">Running in another window.</div>
+      <div v-else class="flex-1 px-3.5 py-3 text-kira-sm text-muted-foreground">Running in another window.</div>
 
-      <div class="flex shrink-0 items-center gap-2 border-t border-[#22252c] px-3 py-2">
+      <div class="flex shrink-0 items-center gap-2 border-t border-border px-3 py-2">
         <label for="ade-agent-input" class="sr-only">Message Claude Code</label>
         <Input
           id="ade-agent-input"
@@ -166,26 +167,26 @@ async function onSend(): Promise<void> {
           Send
         </Button>
       </div>
-      <span v-if="sendError" class="px-3.5 pb-2 text-kira-sm text-[#f28b7d]">{{ sendError }}</span>
+      <span v-if="sendError" class="px-3.5 pb-2 text-kira-sm text-error">{{ sendError }}</span>
     </template>
-    <div v-else class="flex-1 p-3.5 text-kira-sm text-[#9a9ca5]" data-testid="ade-agents-empty">
+    <div v-else class="flex-1 p-3.5 text-kira-sm text-muted-foreground" data-testid="ade-agents-empty">
       No running agents.
     </div>
 
     <div
       v-if="panel.stopped.length"
-      class="flex flex-col gap-1 border-t border-[#22252c] bg-[#121316] px-3 pb-2.5 pt-2"
+      class="flex flex-col gap-1 border-t border-border bg-chrome px-3 pb-2.5 pt-2"
     >
-      <div class="text-kira-sm text-[#9a9ca5]">Stopped</div>
+      <div class="text-kira-sm text-muted-foreground">Stopped</div>
       <div
         v-for="stopped in panel.stopped"
         :key="stopped.id"
         class="flex items-center gap-2 text-kira-sm"
         data-testid="ade-agents-stopped-row"
       >
-        <span class="size-1.5 shrink-0 rounded-[1px] bg-[#4a4d56]" />
+        <span class="size-1.5 shrink-0 rounded-[1px] bg-disabled" />
         <span class="flex-1 font-data text-kira-sm">{{ idLabel(stopped.claudeSessionId) }}</span>
-        <span class="text-[#9a9ca5]">{{ lastActive(stopped.lastActiveAt) }}</span>
+        <span class="text-muted-foreground">{{ lastActive(stopped.lastActiveAt) }}</span>
         <Button variant="dialog" size="sm" class="h-[22px] px-2" @click="onResume(stopped.id)">Resume</Button>
       </div>
     </div>

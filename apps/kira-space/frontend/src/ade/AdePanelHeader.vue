@@ -5,7 +5,7 @@ import { type DialogCtx, rebaseSpec, specForQueueAction, startSpec } from './dia
 import { useAdeResolveDependency } from './mutations';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
-import { CLAUDE_BUTTON_STYLE, chipStyle, TONE } from './tones';
+import { CLAUDE_BUTTON_STYLE, chipStyle, TONE, TONE_INK } from './tones';
 import { DEPENDENCY_COLOR, type QueuePanel, type QueuePanelAction } from './useQueue';
 
 // P129 Part 6 §0.5/§0.22: the panel's own header — colour dot, work-status chip, title, mono fact
@@ -51,18 +51,22 @@ const reviewNote = computed(
 
 // §0.5: mockup `btnP(t)` (line 1383) always reads the tone's own *solid* colour — 'primary' is every
 // call the mockup makes with `btnP('amber')` (Force push, every Rebase*); 'purple'/'red' reuse the
-// same solid as the segment tags. 'claude' and 'secondary' are the mockup's own literal, non-tone
-// styles (`▶ Start agent`'s `#d97757` background, `btnG`'s bordered/transparent secondary Archive).
+// same solid as the segment tags. 'claude' is the shared Start-agent button style
+// (`CLAUDE_BUTTON_STYLE`); 'secondary' is `btnG`'s bordered/transparent Archive.
 function actionStyle(action: QueuePanelAction): Record<string, string> {
   if (action.tone === 'claude') {
     return CLAUDE_BUTTON_STYLE;
   }
   if (action.tone === 'secondary') {
-    return { background: 'transparent', color: '#e8e6e1', border: '1px solid #3a3e48' };
+    return {
+      background: 'transparent',
+      color: 'var(--kira-fg)',
+      border: '1px solid var(--kira-border-strong)',
+    };
   }
   const key = action.tone === 'primary' ? 'amber' : action.tone;
   const solid = TONE[key][2];
-  return { background: solid, color: key === 'purple' ? '#ffffff' : '#15161a', border: 'none' };
+  return { background: solid, color: TONE_INK[key], border: 'none' };
 }
 
 /** §0.5 steps 2-7: every dialog-opening action reuses the exact opener `AdeRepoView`'s own
@@ -118,7 +122,7 @@ async function onActionClick(action: QueuePanelAction): Promise<void> {
 
 <template>
   <div
-    class="flex flex-col gap-[5px] border-b border-[#2a2d35] px-3.5 pb-2.5 pt-3"
+    class="flex flex-col gap-[5px] border-b border-border px-3.5 pb-2.5 pt-3"
     data-testid="ade-panel-header"
   >
     <div class="flex items-center gap-2">
@@ -135,12 +139,12 @@ async function onActionClick(action: QueuePanelAction): Promise<void> {
         {{ panel.title }}
       </h3>
     </div>
-    <div class="truncate font-data text-kira-sm text-[#9a9ca5]" data-testid="ade-panel-mono">
+    <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-mono">
       {{ panel.mono }}
     </div>
     <div
       v-if="panel.readOnly"
-      class="mt-0.5 flex items-center gap-2 rounded-kira-sm border border-[rgba(122,167,255,0.35)] bg-[rgba(122,167,255,0.12)] px-2.5 py-1.5 text-kira-sm text-[#b9cfff]"
+      class="mt-0.5 flex items-center gap-2 rounded-kira-sm border border-[rgba(122,167,255,0.35)] bg-[rgba(122,167,255,0.12)] px-2.5 py-1.5 text-kira-sm text-[#93b6ff]"
       data-testid="ade-panel-review-banner"
     >
       <CodiconIcon name="lock" :size="13" class="text-[#93b6ff]" />
