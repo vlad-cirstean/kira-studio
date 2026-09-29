@@ -787,7 +787,8 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   for (let i = 0; i < 20; i++) {
     const toWide = i % 2 === 0;
     const delta = await measureClickToDom(page, {
-      click: `[data-testid="tab"][data-tab-id="${toWide ? wideTableTabId : bigRowsTabId}"]`,
+      // Synthetic el.click() never reaches the inner button that owns TabStrip.vue's @click.
+      click: `[data-testid="tab"][data-tab-id="${toWide ? wideTableTabId : bigRowsTabId}"] > button:not([data-testid="tab-close"])`,
       observe: '[data-testid="main-view"]',
       until: {
         selector: toWide
