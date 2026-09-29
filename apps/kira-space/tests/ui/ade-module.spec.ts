@@ -434,3 +434,45 @@ test("switching the active repo tab swaps the header and main line to that repo'
   await expect(page.locator('[data-testid="ade-project-name"]')).toHaveText(REPO_B.name);
   await expect(page.locator('[data-testid="ade-main-name"]')).toHaveText('master');
 });
+
+test('ade tabs render through the shared tab strip (P137)', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.windowsEnsure, response: { mode: 'ade' } },
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO_A, REPO_B] },
+      { channel: IPC.terminalAgentSessions, response: { sessions: [] } },
+      { channel: IPC.adeSessions, response: { sessions: [] } },
+      {
+        channel: IPC.adeRepoSnapshot,
+        args: { codeRepoId: REPO_A.id },
+        response: emptySnapshot(REPO_A.id),
+      },
+      { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO_A.id }, response: EMPTY_PRS },
+    ],
+  });
+
+  const tabs = page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab"]');
+  await expect(tabs).toHaveCount(3);
+  await expect(tabs.first()).toHaveAttribute('data-tab-kind', 'ade-all-agents');
+  await expect(tabs.first()).toHaveAttribute('data-pinned', 'true');
+  await expect(tabs.first()).toContainText('All agents');
+  await expect(page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab-close"]')).toHaveCount(
+    0,
+  );
+
+  await repoTab(page, REPO_A.id).click({ button: 'right' });
+  const items = page.locator('[data-testid="context-menu"] [role="menuitem"]');
+  await expect(items).toHaveCount(1);
+  await expect(items).toHaveText('Copy name');
+  await page.keyboard.press('Escape');
+
+  const from = await repoTab(page, REPO_B.id).boundingBox();
+  const to = await repoTab(page, REPO_A.id).boundingBox();
+  if (!from || !to) throw new Error('repo tab has no box');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width * 0.25, to.y + to.height / 2, { steps: 15 });
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  await expect(tabs).toHaveText([/All agents/, /alpha/, /beta/]);
+});
