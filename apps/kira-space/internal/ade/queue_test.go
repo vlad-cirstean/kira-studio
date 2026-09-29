@@ -942,6 +942,103 @@ func TestQueue_Dependencies_LinkLifecycle(t *testing.T) {
 	}
 }
 
+// TestQueue_WorkType_FollowsKind is a cross-table invariant over add, rebind, meta and blockers,
+// not a CRUD round-trip (CLAUDE.md's own unit-test bar): work type pairs with kind (work/
+// investigate with mine or parked, review/test with review), and review/test refuses while the
+// item has blockers.
+func TestQueue_WorkType_FollowsKind(t *testing.T) {
+	skipWithoutGitQueue(t)
+	h := newQueueHarness(t)
+	_, dir := initQueueRepo(t)
+	h.addRepo("cr1", dir)
+	ctx := context.Background()
+
+	wtR := filepath.Join(t.TempDir(), "r")
+	runGitQueueAs(t, dir, queueOtherName, queueOtherEmail, "worktree", "add", "-q", "-b", "r", wtR, "main")
+	writeQueueFile(t, wtR, "r.txt", "r\n")
+	runGitQueueAs(t, wtR, queueOtherName, queueOtherEmail, "add", "r.txt")
+	runGitQueueAs(t, wtR, queueOtherName, queueOtherEmail, "commit", "-q", "-m", "r work")
+	if _, err := h.q.AddBranch(ctx, "cr1", "r", ""); err != nil {
+		t.Fatalf("AddBranch(r): %v", err)
+	}
+
+	check := func(item, wantKind, wantWorkType string) {
+		t.Helper()
+		state, err := h.repos.AdeQueue.Load("cr1")
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		for _, b := range state.Branches {
+			if b.Branch == item {
+				if b.Kind != wantKind || b.WorkType != wantWorkType {
+					t.Fatalf("%s kind/workType = %q/%q, want %q/%q", item, b.Kind, b.WorkType, wantKind, wantWorkType)
+				}
+				return
+			}
+		}
+		t.Fatalf("branch %s not stored", item)
+	}
+
+	check("r", model.AdeBranchKindReview, model.AdeWorkTypeReview)
+	if err := h.q.SetWorkType("cr1", "r", model.AdeWorkTypeTest); err != nil {
+		t.Fatalf("SetWorkType(r, test): %v", err)
+	}
+	check("r", model.AdeBranchKindReview, model.AdeWorkTypeTest)
+	if err := h.q.SetWorkType("cr1", "r", model.AdeWorkTypeInvestigate); err != nil {
+		t.Fatalf("SetWorkType(r, investigate): %v", err)
+	}
+	check("r", model.AdeBranchKindMine, model.AdeWorkTypeInvestigate)
+
+	depID, err := h.q.AddDependency("cr1", DependencyInput{Title: "Vendor reply", Blocks: []string{"r"}})
+	if err != nil {
+		t.Fatalf("AddDependency: %v", err)
+	}
+	if err := h.q.SetWorkType("cr1", "r", model.AdeWorkTypeReview); !errors.Is(err, repos.ErrWorkTypeBlocked) {
+		t.Fatalf("SetWorkType(blocked r, review) = %v, want ErrWorkTypeBlocked", err)
+	}
+	check("r", model.AdeBranchKindMine, model.AdeWorkTypeInvestigate)
+	if err := h.q.SetBlocker("cr1", depID, "r", false); err != nil {
+		t.Fatalf("SetBlocker(unlink): %v", err)
+	}
+	if err := h.q.SetWorkType("cr1", "r", model.AdeWorkTypeReview); err != nil {
+		t.Fatalf("SetWorkType(unblocked r, review): %v", err)
+	}
+	check("r", model.AdeBranchKindReview, model.AdeWorkTypeReview)
+
+	nw1, err := h.q.AddNewWork("cr1", NewWorkInput{Title: "Feature One"})
+	if err != nil {
+		t.Fatalf("AddNewWork: %v", err)
+	}
+	if err := h.q.SetWorkType("cr1", nw1, model.AdeWorkTypeReview); !errors.Is(err, repos.ErrWorkTypeInvalid) {
+		t.Fatalf("SetWorkType(new work, review) = %v, want ErrWorkTypeInvalid", err)
+	}
+	if err := h.q.SetWorkType("cr1", nw1, model.AdeWorkTypeInvestigate); err != nil {
+		t.Fatalf("SetWorkType(new work, investigate): %v", err)
+	}
+	h.setSessions("cr1", SessionRef{
+		ID: "s1", NewWorkID: nw1, State: model.AdeSessionStateRunning, TerminalID: "t1",
+		StartedAt: time.Now().Add(-time.Minute).UnixMilli(),
+	})
+	addQueueWorktree(t, dir, "feat1", "main")
+	if _, err := h.q.Snapshot(ctx, "cr1"); err != nil {
+		t.Fatalf("Snapshot (rebind): %v", err)
+	}
+	check("feat1", model.AdeBranchKindMine, model.AdeWorkTypeInvestigate)
+
+	parked := model.AdeBranchKindParked
+	if err := h.q.SetBranchMeta("cr1", "feat1", model.AdeBranchMetaPatch{Kind: &parked}); err != nil {
+		t.Fatalf("SetBranchMeta(parked): %v", err)
+	}
+	check("feat1", model.AdeBranchKindParked, model.AdeWorkTypeInvestigate)
+
+	if err := h.q.Archive(ctx, "cr1", "feat1", false); err != nil {
+		t.Fatalf("Archive(feat1): %v", err)
+	}
+	if err := h.q.SetWorkType("cr1", "feat1", model.AdeWorkTypeWork); err == nil {
+		t.Fatal("SetWorkType(archived) succeeded, want an error")
+	}
+}
+
 func hasBlocker(blockers []model.AdeBlocker, dependency, item string) bool {
 	for _, b := range blockers {
 		if b.Dependency == dependency && b.Item == item {
