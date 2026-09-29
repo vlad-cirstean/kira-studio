@@ -3,7 +3,7 @@
 Plan for `docs/v2.0/SPEC.md`'s **P139 Part 2** row. Planned against chapter branch
 `claude/unfinished-phases-ru3wo4` at `035bbbeb`. Line numbers are at that commit.
 
-**Status: in progress — measured findings committed as established.**
+**Status: plan complete, ready to implement.**
 
 **Discovery method, disclosed.** Worktree-local `.codegraph/` index built via
 `scripts/codegraph-setup.sh` (shared index pointed at another worktree). `codegraph_explore` ran
@@ -15,6 +15,26 @@ build, probe spec copied from `budgets.spec.ts`, probe Playwright config); all r
 committed. Environment: 4 vCPU, Playwright WebKit (`ui-timing`'s engine), Chromium
 `headless_shell-1194` used only as a comparison engine, `performance.now()` resolution 1 ms in
 WebKit.
+
+## 0. Open points (for the orchestrator/user)
+
+1. **Warm-tab cap is a judgement call: 5.** Kept-alive data tabs hold their grid DOM, SlickGrid
+   instance and (if a cell was selected) one Monaco editor each. The budget needs >= 2. Five
+   bounds retained DOM to ~5 grids' rendered band. Raise or lower on request; one constant
+   (`keepAlive.max`, §3.1).
+2. **Only `data` tabs are kept alive.** Console, stream, document, keyvalue and the rest still
+   remount on every switch. Only `data` has a measured budget. Extending the opt-in to another
+   kind needs its own activation audit (§3.2-§3.3 shape) and is out of scope here.
+3. **Kira Space unchanged.** It sets no `keepAlive` on its host. `RepoGraphView.vue`'s dormant
+   `onActivated`/`onDeactivated` hooks (ARCHITECTURE.md "A tab switch fully unmounts and remounts
+   the graph") stay dormant. Opting Space in is a separate decision.
+4. **Cold switch stays slow on WebKit.** First open, a tab evicted past the cap, and the first
+   switch after relaunch still remount: ~200 ms p50 after §3.4 (from ~320 ms). No stylesheet API
+   gets one SlickGrid mount under ~110 ms on WebKit (§1.7). Not gated; PERF.md records it.
+5. **`ConsoleSlickGrid.vue` likely carries the same double column build.** Not measured, not
+   touched (no budget covers it). Candidate follow-up only if the user wants it.
+6. **Thin margins.** Cell to editor p95 37-41 ms and tree expand p95 24-43 ms against 50 on this
+   4 vCPU sandbox. §6 treats any breach as a root-cause task, never a silent widening.
 
 ---
 
@@ -150,3 +170,45 @@ re-inserted one. The re-inserted grid rebuilds its rows (34-78 `appendCellHtml`)
 pass emptied them. Rest of the ~45 ms over idle is style/layout/paint of the re-inserted subtree.
 B2 passes the probe with `consoleErrors` empty and headers carrying `data-column`, so the header
 listener runs on the first (now only) build.
+
+### 1.9 Scroll position across a DOM detach
+
+Standalone page, WebKit and Chromium identical: a 200x200 scroller at `scrollTop` 1234 /
+`scrollLeft` 321 reads `0 / 0` the moment it is moved into a detached container. It still reads
+`0 / 0` after re-insertion, synchronously and 2 rAF later. **No `scroll` event fires** on detach or
+re-insert. `KeepAlive` deactivation is exactly this move (into its storage container). So a
+kept-alive grid comes back at the top unless the host restores it. `SlickGridHost.vue`'s debounced
+`persistScroll` (`:790-794`) reads `el.scrollTop` when its 300 ms timer fires: a timer landing
+after detach would write `0 / 0` into tab state.
+
+## 2. Root cause
+
+**Every cached tab switch remounts `DataView` and SlickGrid, and a SlickGrid mount costs 4-6
+full-document style recalcs on WebKit.**
+
+1. `MainView.vue:22` renders `<component :is :key="activeTab.id">` with no `KeepAlive`. Switching
+   tabs unmounts the old `DataView` subtree and mounts a new one, synchronously, inside the
+   measured window (§1.2). "Cached" in the budget's name has never been true for the view layer
+   (§1.6); only the page data is cached.
+2. SlickGrid 5.20 positions columns through a per-grid `<style>` and CSSOM rule mutation
+   (`createCssRules`, `applyColumnWidths`). The old grid's `destroy(true)` removes its sheet; the
+   new grid inserts one and mutates its rules. On WebKit each stylesheet change costs one
+   full-document style recalc, 53-65 ms on this page, paid at the next layout read (§1.4, §1.7).
+   Chromium pays 0.3 ms.
+3. `SlickGridHost.vue`'s `onMounted` builds columns twice: once in the constructor
+   (`explicitInitialization: false`, ~`:2063`), again in `rebuildAndSetColumns()` (`:2129`), a
+   workaround for header listeners the constructor build ran before they were subscribed. Each
+   build is another rule-mutation batch plus forced reads (`handleScroll`, `getViewportWidth`,
+   §1.3).
+
+Sum on WebKit: 265-508 ms per switch, p50 311-318 ms, p95 436-447 ms. Same probe on Chromium:
+48-65 ms. The regression dates from `SlickGridHost.vue` replacing `DataGrid.vue` (`d01b082e`, after
+PERF.md's M5 measurement). The `<= 1000` bound from the P57 M5 port (`9ee240f0`) and the broken
+tab selector P139 Part 1 fixed kept it invisible.
+
+**Console keystroke, separate cause:** the spec waits for `.suggest-widget.visible`, a class Monaco
+adds on a fixed 100 ms `setTimeout` with no CSS effect (§1.5). The popup is on screen at 27-32 ms.
+The 112 ms p50 measures Monaco's constant, not app work.
+
+**Cell to editor, tree expand:** no regression. Both pass 50 ms today (§1.1); only the bound is
+wrong.
