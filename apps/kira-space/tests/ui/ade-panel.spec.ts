@@ -489,11 +489,17 @@ test('name: a branch writes SetBranchMeta {name}, a draft writes UpdateNewWork {
     )
     .toBe(true);
 
-  const writesBefore = control.log().length;
+  // Writes only: the snapshot refresh after the last write also logs calls, which are not writes.
+  const writes = () =>
+    control
+      .log()
+      .filter((e) => e.channel === IPC.adeSetBranchMeta || e.channel === IPC.adeUpdateNewWork)
+      .length;
+  const writesBefore = writes();
   await draftNameInput.fill('never sent');
   await draftNameInput.press('Escape');
   await expect(draftNameInput).toHaveValue('Renamed draft');
-  expect(control.log().length).toBe(writesBefore);
+  expect(writes()).toBe(writesBefore);
 });
 
 // ---------------------------------------------------------------------------------------------
