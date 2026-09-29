@@ -80,5 +80,9 @@ test('Schema (DDL) editor at rest (P6)', async ({ relaunch }) => {
   // dialog's own static help text first: "at rest" doesn't require focus, and an unfocused editor
   // renders no caret at all, which is what makes this deterministic.
   await dialog.locator('.help').first().click();
-  await expect(page).toHaveScreenshot('schema-dialog.png');
+  // Monaco's vertical scrollbar fades on a JS timer, so a capture lands with or without its slider
+  // depending on timing. Mask it (a race, not a layout signal).
+  await expect(page).toHaveScreenshot('schema-dialog.png', {
+    mask: [dialog.locator('.monaco-scrollable-element > .scrollbar.vertical')],
+  });
 });
