@@ -91,7 +91,7 @@ export interface ScrollResponseDeltas {
  * An earlier version gated the 8ms budget on the end-to-end number alone. That number conflates
  * two frame-scheduling waits that are not app work: a script-driven `scrollTop` change's own
  * `scroll` event is deferred to Chromium's next "update the rendering" step (the same per-frame
- * cadence requestAnimationFrame uses), and DataGrid.vue's onScroll deliberately coalesces bursty
+ * cadence requestAnimationFrame uses), and the pre-SlickGrid grid's onScroll deliberately coalesces bursty
  * scroll events by doing its actual state sync inside its own requestAnimationFrame callback — a
  * second hop stacked on the first. Confirmed by forcing a step to start right after a frame
  * boundary (via a double-rAF wait) and observing every sample jump to a full frame period.
@@ -256,9 +256,9 @@ export function measureSustainedScroll(
 
 // measureRowUpdatesDuringScroll and its own `window.__kiraGridRowUpdates` hook (GridRow.vue's own
 // onUpdated count) were P22 iter2 D4's sandbox-provable proof that a reference-stable RowVM made
-// Vue skip re-rendering a row whose props didn't change — a property of DataGrid.vue's own Vue-
+// Vue skip re-rendering a row whose props didn't change — a property of the pre-SlickGrid grid's own Vue-
 // reconciliation render path specifically. Deleted at P22 Pass B's cutover (C17) along with
-// DataGrid.vue/GridRow.vue/rowVm.ts: SlickGrid builds and updates its own DOM directly, never
+// the old DataGrid/GridRow/rowVm files: SlickGrid builds and updates its own DOM directly, never
 // through Vue's prop-diffing, so this hook was never called under the SlickGrid engine at all —
 // its own gate in budgets.spec.ts was vacuously true (`updates` always 0) the whole time this
 // suite has run against SlickGrid exclusively, and had no SlickGrid-side equivalent to measure.

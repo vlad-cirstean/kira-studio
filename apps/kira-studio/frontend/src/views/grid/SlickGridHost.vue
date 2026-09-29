@@ -764,7 +764,7 @@ let scrollEventSeq = 0;
 const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
 
 // §6 D9 — the host's own viewport scroll listener. The test-only scroll-work mark
-// (`__kiraGridScrollWorkStart`) lives in KiraSlickGrid's `render()` override, not here: SlickGrid's
+// lives in KiraSlickGrid's `render()` override, not here: SlickGrid's
 // `scrollRenderThrottling` defers a far-jump render past this listener, so a mark here times the
 // throttle wait, not render work. P22 iter2-scroll-gaps D1: render timing is reported by
 // scrollTrace.noteRenderMs() from that same override — not from getRenderedRange, which only
