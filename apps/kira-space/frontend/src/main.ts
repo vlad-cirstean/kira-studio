@@ -13,6 +13,7 @@ import { useGitClientsStore } from './state/gitClients';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
+import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { useSettingsStore } from './state/settings';
@@ -39,6 +40,7 @@ async function mountShell(): Promise<void> {
   // Every store used here runs before app.use(pinia) below, so each needs the module-level
   // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
   const agentSessionsStore = useAgentSessionsStore(pinia);
+  const opsStore = useOpsStore(pinia);
   const appMetricsStore = useAppMetricsStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const layoutStore = useLayoutStore(pinia);
@@ -90,6 +92,8 @@ async function mountShell(): Promise<void> {
     // (repo tabs' needs-input badge, §0.15) — a stuck/erroring subscribe must never block the rest
     // of this app's own boot, same reasoning as every other member of this group.
     agentSessionsStore.initAgentSessions(),
+    // P132 Part 2: the op log dock's snapshot. A failed hydrate still goes live (createOpLogStore).
+    opsStore.hydrateOps(),
   ]);
   for (const result of optional) {
     if (result.status === 'rejected') {

@@ -7,6 +7,7 @@ import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
+import * as OpsService from '@bindings/opsservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TerminalService from '@bindings/terminalservice.js';
@@ -66,6 +67,7 @@ import type {
   AdeUpdateNewWorkArgs,
 } from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
+import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
@@ -291,6 +293,12 @@ const spaceControl = {
     unwrap(AdeService.FocusSession(args)),
   onAdeOpenSession: (cb: (event: AdeOpenSessionEvent) => void): (() => void) =>
     on(CHANNEL.adeOpenSession, cb),
+
+  // P132 Part 2: the in-memory git op log's snapshot, cancel and live-update push.
+  opsRecent: (limit: number): Promise<SpaceOpRecord[]> =>
+    unwrap(OpsService.Recent({ limit })).then((r) => trust<SpaceOpRecord[]>(r ?? [])),
+  opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
+  onOpUpdate: (cb: (record: SpaceOpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

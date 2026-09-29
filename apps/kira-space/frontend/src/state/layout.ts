@@ -4,14 +4,12 @@ import { control } from '../bridge/control';
 // P100 Part 2: Kira Studio's own state/layout.ts, ported unchanged — Layout is the one shared
 // schema (@shared/domain/layout); `panel.project` is this app's own left panel (GitPanel.vue's
 // repo switcher + Files/Search/Review body), the one leaf this app's UI actually reads or writes.
-// `panel.operations`/`panel.cellEditor` have no view here (no ops log, no cell editor) but stay in
-// the shared Layout shape and round-trip through this store untouched, the same "state stays fully
-// populated even where this app's own UI never surfaces it" posture state/settings.ts takes.
+// `panel.operations` drives the Operations dock (P132 Part 2); `panel.cellEditor` has no view here
+// (no cell editor) but stays in the shared Layout shape and round-trips through this store
+// untouched, the same "state stays fully populated even where this app's own UI never surfaces
+// it" posture state/settings.ts takes.
 //
 // P103 Part 2 (§5.3): the shared skeleton now lives in
 // packages/workbench/src/state/createLayoutStore.ts — this app has nothing to add, so this
 // store's own public surface is unchanged from before this phase.
-//
-// P132 Part 1 (§2.5): the core store now also exposes toggleOperationsPanel/setOperationsHeight —
-// Kira Space's own Operations dock lands in Part 2, unused here until then.
 export const useLayoutStore = createLayoutStore(control, () => ({}));

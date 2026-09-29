@@ -11,7 +11,7 @@ import { useSettingsStore } from '../state/settings';
 import { MODE_ORDER, MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own TitleBar.vue, trimmed — no Operations panel toggle. Now a
+// P103 Part 2 (§5.4): Kira Studio's own TitleBar.vue, trimmed. Now a
 // thin composition over the shared bar chrome (packages/workbench/src/components/TitleBar.vue).
 // P116 G5/G6 add the keep-awake toggle and "New window" button back — TitleBarWindowActions.vue,
 // shared with Kira Studio's own copy of this file. P128 §2.6: this app gains a mode switcher of
@@ -56,6 +56,16 @@ function onToggleKeepAwake(): void {
         :aria-pressed="layoutStore.panel.project.visible"
         data-testid="toggle-project-panel"
         @click="layoutStore.toggleProjectPanel"
+      />
+      <TooltipIconButton
+        :icon="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
+        label="Operations"
+        :icon-size="15"
+        variant="title"
+        size="title"
+        :aria-pressed="layoutStore.panel.operations.visible"
+        data-testid="toggle-operations-panel"
+        @click="layoutStore.toggleOperationsPanel"
       />
       <TooltipIconButton
         icon="settings-gear"

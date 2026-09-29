@@ -31,10 +31,11 @@ provide(terminalModuleKey, createTerminalModule());
 // GitPairingDialog/GitCredentialDialog (a pairing/credential prompt must be able to appear with
 // nothing else open).
 //
-// P116 G1-G4: this app's own Go menu (internal/appshell/menu.go) now emits five of Kira Studio's
-// own dozen menu-bar CHANNEL commands (Settings…, Toggle Project Panel, Next/Previous/Close Tab) —
-// subscribed here the same shape Studio's own App.vue uses, trimmed to only those five (this app
-// has no command palette/connections/requests/imports/view-find-refresh-run-format of its own).
+// P116 G1-G4 (P132 Part 2 adds Toggle Operations Panel): this app's own Go menu
+// (internal/appshell/menu.go) emits six of Kira Studio's own dozen menu-bar CHANNEL commands
+// (Settings…, Toggle Project/Operations Panel, Next/Previous/Close Tab) — subscribed here the same
+// shape Studio's own App.vue uses (this app has no command palette/connections/requests/imports/
+// view-find-refresh-run-format of its own).
 const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const tabsStore = useTabsStore();
@@ -48,6 +49,7 @@ onMounted(() => {
       settingsStore.settingsOpen = true;
     }),
     control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
+    control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
     control.onTabNext(tabsStore.activateNextTab),
     control.onTabPrev(tabsStore.activatePrevTab),
     control.onTabClose(tabsStore.closeActiveTab),

@@ -9,12 +9,12 @@ import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { MODES } from './modes';
+import OperationsPanel from './OperationsPanel.vue';
 import StatusBar from './StatusBar.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, trimmed — this app has no Operations
-// panel, so `#dock` is never passed to the shared shell — its grid collapses to
-// project/splitproj/main/status exactly as before (the shared component's own `.has-dock`-gated
-// rows, §5.4's own hazard note). P128 §2.6/§2.7: `GitPanel`/`GitStart`, once this whole app's own
+// P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, trimmed. P132 Part 2: the Operations
+// dock is mounted here too, gated only by `panel.operations.visible` (also in full layout, where
+// `ade` writes ops). P128 §2.6/§2.7: `GitPanel`/`GitStart`, once this whole app's own
 // left panel, are now one entry (`git`) in this app's own module registry (workbench/modes.ts),
 // alongside `terminal` and `ade` — the per-module "+" branch this file used to hold moved into the
 // module itself (repo/GitNewTab.vue), the same shape Kira Studio's own terminal module took at
@@ -23,9 +23,8 @@ import StatusBar from './StatusBar.vue';
 const layoutStore = useLayoutStore();
 const modeStore = useModeStore();
 
-// shortcuts/keys.ts's own doc comment: this app's Go menu emits no accelerator channels, so every
-// shortcut binds through a local keydown here, regardless of the shared SHORTCUTS table's `global`
-// flag. 'view.find' is the one id kira-space actually has a registered handler for.
+// 'view.find' is the one id with no Go menu item, so it binds through a local keydown here.
+// Menu-backed shortcuts (Cmd+J included) reach the renderer only as menu channels (App.vue).
 useEventListener(window, 'keydown', (e: KeyboardEvent) => {
   const id = shortcutFor(e, ['view.find']);
   if (!id) return;
@@ -54,7 +53,10 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
     :project-visible="!isFull && layoutStore.panel.project.visible"
     :project-width="layoutStore.panel.project.width"
     :tab-strip-visible="!isFull"
+    :ops-visible="layoutStore.panel.operations.visible"
+    :ops-height="layoutStore.panel.operations.height"
     @resize-project="layoutStore.setProjectWidth"
+    @resize-ops="layoutStore.setOperationsHeight"
   >
     <template #panel>
       <component :is="activeModePanel" />
@@ -73,6 +75,9 @@ const fullView = computed(() => (def.value.layout === 'full' ? def.value.view : 
           <component :is="modeStart" />
         </template>
       </MainView>
+    </template>
+    <template #dock>
+      <OperationsPanel />
     </template>
     <template #status>
       <StatusBar />
