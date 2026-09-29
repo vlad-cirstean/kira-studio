@@ -706,7 +706,7 @@ let gridRootEl: HTMLElement | null = null;
 let selectionModel: SlickHybridSelectionModel | null = null;
 // P104 §6.4 — AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
 // AttributeTooltip's `useEventListener(computed(() => props.container), ...)` re-binds reactively
-// once this is set, after the constructor's synchronous header build below. An ARRAY, not a
+// once this is set, after init()'s synchronous header build below. An ARRAY, not a
 // single element: SlickGrid always splits the header row into two sibling DOM panes — `_headerL`
 // (frozen columns) and `_headerR` (the rest) — appended directly under the grid's own root `el`,
 // with no narrower common ancestor than `el` itself wrapping both (confirmed reading
@@ -1957,8 +1957,8 @@ onMounted(() => {
   // watch (below) only fires on a *change*, so the first value needs setting here too.
   navColumns = navColumnsFor(rt()?.meta ?? null);
 
-  // M7 finding #5: this component remounts on every tab switch (`:key="activeTab.id"` in
-  // MainView.vue), which resets maskRulesByColumn/maskTagCache/maskTransform — all component-
+  // M7 finding #5: a remount (a tab evicted from MainView.vue's warm set, or reopened) resets
+  // maskRulesByColumn/maskTagCache/maskTransform — all component-
   // scoped `let`s above — back to empty. Without this call, the dataSourceState() built just below
   // would silently bake in `undefined` for activeMaskTransform even when mask preview is already
   // on for this tab, rendering real values while the toggle still reads "on". Cheap in the common
@@ -2071,7 +2071,7 @@ onMounted(() => {
       autoCommitEdit: true,
       asyncEditorLoading: false,
       editorCellNavOnLRKeys: false,
-      explicitInitialization: false,
+      explicitInitialization: true,
       dataItemColumnValueExtractor: (item: RowHandle, columnDef: KiraColumn) =>
         dataSource?.extractValue(item, String(columnDef.field)),
     },
@@ -2100,44 +2100,13 @@ onMounted(() => {
   eventHandler.subscribe(selectionModel.onSelectedRangesChanged, onSelectedRangesChanged);
   subscribeRangeSelecting(eventHandler, selectionModel, onCellRangeSelecting);
 
-  // P104 §6.4 — the constructor call above already ran SlickGrid's own synchronous header build
-  // (see the postscript comment just below), so both `.slick-header-columns` panes exist in `el`
-  // by now — `querySelectorAll` (not `querySelector`), see `headerRowEls`' own comment above.
-  headerRowEls.value = Array.from(el.querySelectorAll<HTMLElement>('.slick-header-columns'));
+  // Explicit init: the header build fires onHeaderCellRendered, so it must run after the
+  // subscriptions above or the first (only) header set misses its badges and select zones.
+  grid.init();
 
-  // P22 postscript §14.2's two "reported but not reproduced" dock/badge symptoms, root-caused
-  // together: `new KiraSlickGrid(...)` above runs synchronously through slick.grid.ts's own
-  // `initialize()` -> `finishInitialization()` -> `createColumnHeaders()` (since
-  // `explicitInitialization: false`) — i.e. it fires `grid.onHeaderCellRendered` for the FIRST,
-  // constructor-built set of header cells *before this file's own `eventHandler.subscribe(grid.
-  // onHeaderCellRendered, onHeaderCellRendered)` above has even run* (subscribing needs a `grid`
-  // instance to subscribe *to*, so it can only happen after the constructor call that already
-  // fired the event). Every DOM addition `onHeaderCellRendered` is responsible for — the PK/FK
-  // `.header-key` badge, the `.header-select-zone` click target, the `data-testid`/tooltip
-  // attributes the header context menu and this file's own header-click handlers key off — is
-  // silently missing from that first build. On a table's first-ever open this goes unnoticed:
-  // `rt()?.meta`'s own watch (below) fires moments later, once the async `treeDescribe` resolves
-  // (meta genuinely changes from unset), and its own `rebuildAndSetColumns()` call rebuilds every
-  // header a second time — this time with the listener attached — papering over the gap. It stops
-  // being invisible the moment a tab's `meta` is already cached in its runtime record before this
-  // component (re)mounts (state.ts: meta survives a tab switch, cleared only when the tab actually
-  // closes) — the *only* case that describes: reopening/switching back to an already-visited tab.
-  // Then `rt()?.meta` never changes post-mount, that watch never fires, and the constructor's own
-  // listener-less header build is the only one that ever runs — every header stays missing its
-  // badge and its select zone for that mount's entire life. This is why the migration's own
-  // "close tab, reopen" repro attempts never caught it (closing clears the runtime record, so a
-  // reopen re-fetches meta and re-triggers the same rebuild that masks the bug on a first visit) —
-  // a plain tab *switch*, not a close, is what exposes it, exactly as originally reported ("PK/FK
-  // header badges disappear after switching a tab away and back"). Confirmed live, this session:
-  // `.header-select-zone`'s own count went from 1 (fresh mount) to 0 (switch away to a second
-  // table, then back) — the same missing element `cell-editor.spec.ts`'s "Target page ... has been
-  // closed" timeouts trace back to (clicking a header control that plain doesn't exist yet).
-  // Fixed the same way the meta/appearance/columnWidths watches below already fix a *later*
-  // change of the same kind: force one more header rebuild, through the now-subscribed listener,
-  // unconditionally on every mount — cheap (`rebuildAndSetColumns` is already this file's own
-  // steady-state answer to "columns need rebuilding") and idempotent if the meta watch does also
-  // fire moments later.
-  rebuildAndSetColumns();
+  // P104 §6.4 — both `.slick-header-columns` panes exist in `el` once init ran — `querySelectorAll`
+  // (not `querySelector`), see `headerRowEls`' own comment above.
+  headerRowEls.value = Array.from(el.querySelectorAll<HTMLElement>('.slick-header-columns'));
 
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl && t) {
