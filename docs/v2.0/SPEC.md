@@ -3031,3 +3031,87 @@ the user's own Mac or a session running on one.
 the only part of this phase that could land without a Mac, and it has landed. No §5 fix, no
 `test:ui:space` guard spec: both are explicitly gated on §4's output existing first, and neither
 was attempted here.
+
+## P132 Part 1 result
+
+Plan: `docs/v2.0/plans/P132-part1-shared-panel-and-dock.md`. One Sonnet implementer, sequential, in
+worktree `p132-part1-impl` off `fb24ba56` (`$P132P1_START`). No split. Part 2 (Kira Space's own op
+log, plan §2.6) untouched. Pushed on branch `p132-part1-impl`, not merged.
+
+**Commits, plan §3 order plus fixes found by verification:**
+
+1. `9e6621e5` — `refactor(shared): generic op-log record base`.
+2. `98ea9350` — `refactor(workbench): op-log store factory`. Two unit specs moved from Studio.
+3. `fb71226a` — `refactor(workbench): layout store owns the operations panel actions`.
+4. `224f72b3` — `refactor(workbench): shared operations panel`. `OpLogPanel.vue`, Studio wrapper.
+5. `2f5759f1` — `fix(workbench): operations dock spans the full width`. Dock leaves the nested
+   vertical group; `DockResizeHandle.vue` on VueUse `useDraggable`.
+6. `be60c48e` — `test(studio): operations dock geometry and resize`. Two new `operations.spec.ts` tests.
+7. `f4b6e804` — `docs(architecture): document the full-width dock and shared op log panel`.
+8. `b0fe5b3b` — `fix(workbench): keep main panel border on an inner div`. Visual regression fix.
+9. `81a075c6` — `test(visual): mask Monaco scrollbar in schema dialog snapshot`. Pre-existing flake fix.
+10. `9f21bc39` — `docs(workbench): drop app-specific name from OpLogPanel comment`. §7 audit hit.
+11. This result commit.
+
+**Caught during the phase, not by the plan:**
+
+- `defineProps` defaults cannot close over `emit` (hoisted out of `setup()`). `canCancel`/`menuFor`
+  in `OpLogPanel.vue` use plain fallback functions, not `withDefaults`. Found by a real vite build;
+  `vue-tsc` alone did not catch it (commit 4).
+- `DockResizeHandle.vue` had ArrowUp/ArrowDown swapped. New keyboard test in commit 6 failed on it.
+  Fixed in commit 6: ArrowUp grows the dock, matching drag-up-grows.
+- Visual regression (commit 8). Rewriting the main panel put border and rounding on the
+  `ResizablePanel` itself. That shifted reka's px-to-% conversion: project panel 260.078px vs
+  260.4375px on `fb24ba56`. 5 of 14 visual specs failed (connection-dialog, console, data-view,
+  http-request-view, workbench-shell), and `schema-dialog` failed with them. Border and rounding are
+  back on an inner `div`, so project width matches baseline again.
+- `schema-dialog` visual flake (commit 9), pre-existing. Monaco's vertical scrollbar slider fades on
+  a JS timer, so the capture lands with or without it. On unmodified `fb24ba56`: 1 failure in 6 solo
+  runs; on this tree before the mask: 3 in 6. Scrollbar now masked, that one snapshot regenerated.
+  Solo: 6 of 6 pass. Full `test:visual:studio` on the final tree: 14 passed, 0 failed (9 of 10 full runs after the fixes were green).
+  **Unconfirmed:** one full-suite run right after the snapshot update failed on `schema-dialog`. Its
+  diff was not captured, so its cause is not proven to be the same slider race.
+
+**Verification (plan §4.3), run once near phase end, re-run on the final tree after fixes:**
+
+| Check | Result |
+|---|---|
+| `bun run test:unit` | 1823 passed, 0 failed (run before commits 8-10; those touch no unit-tested file) |
+| `bun run test:ui:studio` | 301 passed, 2 failed, exit 1. Both failures are `ui-timing` wall-clock gates: `budgets.spec.ts:356`, `slick-grid.spec.ts:896`. See disclosures. |
+| Hang-prone gate: `tree.spec.ts`, `interaction.spec.ts` (`--repeat-each=3`), `leaks.spec.ts`, `--project=ui --no-deps` | Final tree: `interaction.spec.ts` 3 of 3, `tree.spec.ts` 3 of 3 (`--workers=1`) and 3 of 3 (`--workers=2`, with interaction: 6 of 6), `leaks.spec.ts` 1 of 1. At the default 4 workers on 4 CPUs, `tree.spec.ts:158` timed out in 2 of 6 runs (2.0m each); see disclosures. |
+| `operations.spec.ts` | 4 passed, 0 failed (2 old, 2 new) |
+| `bun run test:ui:space` | 88 passed, 0 failed, unchanged |
+| `bun run test:visual:studio` | 14 passed, 0 failed |
+| `bun run typecheck`, `bun run lint:all` | clean (also re-run by the pre-commit hook on every commit) |
+
+**Pre-existing failures, disclosed:**
+
+- `budgets.spec.ts` scroll-response p50 (`ui-timing` project). This run: 13/16/17/20ms vs the 12ms
+  bound. Solo on unmodified `fb24ba56` in a throwaway worktree: 18ms vs 12ms, plus two 30s timeouts.
+  Wall-clock budget in a slow sandbox, not a code defect. No P-row in this table owns it:
+  P134 covers only `api-secret-reveal-isolation.spec.ts`. The P117/P127/P128/P130/P131/P133 results
+  already record this exact test under the same worker-contention flake class. This phase touches
+  neither the file nor its subject (`git diff --stat fb24ba56 -- apps/kira-studio/tests/ui/budgets.spec.ts`
+  is empty). Left failing, not fixed: a real fix means re-basing a wall-clock budget, a design
+  decision outside this phase. Needs its own named row if the user wants it closed.
+- `tree.spec.ts:158` times out (2.0m) under `--repeat-each=3` at 4 workers on 4 CPUs: 2 of 6 runs on
+  this tree. The same 4-worker timeout reproduced earlier on unmodified `fb24ba56`. Same test alone
+  runs 33s. Passes 3 of 3 at `--workers=1`, and 6 of 6 with `interaction.spec.ts` at
+  `--workers=2`. Sandbox contention, not a regression. Passes in the full studio run.
+- `slick-grid.spec.ts:896` select-all 150ms gate: 174ms in the full run. Solo: 153ms once, then 2
+  passes. `ui-timing` wall-clock contention. File untouched (`git diff --stat fb24ba56` empty).
+  No P-row owns it either; same left-failing rationale as `budgets.spec.ts`.
+
+**Closed-dock geometry vs `fb24ba56`:** identical. Every rect in the shell subtree matches with the dock closed (whole-DOM dump, project width 260.4375px on both). Only differences: one redundant same-size wrapper box removed, and a new `#main-panel` testid. Compared by DOM rect dump on a baseline worktree build vs this tree, same viewport.
+
+**Closing audit (plan §7), run against the final tree:** all 13 rows pass.
+
+- Margin hack, nested splitter (1 `<ResizablePanelGroup`), `useDraggable`, hoist, kind generalized,
+  SFC form (both `<script setup lang="ts">`, no `<style`): empty or expected.
+- Shared panel: Studio `OperationsPanel.vue` renders `OpLogPanel`. Factory: `state/ops.ts` calls
+  `createOpLogStore`.
+- Hoist row: `layout.ts` hits are two comment lines only, no definitions.
+- Studio-import row: first run hit a `MonacoHost` comment in `OpLogPanel.vue`; reworded in commit 10.
+- Unit specs: none under `tests/unit/ops-*`; two `oplog-*.spec.ts` in workbench.
+- Space diff: `state/layout.ts`, 3 comment lines.
+- SFC check uses `grep -L`. `rg -L` means `--follow`, not files-without-match.
