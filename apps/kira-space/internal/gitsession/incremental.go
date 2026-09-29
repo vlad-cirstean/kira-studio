@@ -157,8 +157,9 @@ func (e *RepoEntry) branchTip(ctx context.Context, branch string) (string, error
 }
 
 // blobOID resolves rev:path's current blob oid via the cat-file batch session, "" (not an error)
-// for a path that does not exist there — the natural comparand for tier 0 (F6): ” vs. a record's
-// own ” (ContentAbsent) is "still deleted", "unchanged" with no special case.
+// for a path that does not exist there — the natural comparand for tier 0 (F6): the empty string
+// vs. a record's own empty string (ContentAbsent) is "still deleted", "unchanged" with no special
+// case.
 //
 // G31 round-2 architecture/security review, finding #2 (queries.go's Blob, the same class of
 // bug): a newline anywhere in `full` (rev included) desyncs the persistent --batch-check

@@ -32,7 +32,7 @@ const closeGracePeriod = 2 * time.Second
 // closeKillWait bounds how long Close waits, after SIGKILL, for readLoop's blocked ptmx.Read to
 // actually return (F1/P108 Part 2). SIGKILL(-pid) can still leave Close waiting forever: a
 // job-control shell (`-i`) can put a child in its own process group, which Kill(-pid, …) misses,
-// and a job that ignores SIGHUP on its controlling terminal (nohup, `trap '' HUP`, zsh's NO_HUP)
+// and a job that ignores SIGHUP on its controlling terminal (nohup, `trap "" HUP`, zsh's NO_HUP)
 // keeps the slave pty open past both signals either way. Close's own callers —
 // Registry.CloseAll/CloseWindow, in turn both apps' TerminalService.Shutdown (on the app-quit
 // teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang

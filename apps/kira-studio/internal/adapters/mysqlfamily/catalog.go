@@ -178,7 +178,7 @@ func listColumns(ctx context.Context, exec queryExec, database, table string) ([
 // listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
 // the same information_schema.COLUMNS join, minus the TABLE_NAME filter, plus COLUMN_KEY (already
 // on the same row — no second query) so IsPrimaryKey is populated without listIndexes' own
-// per-relation round trip. Views (COLUMN_KEY is always ” for them) are included; sequences and
+// per-relation round trip. Views (COLUMN_KEY is always empty for them) are included; sequences and
 // routines have no columns and are excluded by the JOIN itself. Every column here is
 // byte-identical to what listColumns/Describe reports for the same column (P22c §4.1).
 func listSchemaColumns(ctx context.Context, exec queryExec, database string) ([]model.RelationColumns, error) {

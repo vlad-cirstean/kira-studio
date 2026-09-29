@@ -292,7 +292,7 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 // longer leave a passwordless duplicate behind the way two separate statements could.
 //
 // M5: this INSERT does not name mask_correlation_key, so the duplicate gets the column's own
-// DEFAULT ” — deliberately NOT copied from fromConnectionID (unlike password, just above). A
+// empty-string DEFAULT — deliberately NOT copied from fromConnectionID (unlike password, just above). A
 // copied key would make the duplicate's masked correlation tags linkable back to the original's,
 // silently breaking the "key is scoped to one connection" invariant plan §2.5 states. The
 // duplicate mints its own key lazily, the same as any other connection with no key yet

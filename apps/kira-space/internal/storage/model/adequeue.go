@@ -108,8 +108,11 @@ func (b AdeBranch) Validate() error {
 }
 
 // AdeNewWork is one row of `ade_new_work` (P129 Part 2 §0.10) — a piece of work with no branch
-// yet. CHECK (title <> ” OR jira_key <> ”) mirrors the table's own constraint so a caller catches
-// the mistake before the DB does.
+// yet. The constraint
+//
+//	CHECK (title <> '' OR jira_key <> '')
+//
+// is mirrored here so a caller catches the mistake before the DB does.
 type AdeNewWork struct {
 	ID         string `json:"id"`
 	CodeRepoID string `json:"codeRepoId"`

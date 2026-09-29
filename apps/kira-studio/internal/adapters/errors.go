@@ -123,9 +123,9 @@ func endsTransaction(stmt string) bool {
 	}
 }
 
-// scanQuote reports the end index (exclusive) of a quoted run opened by r[i] (one of `'`, `"`,
-// “ ` “) — the same doubled-quote escaping rule every dialect here honours (`”`, `""`, “ “ “
-// repeats the quote character as content rather than closing). Runs to len(r) — the caller's own
+// scanQuote reports the end index (exclusive) of a quoted run opened by r[i] (a single quote, a
+// double quote or a backtick) — the same doubled-quote escaping rule every dialect here honours
+// (a doubled quote of the same kind repeats the quote character as content rather than closing). Runs to len(r) — the caller's own
 // EOF — when unterminated, never past it.
 //
 // Backslash is deliberately never treated as an escape here, with one exception (escapeBackslash),
@@ -170,7 +170,7 @@ func scanQuote(r []rune, i int, escapeBackslash bool) int {
 
 // isEStringOpen reports whether the quote at r[i] opens a Postgres E'...'/e'...' string — the one
 // case backslash unconditionally escapes regardless of standard_conforming_strings (finding F1).
-// Requires r[i] == '\'' and the immediately preceding rune to be a standalone E/e: a word boundary
+// Requires r[i] to be a single quote and the immediately preceding rune to be a standalone E/e: a word boundary
 // before it (or start of input), so an identifier merely ending in e/E (`table`, `value`) is never
 // mistaken for the prefix.
 func isEStringOpen(r []rune, i int) bool {
@@ -240,7 +240,7 @@ func runesEqual(a, b []rune) bool {
 // which a single non-nesting regexp pass cannot express, so this scans by rune and tracks depth
 // instead.
 //
-// Quote-aware (finding #1, M6): a `'`, `"`, “ ` “ or Postgres dollar-quote opened outside any
+// Quote-aware (finding #1, M6): a single quote, a double quote, a backtick or Postgres dollar-quote opened outside any
 // comment is skipped over as one atomic run before comment markers are even considered inside it,
 // so `--`/`/*` appearing inside a string literal — e.g. `SELECT '/*' ; DROP TABLE users` — is never
 // mistaken for a real comment start. Before this, such a marker inside a quote was read as a

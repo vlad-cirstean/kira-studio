@@ -158,7 +158,11 @@ func EnsureHeaderHelperScript(home, tokenPath string) (string, error) {
 // shellSingleQuote wraps s in single quotes for embedding as a literal argument inside the
 // generated /bin/sh script above (the one place in this package that composes a shell string
 // rather than an argv slice, since the script itself IS shell) — escaping any embedded single
-// quote the standard POSIX way ('\” — close the quote, an escaped quote, reopen it).
+// quote the standard POSIX way, as
+//
+//	'\''
+//
+// — close the quote, an escaped quote, reopen it.
 func shellSingleQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

@@ -118,9 +118,12 @@ func buildShim(helperCommand []string) (string, error) {
 	return b.String(), nil
 }
 
-// shellQuoteSingle wraps s in single quotes, escaping any embedded single quote as '\'' — close
-// the quote, emit a backslash-escaped literal quote outside it, reopen the quote (the standard
-// POSIX idiom). F13: unlike double-quoting (which still expands $var, $(...), backticks and
+// shellQuoteSingle wraps s in single quotes, escaping any embedded single quote as
+//
+//	'\''
+//
+// — close the quote, emit a backslash-escaped literal quote outside it, reopen the quote (the
+// standard POSIX idiom). F13: unlike double-quoting (which still expands $var, $(...), backticks and
 // backslash escapes inside it — the actual vulnerability this replaces), single quotes have no
 // special character at all except the quote itself, so no character, including a literal newline
 // (POSIX shell treats an embedded newline inside a single-quoted string as ordinary data, not a

@@ -26,7 +26,7 @@ type TrackQuery func(RunningQuery) (release func())
 
 // nullSentinel is the *Strings JSON formats' own literal for a Nullable NULL (D16) — chosen by
 // ClickHouse itself specifically so it can't collide with an empty string. Verified empirically
-// against clickhouse-server:26.3 in M6.0's own CH-1 probe: a Nullable(String) NULL and ” come
+// against clickhouse-server:26.3 in M6.0's own CH-1 probe: a Nullable(String) NULL and an empty string come
 // back as "ᴺᵁᴸᴸ" and "" respectively, never JSON null.
 const nullSentinel = "ᴺᵁᴸᴸ"
 
