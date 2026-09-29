@@ -12,7 +12,7 @@ import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -157,14 +157,14 @@ function onGenerateData(): void {
 }
 
 let unregisterCommands: Array<() => void> = [];
+let deactivated = false;
 
-onMounted(() => {
+function activate(): void {
   if (!needsReconnect.value && !gridViewStore.runtime[props.tab.id]) {
     void gridViewStore.load(props.tab.id);
   }
-  // D11: this component is mounted only while its tab is the active one (MainView.vue's
-  // `v-else-if` chain), so registering here — rather than switching on tab kind in a global
-  // dispatcher — is what makes Find/Refresh always act on the currently visible data tab.
+  // D11: registered only while this tab is the active one (mounted and not deactivated by a
+  // KeepAlive), so Find/Refresh always act on the currently visible data tab.
   unregisterCommands = [
     registerCommand('view.find', () => gridViewStore.toggleSearchOpen(props.tab.id)),
     // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
@@ -174,10 +174,24 @@ onMounted(() => {
     registerCommand('view.refresh', () => onRefresh()),
     registerCommand('data.generate', onGenerateData),
   ];
-});
+}
 
-onUnmounted(() => {
+function deactivate(): void {
   for (const off of unregisterCommands) off();
+  unregisterCommands = [];
+}
+
+onMounted(activate);
+onUnmounted(deactivate);
+onDeactivated(() => {
+  deactivate();
+  deactivated = true;
+});
+// The first-mount onActivated is a no-op: correct with or without a KeepAlive ancestor.
+onActivated(() => {
+  if (!deactivated) return;
+  deactivated = false;
+  activate();
 });
 
 const dataGridRef = ref<{ scrollCellIntoView: (row: number, col: number) => void } | null>(null);
