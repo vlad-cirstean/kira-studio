@@ -124,3 +124,83 @@ test('Operations panel — a truncated command cannot be re-run, but can still b
     'data-disabled',
   );
 });
+
+// P132 Part 1 (§4.1): the row's own acceptance for the full-width dock fix (§0.1/§2.4) — the dock
+// no longer sits in a nested SplitterGroup under just the main panel, so it spans project's left
+// edge to main's right edge, and project's own bottom now moves with main's (no more blank strip
+// below a shorter project panel, no margin hack to produce it).
+test('Operations panel — the dock spans the full shell width, flush under project and main (P132 Part 1)', async ({
+  kira,
+}) => {
+  const { window } = kira;
+  await window.click('[data-testid="toggle-operations-panel"]');
+  const dock = window.locator('[data-testid="operations-panel"]');
+  await expect(dock).toBeVisible();
+
+  const project = window.locator('[data-testid="project-panel"]');
+  const main = window.locator('[data-testid="main-panel"]');
+  const [projectBox, mainBox, dockBox, marginBottom] = await Promise.all([
+    project.boundingBox(),
+    main.boundingBox(),
+    dock.boundingBox(),
+    project.evaluate((el) => getComputedStyle(el).marginBottom),
+  ]);
+  if (!projectBox || !mainBox || !dockBox) throw new Error('bounding boxes not found');
+
+  // ±0.5px throughout (the row's own tolerance) — Playwright geometry can land on a sub-pixel
+  // boundary even at integer CSS values.
+  expect(Math.abs(dockBox.x - projectBox.x)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(dockBox.x + dockBox.width - (mainBox.x + mainBox.width))).toBeLessThanOrEqual(
+    0.5,
+  );
+  expect(
+    Math.abs(projectBox.y + projectBox.height - (mainBox.y + mainBox.height)),
+  ).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(dockBox.y - (projectBox.y + projectBox.height) - 6)).toBeLessThanOrEqual(0.5);
+  expect(marginBottom).toBe('0px');
+});
+
+// P132 Part 1 (§4.1): drag, keyboard step, and clamp — DockResizeHandle.vue's own three behaviours
+// (§2.4), exercised through the real separator rather than unit-testing its clamp math directly.
+test('Operations panel — the dock resize handle drags, steps by keyboard, and clamps (P132 Part 1)', async ({
+  kira,
+}) => {
+  const { window } = kira;
+  await window.click('[data-testid="toggle-operations-panel"]');
+  const dock = window.locator('[data-testid="operations-panel"]');
+  await expect(dock).toBeVisible();
+  // The project panel's own reka SplitterResizeHandle is also role="separator" — this one is
+  // named (DockResizeHandle.vue's own aria-label) to disambiguate.
+  const handle = window.getByRole('separator', { name: 'Resize operations panel' });
+
+  const initialBox = await dock.boundingBox();
+  if (!initialBox) throw new Error('dock bounding box not found');
+  const initialHeight = initialBox.height;
+
+  const handleBox = await handle.boundingBox();
+  if (!handleBox) throw new Error('handle bounding box not found');
+  const cx = handleBox.x + handleBox.width / 2;
+  const cy = handleBox.y + handleBox.height / 2;
+  await window.mouse.move(cx, cy);
+  await window.mouse.down();
+  await window.mouse.move(cx, cy - 60, { steps: 5 });
+  await window.mouse.up();
+  const afterDragHeight = (await dock.boundingBox())?.height ?? 0;
+  expect(Math.abs(afterDragHeight - initialHeight - 60)).toBeLessThanOrEqual(1);
+
+  await handle.focus();
+  await window.keyboard.press('ArrowUp');
+  const afterArrowHeight = (await dock.boundingBox())?.height ?? 0;
+  expect(Math.abs(afterArrowHeight - afterDragHeight - 10)).toBeLessThanOrEqual(1);
+
+  const clampHandleBox = await handle.boundingBox();
+  if (!clampHandleBox) throw new Error('handle bounding box not found');
+  const clampCx = clampHandleBox.x + clampHandleBox.width / 2;
+  const clampCy = clampHandleBox.y + clampHandleBox.height / 2;
+  await window.mouse.move(clampCx, clampCy);
+  await window.mouse.down();
+  await window.mouse.move(clampCx, clampCy - 1000, { steps: 5 });
+  await window.mouse.up();
+  const clampedHeight = (await dock.boundingBox())?.height ?? 0;
+  expect(Math.abs(clampedHeight - 500)).toBeLessThanOrEqual(1);
+});

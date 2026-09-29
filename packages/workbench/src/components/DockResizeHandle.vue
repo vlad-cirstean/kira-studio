@@ -44,10 +44,10 @@ watch(isDragging, (dragging) => emit('dragging', dragging));
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'ArrowUp') {
     e.preventDefault();
-    emit('resize', clamp(props.height - 10));
+    emit('resize', clamp(props.height + 10));
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
-    emit('resize', clamp(props.height + 10));
+    emit('resize', clamp(props.height - 10));
   } else if (e.key === 'Home') {
     e.preventDefault();
     emit('resize', props.min);
