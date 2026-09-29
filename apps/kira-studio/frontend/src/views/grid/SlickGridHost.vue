@@ -737,6 +737,8 @@ let resizeObserver: ResizeObserver | null = null;
 // D4's own one-shot flag, set by the header select zone immediately before it pushes ranges into
 // the model — mirrors DataGrid.vue's own `dragProducedRange` shape.
 let pendingSelectionKind: 'column' | null = null;
+// P139: the corner's select-all paints via the `.kira-select-all` host class, not the model's range.
+const selectAllActive = ref(false);
 // Shift-range anchor for the header select zone's own click cycle — DataGrid.vue's own `colAnchor`
 // ref, kept as a plain variable here since nothing renders from it.
 let colAnchor: number | null = null;
@@ -894,6 +896,7 @@ function refreshSelEdges(selOverride?: Selection | null): void {
 // the real commit. The committed `onSelectedRangesChanged` handler (unchanged) supersedes every
 // layer this writes the moment the drag actually ends.
 function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
+  selectAllActive.value = false;
   if (!grid || !dataSource || !selectionModel || selectionModel.currentSelectionModeIsRow()) return;
   const posSel = selectionFromRanges([args.range], false, null);
   const pageSel = posSel ? toPageRowSelection(posSel) : null;
@@ -1299,12 +1302,10 @@ function cycleSortFor(name: string): void {
 
 // §4 item 6, §5 D6 — the corner cell selects everything, as a single `range` (never a `row`
 // selection, which `isSelected` would resolve with `Array.includes`, F14a's own O(rows) cost).
-// **Adopts the selection model** (pushes the full-page range through it, exactly like any other
-// drag/click) rather than D6's named bypass: F2's O(rows × cols) hash — ~61 000 iterations on the
-// spike_grid fixture (1 000 × 61), ~20 000 on the 10 000-row/2-column big_rows one — is well
-// inside T6's own 150ms sandbox gate (slick-grid.spec.ts), so the bypass is written down in the
-// plan (§5 D6) and in this comment, not built: nothing here needs it unless a real page size
-// someday fails that gate, at which point it's a swap of this one function's body, not a redesign.
+// P139: D6's bypass, built. Pushing the full range through the selection model cost 80-130 ms on
+// spike_grid (1 000 × 61) — SlickGrid's O(rows × cols) `kira-cell-selected` hash (F2) — against
+// T6's own 150 ms gate. So the model holds no range: `rt().selection` owns the meaning and
+// `.kira-select-all` on the host root paints every cell.
 function onSelectAll(): void {
   if (!grid || !selectionModel) return;
   // Display row count, not the page's own row count — `SlickRange` below is position-space, and
@@ -1316,7 +1317,14 @@ function onSelectAll(): void {
   const displayRowCount = currentDisplayRows()?.length ?? getPage(props.tabId)?.rowCount ?? 0;
   const colCount = grid.getColumns().length - 1; // minus the gutter
   if (displayRowCount <= 0 || colCount <= 0) return;
-  selectionModel.setSelectedRanges([new SlickRange(0, 1, displayRowCount - 1, colCount)]);
+  // Clears the model's ranges, SlickGrid's fill hash and `rt().selection`; also resets the flag.
+  selectionModel.setSelectedRanges([]);
+  const all = selectionFromRanges([new SlickRange(0, 1, displayRowCount - 1, colCount)], false, null);
+  const entry = rt();
+  if (!entry || !all) return;
+  entry.selection = toPageRowSelection(all);
+  selectAllActive.value = true;
+  refreshSelEdges();
 }
 
 function onHeaderClick(_e: unknown, args: OnHeaderClickEventArgs): void {
@@ -1446,6 +1454,7 @@ function refreshSelectionForFilterChange(): void {
 function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
   const runtimeEntry = rt();
   if (!runtimeEntry) return;
+  selectAllActive.value = false;
   const rowMode = selectionModel?.currentSelectionModeIsRow() ?? false;
   const kind = pendingSelectionKind;
   pendingSelectionKind = null;
@@ -2635,7 +2644,10 @@ defineExpose({
   <div
     class="slick-grid-host"
     data-testid="data-grid"
-    :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
+    :class="{
+      'kira-grid--row-coloring': settingsStore.appearance.rowColoring,
+      'kira-select-all': selectAllActive,
+    }"
   >
     <div ref="rootRef" class="slick-grid-mount"></div>
     <AttributeTooltip :container="headerRowEls" />

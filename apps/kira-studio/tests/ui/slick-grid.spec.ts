@@ -886,13 +886,10 @@ test('P22 iter2-onset — a fresh gesture sizes its runway from that gesture, no
   expect(Object.keys(msGateHistogram).some((count) => Number(count) >= 2)).toBe(true);
 });
 
-// P22 Pass B, C6/§5 D6, T6 — select-all's own cost gate. **Adopts** SlickHybridSelectionModel for
-// select-all (SlickGridHost.vue's own onSelectAll comment): F2's O(rows × cols) hash inside
-// `handleSelectedRangesChanged` is real, but this sandbox-provable measurement is what decides
-// whether that's actually a problem, rather than assuming either way (§5 D6). If this ever regresses
-// past 150ms, D6's own named bypass (rt().selection set directly, a `.kira-select-all` CSS class
-// painting every `.slick-cell`, no range pushed into the model) is the fix — written down in the
-// plan and in onSelectAll's own comment, not built speculatively.
+// P22 Pass B, C6/§5 D6, T6 — select-all's own cost gate. P139 built D6's bypass (rt().selection
+// set directly, a `.kira-select-all` host class painting every `.slick-cell`, no range pushed into
+// the model; SlickGridHost.vue's onSelectAll): the model path cost 80-130 ms against this 150 ms
+// gate on the wide table. The gate now times the bypass.
 test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide and tall', async ({
   relaunch,
 }) => {
@@ -909,7 +906,7 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
     return performance.now() - start;
   });
   expect(wideElapsedMs).toBeLessThan(150);
-  await expect.poll(() => wide.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+  await expect(wide.locator('.slick-grid-host.kira-select-all')).toHaveCount(1);
 
   // --- tall: big_rows, 10 000 rows x 2 columns ----------------------------------------------------
   const BIG_CONNECTION_ID = 'conn-slick-selectall-big';
@@ -988,7 +985,7 @@ test('P22 Pass B C6 — select-all completes within the 150ms sandbox gate, wide
     return performance.now() - start;
   });
   expect(tallElapsedMs).toBeLessThan(150);
-  await expect.poll(() => tall.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+  await expect(tall.locator('.slick-grid-host.kira-select-all')).toHaveCount(1);
 });
 
 // P22 Pass B, C12/§9.2 T7 — "the F5 merge cost" (Pass A §8.6 item 2's own open question, discharged
@@ -1091,7 +1088,7 @@ test('P22 Pass B C12 T7 — select-all stays within the 150ms sandbox gate with 
     return performance.now() - start;
   });
   expect(elapsedMs).toBeLessThan(150);
-  await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+  await expect(page.locator('.slick-grid-host.kira-select-all')).toHaveCount(1);
 });
 
 // Regression test — onSelectAll used to build its SlickRange with `p?.rowCount` (the PAGE row
@@ -1198,7 +1195,7 @@ test('P22 Pass B follow-up — select-all under an active row filter copies only
   await gridCell(page, 1, 'id').click();
   const corner = page.locator('[data-testid="grid-select-all"]');
   await corner.click();
-  await expect.poll(() => page.locator('.kira-cell-selected').count()).toBeGreaterThan(0);
+  await expect(page.locator('.slick-grid-host.kira-select-all')).toHaveCount(1);
 
   // The corner click above lands DOM focus on the header pane (SlickGrid's own header panes
   // carry `tabIndex=0`) rather than the grid canvas — true of clicking any header cell, not

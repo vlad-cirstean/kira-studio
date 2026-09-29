@@ -214,7 +214,7 @@
 }
 
 /* No zebra striping (GridRow.vue's own precedent) — only the hover state below. */
-.slick-grid-host .slick-row:hover .slick-cell:not(.kira-cell-selected) {
+.slick-grid-host:not(.kira-select-all) .slick-row:hover .slick-cell:not(.kira-cell-selected) {
   background: var(--kira-hover);
 }
 
@@ -483,7 +483,10 @@
    (the whole selection's fill, F2) and the app's own 'kira-sel-edges'/'kira-staged'/
    'kira-search' (D5's table). Declared after the type-colour rules above so the cascade enforces
    D6's own priority rule for free. */
-.slick-grid-host .kira-cell-selected {
+/* P139: select-all paints through `.kira-select-all` (SlickGridHost.vue), not the per-cell hash;
+   `:where()` keeps specificity equal to the `.kira-cell-selected` rule so later layers still win. */
+.slick-grid-host .kira-cell-selected,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter)) {
   background: var(--kira-select);
 }
 
@@ -492,7 +495,8 @@
    perimeter (`.sel-t`/`.sel-r`/`.sel-b`/`.sel-l`, SlickGridHost.vue's own computeSelEdgesHash),
    so two adjacent selected cells' shared inner edge draws nothing from either side and the
    selection's outer boundary reads as one uniform line. */
-.slick-grid-host .kira-cell-selected {
+.slick-grid-host .kira-cell-selected,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter)) {
   --sel-t: 0 0 0 0 transparent;
   --sel-r: 0 0 0 0 transparent;
   --sel-b: 0 0 0 0 transparent;
@@ -503,16 +507,20 @@
     inset var(--sel-b),
     inset var(--sel-l);
 }
-.slick-grid-host .kira-cell-selected.sel-t {
+.slick-grid-host .kira-cell-selected.sel-t,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter).sel-t) {
   --sel-t: 0 var(--kira-border-width) 0 0 var(--kira-focus);
 }
-.slick-grid-host .kira-cell-selected.sel-r {
+.slick-grid-host .kira-cell-selected.sel-r,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter).sel-r) {
   --sel-r: calc(-1 * var(--kira-border-width)) 0 0 0 var(--kira-focus);
 }
-.slick-grid-host .kira-cell-selected.sel-b {
+.slick-grid-host .kira-cell-selected.sel-b,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter).sel-b) {
   --sel-b: 0 calc(-1 * var(--kira-border-width)) 0 0 var(--kira-focus);
 }
-.slick-grid-host .kira-cell-selected.sel-l {
+.slick-grid-host .kira-cell-selected.sel-l,
+.slick-grid-host.kira-select-all :where(.slick-cell:not(.kira-gutter).sel-l) {
   --sel-l: var(--kira-border-width) 0 0 0 var(--kira-focus);
 }
 
