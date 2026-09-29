@@ -18,10 +18,10 @@ import type { AdeRepoSnapshot, AdeSession } from './wire';
 // (archived), else an orphan (its branch was removed outside the app). Cross-checked by
 // `tests/unit/ade-all-agents-parity.spec.ts` against the mockup's own `renderVals().allView`.
 
-/** `'#3a3e48'` — the mockup's own fallback swatch (line 875) for a colour index no longer assigned,
- *  reused for every no-palette-colour case here (an archived item with no recorded colour slot, or
- *  an orphan with no queue item at all). */
-const NO_COLOR = '#3a3e48';
+/** The mockup's own fallback swatch (line 875), now `--kira-border-strong`, for a colour index no
+ *  longer assigned, reused for every no-palette-colour case here (an archived item with no recorded
+ *  colour slot, or an orphan with no queue item at all). */
+const NO_COLOR = 'var(--kira-border-strong)';
 
 /** One repo's own inputs, already computed by the caller (`AdeAllAgentsView.vue`'s own per-repo
  *  `useQueue`/`useQueries`, §0.5) — `view`/`snapshot` are `null` only while that repo's own fetch is

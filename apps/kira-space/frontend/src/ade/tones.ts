@@ -1,3 +1,4 @@
+import type { ActivityKind } from './activity';
 import type { QueueTag } from './useQueue';
 
 // P129 Part 6 §0.22: tone literals moved out of `AdeStackBlock.vue` so the detail panel header
@@ -13,6 +14,24 @@ export const TONE: Record<QueueTag['tone'], [string, string, string]> = {
   purple: ['rgba(163,113,247,0.16)', '#c3a3fb', '#a371f7'],
   grey: ['#23252b', '#b4b6bd', '#6b6f7a'],
 };
+
+/** Ink on a tone solid. Fixed with the solid: a themed ink loses contrast under any other theme. */
+export const TONE_INK: Record<QueueTag['tone'], string> = {
+  amber: '#15161a',
+  red: '#15161a',
+  green: '#15161a',
+  blue: '#15161a',
+  purple: '#ffffff',
+  grey: '#15161a',
+};
+
+/** Session activity label colour: tone text for the three live kinds, muted otherwise. */
+export function activityTextColor(kind: ActivityKind): string {
+  if (kind === 'input') return TONE.amber[1];
+  if (kind === 'working') return TONE.green[1];
+  if (kind === 'waiting') return TONE.blue[1];
+  return 'var(--kira-fg-muted)';
+}
 
 /** Mockup `chip(t)` (line 661) — the status-chip style every tone-labelled pill in the panel uses
  *  (header status, Branch/Jira/PR link rows, §0.11). */
@@ -30,11 +49,10 @@ export function chipStyle(tone: QueueTag['tone']): Record<string, string> {
   };
 }
 
-/** P129 Part 7 §2.4: `AdePanelHeader`'s own literal `'claude'`-tone button style (mockup `▶ Start
- *  agent`'s `#d97757` background), extracted so `AdeAllAgentsRow`'s own Start button reuses the
- *  exact same literal rather than a second copy. */
+/** Start-agent button style shared by `AdePanelHeader`, `AdeAllAgentsRow` and `AdeStackBlock`:
+ *  the theme's primary button. */
 export const CLAUDE_BUTTON_STYLE: Record<string, string> = {
-  background: '#d97757',
-  color: '#1a0f0a',
+  background: 'var(--primary)',
+  color: 'var(--primary-foreground)',
   border: 'none',
 };
