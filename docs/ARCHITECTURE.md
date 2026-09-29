@@ -2738,6 +2738,14 @@ persists until the next `Refresh`. `RepoSnapshot.main.name`/`.ref` hold short fo
 `origin/main`), not full refnames, and `RepoSnapshot.remote` names the default remote — a Part 4
 fix, since `AdeMainLine` renders `main` verbatim.
 
+`ade` chrome colours are `--kira-*` tokens (P138): Tailwind utilities in templates, `var(--kira-*)`
+in style objects. Literals stay only for data that encodes queue state: tones (`TONE` in
+`ade/tones.ts`, with `TONE_INK` and one-site alpha tints), the dependency kind colour and the
+20-slot work `PALETTE` in `ade/useQueue.ts`. `scripts/check-ade-colours.sh` (in `bun run lint`)
+fails on any other colour literal under `ade/`, comments included, and on an allowlist entry with
+no hit left. Design §7's Claude accent is the theme's `--primary`. The gate cannot see a kept value
+used as chrome; review covers that.
+
 **Kira Space's `ade` dialog (P129 Part 4) adds the Claude Code send/launch/archive flow on top of
 Part 3's read-only view.** Part 6's detail panel now wires the last opener: `resumeSpec`'s caller is
 the Agents tab's own Stopped list (its per-row Resume button), and the activity-icon click Part 5
@@ -4653,3 +4661,10 @@ Performance:
   cannot push a `.github/workflows/*.yml` change directly (an OAuth scope limit) and requires
   staging one under `docs/pending-changes/` for a session that can; that staging step is real,
   separate work this phase's own icon/docs/audit scope does not cover.
+
+- **No light theme; `ade`'s kept tone and work-palette values are dark-only (P138)**. Kira Space has
+  one dark `:root`; design §7 has no light palette. Kept tone text measures 1.6-2.4:1 on white
+  (amber 1.79, red 2.40, green 1.78, blue 2.02, purple 2.11, grey 2.03) and work palette slots
+  1.86-3.76:1. All `ade` chrome resolves through `--kira-*`, so a light `:root` flips it with no
+  `ade` edit. Closing this needs light tone variants plus a light `:root` in `packages/theme`,
+  which changes kept values.
