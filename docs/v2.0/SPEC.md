@@ -3115,3 +3115,80 @@ log, plan §2.6) untouched. Pushed on branch `p132-part1-impl`, not merged.
 - Unit specs: none under `tests/unit/ops-*`; two `oplog-*.spec.ts` in workbench.
 - Space diff: `state/layout.ts`, 3 comment lines.
 - SFC check uses `grep -L`. `rg -L` means `--follow`, not files-without-match.
+
+## P136 result
+
+Plan: `docs/v2.0/plans/P136-top5-my-work-timeline.md`. Implemented on `p136-plan` (base `96a3d644`),
+one commit per §8 step, plus one knip fix.
+
+**Shipped:**
+
+- `work_type` beside `kind`: `work`/`investigate`/`review`/`test`. Migration `0007` adds the columns,
+  backfills `review` where `kind = 'review'`. Invariant: `work`/`investigate` pair with `mine`/`parked`;
+  `review`/`test` pair with `review`. New work takes `work`/`investigate` only.
+- `SetWorkType` (repo, `Queue`, `AdeService`) is its own write path. Refuses `review`/`test` while
+  blockers exist (`ErrWorkTypeBlocked`) and on new work (`ErrWorkTypeInvalid`); both give `E_INVALID`.
+  `Rebind` carries `work_type`.
+- Details panel Kind select (`AdeWorkTypeField.vue`, shadcn `NativeSelect`). `review`/`test` options
+  disabled while blocked. Refused write shows inline error and reverts.
+- Cap: `myWorkCap.ts`, UI-level. `useQueue` still computes bands and hours over all items. Top 5
+  non-parked, non-dependency stacks by (merged last, earliest segment day, segment index), plus
+  dependencies blocking a kept member. `AdeMyWorkToggle.vue` under the main line. `showAllWork` is a
+  runtime ref in `AdeRepoView.vue`; a repo-tab switch resets it. Selecting a hidden item expands the
+  list once per id.
+
+**Commits:**
+
+1. `bff21371` storage: migration 0007, model, `SetWorkType`, rebind carry
+2. `eddc5e7d` `SetWorkType` on `AdeService`, `workType` in snapshot
+3. `7609220f` Go test: work type follows kind
+4. `ba73338a` work type dropdown
+5. `05a22314` timeline cap and toggle
+6. `8ae1ef7b` fix: keep `WORK_TYPE_LABEL` module-private (knip)
+7. `2cc2701f` unit test: cap ranking
+8. `2948f0e5` UI coverage
+9. `576d02bb` ARCHITECTURE
+
+**Verification (final tree):**
+
+| Check | Result |
+|---|---|
+| `bun run test:ui:space` | 93 passed, 0 failed (88 before; 5 new: 3 cap, 2 work type) |
+| `bun run test:unit` | 1830 passed, 0 failed (7 new cap tests) |
+| `bun run typecheck` | clean |
+| `bun run lint:all` | exit 0 (knip duplicate-export and config-hint output is pre-existing) |
+| `go test` `ade`, `bridge`, `storage/...` | ok |
+| `go build ./...`, `bun run build:space` | clean |
+| Migration backfill, scratch SQLite, `0001`-`0007` applied | `mine` gives `work`, `review` gives `review`, `parked` gives `work`, new work gives `work` |
+
+Five existing UI scenarios lost rows to the cap. They expand first through `tests/ui/support/ade.ts`
+`showAllWork`; no assertion weakened.
+
+**Closing audit (§10):**
+
+- Migration registered: 1 hit, `embed.go:25`.
+- `work_type` in `adequeue.go`: 8 hits (column lists, both INSERTs, `Rebind`, `SetBranchMeta`, `SetWorkType`).
+- `adeSetWorkType`: `bridge/index.ts:259`, `mutations.ts:144`; `useAdeSetWorkType` used by `AdeWorkTypeField.vue`.
+- `AdeService` funcs: 25.
+- `NativeSelect` in `AdeWorkTypeField.vue`: import plus use.
+- `myWorkCap`/`visibleRoots`: `myWorkCap.ts`, `AdeRepoView.vue`, `AdeTimeline.vue`, and the `MY_WORK_LIMIT` import in `AdeMyWorkToggle.vue`; none in `useQueue.ts`.
+- History files diff vs `96a3d644`: empty. `historyOpen`/`historyReach` lines unchanged.
+- `showAllWork`: `AdeRepoView.vue` only.
+- `<style` in new SFCs: none.
+- `package.json`/`bun.lock` diff vs `96a3d644`: empty.
+
+**Disclosures:**
+
+- Native select popup (WebKitGTK/WKWebView) unverified on Linux. Playwright `selectOption` never
+  opens the OS popup.
+- Live-app check on real repos did not run.
+- A pulled-in branch by another author defaults to `review` (`resolveKind`); a defaulted decision.
+  Change `resolveKind` if a different default was meant.
+- `hiddenCount` counts hidden parked stacks and unlinked dependencies, so the toggle can show with
+  zero hidden work stacks.
+- `gofmt -l` flags pre-existing files outside this phase: `bridge/gitclients.go`,
+  `gitaskpass/broker.go`, `gitpreflight/*_test.go`. Untouched.
+- Known wall-clock flakes (Kira Studio `budgets.spec.ts`, `slick-grid.spec.ts:896`) not run here;
+  Studio code untouched.
+
+**Needs its own row:** none.
