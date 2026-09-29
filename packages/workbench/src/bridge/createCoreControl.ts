@@ -165,6 +165,7 @@ export interface CoreControl<S, L, T, P, M> {
   // P116 H5's own ten — see this file's header comment.
   onOpenSettings: (cb: () => void) => () => void;
   onToggleProjectPanel: (cb: () => void) => () => void;
+  onToggleOperationsPanel: (cb: () => void) => () => void;
   onTabNext: (cb: () => void) => () => void;
   onTabPrev: (cb: () => void) => () => void;
   onTabClose: (cb: () => void) => () => void;
@@ -248,6 +249,8 @@ export function createCoreControl<S, L, T, P, M>(b: CoreBindings): CoreControl<S
 
     onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
     onToggleProjectPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleProjectPanel, cb),
+    onToggleOperationsPanel: (cb: () => void): (() => void) =>
+      on(CHANNEL.toggleOperationsPanel, cb),
     onTabNext: (cb: () => void): (() => void) => on(CHANNEL.tabNext, cb),
     onTabPrev: (cb: () => void): (() => void) => on(CHANNEL.tabPrev, cb),
     onTabClose: (cb: () => void): (() => void) => on(CHANNEL.tabClose, cb),

@@ -83,4 +83,30 @@ describe('createOpLogStore hydrateOps subscribe/snapshot race (F7)', () => {
     expect(stored?.status).toBe('ok');
     expect(opsStore.runningCount).toBe(0);
   });
+
+  test('a rejected snapshot keeps buffered updates and lets later updates apply', async () => {
+    const snapshotGate = deferred<OpLogRecord[]>();
+    let deliver: (r: OpLogRecord) => void = () => {};
+    const opsStore = useTestStore({
+      recent: () => snapshotGate.promise,
+      onUpdate: (cb) => {
+        deliver = cb;
+        return () => {};
+      },
+      cancel: async () => {},
+    });
+
+    const hydrating = opsStore.hydrateOps();
+    deliver(record({ id: 'op-buffered', status: 'running' }));
+    snapshotGate.reject(new Error('bridge down'));
+    await expect(hydrating).rejects.toThrow('bridge down');
+
+    expect(opsStore.records.map((r) => r.id)).toEqual(['op-buffered']);
+    deliver(record({ id: 'op-buffered', status: 'ok', durationMs: 3 }));
+    deliver(record({ id: 'op-later', status: 'running' }));
+    expect(opsStore.records.map((r) => `${r.id}:${r.status}`)).toEqual([
+      'op-later:running',
+      'op-buffered:ok',
+    ]);
+  });
 });

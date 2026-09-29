@@ -51,7 +51,7 @@ function canCancelRecord(record: R): boolean {
 function menuForRecord(record: R): MenuItem[] {
   return props.menuFor
     ? props.menuFor(record)
-    : opLogMenuItems(record, () => emit('cancel', record));
+    : opLogMenuItems(record, () => emit('cancel', record), canCancelRecord(record));
 }
 
 interface OpsListItem {

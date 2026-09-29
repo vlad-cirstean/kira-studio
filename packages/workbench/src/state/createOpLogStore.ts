@@ -83,10 +83,19 @@ export function createOpLogStore<R extends OpLogRecord>(options: OpLogStoreOptio
         applyUpdate(state.records, raw);
       });
 
-      const records = (await control.recent(HYDRATE_LIMIT)).map((r) => markRaw(r));
+      // A rejected snapshot still flips to live: without it the buffer grows forever and no live
+      // update ever applies. The caller still sees the failure.
+      let records: R[] = [];
+      let failure: unknown;
+      try {
+        records = (await control.recent(HYDRATE_LIMIT)).map((r) => markRaw(r));
+      } catch (err) {
+        failure = err;
+      }
       for (const raw of buffered.values()) applyUpdate(records, raw);
       state.records = records;
       hydrated = true;
+      if (failure !== undefined) throw failure;
     }
 
     // Clears the in-memory ring only — each app's own clear-hint prop states its own retention

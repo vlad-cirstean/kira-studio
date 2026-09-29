@@ -20,8 +20,13 @@ export type OpLogStatusFilter = 'all' | 'running' | 'error';
 // today's OperationsPanel.vue (184-216) minus its two Studio-only items (Reveal originating tab,
 // Re-run), which a wrapper adds itself by spreading this array in. `cancel` takes no id: every
 // caller already has `record` closed over (the inline stop button and this function both do), so
-// there's nothing for the id to disambiguate.
-export function opLogMenuItems<R extends OpLogRecord>(record: R, cancel: () => void): MenuItem[] {
+// there's nothing for the id to disambiguate. `canCancel` false disables Cancel for a running row
+// that cannot be cancelled (Space's push family).
+export function opLogMenuItems<R extends OpLogRecord>(
+  record: R,
+  cancel: () => void,
+  canCancel = true,
+): MenuItem[] {
   return [
     {
       type: 'item',
@@ -44,7 +49,7 @@ export function opLogMenuItems<R extends OpLogRecord>(record: R, cancel: () => v
       id: 'cancel',
       label: 'Cancel',
       icon: 'debug-stop',
-      disabled: record.status !== 'running',
+      disabled: record.status !== 'running' || !canCancel,
       run: cancel,
     },
   ];

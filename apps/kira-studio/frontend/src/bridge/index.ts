@@ -69,7 +69,6 @@ const studioControl = {
   onNewRequest: (cb: () => void): (() => void) => on(CHANNEL.newRequest, cb),
   onImportPostman: (cb: () => void): (() => void) => on(CHANNEL.importPostman, cb),
   onImportDataGrip: (cb: () => void): (() => void) => on(CHANNEL.importDataGrip, cb),
-  onToggleOperationsPanel: (cb: () => void): (() => void) => on(CHANNEL.toggleOperationsPanel, cb),
   onCommandPalette: (cb: () => void): (() => void) => on(CHANNEL.commandPalette, cb),
   onViewFind: (cb: () => void): (() => void) => on(CHANNEL.viewFind, cb),
   onViewRefresh: (cb: () => void): (() => void) => on(CHANNEL.viewRefresh, cb),
