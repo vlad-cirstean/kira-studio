@@ -19,11 +19,7 @@ export interface UseDragReorderOptions<T> {
  *  these sites use native drag events over a widget, not a sortable-list library) — hand-written,
  *  once, rather than per call site.
  *
- *  packages/workbench/src/components/TabStrip.vue has the same three-function shape but tracks
- *  the dragged tab by id, not index, and never owns a local array to splice — it mutates the
- *  shared tab list live via `host.tabs.moveTab(from, id)` on every dragover (its own comment: "the
- *  strip itself needs no local copy"). That's a different mechanism, not a duplicate of this one;
- *  not migrated here. */
+ *  TabStrip.vue reorders through `vue-draggable-plus` since P137. */
 export function useDragReorder<T>(list: Ref<T[]>, options: UseDragReorderOptions<T> = {}) {
   const dragIndex = ref<number | null>(null);
   const canReorder = options.canReorder ?? (() => true);

@@ -3,16 +3,16 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import { useEventListener } from '@vueuse/core';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, shallowRef, watch } from 'vue';
+import { useDraggable } from 'vue-draggable-plus';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { copyText } from '../util/clipboard';
 import { wheelToHorizontal } from '../util/wheelScroll';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
-// The strip, drag-reorder, wheel-scroll, keyboard-scroll-into-view and the six generic
-// context-menu items are exactly the two apps' shared skeleton (confirmed side by side); every
+// The strip, drag-reorder (vue-draggable-plus since P137), wheel-scroll, keyboard-scroll-into-view
+// and the six generic context-menu items are exactly the two apps' shared skeleton (confirmed side by side); every
 // per-app extra — Kira Studio's incognito eye glyph, Kira Space's seti file icons — arrives
 // through the host's own `iconFor`/`tabIndicator`/`tabBadge`/`tabAttention` hooks (host.ts,
 // tabAttention wired by no app as of P127) instead of an app-local import. The trailing "+"
@@ -194,48 +194,39 @@ function onWheel(e: WheelEvent): void {
   if (wheelToHorizontal(stripRef.value, e)) e.preventDefault();
 }
 
-// Drag-reorder: moveTab splices the underlying tabs array live as the dragged tab crosses another
-// one's midpoint, so the strip itself needs no local copy. Tracks the dragged tab's id, not its
-// index — this strip renders a filtered, per-workspace view.
-const dragId = ref<string | null>(null);
+// Id mirror of the row, bound to the library: it reverts its own DOM move only when a list is
+// bound, then `onUpdate` commits through the store once per drop. Pinned chips sit outside
+// `stripRef`, so they never take part.
+const rowIds = shallowRef<string[]>([]);
+watch(
+  () => scrollingTabs.value.map(({ tab }) => tab.id),
+  (ids) => {
+    rowIds.value = ids;
+  },
+  { immediate: true },
+);
 
-// §6.1: a pinned tab is `draggable="false"` in the template, so it never starts a drag itself —
-// this guard also covers moveTab's own early-return for a pinned *drop target*.
-function onDragStart(id: string): void {
-  dragId.value = id;
+const moveTab = host.tabs.moveTab;
+if (moveTab) {
+  useDraggable(stripRef, rowIds, {
+    draggable: '[data-testid="tab"]',
+    filter: '[data-testid="tab-close"]',
+    preventOnFilter: false,
+    direction: 'horizontal',
+    group: { name: 'tab-strip', pull: false, put: false },
+    forceFallback: true,
+    fallbackOnBody: true,
+    fallbackTolerance: 4,
+    // Sortable toggles one class name on the ghost, so a single utility.
+    ghostClass: 'opacity-50',
+    onUpdate: (evt) => {
+      const ids = scrollingTabs.value.map(({ tab }) => tab.id);
+      const from = ids[evt.oldDraggableIndex ?? -1];
+      const to = ids[evt.newDraggableIndex ?? -1];
+      if (from && to) moveTab(from, to);
+    },
+  });
 }
-function onDragOver(id: string): void {
-  const from = dragId.value;
-  if (from === null || from === id) return;
-  host.tabs.moveTab?.(from, id);
-  // F6: `dragId` tracks the *dragged* tab throughout the whole gesture, never the hovered one --
-  // reassigning it to `id` here (the old code) meant the next dragover moved whatever tab had just
-  // been hovered, not the tab the user is actually dragging, and `is-dragging` (below, matched
-  // against `dragId`) landed on the wrong chip.
-}
-function onDragEnd(): void {
-  dragId.value = null;
-}
-
-// P105 §5.1: dragstart/dragover/dragend delegated off each tab chip onto the strip — a pointer-only
-// gesture with no keyboard equivalent to wire up, same as every other container-level listener this
-// phase moved. `.closest` recovers which chip the event actually landed on.
-function tabIdFromEvent(e: Event): string | null {
-  return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="tab"]')?.dataset
-    .tabId ?? null;
-}
-function onDragStartFromEvent(e: DragEvent): void {
-  const id = tabIdFromEvent(e);
-  if (id !== null) onDragStart(id);
-}
-function onDragOverFromEvent(e: DragEvent): void {
-  e.preventDefault();
-  const id = tabIdFromEvent(e);
-  if (id !== null) onDragOver(id);
-}
-useEventListener(stripRef, 'dragstart', onDragStartFromEvent);
-useEventListener(stripRef, 'dragover', onDragOverFromEvent);
-useEventListener(stripRef, 'dragend', onDragEnd);
 </script>
 
 <template>
@@ -315,8 +306,8 @@ useEventListener(stripRef, 'dragend', onDragEnd);
     >
       <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
            HTML and unreachable by keyboard — the close button is this tab's sibling now, not its
-           child. `draggable`/drag* stay on this wrapper (the whole chip is the drag handle);
-           click/dblclick/auxclick/contextmenu move onto the tab's own inner button. -->
+           child. The whole chip is the drag handle (vue-draggable-plus, on the row);
+           click/dblclick/auxclick/contextmenu live on the tab's own inner button. -->
       <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
@@ -324,7 +315,6 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         :class="[
           tabChipVariants({ active: tab.active }),
           isAttention(tab) ? ATTENTION_CLASS : '',
-          { 'opacity-50': dragId === tab.id },
         ]"
         data-testid="tab"
         :data-tab-id="tab.id"
@@ -334,7 +324,6 @@ useEventListener(stripRef, 'dragend', onDragEnd);
         data-pinned="false"
         :data-color="host.railColorFor(tab)"
         :style="{ '--kira-rail': connColorVar(host.railColorFor(tab)) }"
-        draggable="true"
       >
         <span class="w-0.5 h-3.5 rounded-xs shrink-0 bg-(--kira-rail)" />
         <button
