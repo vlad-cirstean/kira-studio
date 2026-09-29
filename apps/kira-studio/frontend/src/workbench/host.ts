@@ -23,6 +23,7 @@ export function createWorkbenchHost(): WorkbenchHost<AppMode, TabRecord> {
     tabs: tabsStore,
     kinds: TAB_KINDS,
     views: TAB_VIEWS,
+    keepAlive: { kinds: ['data'], max: 5 },
     iconFor(tab): TabIconRender {
       return { codicon: TAB_KINDS[tab.kind].icon(tab) };
     },
