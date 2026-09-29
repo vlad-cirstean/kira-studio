@@ -1,7 +1,7 @@
 import type { QueuePanel } from './useQueue';
 import type { AdeWorkType } from './wire';
 
-export const WORK_TYPE_LABEL: Record<AdeWorkType, string> = {
+const WORK_TYPE_LABEL: Record<AdeWorkType, string> = {
   work: 'Mine: to work',
   investigate: 'Mine: to investigate',
   review: 'To review',
