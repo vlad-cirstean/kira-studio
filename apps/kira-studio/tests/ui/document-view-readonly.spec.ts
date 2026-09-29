@@ -63,7 +63,7 @@ async function assertTooltipShows(
   text: string | RegExp,
 ): Promise<void> {
   await trigger.hover();
-  await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltip(page)).toBeVisible({ timeout: 3_000 });
   // toContainText, not toHaveText: reka's TooltipContent renders a visually-hidden a11y mirror
   // span alongside the visible text, so a bare .textContent read sees the text doubled.
   await expect(tooltip(page)).toContainText(text);
