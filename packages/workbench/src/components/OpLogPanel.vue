@@ -186,7 +186,7 @@ defineSlots<{
         @scroll="onScroll"
       >
         <!--
-          The expanded command/error detail rows embed a #detail slot (Studio: MonacoHost, D18/D19
+          The expanded command/error detail rows embed a #detail slot (the host app's editor, D18/D19
           P60a) inside a fixed virtual row rather than the list itself being variable-height (P2 §0
           note 14 leaves it fixed on purpose). The row height below is JS, not CSS (P24 D34) — it
           has to stay numerically equal to --kira-h-xs (18px), which every row below and any #detail
