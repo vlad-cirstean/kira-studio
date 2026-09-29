@@ -3256,3 +3256,73 @@ strip test; `c33f71f2` tooltip wait fix; `22e1a12c` ARCHITECTURE.
 
 - (a) ade repo drag-reorder needs a persisted repo order path shared with the Git panel.
 - (b) Migrate `useDragReorder`'s three consumers to `vue-draggable-plus`.
+
+## P138 result
+
+Plan: `docs/v2.0/plans/P138-ade-theme-tokens.md`; audit: `docs/v2.0/plans/P138-ade-hex-audit.md`.
+Implemented on `p138-plan` (base `09006e6d`), one commit per §9 step.
+
+**Commits:** `9649dee1` tones/allAgents constants (`TONE_INK`, `activityTextColor`, Claude button
+on `--primary`); `b11d12dc` timeline group; `e660f44e` detail panel group; `a333b6a3` All agents
+view and dialog; `94baf958` `scripts/check-ade-colours.sh` chained into `bun run lint`;
+`4917db45` ARCHITECTURE. No follow-up fix commits: full run found nothing to fix.
+
+**Shipped:**
+
+- 279 literals audited: 109 kept (57 distinct values, the gate allowlist), 162 remapped onto
+  `--kira-*` tokens or utilities, 3 normalized onto kept values, 5 comments reworded.
+- TS style sites read `TONE`/`TONE_INK`/`DEPENDENCY_COLOR`; one `activityTextColor` replaces two
+  copies of `stateColor`. Template classes keep kept literals (Tailwind v4 needs them spelled out).
+- Gate fails on a non-kept literal (comments included) and on a stale allowlist entry. Proved:
+  a stray `text-[#abcdef]` exits 1 with `file:line: #abcdef`; a mistyped allowlist entry exits 1
+  with both the unmatched hit and the stale entry; both reverted, not committed. Passes on final
+  tree, exit 0.
+- No `packages/theme`, dependency, Go or test change. `AdeNotesEditor.vue` keeps its one
+  `<style scoped>` block, literals swapped to `var()`.
+
+**Tests (before/after):**
+
+- Unit 1830 to 1830, 0 fail. Space `ui` 95 to 95. Space visual 4 pass, unchanged.
+- `typecheck`, `lint:all` (biome, three shell gates, golangci-lint 0 issues, knip exit 0), and
+  `build:space` clean. knip prints pre-existing duplicate-export notes in unrelated files.
+- Space `ui` first full run: 2 failures (`ade-panel.spec.ts:430`, `repo-workspace.spec.ts:228`) in
+  the run that overlapped a build; both pass alone (`:430` 15 of 15 repeats) and in a second full
+  run. Load flake, not caused by this phase.
+
+**Closing audit (§11), all pass:**
+
+- Gate exit 0. Wired: `grep -c check-ade-colours package.json` = 1. Allowlist = 57 lines.
+- Residual literals: 92, equal to plan.
+- Amber as chrome (`border-b-`/`outline-`/`text-[#e8a33d]`): empty. Remaining `#e8a33d` outside
+  `tones.ts` are 3 data states: overdue "Move to today", "Rebase all", input glyph.
+- `#f28b7d`: 6 hits, all state roles (`tones.ts`, `AdeDayBand` x2, `AdeDependencyDetails`,
+  `AdeChangesTab` x2). `text-[#7aa7ff]`: only the other-author name in `AdeAddPopover`.
+- Claude orange (`d97757|1a0f0a|e8a07f|217,119,87`): empty. `function stateColor`: empty.
+  `IBM Plex`: empty (the plan's bare `plex` grep also matches "complexity" in `useQueue.ts`).
+- `TONE_INK`/`activityTextColor` have real callers: `AdePanelHeader`, `AdeStackBlock`,
+  `AdeAgentsPill`, `AdeAllAgentsRow`. `<style` only in `AdeNotesEditor.vue`.
+- `git diff --stat 3a71141f -- packages/theme`: empty. Dependencies: `package.json` `lint` line only.
+- Compare spec and snapshots deleted; `git status` clean.
+
+**Visual comparison (§7, one-off, not committed):** six states (timeline, Details, Changes,
+Agents, All agents, history bar), before baseline then after. Playwright's default per-pixel
+tolerance hides sub-threshold neutral shifts (all-agents state showed no diff). Diff images show
+only listed changes: Start buttons and "Current work" orange/amber to blue, selection rail and tab
+underline to blue, agents-pill robot icons to blue, commit sha to grey, Sat/Sun and past day labels
+brighter. Chips, tags, work colours, glyphs, today marker, overdue and dependency box unchanged.
+Dark theme reads near-identical. Runs deterministic (before baseline re-run: 0 diff).
+
+**Disclosed for the user:**
+
+- Claude orange `#d97757` is now Kira blue (`--primary`): Start buttons, robot icons, session tab
+  rail, count pill. Reversible in `tones.ts` plus four class sites, at the cost of a 58th kept value.
+- Light theme is a follow-up, not this bar: no light theme exists, kept tone text is 1.6-2.4:1 on
+  white. Recorded in `docs/ARCHITECTURE.md` Known open items; no SPEC row added.
+- Tone contrast under 4.5:1, pre-existing, kept values: white on purple solid 3.35:1, ink on grey
+  solid 3.60:1 (11-12px button labels). Fixing changes a tone.
+- Selection rail, active-tab underline and drop highlight amber to blue by role (plan §3.5).
+
+**Not verifiable in a Linux sandbox:** colour rendering on WKWebView (macOS) and WebKitGTK;
+`color-mix()` and `/20` opacity already ship in the app but were checked only in Playwright WebKit.
+Comparison used sandbox fonts both sides, so a relative diff only. Live `ade` on real repos not
+run; mocked control only.
