@@ -6,7 +6,7 @@ import AdeDayControls from './AdeDayControls.vue';
 import AdeHistoryPull from './AdeHistoryPull.vue';
 import { useAdeDragStore } from './state/adeDrag';
 import { type DropTarget, dropVerdict, type SetPlanArgs } from './timelineOps';
-import type { QueueBand, QueueSegment, QueueView } from './useQueue';
+import type { QueueBand, QueueSegment, QueueSpan, QueueView } from './useQueue';
 import type { DropResult } from './useTimelineDrag';
 import type { AdePlan } from './wire';
 
@@ -27,6 +27,8 @@ const props = defineProps<{
   pct: number;
   historyDays: number;
   minExtraDate: string;
+  /** P136: stack roots to render, `null` shows every stack. */
+  visibleRoots: ReadonlySet<string> | null;
 }>();
 
 type SegmentActionType = NonNullable<QueueSegment['action']>;
@@ -53,12 +55,18 @@ const itemsById = computed(() => new Map(props.view.items.map((item) => [item.id
 const blocksByDay = computed(() => {
   const m = new Map<number, QueueSegment[]>();
   for (const seg of props.view.segments) {
+    if (props.visibleRoots && !props.visibleRoots.has(seg.stackRoot)) continue;
     const arr = m.get(seg.day);
     if (arr) arr.push(seg);
     else m.set(seg.day, [seg]);
   }
   return m;
 });
+
+function spansFor(band: QueueBand): QueueSpan[] {
+  const roots = props.visibleRoots;
+  return roots ? band.spans.filter((s) => roots.has(s.stackRoot)) : band.spans;
+}
 
 // §0.12: while a drag is active, resolve the element under the pointer into a `DropTarget` — closest
 // `[data-ade-box]` first (drop-on-box, mockup semantics: before its own lead), else closest
@@ -122,6 +130,7 @@ function onDrop(result: NonNullable<DropResult>): void {
       <AdeDayBand
         :band="band"
         :blocks="blocksByDay.get(band.day) ?? []"
+        :spans="spansFor(band)"
         :items-by-id="itemsById"
         :parent-of="view.parentOf"
         :selected-id="view.selectedId"

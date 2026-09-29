@@ -219,6 +219,8 @@ export interface QueueSegment {
  *  rendered on every day of its span after the first. */
 export interface QueueSpan {
   lead: string;
+  /** P136: the owning stack's root, so the my-work cap hides a hidden stack's continuation rows. */
+  stackRoot: string;
   title: string;
   color: string;
   note: string;
@@ -1728,6 +1730,7 @@ function spansForDay(
     const colorIndex = snapshot.colors[g.lead] ?? 0;
     spans.push({
       lead: g.lead,
+      stackRoot: g.stackRoot,
       title: titleOfId(g.lead),
       color: PALETTE[colorIndex % PALETTE.length] as string,
       note: `day ${idx + 1}/${g.days.length}${isEnd ? ' · merges' : ''}`,

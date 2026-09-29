@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert'
 import { Button } from '@theme/components/ui/button';
 import { useElementSize, useIntervalFn, useScroll } from '@vueuse/core';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useSettingsStore } from '../state/settings';
 import AdeAddPopover from './AdeAddPopover.vue';
@@ -12,11 +12,13 @@ import AdeConfirmDialog from './AdeConfirmDialog.vue';
 import AdeDetailPanel from './AdeDetailPanel.vue';
 import AdeHistoryBar from './AdeHistoryBar.vue';
 import AdeMainLine from './AdeMainLine.vue';
+import AdeMyWorkToggle from './AdeMyWorkToggle.vue';
 import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import AdeTimeline from './AdeTimeline.vue';
 import { type DialogCtx, moveSpec, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
+import { myWorkCap } from './myWorkCap';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
@@ -73,6 +75,9 @@ const today = computed(() => localIso(now.value));
 // fallback, never written here).
 const historyOpen = ref(false);
 const historyReach = ref<number | undefined>(undefined);
+
+// P136: runtime only, same lifetime as `historyOpen` (a repo-tab remount collapses the my-work list).
+const showAllWork = ref(false);
 
 // §0.9: the scroll container (root, `overflow-auto`) and the sticky header, whose own live height
 // `scrollToDay` and `inHistory` both read via `useElementSize`.
@@ -262,6 +267,28 @@ const view = computed(() => {
   });
 });
 
+const cap = computed(() => (view.value ? myWorkCap(view.value) : null));
+
+// P136: an explicit selection of a hidden item (Add popover, a dependency chip) expands the list
+// once per id, so a later collapse sticks.
+const hiddenSelection = computed(() => {
+  const id = adeUiStore.selectedByRepo[props.codeRepoId];
+  const c = cap.value;
+  if (!id || !c || !view.value?.items.some((i) => i.id === id)) return null;
+  return c.visibleItems.has(id) ? null : id;
+});
+let revealedFor: string | null = null;
+watch(
+  hiddenSelection,
+  (id) => {
+    if (id && id !== revealedFor) {
+      revealedFor = id;
+      showAllWork.value = true;
+    }
+  },
+  { immediate: true },
+);
+
 function onSelect(id: string): void {
   adeUiStore.select(props.codeRepoId, id);
 }
@@ -424,6 +451,12 @@ function onDismissError(): void {
         >
           <AdeAddPopover :code-repo-id="codeRepoId" :items="view?.items ?? []" />
         </AdeMainLine>
+        <AdeMyWorkToggle
+          v-if="cap && cap.hiddenCount > 0"
+          :hidden-count="cap.hiddenCount"
+          :expanded="showAllWork"
+          @toggle="showAllWork = !showAllWork"
+        />
         <AdeHistoryBar
           v-if="inHistory"
           @go-to-date="onGoToDate"
@@ -454,6 +487,7 @@ function onDismissError(): void {
         :pct="pct"
         :history-days="settingsStore.ade.historyDays"
         :min-extra-date="minExtraDate"
+        :visible-roots="showAllWork || !cap ? null : cap.visibleRoots"
         @select="onSelect"
         @open-session="onOpenSession"
         @open-history="() => void openHistory()"

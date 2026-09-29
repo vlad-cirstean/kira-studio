@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import AdeContinuationRow from './AdeContinuationRow.vue';
 import AdeStackBlock from './AdeStackBlock.vue';
-import type { QueueBand, QueueItem, QueueSegment } from './useQueue';
+import type { QueueBand, QueueItem, QueueSegment, QueueSpan } from './useQueue';
 import type { DropResult } from './useTimelineDrag';
 import { useTimelineDrag } from './useTimelineDrag';
 
@@ -14,6 +14,8 @@ import { useTimelineDrag } from './useTimelineDrag';
 const props = defineProps<{
   band: QueueBand;
   blocks: QueueSegment[];
+  /** P136: `band.spans` after the my-work cap, continuation rows to render. */
+  spans: QueueSpan[];
   itemsById: ReadonlyMap<string, QueueItem>;
   parentOf: Readonly<Record<string, string>>;
   selectedId: string | null;
@@ -191,7 +193,7 @@ const tickColor = computed(() => (props.band.isToday ? '#e8a33d' : '#121316'));
         @drop="emit('drop', $event)"
       />
       <AdeContinuationRow
-        v-for="span in band.spans"
+        v-for="span in spans"
         :key="`${span.lead}-${span.startDay}`"
         :span="span"
         @pick="(lead) => emit('select', lead)"
