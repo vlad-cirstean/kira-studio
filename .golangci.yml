@@ -34,6 +34,11 @@ linters:
       - path: _test\.go
         linters: [gocognit, gocyclo, prealloc]
 
+# Guard for P139: gofmt drift landed silently until pre-push began running this.
+formatters:
+  enable:
+    - gofmt
+
 issues:
   # golangci-lint truncates at 50 per linter / 3 per message by default and still
   # prints a tidy total. That hid 507 of gocritic's 541 findings on the first run
