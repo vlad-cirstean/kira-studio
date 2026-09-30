@@ -110,6 +110,38 @@ export function clampColumnOverscan(
   };
 }
 
+// WebKit rebuilds every element's style when a <style> is removed or a CSSOM rule is mutated
+// (~55 ms on the test page); a sheet appended with its text already set, or a custom property on
+// the grid root, restyles only what it touches. So column rules live in one append-only sheet and
+// per-grid values live on the grid root. P139 Part 2.
+const COLUMN_RULE_CHUNK = 256;
+let columnRuleCapacity = 0;
+
+function ensureColumnRules(columnCount: number): void {
+  if (columnCount <= columnRuleCapacity) return;
+  const next = Math.ceil(columnCount / COLUMN_RULE_CHUNK) * COLUMN_RULE_CHUNK;
+  const rules: string[] = [];
+  if (columnRuleCapacity === 0) {
+    rules.push(
+      '.kira-sg .slick-group-header-column,.kira-sg .slick-header-column{left:1000px}',
+      '.kira-sg .slick-top-panel{height:var(--sg-top-panel-h)}',
+      '.kira-sg .slick-preheader-panel{height:var(--sg-preheader-h)}',
+      '.kira-sg .slick-topheader-panel{height:var(--sg-topheader-h)}',
+      '.kira-sg .slick-headerrow-columns{height:var(--sg-headerrow-h)}',
+      '.kira-sg .slick-footerrow-columns{height:var(--sg-footerrow-h)}',
+      '.kira-sg .slick-cell{height:var(--sg-cell-h)}',
+      '.kira-sg .slick-row{height:var(--sg-row-h)}',
+    );
+  }
+  for (let i = columnRuleCapacity; i < next; i++) {
+    rules.push(`.kira-sg .l${i}{left:var(--sg-l${i})}`, `.kira-sg .r${i}{right:var(--sg-r${i})}`);
+  }
+  const style = document.createElement('style');
+  style.textContent = rules.join('\n'); // text before insertion: WebKit's additive path
+  document.head.append(style);
+  columnRuleCapacity = next;
+}
+
 /**
  * §6 D4 — a thin `SlickGrid` subclass overriding `getRenderedRange`, the plan's single point of
  * coupling to SlickGrid internals. SlickGrid's own runway (F4) is *smaller* than this app's at
@@ -350,6 +382,59 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     };
     this.ancestorScrollHandler = handler;
     document.addEventListener('scroll', handler, true);
+  }
+
+  // Upstream keeps one <style> per grid and mutates its rules; see the block above ensureColumnRules.
+  // `rtl` keeps upstream's sheet (no call site sets it).
+  protected override createCssRules(): void {
+    if (this._options.rtl) {
+      super.createCssRules();
+      return;
+    }
+    ensureColumnRules(this.columns.length);
+    const o = this._options;
+    const box = this._container;
+    box.classList.add('kira-sg');
+    box.style.setProperty('--sg-top-panel-h', `${o.topPanelHeight}px`);
+    box.style.setProperty('--sg-preheader-h', `${o.preHeaderPanelHeight}px`);
+    box.style.setProperty('--sg-topheader-h', `${o.topHeaderPanelHeight}px`);
+    box.style.setProperty('--sg-headerrow-h', `${o.headerRowHeight}px`);
+    box.style.setProperty('--sg-footerrow-h', `${o.footerRowHeight}px`);
+    box.style.setProperty('--sg-row-h', `${o.rowHeight}px`);
+    box.style.setProperty(
+      '--sg-cell-h',
+      o.enableVariableRowHeight
+        ? `calc(100% - ${this.cellHeightDiff}px)`
+        : `${(o.rowHeight ?? 0) - this.cellHeightDiff}px`,
+    );
+  }
+
+  protected override removeCssRules(): void {
+    if (this._options.rtl) super.removeCssRules();
+  }
+
+  protected override applyColumnWidths(): void {
+    if (this._options.rtl) {
+      super.applyColumnWidths();
+      return;
+    }
+    const frozen = this._options.frozenColumn;
+    const style = this._container.style;
+    let x = 0;
+    for (let i = 0; i < this.columns.length; i++) {
+      const column = this.columns[i];
+      if (!column?.hidden) {
+        const w = column?.width || 0;
+        const canvasWidth =
+          frozen !== undefined && frozen !== -1 && i > frozen
+            ? this.canvasWidthR
+            : this.canvasWidthL;
+        style.setProperty(`--sg-l${i}`, `${x}px`);
+        style.setProperty(`--sg-r${i}`, `${canvasWidth - x - w}px`);
+        if (frozen !== i) x += column?.width ?? 0;
+      }
+      if (frozen === i) x = 0;
+    }
   }
 
   /** P22 iter2-pacing D4 — SlickGrid's own `destroy()` never clears `this.initialized` and nulls
