@@ -26,7 +26,7 @@ import type {
   SlickEventData,
 } from 'slickgrid';
 import { SlickEventHandler, type SlickHybridSelectionModel, SlickRange } from 'slickgrid';
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
@@ -772,7 +772,6 @@ const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
 function onViewportScroll(): void {
   const el = viewportEl;
   if (!el) return;
-  lastScroll = { top: el.scrollTop, left: el.scrollLeft };
   // P67 §4.3: the preview popover is anchored to a viewport point over a virtualized row — a
   // scroll makes that point mean nothing (a different row, maybe no row) — reuses this existing
   // listener rather than binding a second one to the same element.
@@ -788,13 +787,11 @@ function onViewportScroll(): void {
 
 // SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted replaces the
 // clearTimeout below.
-// A detached viewport reads 0/0 (a KeepAlive deactivation moves it) and fires no scroll event, so
-// the last scroll event's own position is the one to persist and restore.
-let lastScroll = { top: 0, left: 0 };
-function writeScroll(): void {
-  tabsStore.patchDataTabState(props.tabId, { scrollTop: lastScroll.top, scrollLeft: lastScroll.left });
-}
-const persistScroll = useDebounceFn(writeScroll, 300);
+const persistScroll = useDebounceFn(() => {
+  const el = viewportEl;
+  if (!el) return;
+  tabsStore.patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
+}, 300);
 function onViewportScrollPersist(): void {
   void persistScroll();
 }
@@ -1931,16 +1928,6 @@ function onKeydown(e: SlickEventData): void {
   }
 }
 
-function bindEditorCtx(): void {
-  editorCtx.readValue = (row, name) => displayCell(row, currentOrder().indexOf(name));
-  editorCtx.commit = (row, name, value) =>
-    pendingChangesStore.stageEdit(props.tabId, row, name, value);
-}
-
-// True between a KeepAlive deactivation and the next activation. A descendant's first onActivated
-// fires only when it mounted before its KeepAlive root activated, so the flag gates the hook.
-let deactivated = false;
-
 onMounted(() => {
   const el = rootRef.value;
   if (!el) return;
@@ -1983,7 +1970,9 @@ onMounted(() => {
   // itself). Both callbacks re-resolve the display column / read state fresh on every call, so —
   // unlike `dataItemColumnValueExtractor`'s own captured-closure trap noted just above — this
   // assignment is correct for the tab's whole lifetime and needs no pageVersion-watch counterpart.
-  bindEditorCtx();
+  editorCtx.readValue = (row, name) => displayCell(row, currentOrder().indexOf(name));
+  editorCtx.commit = (row, name, value) =>
+    pendingChangesStore.stageEdit(props.tabId, row, name, value);
 
   // getCellValue's return type is a compatibility shim only (F1's own insurance, never the real
   // render path — dataItemColumnValueExtractor, below, is) so it deliberately returns `unknown`
@@ -2112,7 +2101,6 @@ onMounted(() => {
   if (viewportEl && t) {
     viewportEl.scrollTop = t.state.scrollTop;
     viewportEl.scrollLeft = t.state.scrollLeft;
-    lastScroll = { top: t.state.scrollTop, left: t.state.scrollLeft };
   }
   if (viewportEl) {
     // P22 iter2-onset D1 — seed the sampler's baseline at mount (after the restored scroll position
@@ -2191,39 +2179,6 @@ onMounted(() => {
   // tag-less, by the `grid.render()` above), then fill tags in once the async pass resolves.
   // refreshMaskTagsAndRerender (finding #11) turns preview back off on a correlation-key failure.
   if (maskPreviewOn()) refreshMaskTagsAndRerender();
-});
-
-onDeactivated(() => {
-  if (!grid) return;
-  deactivated = true;
-  closeFkPreview();
-  grid.getEditorLock().cancelCurrentEdit();
-  persistScroll.cancel();
-  writeScroll();
-  // A detached grid measures 0x0: an observed resize would empty its rows.
-  resizeObserver?.disconnect();
-  unregisterGridHost(props.tabId);
-  if (viewportEl) scrollTrace.unregisterGrid(viewportEl);
-});
-
-onActivated(() => {
-  if (!deactivated || !grid || !viewportEl || !gridRootEl) return;
-  deactivated = false;
-  bindEditorCtx();
-  viewportEl.scrollTop = lastScroll.top;
-  viewportEl.scrollLeft = lastScroll.left;
-  scrollVelocityTracker.seed(viewportEl.scrollTop, performance.now());
-  // Rows emptied while detached, or a page that changed meanwhile, repaint here.
-  grid.resizeCanvas();
-  resizeObserver?.observe(gridRootEl);
-  scrollTrace.registerGrid(viewportEl, '.slick-row');
-  // A focus request made while deactivated went pending; no pageVersion bump will consume it.
-  registerGridHost(props.tabId, applyCellFocusRequest);
-  const pendingFocus = consumeCellFocus(props.tabId);
-  if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
-    requestCellFocus(props.tabId, pendingFocus);
-  }
-  refreshSearchLayer();
 });
 
 onUnmounted(() => {

@@ -172,8 +172,8 @@ let prevLiveScrollTop = 0;
 let frames: ScrollTraceFrame[] = [];
 
 /** Called from SlickGridHost.vue's own onMounted/onUnmounted (and, before it was deleted,
- *  DataGrid.vue's) and its activation hooks — at most one grid is ever active at a time (a
- *  kept-alive grid unregisters on deactivation), so a single module-level target is enough. `rowSelector` (P22 spike D9) is the
+ *  DataGrid.vue's) — at most one grid is ever mounted at a time (MainView.vue keys its DataView by
+ *  tab id), so a single module-level target is enough. `rowSelector` (P22 spike D9) is the
  *  mounted-row query `measureMountedBand` below uses — defaults to `[data-testid="grid-row"]`. */
 export function registerGrid(el: HTMLElement, rowSelector = '[data-testid="grid-row"]'): void {
   gridEl = el;
