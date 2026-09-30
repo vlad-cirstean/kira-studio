@@ -101,19 +101,10 @@ export interface TabStripHost<WK extends string, R extends TabLike> {
   tabIndicator?(tab: R): { icon: string; tooltip: string } | null;
 }
 
-export interface WorkbenchKeepAlive<K extends string> {
-  /** Kinds whose view is deactivated, not unmounted, on a switch away. */
-  readonly kinds: readonly K[];
-  /** Warm tabs kept; least recently activated evicted first. */
-  readonly max: number;
-}
-
 export interface WorkbenchHost<WK extends string, R extends TabLike> extends TabStripHost<WK, R> {
   readonly tabs: WorkbenchTabsHost<WK, R>;
   readonly kinds: TabKindRegistry<R['kind'], R, unknown, unknown, MenuItem>;
   readonly views: TabViewMap<R['kind']>;
-  /** Opt-in per app: omitted, every switch remounts the view. */
-  readonly keepAlive?: WorkbenchKeepAlive<R['kind']>;
 }
 
 // An InjectionKey carries one concrete type; each app's real WK/R instantiation is narrowed back
