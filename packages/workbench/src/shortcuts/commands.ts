@@ -1,8 +1,7 @@
-// D11: a tiny per-id registry the active view's own component registers into while active and
-// unregisters when it deactivates or unmounts. Exactly one of DataView.vue/DefinitionView.vue/
-// ConsoleView.vue is ever active at a time (MainView.vue renders the active tab only; a kept-alive
-// view deactivates), so "run the active tab's own Find/Refresh/Run/Run all" falls out for free
-// with no active-tab-kind branching here.
+// D11: a tiny per-id registry the active view's own component registers into on mount and
+// unregisters on unmount. Exactly one of DataView.vue/DefinitionView.vue/ConsoleView.vue is ever
+// mounted at a time (MainView.vue's `v-else-if` chain), so "run the active tab's own Find/
+// Refresh/Run/Run all" falls out for free with no active-tab-kind branching here.
 const handlers = new Map<string, () => void>();
 
 export function registerCommand(id: string, handler: () => void): () => void {
