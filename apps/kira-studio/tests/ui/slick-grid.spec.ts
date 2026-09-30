@@ -291,26 +291,17 @@ function rightViewport(page: import('@playwright/test').Page) {
   return page.locator('[data-testid="data-grid"] .slick-viewport-top.slick-viewport-right');
 }
 
-// Counts only SlickGrid's OWN per-instance <style> element (F8's own createCssRules/
-// removeCssRules), not every <style> tag in <head> — opening a data tab also mounts
-// FilterToolbar.vue's WHERE/ORDER BY fields (Monaco span-painted overlays, P60a), and Monaco's own
-// theme service injects a *global*, never-removed `<style>` (the `.mtk*`/`.monaco-colors` token
-// colour rules `colorize()` and every editor instance share) the first time any editor surface in
-// the session paints anything. SlickGrid's own rules are always scoped
-// `.<uid> .slick-header-column { ... }` (createCssRules, dist/esm/index.mjs read this session) — a
-// real signature no editor's own injected stylesheet can ever share, filtered for below rather than
-// excluded by name (so it stays correct regardless of which editor engine is behind the toolbar's
-// own fields at any given time). Module-scope (not nested in the exit-criteria test below) so P22
-// iter2-pacing's own teardown test (T4) can reuse it without restating it.
+// Counts <style> elements holding a `.slickgrid_<uid>` rule, SlickGrid's per-grid sheet signature.
+// kiraSlickGrid.ts no longer creates one (columns position through custom properties, P139
+// Part 2), so this proves none appears; the shared column sheet's `.kira-sg` rules never match.
+// Module-scope so P22 iter2-pacing's own teardown test (T4) can reuse it.
 async function slickStyleTagCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(
     () =>
       Array.from(document.querySelectorAll('style')).filter((s) => {
         try {
           return Array.from(s.sheet?.cssRules ?? []).some(
-            (r) =>
-              'selectorText' in r &&
-              (r as CSSStyleRule).selectorText?.includes('slick-header-column'),
+            (r) => 'selectorText' in r && (r as CSSStyleRule).selectorText?.includes('.slickgrid_'),
           );
         } catch {
           return false;
@@ -515,6 +506,7 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   const { window: teardownPage } = await relaunch({ control: CONTROL, stream: PORT });
 
   const baselineStyles = await slickStyleTagCount(teardownPage);
+  expect(baselineStyles).toBe(0);
   const baselineRetention = await teardownPage.evaluate(() =>
     JSON.stringify((window as unknown as { __kiraRetention: () => unknown }).__kiraRetention()),
   );
@@ -523,6 +515,7 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   );
 
   await connectAndOpenSpikeGrid(teardownPage);
+  expect(await slickStyleTagCount(teardownPage)).toBe(0);
   for (let i = 0; i < 5; i++) {
     if (i > 0) await reopenSpikeGridTab(teardownPage);
     await teardownPage.locator('[data-testid="tab"].is-active [data-testid="tab-close"]').click();
@@ -635,6 +628,7 @@ test('P22 iter2-pacing — tearing down the grid with a catch-up render still ar
   page.on('pageerror', (err) => pageErrors.push(String(err)));
 
   const baselineStyles = await slickStyleTagCount(page);
+  expect(baselineStyles).toBe(0);
   const baselineRetention = await page.evaluate(() =>
     JSON.stringify((window as unknown as { __kiraRetention: () => unknown }).__kiraRetention()),
   );
@@ -643,6 +637,7 @@ test('P22 iter2-pacing — tearing down the grid with a catch-up render still ar
   );
 
   await connectAndOpenSpikeGrid(page);
+  expect(await slickStyleTagCount(page)).toBe(0);
   await page.evaluate(() => {
     window.__kiraGridTuning ??= {};
     window.__kiraGridTuning.chaseQuietMsOverride = 300;
