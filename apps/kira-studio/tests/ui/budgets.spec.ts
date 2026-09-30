@@ -315,6 +315,16 @@ function logCoverage(label: string, velocity: number, uncoveredPx: number[]): vo
   );
 }
 
+// Monaco adds `.visible` to the suggest widget 100 ms after it is on screen (SuggestWidget._show's
+// setTimeout); suggest.css styles nothing on it. The budget is "popup visible", so both the probe
+// and the hidden-between-keystrokes wait test the on-screen state instead. Self-contained: it is
+// serialised into the page by evaluate().
+function suggestPopupShown(): boolean {
+  const w = document.querySelector<HTMLElement>('.suggest-widget');
+  if (!w || getComputedStyle(w).visibility !== 'visible' || w.offsetHeight === 0) return false;
+  return w.querySelector('.monaco-list-row') !== null;
+}
+
 // P18 addendum D26. `measureClickToDom`'s "arm the observer and read `performance.now()` inside
 // one synchronous evaluate() call" trick doesn't transfer directly to a keystroke: unlike
 // `.click()`, there is no script-callable way to make an element genuinely receive typed input —
@@ -329,12 +339,17 @@ async function measureKeyToPopup(page: Page, key: string): Promise<number> {
   await page.evaluate(() => {
     const w = window as unknown as { __kiraKeyProbe?: Promise<number>; __kiraKeyStart?: number };
     w.__kiraKeyProbe = new Promise<number>((resolve) => {
+      // Same predicate as suggestPopupShown above, inlined: a closure over it does not serialise.
+      const shown = (): boolean => {
+        const el = document.querySelector<HTMLElement>('.suggest-widget');
+        if (!el || getComputedStyle(el).visibility !== 'visible' || el.offsetHeight === 0) {
+          return false;
+        }
+        return el.querySelector('.monaco-list-row') !== null;
+      };
+      // The persistent widget node toggles inline style and class rather than being added.
       const observer = new MutationObserver(() => {
-        // Monaco's own suggest widget is a persistent DOM node reused across shows — `visible`
-        // toggles as a class, not the node's own presence — so this watches class mutations
-        // (P60b) alongside childList, unlike CodeMirror's own tooltip, which was added/removed
-        // wholesale and only ever needed the latter.
-        if (!document.querySelector('.suggest-widget.visible')) return;
+        if (!shown()) return;
         observer.disconnect();
         resolve(performance.now() - (w.__kiraKeyStart as number));
       });
@@ -342,7 +357,7 @@ async function measureKeyToPopup(page: Page, key: string): Promise<number> {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['class'],
+        attributeFilter: ['class', 'style'],
       });
       w.__kiraKeyStart = performance.now();
     });
@@ -830,15 +845,14 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await page.click('[data-testid="menu-item-open-console"]');
   const consoleView = page.locator('[data-testid="console-view"]');
   await expect(consoleView).toBeVisible();
-  const tooltip = page.locator('.suggest-widget.visible');
   await consoleView.locator('.view-lines').click();
   await page.keyboard.type('SEL');
-  await expect(tooltip).toBeVisible({ timeout: 5_000 });
+  await expect.poll(() => page.evaluate(suggestPopupShown), { timeout: 5_000 }).toBe(true);
 
   const keyDeltas: number[] = [];
   for (let i = 0; i < 20; i++) {
     await page.keyboard.press('Escape');
-    await expect(tooltip).toHaveCount(0);
+    await expect.poll(() => page.evaluate(suggestPopupShown)).toBe(false);
     await page.keyboard.press('Backspace');
     keyDeltas.push(await measureKeyToPopup(page, 'l'));
   }
