@@ -26,9 +26,9 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 | Row window stays coalesced to <= 1 re-render/frame during sustained fast scroll (P22 D1) | `notifiesPerFrame` <= 1 at 40/100/200/456 px/frame; `uncoveredPx` === 0 at 40-100 px/frame | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1a** |
 | — (secondary) | rAF interval p95 < 24 ms (80 ms on the `tests/ui/` tier, see §2.1), DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
 | Cell selection → editor populated ≤ 50 ms | click cell → `.view-lines` contains the cell's text (`.cm-content`, CodeMirror, before P60a moved the cell editor to Monaco) — the DOM element the click-to-DOM measurement waits on, not a full-document read, so it stays a plain DOM text-wait rather than the `data-kira-editor-text` debug hook `tests/ui/support/editorText.ts` uses elsewhere, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
-| Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
+| Tab switch ≤ 50 ms (product budget) | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted at p95 ≤ 300 ms** (WebKit sandbox bound) plus a machine-independent guard (no `<style>`/`<link>` churn, no `.slickgrid_` rule); 50 ms unverified on WKWebView after P139 Part 2 — see §2.1 |
 | Tree node expand (cached) ≤ 50 ms | click twisty → child rows present, p95 over 20 collapse/expand cycles of an already-cached schema node | `tests/ui/budgets.spec.ts` | **asserted** |
-| Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → `.suggest-widget.visible` present (Monaco's own suggest widget, P60b — was `.cm-tooltip-autocomplete`), p50 over 20 keystrokes | `tests/ui/budgets.spec.ts` | **asserted** |
+| Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → suggest widget on screen (computed `visibility: visible` and a list row; Monaco's own suggest widget, P60b — was `.cm-tooltip-autocomplete`), p50 over 20 keystrokes. Not `.visible`: Monaco adds that class 100 ms after the widget is on screen | `tests/ui/budgets.spec.ts` | **asserted** |
 | Any DB round-trip async/cancellable | — | covered by every adapter's cancel scenario (P1–P10) | n/a |
 | < 350 MB total RSS, 5 connections / 10 tabs | min of 10 `app.getAppMetrics()` sums over an idle window | removed — see §2.2 below | **not automated; documented structural finding** |
 | Same, packaged | `ps -o rss` sum for the same scenario | §3 procedure below | manual (macOS) |
@@ -44,10 +44,10 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 | Scroll response | 2.2 ms | 4.1 ms | 4.8 ms | 14.5 ms | ≤ 8 ms (**p50 gated on work** — see note) | pass |
 | Scroll response, horizontal (P29) | 6.2 ms | 12.7 ms | 9.0 ms | 19.0 ms | ≤ 8 ms (p50 gated on work) | pass |
 | Scroll response, vertical, wide table (P29, `scroll_grid`) | 5.1 ms | 7.6 ms | 8.3 ms | 13.9 ms | ≤ 8 ms (p50 gated on work) | pass |
-| Cell → editor | 1.4 ms | 4.7 ms | — | — | ≤ 50 ms (p95) | pass |
-| Cached tab switch | 4.3 ms | 6.5 ms | — | — | ≤ 50 ms (p95) | pass |
-| Cached tree expand | 1.3 ms | 1.4 ms | — | — | ≤ 50 ms (p95) | pass |
-| Console keystroke → completion popup (P18 addendum D26) | 113.0 ms | 116.0 ms | — | — | ≤ 1000 ms (p50, the code's own gate — see note) | pass |
+| Cell → editor | 17-22 ms | 23-32 ms | — | — | ≤ 50 ms (p95) | pass |
+| Tab switch (P139 Part 2) | 113-125 ms | 159-194 ms | — | — | ≤ 300 ms (p95, WebKit sandbox bound; product budget 50 ms, see below) | pass |
+| Cached tree expand | 17-20 ms | 24-53 ms | — | — | ≤ 50 ms (p95) | pass |
+| Console keystroke → completion popup (P18 addendum D26) | 32-36 ms | 38-49 ms | — | — | ≤ 50 ms (p50), max ≤ 200 ms | pass |
 | Cell-editor populate latency (informational) | — | 41 ms | — | — | — | logged |
 | `perf.spec.ts` rAF scroll frame time | 16.7 ms | 17.6 ms | — | — | < 24 ms (secondary tripwire) | pass |
 | Cold start, fresh | wall 589 ms / in-app uptime 537 ms | — | — | — | ≤ 2500 ms | pass |
@@ -55,14 +55,35 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 
 Re-measured 2026-08-26 on this environment (the macOS/Colima dev machine) as part of P47's checkpoint,
 alongside the assertion split below and the D13 table in the P47 note — the previous "not yet run" /
-"fails" entries this row replaces predate both.
+"fails" entries this row replaces predate both. The cell to editor, tab switch, tree expand and
+keystroke rows were replaced in P139 Part 2 with the Linux sandbox's WebKit numbers (headless,
+4 vCPU, `ui-timing` project, ranges over 5 runs); the macOS figures they held predate
+`SlickGridHost.vue` and the Wails port.
 
-**Console keystroke → completion popup** re-measured 2026-09-14 (P60b, this sandboxed container, not
-the macOS/Colima machine the row above names) — CodeMirror's own `.cm-tooltip-autocomplete` gave way
-to Monaco's `.suggest-widget.visible`, so the 43.4/46.4 ms this row used to carry is a different
-engine on a different machine, not a clean before/after. The code's own gate (`budgets.spec.ts`) was
-always ≤ 1000 ms, not the ≤ 50 ms this row previously documented as an aspiration; both numbers stay
-comfortably inside it. Not chased further — no plan-stated budget regressed.
+**Console keystroke → completion popup.** The `<= 1000` gate came from the P57 M5 port (`9ee240f0`);
+before it the spec asserted p50 <= 50 / max <= 200. The ~113 ms it then measured was Monaco's fixed
+100 ms `.visible` class timer, not the popup: the widget is on screen at 27-32 ms. P139 Part 2
+measures the on-screen state and restores p50 <= 50 / max <= 200.
+
+**Tab switch (P139 Part 2).** Every switch remounts `DataView` and SlickGrid (`MainView.vue` keys it
+by tab id); no tab caching. Before the fix, WebKit here measured p50 311-318 / p95 436-447 ms. Two
+causes: SlickGrid built its columns twice per mount (`ba41ec3f`), and its per-grid `<style>` (append,
+mutate rules, remove on unmount) forced a full-document style rebuild of ~55 ms each on WebKit, where
+a sheet appended with its text set costs 2-3 ms. `kiraSlickGrid.ts` now positions columns through
+`--sg-l<i>`/`--sg-r<i>` on the grid root plus one shared append-only sheet, so no per-grid sheet
+exists. Result: p50 113-125 / p95 159-194 ms.
+
+Why the gate is 300 ms, not 50 ms: a real remount costs ~47 ms of Vue work alone on this sandbox's
+WebKit (~29 ms on Chromium; Chromium's whole remount measures p95 58-75 ms), so 50 ms p95 is not
+reachable here on either engine. This WebKit build also lacks `margin-trim`, which turns on
+Tailwind v4's `@property` fallback (~68 `--tw-*` custom properties on every element) and roughly
+doubles every restyle; dropping it measured p95 136-162 ms, but it is dead CSS on macOS 14+ and the
+build was left unchanged. Measured without it, the stylesheet fix alone gave p95 170-212 ms; 300 ms is
+~1.5x that and below every pre-fix run. The bound is a sandbox tripwire. The guard is the real
+regression check: zero `<style>`/`<link>` churn in `<head>` (Monaco's per-editor `media="screen"`
+sheets excluded) and zero `.slickgrid_` rules across the 20 switches. Not measured: real WKWebView.
+Run on a Mac (§3): `CSS.supports('margin-trim: inline')` should be `true`, and the 20-switch p50/p95
+gives the true figure against the 50 ms product budget.
 
 **Console keystroke → completion popup.** Docker/Colima is available here (the macOS dev machine
 this file's numbers now come from), so the Postgres-backed `tests/ui/budgets.spec.ts` suite runs in
@@ -142,7 +163,7 @@ came from):
 | Scroll response, horizontal (`scroll_grid`, mocked to one pageSize=100 page) | 19-21 ms | 27-43 ms | ≤ 1000 ms (sanity bound only, not a budget — see note) | pass |
 | Scroll response, vertical, wide table (`scroll_grid`) | 14-16 ms | 29-48 ms | ≤ 1000 ms (sanity bound only) | pass |
 | Cell → editor | ~6 ms | ~15 ms | ≤ 50 ms (p95) | pass |
-| Cached tab switch | ~48 ms | ~85 ms | ≤ 50 ms (p95, tight) | pass |
+| Cached tab switch | ~48 ms | ~85 ms | ≤ 50 ms (p95, tight) — measured `DataGrid.vue`, before `SlickGridHost.vue` (`d01b082e`); superseded by the P139 Part 2 row above | pass |
 | Cached tree expand | ~4 ms | ~10 ms | ≤ 50 ms (p95) | pass |
 | Console keystroke → completion popup | ~13 ms | ~20 ms | ≤ 50 ms (p50) | pass |
 | `perf.spec.ts` rAF scroll frame time | 34-47 ms | 37-54 ms | < 80 ms (secondary tripwire; see note) | pass |
@@ -1576,6 +1597,12 @@ artifact as of P10. electron-builder's `dist/mac-arm64/` output, its `app.asar` 
 tree of any kind — no vendored Node runtime, no engine-child bundle — since every adapter now runs
 natively inside the one Go binary. The only measurement-relevant path inside the bundle is
 `Contents/MacOS/Kira Studio` itself.
+
+**Tab switch (P139 Part 2).** Open `big_rows` and `wide_table` data tabs. In the packaged app's Web
+Inspector, confirm `CSS.supports('margin-trim: inline')` is `true`. Record a Timeline over 20
+alternating tab switches: median and p95 of click to header cell present against the 50 ms budget,
+and the count of full style recalculations per switch (expect none from SlickGrid). Record the
+numbers here.
 
 **Packaged cold start** (target: ≤ 1500 ms median of 3 warm launches):
 1. `bun run package:studio`.
