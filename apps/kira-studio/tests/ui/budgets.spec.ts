@@ -777,9 +777,9 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     cellDeltas.push(delta);
   }
   logStats('cell -> editor', cellDeltas);
-  expect(percentile(cellDeltas, 95)).toBeLessThanOrEqual(1000);
+  expect(percentile(cellDeltas, 95)).toBeLessThanOrEqual(50);
 
-  // --- 3. cached tab switch, p95 <= 50ms -----------------------------------------------------
+  // --- 3. tab switch, p95 <= 300ms (WebKit sandbox bound; PERF.md §2.1) -----------------------------------------------------
   await openRowMenu(page, WIDE_TABLE_PATH);
   await page.click('[data-testid="menu-item-open-data-new-tab"]');
   await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
@@ -798,6 +798,29 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   await page.click(`[data-testid="tab"][data-tab-id="${bigRowsTabId}"]`);
   await expect(page.locator('[data-testid="grid-header-cell"][data-column="hash"]')).toBeVisible();
 
+  // Deterministic guard, machine-independent: a switch remounts the grid, and a per-grid SlickGrid
+  // <style> (added, then removed on unmount) is what made WebKit rebuild every element's style.
+  await page.evaluate(() => {
+    const w = window as unknown as { __kiraHeadChurn?: { count: number; stop: () => void } };
+    const churn = { count: 0, stop: () => observer.disconnect() };
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        for (const n of [...r.addedNodes, ...r.removedNodes]) {
+          // Monaco keeps a `media="screen"` sheet per editor (domStylesheets.createStyleSheet); it
+          // is not SlickGrid's, and the toolbars' editors remount with each tab.
+          if (
+            (n.nodeName === 'STYLE' || n.nodeName === 'LINK') &&
+            (n as Element).getAttribute('media') !== 'screen'
+          ) {
+            churn.count++;
+          }
+        }
+      }
+    });
+    observer.observe(document.head, { childList: true });
+    w.__kiraHeadChurn = churn;
+  });
+
   const tabDeltas: number[] = [];
   for (let i = 0; i < 20; i++) {
     const toWide = i % 2 === 0;
@@ -814,7 +837,25 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     tabDeltas.push(delta);
   }
   logStats('cached tab switch', tabDeltas);
-  expect(percentile(tabDeltas, 95)).toBeLessThanOrEqual(1000);
+  // Not 50: a full DataView + SlickGrid remount is ~47 ms of Vue work on this 4 vCPU WebKit
+  // sandbox, and its Tailwind `@property` fallback (live only here) slows every restyle. p95 was
+  // 170-212 ms with the stylesheet fix alone. Real WKWebView is unmeasured; see PERF.md §2.1.
+  expect(percentile(tabDeltas, 95)).toBeLessThanOrEqual(300);
+  const headChurn = await page.evaluate(() => {
+    const w = window as unknown as { __kiraHeadChurn: { count: number; stop: () => void } };
+    w.__kiraHeadChurn.stop();
+    const perGridRules = Array.from(document.styleSheets).filter((sheet) => {
+      try {
+        return Array.from(sheet.cssRules).some((r) =>
+          (r as CSSStyleRule).selectorText?.includes('.slickgrid_'),
+        );
+      } catch {
+        return false;
+      }
+    }).length;
+    return { churn: w.__kiraHeadChurn.count, perGridRules };
+  });
+  expect(headChurn).toEqual({ churn: 0, perGridRules: 0 });
 
   // --- 4. cached tree expand, p95 <= 50ms -----------------------------------------------------
   const expandDeltas: number[] = [];
@@ -832,7 +873,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     expandDeltas.push(delta);
   }
   logStats('cached tree expand', expandDeltas);
-  expect(percentile(expandDeltas, 95)).toBeLessThanOrEqual(1000);
+  expect(percentile(expandDeltas, 95)).toBeLessThanOrEqual(50);
 
   // --- 5. console keystroke -> completion popup visible, p50 <= 50ms (P18 addendum D26) -------
   // APP_PATH (a schema), not DB_PATH (the bare database) — P60b: with no DDL document, a console's
@@ -857,8 +898,8 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     keyDeltas.push(await measureKeyToPopup(page, 'l'));
   }
   logStats('console keystroke -> completion popup', keyDeltas);
-  expect(percentile(keyDeltas, 50)).toBeLessThanOrEqual(1000);
-  expect(Math.max(...keyDeltas)).toBeLessThanOrEqual(1000);
+  expect(percentile(keyDeltas, 50)).toBeLessThanOrEqual(50);
+  expect(Math.max(...keyDeltas)).toBeLessThanOrEqual(200);
 
   expect(consoleErrors).toEqual([]);
 });
