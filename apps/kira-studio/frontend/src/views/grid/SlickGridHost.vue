@@ -1944,8 +1944,8 @@ onMounted(() => {
   // watch (below) only fires on a *change*, so the first value needs setting here too.
   navColumns = navColumnsFor(rt()?.meta ?? null);
 
-  // M7 finding #5: a remount (a tab evicted from MainView.vue's warm set, or reopened) resets
-  // maskRulesByColumn/maskTagCache/maskTransform — all component-
+  // M7 finding #5: this component remounts on every tab switch (`:key="activeTab.id"` in
+  // MainView.vue), which resets maskRulesByColumn/maskTagCache/maskTransform — all component-
   // scoped `let`s above — back to empty. Without this call, the dataSourceState() built just below
   // would silently bake in `undefined` for activeMaskTransform even when mask preview is already
   // on for this tab, rendering real values while the toggle still reads "on". Cheap in the common
@@ -2208,9 +2208,10 @@ onUnmounted(() => {
   selectionModel?.destroy();
   selectionModel = null;
   // F8 — `true` also nulls SlickGrid's own ~60 internal element references; its own destroy()
-  // unbinds every listener it registered, unregisters every plugin, cancels any in-flight edit and
-  // removes its per-instance injected <style> element. The only real risk was ever this app
-  // forgetting to call it (F8's own finding) — this call is the named, gated acceptance item (§9.1).
+  // unbinds every listener it registered, unregisters every plugin and cancels any in-flight edit.
+  // Column rules live in kiraSlickGrid.ts's shared append-only sheet, so there is no per-grid
+  // <style> to leak. The only real risk was ever this app forgetting to call it (F8's own finding) —
+  // this call is the named, gated acceptance item (§9.1).
   grid?.destroy(true);
   grid = null;
   dataSource = null;
