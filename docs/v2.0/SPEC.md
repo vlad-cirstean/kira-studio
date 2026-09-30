@@ -3461,3 +3461,56 @@ specs pass.
   unpainted, edge shadows present); no baseline screenshot committed.
 - `perf.spec.ts` stays load-sensitive (73 ms measured under synthetic load against 80).
 - No `docs/ARCHITECTURE.md` change: the plan called for none.
+
+## P139 Part 2 result
+
+Plan: `docs/v2.0/plans/P139-part2-tab-switch-regression-iter2.md`. Implemented on `p139-part2-plan`,
+one commit per step. No tab caching, per user decision. Two plan items dropped by user decision: §3.3
+(PostCSS plugin dropping Tailwind's `@property` fallback) and the 250 ms bound; 300 ms with the
+plan's own fallback used instead.
+
+**Commits:** `4c0e6f5c`, `3c4df406`, `456f3051`, `54125e6e` four reverts of the iteration 1 caching
+work (`ba41ec3f` kept); `b6086d02` column positions through custom properties in
+`kiraSlickGrid.ts`; `7467b6e3` stale comments; `0b6226fb` `slick-grid.spec.ts` no per-grid sheet;
+`e864caff` keystroke measures the on-screen popup; `058623df` restored bounds plus stylesheet churn
+guard; `029a6678` PERF.md and ARCHITECTURE.md.
+
+**Root cause:** every switch remounts `DataView` and SlickGrid. SlickGrid's per-grid `<style>`
+(append, rule mutation, removal) forces a full-document style rebuild of ~55 ms each on WebKit;
+columns were also built twice per mount (`ba41ec3f`). Fix: `KiraSlickGrid` overrides
+`createCssRules`/`removeCssRules`/`applyColumnWidths` to set `--sg-l<i>`/`--sg-r<i>` on the grid
+root, over one shared append-only sheet.
+
+**Bounds and numbers (Linux sandbox WebKit, `ui-timing`, p50 / p95 ms):**
+
+| Metric | Bound | Measured |
+|---|---|---|
+| Cell to editor | p95 <= 50 | 17-22 / 23-32 |
+| Tab switch | p95 <= 300 (WebKit sandbox bound) | 113-125 / 159-194 (before: 311-318 / 436-447) |
+| Tree expand | p95 <= 50 | 17-20 / 24-53 (one run 77 at p95, p50 20; 7 other runs <= 53) |
+| Keystroke | p50 <= 50, max <= 200 | 32-36 / 38-49 |
+
+Why 300 and not 50: a real remount costs ~47 ms of Vue work on this WebKit (~29 ms Chromium, whose
+whole remount is p95 58-75 ms). Tailwind v4's `@property` fallback is live only on this WebKit build
+(no `margin-trim`) and doubles every restyle; measured with it dropped, p95 was 136-162 ms. Dropping
+it is a build-wide CSS change for a sandbox-only effect, declined by the user; vars alone measured
+p95 170-212 ms. Guard, machine-independent: zero `<style>`/`<link>` churn in `<head>` (Monaco's
+per-editor `media="screen"` sheets excluded) and zero `.slickgrid_` rules across the 20 switches.
+
+**Verification (one full run, per user instruction):** `ui` shards 1/3, 2/3, 3/3 all pass (100 each);
+`ui-timing` 4 passed; `test:ui:space` 101 passed; `test:visual:studio` 14 and `test:visual:space` 4
+passed; lint, typecheck and knip clean; `test:unit` 1831 pass on 4 of 5 runs.
+
+**Disclosed:**
+
+- One `test:unit` run showed 2 failures that did not reproduce in 4 later runs; the failing tests
+  were not captured.
+- The plan's 3 consecutive full runs were reduced to 1 by user instruction. Stray budget runs
+  (11 in all) all passed except one tree expand p95 of 77 ms (outlier under residual load).
+- The plan's §6 item 8 manual check (300-column result, resize, density) was not run: no interactive
+  browser here. Covered by `slick-grid.spec.ts` (resize, frozen gutter) and `budgets.spec.ts` (2 and
+  60 columns); the >256-column chunk growth in `ensureColumnRules` is untested.
+- Still open: real WKWebView numbers (p50/p95 of 20 switches, `CSS.supports('margin-trim: inline')`)
+  need a Mac (PERF.md §3, ARCHITECTURE.md Known open items). The Tailwind `@property` fallback stays as
+  is. Out of scope, unchanged: scroll-persist cancel on unmount, `budgets.spec.ts` horizontal and
+  wide-vertical `<= 1000` sanity bounds, `CommitGrid.vue` per-grid sheet.
