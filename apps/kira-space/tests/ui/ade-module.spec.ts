@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
+import type { ControlSnapshot } from './support/types';
 
 // P129 Part 3 §3.3: `ade`'s own full-area shell, data layer and the 6 §2.7 components, under
 // mocked control — a fresh `relaunch()` per test (this fixture tier's own convention, modules.spec.ts's
@@ -36,6 +37,15 @@ const REPO_B = {
   root: '/tmp/beta',
   repoId: '/tmp/beta',
   sortOrder: 2,
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+const REPO_C = {
+  id: 'repo-c',
+  name: 'gamma',
+  root: '/tmp/gamma',
+  repoId: '/tmp/gamma',
+  sortOrder: 3,
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -465,4 +475,109 @@ test('ade tabs render through the shared tab strip (P137)', async ({ relaunch })
   await expect(items).toHaveCount(1);
   await expect(items).toHaveText('Copy name');
   await page.keyboard.press('Escape');
+});
+
+// Sortable's fallback mode emulates dragover on a 50ms tick, so the pointer must hover before `up`.
+async function dragTab(page: Page, fromId: string, toId: string) {
+  const from = await repoTab(page, fromId).boundingBox();
+  const to = await repoTab(page, toId).boundingBox();
+  if (!from || !to) throw new Error('repo tab has no box');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 10, from.y + from.height / 2, { steps: 5 });
+  await page.mouse.move(to.x + to.width * 0.25, to.y + to.height / 2, { steps: 15 });
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+}
+
+function adeBoot(repos: unknown[], extra: ControlSnapshot[] = []): ControlSnapshot[] {
+  return [
+    { channel: IPC.windowsEnsure, response: { mode: 'ade' } },
+    { channel: IPC.codeWorkspaceListRepos, response: repos },
+    { channel: IPC.terminalAgentSessions, response: { sessions: [] } },
+    { channel: IPC.adeSessions, response: { sessions: [] } },
+    {
+      channel: IPC.adeRepoSnapshot,
+      args: { codeRepoId: REPO_A.id },
+      response: emptySnapshot(REPO_A.id),
+    },
+    {
+      channel: IPC.adeRepoSnapshot,
+      args: { codeRepoId: REPO_C.id },
+      response: emptySnapshot(REPO_C.id),
+    },
+    { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO_A.id }, response: EMPTY_PRS },
+    { channel: IPC.adeRepoPrs, args: { codeRepoId: REPO_C.id }, response: EMPTY_PRS },
+    ...extra,
+  ];
+}
+
+test('ade repo tabs reorder by drag; the order persists and shows in the Git panel (P140)', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: adeBoot(
+      [REPO_A, REPO_B, REPO_C],
+      [{ channel: IPC.codeWorkspaceReorderRepos, response: [REPO_C, REPO_A, REPO_B] }],
+    ),
+  });
+  const tabs = page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab"]');
+  const reorderCalls = () =>
+    control.log().filter((e) => e.channel === IPC.codeWorkspaceReorderRepos);
+  await expect(tabs).toHaveText([/All agents/, /alpha/, /beta/, /gamma/]);
+
+  await dragTab(page, REPO_C.id, REPO_A.id);
+  await expect(tabs).toHaveText([/All agents/, /gamma/, /alpha/, /beta/]);
+  expect(reorderCalls()).toHaveLength(1);
+  expect(reorderCalls()[0].args).toMatchObject({ ids: [REPO_C.id, REPO_A.id, REPO_B.id] });
+
+  const pinned = await tabs.first().boundingBox();
+  const target = await repoTab(page, REPO_A.id).boundingBox();
+  if (!pinned || !target) throw new Error('tab has no box');
+  await page.mouse.move(pinned.x + pinned.width / 2, pinned.y + pinned.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pinned.x + pinned.width / 2 + 10, pinned.y + pinned.height / 2, {
+    steps: 5,
+  });
+  await page.mouse.move(target.x + target.width * 0.75, target.y + target.height / 2, {
+    steps: 15,
+  });
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  await expect(tabs).toHaveText([/All agents/, /gamma/, /alpha/, /beta/]);
+  expect(reorderCalls()).toHaveLength(1);
+
+  await modeTab(page, 'git').click();
+  await expect(page.locator('[data-testid="repo-row"]')).toHaveText([/gamma/, /alpha/, /beta/]);
+});
+
+test('ade repo tabs boot in the stored order', async ({ relaunch }) => {
+  const { window: page } = await relaunch({ control: adeBoot([REPO_C, REPO_A, REPO_B]) });
+  await expect(page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab"]')).toHaveText([
+    /All agents/,
+    /gamma/,
+    /alpha/,
+    /beta/,
+  ]);
+});
+
+test('a rejected repo order save snaps the strip back to the persisted order', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: adeBoot(
+      [REPO_A, REPO_B, REPO_C],
+      [
+        {
+          channel: IPC.codeWorkspaceReorderRepos,
+          error: { code: 'E_INTERNAL', message: 'disk full' },
+        },
+        { channel: IPC.codeWorkspaceListRepos, response: [REPO_A, REPO_B, REPO_C] },
+      ],
+    ),
+  });
+  const tabs = page.locator('[data-testid="ade-repo-tabs"] [data-testid="tab"]');
+  await expect(tabs).toHaveText([/All agents/, /alpha/, /beta/, /gamma/]);
+  await dragTab(page, REPO_C.id, REPO_A.id);
+  await expect(tabs).toHaveText([/All agents/, /alpha/, /beta/, /gamma/]);
 });
