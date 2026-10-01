@@ -9,3 +9,70 @@ path, leak, sizeable waste), low (maintainability or rule breach with no runtime
 Status: in progress. Areas land as they finish.
 
 ## Findings
+
+### Area 1: Kira Space ADE backend (`internal/ade`, `bridge/ade.go`, `storage/repos/adequeue.go`, migrations 0003-0007)
+
+**F1. Rebind derives `kind` from the tip author, so fresh new work turns into a review branch.**
+Dimension F. Severity high.
+`apps/kira-space/internal/ade/queue.go:1124` (`bindNewWorkLocked` calls `resolveKind(row, userEmail, "")`).
+Rebind runs on the first Snapshot after the agent creates its branch, usually before any commit lands. The tip
+is then the start point's commit (main's tip), so `kind` follows whoever last committed to main. In a team repo
+that is often someone else, so the user's own new work persists as `kind=review`, `work_type=review`. Nothing
+re-derives `kind` later. The blocker rows rekeyed at `storage/repos/adequeue.go:820` then sit on a review branch,
+breaking the invariant `checkBlockable` and `ErrWorkTypeBlocked` enforce.
+Fix: a rebind always binds as `mine` (new work is the user's by construction; keep the new work's own
+`work_type`). Drop the `kind` derivation from `bindNewWorkLocked` and `Store.Rebind`'s review branch.
+
+**F2. Claude session id from a hook event reaches a shell command unquoted.**
+Dimension A (security). Severity medium.
+`apps/kira-space/internal/ade/tracker.go:400-408` stores `ev.SessionID` from any `SessionStart` hook body
+verbatim. `apps/kira-space/internal/ade/command.go:10-17` concatenates it into the command that runs as
+`$SHELL -l -i -c <command>` on the next resume. The hook socket is token-guarded, so this is defense in depth,
+but one malformed or hostile body persists a shell payload that runs on a later click.
+Fix: accept the id only when `uuid.Parse` succeeds (ignore the event otherwise), and quote with `quotePOSIX`
+in `newCommand`/`resumeCommand`.
+
+**F3. Two resume Prepares for one stopped record both succeed.**
+Dimension F. Severity low.
+`apps/kira-space/internal/ade/tracker.go:203-254`. Prepare checks `State == stopped` but reserves nothing. Two
+quick resumes (double click, two windows) each get a pending intent; both Composes run `MarkRunning`, spawning
+two `claude --resume <same id>` processes on one record. `byRecord` keeps only the second terminal, so the
+first terminal's `live` entry leaks and its activity is attributed to nothing.
+Fix: in Prepare's resume branch, refuse with `ErrSessionRunning` when `t.pending` or `t.byRecord` already holds
+that record id (check under `t.mu`).
+
+**F4. Snapshot spawns git work it can derive or already did.**
+Dimension P. Severity medium.
+`apps/kira-space/internal/ade/queue.go:787-794` runs `for-each-ref --merged=<mainTip> <ref>` per existing
+branch, per Snapshot, uncached. `depths[b]` (`queue.go:617`, `rev-list --left-right --count tip...main`) already
+answers it: left count 0 means tip is reachable from main. `reconcileNewWork` (`queue.go:1012-1023`) also re-runs
+`BranchInventory` and `git config --get user.email`, which `snapshotLocked` runs again at `queue.go:486-497`.
+Snapshot fires on every debounced `repo.changed`, so each queued branch costs at least one extra process.
+Fix: `tipReachableFromMain = sc.hasMain && sc.depths[b.Branch] == 0`. Read inventory and `user.email` once in
+`snapshotLocked`, pass both into `reconcileNewWork`, and re-read inventory only when a rebind happened.
+
+**F5. `ade_sessions` grows forever and every read scans and stats all of it.**
+Dimension P. Severity medium.
+Nothing deletes `ade_sessions` rows. `bridge/ade.go:207-216` (`Sessions`) returns every row ever recorded and
+`os.Stat`s each cwd (`cwdMissing`, `bridge/ade.go:85`) on every `AdeSessionsChanged` refetch. In
+`main.go` `adeSessionsFor` calls `tracker.List()` (full table) and filters in Go. `reconcileHeuristicNewWork`
+calls it once per active new-work item per Snapshot (`queue.go:1070`), inside the repo mutex.
+Fix: add `AdeSessionsRepo.ListByRepo(codeRepoID)` on the existing `ade_sessions_repo` index and call it once
+per `reconcileNewWork`. Bound `Sessions()` (only stopped sessions newer than a cutoff, or stat only rows the
+renderer shows), or give the table a retention rule.
+
+**F6. ArchiveRisk reports zero unmerged commits when MainRef fails.**
+Dimension F. Severity low.
+`apps/kira-space/internal/ade/queue.go:1670` (`if ..., err := entry.MainRef(ctx); err == nil && hasMain`) drops
+the error. A transient git failure makes the archive confirm show "nothing at risk" for a branch with unmerged
+work. Every other git error in this function is returned.
+Fix: return the `MainRef` error like the surrounding calls do.
+
+**F7. AdeQueueRepo write scoping and one false guard comment.**
+Dimension A. Severity low.
+`apps/kira-space/internal/storage/repos/adequeue.go:503`: `UpdateNewWork` updates `WHERE id = ?`, ignoring the
+`codeRepoID` `Queue.UpdateNewWork` receives, and allows editing archived new work. The change signal then goes to
+whatever repo the caller named. `adequeue.go:515-517` says bridge validation restricts a review branch's patch
+to Notes alone. No such check exists (`bridge/ade.go:1010-1040`, `Queue.SetBranchMeta`).
+Fix: add `AND code_repo_id = ? AND archived_at IS NULL` to the update and its est select. Either add the
+review-branch restriction in `Queue.SetBranchMeta` (load the row's kind) or delete the claim from the comment.
