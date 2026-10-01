@@ -43,10 +43,12 @@ export function useSortableReorder(
   );
   const dragging = shallowRef(false);
 
-  useDraggable(
+  const sortable = useDraggable(
     container,
     rowIds,
     computed(() => ({
+      // Bound below once the element exists: a portalled container is absent at mount.
+      immediate: false,
       draggable: options.draggable,
       handle: options.handle,
       filter: options.filter,
@@ -72,6 +74,14 @@ export function useSortableReorder(
         if (from && to && from !== to) onMove(from, to);
       },
     })),
+  );
+
+  watch(
+    container,
+    (el) => {
+      if (el) sortable.start(el);
+    },
+    { immediate: true, flush: 'post' },
   );
 
   return { dragging };

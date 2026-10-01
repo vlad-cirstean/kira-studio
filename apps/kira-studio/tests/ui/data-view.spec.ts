@@ -1232,6 +1232,40 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
     timeout: 10_000,
   });
 
+  // --- column order: dragging a Columns menu row stages a custom order (indicator dot, order kept
+  // on reopen); dragging back restores the natural order, which clears the dot (P140). -----------
+  const columnsDot = page.locator('[data-testid="toolbar-columns"] span');
+  const menuOrder = () =>
+    page
+      .locator('[data-testid="columns-menu-row"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-name')));
+  const dragColumnRow = async (from: string, to: string) => {
+    await page.click('[data-testid="toolbar-columns"]');
+    const src = await page
+      .locator(`[data-testid="columns-menu-row"][data-name="${from}"]`)
+      .boundingBox();
+    const dst = await page
+      .locator(`[data-testid="columns-menu-row"][data-name="${to}"]`)
+      .boundingBox();
+    if (!src || !dst) throw new Error('columns menu row has no box');
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, { steps: 5 });
+    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid="columns-menu"]')).toHaveCount(0);
+  };
+  await expect(columnsDot).toHaveCount(0);
+  await dragColumnRow('hash', 'id');
+  await expect(columnsDot).toHaveCount(1);
+  await page.click('[data-testid="toolbar-columns"]');
+  expect(await menuOrder()).toEqual(['hash', 'id']);
+  await page.keyboard.press('Escape');
+  await dragColumnRow('hash', 'id');
+  await expect(columnsDot).toHaveCount(0);
+
   // --- sort: header click asc -> desc -> none, then free-text ORDER BY wins -------------------
   // P22 Pass B, items 9-11 (a later coordinator round) — a left-click on a header's BODY now
   // selects the column instead of sorting it; sorting moved to a dedicated arrow control

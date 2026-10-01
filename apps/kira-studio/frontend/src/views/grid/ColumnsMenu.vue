@@ -7,8 +7,8 @@ import { Label } from '@theme/components/ui/label';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { useDragReorder } from '@workbench/util/useDragReorder';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
+import { computed, onBeforeUnmount, ref, useTemplateRef } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { nextProjectionFromSelectedColumns } from './menu';
 import { useGridViewStore } from './state';
@@ -69,9 +69,17 @@ function sameOrder(a: string[], b: string[] | null): boolean {
   return a.length === b.length && a.every((name, i) => name === b[i]);
 }
 
-// P107 T2-20: same drag reorder EnvironmentsView.vue/VariableSetView.vue use — persistence stays
-// in onBeforeUnmount below (commits `order` alongside `selected`), so no onReorder callback here.
-const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order);
+// Persistence stays in onBeforeUnmount below (commits `order` alongside `selected`). Drag clone
+// stays inside the popover: a body-level one would count as an outside pointer and dismiss it.
+const listEl = useTemplateRef<HTMLElement>('listEl');
+useSortableReorder(
+  listEl,
+  () => order.value,
+  (from, to) => {
+    order.value = moveId(order.value, from, to);
+  },
+  { draggable: '[data-testid="columns-menu-row"]', direction: 'vertical', fallbackOnBody: false },
+);
 
 // P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
 // the toggle button) becomes onBeforeUnmount — DataToolbar.vue's Popover mounts this component
@@ -106,19 +114,18 @@ onBeforeUnmount(() => {
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
         <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">None</Button>
       </div>
-      <div v-if="!meta" class="p-2 text-kira-sm text-muted-foreground">Loading columns…</div>
-      <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
-           (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked. -->
-      <div v-else class="overflow-y-auto p-0.5">
+      <!-- Drag a row to reorder — the same order the grid renders columns in
+           (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked.
+           The container is always mounted: the sortable binds to it once, at mount. -->
+      <div ref="listEl" class="overflow-y-auto p-0.5">
+        <div v-if="!meta" class="p-1.5 text-kira-sm text-muted-foreground">Loading columns…</div>
         <Label
-          v-for="(name, index) in order"
+          v-for="name in order"
           :key="name"
           class="h-control flex items-center gap-1 px-1.5 rounded-kira-sm text-fg text-kira-md cursor-pointer hover:bg-hover columns-menu-item"
-          :class="[{ 'is-pk': pkNames.has(name) }, dragIndex === index ? 'opacity-50' : '']"
-          draggable="true"
-          @dragstart="onDragStart(index)"
-          @dragover.prevent="onDragOver(index)"
-          @dragend="onDragEnd"
+          :class="{ 'is-pk': pkNames.has(name) }"
+          data-testid="columns-menu-row"
+          :data-name="name"
         >
           <span class="flex items-center shrink-0 text-subtle cursor-grab" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
           <Tooltip v-if="pkNames.has(name)">
@@ -150,11 +157,5 @@ onBeforeUnmount(() => {
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
-    <!-- P110 B40: `.columns-menu-item`'s own plain rule (cursor-pointer, gap-1) was already
-         duplicated inline in the template -- dropped as redundant. `.drag-handle` folded onto its
-         span the same way. `.columns-menu-item` itself stays a bare marker: tooltips.spec.ts
-         locates by `.columns-menu-item.is-pk`, and this compound variant still needs it.
-         P110 I2-16: `.columns-menu-item.is-dragging` moved onto a plain ternary (`opacity-50`) --
-         no test dependency on `is-dragging` itself (checked; only `is-pk` is real). -->
   </PopoverContent>
 </template>
