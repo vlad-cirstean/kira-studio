@@ -16,10 +16,12 @@ import AdeMyWorkToggle from './AdeMyWorkToggle.vue';
 import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeProjectHeader from './AdeProjectHeader.vue';
 import AdeTimeline from './AdeTimeline.vue';
+import { type ActivityKind, activityKindsByTerminal, NO_ACTIVITY } from './activity';
 import { type DialogCtx, moveSpec, rebaseAllSpec, specForQueueAction, startSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
 import { myWorkCap } from './myWorkCap';
 import { useAdePrs, useAdeSessions, useAdeSnapshot } from './queries';
+import { applyActivity } from './queueActivity';
 import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 import { useAgentSessionsStore } from './state/agentSessions';
@@ -246,13 +248,19 @@ const projectName = computed(
   () => codeReposStore.codeRepoRecord(props.codeRepoId)?.name ?? props.codeRepoId,
 );
 
-const view = computed(() => {
+// Activity stays out of `useQueue`: a hook event only moves `kinds` when a phase changes, and
+// `applyActivity` then patches just acts/agents/panel agents instead of rebuilding the whole view.
+const kinds = computed<ReadonlyMap<string, ActivityKind>>((prev) =>
+  activityKindsByTerminal(repoSessions.value, agentSessionsStore.activity, prev),
+);
+
+const baseView = computed(() => {
   const snapshot = snapshotQuery.data.value;
   if (!snapshot) return null;
   return useQueue({
     snapshot,
     sessions: repoSessions.value,
-    activity: agentSessionsStore.activity,
+    activity: NO_ACTIVITY,
     prs: prsQuery.data.value,
     settings: settingsStore.ade,
     today: today.value,
@@ -266,6 +274,10 @@ const view = computed(() => {
     historyReach: historyReach.value,
   });
 });
+
+const view = computed(() =>
+  baseView.value ? applyActivity(baseView.value, repoSessions.value, kinds.value) : null,
+);
 
 const cap = computed(() => (view.value ? myWorkCap(view.value) : null));
 

@@ -8,7 +8,7 @@ import { useTerminalsStore } from '../state/terminals';
 import AdeActivityIcon from './AdeActivityIcon.vue';
 import AdeAllAgentsRow from './AdeAllAgentsRow.vue';
 import AdeClaudeDialog from './AdeClaudeDialog.vue';
-import { ACTIVITY_LABEL, type ActivityKind } from './activity';
+import { ACTIVITY_LABEL, type ActivityKind, NO_ACTIVITY } from './activity';
 import { type AllAgentsRepoInput, type AllAgentsRow, buildAllAgents } from './allAgents';
 import { type DialogCtx, resumeSpec } from './dialogCompose';
 import { localIso, localIsoOfMs } from './localDay';
@@ -71,7 +71,7 @@ const reposInput = computed<AllAgentsRepoInput[]>(() => {
       ? useQueue({
           snapshot,
           sessions: repoSessions,
-          activity: agentSessionsStore.activity,
+          activity: NO_ACTIVITY,
           prs: entry?.prs,
           settings: settingsStore.ade,
           today: today.value,

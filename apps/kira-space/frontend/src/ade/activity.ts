@@ -84,3 +84,30 @@ export function actRank(a: ActivityKind): number {
       return 4;
   }
 }
+
+/** Shared empty activity map: `useQueue` runs without activity (see `queueActivity.ts`). */
+export const NO_ACTIVITY: ReadonlyMap<string, AgentActivity> = new Map();
+
+/** terminalId -> kind for the running sessions given. Pass the previous result as `prev` to get it
+ *  back unchanged when no kind moved, so a computed keyed on it only fires on a real phase change. */
+export function activityKindsByTerminal(
+  sessions: readonly AdeSession[],
+  activity: ReadonlyMap<string, AgentActivity>,
+  prev?: ReadonlyMap<string, ActivityKind>,
+): ReadonlyMap<string, ActivityKind> {
+  const next = new Map<string, ActivityKind>();
+  for (const s of sessions) {
+    if (s.state === 'running') next.set(s.terminalId, activityKind(s, activity));
+  }
+  if (prev && prev.size === next.size) {
+    let same = true;
+    for (const [k, v] of next) {
+      if (prev.get(k) !== v) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return prev;
+  }
+  return next;
+}
