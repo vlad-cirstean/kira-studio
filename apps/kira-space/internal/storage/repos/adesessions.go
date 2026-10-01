@@ -56,6 +56,15 @@ func (r *AdeSessionsRepo) List() ([]model.AdeSession, error) {
 	})
 }
 
+// ListByRepo is List narrowed to one code repo, on the ade_sessions_repo index.
+func (r *AdeSessionsRepo) ListByRepo(codeRepoID string) ([]model.AdeSession, error) {
+	rows, err := r.DB.Query(`SELECT `+adeSessionsSelectColumns+` FROM ade_sessions WHERE code_repo_id = ? ORDER BY last_active_at DESC`, codeRepoID)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeSession, bool, error) {
+		rec, err := scanAdeSessionRow(rows)
+		return rec, true, err
+	})
+}
+
 // Insert writes a newly spawned session's own row — always state='running', terminal_id set,
 // called right after Tracker.Compose hands back a composed command (§4.2's own ordering: the row
 // exists before the process the terminal_id names does).

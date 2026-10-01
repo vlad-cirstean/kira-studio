@@ -29,6 +29,8 @@ var (
 	// ErrWorkTypeBlocked is SetWorkType's own sentinel (P136 §3.3) — a blocked item cannot become
 	// review or test (checkBlockable never lets a review item be blocked).
 	ErrWorkTypeBlocked = errors.New("repos: unlink its dependencies before marking it review or test")
+	// ErrReviewNotesOnly is SetBranchMeta's own sentinel — a review branch only takes notes.
+	ErrReviewNotesOnly = errors.New("repos: a review branch only takes notes")
 	// ErrWorkTypeInvalid is SetWorkType's own sentinel — new work has no owner to review or test.
 	ErrWorkTypeInvalid = errors.New("repos: new work can only be to work or to investigate")
 )
@@ -465,7 +467,7 @@ func execEstGuarded(db *sql.DB, selectSQL string, selectArgs []any, newEst, upda
 }
 
 // UpdateNewWork writes only the leaves the caller actually patched.
-func (r *AdeQueueRepo) UpdateNewWork(id string, patch model.AdeNewWorkPatch) error {
+func (r *AdeQueueRepo) UpdateNewWork(codeRepoID, id string, patch model.AdeNewWorkPatch) error {
 	var sets []string
 	var args []any
 	if patch.Title != nil {
@@ -499,10 +501,10 @@ func (r *AdeQueueRepo) UpdateNewWork(id string, patch model.AdeNewWorkPatch) err
 	if len(sets) == 0 {
 		return nil
 	}
-	args = append(args, id)
-	updateSQL := `UPDATE ade_new_work SET ` + strings.Join(sets, ", ") + ` WHERE id = ?`
+	args = append(args, codeRepoID, id)
+	updateSQL := `UPDATE ade_new_work SET ` + strings.Join(sets, ", ") + ` WHERE code_repo_id = ? AND id = ? AND archived_at IS NULL`
 	if patch.Est != nil {
-		return execEstGuarded(r.DB, `SELECT est FROM ade_new_work WHERE id = ?`, []any{id}, *patch.Est,
+		return execEstGuarded(r.DB, `SELECT est FROM ade_new_work WHERE code_repo_id = ? AND id = ? AND archived_at IS NULL`, []any{codeRepoID, id}, *patch.Est,
 			updateSQL, args, "ade new work "+id)
 	}
 	res, err := r.DB.Exec(updateSQL, args...)
@@ -513,9 +515,18 @@ func (r *AdeQueueRepo) UpdateNewWork(id string, patch model.AdeNewWorkPatch) err
 }
 
 // SetBranchMeta writes only the leaves the caller actually patched — review's own "keep your own
-// notes" rule (bridge validation restricts a review branch's patch to Notes alone before this ever
-// runs).
+// notes" rule: a review branch's patch is limited to Notes (ErrReviewNotesOnly).
 func (r *AdeQueueRepo) SetBranchMeta(codeRepoID, branch string, patch model.AdeBranchMetaPatch) error {
+	if patch.Name != nil || patch.Kind != nil || patch.JiraKey != nil || patch.JiraURL != nil || patch.PrURL != nil || patch.Est != nil {
+		var kind string
+		err := r.DB.QueryRow(`SELECT kind FROM ade_branches WHERE code_repo_id = ? AND branch = ?`, codeRepoID, branch).Scan(&kind)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("repos: read ade branch kind %s: %w", branch, err)
+		}
+		if kind == model.AdeBranchKindReview {
+			return ErrReviewNotesOnly
+		}
+	}
 	var sets []string
 	var args []any
 	if patch.Name != nil {
@@ -766,16 +777,12 @@ func (r *AdeQueueRepo) Archive(codeRepoID, item string, at int64) error {
 
 // Rebind is §6.4's own transaction: a new-work row becomes a real ade_branches row once its agent's
 // branch exists, carrying its title into draft_title, its links/notes/estimate across, re-keying its
-// plan/color/session rows from "nw:<uuid>" to the branch, then deleting the new-work row. kind is
-// the caller's own isMine-derived kind (§0.11) — only Queue, which reads the branch's tip author
-// through git, can compute it; Store.Rebind takes it as a plain parameter rather than re-deriving it
-// (this repo has no git access), a small, disclosed widening of the plan's own listed signature.
+// plan/color/session rows from "nw:<uuid>" to the branch, then deleting the new-work row. Always
+// binds as mine, keeping the new work's own work_type: new work is the user's by construction, and
+// the tip author at bind time is just whoever last committed to the start point.
 // BindNewWork runs this exact same path for an explicit, already-existing branch (§0.10's ambiguous
 // case) — checkNotQueuedOrArchived's ErrQueued/ErrArchived cover "must be unqueued" for both.
-func (r *AdeQueueRepo) Rebind(codeRepoID, newWorkID, branch, kind string, now int64) error {
-	if !model.ValidAdeBranchKind(kind) {
-		return fmt.Errorf("repos: rebind %s: invalid kind %q", newWorkID, kind)
-	}
+func (r *AdeQueueRepo) Rebind(codeRepoID, newWorkID, branch string, now int64) error {
 	tx, err := r.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("repos: begin rebind %s: %w", newWorkID, err)
@@ -794,14 +801,10 @@ func (r *AdeQueueRepo) Rebind(codeRepoID, newWorkID, branch, kind string, now in
 		return err
 	}
 
-	workType := model.DefaultAdeWorkType(kind)
-	if kind == model.AdeBranchKindMine {
-		workType = w.WorkType
-	}
 	if _, err := tx.Exec(
 		`INSERT INTO ade_branches (code_repo_id, branch, kind, work_type, name, draft_title, start_from, jira_key, jira_url, pr_url, est, notes, added_at, had_commits, merged_at, archived_at)
 		 VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, '', ?, ?, ?, 0, NULL, NULL)`,
-		codeRepoID, branch, kind, workType, w.Title, w.StartFrom, w.JiraKey, w.JiraURL, w.Est, w.Notes, now,
+		codeRepoID, branch, model.AdeBranchKindMine, w.WorkType, w.Title, w.StartFrom, w.JiraKey, w.JiraURL, w.Est, w.Notes, now,
 	); err != nil {
 		return fmt.Errorf("repos: rebind: insert ade branch %s: %w", branch, err)
 	}

@@ -253,6 +253,7 @@ type Queue struct {
 	mu          sync.Mutex
 	repoMus     map[string]*sync.Mutex
 	byGitRepoID map[string]string // gitclient RepoID -> codeRepoID, populated on open
+	gitRepoIDOf map[string]string // codeRepoID -> gitclient RepoID, skips Identify while held
 	caches      map[string]*repoCaches
 	debounce    map[string]*time.Timer
 }
@@ -262,6 +263,7 @@ func NewQueue(deps QueueDeps) *Queue {
 		deps:        deps,
 		repoMus:     map[string]*sync.Mutex{},
 		byGitRepoID: map[string]string{},
+		gitRepoIDOf: map[string]string{},
 		caches:      map[string]*repoCaches{},
 		debounce:    map[string]*time.Timer{},
 	}
@@ -342,6 +344,14 @@ func (q *Queue) cachesFor(codeRepoID string) *repoCaches {
 // it on ade's own Conn (first use arms the held-until-Close/repo-gone lifetime §5.1 describes), and
 // record the gitclient RepoID -> codeRepoID mapping handleEmit needs.
 func (q *Queue) openRepo(ctx context.Context, codeRepoID string) (*gitsession.RepoEntry, error) {
+	q.mu.Lock()
+	gitID, known := q.gitRepoIDOf[codeRepoID]
+	q.mu.Unlock()
+	if known {
+		if entry, ok := q.conn.Entry(gitID); ok {
+			return entry, nil
+		}
+	}
 	root, ok := q.deps.CodeRepo(codeRepoID)
 	if !ok {
 		return nil, fmt.Errorf("ade: queue: code repo %s not found", codeRepoID)
@@ -352,6 +362,7 @@ func (q *Queue) openRepo(ctx context.Context, codeRepoID string) (*gitsession.Re
 	}
 	q.mu.Lock()
 	q.byGitRepoID[summary.RepoID] = codeRepoID
+	q.gitRepoIDOf[codeRepoID] = summary.RepoID
 	q.mu.Unlock()
 	entry, ok := q.conn.Entry(summary.RepoID)
 	if !ok {
@@ -472,7 +483,11 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 	if err != nil {
 		return RepoSnapshot{}, err
 	}
-	rebound, branchCandidates, err := q.reconcileNewWork(ctx, entry, codeRepoID, &state)
+	inventory, err := entry.BranchInventory(ctx)
+	if err != nil {
+		return RepoSnapshot{}, err
+	}
+	rebound, branchCandidates, err := q.reconcileNewWork(ctx, entry, codeRepoID, &state, inventory)
 	if err != nil {
 		return RepoSnapshot{}, err
 	}
@@ -483,10 +498,6 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 		}
 	}
 
-	inventory, err := entry.BranchInventory(ctx)
-	if err != nil {
-		return RepoSnapshot{}, err
-	}
 	mainRefName, mainTip, hasMain, err := entry.MainRef(ctx)
 	if err != nil {
 		return RepoSnapshot{}, err
@@ -784,14 +795,7 @@ func (q *Queue) computeOneBranchFact(ctx context.Context, sc *snapshotContext, b
 	hadCommits := b.HadCommits || sc.depths[b.Branch] > 0
 	hadCommitsNew = hadCommits && !b.HadCommits
 
-	tipReachableFromMain := false
-	if sc.hasMain {
-		reached, err := sc.entry.Ancestors(ctx, sc.mainTip, []string{fact.Ref})
-		if err != nil {
-			return BranchFact{}, nil, false, false, err
-		}
-		tipReachableFromMain = len(reached) > 0
-	}
+	tipReachableFromMain := sc.hasMain && sc.depths[b.Branch] == 0
 	fact.Merged = mergedRule(tipReachableFromMain, hadCommits, "")
 	if fact.Merged && b.MergedAt == nil {
 		mergedNew = true
@@ -998,7 +1002,7 @@ func filesSet(changes []porcelain.FileChange) map[string]bool {
 // session start minus 5s — more than one such candidate stays unbound and is served back on the
 // NewWork row as BranchCandidates (this function's own second return, applied by the caller onto
 // NewWorkFact regardless of whether this call itself rebound anything else).
-func (q *Queue) reconcileNewWork(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, state *repos.AdeQueueState) (bool, map[string][]string, error) {
+func (q *Queue) reconcileNewWork(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, state *repos.AdeQueueState, inv []porcelain.InventoryRef) (bool, map[string][]string, error) {
 	var activeNewWork []model.AdeNewWork
 	for _, w := range state.NewWork {
 		if w.ArchivedAt == nil {
@@ -1009,31 +1013,23 @@ func (q *Queue) reconcileNewWork(ctx context.Context, entry *gitsession.RepoEntr
 		return false, nil, nil
 	}
 
-	inv, err := entry.BranchInventory(ctx)
-	if err != nil {
-		return false, nil, err
-	}
+	sessions := q.deps.Sessions(codeRepoID)
 	branchState := make(map[string]model.AdeBranch, len(state.Branches))
 	for _, b := range state.Branches {
 		branchState[b.Branch] = b
 	}
-	userEmail, err := entry.ConfigValue(ctx, "user.email")
-	if err != nil {
-		return false, nil, err
-	}
-
 	rebound := false
 	branchCandidates := map[string][]string{}
 	for _, w := range activeNewWork {
 		if w.BranchName != "" {
-			bound, err := q.reconcileTypedNewWork(ctx, entry, codeRepoID, w, inv, branchState, userEmail)
+			bound, err := q.reconcileTypedNewWork(codeRepoID, w, inv, branchState)
 			if err != nil {
 				return false, nil, err
 			}
 			rebound = rebound || bound
 			continue
 		}
-		bound, candidates, err := q.reconcileHeuristicNewWork(ctx, entry, codeRepoID, w, inv, branchState, userEmail)
+		bound, candidates, err := q.reconcileHeuristicNewWork(ctx, entry, codeRepoID, w, inv, branchState, sessions)
 		if err != nil {
 			return false, nil, err
 		}
@@ -1048,15 +1044,14 @@ func (q *Queue) reconcileNewWork(ctx context.Context, entry *gitsession.RepoEntr
 
 // reconcileTypedNewWork is §0.10 rule 1: a typed branch_name binds once that branch exists in the
 // inventory and is not already queued or archived — never falls through to the heuristic below.
-func (q *Queue) reconcileTypedNewWork(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, w model.AdeNewWork, inv []porcelain.InventoryRef, branchState map[string]model.AdeBranch, userEmail string) (bool, error) {
-	row, found := resolveQueuedRef(inv, w.BranchName, "")
-	if !found {
+func (q *Queue) reconcileTypedNewWork(codeRepoID string, w model.AdeNewWork, inv []porcelain.InventoryRef, branchState map[string]model.AdeBranch) (bool, error) {
+	if _, found := resolveQueuedRef(inv, w.BranchName, ""); !found {
 		return false, nil
 	}
 	if _, exists := branchState[w.BranchName]; exists {
 		return false, nil // already queued or archived — a typed name never displaces it.
 	}
-	if err := q.bindNewWorkLocked(ctx, entry, codeRepoID, w.ID, w.BranchName, row, userEmail); err != nil {
+	if err := q.bindNewWorkLocked(codeRepoID, w.ID, w.BranchName); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1066,8 +1061,8 @@ func (q *Queue) reconcileTypedNewWork(ctx context.Context, entry *gitsession.Rep
 // exactly one local branch, not queued or archived, checked out in a linked worktree, has a reflog
 // creation time at or after that session's own first start minus 5s. More than one match: stays
 // unbound, every matching name returned as the ambiguous candidate set.
-func (q *Queue) reconcileHeuristicNewWork(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, w model.AdeNewWork, inv []porcelain.InventoryRef, branchState map[string]model.AdeBranch, userEmail string) (bool, []string, error) {
-	firstStartedMs, hasSession := firstSessionStart(q.deps.Sessions(codeRepoID), w.ID)
+func (q *Queue) reconcileHeuristicNewWork(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, w model.AdeNewWork, inv []porcelain.InventoryRef, branchState map[string]model.AdeBranch, sessions []SessionRef) (bool, []string, error) {
+	firstStartedMs, hasSession := firstSessionStart(sessions, w.ID)
 	if !hasSession {
 		return false, nil, nil
 	}
@@ -1097,11 +1092,10 @@ func (q *Queue) reconcileHeuristicNewWork(ctx context.Context, entry *gitsession
 	if decision.Bind == "" {
 		return false, decision.Candidates, nil
 	}
-	row, found := resolveQueuedRef(inv, decision.Bind, "")
-	if !found {
+	if _, found := resolveQueuedRef(inv, decision.Bind, ""); !found {
 		return false, nil, nil
 	}
-	if err := q.bindNewWorkLocked(ctx, entry, codeRepoID, w.ID, decision.Bind, row, userEmail); err != nil {
+	if err := q.bindNewWorkLocked(codeRepoID, w.ID, decision.Bind); err != nil {
 		return false, nil, err
 	}
 	return true, nil, nil
@@ -1120,10 +1114,9 @@ func firstSessionStart(sessions []SessionRef, newWorkID string) (firstStartedMs 
 	return firstStartedMs, ok
 }
 
-func (q *Queue) bindNewWorkLocked(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID, newWorkID, branch string, row porcelain.InventoryRef, userEmail string) error {
-	kind := resolveKind(row, userEmail, "")
+func (q *Queue) bindNewWorkLocked(codeRepoID, newWorkID, branch string) error {
 	now := q.deps.Now().UnixMilli()
-	if err := q.deps.Store.Rebind(codeRepoID, newWorkID, branch, kind, now); err != nil {
+	if err := q.deps.Store.Rebind(codeRepoID, newWorkID, branch, now); err != nil {
 		return err
 	}
 	if q.deps.OnSessionsChanged != nil {
@@ -1288,7 +1281,7 @@ func (q *Queue) AddNewWork(codeRepoID string, in NewWorkInput) (string, error) {
 }
 
 func (q *Queue) UpdateNewWork(codeRepoID, id string, patch model.AdeNewWorkPatch) error {
-	if err := q.deps.Store.UpdateNewWork(id, patch); err != nil {
+	if err := q.deps.Store.UpdateNewWork(codeRepoID, id, patch); err != nil {
 		return err
 	}
 	q.notifyChanged(codeRepoID)
@@ -1393,15 +1386,10 @@ func (q *Queue) BindNewWork(ctx context.Context, codeRepoID, newWorkID, branch s
 		return err
 	}
 	remote, _ := entry.DefaultRemote(ctx)
-	row, found := resolveQueuedRef(inv, branch, remote)
-	if !found {
+	if _, found := resolveQueuedRef(inv, branch, remote); !found {
 		return fmt.Errorf("ade: queue: branch %q not found", branch)
 	}
-	userEmail, err := entry.ConfigValue(ctx, "user.email")
-	if err != nil {
-		return err
-	}
-	return q.bindNewWorkLocked(ctx, entry, codeRepoID, newWorkID, branch, row, userEmail)
+	return q.bindNewWorkLocked(codeRepoID, newWorkID, branch)
 }
 
 // --- Refresh (§6.1) ----------------------------------------------------------------------------
@@ -1667,7 +1655,11 @@ func (q *Queue) ArchiveRisk(ctx context.Context, codeRepoID, item string) (Archi
 
 	var unmerged int
 	if branch.MergedAt == nil {
-		if _, mainTip, hasMain, err := entry.MainRef(ctx); err == nil && hasMain {
+		_, mainTip, hasMain, err := entry.MainRef(ctx)
+		if err != nil {
+			return ArchiveRisk{}, err
+		}
+		if hasMain {
 			inv, ierr := entry.BranchInventory(ctx)
 			if ierr != nil {
 				return ArchiveRisk{}, ierr

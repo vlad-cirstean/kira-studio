@@ -432,20 +432,16 @@ func wireAde(
 	return tracker, queue, hooks
 }
 
-// adeSessionsFor is QueueDeps.Sessions' own construction (§5.1): Tracker.List filtered to
-// codeRepoID and mapped to ade.SessionRef, Part 1's own already-recorded session rows.
+// adeSessionsFor is QueueDeps.Sessions' own construction (§5.1): Tracker.ListByRepo mapped to ade.SessionRef, Part 1's own already-recorded session rows.
 func adeSessionsFor(tracker *ade.Tracker) func(codeRepoID string) []ade.SessionRef {
 	return func(codeRepoID string) []ade.SessionRef {
-		sessions, err := tracker.List()
+		sessions, err := tracker.ListByRepo(codeRepoID)
 		if err != nil {
 			slog.Warn("ade: list sessions for queue", "scope", "ade", "err", err)
 			return nil
 		}
 		var out []ade.SessionRef
 		for _, sess := range sessions {
-			if sess.CodeRepoID != codeRepoID {
-				continue
-			}
 			out = append(out, ade.SessionRef{
 				ID: sess.ID, Branch: sess.Branch, NewWorkID: sess.NewWorkID,
 				State: sess.State, TerminalID: sess.TerminalID, StartedAt: sess.StartedAt,

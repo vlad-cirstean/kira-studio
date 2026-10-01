@@ -458,6 +458,19 @@ func (t *Tracker) List() ([]model.AdeSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ade: list: %w", err)
 	}
+	return t.withLiveActivity(rows), nil
+}
+
+// ListByRepo is List narrowed to one code repo.
+func (t *Tracker) ListByRepo(codeRepoID string) ([]model.AdeSession, error) {
+	rows, err := t.deps.Store.ListByRepo(codeRepoID)
+	if err != nil {
+		return nil, fmt.Errorf("ade: list by repo: %w", err)
+	}
+	return t.withLiveActivity(rows), nil
+}
+
+func (t *Tracker) withLiveActivity(rows []model.AdeSession) []model.AdeSession {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for i := range rows {
@@ -465,7 +478,7 @@ func (t *Tracker) List() ([]model.AdeSession, error) {
 			rows[i].LastActiveAt = v
 		}
 	}
-	return rows, nil
+	return rows
 }
 
 // Recover marks every row left "running" by a previous process life "stopped" — called once at

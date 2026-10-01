@@ -74,7 +74,9 @@ func toWireAdeSession(s model.AdeSession) AdeSessionWire {
 	return AdeSessionWire{
 		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, CodeRepoID: s.CodeRepoID, Branch: s.Branch,
 		NewWorkID: s.NewWorkID, Cwd: s.Cwd, State: s.State, TerminalID: s.TerminalID,
-		StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt, CwdMissing: cwdMissing(s.Cwd),
+		StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
+		// Only a stopped row can be resumed, so only it needs the stat.
+		CwdMissing: s.State == model.AdeSessionStateStopped && cwdMissing(s.Cwd),
 	}
 }
 
@@ -831,7 +833,7 @@ func adeQueueError(err error) error {
 	if errors.Is(err, repos.ErrQueued) || errors.Is(err, repos.ErrArchived) ||
 		errors.Is(err, repos.ErrNotBlockable) || errors.Is(err, repos.ErrDependencyGone) ||
 		errors.Is(err, repos.ErrEstimateShrink) || errors.Is(err, repos.ErrWorkTypeBlocked) ||
-		errors.Is(err, repos.ErrWorkTypeInvalid) {
+		errors.Is(err, repos.ErrWorkTypeInvalid) || errors.Is(err, repos.ErrReviewNotesOnly) {
 		return ipcerr.New("E_INVALID", err.Error())
 	}
 	return ipcerr.InternalErr(err)
