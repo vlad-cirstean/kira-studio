@@ -18,7 +18,7 @@ import RunState from '@theme/RunState.vue';
 import { useEventListener } from '@vueuse/core';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
-import { useDragReorder } from '@workbench/util/useDragReorder';
+import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
 import { computed, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
@@ -71,15 +71,6 @@ const descriptionDrafts = reactive<Record<string, string>>({});
 const seeds = reactive<Record<string, EnvDraft>>({});
 const order = ref<string[]>([]);
 
-// D14: the same drag/keyboard reorder the variable rows use. Declared here, ahead of syncDrafts
-// below, so dragIndex already exists before that first immediate watch fires (canReorder/onReorder
-// close over isFiltered/variablesStore lazily, so declaring this early is safe even though both are
-// defined further down).
-const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
-  canReorder: () => !isFiltered.value,
-  onReorder: (next) => variablesStore.reorderEnvironmentsList(next),
-});
-
 // P112 §6.5: keep a row's draft that has changed since it was seeded and still differs from what
 // the row now is (an in-progress edit); reseed everything else. Order reseeds from the incoming
 // list too, unless a drag is in progress.
@@ -101,9 +92,8 @@ function syncDrafts(): void {
   }
   for (const key of Object.keys(seeds)) delete seeds[key];
   Object.assign(seeds, merged.seeds);
-  if (dragIndex.value === null) order.value = merged.order;
+  if (!dragging.value) order.value = merged.order;
 }
-watch(() => variablesStore.environments, syncDrafts, { immediate: true });
 
 const orderedEnvironments = computed<ApiEnvironment[]>(() => {
   const byId = new Map(variablesStore.environments.map((env) => [env.id, env]));
@@ -123,6 +113,26 @@ const displayEnvironments = computed<ApiEnvironment[]>(() => {
     ? orderedEnvironments.value.filter((env) => env.name.toLowerCase().includes(q))
     : orderedEnvironments.value;
 });
+
+// D14: drag by the grip, or Alt+Arrow below. Declared ahead of the first syncDrafts run (the
+// immediate watch below) so `dragging` exists when it reads it. The grip is the drag handle: rows
+// hold text inputs and a radio, which a whole-row drag would start from.
+const listEl = useTemplateRef<HTMLElement>('listEl');
+const { dragging } = useSortableReorder(
+  listEl,
+  () => displayEnvironments.value.map((env) => env.id),
+  (from, to) => {
+    order.value = moveId(order.value, from, to);
+    void variablesStore.reorderEnvironmentsList(order.value);
+  },
+  {
+    draggable: '[data-testid="environment-row"]',
+    handle: '[data-testid="environment-grip"]',
+    direction: 'vertical',
+    disabled: () => isFiltered.value,
+  },
+);
+watch(() => variablesStore.environments, syncDrafts, { immediate: true });
 
 // P17 D14: renaming and describing are one row update — both fields' drafts commit together
 // whichever one blurred, rather than two separate IPC calls for two cells of one row.
@@ -191,34 +201,16 @@ function onKeydown(e: KeyboardEvent, id: string): void {
   }
 }
 
-// P105 §5.1: the row divs carry no interactive role of their own, so the keydown/drag listeners
-// bind once on the list container and resolve back to a row via its own data-id, rather than each
-// row wiring the four handlers itself.
-const listEl = useTemplateRef<HTMLElement>('listEl');
+// P105 §5.1: the row divs carry no interactive role of their own, so the keydown listener binds
+// once on the list container and resolves back to a row via its own data-id.
 function rowIdFromEvent(e: Event): string | null {
   return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="environment-row"]')
     ?.dataset.id ?? null;
-}
-function rowIndexFromEvent(e: Event): number | null {
-  const id = rowIdFromEvent(e);
-  if (id === null) return null;
-  const i = displayEnvironments.value.findIndex((env) => env.id === id);
-  return i === -1 ? null : i;
 }
 useEventListener(listEl, 'keydown', (e) => {
   const id = rowIdFromEvent(e);
   if (id !== null) onKeydown(e as KeyboardEvent, id);
 });
-useEventListener(listEl, 'dragstart', (e) => {
-  const i = rowIndexFromEvent(e);
-  if (i !== null) onDragStart(i);
-});
-useEventListener(listEl, 'dragover', (e) => {
-  e.preventDefault();
-  const i = rowIndexFromEvent(e);
-  if (i !== null) onDragOver(i);
-});
-useEventListener(listEl, 'dragend', onDragEnd);
 </script>
 
 <template>
@@ -273,11 +265,9 @@ useEventListener(listEl, 'dragend', onDragEnd);
 
     <div ref="listEl" class="flex flex-col gap-0.5 p-1">
         <div
-          v-for="(env, i) in displayEnvironments"
+          v-for="env in displayEnvironments"
           :key="env.id"
           class="flex items-center gap-1 px-1.5 py-1"
-          :class="{ 'opacity-50': dragIndex === i }"
-          :draggable="!isFiltered"
           data-testid="environment-row"
           :data-id="env.id"
         >

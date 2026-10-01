@@ -377,3 +377,63 @@ test('collections — no environments category in the panel; the header action o
   await expect(page.locator('[data-testid="tab"][data-active="true"]')).toContainText('Prod');
   await expect(page.locator('[data-testid="tab"][data-tab-kind="environments"]')).toHaveCount(1);
 });
+
+test('environments reorder by dragging the grip; refused while filtered (P140)', async ({
+  relaunch,
+}) => {
+  const PREVIEW = {
+    id: 'env-preview',
+    name: 'Preview',
+    sortOrder: 2,
+    isActive: false,
+    color: 'blue',
+  };
+  const BASE = [...ENVIRONMENTS, PREVIEW];
+  const REORDERED = [BASE[1], BASE[0], BASE[2]];
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.collectionsList, response: TREE },
+    { channel: IPC.variablesListEnvironments, response: BASE },
+    { channel: IPC.variablesReorderEnvironments, response: REORDERED },
+    { channel: IPC.variablesListEnvironments, response: REORDERED },
+  ];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await openHttpMode(page);
+  await page.click('[data-testid="api-environments"]');
+
+  const rows = page.locator('[data-testid="environment-row"]');
+  const rowIds = () => rows.evaluateAll((els) => els.map((el) => el.getAttribute('data-id')));
+  const reorderCalls = () =>
+    control.log().filter((e) => e.channel === IPC.variablesReorderEnvironments);
+  const dragGrip = async (from: string, to: string) => {
+    const src = await page
+      .locator(
+        `[data-testid="environment-row"][data-id="${from}"] [data-testid="environment-grip"]`,
+      )
+      .boundingBox();
+    const dst = await page
+      .locator(`[data-testid="environment-row"][data-id="${to}"]`)
+      .boundingBox();
+    if (!src || !dst) throw new Error('environment row has no box');
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2 + 10, { steps: 5 });
+    await page.mouse.move(dst.x + dst.width / 2, dst.y + dst.height * 0.25, { steps: 15 });
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+  };
+
+  await expect(rows).toHaveCount(3);
+  await dragGrip('env-staging', 'env-prod');
+  await expect.poll(rowIds).toEqual(['env-staging', 'env-prod', 'env-preview']);
+  expect(reorderCalls()).toHaveLength(1);
+  expect(reorderCalls()[0].args).toMatchObject({
+    ids: ['env-staging', 'env-prod', 'env-preview'],
+  });
+
+  await page.fill('[data-testid="environments-filter"]', 'pr');
+  await expect(rows).toHaveCount(2);
+  await dragGrip('env-preview', 'env-prod');
+  await page.waitForTimeout(300);
+  expect(reorderCalls()).toHaveLength(1);
+  expect(await rowIds()).toEqual(['env-prod', 'env-preview']);
+});
