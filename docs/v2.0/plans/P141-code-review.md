@@ -6,7 +6,7 @@ F = functional correctness/business logic, P = performance/resource efficiency).
 Severity: high (data loss, security, user-visible wrong result), medium (real bug on a narrower
 path, leak, sizeable waste), low (maintainability or rule breach with no runtime harm).
 
-Status: in progress. Areas land as they finish.
+Status: complete (round 1). 11 findings: high 1, medium 6, low 4.
 
 ## Findings
 
@@ -121,3 +121,32 @@ the selected `nw:` item, and `useQueue` falls back to the first item while the u
 item's notes are overwritten, and the outgoing item's last edit is lost.
 Fix: track the item id the editor content belongs to, emit `save` with `(itemId, markdown)`, and have
 `useItemMeta` write to that id (branch name or new-work id) rather than the current panel.
+
+## Area 3: Studio Go adapters and shared internal packages
+
+No verified findings.
+Checked: the postgres Guarded/relational refactor, `connstate`, the sqs adapter, `sqltext.go`, `sslmode.go`
+(`ParseSSLMode` still rejects unknown modes, so mysql-family keeps its fail-loud TLS rule), mysqlfamily
+`applyTLS` and the `BeginReadOnlyConsole` wrap (waitInFlight still runs before COMMIT), `connections.go`
+`insertTx`, sqlitex `QueryOne`/`NextSortOrder`, the studio `bridge/terminal.go` shim over
+`internal/terminal.BoundService`, `internal/agenthooks`, `internal/terminal` bound.go/procgroup.go,
+`internal/appupdate/install.go`, and Shell `OpenExternalURL` (http(s) scheme check intact).
+
+## Coverage
+
+Reviewed:
+- Kira Space ADE backend: `internal/ade` queue/tracker/command, `bridge/ade.go`, `storage/repos/adequeue.go`,
+  `adesessions.go`, migrations 0003-0007.
+- Kira Space gitsession: `queuefacts.go`, `facts.go`, `cache.go`, `preflight.go`, `incremental.go`, `oplog.go`,
+  `conn.go`; `internal/oplog`.
+- ADE frontend: `queries.ts`, `mutations.ts`, `adeActions.ts`, `useQueue`, `useItemMeta`, `AdeRepoView`,
+  `AdeAllAgentsView`, `AdeDetailsTab`, `AdeNotesEditor`, `dialogFlow.ts`, agent sessions store.
+- Area 3 files listed above.
+
+Not reached:
+- Studio adapters mongo, kafka, clickhouse, redis, s3, sqlite (diffs not read line by line).
+- Studio `agenthooks` manager, keepawake, windowsvc, appstorage, appsettings, `storage/model/settings.go`.
+- Space `storage/repos/settings.go`, `coderepos.go`, gitclient porcelain `inventory.go`.
+- ADE `wire.ts`, `dialogCompose.ts`, `adeUi.ts`, `allAgents.ts`, `timelineOps.ts`.
+- packages/workbench, packages/git-ui, packages/theme, studio frontend view conversions,
+  `scripts/check-class-conflicts.ts`, `check-theme-classes.sh`.
