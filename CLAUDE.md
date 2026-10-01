@@ -103,8 +103,8 @@ duplicated here; this file only points at them.
   the repo's tracking it, before or as part of any handoff, never held back for a single later
   subagent to fold into a closing summary. Concretely: a review subagent writes its findings to a
   file under the current chapter's `plans/` before a fixer ever starts (never just a conversational
-  handback the fixer is trusted to remember); a fixer commits each finding's fix as its own commit
-  as it lands, not batched for one commit at the end. If a run is interrupted, what actually landed
+  handback the fixer is trusted to remember); a fixer commits each group of related fixes as it lands,
+  not batched for one commit at the end. If a run is interrupted, what actually landed
   (commits, findings files, plans) must be enough to see exactly where it stopped and pick back up
   — never a state where recovering means re-deriving work an interrupted subagent already did but
   never wrote down.
@@ -135,8 +135,8 @@ duplicated here; this file only points at them.
   commits it before any fixer starts. Then one sequential Sonnet subagent fixes every finding (parallel
   only for a batch genuinely isolated from each other). Repeat the whole cycle for as many rounds as
   asked — a round finding nothing real should say so, not manufacture a finding. No findings document
-  survives a round once fixed — each finding gets fixed and committed one at a time, so the commit log
-  is the durable record. Carry forward only a genuinely still-open item (see "Known open items"),
+  survives a round once fixed. The fixer commits per logical group of related findings (same file,
+  module or root cause), not one commit per finding, so the commit log stays short and still durable. Carry forward only a genuinely still-open item (see "Known open items"),
   never a running narrative of what each round found.
 - **A review's scope is everything changed since the last review session**, not the whole repo and not
   just the latest chapter. Find that session in git (the last commit of a prior review's findings or
