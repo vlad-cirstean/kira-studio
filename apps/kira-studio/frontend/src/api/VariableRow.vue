@@ -26,10 +26,6 @@ const props = defineProps<{
   /** D10: secrets.Status().available is false — ticking "secret" is refused, with the reason
    *  shown once at the dialog level rather than repeated per row. */
   secretsUnavailable?: boolean;
-  /** D14: this row's position in the drag-reorderable list, and whether it is the one currently
-   *  being dragged — both owned by the parent, since only it knows the full order. */
-  index: number;
-  dragging?: boolean;
   /** P16 D14: true while the dialog's own filter is non-empty — reordering is refused ("move up"
    *  past a filter-hidden neighbour has no defined result), and the drag handle says why. */
   filtered?: boolean;
@@ -44,9 +40,6 @@ const emit = defineEmits<{
   remove: [];
   /** Not yet revealed (row.value === '' && row.isSecret) — the eye IS the reveal action. */
   reveal: [];
-  dragstart: [index: number];
-  dragover: [index: number];
-  dragend: [];
   move: [direction: 'up' | 'down'];
   /** R10: the parent knows the tab/scope/owner this row's history popover needs to open against
    *  (state/variables.ts's openHistoryMenu now takes them explicitly) — this row only says
@@ -118,16 +111,10 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
-// P105 §5.1: the row root has no interactive role of its own -- all four listeners bind here via
-// VueUse instead of as raw template attributes.
+// P105 §5.1: the row root has no interactive role of its own -- the keydown listener binds here via
+// VueUse instead of as a raw template attribute.
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
 useEventListener(rootEl, 'keydown', onKeydown);
-useEventListener(rootEl, 'dragstart', () => emit('dragstart', props.index));
-useEventListener(rootEl, 'dragover', (e) => {
-  e.preventDefault();
-  emit('dragover', props.index);
-});
-useEventListener(rootEl, 'dragend', () => emit('dragend'));
 </script>
 
 <template>
@@ -141,10 +128,8 @@ useEventListener(rootEl, 'dragend', () => emit('dragend'));
   <div
     ref="rootEl"
     class="grid items-center gap-1 px-1.5 py-1 grid-cols-[auto_1.2fr_2fr_1.5fr_auto_auto_auto] variable-row"
-    :class="{ 'opacity-50': dragging }"
     data-testid="variable-row"
     :data-id="row.id"
-    :draggable="!trailing && !filtered"
   >
     <Tooltip v-if="filtered && !trailing">
       <TooltipTrigger as-child>

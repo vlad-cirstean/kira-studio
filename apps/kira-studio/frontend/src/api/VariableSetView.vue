@@ -19,8 +19,8 @@ import { connColorVar } from '@theme/connColor';
 import RunState from '@theme/RunState.vue';
 import SwatchRadio from '@theme/SwatchRadio.vue';
 import ViewToolbar from '@workbench/components/ViewToolbar.vue';
-import { useDragReorder } from '@workbench/util/useDragReorder';
-import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { moveId, useSortableReorder } from '@workbench/util/useSortableReorder';
+import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
@@ -185,16 +185,6 @@ const trailingDraft = reactive<Draft>({
 });
 const order = ref<string[]>([]);
 
-// P107 T2-20: same drag/keyboard reorder EnvironmentsView.vue's own rows use. Declared here, ahead
-// of syncDrafts below, so dragIndex already exists before that first immediate watch fires
-// (canReorder/onReorder close over isFiltered/variableSetStore lazily, so declaring this early is
-// safe even though both are defined further down).
-const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
-  canReorder: () => !isFiltered.value,
-  onReorder: (next) =>
-    variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, next),
-});
-
 // P112 §6.5: keep a draft that has changed since it was seeded and still differs from what the
 // row now is (an in-progress edit); reseed everything else, including after this window's own
 // commit lands (the draft then equals the incoming row again). Order reseeds from the incoming
@@ -214,9 +204,8 @@ function syncDrafts(): void {
   trailingDraft.valueTouched = false;
   trailingDraft.isSecret = false;
   trailingDraft.description = '';
-  if (dragIndex.value === null) order.value = merged.order;
+  if (!dragging.value) order.value = merged.order;
 }
-watch(rows, syncDrafts, { immediate: true });
 
 // Which id's draft currently mirrors a revealed plaintext, and what that plaintext was — so a
 // later grace-window expiry (state/variables.ts's own scheduleRevealExpiry) can re-mask the field
@@ -283,6 +272,26 @@ const displayRows = computed<ApiVariable[]>(() => {
     : allRealRows.value;
   return [...real, trailingRow.value];
 });
+
+// D14: drag by the grip, or Alt+Arrow (onMove). Declared ahead of the first syncDrafts run (the
+// immediate watch below) so `dragging` exists when it reads it. The trailing blank row is never a
+// drag source.
+const listRef = useTemplateRef<HTMLElement>('listRef');
+const { dragging } = useSortableReorder(
+  listRef,
+  () => displayRows.value.filter((row) => row.id !== '').map((row) => row.id),
+  (from, to) => {
+    order.value = moveId(order.value, from, to);
+    void variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
+  },
+  {
+    draggable: '[data-testid="variable-row"]:not([data-id=""])',
+    handle: '[data-testid="variable-grip"]',
+    direction: 'vertical',
+    disabled: () => isFiltered.value,
+  },
+);
+watch(rows, syncDrafts, { immediate: true });
 
 function duplicateFor(row: ApiVariable): boolean {
   const full = [...allRealRows.value, trailingRow.value];
@@ -428,7 +437,6 @@ async function onRemove(id: string): Promise<void> {
 // resolving, not a user adding a row, and must not scroll a freshly opened set straight to its own
 // bottom. `hasLoadedOnce` distinguishes the two: false for that first invocation only, true for
 // every real add after it.
-const listRef = ref<HTMLElement | null>(null);
 let hasLoadedOnce = false;
 watch(
   () => allRealRows.value.length,
@@ -615,11 +623,9 @@ function onBulkClose(): void {
         <span class="cell"></span>
       </div>
       <VariableRow
-        v-for="(row, i) in displayRows"
+        v-for="row in displayRows"
         :key="row.id || 'trailing'"
         :row="row"
-        :index="i"
-        :dragging="dragIndex === i"
         :duplicate="duplicateFor(row)"
         :trailing="row.id === ''"
         :filtered="isFiltered"
@@ -632,9 +638,6 @@ function onBulkClose(): void {
         @remove="onRemove(row.id)"
         @reveal="onReveal(row.id)"
         @history="onHistoryClickFor(row)"
-        @dragstart="onDragStart"
-        @dragover="onDragOver"
-        @dragend="onDragEnd"
         @move="onMove(row.id, $event)"
       />
     </div>

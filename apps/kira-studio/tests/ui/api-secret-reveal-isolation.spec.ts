@@ -332,9 +332,8 @@ test('the variables filter matches a secret’s name, never its plaintext, and d
   await expect(realRows).toHaveCount(1);
   await expect(variableRow(page, 'var-apikey')).toBeVisible();
 
-  // D14: reordering is refused while filtered — the row itself carries `:draggable`, the drag
-  // handle says why via its own tooltip, and Alt+↑ is a no-op.
-  await expect(variableRow(page, 'var-apikey')).toHaveAttribute('draggable', 'false');
+  // D14: reordering is refused while filtered — the drag handle says why via its own tooltip,
+  // and Alt+↑ is a no-op.
   await variableRow(page, 'var-apikey').locator('[data-testid="variable-grip"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'Clear the filter to reorder',
@@ -343,8 +342,25 @@ test('the variables filter matches a secret’s name, never its plaintext, and d
   await page.keyboard.press('Alt+ArrowUp');
   expect(control.log().filter((e) => e.channel === IPC.variablesReorder)).toHaveLength(0);
 
-  // Clearing the filter restores every row, and reordering.
+  // A drag between two still-visible rows is refused too (P140: Sortable is disabled).
+  await page.fill('[data-testid="variables-filter"]', 'e');
+  await expect(realRows).toHaveCount(2);
+  const grip = await variableRow(page, 'var-region')
+    .locator('[data-testid="variable-grip"]')
+    .boundingBox();
+  const target = await variableRow(page, 'var-apikey').boundingBox();
+  if (!grip || !target) throw new Error('variable row has no box');
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 - 10, { steps: 5 });
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.25, {
+    steps: 15,
+  });
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  expect(control.log().filter((e) => e.channel === IPC.variablesReorder)).toHaveLength(0);
+
+  // Clearing the filter restores every row.
   await page.fill('[data-testid="variables-filter"]', '');
   await expect(realRows).toHaveCount(2);
-  await expect(variableRow(page, 'var-apikey')).toHaveAttribute('draggable', 'true');
 });
