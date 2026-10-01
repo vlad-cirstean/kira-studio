@@ -6,7 +6,7 @@ F = functional correctness/business logic, P = performance/resource efficiency).
 Severity: high (data loss, security, user-visible wrong result), medium (real bug on a narrower
 path, leak, sizeable waste), low (maintainability or rule breach with no runtime harm).
 
-Status: in progress (round 1 continuation).
+Status: complete (round 1). 13 findings: high 2, medium 7, low 4.
 
 ## Findings
 
@@ -189,21 +189,50 @@ Reviewed with no findings:
   each engine's accepted set and the fail-loud rule. Kafka's exact-length topic check is documented
   at `kafka/adapter.go:165-170`. ClickHouse `ValidateRequestedTerms` keeps the column and direction checks.
 
+## Area 6: Shared packages, Studio frontend conversions, check scripts
+
+No verified findings.
+- `packages/workbench`:
+  - `util/useSortableReorder.ts`: `start` destroys the previous Sortable, and options stay reactive.
+  - Every caller's `ids()` maps 1:1 onto the draggable rows. TabStrip uses the scrolling tabs only.
+    ColumnsMenu iterates the full `order`. VariableSetView and EnvironmentsView disable the drag while
+    filtered.
+  - `createOpLogStore` (subscribe-before-snapshot buffer), `createAppUpdateStore`.
+  - `terminal/TerminalPanel.vue`, `TabStrip.vue`.
+- P140 repo reorder: `state/coderepos.ts` `reorderCodeRepos` (optimistic, rehydrates on failure) and
+  `useAdeTabStripHost.ts` `moveTab`. Cross-window sync is disclosed in P140.
+- `packages/git-ui` conversions: BranchPicker, ResetDialog and ForcePushDialog script diffs. The
+  confirm gating (`canConfirm*`) is intact. The rest is component and class swaps.
+- `packages/theme`: primitives moved into `tailwind-core.css`.
+- Studio frontend: `kiraSlickGrid.ts` append-only column sheet (P139). Its scroll listener is still
+  removed on destroy. ColumnsMenu, VariableSetView and EnvironmentsView drag. No new `<style>` blocks
+  beyond the justified AdeNotesEditor one.
+- Check scripts: all pass inside the pre-commit hook on every commit in this review. They were run
+  only, not read line by line.
+
 ## Coverage
 
 Reviewed:
 - Kira Space ADE backend: `internal/ade` queue/tracker/command, `bridge/ade.go`, `storage/repos/adequeue.go`,
-  `adesessions.go`, migrations 0003-0007.
-- Kira Space gitsession: `queuefacts.go`, `facts.go`, `cache.go`, `preflight.go`, `incremental.go`, `oplog.go`,
-  `conn.go`; `internal/oplog`.
-- ADE frontend: `queries.ts`, `mutations.ts`, `adeActions.ts`, `useQueue`, `useItemMeta`, `AdeRepoView`,
-  `AdeAllAgentsView`, `AdeDetailsTab`, `AdeNotesEditor`, `dialogFlow.ts`, agent sessions store.
-- Area 3 files listed above.
+  `adesessions.go`, `coderepos.go`, `settings.go`, migrations 0003-0007.
+- Kira Space gitsession and gitclient: `queuefacts.go`, `facts.go`, `cache.go`, `preflight.go`, `incremental.go`,
+  `oplog.go`, `conn.go`, `registry.go`, porcelain `inventory.go`; `internal/oplog`.
+- ADE frontend: every `ade/*.ts` and `ade/state/*.ts` module named in the plan, plus `AdeRepoView`,
+  `AdeAllAgentsView`, `AdeDetailsTab`, `AdeNotesEditor`, `AdeRepoTabs`.
+- Shared Go: `internal/agenthooks`, `keepawake`, `windowsvc`, `appstorage`, `appsettings`, `appupdate`,
+  `terminal`.
+- Studio Go: every adapter touched in range (postgres, mysqlfamily, sqs, mongo, kafka, clickhouse, redis,
+  s3, sqlite, shared `adapters` helpers), storage model/repos/migrations for settings, `main.go` wiring.
+- Shared frontend: `packages/workbench` (stores, TabStrip, terminal panel, sortable reorder), git-ui
+  destructive dialogs and BranchPicker, Studio slick grid and drag views.
 
-Not reached:
-- Studio adapters mongo, kafka, clickhouse, redis, s3, sqlite (diffs not read line by line).
-- Studio `agenthooks` manager, keepawake, windowsvc, appstorage, appsettings, `storage/model/settings.go`.
-- Space `storage/repos/settings.go`, `coderepos.go`, gitclient porcelain `inventory.go`.
-- ADE `wire.ts`, `dialogCompose.ts`, `adeUi.ts`, `allAgents.ts`, `timelineOps.ts`.
-- packages/workbench, packages/git-ui, packages/theme, studio frontend view conversions,
-  `scripts/check-class-conflicts.ts`, `check-theme-classes.sh`.
+Not reached, or only skimmed:
+- `packages/git-ui`: the remaining component conversions (ReviewView, FileTree, App, CommitMeta,
+  StashDialog, RepoSettingsDialog, WorktreeDialog, SearchBox and the smaller dialogs). Only the
+  imports were checked; the template class swaps were not compared for behavior.
+- `packages/theme/src/primitives.css` deletions, and whether every removed rule has a utility
+  replacement. Only the token and class check scripts back this.
+- `scripts/check-class-conflicts.ts`, `check-theme-classes.sh`, `check-ade-colours.sh`,
+  `install.sh`, `prepare-worktree.sh`: run, not read.
+- Studio frontend view conversions outside the files named above (P104/P110 component swaps
+  across `views/`, `api/`, `project/`).
