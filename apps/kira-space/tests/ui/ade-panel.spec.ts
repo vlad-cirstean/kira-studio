@@ -736,7 +736,6 @@ test('estimate: settable in hours or days; once set, extend-only (P135 §6.1)', 
       ...snapshotControl(snap),
       { channel: IPC.adeSetBranchMeta, response: null },
       ...snapshotControl(withEst3d),
-      { channel: IPC.adeSetBranchMeta, response: null },
       ...snapshotControl(withEst5d),
     ],
   });

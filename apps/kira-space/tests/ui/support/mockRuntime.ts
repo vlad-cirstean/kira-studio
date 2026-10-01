@@ -205,11 +205,53 @@ export async function installControlMocks(
   page: Page,
   snapshots: readonly ControlSnapshot[],
 ): Promise<ControlMockHandle> {
-  return sharedInstallControlMocks(page, snapshots, {
+  const handle = await sharedInstallControlMocks(page, snapshots, {
     fqnToChannel: FQN_TO_CHANNEL,
     wildcardDefaults: WILDCARD_DEFAULTS,
     runtimeJsPath: WAILS_RUNTIME_JS,
     canonicalOptions: CANONICAL_OPTIONS,
+  });
+  emulateAdeRepoPush(page);
+  return handle;
+}
+
+// Go's queue writes each emit `kira:ade:repo` (Queue.notifyChanged) and the renderer refetches off
+// that push alone, so the mock repeats it after every successful write.
+const ADE_PUSHING_WRITES = new Set<string>([
+  IPC.adeAddBranch,
+  IPC.adeAddNewWork,
+  IPC.adeUpdateNewWork,
+  IPC.adeSetBranchMeta,
+  IPC.adeSetWorkType,
+  IPC.adeSetPlan,
+  IPC.adeSetQueuedAfter,
+  IPC.adeAddDependency,
+  IPC.adeUpdateDependency,
+  IPC.adeResolveDependency,
+  IPC.adeSetBlocker,
+  IPC.adeArchive,
+  IPC.adeForcePush,
+  IPC.adeRefresh,
+]);
+
+function emulateAdeRepoPush(page: Page): void {
+  page.on('requestfinished', async (request) => {
+    if (request.method() !== 'POST' || !request.url().includes('/wails/')) return;
+    try {
+      const body = JSON.parse(request.postData() ?? '{}') as {
+        args?: { methodName?: string; args?: { codeRepoId?: string }[] };
+      };
+      const channel = FQN_TO_CHANNEL[body.args?.methodName ?? ''];
+      const codeRepoId = body.args?.args?.[0]?.codeRepoId;
+      if (!channel || !ADE_PUSHING_WRITES.has(channel) || !codeRepoId) return;
+      const response = await request.response();
+      if (!response?.ok()) return;
+      // A Refresh git failure resolves with `.error` and pushes nothing.
+      if (channel === IPC.adeRefresh && (await response.text()).includes('"error":{')) return;
+      await emitWailsEvent(page, IPC.adeRepo, { codeRepoId });
+    } catch {
+      // page closed mid-request
+    }
   });
 }
 
