@@ -156,6 +156,39 @@ Reviewed with no findings:
 - `ade/wire.ts` (types only), `timelineOps.ts` (pure port, mockup oracle test), `allAgents.ts`,
   `state/adeUi.ts` (its single-store scope is recorded as deliberate in P129 parts 4-7), `dialogCompose.ts`.
 
+## Area 5: Studio Go (shared services, settings, remaining adapters)
+
+**F13. S3 delete and upload into a folder fail path validation.**
+Dimension F. Severity high.
+`adapters/s3/mutate.go:30-36` `resolveBucketSegment` now calls `RequirePath(path, "mutate", Seg("bucket"))`.
+That match is exact-length. Before `689b6eea` (P113 G2, in range) the check only needed `segments[0]` to be a
+bucket, at any depth. The renderer sends deeper paths. `state/objectStore.ts:76-91` `deleteObject` sends the
+object's own path (`bucket/.../object`, at least 2 segments). `uploadObject` (`objectStore.ts:94-121`) sends
+`containerPath`, which is a bucket or a prefix (`bucket/prefix/...`). Every delete, and every upload below the
+bucket root, now fails with "mutate requires a bucket path". `preview` (`mutate.go:63`) fails the same way.
+The s3 tests only pass `bucketPath(...)`, so they did not catch it. This is the same narrowing as the redis
+Known open item, but a separate, live path that ARCHITECTURE does not record.
+Fix: restore a rooted check for s3 (and redis): `len(segs) >= 1 && segs[0].Kind == "bucket"`, or add a
+`RequirePathPrefix` variant next to `RequirePath`. Add tests that mutate with an object path and a prefix path.
+
+Reviewed with no findings:
+- `internal/agenthooks/manager.go`: Start/Stop/ComposeLaunch under one mutex; the quoted hooks path is
+  computed once in `New`.
+- `internal/keepawake/toggle.go`: carried over unchanged from the old Studio bridge. Its update to `manual`
+  and the `Ctl.Set` call are not atomic together, which was already true before this diff. Two windows
+  would have to toggle within microseconds to hit it, so it is not reported.
+- `internal/windowsvc/windowsvc.go`, `internal/appstorage` (`QueryLeaves`, `UpsertLeafList`,
+  `CheckWindow`/`ListWindowTabs`, `WindowModes`/`GetMode`/`SetMode`), `internal/appsettings`
+  (git/inlineBlame leaves moved into Space).
+- Studio `storage/model/settings.go`, `repos/settings.go`, migrations 0028/0029 (rename runs before
+  any `advanced.logLevel` row can exist), `main.go` wiring (LinkService, agent-sessions channel and
+  agenthooks removed with no remaining renderer caller; keep-awake agent reason still fed by
+  `Registry.OnChange`).
+- Adapters mongo, kafka, clickhouse, redis, sqlite: `Guarded[connState]` swaps are equivalent and also
+  close the previously unguarded `a.defaultDbIndex` read in `redis/console.go:262`. `ParseSSLMode` keeps
+  each engine's accepted set and the fail-loud rule. Kafka's exact-length topic check is documented
+  at `kafka/adapter.go:165-170`. ClickHouse `ValidateRequestedTerms` keeps the column and direction checks.
+
 ## Coverage
 
 Reviewed:
