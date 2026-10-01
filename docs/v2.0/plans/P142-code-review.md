@@ -1,6 +1,6 @@
 # P142 code review (round 2 of 2)
 
-Status: in progress.
+Status: complete.
 
 Head: `b43281ed`. Part A base `22cd3de7` (P141 fix commits `108ada87..b43281ed`). Part B base `771512bc`
 (areas P141 skimmed or never reached). One Opus reviewer, three dimensions: architecture/security,
@@ -87,6 +87,20 @@ correctness, performance. CodeGraph via stdio fallback `cgx.mjs` (`codegraph_exp
   `.p-input.is-grow`/`.input-wrap` is still used by `AutocompleteField.vue`.
 - `check-ade-colours.sh`, `check-theme-classes.sh`, `check-class-conflicts.ts`: correct for what
   they claim (single-line `class=` attributes only in the shell checks, as documented).
+- Studio frontend (`views`, `api`, `project`): a scripted pass over every changed `.vue` file
+  for event handlers, `v-if`/`v-for`/`v-model`, testids, roles and aria attributes that left
+  the template. Every hit was traced: moved into `TooltipIconButton` `label`, `TreeTwisty`,
+  `NumberStepperInput`, `SearchToggles` (`testid-prefix`), reka `Tabs`/`ToggleGroup`
+  (`v && setMode` guards deselect), `useSortableReorder` (Columns, Environments, Variables),
+  or `@update:model-value` handlers taking the value instead of the event. The Claude hooks
+  prompt in `TerminalView` went with `c2dc2a14` (deliberate). `--kira-s-*` → host classes
+  (default 4px scale) checked in all seven files that dropped them: correct.
+- `viewOp.ts` (`PagedViewRuntime`, `defaultPagedRuntime`), `lexOptionsFor` (all four call sites
+  built the same six fields), `rawTree.ts` `tryParse`/`beautifyWith`, `crockfordBase32` (10
+  bytes = 16 chars, no tail bits): behaviour unchanged.
+- `kiraSlickGrid.ts` CSS-variable column rules: `applyColumnWidths` matches SlickGrid 5.20's
+  LTR body (frozen reset, R/L canvas width); RTL falls through to `super`; nothing else in
+  SlickGrid reads `_style`/`stylesheet` once `getColumnCssRules` is bypassed.
 
 ## Part A notes (verified clean)
 
@@ -110,3 +124,31 @@ correctness, performance. CodeGraph via stdio fallback `cgx.mjs` (`codegraph_exp
   prefix matches `queue.go:1271`; `:` cannot appear in a git branch name): correct.
 - `RequirePathPrefix` (`adapters/tree.go`): s3 uses only the bucket segment; redis picks its DB from
   segment 0 in `Adapter.Mutate`. Deeper paths carry no other meaning in either mutate.
+
+## Coverage
+
+Reviewed:
+- (A) `22cd3de7..HEAD`: `ade/tracker.go`, `ade/queue.go`, `internal/terminal/bound.go` touch
+  points, ADE frontend (`mutations.ts`, `queries.ts`, `queueActivity.ts`, `activity.ts`,
+  `AdeRepoView.vue`, `AdeAllAgentsView.vue`, `useItemMeta.ts`, `AdeNotesEditor.vue`), Studio
+  adapters (`tree.go`, s3/redis `mutate.go`).
+- (B) git-ui: all 37 components that dropped `--kv-s-*` (spacing rule by rule); behaviour diffs
+  of ReviewView, FileTree, App, CommitMeta, SearchBox, StashDialog, RepoSettingsDialog,
+  WorktreeDialog, Reset/CherryPick/Revert (incl. `PreflightPrediction`), Tag, Checkout,
+  ForcePush, Stack, Branch, RenameRef; `state/*.ts` (`RepoScopedReload`, `FileListCursor`,
+  `createDetailActions`), `openAllChangesAnnounced.ts`.
+- (B) `packages/theme/src/primitives.css` deletions; `native-select`.
+- (B) scripts: `check-class-conflicts.ts`, `check-theme-classes.sh`, `check-ade-colours.sh`,
+  `install.sh`, `prepare-worktree.sh`.
+- (B) Studio `views`/`api`/`project`: template-behaviour scan of every changed `.vue`, spacing
+  in the seven `--kira-s-*` files, shared `.ts` (`viewOp`, `sqlIdent`, `rawTree`/`ejson`,
+  `generate`, `page/load`, grid/stream `state.ts`, `slick/gridHostShared`, `slick/kiraSlickGrid`),
+  `useSortableReorder`.
+
+Not reached in depth:
+- Studio `.vue` colour/typography token swaps were not compared one by one (only spacing and
+  behaviour); the token checkers (`check-tokens.sh`, `check-theme-classes.sh`) gate those.
+- git-ui `BranchPicker`/`AppToolbar` were checked for spacing only, not line-by-line behaviour.
+
+CodeGraph (stdio `cgx.mjs`, `codegraph_explore`): 5 calls: 2 during Part A, then `lexOptionsFor`
+callers, `useSortableReorder` callers, `RepoScopedReload` usage.
