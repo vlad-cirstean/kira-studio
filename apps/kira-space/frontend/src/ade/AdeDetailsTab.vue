@@ -177,8 +177,8 @@ async function onCandidatePick(branch: string): Promise<void> {
 }
 
 // ---- Notes -----------------------------------------------------------------------------------------
-function onNotesSave(value: string): void {
-  void meta.setNotes(value);
+function onNotesSave(itemId: string, value: string): void {
+  void meta.setNotes(itemId, value);
 }
 </script>
 

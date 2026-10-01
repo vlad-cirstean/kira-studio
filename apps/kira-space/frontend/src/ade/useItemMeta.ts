@@ -34,21 +34,27 @@ export function useItemMeta(
     base: null,
   });
 
-  async function writeNewWork(patch: AdeNewWorkPatch, field: ItemMetaField): Promise<void> {
-    const p = toValue(panel);
+  async function writeNewWork(
+    patch: AdeNewWorkPatch,
+    field: ItemMetaField,
+    id = toValue(panel).id,
+  ): Promise<void> {
     try {
-      await setNewWork.mutateAsync({ codeRepoId: toValue(codeRepoId), id: p.id, patch });
+      await setNewWork.mutateAsync({ codeRepoId: toValue(codeRepoId), id, patch });
     } catch (e) {
       errors[field] = e instanceof Error ? e.message : 'Save failed';
     }
   }
 
-  async function writeBranch(patch: AdeBranchMetaPatch, field: ItemMetaField): Promise<void> {
-    const p = toValue(panel);
+  async function writeBranch(
+    patch: AdeBranchMetaPatch,
+    field: ItemMetaField,
+    branch = toValue(panel).branch.ref,
+  ): Promise<void> {
     try {
       await setBranchMeta.mutateAsync({
         codeRepoId: toValue(codeRepoId),
-        branch: p.branch.ref,
+        branch,
         patch,
       });
     } catch (e) {
@@ -120,11 +126,13 @@ export function useItemMeta(
     else await writeBranch({ est: trimmed }, 'estimate');
   }
 
-  async function setNotes(value: string): Promise<void> {
+  /** Writes to `itemId` (the item the editor text belongs to), never the current panel: the
+   *  selection can move before a pending save lands. New-work ids carry the `nw:` prefix; a
+   *  branch item's id is its branch name. */
+  async function setNotes(itemId: string, value: string): Promise<void> {
     errors.notes = null;
-    const p = toValue(panel);
-    if (p.isNewWork) await writeNewWork({ notes: value }, 'notes');
-    else await writeBranch({ notes: value }, 'notes');
+    if (itemId.startsWith('nw:')) await writeNewWork({ notes: value }, 'notes', itemId);
+    else await writeBranch({ notes: value }, 'notes', itemId);
   }
 
   /** New work only (§0.14's own Branch-row `from` select) — `''` means main. */

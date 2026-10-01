@@ -16,9 +16,11 @@ const props = defineProps<{
   itemId: string;
 }>();
 
-const emit = defineEmits<{ save: [value: string] }>();
+const emit = defineEmits<{ save: [itemId: string, value: string] }>();
 
 let lastEmitted = props.notes;
+// The item the editor text currently belongs to; lags `props.itemId` until the switch watcher runs.
+let contentItemId = props.itemId;
 
 function flush(): void {
   const ed = editor.value;
@@ -26,7 +28,7 @@ function flush(): void {
   const md = ed.getMarkdown();
   if (md !== lastEmitted) {
     lastEmitted = md;
-    emit('save', md);
+    emit('save', contentItemId, md);
   }
 }
 
@@ -60,6 +62,7 @@ watch(
   () => props.itemId,
   () => {
     flush();
+    contentItemId = props.itemId;
     const ed = editor.value;
     if (!ed) return;
     lastEmitted = props.notes;
