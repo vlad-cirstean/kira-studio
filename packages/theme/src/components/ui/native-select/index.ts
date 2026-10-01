@@ -6,8 +6,8 @@ export { default as NativeSelect } from '@theme/components/ui/native-select/Nati
 // P110 B24: fetched from shadcn-vue.com/r/styles/reka-nova/native-select.json (P99 §4.2's
 // direct-curl procedure), then fully restyled -- the registry's own default look is
 // appearance-none plus a manually-positioned ChevronDownIcon requiring a wrapper div, but this
-// app targets a single pinned Electron/Chromium build (base.css's own precedent, primitives.css's
-// former .p-select comment) so it keeps Chromium's Customizable Select API instead: a bare
+// app ships in Wails WebKit (WKWebView/WebKitGTK; see P61), the same engine the UI tests pin, so
+// it keeps the Customizable Select API instead: a bare
 // <select appearance:base-select>, no wrapper, no manual icon -- the browser draws
 // ::picker-icon/::picker(select) itself, themed below. `[appearance:base-select]`,
 // `[&::picker(select)]:…`, `[&::picker-icon]:…` are §1.2's own allowlisted arbitrary values,
