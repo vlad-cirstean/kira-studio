@@ -8,12 +8,12 @@ import "strings"
 // path to a fake script, sidestepping PATH resolution entirely (real launches always resolve
 // "claude" the same way any other shell command does).
 func newCommand(claudeBin, claudeSessionID string) string {
-	return claudeBin + " --session-id " + claudeSessionID
+	return claudeBin + " --session-id " + quotePOSIX(claudeSessionID)
 }
 
 // resumeCommand picks a previously stopped session back up by its own Claude session id.
 func resumeCommand(claudeBin, claudeSessionID string) string {
-	return claudeBin + " --resume " + claudeSessionID
+	return claudeBin + " --resume " + quotePOSIX(claudeSessionID)
 }
 
 // quotePOSIX wraps s as one single-quoted POSIX shell word — the command runs as

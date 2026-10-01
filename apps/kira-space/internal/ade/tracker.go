@@ -186,6 +186,19 @@ func (t *Tracker) pruneExpiredPendingLocked(now time.Time) {
 	}
 }
 
+// recordHeldLocked reports whether a pending intent or a live terminal already claims recordID.
+func (t *Tracker) recordHeldLocked(recordID string) bool {
+	if _, ok := t.byRecord[recordID]; ok {
+		return true
+	}
+	for _, p := range t.pending {
+		if p.RecordID == recordID {
+			return true
+		}
+	}
+	return false
+}
+
 // Prepare validates a launch request against the store (§4.4's own table), mints a fresh
 // terminalId and records a pending intent for the Compose call the renderer's own
 // openTerminalSession is about to trigger.
@@ -250,6 +263,10 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 
 	t.mu.Lock()
 	t.pruneExpiredPendingLocked(now)
+	if intent.Resume && t.recordHeldLocked(recordID) {
+		t.mu.Unlock()
+		return PrepareResult{}, ErrSessionRunning
+	}
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
 
@@ -397,7 +414,8 @@ func (t *Tracker) HandleEvent(ev agenthooks.Event) {
 	t.lastActive[recordID] = nowMs
 
 	sessionChanged := false
-	if ev.Event == "SessionStart" && ev.SessionID != "" && t.claudeSessionID[recordID] != ev.SessionID {
+	// The id lands in a later shell command line; only a real UUID is trusted.
+	if _, perr := uuid.Parse(ev.SessionID); ev.Event == "SessionStart" && perr == nil && t.claudeSessionID[recordID] != ev.SessionID {
 		t.claudeSessionID[recordID] = ev.SessionID
 		sessionChanged = true
 	}

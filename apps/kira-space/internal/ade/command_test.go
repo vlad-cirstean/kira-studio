@@ -34,10 +34,10 @@ func TestQuotePOSIX_RoundTrip(t *testing.T) {
 }
 
 func TestNewCommandAndResumeCommand(t *testing.T) {
-	if got, want := newCommand("claude", "abc-123"), "claude --session-id abc-123"; got != want {
+	if got, want := newCommand("claude", "abc-123"), "claude --session-id 'abc-123'"; got != want {
 		t.Fatalf("newCommand = %q, want %q", got, want)
 	}
-	if got, want := resumeCommand("claude", "abc-123"), "claude --resume abc-123"; got != want {
+	if got, want := resumeCommand("claude", "abc-123"), "claude --resume 'abc-123'"; got != want {
 		t.Fatalf("resumeCommand = %q, want %q", got, want)
 	}
 }
