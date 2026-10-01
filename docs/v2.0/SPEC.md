@@ -3580,3 +3580,59 @@ sync: another window sees the order after reload, same as rename.
 **Not verified in this sandbox:** drag feel in WebKitGTK/WKWebView and macOS trackpad (Playwright
 Chromium/WebKit, mouse only); live ade against real repos not run. The real `ReorderRepos` round trip is
 proven by the Go test, not the mocked UI suite.
+
+## P141 result
+
+Findings file `docs/v2.0/plans/P141-code-review.md` (base `771512bc`, 13 findings: high 2, medium 7,
+low 4), deleted by this commit. Fixed on `claude/unfinished-phases-ru3wo4` by one sequential fixer, one
+commit per group. Every finding was re-read against the current code first; all 13 held.
+
+**Commits:** `108ada87` ADE queue and storage; `003a81d2` ADE session ids; `67d41942` ADE mutation
+invalidations; `1d9afdfa` ADE activity overlay; `4cf57005` ADE notes; `3711dcd9` Studio S3/redis
+paths; `797254d2` Space UI mock push.
+
+**Per finding:**
+
+- F1 rebind always binds as `mine`, keeping the new work's `work_type`; `Store.Rebind` lost its `kind`
+  parameter, `resolveKind` stays for AddBranch and Candidates. F4 `tipReachableFromMain` is
+  `hasMain && depths[b] == 0`; Snapshot reads inventory once and passes it to `reconcileNewWork`;
+  `reconcileNewWork` no longer reads `user.email` (F1 removed its only use). F5 `ListByRepo` on the
+  `ade_sessions_repo` index, one read per `reconcileNewWork`; `cwdMissing` stats stopped rows only.
+  F6 `ArchiveRisk` returns the `MainRef` error. F7 `UpdateNewWork` scoped to repo and live rows;
+  `SetBranchMeta` refuses non-notes patches on review branches (`ErrReviewNotesOnly`, so both
+  comments are now true). F12 `gitRepoIDOf` map; `openRepo` tries `Conn.Entry` first.
+- F2 SessionStart ids accepted only if `uuid.Parse` succeeds; both launch commands POSIX-quote the id.
+  F3 `Prepare` refuses a resume with `ErrSessionRunning` when `pending` or `byRecord` holds the record,
+  checked under the same lock as the pending insert.
+- F8 duplicate snapshot/PR invalidations dropped for every write Go pushes for. Kept: sessions after
+  launch and bind, candidates after AddBranch, snapshot and PRs after a failed Archive or Refresh, bind's
+  snapshot (`BindNewWork` pushes sessions only). F10 callbacks read `args.codeRepoId`.
+- F9 `AdeRepoView` and `AdeAllAgentsView` call `useQueue` with `NO_ACTIVITY`. `AdeRepoView` overlays
+  `acts`, `agents` and panel `running` kinds (`queueActivity.ts`) keyed on a per-terminal kind map that
+  keeps its identity until a phase moves. `useQueue`'s API is unchanged, so its parity tests are untouched.
+- F11 the editor emits `(itemId, markdown)`; `useItemMeta.setNotes(itemId, ...)` writes to that id
+  (`nw:` prefix means new work, else branch).
+- F13 `RequirePathPrefix` next to `RequirePath`; used by s3 `resolveBucketSegment` and redis
+  `resolveDatabaseSegment`, so the redis ARCHITECTURE Known open item is resolved by the same change and
+  removed. Docker-free tests cover bucket, prefix, object and key paths plus a non-rooted path.
+
+**Verification:** `go test ./...` 71 packages ok. `bun run test:unit` 1831 pass, 0 fail. `typecheck`
+and `lint:all` exit 0. Space `ui` 104 pass. Studio `ui` plus `ui-timing`: 304 pass on the final run; two earlier full runs each failed only `budgets.spec.ts` cell-to-editor p95 (52 and 53 ms vs 50), which passed 3 of 3 on the next full run (p95 31-44 ms).
+
+**Deviations:**
+
+- F4: the finding says re-read inventory after a rebind. Rebind only touches the DB, so git inventory
+  cannot change; no re-read.
+- F5: the finding offers a cutoff or retention rule for `Sessions()`; neither is a pure fix (it drops
+  resumable history), so only the stat is bounded to stopped rows. The table still grows; a retention
+  rule needs a product decision and is not scheduled.
+- F7: took the "add the restriction" branch rather than deleting the comments.
+- F8 broke the Space UI mock, which has no Go push: it now emits `kira:ade:repo` after each successful
+  ADE write (`797254d2`). One scenario had two scripted `SetBranchMeta` entries, so its writes got a
+  fixture miss and passed only through the old `onSettled` refetch; reduced to one entry.
+- ARCHITECTURE: two ADE statements updated (SetPlan refetch, `cwdMissing` per stopped record).
+
+**Not verifiable here:** the real-container s3 and redis suites (no Docker daemon in this container).
+The new tests are Docker-free and exercise `Preview`, which shares the path check with `Mutate`.
+Studio `ui-timing` cell-to-editor p95 sits near its 50 ms bound in this container and flaked twice
+(also seen in the P140 result); Studio grid code is untouched by P141.
