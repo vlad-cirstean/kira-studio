@@ -186,19 +186,6 @@ func (t *Tracker) pruneExpiredPendingLocked(now time.Time) {
 	}
 }
 
-// recordHeldLocked reports whether a pending intent or a live terminal already claims recordID.
-func (t *Tracker) recordHeldLocked(recordID string) bool {
-	if _, ok := t.byRecord[recordID]; ok {
-		return true
-	}
-	for _, p := range t.pending {
-		if p.RecordID == recordID {
-			return true
-		}
-	}
-	return false
-}
-
 // Prepare validates a launch request against the store (§4.4's own table), mints a fresh
 // terminalId and records a pending intent for the Compose call the renderer's own
 // openTerminalSession is about to trigger.
@@ -263,9 +250,17 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 
 	t.mu.Lock()
 	t.pruneExpiredPendingLocked(now)
-	if intent.Resume && t.recordHeldLocked(recordID) {
-		t.mu.Unlock()
-		return PrepareResult{}, ErrSessionRunning
+	if intent.Resume {
+		if _, held := t.byRecord[recordID]; held {
+			t.mu.Unlock()
+			return PrepareResult{}, ErrSessionRunning
+		}
+		// A retry supersedes an abandoned launch; Compose guards the real double-resume race.
+		for id, p := range t.pending {
+			if p.RecordID == recordID {
+				delete(t.pending, id)
+			}
+		}
 	}
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
@@ -300,7 +295,19 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 
 	now := t.deps.Now()
 	if intent.Resume {
+		// Reserve before MarkRunning so two concurrent composes cannot both resume one record;
+		// Reconcile ignores it until spawnedAt is set below.
+		t.mu.Lock()
+		if _, held := t.byRecord[intent.RecordID]; held {
+			t.mu.Unlock()
+			return "", nil, ErrSessionRunning
+		}
+		t.byRecord[intent.RecordID] = terminalID
+		t.mu.Unlock()
 		if err := t.deps.Store.MarkRunning(intent.RecordID, terminalID, now.UnixMilli()); err != nil {
+			t.mu.Lock()
+			delete(t.byRecord, intent.RecordID)
+			t.mu.Unlock()
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
 		}
 	} else {

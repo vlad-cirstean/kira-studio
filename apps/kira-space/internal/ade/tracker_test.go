@@ -452,3 +452,46 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 		t.Fatalf("sessions = %d, want %d", len(sessions), n)
 	}
 }
+
+func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
+	tr, _, live, clock, repoID := newTestTracker(t)
+	first := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	sessions, _ := tr.List()
+	recordID := sessions[0].ID
+	live.remove(first.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	args := PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo", Resume: recordID}
+	abandoned, err := tr.Prepare(args) // never composed: Open failed before ComposeAgent
+	if err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	a, err := tr.Prepare(args)
+	if err != nil {
+		t.Fatalf("retry after abandoned launch: err = %v, want nil", err)
+	}
+	if _, _, err := tr.Compose(abandoned.TerminalID, abandoned.Command); err != nil {
+		t.Fatalf("superseded intent composed without error path: %v", err)
+	}
+	// The superseded intent is gone, so it took the no-intent hooks-only path and held nothing.
+	if _, _, err := tr.Compose(a.TerminalID, a.Command); err != nil {
+		t.Fatalf("Compose retry: %v", err)
+	}
+	live.add(a.TerminalID)
+
+	// Two prepared before either composes: second Compose must refuse.
+	live.remove(a.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+	p1, _ := tr.Prepare(args)
+	tr.mu.Lock()
+	tr.pending["second"] = pendingIntent{RecordID: recordID, ClaudeSessionID: p1.SessionID, CodeRepoID: repoID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
+	tr.mu.Unlock()
+	if _, _, err := tr.Compose(p1.TerminalID, p1.Command); err != nil {
+		t.Fatalf("first Compose: %v", err)
+	}
+	if _, _, err := tr.Compose("second", p1.Command); err != ErrSessionRunning {
+		t.Fatalf("second Compose: err = %v, want ErrSessionRunning", err)
+	}
+}
