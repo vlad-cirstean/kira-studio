@@ -47,6 +47,10 @@ type CodeWorkspaceRenameArgs struct {
 	Name string `json:"name"`
 }
 
+type CodeWorkspaceReorderArgs struct {
+	IDs []string `json:"ids"`
+}
+
 type CodeWorkspaceReadFileArgs struct {
 	ID   string `json:"id"`
 	Path string `json:"path"`
@@ -83,8 +87,7 @@ func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codewor
 }
 
 // ListRepos returns every imported repository, sort_order then name (CodeReposRepo.List's own
-// order — the panel's own list, oldest-imported-first until a user reorders it, matching
-// ConnectionsRepo's own convention).
+// order — the panel's own list, oldest-imported-first until ReorderRepos sets a user's order).
 func (s *CodeWorkspaceService) ListRepos() ([]model.CodeRepo, error) {
 	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.List())
 }
@@ -306,6 +309,22 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 		return model.CodeRepo{}, ipcerr.BadRequest("name is required")
 	}
 	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Rename(args.ID, args.Name))
+}
+
+// ReorderRepos persists a user's drag order (ade repo tabs) — the same list ListRepos and the
+// Git panel read.
+func (s *CodeWorkspaceService) ReorderRepos(args CodeWorkspaceReorderArgs) ([]model.CodeRepo, error) {
+	if len(args.IDs) == 0 {
+		return nil, ipcerr.BadRequest("ids is required")
+	}
+	seen := make(map[string]bool, len(args.IDs))
+	for _, id := range args.IDs {
+		if seen[id] {
+			return nil, ipcerr.BadRequest("ids must be unique")
+		}
+		seen[id] = true
+	}
+	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Reorder(args.IDs))
 }
 
 // RemoveRepo drops the row, its tab rows (CodeReposRepo.Remove's own transaction, §3.1) and stops

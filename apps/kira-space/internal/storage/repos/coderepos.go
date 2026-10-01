@@ -88,6 +88,58 @@ func (r *CodeReposRepo) Rename(id, name string) (model.CodeRepo, error) {
 	return *rec, nil
 }
 
+// Reorder rewrites sort_order dense in the order ids gives, in one transaction. An id with no row
+// (removed in another window) is skipped; a row ids omits (imported in another window) keeps its
+// relative order after the listed ones. Returns List().
+func (r *CodeReposRepo) Reorder(ids []string) ([]model.CodeRepo, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("repos: reorder code repos: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	rows, err := tx.Query(`SELECT id FROM code_repos ORDER BY sort_order ASC, name ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("repos: reorder code repos: %w", err)
+	}
+	existing, err := sqlitex.QueryAll(rows, nil, func(rows *sql.Rows) (string, bool, error) {
+		var id string
+		err := rows.Scan(&id)
+		return id, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repos: reorder code repos: %w", err)
+	}
+
+	known := make(map[string]bool, len(existing))
+	for _, id := range existing {
+		known[id] = true
+	}
+	final := make([]string, 0, len(existing))
+	listed := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if known[id] && !listed[id] {
+			listed[id] = true
+			final = append(final, id)
+		}
+	}
+	for _, id := range existing {
+		if !listed[id] {
+			final = append(final, id)
+		}
+	}
+
+	for i, id := range final {
+		if _, err := tx.Exec(`UPDATE code_repos SET sort_order = ? WHERE id = ?`, i, id); err != nil {
+			return nil, fmt.Errorf("repos: reorder code repo %s: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("repos: reorder code repos: %w", err)
+	}
+	return r.List()
+}
+
 // Remove deletes the repo row. Kira Studio's own Remove also deletes every `tabs` row scoped to
 // the repo's workspace in the same transaction — Kira Space has no `tabs` table yet (this
 // package's own migrations/0001_init.sql header comment: deferred to Part 2, which is also where
