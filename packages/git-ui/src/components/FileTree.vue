@@ -515,7 +515,7 @@ const parentSelectId = useId();
     <!-- P131 Part 2 §5.6: one hoisted AttributeTooltip for every row's data-kira-tip span --
          treeEl always names whichever of the two row containers below is currently mounted. -->
     <AttributeTooltip :container="treeEl" />
-    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-1 kv:px-5 kv:pb-4 kv:text-base">
+    <div v-if="parentOptions.length > 1" class="kv:flex kv:flex-col kv:gap-0.5 kv:px-3 kv:pb-2 kv:text-base">
       <Label :for="parentSelectId">Diffing against</Label>
       <NativeSelect
         :id="parentSelectId"
@@ -530,7 +530,7 @@ const parentSelectId = useId();
       </NativeSelect>
     </div>
 
-    <div v-if="showToolbar !== false" class="kv:flex kv:gap-2 kv:px-4 kv:pb-2">
+    <div v-if="showToolbar !== false" class="kv:flex kv:gap-1 kv:px-2 kv:pb-1">
       <InputGroup variant="kira" class="flex-1 min-w-0">
         <InputGroupAddon>
           <span class="codicon codicon-search" aria-hidden="true"></span>
