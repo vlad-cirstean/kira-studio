@@ -1,11 +1,13 @@
 import type { TabLike, TabStripHost } from '@workbench/host';
 import { computed } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
+import { useAdeActionsStore } from './state/adeActions';
 import { useAdeUiStore } from './state/adeUi';
 
 // P137: adapts ade's repo tabs (one per `codeReposStore` record, plus the pinned "All agents"
-// tab) onto the shared `TabStrip`'s narrow seam. No close/duplicate/move capability: closing a
-// repo tab has no meaning, and repo order is `code_repos.sort_order` with no reorder path.
+// tab) onto the shared `TabStrip`'s narrow seam. No close/duplicate capability: closing a repo tab
+// has no meaning. Drag-reorder persists `code_repos.sort_order` through `reorderCodeRepos`, shared
+// with the Git panel.
 export const ALL_AGENTS_TAB = '__all__';
 
 type AdeTab = TabLike & { kind: 'ade-all-agents' | 'ade-repo'; state: null };
@@ -13,6 +15,7 @@ type AdeTab = TabLike & { kind: 'ade-all-agents' | 'ade-repo'; state: null };
 export function useAdeTabStripHost(): TabStripHost<'ade', AdeTab> {
   const codeReposStore = useCodeReposStore();
   const adeUi = useAdeUiStore();
+  const adeActions = useAdeActionsStore();
 
   return {
     activeWorkspace: computed(() => 'ade' as const),
@@ -36,6 +39,12 @@ export function useAdeTabStripHost(): TabStripHost<'ade', AdeTab> {
       activateTab: (id) => {
         if (id === ALL_AGENTS_TAB) adeUi.showAllAgents();
         else adeUi.showRepo(id);
+      },
+      moveTab: (fromId, toId) => {
+        codeReposStore.reorderCodeRepos(fromId, toId).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          adeActions.actionError.set(fromId, `Couldn't save repository order: ${msg}`);
+        });
       },
     },
     kinds: {

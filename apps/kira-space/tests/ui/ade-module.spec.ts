@@ -465,14 +465,4 @@ test('ade tabs render through the shared tab strip (P137)', async ({ relaunch })
   await expect(items).toHaveCount(1);
   await expect(items).toHaveText('Copy name');
   await page.keyboard.press('Escape');
-
-  const from = await repoTab(page, REPO_B.id).boundingBox();
-  const to = await repoTab(page, REPO_A.id).boundingBox();
-  if (!from || !to) throw new Error('repo tab has no box');
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(to.x + to.width * 0.25, to.y + to.height / 2, { steps: 15 });
-  await page.waitForTimeout(300);
-  await page.mouse.up();
-  await expect(tabs).toHaveText([/All agents/, /alpha/, /beta/]);
 });
