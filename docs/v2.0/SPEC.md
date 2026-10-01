@@ -3636,3 +3636,29 @@ and `lint:all` exit 0. Space `ui` 104 pass. Studio `ui` plus `ui-timing`: 304 pa
 The new tests are Docker-free and exercise `Preview`, which shares the path check with `Mutate`.
 Studio `ui-timing` cell-to-editor p95 sits near its 50 ms bound in this container and flaked twice
 (also seen in the P140 result); Studio grid code is untouched by P141.
+
+## P142 result
+
+Round 2 review fixes, all five findings real on re-read. Review file deleted.
+
+- F1 (`d14a7dee`): `Prepare` refuses a resume only when `byRecord` holds the record; a pending
+  duplicate drops older intents for that record. `Compose` reserves `byRecord` under `t.mu` before
+  `MarkRunning` (`ErrSessionRunning` on a held record, reservation released on `MarkRunning` error).
+  `Reconcile` ignores the reservation until `spawnedAt` is set. `recordHeldLocked` removed. New test
+  covers retry after an abandoned launch and the second-compose refusal.
+- F2 (`66902276`): FileTree parent picker `kv:gap-0.5 kv:px-3 kv:pb-2`, toolbar `kv:gap-1 kv:px-2 kv:pb-1`.
+- F3+F5 (`f23a804a`): `install.sh` now `die`s when the release reports no `sha256:` digest (no
+  documented install path relies on a missing digest); message states ad-hoc codesign detects
+  corruption only. `prepare-worktree.sh` runs `apt-get update -qq` and `install --no-install-recommends`
+  with a `sudo` prefix when not root; `docs/DEV_ENVIRONMENT.md` command updated to match.
+- F4 (`743af03c`): native-select comment names Wails WebKit (WKWebView/WebKitGTK), P61.
+
+**Verification:** `go test ./...` 71 packages ok. `bun run test:unit` 1831 pass, 0 fail. Space `ui`
+104 pass. Pre-commit hooks (biome, token checks, all typechecks) passed on every normal commit.
+`sh -n` clean on both scripts. Studio frontend untouched, so Studio `ui` not run.
+
+**Deviations:** F3 took the fail-closed branch, so a release without a digest now aborts the install.
+
+**Not verifiable here:** `shellcheck` not installed; `install.sh` runs on macOS only (`shasum`,
+`hdiutil`, `codesign`), so the new `die` path was not executed. Wails WebKit rendering of the FileTree
+spacing was checked by Space UI suite only, not on a real device.
