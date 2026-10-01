@@ -3,11 +3,11 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { tabChipVariants } from '@theme/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import { computed, nextTick, ref, shallowRef, watch } from 'vue';
-import { useDraggable } from 'vue-draggable-plus';
+import { computed, nextTick, ref, watch } from 'vue';
 import { type TabLike, type TabStripHost, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { copyText } from '../util/clipboard';
+import { useSortableReorder } from '../util/useSortableReorder';
 import { wheelToHorizontal } from '../util/wheelScroll';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/panels/TabStrip.vue and Kira Space's, unified.
@@ -194,37 +194,13 @@ function onWheel(e: WheelEvent): void {
   if (wheelToHorizontal(stripRef.value, e)) e.preventDefault();
 }
 
-// Id mirror of the row, bound to the library: it reverts its own DOM move only when a list is
-// bound, then `onUpdate` commits through the store once per drop. Pinned chips sit outside
-// `stripRef`, so they never take part.
-const rowIds = shallowRef<string[]>([]);
-watch(
-  () => scrollingTabs.value.map(({ tab }) => tab.id),
-  (ids) => {
-    rowIds.value = ids;
-  },
-  { immediate: true },
-);
-
 const moveTab = host.tabs.moveTab;
 if (moveTab) {
-  useDraggable(stripRef, rowIds, {
+  // Pinned chips sit outside `stripRef`, so they never take part.
+  useSortableReorder(stripRef, () => scrollingTabs.value.map(({ tab }) => tab.id), moveTab, {
     draggable: '[data-testid="tab"]',
     filter: '[data-testid="tab-close"]',
-    preventOnFilter: false,
     direction: 'horizontal',
-    group: { name: 'tab-strip', pull: false, put: false },
-    forceFallback: true,
-    fallbackOnBody: true,
-    fallbackTolerance: 4,
-    // Sortable toggles one class name on the ghost, so a single utility.
-    ghostClass: 'opacity-50',
-    onUpdate: (evt) => {
-      const ids = scrollingTabs.value.map(({ tab }) => tab.id);
-      const from = ids[evt.oldDraggableIndex ?? -1];
-      const to = ids[evt.newDraggableIndex ?? -1];
-      if (from && to) moveTab(from, to);
-    },
   });
 }
 </script>
