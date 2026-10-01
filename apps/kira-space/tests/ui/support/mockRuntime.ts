@@ -51,6 +51,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
   codeWorkspaceRenameRepo: 'CodeWorkspaceService.RenameRepo',
   codeWorkspaceRemoveRepo: 'CodeWorkspaceService.RemoveRepo',
+  codeWorkspaceReorderRepos: 'CodeWorkspaceService.ReorderRepos',
   codeWorkspaceListFiles: 'CodeWorkspaceService.ListFiles',
   codeWorkspaceReadFile: 'CodeWorkspaceService.ReadFile',
   codeWorkspaceOpenWorkspace: 'CodeWorkspaceService.OpenWorkspace',

@@ -1,12 +1,13 @@
 import { canonicalPath } from '@shared/domain/path';
 import type { RepoSummary } from '@shared/domain/repo';
+import { moveId } from '@workbench/util/useSortableReorder';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { useWorkspaceStore } from './workspace';
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
-// import, rename, remove. No connect/disconnect lifecycle (a repository is a path, not a live
+// import, rename, reorder, remove. No connect/disconnect lifecycle (a repository is a path, not a live
 // session, D11) and no secret-storage concept (D1's own "nothing secret, nothing credential-
 // shaped").
 export const useCodeReposStore = defineStore('coderepos', () => {
@@ -41,6 +42,24 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     const repo = await control.codeWorkspaceRenameRepo(id, name);
     const idx = state.records.findIndex((r) => r.id === id);
     if (idx >= 0) state.records[idx] = repo;
+  }
+
+  /** Optimistic: the new order shows at once in ade's tab strip and the Git panel (both read
+   *  `records`); a rejected save re-reads the persisted order, then rethrows. */
+  async function reorderCodeRepos(fromId: string, toId: string): Promise<void> {
+    const ids = moveId(
+      state.records.map((r) => r.id),
+      fromId,
+      toId,
+    );
+    const byId = new Map(state.records.map((r) => [r.id, r]));
+    state.records = ids.flatMap((id) => byId.get(id) ?? []);
+    try {
+      state.records = await control.codeWorkspaceReorderRepos(ids);
+    } catch (err) {
+      await hydrateCodeRepos();
+      throw err;
+    }
   }
 
   // The Go side already dropped this repo's own tab rows in the same transaction (CodeReposRepo.Remove)
@@ -95,6 +114,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
     hydrateCodeRepos,
     importRepoViaDialog,
     renameCodeRepo,
+    reorderCodeRepos,
     removeCodeRepo,
     codeRepoRecordForPath,
     openRepoAtPath,

@@ -69,6 +69,7 @@ export const IPC = {
   codeWorkspaceImportRepo: 'kira:codeWorkspace:importRepo',
   codeWorkspaceRenameRepo: 'kira:codeWorkspace:renameRepo',
   codeWorkspaceRemoveRepo: 'kira:codeWorkspace:removeRepo',
+  codeWorkspaceReorderRepos: 'kira:codeWorkspace:reorderRepos',
   codeWorkspaceListFiles: 'kira:codeWorkspace:listFiles',
   codeWorkspaceReadFile: 'kira:codeWorkspace:readFile',
   codeWorkspaceOpenWorkspace: 'kira:codeWorkspace:openWorkspace',

@@ -153,8 +153,8 @@ const spaceControl = {
       trust<GitVsixInstallResult>(r),
     ),
 
-  // C5 §3.3: the native code-viewing workspace's bound surface — repo import/rename/remove plus
-  // the two read primitives (ListFiles/ReadFile). A rejected ImportRepo/RenameRepo call carries a
+  // C5 §3.3: the native code-viewing workspace's bound surface — repo import/rename/reorder/remove plus
+  // the two read primitives (ListFiles/ReadFile). A rejected ImportRepo/RenameRepo/ReorderRepos call carries a
   // structured ipcerr that unwrap() already turns into a rejected promise.
   codeWorkspaceListRepos: (): Promise<RepoSummary[]> =>
     unwrap(CodeWorkspaceService.ListRepos()).then((r) => trust<RepoSummary[]>(r ?? [])),
@@ -174,6 +174,8 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.RenameRepo({ id, name })).then((r) => trust<RepoSummary>(r)),
+  codeWorkspaceReorderRepos: (ids: string[]): Promise<RepoSummary[]> =>
+    unwrap(CodeWorkspaceService.ReorderRepos({ ids })).then((r) => trust<RepoSummary[]>(r ?? [])),
   codeWorkspaceRemoveRepo: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.RemoveRepo({ id })),
   codeWorkspaceListFiles: (id: string): Promise<FileListing> =>
