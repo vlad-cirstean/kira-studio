@@ -6,7 +6,7 @@ F = functional correctness/business logic, P = performance/resource efficiency).
 Severity: high (data loss, security, user-visible wrong result), medium (real bug on a narrower
 path, leak, sizeable waste), low (maintainability or rule breach with no runtime harm).
 
-Status: complete (round 1). 11 findings: high 1, medium 6, low 4.
+Status: in progress (round 1 continuation).
 
 ## Findings
 
@@ -131,6 +131,30 @@ Checked: the postgres Guarded/relational refactor, `connstate`, the sqs adapter,
 `insertTx`, sqlitex `QueryOne`/`NextSortOrder`, the studio `bridge/terminal.go` shim over
 `internal/terminal.BoundService`, `internal/agenthooks`, `internal/terminal` bound.go/procgroup.go,
 `internal/appupdate/install.go`, and Shell `OpenExternalURL` (http(s) scheme check intact).
+
+## Area 4: Space storage, porcelain inventory, remaining ADE frontend
+
+**F12. Every queue call re-runs `Identify`, five or six git spawns, before doing any work.**
+Dimension P. Severity medium.
+`ade/queue.go:344-361` `openRepo` calls `q.conn.Open` on every Snapshot, Refresh, ForcePush, Archive,
+ArchiveRisk, Candidates and bind (call sites at 466, 1138, 1189, 1239, 1387, 1420, 1585, 1651, 1716).
+`Conn.Open` goes through `Registry.acquire` (`gitsession/registry.go:144`), which runs
+`gitclient.Identify` before it looks up the existing entry. `Identify` (`gitclient/repo.go:201`) spawns
+`rev-parse --is-bare-repository`, `--absolute-git-dir`, `--git-common-dir`, `--show-toplevel` and one or
+two `ResolveHead` spawns. When the repo is already held, `Conn.Open` then just releases the new ref and
+returns (`conn.go:232-235`). So each Snapshot (run twice per write, F8) pays this before its own reads.
+Fix: keep a `codeRepoID -> gitRepoID` map beside `byGitRepoID`. In `openRepo`, try `q.conn.Entry(id)`
+first and call `Open` only when it misses (first use, or after repo-gone/Close dropped the hold).
+
+Reviewed with no findings:
+- `storage/repos/coderepos.go` `Reorder` (P140): one transaction, unknown ids skipped, omitted rows
+  kept after the listed ones. `bridge/codeworkspace.go:316` `ReorderRepos` rejects empty and duplicate ids.
+- `storage/repos/settings.go` `readAde`/`upsertAde`: every leaf is checked by `validateAdeSection` before
+  the write, and by `LeafValid` on read.
+- `gitclient/porcelain/inventory.go`: `authoremail:trim`, `--exclude=refs/remotes/*/HEAD`, field count
+  check. `resolveKind` compares email with `EqualFold`.
+- `ade/wire.ts` (types only), `timelineOps.ts` (pure port, mockup oracle test), `allAgents.ts`,
+  `state/adeUi.ts` (its single-store scope is recorded as deliberate in P129 parts 4-7), `dialogCompose.ts`.
 
 ## Coverage
 
