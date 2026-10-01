@@ -412,6 +412,10 @@ test('tooltips — shifts back on-screen near a horizontal viewport edge', async
   const { window: page } = await relaunch({ control: RW_CONTROL, stream: RW_PORT });
   await openConnectionAndGrid(page);
   await page.setViewportSize({ width: 400, height: 400 });
+  // The injected trigger's offsets read the header's rect, so let the resize's layout settle first.
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
 
   // reka's default `align: "center"` grows the tooltip both ways from the trigger's own centre —
   // parking the trigger 4px from the right edge of a 400px-wide viewport forces real overflow past
