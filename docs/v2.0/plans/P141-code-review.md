@@ -73,6 +73,51 @@ Dimension A. Severity low.
 `apps/kira-space/internal/storage/repos/adequeue.go:503`: `UpdateNewWork` updates `WHERE id = ?`, ignoring the
 `codeRepoID` `Queue.UpdateNewWork` receives, and allows editing archived new work. The change signal then goes to
 whatever repo the caller named. `adequeue.go:515-517` says bridge validation restricts a review branch's patch
-to Notes alone. No such check exists (`bridge/ade.go:1010-1040`, `Queue.SetBranchMeta`).
+to Notes alone, and `frontend/src/ade/mutations.ts:113-115` says Go refuses the rest. No such check exists
+(`bridge/ade.go:1010-1040`, `Queue.SetBranchMeta`); only the UI hides the inputs.
 Fix: add `AND code_repo_id = ? AND archived_at IS NULL` to the update and its est select. Either add the
-review-branch restriction in `Queue.SetBranchMeta` (load the row's kind) or delete the claim from the comment.
+review-branch restriction in `Queue.SetBranchMeta` (load the row's kind) or delete the claim from both comments.
+
+### Area 2: Kira Space ADE frontend data layer (`frontend/src/ade`)
+
+**F8. Every queue write computes the full Snapshot twice.**
+Dimension P. Severity medium.
+Each Go write (`queue.go` `AddBranch`, `SetPlan`, `Archive`, `ForcePush`, ...) calls `notifyChanged`, which emits
+`kira:ade:repo`; `queries.ts:173-176` invalidates the snapshot (and PRs) on it. Each mutation in
+`frontend/src/ade/mutations.ts` (lines 86-312) also invalidates the same keys in `onSettled`, and `useAdeRefresh`
+does too (`queries.ts:124-125`). The two invalidations land milliseconds apart. TanStack's default
+`cancelRefetch: true` drops the first fetch client-side, but Go keeps computing it under the repo mutex, then
+runs a second full Snapshot. A Snapshot is several git spawns per queued branch (F4).
+Fix: rely on the push for writes whose Go method calls `notifyChanged` and drop the duplicate `onSettled`
+snapshot/PR invalidations. Keep only invalidations Go does not push (`adeSessionsKey` after launch,
+candidates).
+
+**F9. Agent tool events recompute the whole queue view.**
+Dimension P. Severity medium.
+`AdeRepoView.vue:249-268` wraps the full `useQueue(...)` derivation (calendar, stacks, segments, bands, panel)
+in one `computed` that reads `agentSessionsStore.activity`. The store `set`s a new activity object on every hook
+event (`createAgentSessionsStore.ts:57-60`), so each `PreToolUse`/`PostToolUse` of an agent in this repo rebuilds
+every segment, band and item object, and re-renders the timeline. `useQueue` only needs activity for `acts`,
+`agents` and the panel agent list. `AdeAllAgentsView.vue:68-80` does the same for every repo with a session.
+Fix: run `useQueue` without activity, and derive `acts`/`agents`/panel agents in a second, cheap `computed` keyed
+on each session's phase (a `computed` map of `terminalId -> ActivityKind` that only changes when a phase does).
+
+**F10. Shared retargeted mutations read the repo id at settle time.**
+Dimension F. Severity low.
+`state/adeActions.ts:113-123` binds one mutation per kind to `currentRepoId`, retargeted before each call.
+`mutations.ts` callbacks call `toValue(codeRepoId)` when they run, not when the mutation started. If the user
+acts on repo B while repo A's call is in flight, A's `onSettled` invalidates B's keys, and `useAdeSetPlan`'s
+`onError` (`mutations.ts:180-184`) writes A's previous snapshot into B's cache entry.
+Fix: read the repo from the mutation variables (`args.codeRepoId`; every args type carries it) in
+`onMutate`/`onError`/`onSettled`, and return it in the `onMutate` context.
+
+**F11. Notes typed for one item can save onto another.**
+Dimension F. Severity medium.
+`AdeNotesEditor.vue:21-31,58-68` emits `save` with only the Markdown. `AdeDetailsTab.vue:180` forwards it to
+`useItemMeta.setNotes` (`useItemMeta.ts:123-128`), which reads `toValue(panel)` at call time. When the selected
+item changes without an editor blur, the item-switch watcher's `flush()` and any pending 600 ms
+`debouncedFlush` both write the outgoing item's text onto the incoming item. One real trigger: a rebind removes
+the selected `nw:` item, and `useQueue` falls back to the first item while the user is typing. The incoming
+item's notes are overwritten, and the outgoing item's last edit is lost.
+Fix: track the item id the editor content belongs to, emit `save` with `(itemId, markdown)`, and have
+`useItemMeta` write to that id (branch name or new-work id) rather than the current panel.
