@@ -3516,3 +3516,67 @@ passed; lint, typecheck and knip clean; `test:unit` 1831 pass on 4 of 5 runs.
   need a Mac (PERF.md §3, ARCHITECTURE.md Known open items). The Tailwind `@property` fallback stays as
   is. Out of scope, unchanged: scroll-persist cancel on unmount, `budgets.spec.ts` horizontal and
   wide-vertical `<= 1000` sanity bounds, `CommitGrid.vue` per-grid sheet.
+
+## P140 result
+
+Plan: `docs/v2.0/plans/P140-drag-reorder-ade-tabs.md`. Implemented on `claude/unfinished-phases-ru3wo4`
+(base `58269ff8`), one commit per §8 step.
+
+**Commits:** `1534e2d3` ReorderRepos storage and bridge; `0203ae83` store action; `19b78e08`
+`useSortableReorder`, TabStrip onto it; `2457e9fd` ade `moveTab`; `71b5ab89` ade drag tests;
+`0f06f58a` ColumnsMenu; `a96e389f` EnvironmentsView; `297208ec` variable rows; `6baacdaf` delete
+`useDragReorder`; `6d3c8ead`, `0ab2f4c6` tooltip test fixes; `952b95cd` ARCHITECTURE.
+
+**Shipped:**
+
+- Order lives in the existing `code_repos.sort_order`; no migration. `CodeReposRepo.Reorder` rewrites it
+  dense in one transaction (unknown ids skipped, unlisted rows appended). `CodeWorkspaceService.ReorderRepos`
+  validates (non-empty, unique ids). New imports land last; removal leaves a harmless gap.
+- `reorderCodeRepos` reassigns `records` optimistically, then with the server echo; a rejection
+  re-hydrates and rethrows. ade adapter reports the failure through `adeActions.actionError`. Git panel
+  reads the same `records` array: no edit.
+- `util/useSortableReorder.ts`: `useDraggable`, `forceFallback`, bound id mirror, one `onMove` per drop,
+  reactive `disabled`. Binds when the container appears (`immediate: false` plus `start(el)`): reka
+  popover content and the `v-else` variable list are absent at mount, and a null root logged console errors.
+- TabStrip, ColumnsMenu, EnvironmentsView, VariableSetView use it. `useDragReorder.ts` deleted.
+
+**Tests (before/after):**
+
+- Go: `go test ./...` 71 packages ok (one unreproducible first-run FAIL, three clean reruns). New
+  `TestCodeReposRepo_Reorder` (order, unknown skip, unlisted append, remove then create, reopen).
+- Unit 1830 to 1831 pass, 0 fail (the Go test is not in this count; the delta is the tree's, not P140's).
+- Space `ui`: 104 pass (3 new ade tests). Studio `ui` plus `ui-timing`: 305 pass on the final run. Visual
+  Studio 14, Space 4: pass. `typecheck`, `lint`, `lint:go` 0 issues, `knip` exit 0, `gofmt -l apps/` empty.
+- Studio `ui` first full run: `tooltips.spec.ts` "flips below" failed a 1s tooltip wait. Fixed by 3s waits
+  (`6d3c8ead`). "shifts back" failed 3 of 4 on the pre-P140 baseline too: the injected trigger read the
+  header rect before the resize laid out. Fixed by waiting two frames (`0ab2f4c6`); 5 of 5 pass.
+- One earlier full run had `budgets.spec.ts` cell-to-editor p95 52ms vs 50ms; passed on the final run.
+  Known wall-clock flake, grid code untouched.
+
+**Closing audit (§10), all pass:** `rg useDragReorder` empty outside plans and this file; file deleted;
+native DnD `rg` over the four views empty; `useSortableReorder(` callers: TabStrip, ColumnsMenu,
+EnvironmentsView, VariableSetView; helper imports `vue-draggable-plus`, `forceFallback: true`;
+`moveTab` 1 hit in `useAdeTabStripHost.ts`; `ReorderRepos` in `bridge/index.ts`; `reorderCodeRepos`
+defined plus adapter caller; migrations and `package.json`/`bun.lock` diffs empty.
+
+**Deviations from the plan:**
+
+- `moveId` landed with the store action (step 2), the hook in step 3: step 2 imports it.
+- ade drag coverage is three tests (drag plus pinned plus Git panel; stored-order boot; rejected save)
+  rather than one with `relaunch` steps.
+- Columns step asserts the indicator dot and menu order on reopen, not `grid-header-cell` order: the grid
+  header only rebuilds on a page reload, not on a `columnOrder` patch (pre-existing, not touched). The old
+  `not.toHaveClass(/has-indicator/)` check is vacuous (the dot is a child span); the new step uses the span.
+- Environments test uses three envs so a filter leaves two rows. `api-secret-reveal-isolation.spec.ts`
+  lost its `draggable` attribute assertions (no such attribute under Sortable); it now drags while filtered
+  and expects no `variablesReorder` call.
+- `ColumnsMenu` list container is always mounted (loading text inside it) so the sortable binds once.
+- Two tooltip test fixes beyond the plan (pre-existing flakes, CLAUDE.md).
+
+**Disclosures:** environment rows drag by the grip only (rows hold inputs and a radio). Reordering imported
+linked worktrees can change the Git panel's worktree anchor (`RepoWorktreeLinks` rule). No cross-window live
+sync: another window sees the order after reload, same as rename.
+
+**Not verified in this sandbox:** drag feel in WebKitGTK/WKWebView and macOS trackpad (Playwright
+Chromium/WebKit, mouse only); live ade against real repos not run. The real `ReorderRepos` round trip is
+proven by the Go test, not the mocked UI suite.
