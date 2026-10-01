@@ -242,7 +242,7 @@ historical prose.
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
 - **None of this toolchain persists across sessions.** Re-run at the start of any fresh container:
-  `apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` (needed even though the product
+  `apt-get update -qq && apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config` (needed even though the product
   targets macOS — `wails3`'s own Linux build fails at `internal/operatingsystem` with a
   `pkg-config` error without it), then `go install github.com/wailsapp/wails/v3/cmd/wails3@<the
   version go.mod pins>` and `export PATH=$PATH:$(go env GOPATH)/bin`. **Pin that version, never

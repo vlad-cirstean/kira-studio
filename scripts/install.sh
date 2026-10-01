@@ -284,11 +284,8 @@ JXA_EOF
         die "downloaded file's sha256 does not match the release's reported digest"
       fi
       ;;
-    '')
-      log "note: the release reported no digest for $ASSET — codesign/identity checks below are the real gate"
-      ;;
     *)
-      log "note: unsupported digest algorithm in '$ASSET_DIGEST' — codesign/identity checks below are the real gate"
+      die "the release reported no sha256 digest for $ASSET (got '$ASSET_DIGEST'); refusing to install unverified. Ad-hoc codesign below only detects corruption, not tampering"
       ;;
   esac
 

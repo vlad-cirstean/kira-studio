@@ -20,7 +20,10 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # cheap but not free, and this runs once per fresh worktree, not once per repo.
 if [ "$(uname -s)" = "Linux" ] && ! pkg-config --exists gtk4 webkitgtk-6.0 2>/dev/null; then
   echo "prepare-worktree: installing libgtk-4-dev/libwebkitgtk-6.0-dev/pkg-config (wails3 CLI build dep)"
-  apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
+  SUDO=""
+  [ "$(id -u)" -eq 0 ] || SUDO="sudo"
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev pkg-config
 else
   echo "prepare-worktree: wails3 CLI build deps already present, skipping apt-get"
 fi
