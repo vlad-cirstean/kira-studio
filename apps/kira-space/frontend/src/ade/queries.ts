@@ -126,8 +126,11 @@ export function useAdeRefresh(codeRepoId: MaybeRefOrGetter<string>) {
           newlyMerged: result.newlyMerged,
         });
       }
-      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
-      void queryClient.invalidateQueries({ queryKey: adePrsKey(id), exact: true });
+      // Go pushes on a successful fetch; a failure pushes nothing.
+      if (result?.error || error) {
+        void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+        void queryClient.invalidateQueries({ queryKey: adePrsKey(id), exact: true });
+      }
     },
   }));
 }

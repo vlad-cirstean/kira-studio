@@ -86,10 +86,13 @@ export function useAdeArchive(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'archive'),
     mutationFn: (args: AdeArchiveArgs): Promise<void> => control.adeArchive(args),
-    onSettled: () => {
-      const id = toValue(codeRepoId);
-      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
-      void queryClient.invalidateQueries({ queryKey: adePrsKey(id), exact: true });
+    // Go pushes on success; a failed archive may still have stopped sessions or removed a worktree.
+    onError: (_err, args) => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(args.codeRepoId),
+        exact: true,
+      });
+      void queryClient.invalidateQueries({ queryKey: adePrsKey(args.codeRepoId), exact: true });
     },
   }));
 }
@@ -98,12 +101,6 @@ export function useAdeSetQueuedAfter(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setQueuedAfter'),
     mutationFn: (args: AdeSetQueuedAfterArgs): Promise<void> => control.adeSetQueuedAfter(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -111,12 +108,6 @@ export function useAdeUpdateNewWork(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'updateNewWork'),
     mutationFn: (args: AdeUpdateNewWorkArgs): Promise<void> => control.adeUpdateNewWork(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -127,12 +118,6 @@ export function useAdeSetBranchMeta(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setBranchMeta'),
     mutationFn: (args: AdeSetBranchMetaArgs): Promise<void> => control.adeSetBranchMeta(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -142,12 +127,6 @@ export function useAdeSetWorkType(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setWorkType'),
     mutationFn: (args: AdeSetWorkTypeArgs): Promise<void> => control.adeSetWorkType(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -158,9 +137,12 @@ export function useAdeBindNewWork(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'bindNewWork'),
     mutationFn: (args: AdeBindNewWorkArgs): Promise<void> => control.adeBindNewWork(args),
-    onSettled: () => {
-      const id = toValue(codeRepoId);
-      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
+    // BindNewWork's Go side pushes sessions only, not the repo snapshot.
+    onSettled: (_data, _err, args) => {
+      void queryClient.invalidateQueries({
+        queryKey: adeSnapshotKey(args.codeRepoId),
+        exact: true,
+      });
       void queryClient.invalidateQueries({ queryKey: adeSessionsKey, exact: true });
     },
   }));
@@ -169,13 +151,13 @@ export function useAdeBindNewWork(codeRepoId: MaybeRefOrGetter<string>) {
 /** P129 Part 5 §0.15: `SetPlan` is optimistic — a drop moves no DOM of its own (`timelineOps.ts` is
  *  pure), so without this the dropped box would sit at its old day until the refetch. TanStack's own
  *  documented optimistic-update shape: `onMutate` cancels the in-flight snapshot query, snapshots it,
- *  writes the merged `plan.day`/`plan.order`; `onError` restores it; `onSettled` invalidates last. */
+ *  writes the merged `plan.day`/`plan.order`; `onError` restores it; Go's own push refetches. */
 export function useAdeSetPlan(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setPlan'),
     mutationFn: (args: AdeSetPlanArgs): Promise<void> => control.adeSetPlan(args),
     onMutate: async (args: AdeSetPlanArgs) => {
-      const key = adeSnapshotKey(toValue(codeRepoId));
+      const key = adeSnapshotKey(args.codeRepoId);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<AdeRepoSnapshot>(key);
       if (previous) {
@@ -190,16 +172,10 @@ export function useAdeSetPlan(codeRepoId: MaybeRefOrGetter<string>) {
       }
       return { previous };
     },
-    onError: (_err, _args, context) => {
+    onError: (_err, args, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(adeSnapshotKey(toValue(codeRepoId)), context.previous);
+        queryClient.setQueryData(adeSnapshotKey(args.codeRepoId), context.previous);
       }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
     },
   }));
 }
@@ -211,57 +187,40 @@ export function useAdeForcePush(codeRepoId: MaybeRefOrGetter<string>) {
     mutationKey: deliverKey(toValue(codeRepoId), 'forcePush'),
     mutationFn: (args: AdeForcePushArgs): Promise<AdeForcePushResult[]> =>
       control.adeForcePush(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
-/** §0.19: New-work tab's own "Add to Later" — invalidates the snapshot (the new row) and the
- *  candidates list (§0.19: a fresh draft has no branch yet, so it never appears there anyway, but
- *  invalidating both queue-writes identically keeps this mutation and `useAdeAddBranch` symmetric). */
+/** §0.19: New-work tab's own "Add to Later" — a fresh draft has no branch yet, so it never touches
+ *  the candidates list, and Go's own push refreshes the snapshot. */
 export function useAdeAddNewWork(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'addNewWork'),
     mutationFn: (args: AdeAddNewWorkArgs): Promise<string> => control.adeAddNewWork(args),
-    onSettled: () => {
-      const id = toValue(codeRepoId);
-      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
-      void queryClient.invalidateQueries({ queryKey: adeCandidatesKey(id), exact: true });
-    },
   }));
 }
 
-/** §0.19: Existing-branch tab's own pick — the queued branch must both appear in the snapshot and
- *  drop off the candidates list. */
+/** §0.19: Existing-branch tab's own pick — the queued branch must drop off the candidates list (Go
+ *  pushes the snapshot, not candidates). */
 export function useAdeAddBranch(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'addBranch'),
     mutationFn: (args: AdeAddBranchArgs): Promise<string> => control.adeAddBranch(args),
-    onSettled: () => {
-      const id = toValue(codeRepoId);
-      void queryClient.invalidateQueries({ queryKey: adeSnapshotKey(id), exact: true });
-      void queryClient.invalidateQueries({ queryKey: adeCandidatesKey(id), exact: true });
+    onSettled: (_data, _err, args) => {
+      void queryClient.invalidateQueries({
+        queryKey: adeCandidatesKey(args.codeRepoId),
+        exact: true,
+      });
     },
   }));
 }
 
 // P135 §4.5: the four dependency-node mutations (creation tab, detail panel, blocker linking) —
-// shaped like useAdeAddNewWork/useAdeUpdateNewWork above, one repo-snapshot invalidation each.
+// shaped like useAdeAddNewWork/useAdeUpdateNewWork above; Go's own push refreshes the snapshot.
 
 export function useAdeAddDependency(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'addDependency'),
     mutationFn: (args: AdeAddDependencyArgs): Promise<string> => control.adeAddDependency(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -269,12 +228,6 @@ export function useAdeUpdateDependency(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'updateDependency'),
     mutationFn: (args: AdeUpdateDependencyArgs): Promise<void> => control.adeUpdateDependency(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -282,12 +235,6 @@ export function useAdeResolveDependency(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'resolveDependency'),
     mutationFn: (args: AdeDependencyArgs): Promise<void> => control.adeResolveDependency(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
@@ -295,12 +242,6 @@ export function useAdeSetBlocker(codeRepoId: MaybeRefOrGetter<string>) {
   return useMutation(() => ({
     mutationKey: deliverKey(toValue(codeRepoId), 'setBlocker'),
     mutationFn: (args: AdeSetBlockerArgs): Promise<void> => control.adeSetBlocker(args),
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: adeSnapshotKey(toValue(codeRepoId)),
-        exact: true,
-      });
-    },
   }));
 }
 
