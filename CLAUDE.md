@@ -128,15 +128,20 @@ duplicated here; this file only points at them.
   stays legible. A planning pass re-reads the current source rather than trusting the previous
   pass's summary prose, and states plainly when a pass finds nothing real rather than manufacturing
   a finding.
-- **"Code review"** (once a phase or batch is otherwise complete, on request) means three **Opus
-  subagents in parallel**, one per dimension: (1) architecture/structure/maintainability/security,
-  (2) functional correctness and business logic, (3) performance and resource efficiency. Each only
-  reports findings, never fixes. Then one sequential Sonnet subagent fixes every finding (parallel
-  only for a batch genuinely isolated from each other). Repeat the whole three-agent cycle for as
-  many rounds as asked — a round finding nothing real should say so, not manufacture a finding. No
-  findings document survives a round once fixed — each finding gets fixed and committed one at a
-  time, so the commit log is the durable record. Carry forward only a genuinely still-open item (see
-  "Known open items"), never a running narrative of what each round found.
+- **"Code review"** (once a phase or batch is otherwise complete, on request) means **one Opus
+  subagent** covering all three dimensions: (1) architecture/structure/maintainability/security,
+  (2) functional correctness and business logic, (3) performance and resource efficiency. It only
+  reports findings, never fixes. It writes them to a file under the current chapter's `plans/` and
+  commits it before any fixer starts. Then one sequential Sonnet subagent fixes every finding (parallel
+  only for a batch genuinely isolated from each other). Repeat the whole cycle for as many rounds as
+  asked — a round finding nothing real should say so, not manufacture a finding. No findings document
+  survives a round once fixed — each finding gets fixed and committed one at a time, so the commit log
+  is the durable record. Carry forward only a genuinely still-open item (see "Known open items"),
+  never a running narrative of what each round found.
+- **A review's scope is everything changed since the last review session**, not the whole repo and not
+  just the latest chapter. Find that session in git (the last commit of a prior review's findings or
+  fixes, e.g. P108's close-out `771512bc`) and diff from there. State the base commit in the review's
+  findings file. Later rounds scope to what the previous round's fixes left.
 - No per-phase PRs. One feature branch per chapter.
 - **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
   per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8/v1.9 continue one counter (v1.6 topped out at `P70`; v1.8
