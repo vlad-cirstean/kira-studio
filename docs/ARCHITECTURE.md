@@ -1372,7 +1372,8 @@ preview, `moveTab`) hide their affordance when absent. `#tab-leading` slot rende
 kind flag `pinnedTitle` makes a pinned chip labelled, not icon-only. Reorder is `vue-draggable-plus`
 `useDraggable` in `forceFallback` mode on the scrolling row only (pinned chips sit outside it), bound
 to an id mirror so the library reverts its own DOM move; `onUpdate` commits once per drop via
-`moveTab`. Adding a tab
+`moveTab`. That binding is `util/useSortableReorder.ts`, shared with Studio's column, environment
+and variable lists. Adding a tab
 kind means one registry entry each in `state/tabKinds.ts` and `workbench/tabViews.ts`, not editing
 a dispatch chain in three files — `'http-request'` (P2) is the first kind to actually exercise
 that promise, and the first Api-mode kind at all: `TAB_KIND_MODE['http-request']` is `'api'`,
@@ -2712,7 +2713,9 @@ union paragraph above) — a full-area view, no left panel, no tab strip, replac
 placeholder.** `apps/kira-space/frontend/src/ade/`: `AdeView.vue` (the module's `FullModeDef.view`
 — repo tabs plus the active repo's own view, or an empty state when no repository is imported yet)
 mounts `AdeRepoTabs.vue` (renders the shared `TabStrip` through `useAdeTabStripHost.ts`, one tab per imported repository, no
-close, no reorder: repo order is `code_repos.sort_order`, no reorder path; a needs-input badge summing every
+close; drag-reorder persists `code_repos.sort_order` through `CodeWorkspaceService.ReorderRepos`
+(full-list rewrite, unknown ids skipped, unlisted rows appended), the same order the Git panel's repo
+list reads, and new imports land last; a needs-input badge summing every
 `attention`-phase session in that repo — every running session's own repo, not only a queued item's,
 `ade/activity.ts`'s own `needsInputByRepo`) and `AdeRepoView.vue` (that repo's sticky
 `AdeProjectHeader.vue` + `AdeMainLine.vue`; the timeline itself is Part 5's). `ade/useQueue.ts` is a
@@ -2805,8 +2808,9 @@ reflects immediately rather than waiting on the round trip. The DnD model is `vu
 than the HTML5 drag API SortableJS otherwise prefers, chosen because Playwright can drive
 `forceFallback` with a plain `mouse.move`/`down`/`up` sequence while HTML5 DnD has no such hook.
 `useTimelineDrag.ts` binds `useDraggable` with no `v-model` list — every sortable is a pass-through
-that leaves the DOM order alone and reports `onEnd` (`TabStrip.vue` also uses it, but with a bound
-id list, since its reorder commits through `moveTab`); the actual drop target comes from
+that leaves the DOM order alone and reports `onEnd` (the bound-id-list path is
+`util/useSortableReorder.ts`: `TabStrip.vue` and Studio's `ColumnsMenu`/`EnvironmentsView`/
+`VariableSetView`, each committing one move per drop); the actual drop target comes from
 `AdeTimeline.vue`'s own hit-test (`useElementByPoint`/`useMouse` from VueUse, `closest`ing
 `[data-ade-box]` then `[data-ade-band]`), never from Sortable's own index, since a fallback clone
 can land the pointer over stale DOM. A review row carries no `data-ade-row-movable`, so grabbing it
