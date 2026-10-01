@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -68,32 +69,38 @@ func AnySeg(label string) PathPart {
 // fixed-depth path check by hand, drifting on message format ("got depth N" vs "got: <path>") along
 // the way — this always reports "<op> requires a <label>/<label>/... path, got: <path>".
 func RequirePath(path model.NodePath, op string, parts ...PathPart) ([]model.PathSegment, error) {
-	segs := path.Segments
-	if len(segs) == len(parts) {
-		ok := true
-		for i, part := range parts {
-			if len(part.Kinds) == 0 {
-				continue
-			}
-			found := false
-			for _, k := range part.Kinds {
-				if segs[i].Kind == k {
-					found = true
-					break
-				}
-			}
-			if !found {
-				ok = false
-				break
-			}
+	if len(path.Segments) == len(parts) && kindsMatch(path.Segments, parts) {
+		return path.Segments, nil
+	}
+	return nil, pathErr(path, op, parts)
+}
+
+// RequirePathPrefix is RequirePath's rooted variant: path may be deeper than len(parts), only its
+// first len(parts) segments are checked. For ops that address a container by its root (s3 and redis
+// mutate: the renderer sends an object, prefix or key path below the bucket/database).
+func RequirePathPrefix(path model.NodePath, op string, parts ...PathPart) ([]model.PathSegment, error) {
+	if len(path.Segments) >= len(parts) && kindsMatch(path.Segments, parts) {
+		return path.Segments, nil
+	}
+	return nil, pathErr(path, op, parts)
+}
+
+func kindsMatch(segs []model.PathSegment, parts []PathPart) bool {
+	for i, part := range parts {
+		if len(part.Kinds) == 0 {
+			continue
 		}
-		if ok {
-			return segs, nil
+		if !slices.Contains(part.Kinds, segs[i].Kind) {
+			return false
 		}
 	}
+	return true
+}
+
+func pathErr(path model.NodePath, op string, parts []PathPart) error {
 	labels := make([]string, len(parts))
 	for i, part := range parts {
 		labels[i] = part.Label
 	}
-	return nil, New(CodeNotFound, op+" requires a "+strings.Join(labels, "/")+" path, got: "+model.EncodePath(segs), nil)
+	return New(CodeNotFound, op+" requires a "+strings.Join(labels, "/")+" path, got: "+model.EncodePath(path.Segments), nil)
 }

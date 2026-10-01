@@ -16,12 +16,11 @@ import (
 // by definition has no existing key a path could point at yet.
 const keySentinel = "_key"
 
-// resolveDatabaseSegment is mutate's own single-database path check (P113 G2) — plan.path only ever
-// resolves to a database, never a specific key (see keySentinel above), so RequirePath's exact-length
-// match is safe here. Message text moves from "database-rooted path" to RequirePath's fixed
-// "database path" wording — no test or frontend code pins the old string.
+// resolveDatabaseSegment is mutate's own database-rooted path check — the renderer may send a key's
+// own path below the database (a namespaced-key delete), so only the leading database segment is
+// checked, at any depth.
 func resolveDatabaseSegment(path model.NodePath) (string, error) {
-	segs, err := adapters.RequirePath(path, "mutate", adapters.Seg("database"))
+	segs, err := adapters.RequirePathPrefix(path, "mutate", adapters.Seg("database"))
 	if err != nil {
 		return "", err
 	}

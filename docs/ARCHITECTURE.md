@@ -2220,7 +2220,7 @@ that case (`AdeAllAgentsView`'s `forceNew`), so the message tells Claude to crea
 itself never runs `git worktree add`. `AdePrepareLaunchResult.Cwd` is the effective cwd either way
 (the recreated recorded one on resume, `args.Cwd` otherwise), and `deliver` opens the terminal there
 rather than at the renderer's own guess, so the PTY and the record always agree. The wire session
-carries `cwdMissing` (one `os.Stat` per record per `Sessions()` call, never cached), which
+carries `cwdMissing` (one `os.Stat` per stopped record per `Sessions()` call, never cached), which
 `AdeAllAgentsRow`'s own Start reads to force that same `new worktree` choice for a stopped session
 whose worktree is already gone, same as an archived one. **Unverified:** a real `claude` CLI's own
 cross-directory resume behaviour was never confirmed against the fallback above (the planning pass's
@@ -2802,7 +2802,7 @@ refuses (`dropVerdict`) — no other file constructs a `SetPlan` `order`/`days` 
 rules (a parked branch applies directly; my own work always confirms; a day earlier than a
 non-review parent's own effective day refuses) live in exactly one place. `mutations.ts`'s
 `SetPlan` mutation is optimistic (`onMutate` cancels the in-flight snapshot query and writes the
-new plan locally; `onError` rolls back; `onSettled` invalidates last), so a drag/menu action
+new plan locally; `onError` rolls back; Go's own `kira:ade:repo` push refetches), so a drag/menu action
 reflects immediately rather than waiting on the round trip. The DnD model is `vue-draggable-plus`
 (SortableJS) in `forceFallback` mode — a synthetic drag image driven by native mouse events rather
 than the HTML5 drag API SortableJS otherwise prefers, chosen because Playwright can drive
@@ -4474,13 +4474,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   empty. This suite is explicitly on-demand/CI-only (`CLAUDE.md`'s real-container two-suite rule),
   so it doesn't gate a phase's own fast checks. Closing it needs running the suite's own
   regeneration path (extend, per `CLAUDE.md`'s own P25/P26 guidance) against a current schema.
-  `TestFixture_Redis` also carries a second, independent failure on top of the above (found by P118
-  Stream A): `689b6eea` (P113 G2) narrowed `redis/mutate.go`'s `resolveDatabaseSegment` from "path is
-  database-rooted" (`segments[0].Kind == "database"`, any length) to `RequirePath`'s exact-one-
-  segment match, so the fixture's own namespaced-key delete scenario now fails path validation
-  before it ever reaches the stale-fixture diff above. Fix needs restoring the rooted-path check (or
-  a rooted/prefix variant of `RequirePath`) — a `redis/mutate.go` design call, out of scope for the
-  phase that found it.
 
 - **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
   definition** (M7 round 2, finding #1). A view that itself renames a masked column

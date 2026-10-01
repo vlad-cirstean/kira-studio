@@ -24,11 +24,11 @@ const (
 	objectContentTypeSentinel = "$contentType"
 )
 
-// resolveBucketSegment is mutate's own single-bucket path check (P113 G2), same shape as redis's
-// resolveDatabaseSegment. Message text moves from "bucket-rooted path" to RequirePath's fixed
-// "bucket path" wording — no test or frontend code pins the old string.
+// resolveBucketSegment is mutate's own bucket-rooted path check, same shape as redis's
+// resolveDatabaseSegment: the renderer sends an object's own path (delete) or a prefix path (upload),
+// so only the leading bucket segment is checked, at any depth.
 func resolveBucketSegment(path model.NodePath) (string, error) {
-	segs, err := adapters.RequirePath(path, "mutate", adapters.Seg("bucket"))
+	segs, err := adapters.RequirePathPrefix(path, "mutate", adapters.Seg("bucket"))
 	if err != nil {
 		return "", err
 	}
