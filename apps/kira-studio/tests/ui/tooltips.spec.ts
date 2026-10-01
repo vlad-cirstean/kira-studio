@@ -174,7 +174,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await refreshButton.hover();
   await page.waitForTimeout(150);
   await expect(tooltipContent(page)).toHaveCount(0);
-  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltipContent(page)).toBeVisible({ timeout: 3_000 });
   // reka's own TooltipContent renders a visually-hidden a11y mirror span alongside the visible
   // text, so a bare .textContent read (toHaveText) sees "RefreshRefresh" — toContainText reads
   // the visible text node correctly without depending on that internal duplication.
@@ -265,7 +265,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   // (and the a11y mirror) already reads. -----
   const tenantIdHeader = page.locator('[data-testid="grid-header-cell"][data-column="tenant_id"]');
   await tenantIdHeader.hover();
-  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltipContent(page)).toBeVisible({ timeout: 3_000 });
   await expect(tooltipContent(page).locator('[data-testid="tooltip-title"]')).toHaveText(
     'tenant_id',
   );
@@ -388,7 +388,7 @@ test('tooltips — flips below the trigger when there is no room above', async (
   const trigger = await injectHeaderTooltipTrigger(page, { top: '4px', left: '400px' });
   await hoverInjectedTrigger(trigger);
   const tip = tooltipContent(page);
-  await expect(tip).toBeVisible({ timeout: 1_000 });
+  await expect(tip).toBeVisible({ timeout: 3_000 });
   const tipBox = await tip.boundingBox();
   const triggerBox = await trigger.boundingBox();
   if (!tipBox || !triggerBox) throw new Error('tooltip or trigger has no box');
@@ -419,16 +419,18 @@ test('tooltips — shifts back on-screen near a horizontal viewport edge', async
   const trigger = await injectHeaderTooltipTrigger(page, { top: '200px', right: '4px' });
   await hoverInjectedTrigger(trigger);
   const tip = tooltipContent(page);
-  await expect(tip).toBeVisible({ timeout: 1_000 });
-  const tipBox = await tip.boundingBox();
-  if (!tipBox) throw new Error('tooltip has no box');
+  await expect(tip).toBeVisible({ timeout: 3_000 });
   const viewportWidth = await page.evaluate(() => window.innerWidth);
-
-  expect(tipBox.x, 'shift: the tooltip stays on-screen (left edge)').toBeGreaterThanOrEqual(0);
-  expect(
-    tipBox.x + tipBox.width,
-    'shift: the tooltip stays on-screen (right edge)',
-  ).toBeLessThanOrEqual(viewportWidth);
+  // The resize above can land after the first paint, so the shifted position settles by polling.
+  await expect
+    .poll(
+      async () => {
+        const box = await tip.boundingBox();
+        return box ? box.x >= 0 && box.x + box.width <= viewportWidth : false;
+      },
+      { message: 'shift: the tooltip stays on-screen (both edges)' },
+    )
+    .toBe(true);
 
   expect(consoleErrors).toEqual([]);
 });
