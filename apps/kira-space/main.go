@@ -15,6 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appshell"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
@@ -450,17 +451,30 @@ func wireAdeTask(repositories *repos.Repos, events *bridge.Events, git gitWired)
 		Tasks: repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry: git.registry, GitPath: gitPath,
-		GitStatus:        func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
-		Askpass:          git.askpassBroker,
-		Workflows:        &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
-		OnBoard:          func() { bridge.AdeTaskBoardChanged(events) },
-		OnBacklog:        func() { bridge.AdeTaskBacklogChanged(events) },
-		OnWorkflows:      func() { bridge.AdeTaskWorkflowsChanged(events) },
-		OnRepos:          func() { bridge.AdeTaskReposChanged(events) },
-		Facts:            repositories.AdeFacts,
-		Runner:           git.runner,
-		SetRepoSettings:  git.router.SetRepoSettings,
-		OnCredential:     func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
+		GitStatus:       func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
+		Askpass:         git.askpassBroker,
+		Workflows:       &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
+		OnBoard:         func() { bridge.AdeTaskBoardChanged(events) },
+		OnBacklog:       func() { bridge.AdeTaskBacklogChanged(events) },
+		OnWorkflows:     func() { bridge.AdeTaskWorkflowsChanged(events) },
+		OnRepos:         func() { bridge.AdeTaskReposChanged(events) },
+		Facts:           repositories.AdeFacts,
+		Runner:          git.runner,
+		SetRepoSettings: git.router.SetRepoSettings,
+		OnCredential:    func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
+		Logs:            repositories.AdeLogs,
+		Sessions:        repositories.AdeSessions,
+		OnRuns:          func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
+		OnLog:           func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnSessions:      func() { bridge.AdeTaskSessionsChanged(events) },
+		AgentDir:        filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
+		HeadlessSettingSources: func() string {
+			settings, err := repositories.Settings.GetAll()
+			if err != nil {
+				return ""
+			}
+			return settings.Ade.HeadlessSettingSources
+		},
 		AutofetchMinutes: adeAutofetchMinutes(repositories),
 		HomeDir:          userHome,
 		Now:              time.Now,

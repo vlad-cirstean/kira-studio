@@ -34,6 +34,19 @@ func AdeTaskBoardChanged(ev *Events) { ev.Broadcast(adewire.ChannelBoard) }
 // AdeTaskBacklogChanged is TaskBoard.OnBacklog's target: payload-free.
 func AdeTaskBacklogChanged(ev *Events) { ev.Broadcast(adewire.ChannelBacklog) }
 
+// AdeTaskRunsChanged is TaskBoard.OnRuns' target: the changed runs ride the event.
+func AdeTaskRunsChanged(ev *Events, payload adewire.RunsChangedEvent) {
+	ev.emit.Emit(adewire.ChannelRuns, payload)
+}
+
+// AdeTaskLogAppended is TaskBoard.OnLog's target: one stored batch of log chunks.
+func AdeTaskLogAppended(ev *Events, payload adewire.LogEvent) {
+	ev.emit.Emit(adewire.ChannelLog, payload)
+}
+
+// AdeTaskSessionsChanged is TaskBoard.OnSessions' target: payload-free.
+func AdeTaskSessionsChanged(ev *Events) { ev.Broadcast(adewire.ChannelSessions) }
+
 // AdeTaskCredentialRequested is TaskBoard.OnCredential's target; EmitFocused because a prompt
 // belongs to the window driving the op.
 func AdeTaskCredentialRequested(ev *Events, payload any) {
@@ -56,7 +69,7 @@ func adeTaskError(err error) error {
 		errors.Is(err, repos.ErrReviewKind):
 		return ipcerr.New("E_INVALID", err.Error())
 	case errors.Is(err, repos.ErrTaskNotFound), errors.Is(err, repos.ErrBranchMissing),
-		errors.Is(err, repos.ErrBacklogGone):
+		errors.Is(err, repos.ErrBacklogGone), errors.Is(err, repos.ErrRunNotFound):
 		return ipcerr.New("E_NOT_FOUND", err.Error())
 	}
 	return ipcerr.InternalErr(err)
@@ -497,4 +510,85 @@ func (s *AdeTaskService) RecordMerge(ctx context.Context, args adewire.RecordMer
 		return err
 	}
 	return adeTaskError(s.Engine.RecordMerge(ctx, args.BranchID, args.Target))
+}
+
+// --- runs --------------------------------------------------------------------------------------
+
+func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs) (adewire.StartRunResult, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.StartRunResult{}, err
+	}
+	if len(args.BranchNames) > adeTaskMaxRepoIDs {
+		return adewire.StartRunResult{}, adeTaskInvalid("branchNames is too long")
+	}
+	for id, name := range args.BranchNames {
+		if err := validateAdeItemID(id, "branchNames"); err != nil {
+			return adewire.StartRunResult{}, err
+		}
+		if name == "" {
+			continue
+		}
+		if err := validateAdeBranchName(name, "branchNames"); err != nil {
+			return adewire.StartRunResult{}, err
+		}
+	}
+	if len(args.Message) > adeMaxMessageBytes {
+		return adewire.StartRunResult{}, adeTaskInvalid("message is too long")
+	}
+	r, err := s.Engine.StartRun(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) Approve(ctx context.Context, args adewire.StepArgs) error {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return err
+	}
+	if err := validateAdeItemID(args.StageID, "stageId"); err != nil {
+		return err
+	}
+	if err := validateAdeItemID(args.StepID, "stepId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.Approve(ctx, args))
+}
+
+func (s *AdeTaskService) RetryRun(ctx context.Context, args adewire.RunArgs) error {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RetryRun(ctx, args.RunID))
+}
+
+func (s *AdeTaskService) StageDone(ctx context.Context, args adewire.TaskArgs) (adewire.Task, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Task{}, err
+	}
+	t, err := s.Engine.StageDone(ctx, args.TaskID)
+	return t, adeTaskError(err)
+}
+
+func (s *AdeTaskService) RetrySetup(ctx context.Context, args adewire.BranchArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RetrySetup(ctx, args.BranchID))
+}
+
+func (s *AdeTaskService) ReadLog(ctx context.Context, args adewire.ReadLogArgs) (adewire.LogPage, error) {
+	if args.Kind != "run" && args.Kind != "setup" {
+		return adewire.LogPage{}, adeTaskInvalid("kind must be run or setup")
+	}
+	if err := validateAdeItemID(args.ID, "id"); err != nil {
+		return adewire.LogPage{}, err
+	}
+	if args.AfterSeq < 0 {
+		return adewire.LogPage{}, adeTaskInvalid("afterSeq must not be negative")
+	}
+	p, err := s.Engine.ReadLog(ctx, args)
+	return p, adeTaskError(err)
+}
+
+func (s *AdeTaskService) Sessions(ctx context.Context) (adewire.SessionsResult, error) {
+	r, err := s.Engine.Sessions(ctx)
+	return r, adeTaskError(err)
 }

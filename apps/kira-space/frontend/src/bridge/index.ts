@@ -324,10 +324,26 @@ const spaceControl = {
     unwrap(AdeTaskService.RemoveFolder(args)),
   adeTaskRecordMerge: (args: V2.RecordMergeArgs): Promise<void> =>
     unwrap(AdeTaskService.RecordMerge(args)),
+  adeTaskStartRun: (args: V2.StartRunArgs): Promise<V2.StartRunResult> =>
+    unwrap(AdeTaskService.StartRun(args)).then((r) => trust<V2.StartRunResult>(r)),
+  adeTaskApprove: (args: V2.StepArgs): Promise<void> => unwrap(AdeTaskService.Approve(args)),
+  adeTaskRetryRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.RetryRun(args)),
+  adeTaskStageDone: (args: V2.TaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.StageDone(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskRetrySetup: (args: V2.BranchArgs): Promise<void> =>
+    unwrap(AdeTaskService.RetrySetup(args)),
+  adeTaskReadLog: (args: V2.ReadLogArgs): Promise<V2.LogPage> =>
+    unwrap(AdeTaskService.ReadLog(args)).then((r) => trust<V2.LogPage>(r)),
+  adeTaskSessions: (): Promise<V2.SessionsResult> =>
+    unwrap(AdeTaskService.Sessions()).then((r) => trust<V2.SessionsResult>(r)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on('kira:adetask:board', cb),
   onAdeTaskBacklog: (cb: () => void): (() => void) => on('kira:adetask:backlog', cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on('kira:adetask:workflows', cb),
   onAdeTaskRepos: (cb: () => void): (() => void) => on('kira:adetask:repos', cb),
+  onAdeTaskRuns: (cb: (event: V2.RunsChangedEvent) => void): (() => void) =>
+    on('kira:adetask:runs', cb),
+  onAdeTaskLog: (cb: (event: V2.LogEvent) => void): (() => void) => on('kira:adetask:log', cb),
+  onAdeTaskSessions: (cb: () => void): (() => void) => on('kira:adetask:sessions', cb),
   onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
     on('kira:adetask:credential', cb),
 };
