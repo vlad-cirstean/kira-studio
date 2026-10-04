@@ -509,7 +509,7 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	if runner == nil {
 		runner = gitprepare.NewOSRunner()
 	}
-	timeout, timeoutText := prepareTimeout(settings.WorktreePrepareTimeout)
+	timeout, timeoutText := ParsePrepareTimeout(settings.WorktreePrepareTimeout)
 
 	onBatch := func(lines []gitprepare.Line) {
 		if conn == nil {
@@ -541,9 +541,9 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	return result, nil
 }
 
-// prepareTimeout parses the per-repo worktreePrepareTimeout leaf. A stored value that no longer
+// ParsePrepareTimeout parses the per-repo worktreePrepareTimeout leaf. A stored value that no longer
 // validates falls back to the default and is logged, never blocks the run.
-func prepareTimeout(stored string) (time.Duration, string) {
+func ParsePrepareTimeout(stored string) (time.Duration, string) {
 	d, err := model.ParsePrepareTimeout(stored)
 	if err == nil {
 		return d, stored

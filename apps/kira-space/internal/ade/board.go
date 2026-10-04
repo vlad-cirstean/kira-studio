@@ -52,6 +52,9 @@ type TaskBoardDeps struct {
 	Runner gitclient.Runner
 	// Scripts runs the environment deploy-sha scripts; nil = the OS runner.
 	Scripts gitprepare.Runner
+	// Logs stores run and worktree-setup logs; OnLog pushes each stored batch.
+	Logs  *repos.AdeLogsRepo
+	OnLog func(adewire.LogEvent)
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings  func(repoID string, patch model.GitRepoSettingsPatch) error
@@ -88,6 +91,10 @@ type TaskBoard struct {
 	caches      map[string]*repoCaches
 	rebase      map[string]*rebaseCache
 	boardTimer  *time.Timer
+
+	runMu     sync.Mutex      // guards setupBusy
+	setupBusy map[string]bool // branch id -> a prepare script is running
+	wg        sync.WaitGroup  // background setups and runs; Close waits
 }
 
 // NewTaskBoard builds the engine; Close releases it.
@@ -99,7 +106,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	b := &TaskBoard{
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
-		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{},
+		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, setupBusy: map[string]bool{},
 	}
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.checker = newRebaseChecker(ctx, deps.GitStatus, b.scheduleBoard)
@@ -118,6 +125,7 @@ func (b *TaskBoard) Close() {
 	}
 	b.mu.Unlock()
 	b.stopWatchers()
+	b.wg.Wait()
 	b.conn.Close()
 }
 
