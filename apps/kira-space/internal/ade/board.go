@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
@@ -55,6 +56,17 @@ type TaskBoardDeps struct {
 	// Logs stores run and worktree-setup logs; OnLog pushes each stored batch.
 	Logs  *repos.AdeLogsRepo
 	OnLog func(adewire.LogEvent)
+	// Sessions stores the headless session rows; OnSessions fires when they change.
+	Sessions   *repos.AdeSessionsRepo
+	OnSessions func()
+	// OnRuns pushes changed runs on kira:adetask:runs.
+	OnRuns func(adewire.RunsChangedEvent)
+	// AgentDir holds each run's MCP config file (0700 dir, 0600 files).
+	AgentDir string
+	// ClaudeBin defaults to "claude" (a test points it at a fake).
+	ClaudeBin string
+	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
+	HeadlessSettingSources func() string
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings  func(repoID string, patch model.GitRepoSettingsPatch) error
@@ -92,9 +104,13 @@ type TaskBoard struct {
 	rebase      map[string]*rebaseCache
 	boardTimer  *time.Timer
 
-	runMu     sync.Mutex      // guards setupBusy
-	setupBusy map[string]bool // branch id -> a prepare script is running
-	wg        sync.WaitGroup  // background setups and runs; Close waits
+	runMu     sync.Mutex             // guards setupBusy, taskMus, finishes, stepMsgs
+	setupBusy map[string]bool        // branch id -> a prepare script is running
+	taskMus   map[string]*sync.Mutex // task id -> serializes that task's run transitions
+	finishes  map[string]finishCall  // run id -> last finish_step call
+	stepMsgs  map[string]string      // task|stage|step -> the Run dialog's edited message
+	agent     *adeagent.Server
+	wg        sync.WaitGroup // background setups and runs; Close waits
 }
 
 // NewTaskBoard builds the engine; Close releases it.
@@ -107,7 +123,9 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, setupBusy: map[string]bool{},
+		taskMus: map[string]*sync.Mutex{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
 	}
+	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)
 	b.checker = newRebaseChecker(ctx, deps.GitStatus, b.scheduleBoard)
 	return b
@@ -126,6 +144,9 @@ func (b *TaskBoard) Close() {
 	b.mu.Unlock()
 	b.stopWatchers()
 	b.wg.Wait()
+	if err := b.agent.Close(); err != nil {
+		slog.Warn("ade: close agent server", "scope", "ade", "err", err)
+	}
 	b.conn.Close()
 }
 
