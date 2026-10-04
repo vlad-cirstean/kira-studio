@@ -549,3 +549,63 @@ outline, step line layout) is a defect fixed before landing. Verdict + image pat
   `buildCard` gets real sessions (`Sessions()` + `onAdeTaskSessions`).
 - P150: amends `ArchiveTask` (unpin, purge, review windows) per its own plan.
 - Open for the user (unchanged): todo progress unobservable in `claude -p` 2.1.289.
+
+## Result
+
+Streams A and B landed on `v2.0` from `7f40cbb5` (`B0`, step 0 tip). Notes: `P147-streamA-notes.md`,
+`P147-streamB-notes.md`.
+
+**Commits:** 18 from `B0` to `82dd0c1f` (A 9 incl. notes, B 9 incl. notes), then closing commits.
+
+**Counts:** 47 `AdeTaskService` methods (grep of `func (s *AdeTaskService) [A-Z]`), 47 `adeTask*` entries
+in `bridge/index.ts`; `onAdeTaskOpenSession` present, emitted from `FocusSession` (`bridge/adetask.go:42`);
+no migration added (`0010` still last); `test:unit` 1740 pass; `test:ui:space` 119 pass.
+
+**Acceptance (landed tip, all exit 0):** `go build ./...`, `go test ./apps/kira-space/...`,
+`go test -race` on `ade`, `adeagent`, `adeflow`, `gitsession`, `bun run typecheck`, `lint:all`.
+Contract untouched since `B0` (`git diff` of `wire.ts`, `adewire`, `tests/fixtures/ade-v2`,
+`packages/shared` empty). No `ade/wire.ts` import, scoped `<style>` or `defineComponent` under
+`ade/v2/`. Every §6.2 method has a frontend caller outside `bridge/index.ts`.
+
+**gitsock (P152).** Green on the landed tip's full `go test ./apps/kira-space/...`. No flake seen.
+
+**Real-claude send-back smoke.** Stream A notes (claude 2.1.289): `back:impl` round trip resumed the
+same Claude session id. Repeated on the landed tip through the UI (below).
+
+**Live run (landed tip, server-tag build, local `Locate` patch reverted, real `claude`).** Temp home,
+scratch repos `api` and `web`, Playwright Chromium on `/?window=main`. Setup needed beyond the
+recipe: `settings.git.path` row set to `"/usr/bin/git"` (ADE reads the setting, not discovery; unset
+gives `E_INTERNAL ... exec: no command` on `StartRun`).
+- Ran, passed: (1) Repos page, nickname `api` to `API`, prepare script `sleep 5; echo prepared` set
+  through the UI; new-task toggle and Add-repo select show `API`. (2) Workflows: empty state text,
+  Import YAML by path of `smoke.yaml`, YAML mode `✓ valid`, broken edit shows `✕ line 29: stage 3:
+  kind must be user, agent or script (the last valid version stays in use)`, list row keeps stages and
+  shows `✕`, fix restores `✓ valid`. (3) Task on both repos, `Smoke` workflow, `Done ›`, `▶ Run`
+  dialog with default text and `Run in background`: `web` runs first, `API` waits for setup, then
+  `tests` sent back on both (`fixed marker missing → back to Implement (1 of 3)`), `impl` reruns with
+  `fix round 1 of 3`, `tests` done; Log shows `▸` tool lines and `result: success · 3 turns`; `Done ›`;
+  script `▶ Run`, Output shows `feat/smoke-one`; `Finish ✓` gives task tag `✓ merged`, no action
+  button left (R22). (4) Restart: second task with `sleep 120` script, server killed with SIGKILL and
+  restarted: run line `! API stuck ... interrupted by restart`, `Retry` reruns it (`● API running`).
+- Not observed: the `⚙ preparing Ns` chip text itself (4s poll missed it). DB shows the `api` setup
+  row took 5.2s (`started_at` to `finished_at`) and the `api` run started only after it. Not run live:
+  Take over, `LaunchStage`, `StartBranch`, `ArchiveTask` (no UI caller until P148 B; engine tests
+  cover them), the Playwright mockup comparison at wave end (Stream B's verdict stands, no UI change
+  since). The SIGKILL left the `sleep 120` child orphaned; killed by hand.
+
+**Closing items.** `SPEC.md` P148 row, preplan §4/§5 updated per §7. `knip.json` dry run: dropping
+the `ade/v2/wire.ts` and `ade/v2/board/*.ts` entries still fails `lint:dead` (unused `wire.ts`
+exports: `RepoState`, `RepoPrs`, `MergedInto`, `BranchRisk`, ...); both stay, expected before P148.
+`ARCHITECTURE.md` gains send-back, stop, recovery and archive notes plus one Known open item.
+
+**Licenses:** none new. `go.mod`, `go.sum`, `package.json`, `bun.lock` unchanged.
+
+**Deviations / carry-forward:**
+- Held fix runs lose `runOpts` across restart and launch as a plain fresh attempt.
+- Engine test `waitUntil` raised 10s to 45s in `workflows_test.go`: multi-process chains exceed 10s
+  under `-race`.
+- A taken-over stuck or failed run gets `finish_step` from the TUI (R14); UI is P148 B.
+- Interactive `claude --resume` TUI is unobservable in this sandbox (no display); covered by argv
+  tests and the tracker, not live.
+- Todo progress still unobservable in `claude -p` 2.1.289 (open for the user).
+- Stream notes list the remaining A and B deviations.

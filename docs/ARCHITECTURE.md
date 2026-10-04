@@ -3190,6 +3190,20 @@ feature be tested without ever spawning a real shell.
 - Todo progress `[n, m]` parses `TodoWrite` and `TaskCreate`/`TaskUpdate`. CLI 2.1.289 in `-p` mode
   offers neither tool, so `todo` stays null live (see Known open items).
 
+**ADE v2 send-back, Take over and archive (P147).**
+
+- Send-back: a `back:<step>` failure queues a fix run of the target step with `claude -p --resume
+  <session id>`, so the Claude session id stays the same across rounds. `loops` is the round epoch;
+  3 rounds, then the run fails. Fix runs of a step on another repo or `once` branch get a note, not a run.
+- Per-run stop (`StopRun`, task archive, Take over) records its cause on the run.
+- Restart recovery: `Recover()` runs before `Start()`; `running` runs become `stuck` with note
+  `interrupted by restart`. Nothing auto-resumes (D7). A held fix run loses its resume options and
+  relaunches as a plain fresh attempt.
+- TUI launches (`claude --session-id` / `--resume`) put the user message after ` -- `, so it cannot
+  parse as a flag. A taken-over run can still report `finish_step` from the TUI (R14).
+- Archive stops the task's runs and prepare scripts, closes its terminals, then archives; no discard flag.
+- Adding an existing branch that is not checked out creates its worktree and runs setup.
+
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
 any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
 reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
@@ -4458,6 +4472,7 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
+- **Interactive `claude --resume` TUI is unobservable in the dev sandbox (P147).** No display; argv shape is covered by tests only. Delete once checked on a real desktop build.
 - **Run held behind a failed worktree setup keeps note `waiting for worktree setup` (P146).** `worktree setup failed` shows only on runs queued after the failure; the setup state itself shows failed.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and

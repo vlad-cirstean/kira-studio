@@ -310,6 +310,12 @@ Merge dialog (Claude dialog, `Also push develop` default off, develop worktree t
 every branch at risk) reusing archive-at-risk flow. Needs you page (§11: kinds, ordering, one
 action each (`interrupted by restart` stuck runs included), footer counts, `All sessions` toggle grouped by task, tab badge count). History rows
 per task with repos.
+**P147 boundary (methods the P148 B dialogs call).** Take over: `TakeOver{stopIfRunning:true}` after the D3
+confirm (R13); a taken-over stuck or failed run finishes from the TUI via `finish_step` (R14). `▶ <Stage>`:
+`LaunchStage` (R15). `▶ Start`: `StartBranch` (R16). Merge, rebase and queue dialogs: `Send` to a running
+session, else `StartBranch` with the dialog text (R16, R17). Archive dialog: `ArchiveRisk`, then
+`ArchiveTask` with no discard flag (R18). Needs you `Open`: `FocusSession` plus `onAdeTaskOpenSession`.
+Sessions tab: `Sessions()` plus `onAdeTaskSessions`; terminal id from `Launch`. `RecordMerge` on finish (D14).
 **SPEC2:** §4.1 (`!` click targets), §5 (Take over UI), §7 (Sessions tab), §10 (UI), §11.
 
 **Ownership.** A: `internal/**`, migrations, `bridge/index.ts`, `ade/wire.ts` (v1, deleted). B: as
@@ -367,6 +373,8 @@ check), §13 (audit). Size M.
 | §6 | Rebase-conflict check of every visible branch after refresh (D1) | P144 A |
 | §6 | Row text, panel Merged into (P146 B); fix menu, Merge dialog, Merge / Re-merge (P148 B, M1) | P146 B, P148 B |
 | §6.1 | Prepare script run, states, gate, persist | P146 A |
+| §6.1 | "Add existing branch" trigger: worktree and setup for a branch not checked out (R19) | P147 A |
+| §5 | Workflow switch restarts at first stage (R1) | P147 step 0 |
 | §6.1 | Graph/panel/Needs you display | P147 B, P148 B |
 | §6.2 | Deploy compute | P145 A |
 | §6.2 | Deploy display | P146 B |
