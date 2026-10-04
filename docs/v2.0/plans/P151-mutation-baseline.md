@@ -31,9 +31,11 @@ User-approved sample; the full baseline is a later on-demand run in resumable ch
 - Go: 1,296 killed, 0 survived, 735 not covered. Score 63.8%, covered score 100.0%.
 - TS: 3,515 killed, 217 timeout, 983 survived, 3,525 not covered, 652 ignored. Score 45.3%, covered
   score 79.2%.
-- Go "0 survived" is not a harness blind spot: a synthetic weak test in a scratch snapshot reports
-  `LIVED`. It disagrees with the plan's early `mask` probe (17 lived); not investigated, tree and
-  load differed. Treat Go survivor counts as unproven until a larger Go sample confirms.
+- Go numbers below are INVALID. They came from `--test-cpu 2`, which gremlins v0.6.0 passes as one
+  argv entry (`-cpu 2`); `go test` then fails to start and every covered mutant reads as killed
+  (hence "0 survived"). Fixed in `fab4ca68`. Without the flag, `internal/mask` gives 87 killed, 17
+  lived, 1 timeout, 1 not covered (matches the plan's early probe). Go rerun pending on another VM.
+  TS numbers are unaffected.
 - Go score is dominated by packages with no tests (`jsonx`, `pathsafe`, `kirapaths`, ...) and
   container-gated adapters. TS survivors concentrate in `git-core` (`commitStore`, `edges`,
   `matcher`) and `api-core`.

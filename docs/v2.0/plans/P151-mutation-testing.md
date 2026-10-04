@@ -342,7 +342,7 @@ keeps any rebase conflict trivial.
 Implemented as planned, 6 commits (`ab035847` manifest, `bb58aa81` Go runner, `6e430f7f` TS runner,
 `252c7773` summary, `725d30e1` docs, baseline commit last). Baseline: `P151-mutation-baseline.md`
 (sample, user-approved: Go 25 packages / 2,031 mutants, TS 4 areas / 8,892 mutants, about 43 min at
-2 workers). Go 0 survived / 735 not covered; TS score 45.3%, covered score 79.2%.
+2 workers). Go figures invalid, see Open items; TS score 45.3%, covered score 79.2%.
 
 Q1-Q5 answered by user: single-maintainer bun runner accepted; sample baseline now (full later,
 resumable); container-gated adapters stay "not covered"; CI job manual-dispatch only (no weekly
@@ -381,3 +381,14 @@ Acceptance checks (real runs):
   without `--no-verify`; `knip` exit 0, `bun run lint` and `typecheck` pass, `tsgo -p
   tools/mutation/tsconfig.json` clean.
 - After runs `git status --short` is empty; `out/latest/summary.json` totals match the baseline note.
+
+Open items:
+
+- Go baseline invalid. Finding: gremlins v0.6.0 builds `-cpu 2` as a single argv entry, so `go test`
+  fails to start and every covered mutant counts as killed (the "0 survived" vs the early `mask`
+  probe's 17 lived). Reproduced on `internal/mask`: with the flag 105 killed / 0 lived; without
+  87 killed / 17 lived / 1 timeout. Flag removed from `scripts/mutation/go.sh` (`fab4ca68`). The
+  Go rerun (25 packages, about 12 min at 2 workers) is deferred to a run on another VM; the Go
+  totals and tables in `P151-mutation-baseline.md` stay stale until then. Not rerun here.
+- `internal/terminal` `TestSessionCloseKillsProcessGroup` did not reproduce on retest in this
+  container (4 passes, main and p151 worktrees). Tracked as P153.
