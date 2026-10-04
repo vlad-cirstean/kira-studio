@@ -121,6 +121,7 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 	t.Parallel()
 	clock := newFakeClock()
 	b := NewBroker(clock.Now)
+	t.Cleanup(b.Shutdown) // releases the three Request goroutines.
 
 	var mu sync.Mutex
 	var queuedSeen []int
@@ -334,6 +335,14 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 		case <-done:
 			t.Fatal("an already-queued request resolved on its own — it should still be pending")
 		default:
+		}
+	}
+
+	// Release the maxQueueLen goroutines blocked on their result channels.
+	b.Shutdown()
+	for i, done := range results {
+		if out := recvOrTimeout(t, done); out != PairingAborted {
+			t.Fatalf("queued request %d after Shutdown: got %v, want PairingAborted", i, out)
 		}
 	}
 }
