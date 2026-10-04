@@ -249,3 +249,88 @@ Questions for the user:
 3. CodeGraph fan-in as an optional enrichment when present, or skip CodeGraph entirely in the app?
 4. Should the LLM pass run automatically per review open (cost) or on demand from the questions panel?
 5. Lockfile changes: always Mechanical, or Attention when a direct dependency's version changes?
+
+## 6. Optional installed CodeGraph
+
+User follow-up: CodeGraph is not shipped, but it is installed on the user's machine. Can the app
+use it when present (degrade to Go-only when absent) and skip its own tree-sitter? Verified on
+1.6.2 below.
+
+### 6.1 What it exposes for hunk triage
+
+| Need | Available? | Evidence |
+|---|---|---|
+| Per-symbol line/column ranges | Yes | `nodes.start_line/end_line/start_column/end_column`; CLI `query`/`callers` JSON carry `startLine` |
+| Stored signature | Yes, raw source text | `Queue::reconcileTypedNewWork … '(ctx context.Context, entry *gitsession.RepoEntry, …) (bool, error)'`; whitespace not normalised, app must normalise |
+| Body hash / normalised-body hash / AST hash | **No** | `nodes` columns: none; `ExtractionResult.Node` keys: `id,kind,name,qualifiedName,filePath,language,startLine,endLine,startColumn,endColumn,updatedAt,signature` |
+| File hash | Raw bytes only | `files.content_hash` = sha256 of file; comment/whitespace-sensitive |
+| Comment ranges, token stream, parse tree | **Not on any public surface** | Library-internal `dist/extraction/syntax-tokens` classifies comments for its viewer; no CLI/MCP/JSON output |
+| Parse-only command | **No** | CLI: `init index sync status query explore context node files callers callees impact affected …`; MCP `tools/list` returns one tool, `codegraph_explore`, markdown, no `outputSchema` |
+| Callers/callees/impact | Yes, JSON | `callers --json` keys `symbol,targets,ambiguous,aggregation,filteredOut,definitions,callers,total,limit,truncated` |
+
+So formatting-only, comment-only and import-order-only **cannot** be decided from CodeGraph's public
+outputs. It gives symbol mapping, signature-text comparison, new/deleted symbols, and caller counts.
+Comment-only needs a tokenizer either way.
+
+### 6.2 Languages and parsing a base blob without a second checkout
+
+Grammars bundled (`tree-sitter-wasms`): go, typescript, tsx, javascript, vue, json, yaml, toml, html,
+css and ~25 more. Covers all of Go/TS/Vue. Vue granularity is coarse (R2: hunks map to the whole
+component node).
+
+No stdin mode. Two workable routes, both measured:
+
+| Route | How | Latency | Stability |
+|---|---|---|---|
+| Temp project of changed base blobs | write `git show base:path` files to a temp dir keeping paths, `codegraph init -y` there, read its SQLite | 1-file: **1,270 ms**; 9 base blobs of P140 range: **1,234 ms** (65 Go, 92 TS, 35 Vue nodes); DB 692 KB | Public CLI; correct signatures for the base side (`reconcileTypedNewWork` 1051-1063, old param list) |
+| Internal `extractFromSource` via bundled Node | `require('…/dist/extraction/tree-sitter.js').extractFromSource(path, src)` | 237 ms load + **46 ms** for `queue.go` | Not exported from the package entry (`extractFromSource is not a function` from `dist/index.js`); internal path, breaks on any release. Also returned 2 nodes for `TabStrip.vue` vs 35 via `init`. **Do not use** |
+
+Temp-project route removes the need for a second full checkout. Edges in it cover only the changed
+files, so it gives base signatures and symbol ranges, never base-side caller counts. Tip side: use
+the user's existing index for the worktree if fresh, else the same temp-project trick on tip blobs.
+
+### 6.3 Cost, stability, version detection
+
+- Spawn cost: `codegraph version` **139 ms**, `callers --json` **368 ms**, `impact --json` 391 ms.
+  Direct read-only SQLite of an existing index: **21 ms**. Prefer SQLite for queries, CLI only for
+  `status --json` and temp-project `init`.
+- Daemon: `.codegraph/daemon.pid` JSON `{pid, version, socketPath}`; socket is an MCP proxy, not a
+  documented query API. Do not use it; a present `daemon.pid` only tells the index is being kept
+  fresh.
+- Freshness: `status --json` has `pendingChanges {added,modified,removed}`, `worktreeMismatch`
+  (borrowed parent index, see `dist/sync/worktree.d.ts`), `index.state`, `reindexRecommended`. Plus
+  per-file sha256 check against `git show tip:path`.
+- Versioning: JSON has no schema version field. Detect via `status --json` `version` (semver) and
+  `index.builtWithExtractionVersion` (27), plus DB `schema_versions` max (11). App pins a tested
+  range (e.g. `1.6.x`, schema 11) and degrades to Go-only on anything else, logging why.
+- Telemetry: spawn with `CODEGRAPH_TELEMETRY=0`. Temp-project runs also need `CODEGRAPH_NO_DAEMON=1`
+  so no watcher daemon lingers.
+- Writes: `init` in a temp dir writes only `<tmp>/.codegraph`. Never run `init`/`sync` in the user's
+  repo from the app; read their index as-is.
+
+### 6.4 Updated verdict
+
+Detection: `exec.LookPath("codegraph")` (same posture as `ghclient.Discovery`), `status --json` with
+a TTL, version gate. Absent or incompatible: Go-only path, no error surfaced beyond a "symbol
+insights unavailable" hint.
+
+| Signal | Go-only path | + optional CodeGraph | Tier verdict |
+|---|---|---|---|
+| Path/rename/mode/binary, whitespace, moved | git | same | Go |
+| Comment-only / token-equal, Go | `go/scanner` | same (CodeGraph cannot) | Go |
+| Comment-only / token-equal, TS/Vue | none, unless Monaco's Monarch `editor.tokenize` (TS grammar already registered, `monarch/decorators.ts`) in the frontend | same (CodeGraph cannot) | Maybe, via Monaco, verify Vue |
+| Symbol mapping + signature change, Go | `go/parser` | redundant | Go |
+| Symbol mapping + signature change, TS/Vue | none | **yes**: temp-project base + tip, ~1.3 s per side | Maybe (CodeGraph-only) |
+| Ripple groups, TS/Vue | none | yes, built on the row above | Maybe |
+| Caller count / blast radius | none | yes, tip index if fresh; undercounts bridge/interface calls | Maybe, context only |
+| Dead-code deletion | none | needs base-side edges, not in temp project; only if user's index predates the change | No-go |
+
+What optional CodeGraph buys over Go-only: TS/Vue symbol mapping, signature-change and ripple
+detection, and caller counts. It does **not** replace a tokenizer: comment/format/import-only stays
+Go stdlib for Go and Monaco tokenize (or nothing) for TS/Vue. So "skip our own tree-sitter" holds:
+Go-only + Monaco tokenize + optional CodeGraph covers every tier the tree-sitter plan did, except
+TS/Vue symbol tiers when CodeGraph is absent.
+
+Recommended order for the later phase: Go-only tiers 0-2 first, then the optional CodeGraph adapter
+(detect, version gate, temp-project base parse, SQLite reads), then Monaco tokenize for TS comment-
+only. P150 scope unchanged.
