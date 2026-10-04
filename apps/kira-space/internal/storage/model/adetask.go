@@ -236,3 +236,21 @@ type AdeEnvState struct {
 	Error      string
 	CheckedAt  int64
 }
+
+// AdeBranchKind* are ade_task_branches.kind's CHECK values: mine (the local git user's own),
+// review (someone else's), parked (set aside by the user).
+const (
+	AdeBranchKindMine   = "mine"
+	AdeBranchKindReview = "review"
+	AdeBranchKindParked = "parked"
+)
+
+// ValidAdeBranchKind mirrors ade_task_branches.kind's CHECK constraint.
+func ValidAdeBranchKind(v string) bool {
+	switch v {
+	case AdeBranchKindMine, AdeBranchKindReview, AdeBranchKindParked:
+		return true
+	default:
+		return false
+	}
+}

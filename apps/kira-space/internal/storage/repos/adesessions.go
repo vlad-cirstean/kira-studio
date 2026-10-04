@@ -8,26 +8,25 @@ import (
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
-const adeSessionsSelectColumns = `id, code_repo_id, branch, new_work_id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at,
+const adeSessionsSelectColumns = `id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at,
 	mode, task_id, branch_id, stage_id, step_id, run_id, resumes`
 
-// AdeSessionsRepo reads and writes `ade_sessions` (P129 Part 1 §4.7) — ade.Tracker's own history
-// of every Claude Code session it has spawned or resumed.
+// AdeSessionsRepo reads and writes `ade_sessions` — the history of every task Claude Code session
+// (interactive or headless) the app has spawned or resumed.
 type AdeSessionsRepo struct {
 	DB *sql.DB
 }
 
 func scanAdeSessionRow(row rowScanner) (model.AdeSession, error) {
 	var rec model.AdeSession
-	var terminalID, codeRepoID sql.NullString
+	var terminalID sql.NullString
 	if err := row.Scan(
-		&rec.ID, &codeRepoID, &rec.Branch, &rec.NewWorkID, &rec.ClaudeSessionID, &rec.Cwd,
+		&rec.ID, &rec.ClaudeSessionID, &rec.Cwd,
 		&rec.State, &terminalID, &rec.StartedAt, &rec.LastActiveAt,
 		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StageID, &rec.StepID, &rec.RunID, &rec.Resumes,
 	); err != nil {
 		return model.AdeSession{}, err
 	}
-	rec.CodeRepoID = codeRepoID.String
 	rec.TerminalID = terminalID.String
 	return rec, nil
 }
@@ -48,48 +47,9 @@ func (r *AdeSessionsRepo) Get(id string) (*model.AdeSession, error) {
 	return rec, nil
 }
 
-// List returns every v1 row (task_id = ”), most recently active first — Tracker.Recover's own boot
-// read and AdeService.Sessions' own wire projection both use this, never a paged or filtered
-// variant (this app's own session count never approaches a size where that would matter). v2 task
-// rows are ListTask's.
-func (r *AdeSessionsRepo) List() ([]model.AdeSession, error) {
-	rows, err := r.DB.Query(`SELECT ` + adeSessionsSelectColumns + ` FROM ade_sessions WHERE task_id = '' ORDER BY last_active_at DESC`)
-	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeSession, bool, error) {
-		rec, err := scanAdeSessionRow(rows)
-		return rec, true, err
-	})
-}
-
-// ListByRepo is List narrowed to one code repo, on the ade_sessions_repo index.
-func (r *AdeSessionsRepo) ListByRepo(codeRepoID string) ([]model.AdeSession, error) {
-	rows, err := r.DB.Query(`SELECT `+adeSessionsSelectColumns+` FROM ade_sessions WHERE code_repo_id = ? AND task_id = '' ORDER BY last_active_at DESC`, codeRepoID)
-	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeSession, bool, error) {
-		rec, err := scanAdeSessionRow(rows)
-		return rec, true, err
-	})
-}
-
-// Insert writes a newly spawned session's own row — always state='running', terminal_id set,
-// called right after Tracker.Compose hands back a composed command (§4.2's own ordering: the row
-// exists before the process the terminal_id names does).
-func (r *AdeSessionsRepo) Insert(rec model.AdeSession) error {
-	if err := rec.Validate(); err != nil {
-		return fmt.Errorf("repos: %w", err)
-	}
-	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, code_repo_id, branch, new_work_id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.CodeRepoID, rec.Branch, rec.NewWorkID, rec.ClaudeSessionID, rec.Cwd, rec.State,
-		nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
-	); err != nil {
-		return fmt.Errorf("repos: insert ade session %s: %w", rec.ID, err)
-	}
-	return nil
-}
-
-// ListTask returns every v2 row (task_id <> ”), running first then most recently active.
+// ListTask returns every row, running first then most recently active.
 func (r *AdeSessionsRepo) ListTask() ([]model.AdeSession, error) {
-	rows, err := r.DB.Query(`SELECT ` + adeSessionsSelectColumns + ` FROM ade_sessions WHERE task_id <> ''
+	rows, err := r.DB.Query(`SELECT ` + adeSessionsSelectColumns + ` FROM ade_sessions
 		ORDER BY state = 'running' DESC, last_active_at DESC, id`)
 	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeSession, bool, error) {
 		rec, err := scanAdeSessionRow(rows)
@@ -97,7 +57,7 @@ func (r *AdeSessionsRepo) ListTask() ([]model.AdeSession, error) {
 	})
 }
 
-// InsertHeadless writes a v2 task session row (no code repo, no terminal).
+// InsertHeadless writes a headless task session row (no terminal).
 func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 	if rec.TaskID == "" {
 		return fmt.Errorf("repos: insert headless ade session %s: taskId is required", rec.ID)
@@ -106,9 +66,9 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, code_repo_id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
@@ -117,7 +77,7 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 	return nil
 }
 
-// InsertTUI writes a v2 task session row for an interactive Claude Code terminal (no code repo).
+// InsertTUI writes a task session row for an interactive Claude Code terminal.
 func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
 	if rec.TaskID == "" || rec.Mode != model.AdeSessionModeTUI {
 		return fmt.Errorf("repos: insert tui ade session %s: a tui task row needs taskId and mode tui", rec.ID)
@@ -126,9 +86,9 @@ func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, code_repo_id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
@@ -184,25 +144,11 @@ func (r *AdeSessionsRepo) SetLastActive(id string, lastActiveAt int64) error {
 	return sqlitex.RequireOneRow(res, "ade session "+id)
 }
 
-// StopAllRunning marks every still-'running' row 'stopped' and clears its terminal_id — Recover's
-// own boot-time call, since no terminal from a previous process life is ever still alive under a
-// fresh Registry (P129 Part 1 §4.4). Affecting zero rows is not an error: a fresh database, or one
-// where every prior session had already stopped cleanly, is the ordinary case.
-func (r *AdeSessionsRepo) StopAllRunning(now int64) error {
-	if _, err := r.DB.Exec(
-		`UPDATE ade_sessions SET state = ?, terminal_id = NULL, last_active_at = ? WHERE state = ? AND task_id = ''`,
-		model.AdeSessionStateStopped, now, model.AdeSessionStateRunning,
-	); err != nil {
-		return fmt.Errorf("repos: stop all running ade sessions: %w", err)
-	}
-	return nil
-}
-
-// StopAllTaskRunning marks every still-'running' v2 row 'stopped' and clears its terminal_id (boot
+// StopAllTaskRunning marks every still-'running' row 'stopped' and clears its terminal_id (boot
 // recovery: no process or PTY of the previous life survives).
 func (r *AdeSessionsRepo) StopAllTaskRunning(now int64) error {
 	if _, err := r.DB.Exec(
-		`UPDATE ade_sessions SET state = ?, terminal_id = NULL, last_active_at = ? WHERE state = ? AND task_id <> ''`,
+		`UPDATE ade_sessions SET state = ?, terminal_id = NULL, last_active_at = ? WHERE state = ?`,
 		model.AdeSessionStateStopped, now, model.AdeSessionStateRunning,
 	); err != nil {
 		return fmt.Errorf("repos: stop all running task sessions: %w", err)

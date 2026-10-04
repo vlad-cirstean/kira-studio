@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
@@ -21,7 +22,35 @@ var (
 	ErrRunNotFound   = errors.New("repos: run not found")
 	// ErrBranchNameTaken marks a created-branch name already used by a live branch of the repo.
 	ErrBranchNameTaken = errors.New("repos: a live branch in that repo already has that name")
+	// ErrEstimateShrink: once an estimate is set, a patch may only grow it (same unit).
+	ErrEstimateShrink = errors.New("repos: estimate can only grow once set")
 )
+
+// maxColorSlots is the task colour slot count (0-19).
+const maxColorSlots = 20
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// checkEstExtends guards an estimate patch: once set, it may only grow, same unit (h or d).
+func checkEstExtends(old, next string) error {
+	if old == "" {
+		return nil
+	}
+	if next == "" || next[len(next)-1] != old[len(old)-1] {
+		return ErrEstimateShrink
+	}
+	o, _ := strconv.ParseFloat(old[:len(old)-1], 64)
+	n, _ := strconv.ParseFloat(next[:len(next)-1], 64)
+	if n < o {
+		return ErrEstimateShrink
+	}
+	return nil
+}
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at`

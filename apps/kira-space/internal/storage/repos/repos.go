@@ -15,8 +15,7 @@ import (
 // P100 Part 2's own addition, once the frontend gave both a real consumer
 // (migrations/0002_p100_tabs_layout.sql). AdeSessions is P129 Part 1's own addition — ade.Tracker's
 // persisted history of every Claude Code session it has spawned or resumed
-// (migrations/0004_p129_ade_sessions.sql). AdeQueue is P129 Part 2's own addition — the merge
-// queue's own branches/new-work/plan/colors state (migrations/0005_p129_ade_queue.sql).
+// (migrations/0004_p129_ade_sessions.sql).
 type Repos struct {
 	Settings        *SettingsRepo
 	Windows         *WindowsRepo
@@ -26,7 +25,6 @@ type Repos struct {
 	Layout          *LayoutRepo
 	Tabs            *TabsRepo
 	AdeSessions     *AdeSessionsRepo
-	AdeQueue        *AdeQueueRepo
 	AdeTasks        *AdeTaskRepo
 	AdeBacklog      *AdeBacklogRepo
 	AdeRepoConfig   *AdeRepoConfigRepo
@@ -62,7 +60,6 @@ func New(db *sql.DB) (*Repos, error) {
 		Layout:          &LayoutRepo{DB: db, selectAll: layoutSelectAll},
 		Tabs:            &TabsRepo{DB: db, selectAll: tabsSelectAll},
 		AdeSessions:     &AdeSessionsRepo{DB: db},
-		AdeQueue:        &AdeQueueRepo{DB: db},
 		AdeTasks:        &AdeTaskRepo{DB: db},
 		AdeBacklog:      &AdeBacklogRepo{DB: db},
 		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},
