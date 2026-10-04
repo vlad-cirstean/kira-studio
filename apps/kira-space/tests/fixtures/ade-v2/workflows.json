@@ -1,0 +1,281 @@
+{
+  "dir": "~/.kira-space/workflows",
+  "workflows": [
+    {
+      "fileName": "standard.yaml",
+      "path": "~/.kira-space/workflows/standard.yaml",
+      "workflow": {
+        "id": "standard",
+        "name": "Standard feature",
+        "stages": [
+          {
+            "id": "spec",
+            "name": "Spec",
+            "kind": "user",
+            "status": "In progress",
+            "session": true,
+            "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
+            "steps": [],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "impl",
+            "name": "Implement",
+            "kind": "agent",
+            "status": "In progress",
+            "session": false,
+            "prompt": "",
+            "steps": [
+              {
+                "id": "plan",
+                "name": "Plan from spec",
+                "runsOn": "once",
+                "before": "auto",
+                "onFailure": "stop",
+                "timeout": "20m",
+                "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
+                "allowedTools": []
+              },
+              {
+                "id": "impl",
+                "name": "Implement",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "retry 1",
+                "timeout": "2h",
+                "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
+                "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+              },
+              {
+                "id": "tests",
+                "name": "Write tests",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "back:impl",
+                "timeout": "1h",
+                "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
+                "allowedTools": []
+              },
+              {
+                "id": "ci",
+                "name": "Make CI green",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "back:impl",
+                "timeout": "1h",
+                "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+                "allowedTools": []
+              },
+              {
+                "id": "pr",
+                "name": "Open PRs",
+                "runsOn": "each repo",
+                "before": "approval",
+                "onFailure": "stop",
+                "timeout": "15m",
+                "prompt": "Open a draft PR for {branch} and link {jira}.",
+                "allowedTools": ["Bash(gh pr *)"]
+              }
+            ],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "review",
+            "name": "Review",
+            "kind": "user",
+            "status": "In review",
+            "session": true,
+            "prompt": "Help me go through the review comments on {branch} and address them.",
+            "steps": [],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "release",
+            "name": "Release",
+            "kind": "script",
+            "status": "In review",
+            "session": false,
+            "prompt": "",
+            "steps": [],
+            "command": "./scripts/release.sh --branch {branch}",
+            "runsOn": "each repo",
+            "onFailure": "stop",
+            "timeout": "15m"
+          }
+        ]
+      },
+      "error": null,
+      "usedBy": 8
+    },
+    {
+      "fileName": "bugfix.yaml",
+      "path": "~/.kira-space/workflows/bugfix.yaml",
+      "workflow": {
+        "id": "bugfix",
+        "name": "Bugfix",
+        "stages": [
+          {
+            "id": "triage",
+            "name": "Triage",
+            "kind": "user",
+            "status": "In progress",
+            "session": true,
+            "prompt": "Help me understand {jira} and find where it happens. Do not change any code.",
+            "steps": [],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "fix",
+            "name": "Fix",
+            "kind": "agent",
+            "status": "In progress",
+            "session": false,
+            "prompt": "",
+            "steps": [
+              {
+                "id": "repro",
+                "name": "Reproduce with a failing test",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "stop",
+                "timeout": "30m",
+                "prompt": "Reproduce {jira} with a failing test on {branch}.",
+                "allowedTools": []
+              },
+              {
+                "id": "fix",
+                "name": "Fix",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "retry 1",
+                "timeout": "1h",
+                "prompt": "Make the failing test pass with the smallest change.",
+                "allowedTools": ["Bash(npm test)"]
+              },
+              {
+                "id": "ci",
+                "name": "Make CI green",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "retry 2",
+                "timeout": "1h",
+                "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+                "allowedTools": []
+              },
+              {
+                "id": "pr",
+                "name": "Open PR",
+                "runsOn": "each repo",
+                "before": "approval",
+                "onFailure": "stop",
+                "timeout": "15m",
+                "prompt": "Open a draft PR for {branch} and link {jira}.",
+                "allowedTools": []
+              }
+            ],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "release",
+            "name": "Release",
+            "kind": "script",
+            "status": "In review",
+            "session": false,
+            "prompt": "",
+            "steps": [],
+            "command": "./scripts/release.sh --branch {branch}",
+            "runsOn": "each repo",
+            "onFailure": "stop",
+            "timeout": "15m"
+          }
+        ]
+      },
+      "error": null,
+      "usedBy": 2
+    },
+    {
+      "fileName": "chore.yaml",
+      "path": "~/.kira-space/workflows/chore.yaml",
+      "workflow": {
+        "id": "chore",
+        "name": "Maintenance",
+        "stages": [
+          {
+            "id": "update",
+            "name": "Update",
+            "kind": "agent",
+            "status": "In progress",
+            "session": false,
+            "prompt": "",
+            "steps": [
+              {
+                "id": "update",
+                "name": "Apply the change",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "stop",
+                "timeout": "1h",
+                "prompt": "Apply the change described in the task on {branch}.",
+                "allowedTools": []
+              },
+              {
+                "id": "ci",
+                "name": "Make CI green",
+                "runsOn": "each repo",
+                "before": "auto",
+                "onFailure": "retry 2",
+                "timeout": "1h",
+                "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+                "allowedTools": []
+              }
+            ],
+            "command": "",
+            "runsOn": "",
+            "onFailure": "",
+            "timeout": ""
+          },
+          {
+            "id": "release",
+            "name": "Release",
+            "kind": "script",
+            "status": "In review",
+            "session": false,
+            "prompt": "",
+            "steps": [],
+            "command": "make release",
+            "runsOn": "each repo",
+            "onFailure": "stop",
+            "timeout": "10m"
+          }
+        ]
+      },
+      "error": null,
+      "usedBy": 1
+    },
+    {
+      "fileName": "broken.yaml",
+      "path": "~/.kira-space/workflows/broken.yaml",
+      "workflow": null,
+      "error": {
+        "line": 11,
+        "message": "step \"impl\": runs_on must be once, each repo or only <repo>"
+      },
+      "usedBy": 0
+    }
+  ]
+}

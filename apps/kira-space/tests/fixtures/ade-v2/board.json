@@ -1,0 +1,2830 @@
+{
+  "tasks": [
+    {
+      "id": "T_cart",
+      "kind": "task",
+      "title": "Cart total test fails intermittently",
+      "owner": "",
+      "jira": {
+        "key": "WEB-311",
+        "url": "https://acme.atlassian.net/browse/WEB-311"
+      },
+      "githubUrl": "",
+      "workflowId": "bugfix",
+      "stageId": "release",
+      "currentStage": {
+        "id": "release",
+        "name": "Release",
+        "kind": "script",
+        "status": "In review",
+        "session": false,
+        "prompt": "",
+        "steps": [],
+        "command": "./scripts/release.sh --branch {branch}",
+        "runsOn": "each repo",
+        "onFailure": "stop",
+        "timeout": "15m"
+      },
+      "est": "1h",
+      "notes": "",
+      "color": 0,
+      "branchIds": ["b_cart"],
+      "runs": [
+        {
+          "id": "r_T_cart_repro_b_cart",
+          "taskId": "T_cart",
+          "stageId": "fix",
+          "stepId": "repro",
+          "branchId": "b_cart",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_cart_fix_b_cart",
+          "taskId": "T_cart",
+          "stageId": "fix",
+          "stepId": "fix",
+          "branchId": "b_cart",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": 1790034900000
+        },
+        {
+          "id": "r_T_cart_ci_b_cart",
+          "taskId": "T_cart",
+          "stageId": "fix",
+          "stepId": "ci",
+          "branchId": "b_cart",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": 1790036100000
+        },
+        {
+          "id": "r_T_cart_pr_b_cart",
+          "taskId": "T_cart",
+          "stageId": "fix",
+          "stepId": "pr",
+          "branchId": "b_cart",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "c81a",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": 1790037300000
+        },
+        {
+          "id": "r_T_cart_release_b_cart",
+          "taskId": "T_cart",
+          "stageId": "release",
+          "stepId": "release",
+          "branchId": "b_cart",
+          "attempt": 1,
+          "state": "failed",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "",
+          "exitCode": 1,
+          "startedAt": 1790037600000,
+          "finishedAt": 1790038500000
+        }
+      ],
+      "createdAt": 1789808400000
+    },
+    {
+      "id": "T_bill",
+      "kind": "task",
+      "title": "",
+      "owner": "",
+      "jira": {
+        "key": "PAY-102",
+        "url": "https://acme.atlassian.net/browse/PAY-102"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "impl",
+      "currentStage": {
+        "id": "impl",
+        "name": "Implement",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "plan",
+            "name": "Plan from spec",
+            "runsOn": "once",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "20m",
+            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
+            "allowedTools": []
+          },
+          {
+            "id": "impl",
+            "name": "Implement",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 1",
+            "timeout": "2h",
+            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
+            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+          },
+          {
+            "id": "tests",
+            "name": "Write tests",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
+            "allowedTools": []
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          },
+          {
+            "id": "pr",
+            "name": "Open PRs",
+            "runsOn": "each repo",
+            "before": "approval",
+            "onFailure": "stop",
+            "timeout": "15m",
+            "prompt": "Open a draft PR for {branch} and link {jira}.",
+            "allowedTools": ["Bash(gh pr *)"]
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "2d",
+      "notes": "## Q4 pricing launch\n- [x] Usage metering in api\n- [ ] Invoice lines **before** Oct 1\n- [ ] Align with *Sara* on merge timing\n\nTotals live in `invoice.ts` for now.",
+      "color": 1,
+      "branchIds": ["b_meter", "b_bill", "b_billdash"],
+      "runs": [
+        {
+          "id": "r_T_bill_plan_b_meter",
+          "taskId": "T_bill",
+          "stageId": "impl",
+          "stepId": "plan",
+          "branchId": "b_meter",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_bill_impl_b_meter",
+          "taskId": "T_bill",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_meter",
+          "attempt": 1,
+          "state": "running",
+          "todo": [6, 9],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "m111",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": null
+        },
+        {
+          "id": "r_T_bill_impl_b_bill",
+          "taskId": "T_bill",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_bill",
+          "attempt": 1,
+          "state": "running",
+          "todo": [4, 10],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "b1c2",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": null
+        },
+        {
+          "id": "r_T_bill_impl_b_billdash",
+          "taskId": "T_bill",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_billdash",
+          "attempt": 1,
+          "state": "running",
+          "todo": [2, 7],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "9d10",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": null
+        }
+      ],
+      "createdAt": 1789722000000
+    },
+    {
+      "id": "T_auth",
+      "kind": "task",
+      "title": "",
+      "owner": "",
+      "jira": {
+        "key": "AUTH-212",
+        "url": "https://acme.atlassian.net/browse/AUTH-212"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "review",
+      "currentStage": {
+        "id": "review",
+        "name": "Review",
+        "kind": "user",
+        "status": "In review",
+        "session": true,
+        "prompt": "Help me go through the review comments on {branch} and address them.",
+        "steps": [],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "5h",
+      "notes": "",
+      "color": 2,
+      "branchIds": ["b_authcb", "b_auth", "b_authui"],
+      "runs": [
+        {
+          "id": "r_T_auth_plan_b_authcb",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "plan",
+          "branchId": "b_authcb",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_auth_impl_b_authcb",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_authcb",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": 1790034900000
+        },
+        {
+          "id": "r_T_auth_impl_b_auth",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_auth",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": 1790036100000
+        },
+        {
+          "id": "r_T_auth_impl_b_authui",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_authui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": 1790037300000
+        },
+        {
+          "id": "r_T_auth_tests_b_authcb",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_authcb",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790037600000,
+          "finishedAt": 1790038500000
+        },
+        {
+          "id": "r_T_auth_tests_b_auth",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_auth",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790038800000,
+          "finishedAt": 1790039700000
+        },
+        {
+          "id": "r_T_auth_tests_b_authui",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_authui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790040000000,
+          "finishedAt": 1790040900000
+        },
+        {
+          "id": "r_T_auth_ci_b_authcb",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_authcb",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790041200000,
+          "finishedAt": 1790042100000
+        },
+        {
+          "id": "r_T_auth_ci_b_auth",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_auth",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790042400000,
+          "finishedAt": 1790043300000
+        },
+        {
+          "id": "r_T_auth_ci_b_authui",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_authui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790043600000,
+          "finishedAt": 1790044500000
+        },
+        {
+          "id": "r_T_auth_pr_b_authcb",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "pr",
+          "branchId": "b_authcb",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "a7a7",
+          "exitCode": null,
+          "startedAt": 1790044800000,
+          "finishedAt": 1790045700000
+        },
+        {
+          "id": "r_T_auth_pr_b_auth",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "pr",
+          "branchId": "b_auth",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "51cd",
+          "exitCode": null,
+          "startedAt": 1790046000000,
+          "finishedAt": 1790046900000
+        },
+        {
+          "id": "r_T_auth_pr_b_authui",
+          "taskId": "T_auth",
+          "stageId": "impl",
+          "stepId": "pr",
+          "branchId": "b_authui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "d4e7",
+          "exitCode": null,
+          "startedAt": 1790047200000,
+          "finishedAt": 1790048100000
+        }
+      ],
+      "createdAt": 1789635600000
+    },
+    {
+      "id": "T_hooks",
+      "kind": "task",
+      "title": "",
+      "owner": "",
+      "jira": {
+        "key": "API-51",
+        "url": "https://acme.atlassian.net/browse/API-51"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "impl",
+      "currentStage": {
+        "id": "impl",
+        "name": "Implement",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "plan",
+            "name": "Plan from spec",
+            "runsOn": "once",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "20m",
+            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
+            "allowedTools": []
+          },
+          {
+            "id": "impl",
+            "name": "Implement",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 1",
+            "timeout": "2h",
+            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
+            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+          },
+          {
+            "id": "tests",
+            "name": "Write tests",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
+            "allowedTools": []
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          },
+          {
+            "id": "pr",
+            "name": "Open PRs",
+            "runsOn": "each repo",
+            "before": "approval",
+            "onFailure": "stop",
+            "timeout": "15m",
+            "prompt": "Open a draft PR for {branch} and link {jira}.",
+            "allowedTools": ["Bash(gh pr *)"]
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "3h",
+      "notes": "",
+      "color": 3,
+      "branchIds": ["b_hooks", "b_hooksretry"],
+      "runs": [
+        {
+          "id": "r_T_hooks_plan_b_hooks",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "plan",
+          "branchId": "b_hooks",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_hooks_impl_b_hooks",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_hooks",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": 1790034900000
+        },
+        {
+          "id": "r_T_hooks_impl_b_hooksretry",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_hooksretry",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": 1790036100000
+        },
+        {
+          "id": "r_T_hooks_tests_b_hooks",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_hooks",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": 1790037300000
+        },
+        {
+          "id": "r_T_hooks_tests_b_hooksretry",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_hooksretry",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790037600000,
+          "finishedAt": 1790038500000
+        },
+        {
+          "id": "r_T_hooks_ci_b_hooks",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_hooks",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790038800000,
+          "finishedAt": 1790039700000
+        },
+        {
+          "id": "r_T_hooks_ci_b_hooksretry",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_hooksretry",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790040000000,
+          "finishedAt": 1790040900000
+        },
+        {
+          "id": "r_T_hooks_pr_b_hooks",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "pr",
+          "branchId": "b_hooks",
+          "attempt": 1,
+          "state": "running",
+          "todo": [1, 3],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "h001",
+          "exitCode": null,
+          "startedAt": 1790041200000,
+          "finishedAt": null
+        },
+        {
+          "id": "r_T_hooks_pr_b_hooksretry",
+          "taskId": "T_hooks",
+          "stageId": "impl",
+          "stepId": "pr",
+          "branchId": "b_hooksretry",
+          "attempt": 1,
+          "state": "running",
+          "todo": [2, 3],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "h002",
+          "exitCode": null,
+          "startedAt": 1790042400000,
+          "finishedAt": null
+        }
+      ],
+      "createdAt": 1789549200000
+    },
+    {
+      "id": "T_search",
+      "kind": "task",
+      "title": "Search v2",
+      "owner": "",
+      "jira": {
+        "key": "SRCH-41",
+        "url": "https://acme.atlassian.net/browse/SRCH-41"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "impl",
+      "currentStage": {
+        "id": "impl",
+        "name": "Implement",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "plan",
+            "name": "Plan from spec",
+            "runsOn": "once",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "20m",
+            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
+            "allowedTools": []
+          },
+          {
+            "id": "impl",
+            "name": "Implement",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 1",
+            "timeout": "2h",
+            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
+            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+          },
+          {
+            "id": "tests",
+            "name": "Write tests",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
+            "allowedTools": []
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          },
+          {
+            "id": "pr",
+            "name": "Open PRs",
+            "runsOn": "each repo",
+            "before": "approval",
+            "onFailure": "stop",
+            "timeout": "15m",
+            "prompt": "Open a draft PR for {branch} and link {jira}.",
+            "allowedTools": ["Bash(gh pr *)"]
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "3d",
+      "notes": "",
+      "color": 4,
+      "branchIds": ["b_search", "b_searchui"],
+      "runs": [
+        {
+          "id": "r_T_search_plan_b_search",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "plan",
+          "branchId": "b_search",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_search_impl_b_search",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_search",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": 1790034900000
+        },
+        {
+          "id": "r_T_search_impl_b_searchui",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_searchui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": 1790036100000
+        },
+        {
+          "id": "r_T_search_tests_b_search",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_search",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": 1790037300000
+        },
+        {
+          "id": "r_T_search_tests_b_searchui",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_searchui",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790037600000,
+          "finishedAt": 1790038500000
+        },
+        {
+          "id": "r_T_search_ci_b_search",
+          "taskId": "T_search",
+          "stageId": "impl",
+          "stepId": "ci",
+          "branchId": "b_search",
+          "attempt": 1,
+          "state": "running",
+          "todo": [4, 6],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "5e3a",
+          "exitCode": null,
+          "startedAt": 1790038800000,
+          "finishedAt": null
+        }
+      ],
+      "createdAt": 1789462800000
+    },
+    {
+      "id": "T_notif",
+      "kind": "task",
+      "title": "In-app notifications",
+      "owner": "",
+      "jira": null,
+      "githubUrl": "",
+      "workflowId": "bugfix",
+      "stageId": "fix",
+      "currentStage": {
+        "id": "fix",
+        "name": "Fix",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "repro",
+            "name": "Reproduce with a failing test",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "30m",
+            "prompt": "Reproduce {jira} with a failing test on {branch}.",
+            "allowedTools": []
+          },
+          {
+            "id": "fix",
+            "name": "Fix",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 1",
+            "timeout": "1h",
+            "prompt": "Make the failing test pass with the smallest change.",
+            "allowedTools": ["Bash(npm test)"]
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 2",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          },
+          {
+            "id": "pr",
+            "name": "Open PR",
+            "runsOn": "each repo",
+            "before": "approval",
+            "onFailure": "stop",
+            "timeout": "15m",
+            "prompt": "Open a draft PR for {branch} and link {jira}.",
+            "allowedTools": []
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "2h",
+      "notes": "",
+      "color": 5,
+      "branchIds": ["b_notif"],
+      "runs": [
+        {
+          "id": "r_T_notif_repro_b_notif",
+          "taskId": "T_notif",
+          "stageId": "fix",
+          "stepId": "repro",
+          "branchId": "b_notif",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_notif_fix_b_notif",
+          "taskId": "T_notif",
+          "stageId": "fix",
+          "stepId": "fix",
+          "branchId": "b_notif",
+          "attempt": 1,
+          "state": "running",
+          "todo": [1, 4],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "71b0",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": null
+        }
+      ],
+      "createdAt": 1789376400000
+    },
+    {
+      "id": "T_deps",
+      "kind": "task",
+      "title": "Monthly dependency updates",
+      "owner": "",
+      "jira": null,
+      "githubUrl": "",
+      "workflowId": "chore",
+      "stageId": "update",
+      "currentStage": {
+        "id": "update",
+        "name": "Update",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "update",
+            "name": "Apply the change",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "1h",
+            "prompt": "Apply the change described in the task on {branch}.",
+            "allowedTools": []
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 2",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "1h",
+      "notes": "",
+      "color": 6,
+      "branchIds": ["b_deps"],
+      "runs": [
+        {
+          "id": "r_T_deps_update_b_deps",
+          "taskId": "T_deps",
+          "stageId": "update",
+          "stepId": "update",
+          "branchId": "b_deps",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_deps_ci_b_deps",
+          "taskId": "T_deps",
+          "stageId": "update",
+          "stepId": "ci",
+          "branchId": "b_deps",
+          "attempt": 1,
+          "state": "running",
+          "todo": [3, 5],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "aa12",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": null
+        }
+      ],
+      "createdAt": 1789290000000
+    },
+    {
+      "id": "T_push",
+      "kind": "task",
+      "title": "",
+      "owner": "",
+      "jira": {
+        "key": "MOB-17",
+        "url": "https://acme.atlassian.net/browse/MOB-17"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "impl",
+      "currentStage": {
+        "id": "impl",
+        "name": "Implement",
+        "kind": "agent",
+        "status": "In progress",
+        "session": false,
+        "prompt": "",
+        "steps": [
+          {
+            "id": "plan",
+            "name": "Plan from spec",
+            "runsOn": "once",
+            "before": "auto",
+            "onFailure": "stop",
+            "timeout": "20m",
+            "prompt": "Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.",
+            "allowedTools": []
+          },
+          {
+            "id": "impl",
+            "name": "Implement",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "retry 1",
+            "timeout": "2h",
+            "prompt": "Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.",
+            "allowedTools": ["Bash(pnpm *)", "Bash(git *)"]
+          },
+          {
+            "id": "tests",
+            "name": "Write tests",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.",
+            "allowedTools": []
+          },
+          {
+            "id": "ci",
+            "name": "Make CI green",
+            "runsOn": "each repo",
+            "before": "auto",
+            "onFailure": "back:impl",
+            "timeout": "1h",
+            "prompt": "Run the checks for {branch}. Fix failures until they pass.",
+            "allowedTools": []
+          },
+          {
+            "id": "pr",
+            "name": "Open PRs",
+            "runsOn": "each repo",
+            "before": "approval",
+            "onFailure": "stop",
+            "timeout": "15m",
+            "prompt": "Open a draft PR for {branch} and link {jira}.",
+            "allowedTools": ["Bash(gh pr *)"]
+          }
+        ],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "2h",
+      "notes": "",
+      "color": 7,
+      "branchIds": ["b_pushapi", "b_push"],
+      "runs": [
+        {
+          "id": "r_T_push_plan_b_pushapi",
+          "taskId": "T_push",
+          "stageId": "impl",
+          "stepId": "plan",
+          "branchId": "b_pushapi",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790032800000,
+          "finishedAt": 1790033700000
+        },
+        {
+          "id": "r_T_push_impl_b_pushapi",
+          "taskId": "T_push",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_pushapi",
+          "attempt": 1,
+          "state": "done",
+          "todo": null,
+          "loops": 0,
+          "note": "",
+          "summary": "Completed.",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790034000000,
+          "finishedAt": 1790034900000
+        },
+        {
+          "id": "r_T_push_impl_b_push",
+          "taskId": "T_push",
+          "stageId": "impl",
+          "stepId": "impl",
+          "branchId": "b_push",
+          "attempt": 1,
+          "state": "running",
+          "todo": [3, 5],
+          "loops": 1,
+          "note": "sent back by Write tests: 2 failing tests in Push.test.tsx",
+          "summary": "",
+          "sessionId": "m7m7",
+          "exitCode": null,
+          "startedAt": 1790035200000,
+          "finishedAt": null
+        },
+        {
+          "id": "r_T_push_tests_b_pushapi",
+          "taskId": "T_push",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_pushapi",
+          "attempt": 1,
+          "state": "running",
+          "todo": [5, 8],
+          "loops": 0,
+          "note": "",
+          "summary": "",
+          "sessionId": "p0p0",
+          "exitCode": null,
+          "startedAt": 1790036400000,
+          "finishedAt": null
+        },
+        {
+          "id": "r_T_push_tests_b_push",
+          "taskId": "T_push",
+          "stageId": "impl",
+          "stepId": "tests",
+          "branchId": "b_push",
+          "attempt": 1,
+          "state": "back",
+          "todo": null,
+          "loops": 0,
+          "note": "2 failing tests → back to Implement (1 of 3)",
+          "summary": "",
+          "sessionId": "",
+          "exitCode": null,
+          "startedAt": 1790037600000,
+          "finishedAt": 1790038500000
+        }
+      ],
+      "createdAt": 1789203600000
+    },
+    {
+      "id": "T_alerts",
+      "kind": "task",
+      "title": "Usage alerts by email",
+      "owner": "",
+      "jira": {
+        "key": "PAY-130",
+        "url": "https://acme.atlassian.net/browse/PAY-130"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "spec",
+      "currentStage": {
+        "id": "spec",
+        "name": "Spec",
+        "kind": "user",
+        "status": "In progress",
+        "session": true,
+        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
+        "steps": [],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "1d",
+      "notes": "",
+      "color": 8,
+      "branchIds": ["d_alerts_api", "d_alerts_web"],
+      "runs": [],
+      "createdAt": 1789117200000
+    },
+    {
+      "id": "T_csv",
+      "kind": "task",
+      "title": "",
+      "owner": "",
+      "jira": {
+        "key": "PAY-121",
+        "url": "https://acme.atlassian.net/browse/PAY-121"
+      },
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "spec",
+      "currentStage": {
+        "id": "spec",
+        "name": "Spec",
+        "kind": "user",
+        "status": "In progress",
+        "session": true,
+        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
+        "steps": [],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "4h",
+      "notes": "Reuse the invoice line items from usage billing.",
+      "color": 9,
+      "branchIds": ["d_csv_api", "d_csv_web"],
+      "runs": [],
+      "createdAt": 1789030800000
+    },
+    {
+      "id": "R_sara",
+      "kind": "review",
+      "title": "",
+      "owner": "sara",
+      "jira": null,
+      "githubUrl": "",
+      "workflowId": "",
+      "stageId": "",
+      "currentStage": null,
+      "est": "",
+      "notes": "",
+      "color": 10,
+      "branchIds": ["b_sara"],
+      "runs": [],
+      "createdAt": 1788944400000
+    },
+    {
+      "id": "R_li",
+      "kind": "review",
+      "title": "",
+      "owner": "li",
+      "jira": null,
+      "githubUrl": "",
+      "workflowId": "",
+      "stageId": "",
+      "currentStage": null,
+      "est": "",
+      "notes": "",
+      "color": 11,
+      "branchIds": ["b_li"],
+      "runs": [],
+      "createdAt": 1788858000000
+    },
+    {
+      "id": "T_spike",
+      "kind": "parked",
+      "title": "Header redesign spike",
+      "owner": "",
+      "jira": null,
+      "githubUrl": "",
+      "workflowId": "standard",
+      "stageId": "spec",
+      "currentStage": {
+        "id": "spec",
+        "name": "Spec",
+        "kind": "user",
+        "status": "In progress",
+        "session": true,
+        "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
+        "steps": [],
+        "command": "",
+        "runsOn": "",
+        "onFailure": "",
+        "timeout": ""
+      },
+      "est": "1d",
+      "notes": "",
+      "color": 12,
+      "branchIds": ["b_spike"],
+      "runs": [],
+      "createdAt": 1788771600000
+    }
+  ],
+  "branches": [
+    {
+      "id": "b_cart",
+      "taskId": "T_cart",
+      "codeRepoId": "repo-web-app",
+      "name": "fix/cart-flaky",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "4be21c9",
+      "ahead": 1,
+      "behind": 0,
+      "upstream": "origin/fix/cart-flaky",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": true,
+      "mergedAt": 1789894800000,
+      "worktree": "~/wt/web-app/cart-flaky",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "merged",
+          "note": "",
+          "recorded": true
+        }
+      ],
+      "deployments": [
+        {
+          "env": "staging",
+          "deployedSha": "a91f2c0",
+          "checkedAt": 1790067300000,
+          "status": "deployed",
+          "missingCommits": 0,
+          "note": "",
+          "error": ""
+        },
+        {
+          "env": "prod",
+          "deployedSha": "a91f2c0",
+          "checkedAt": 1790067300000,
+          "status": "deployed",
+          "missingCommits": 0,
+          "note": "",
+          "error": ""
+        }
+      ],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/cart/cart.test.ts",
+          "added": 14,
+          "deleted": 9,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "4be21c9",
+          "message": "Use fake timers in cart test"
+        }
+      ],
+      "commitCount": 1,
+      "dirty": [],
+      "lastCommitAt": 1790064000000,
+      "addedAt": 1789894800000
+    },
+    {
+      "id": "b_bill",
+      "taskId": "T_bill",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/usage-billing",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "6b2c8e9",
+      "ahead": 5,
+      "behind": 0,
+      "upstream": "origin/feat/usage-billing",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/usage-billing",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/payments/client.ts",
+          "added": 40,
+          "deleted": 12,
+          "binary": false
+        },
+        {
+          "path": "src/payments/invoice.ts",
+          "added": 95,
+          "deleted": 8,
+          "binary": false
+        },
+        {
+          "path": "src/metering/usage.ts",
+          "added": 132,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "0de4f71",
+          "message": "Meter API usage per workspace"
+        },
+        {
+          "sha": "6b2c8e9",
+          "message": "Invoice line items from usage"
+        }
+      ],
+      "commitCount": 5,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/payments/invoice.ts"
+        }
+      ],
+      "lastCommitAt": 1790061780000,
+      "addedAt": 1789808400000
+    },
+    {
+      "id": "b_billdash",
+      "taskId": "T_bill",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/billing-dashboard",
+      "kind": "mine",
+      "owner": "",
+      "base": "feat/usage-billing",
+      "baseBranchId": "b_bill",
+      "baseOwner": "",
+      "tip": "b4402df",
+      "ahead": 3,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/billing-dashboard",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/ui/billing/Dashboard.tsx",
+          "added": 210,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/ui/nav/Sidebar.tsx",
+          "added": 6,
+          "deleted": 1,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "7e1c0aa",
+          "message": "Usage chart"
+        },
+        {
+          "sha": "b4402df",
+          "message": "Upcoming invoice card"
+        }
+      ],
+      "commitCount": 3,
+      "dirty": [],
+      "lastCommitAt": 1790059560000,
+      "addedAt": 1789722000000
+    },
+    {
+      "id": "b_meter",
+      "taskId": "T_bill",
+      "codeRepoId": "repo-api",
+      "name": "feat/usage-metering",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "33cc44d",
+      "ahead": 4,
+      "behind": 0,
+      "upstream": "origin/feat/usage-metering",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/api/usage-metering",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "merged",
+          "note": "",
+          "recorded": false
+        },
+        {
+          "target": "staging",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [
+        {
+          "env": "staging",
+          "deployedSha": "33cc44d",
+          "checkedAt": 1790067300000,
+          "status": "deployed",
+          "missingCommits": 0,
+          "note": "",
+          "error": ""
+        }
+      ],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/metering/store.ts",
+          "added": 120,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/routes/usage.ts",
+          "added": 64,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "11aa22b",
+          "message": "Metering table"
+        },
+        {
+          "sha": "33cc44d",
+          "message": "Usage endpoint"
+        }
+      ],
+      "commitCount": 4,
+      "dirty": [],
+      "lastCommitAt": 1790057340000,
+      "addedAt": 1789635600000
+    },
+    {
+      "id": "b_auth",
+      "taskId": "T_auth",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/oauth-login",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "1f8e6aa",
+      "ahead": 7,
+      "behind": 3,
+      "upstream": "origin/feat/oauth-login",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/oauth-login",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "stale",
+          "note": "2 commits since it was merged",
+          "recorded": false
+        }
+      ],
+      "deployments": [
+        {
+          "env": "preview",
+          "deployedSha": "9bc0f13",
+          "checkedAt": 1790067300000,
+          "status": "stale",
+          "missingCommits": 2,
+          "note": "preview runs 9bc0f13, from before the last 2 commits",
+          "error": ""
+        }
+      ],
+      "conflictsIfRebased": ["src/auth/session.ts"],
+      "files": [
+        {
+          "path": "src/auth/oauth.ts",
+          "added": 214,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/auth/session.ts",
+          "added": 19,
+          "deleted": 6,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "e41a7d2",
+          "message": "Add OAuth provider config"
+        },
+        {
+          "sha": "9bc0f13",
+          "message": "Callback route + token exchange"
+        },
+        {
+          "sha": "1f8e6aa",
+          "message": "Persist refresh tokens"
+        }
+      ],
+      "commitCount": 7,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/auth/tokens.ts"
+        },
+        {
+          "code": "??",
+          "path": "src/auth/crypto.ts"
+        }
+      ],
+      "lastCommitAt": 1790055120000,
+      "addedAt": 1789549200000
+    },
+    {
+      "id": "b_authui",
+      "taskId": "T_auth",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/oauth-login-ui",
+      "kind": "mine",
+      "owner": "",
+      "base": "feat/oauth-login",
+      "baseBranchId": "b_auth",
+      "baseOwner": "",
+      "tip": "c7d21e0",
+      "ahead": 4,
+      "behind": 0,
+      "upstream": "origin/feat/oauth-login-ui",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/oauth-login-ui",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/ui/LoginScreen.tsx",
+          "added": 176,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "c7d21e0",
+          "message": "Login screen with provider buttons"
+        }
+      ],
+      "commitCount": 4,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/ui/LoginScreen.tsx"
+        }
+      ],
+      "lastCommitAt": 1790052900000,
+      "addedAt": 1789462800000
+    },
+    {
+      "id": "b_authcb",
+      "taskId": "T_auth",
+      "codeRepoId": "repo-api",
+      "name": "feat/oauth-callback",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "aa01bb2",
+      "ahead": 3,
+      "behind": 0,
+      "upstream": "origin/feat/oauth-callback",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/api/oauth-callback",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "merged",
+          "note": "",
+          "recorded": true
+        },
+        {
+          "target": "staging",
+          "status": "merged",
+          "note": "",
+          "recorded": true
+        }
+      ],
+      "deployments": [
+        {
+          "env": "staging",
+          "deployedSha": "aa01bb2",
+          "checkedAt": 1790067300000,
+          "status": "deployed",
+          "missingCommits": 0,
+          "note": "",
+          "error": ""
+        },
+        {
+          "env": "prod",
+          "deployedSha": "71e0c3a",
+          "checkedAt": 1790067300000,
+          "status": "stale",
+          "missingCommits": 1,
+          "note": "prod runs 71e0c3a: 1 commit of this branch is missing",
+          "error": ""
+        }
+      ],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/auth/callback.ts",
+          "added": 98,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "aa01bb2",
+          "message": "Token exchange endpoint"
+        }
+      ],
+      "commitCount": 3,
+      "dirty": [],
+      "lastCommitAt": 1790050680000,
+      "addedAt": 1789376400000
+    },
+    {
+      "id": "b_hooks",
+      "taskId": "T_hooks",
+      "codeRepoId": "repo-api",
+      "name": "feat/webhooks",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "cc33dd4",
+      "ahead": 4,
+      "behind": 0,
+      "upstream": "origin/feat/webhooks",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/api/webhooks",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "merged",
+          "note": "",
+          "recorded": false
+        },
+        {
+          "target": "staging",
+          "status": "stale",
+          "note": "rebased since it was merged",
+          "recorded": false
+        }
+      ],
+      "deployments": [
+        {
+          "env": "staging",
+          "deployedSha": "cc33dd4",
+          "checkedAt": 1790067300000,
+          "status": "deployed",
+          "missingCommits": 0,
+          "note": "",
+          "error": ""
+        }
+      ],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/hooks/registry.ts",
+          "added": 120,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/hooks/sign.ts",
+          "added": 40,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "aa11bb2",
+          "message": "Webhook registry"
+        },
+        {
+          "sha": "cc33dd4",
+          "message": "Signing"
+        }
+      ],
+      "commitCount": 4,
+      "dirty": [],
+      "lastCommitAt": 1790048460000,
+      "addedAt": 1789290000000
+    },
+    {
+      "id": "b_hooksretry",
+      "taskId": "T_hooks",
+      "codeRepoId": "repo-api",
+      "name": "feat/webhooks-retry",
+      "kind": "mine",
+      "owner": "",
+      "base": "feat/webhooks",
+      "baseBranchId": "b_hooks",
+      "baseOwner": "",
+      "tip": "ee55ff6",
+      "ahead": 2,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/api/webhooks-retry",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        },
+        {
+          "target": "staging",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/hooks/retry.ts",
+          "added": 88,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "ee55ff6",
+          "message": "Exponential backoff"
+        }
+      ],
+      "commitCount": 2,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/hooks/retry.ts"
+        }
+      ],
+      "lastCommitAt": 1790046240000,
+      "addedAt": 1789203600000
+    },
+    {
+      "id": "b_sara",
+      "taskId": "R_sara",
+      "codeRepoId": "repo-web-app",
+      "name": "sara/payments-refactor",
+      "kind": "review",
+      "owner": "sara",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "f02b9c4",
+      "ahead": 9,
+      "behind": 1,
+      "upstream": "origin/sara/payments-refactor",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/payments-refactor",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/payments/client.ts",
+          "added": 120,
+          "deleted": 96,
+          "binary": false
+        },
+        {
+          "path": "src/payments/invoice.ts",
+          "added": 44,
+          "deleted": 51,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "f02b9c4",
+          "message": "Split payment client into adapters"
+        }
+      ],
+      "commitCount": 9,
+      "dirty": [],
+      "lastCommitAt": 1790044020000,
+      "addedAt": 1789117200000
+    },
+    {
+      "id": "b_li",
+      "taskId": "R_li",
+      "codeRepoId": "repo-web-app",
+      "name": "li/search-schema",
+      "kind": "review",
+      "owner": "li",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "9f1a2b3",
+      "ahead": 4,
+      "behind": 0,
+      "upstream": "origin/li/search-schema",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/search-schema",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/search/schema.ts",
+          "added": 88,
+          "deleted": 40,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "9f1a2b3",
+          "message": "Schema v2 + migration"
+        }
+      ],
+      "commitCount": 4,
+      "dirty": [],
+      "lastCommitAt": 1790041800000,
+      "addedAt": 1789030800000
+    },
+    {
+      "id": "b_search",
+      "taskId": "T_search",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/search-index",
+      "kind": "mine",
+      "owner": "",
+      "base": "li/search-schema",
+      "baseBranchId": "b_li",
+      "baseOwner": "li",
+      "tip": "c2a7b95",
+      "ahead": 6,
+      "behind": 0,
+      "upstream": "origin/feat/search-index",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/search-index",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/search/indexer.ts",
+          "added": 160,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/search/schema.ts",
+          "added": 6,
+          "deleted": 2,
+          "binary": false
+        },
+        {
+          "path": "package.json",
+          "added": 1,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "3d8e1f0",
+          "message": "Write hook"
+        },
+        {
+          "sha": "c2a7b95",
+          "message": "Backfill job"
+        }
+      ],
+      "commitCount": 6,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/search/backfill.ts"
+        }
+      ],
+      "lastCommitAt": 1790039580000,
+      "addedAt": 1788944400000
+    },
+    {
+      "id": "b_searchui",
+      "taskId": "T_search",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/search-ui",
+      "kind": "mine",
+      "owner": "",
+      "base": "feat/search-index",
+      "baseBranchId": "b_search",
+      "baseOwner": "",
+      "tip": "625f736",
+      "ahead": 0,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/search-ui",
+      "setup": {
+        "state": "failed",
+        "startedAt": 1790067000000,
+        "finishedAt": 1790067072000,
+        "exitCode": 1
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/ui/search/Results.tsx",
+          "added": 40,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [],
+      "commitCount": 0,
+      "dirty": [],
+      "lastCommitAt": null,
+      "addedAt": 1788858000000
+    },
+    {
+      "id": "b_notif",
+      "taskId": "T_notif",
+      "codeRepoId": "repo-web-app",
+      "name": "feat/notifications",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "5c9d0e1",
+      "ahead": 4,
+      "behind": 0,
+      "upstream": "origin/feat/notifications",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/notifications",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/notifications/model.ts",
+          "added": 72,
+          "deleted": 0,
+          "binary": false
+        },
+        {
+          "path": "src/ui/nav/Sidebar.tsx",
+          "added": 3,
+          "deleted": 1,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "5c9d0e1",
+          "message": "Notifications model"
+        }
+      ],
+      "commitCount": 4,
+      "dirty": [],
+      "lastCommitAt": 1790035140000,
+      "addedAt": 1788771600000
+    },
+    {
+      "id": "b_deps",
+      "taskId": "T_deps",
+      "codeRepoId": "repo-web-app",
+      "name": "chore/deps-bump",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "0f9e8d7",
+      "ahead": 1,
+      "behind": 0,
+      "upstream": "origin/chore/deps-bump",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/deps-bump",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "package.json",
+          "added": 23,
+          "deleted": 23,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "0f9e8d7",
+          "message": "Bump 23 packages"
+        }
+      ],
+      "commitCount": 1,
+      "dirty": [],
+      "lastCommitAt": 1790032920000,
+      "addedAt": 1788685200000
+    },
+    {
+      "id": "b_push",
+      "taskId": "T_push",
+      "codeRepoId": "repo-mobile",
+      "name": "feat/mob-17-push-notification-settings-quiet-hours-and-digests",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "abab123",
+      "ahead": 2,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/mobile/mob-17-push-notification-settings-quiet-hours-and-digests",
+      "setup": {
+        "state": "running",
+        "startedAt": 1790067000000,
+        "finishedAt": null,
+        "exitCode": null
+      },
+      "integration": [],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "app/settings/Push.tsx",
+          "added": 140,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "abab123",
+          "message": "Settings screen"
+        }
+      ],
+      "commitCount": 2,
+      "dirty": [],
+      "lastCommitAt": 1790030700000,
+      "addedAt": 1788598800000
+    },
+    {
+      "id": "b_pushapi",
+      "taskId": "T_push",
+      "codeRepoId": "repo-api",
+      "name": "feat/push-tokens",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "9090aaa",
+      "ahead": 2,
+      "behind": 0,
+      "upstream": "origin/feat/push-tokens",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/api/push-tokens",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "merged",
+          "note": "",
+          "recorded": false
+        },
+        {
+          "target": "staging",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/push/tokens.ts",
+          "added": 70,
+          "deleted": 0,
+          "binary": false
+        }
+      ],
+      "commits": [
+        {
+          "sha": "9090aaa",
+          "message": "Device token table"
+        }
+      ],
+      "commitCount": 2,
+      "dirty": [],
+      "lastCommitAt": 1790028480000,
+      "addedAt": 1788512400000
+    },
+    {
+      "id": "b_spike",
+      "taskId": "T_spike",
+      "codeRepoId": "repo-web-app",
+      "name": "spike/header-redesign",
+      "kind": "parked",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "625f737",
+      "ahead": 6,
+      "behind": 3,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "~/wt/web-app/header-redesign",
+      "setup": {
+        "state": "ready",
+        "startedAt": 1789894800000,
+        "finishedAt": 1789894890000,
+        "exitCode": 0
+      },
+      "integration": [
+        {
+          "target": "develop",
+          "status": "not merged",
+          "note": "",
+          "recorded": false
+        }
+      ],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [
+        {
+          "path": "src/ui/Header.tsx",
+          "added": 120,
+          "deleted": 80,
+          "binary": false
+        }
+      ],
+      "commits": [],
+      "commitCount": 6,
+      "dirty": [
+        {
+          "code": "M",
+          "path": "src/ui/Header.tsx"
+        }
+      ],
+      "lastCommitAt": null,
+      "addedAt": 1788426000000
+    },
+    {
+      "id": "d_alerts_api",
+      "taskId": "T_alerts",
+      "codeRepoId": "repo-api",
+      "name": "",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "",
+      "ahead": 0,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "",
+      "setup": null,
+      "integration": [],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [],
+      "commits": [],
+      "commitCount": 0,
+      "dirty": [],
+      "lastCommitAt": null,
+      "addedAt": 1790065800000
+    },
+    {
+      "id": "d_alerts_web",
+      "taskId": "T_alerts",
+      "codeRepoId": "repo-web-app",
+      "name": "",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "",
+      "ahead": 0,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "",
+      "setup": null,
+      "integration": [],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [],
+      "commits": [],
+      "commitCount": 0,
+      "dirty": [],
+      "lastCommitAt": null,
+      "addedAt": 1790065800000
+    },
+    {
+      "id": "d_csv_api",
+      "taskId": "T_csv",
+      "codeRepoId": "repo-api",
+      "name": "",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "",
+      "ahead": 0,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "",
+      "setup": null,
+      "integration": [],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [],
+      "commits": [],
+      "commitCount": 0,
+      "dirty": [],
+      "lastCommitAt": null,
+      "addedAt": 1790065800000
+    },
+    {
+      "id": "d_csv_web",
+      "taskId": "T_csv",
+      "codeRepoId": "repo-web-app",
+      "name": "",
+      "kind": "mine",
+      "owner": "",
+      "base": "main",
+      "baseBranchId": "",
+      "baseOwner": "",
+      "tip": "",
+      "ahead": 0,
+      "behind": 0,
+      "upstream": "",
+      "upstreamAhead": 0,
+      "upstreamBehind": 0,
+      "mergedIntoMain": false,
+      "mergedAt": null,
+      "worktree": "",
+      "setup": null,
+      "integration": [],
+      "deployments": [],
+      "conflictsIfRebased": [],
+      "files": [],
+      "commits": [],
+      "commitCount": 0,
+      "dirty": [],
+      "lastCommitAt": null,
+      "addedAt": 1790065800000
+    }
+  ],
+  "plan": {
+    "day": {
+      "T_cart": "2026-09-21",
+      "T_bill": "2026-09-22",
+      "T_auth": "2026-09-23",
+      "T_hooks": "2026-09-28",
+      "T_search": "2026-09-24",
+      "T_notif": "2026-09-24",
+      "T_deps": "2026-09-25",
+      "T_push": "2026-09-25",
+      "T_alerts": "2026-09-29",
+      "T_csv": "2026-09-30"
+    },
+    "order": [
+      "T_cart",
+      "T_bill",
+      "T_auth",
+      "T_hooks",
+      "T_search",
+      "T_notif",
+      "T_deps",
+      "T_push",
+      "T_alerts",
+      "T_csv",
+      "T_spike"
+    ],
+    "queuedAfter": {},
+    "unpushed": {}
+  },
+  "pairs": [
+    {
+      "a": "b_bill",
+      "b": "b_sara",
+      "shared": ["src/payments/client.ts"],
+      "conflicts": []
+    }
+  ],
+  "history": [
+    {
+      "taskId": "H_1",
+      "title": "Audit log for admin actions",
+      "codeRepoIds": ["repo-web-app", "repo-api"],
+      "mergedAt": 1789981200000,
+      "archivedAt": 1789981200000
+    },
+    {
+      "taskId": "H_2",
+      "title": "Fix login redirect loop",
+      "codeRepoIds": ["repo-web-app"],
+      "mergedAt": 1789722000000,
+      "archivedAt": 1789722000000
+    },
+    {
+      "taskId": "H_3",
+      "title": "Pagination cursor",
+      "codeRepoIds": ["repo-api"],
+      "mergedAt": 1789722000000,
+      "archivedAt": 1789722000000
+    },
+    {
+      "taskId": "H_4",
+      "title": "Team invites",
+      "codeRepoIds": ["repo-web-app", "repo-api", "repo-mobile"],
+      "mergedAt": 1789549200000,
+      "archivedAt": 1789549200000
+    },
+    {
+      "taskId": "H_5",
+      "title": "Old search spike",
+      "codeRepoIds": ["repo-web-app"],
+      "mergedAt": null,
+      "archivedAt": 1789030800000
+    }
+  ],
+  "repos": [
+    {
+      "codeRepoId": "repo-web-app",
+      "mainName": "main",
+      "remote": "origin",
+      "lastFetchAt": 1790067360000
+    },
+    {
+      "codeRepoId": "repo-api",
+      "mainName": "main",
+      "remote": "origin",
+      "lastFetchAt": 1790066880000
+    },
+    {
+      "codeRepoId": "repo-mobile",
+      "mainName": "main",
+      "remote": "origin",
+      "lastFetchAt": 1790064000000
+    }
+  ],
+  "worktreeBasePath": "~/wt",
+  "autofetchMinutes": 5
+}

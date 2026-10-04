@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "id": "i1",
+      "text": "Rate limit the export endpoint per workspace",
+      "addedAt": 1790065800000,
+      "jira": {
+        "key": "PAY-140",
+        "url": "https://acme.atlassian.net/browse/PAY-140"
+      },
+      "githubUrl": "",
+      "notes": ""
+    },
+    {
+      "id": "i2",
+      "text": "Look at flaky e2e on Safari",
+      "addedAt": 1789981200000,
+      "jira": null,
+      "githubUrl": "https://github.com/acme/web-app/issues/882",
+      "notes": ""
+    },
+    {
+      "id": "i3",
+      "text": "Ask Dana about the onboarding copy deadline",
+      "addedAt": 1789894800000,
+      "jira": null,
+      "githubUrl": "",
+      "notes": ""
+    },
+    {
+      "id": "i4",
+      "text": "Dark mode for the billing dashboard?",
+      "addedAt": 1789635600000,
+      "jira": null,
+      "githubUrl": "",
+      "notes": ""
+    }
+  ]
+}

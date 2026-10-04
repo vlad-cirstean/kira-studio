@@ -1,0 +1,32 @@
+{
+  "id": "T_csv",
+  "kind": "task",
+  "title": "",
+  "owner": "",
+  "jira": {
+    "key": "PAY-121",
+    "url": "https://acme.atlassian.net/browse/PAY-121"
+  },
+  "githubUrl": "",
+  "workflowId": "standard",
+  "stageId": "spec",
+  "currentStage": {
+    "id": "spec",
+    "name": "Spec",
+    "kind": "user",
+    "status": "In progress",
+    "session": true,
+    "prompt": "Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.",
+    "steps": [],
+    "command": "",
+    "runsOn": "",
+    "onFailure": "",
+    "timeout": ""
+  },
+  "est": "4h",
+  "notes": "Reuse the invoice line items from usage billing.",
+  "color": 9,
+  "branchIds": ["d_csv_api", "d_csv_web"],
+  "runs": [],
+  "createdAt": 1789030800000
+}

@@ -1,0 +1,105 @@
+{
+  "repos": [
+    {
+      "codeRepoId": "repo-web-app",
+      "name": "acme-customer-dashboard-web-frontend",
+      "nickname": "web-app",
+      "path": "~/code/acme/acme-customer-dashboard-web-frontend",
+      "source": "~/code/acme",
+      "usedByTasks": true,
+      "integrationBranches": ["develop"],
+      "prepareScript": "pnpm install --frozen-lockfile\ncp .env.example .env.local",
+      "prepareTimeout": "10m",
+      "environments": [
+        {
+          "name": "preview",
+          "deployedShaScript": "vercel inspect \"$PREVIEW_URL\" --json | jq -r .meta.githubCommitSha"
+        },
+        {
+          "name": "staging",
+          "deployedShaScript": "curl -s https://staging.acme.dev/version | jq -r .sha"
+        },
+        {
+          "name": "prod",
+          "deployedShaScript": "curl -s https://acme.dev/version | jq -r .sha"
+        }
+      ]
+    },
+    {
+      "codeRepoId": "repo-api",
+      "name": "acme-platform-core-api-service",
+      "nickname": "api",
+      "path": "~/code/acme/acme-platform-core-api-service",
+      "source": "~/code/acme",
+      "usedByTasks": true,
+      "integrationBranches": ["develop", "staging"],
+      "prepareScript": "go mod download\nmake db-local",
+      "prepareTimeout": "15m",
+      "environments": [
+        {
+          "name": "staging",
+          "deployedShaScript": "kubectl -n staging get deploy api -o jsonpath=\"{.metadata.labels.git-sha}\""
+        },
+        {
+          "name": "prod",
+          "deployedShaScript": "kubectl -n prod get deploy api -o jsonpath=\"{.metadata.labels.git-sha}\""
+        }
+      ]
+    },
+    {
+      "codeRepoId": "repo-mobile",
+      "name": "acme-mobile-react-native-app",
+      "nickname": "mobile",
+      "path": "~/code/acme/acme-mobile-react-native-app",
+      "source": "~/code/acme",
+      "usedByTasks": true,
+      "integrationBranches": [],
+      "prepareScript": "yarn install --immutable\nnpx pod-install",
+      "prepareTimeout": "20m",
+      "environments": []
+    },
+    {
+      "codeRepoId": "repo-infra",
+      "name": "acme-terraform-infrastructure-live",
+      "nickname": "infra",
+      "path": "~/code/acme/acme-terraform-infrastructure-live",
+      "source": "~/code/acme",
+      "usedByTasks": false,
+      "integrationBranches": [],
+      "prepareScript": "",
+      "prepareTimeout": "10m",
+      "environments": []
+    },
+    {
+      "codeRepoId": "repo-docs",
+      "name": "acme-public-documentation-site",
+      "nickname": "docs",
+      "path": "~/code/acme/acme-public-documentation-site",
+      "source": "~/code/acme",
+      "usedByTasks": false,
+      "integrationBranches": [],
+      "prepareScript": "",
+      "prepareTimeout": "10m",
+      "environments": []
+    },
+    {
+      "codeRepoId": "repo-dotfiles",
+      "name": "dotfiles",
+      "nickname": "",
+      "path": "~/dotfiles",
+      "source": "added",
+      "usedByTasks": false,
+      "integrationBranches": [],
+      "prepareScript": "",
+      "prepareTimeout": "10m",
+      "environments": []
+    }
+  ],
+  "folders": [
+    {
+      "path": "~/code/acme",
+      "watch": true,
+      "repoCount": 5
+    }
+  ]
+}

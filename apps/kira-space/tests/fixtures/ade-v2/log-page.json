@@ -1,0 +1,39 @@
+{
+  "kind": "setup",
+  "id": "b_searchui",
+  "chunks": [
+    {
+      "seq": 1,
+      "at": 1790066880000,
+      "stream": "stdout",
+      "text": "$ pnpm install --frozen-lockfile\n"
+    },
+    {
+      "seq": 2,
+      "at": 1790066881000,
+      "stream": "stdout",
+      "text": "Lockfile is up to date, resolution step is skipped\n"
+    },
+    {
+      "seq": 3,
+      "at": 1790066882000,
+      "stream": "stdout",
+      "text": "Packages: +1412\n"
+    },
+    {
+      "seq": 4,
+      "at": 1790066883000,
+      "stream": "stderr",
+      "text": "ERR_PNPM_FETCH_404  GET https://npm.acme.dev/@acme%2fsearch-sdk: Not Found - 404\n"
+    },
+    {
+      "seq": 5,
+      "at": 1790066884000,
+      "stream": "event",
+      "text": "exit code 1\n"
+    }
+  ],
+  "nextSeq": 6,
+  "done": true,
+  "truncated": false
+}

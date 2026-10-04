@@ -1,0 +1,68 @@
+{
+  "task": {
+    "id": "R_omar",
+    "kind": "review",
+    "title": "",
+    "owner": "omar",
+    "jira": null,
+    "githubUrl": "",
+    "workflowId": "",
+    "stageId": "",
+    "currentStage": null,
+    "est": "",
+    "notes": "",
+    "color": 13,
+    "branchIds": ["p_rate"],
+    "runs": [],
+    "createdAt": 1790067540000
+  },
+  "branch": {
+    "id": "p_rate",
+    "taskId": "R_omar",
+    "codeRepoId": "repo-web-app",
+    "name": "omar/rate-limits",
+    "kind": "review",
+    "owner": "omar",
+    "base": "main",
+    "baseBranchId": "",
+    "baseOwner": "",
+    "tip": "7a1c9e2",
+    "ahead": 3,
+    "behind": 0,
+    "upstream": "origin/omar/rate-limits",
+    "upstreamAhead": 0,
+    "upstreamBehind": 0,
+    "mergedIntoMain": false,
+    "mergedAt": null,
+    "worktree": "",
+    "setup": null,
+    "integration": [
+      {
+        "target": "develop",
+        "status": "not merged",
+        "note": "",
+        "recorded": false
+      }
+    ],
+    "deployments": [],
+    "conflictsIfRebased": [],
+    "files": [
+      {
+        "path": "src/api/limits.ts",
+        "added": 140,
+        "deleted": 0,
+        "binary": false
+      }
+    ],
+    "commits": [
+      {
+        "sha": "7a1c9e2",
+        "message": "Rate limits per workspace"
+      }
+    ],
+    "commitCount": 3,
+    "dirty": [],
+    "lastCommitAt": 1789893600000,
+    "addedAt": 1790067540000
+  }
+}
