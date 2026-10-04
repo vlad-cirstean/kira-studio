@@ -100,15 +100,30 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 			// — a client sending a decomposed repoId must not write settings rows that no entry
 			// ever reads back, nor have repoSettings.changed echo the raw, possibly non-NFC spelling.
 			p.RepoID = gitpath.CleanNFC(p.RepoID)
-			s, err := r.deps.Registry.RepoSettingsSet(p.RepoID, p.Patch.toModel())
+			snapshot, err := r.setRepoSettings(p.RepoID, p.Patch.toModel())
 			if err != nil {
 				return RepoSettingsSnapshot{}, ipcerr.BadRequest("gitrpc: repoSettings.set: " + err.Error())
 			}
-			snapshot := repoSettingsSnapshotFrom(s)
-			r.repoSettingsChanged.Emit(RepoSettingsChangedPayload{RepoID: p.RepoID, Settings: snapshot})
 			return snapshot, nil
 		},
 	)
+}
+
+func (r *Router) setRepoSettings(repoID string, patch model.GitRepoSettingsPatch) (RepoSettingsSnapshot, error) {
+	s, err := r.deps.Registry.RepoSettingsSet(repoID, patch)
+	if err != nil {
+		return RepoSettingsSnapshot{}, err
+	}
+	snapshot := repoSettingsSnapshotFrom(s)
+	r.repoSettingsChanged.Emit(RepoSettingsChangedPayload{RepoID: repoID, Settings: snapshot})
+	return snapshot, nil
+}
+
+// SetRepoSettings is repoSettings.set's write-and-fan-out path for in-process callers (ADE's
+// prepare-timeout leaf), so connected git-ui clients see the change.
+func (r *Router) SetRepoSettings(repoID string, patch model.GitRepoSettingsPatch) error {
+	_, err := r.setRepoSettings(gitpath.CleanNFC(repoID), patch)
+	return err
 }
 
 // handleSettingsSetGitPath is G18 D11's own migration leg: writes kiraSpace.git.path's migrated

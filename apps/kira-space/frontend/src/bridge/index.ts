@@ -346,8 +346,34 @@ const spaceControl = {
     unwrap(AdeTaskService.Workflows()).then((r) => trust<V2.WorkflowsResult>(r)),
   adeTaskRepos: (): Promise<V2.ReposResult> =>
     unwrap(AdeTaskService.Repos()).then((r) => trust<V2.ReposResult>(r)),
+  adeTaskWorkflowYaml: (args: V2.FileNameArgs): Promise<V2.WorkflowYaml> =>
+    unwrap(AdeTaskService.WorkflowYaml(args)).then((r) => trust<V2.WorkflowYaml>(r)),
+  adeTaskValidateWorkflowYaml: (
+    args: V2.ValidateWorkflowYamlArgs,
+  ): Promise<V2.WorkflowValidation> =>
+    unwrap(AdeTaskService.ValidateWorkflowYaml(args)).then((r) => trust<V2.WorkflowValidation>(r)),
+  adeTaskSaveWorkflow: (args: V2.SaveWorkflowArgs): Promise<V2.WorkflowEntry> =>
+    unwrap(AdeTaskService.SaveWorkflow(args)).then((r) => trust<V2.WorkflowEntry>(r)),
+  adeTaskSaveWorkflowYaml: (args: V2.SaveWorkflowYamlArgs): Promise<V2.WorkflowEntry> =>
+    unwrap(AdeTaskService.SaveWorkflowYaml(args)).then((r) => trust<V2.WorkflowEntry>(r)),
+  adeTaskImportWorkflow: (args: V2.ImportWorkflowArgs): Promise<V2.WorkflowEntry> =>
+    unwrap(AdeTaskService.ImportWorkflow(args)).then((r) => trust<V2.WorkflowEntry>(r)),
+  adeTaskNewWorkflow: (args: V2.NewWorkflowArgs): Promise<V2.WorkflowEntry> =>
+    unwrap(AdeTaskService.NewWorkflow(args)).then((r) => trust<V2.WorkflowEntry>(r)),
+  adeTaskUpdateRepo: (args: V2.UpdateRepoArgs): Promise<V2.Repo> =>
+    unwrap(AdeTaskService.UpdateRepo(args)).then((r) => trust<V2.Repo>(r)),
+  adeTaskAddFolder: (args: V2.FolderArgs): Promise<V2.FolderImportResult> =>
+    unwrap(AdeTaskService.AddFolder(args)).then((r) => trust<V2.FolderImportResult>(r)),
+  adeTaskSetFolderWatch: (args: V2.FolderArgs): Promise<V2.Folder> =>
+    unwrap(AdeTaskService.SetFolderWatch(args)).then((r) => trust<V2.Folder>(r)),
+  adeTaskRemoveFolder: (args: V2.PathArgs): Promise<void> =>
+    unwrap(AdeTaskService.RemoveFolder(args)),
+  adeTaskRecordMerge: (args: V2.RecordMergeArgs): Promise<void> =>
+    unwrap(AdeTaskService.RecordMerge(args)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on('kira:adetask:board', cb),
   onAdeTaskBacklog: (cb: () => void): (() => void) => on('kira:adetask:backlog', cb),
+  onAdeTaskWorkflows: (cb: () => void): (() => void) => on('kira:adetask:workflows', cb),
+  onAdeTaskRepos: (cb: () => void): (() => void) => on('kira:adetask:repos', cb),
   onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
     on('kira:adetask:credential', cb),
 };

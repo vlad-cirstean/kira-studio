@@ -151,6 +151,7 @@ func main() {
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
 	adeTaskBoard := wireAdeTask(repositories, events, git)
+	adeTaskBoard.Start()
 	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry, Queue: adeQueue}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -454,6 +455,11 @@ func wireAdeTask(repositories *repos.Repos, events *bridge.Events, git gitWired)
 		Workflows:        &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
 		OnBoard:          func() { bridge.AdeTaskBoardChanged(events) },
 		OnBacklog:        func() { bridge.AdeTaskBacklogChanged(events) },
+		OnWorkflows:      func() { bridge.AdeTaskWorkflowsChanged(events) },
+		OnRepos:          func() { bridge.AdeTaskReposChanged(events) },
+		Facts:            repositories.AdeFacts,
+		Runner:           git.runner,
+		SetRepoSettings:  git.router.SetRepoSettings,
 		OnCredential:     func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
 		AutofetchMinutes: adeAutofetchMinutes(repositories),
 		HomeDir:          userHome,

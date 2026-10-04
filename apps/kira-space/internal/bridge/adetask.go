@@ -15,6 +15,11 @@ const (
 	adeTaskMaxColor    = 20
 	adeTaskMaxRepoIDs  = 64
 	adeTaskMaxPlanKeys = 10_000
+	adeMaxYamlBytes    = 1 << 20
+	adeMaxPathBytes    = 4096
+	adeMaxIntegration  = 32
+	adeMaxEnvironments = 32
+	adeMaxScriptBytes  = 64 << 10
 )
 
 // AdeTaskService is the v2 ADE task surface (P144): board snapshot, task/plan/backlog writes and
@@ -34,6 +39,12 @@ func AdeTaskBacklogChanged(ev *Events) { ev.Broadcast(adewire.ChannelBacklog) }
 func AdeTaskCredentialRequested(ev *Events, payload any) {
 	ev.emit.EmitFocused(adewire.ChannelCredential, payload)
 }
+
+// AdeTaskWorkflowsChanged is TaskBoard.OnWorkflows' target: payload-free.
+func AdeTaskWorkflowsChanged(ev *Events) { ev.Broadcast(adewire.ChannelWorkflows) }
+
+// AdeTaskReposChanged is TaskBoard.OnRepos' target: payload-free.
+func AdeTaskReposChanged(ev *Events) { ev.Broadcast(adewire.ChannelRepos) }
 
 // adeTaskError maps store and engine sentinels to wire codes.
 func adeTaskError(err error) error {
@@ -335,4 +346,153 @@ func (s *AdeTaskService) PromoteBacklogItem(ctx context.Context, args adewire.Ba
 	}
 	t, err := s.Engine.PromoteBacklogItem(ctx, args)
 	return t, adeTaskError(err)
+}
+
+// --- workflow files and repo config (P145) -------------------------------------------------------
+
+func validateAdeYaml(src string) error {
+	if len(src) > adeMaxYamlBytes {
+		return adeTaskInvalid("yaml is too large")
+	}
+	return nil
+}
+
+func validateAdePath(path, field string) error {
+	if path == "" {
+		return adeTaskInvalid(field + " is required")
+	}
+	if len(path) > adeMaxPathBytes || strings.ContainsRune(path, 0) {
+		return adeTaskInvalid(field + " is invalid")
+	}
+	return nil
+}
+
+func validateUpdateRepo(a adewire.UpdateRepoArgs) error {
+	if err := validateAdeItemID(a.CodeRepoID, "codeRepoId"); err != nil {
+		return err
+	}
+	p := a.Patch
+	if p.Nickname != nil {
+		if err := validateAdeName(*p.Nickname, "nickname"); err != nil {
+			return err
+		}
+	}
+	if p.IntegrationBranches != nil {
+		if len(*p.IntegrationBranches) > adeMaxIntegration {
+			return adeTaskInvalid("integrationBranches is too long")
+		}
+		for _, name := range *p.IntegrationBranches {
+			if err := validateAdeBranchName(name, "integrationBranches"); err != nil {
+				return err
+			}
+		}
+	}
+	if p.PrepareScript != nil && len(*p.PrepareScript) > adeMaxScriptBytes {
+		return adeTaskInvalid("prepareScript is too large")
+	}
+	if p.Environments != nil {
+		if len(*p.Environments) > adeMaxEnvironments {
+			return adeTaskInvalid("environments is too long")
+		}
+		for _, env := range *p.Environments {
+			if err := validateAdeName(env.Name, "environment name"); err != nil {
+				return err
+			}
+			if len(env.DeployedShaScript) > adeMaxScriptBytes {
+				return adeTaskInvalid("deployedShaScript is too large")
+			}
+		}
+	}
+	return nil
+}
+
+func (s *AdeTaskService) WorkflowYaml(ctx context.Context, args adewire.FileNameArgs) (adewire.WorkflowYaml, error) {
+	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
+		return adewire.WorkflowYaml{}, err
+	}
+	r, err := s.Engine.WorkflowYaml(ctx, args.FileName)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) ValidateWorkflowYaml(ctx context.Context, args adewire.ValidateWorkflowYamlArgs) (adewire.WorkflowValidation, error) {
+	if err := validateAdeYaml(args.Yaml); err != nil {
+		return adewire.WorkflowValidation{}, err
+	}
+	return s.Engine.ValidateWorkflowYaml(ctx, args.Yaml), nil
+}
+
+func (s *AdeTaskService) SaveWorkflow(ctx context.Context, args adewire.SaveWorkflowArgs) (adewire.WorkflowEntry, error) {
+	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
+		return adewire.WorkflowEntry{}, err
+	}
+	r, err := s.Engine.SaveWorkflow(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) SaveWorkflowYaml(ctx context.Context, args adewire.SaveWorkflowYamlArgs) (adewire.WorkflowEntry, error) {
+	if err := validateAdeBranchName(args.FileName, "fileName"); err != nil {
+		return adewire.WorkflowEntry{}, err
+	}
+	if err := validateAdeYaml(args.Yaml); err != nil {
+		return adewire.WorkflowEntry{}, err
+	}
+	r, err := s.Engine.SaveWorkflowYaml(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) ImportWorkflow(ctx context.Context, args adewire.ImportWorkflowArgs) (adewire.WorkflowEntry, error) {
+	if err := validateAdePath(args.Path, "path"); err != nil {
+		return adewire.WorkflowEntry{}, err
+	}
+	r, err := s.Engine.ImportWorkflow(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) NewWorkflow(ctx context.Context, args adewire.NewWorkflowArgs) (adewire.WorkflowEntry, error) {
+	if err := validateAdeName(args.Name, "name"); err != nil {
+		return adewire.WorkflowEntry{}, err
+	}
+	r, err := s.Engine.NewWorkflow(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs) (adewire.Repo, error) {
+	if err := validateUpdateRepo(args); err != nil {
+		return adewire.Repo{}, err
+	}
+	r, err := s.Engine.UpdateRepo(ctx, args)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) AddFolder(ctx context.Context, args adewire.FolderArgs) (adewire.FolderImportResult, error) {
+	if err := validateAdePath(args.Path, "path"); err != nil {
+		return adewire.FolderImportResult{}, err
+	}
+	r, err := s.Engine.AddFolder(ctx, args.Path, args.Watch)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) SetFolderWatch(ctx context.Context, args adewire.FolderArgs) (adewire.Folder, error) {
+	if err := validateAdePath(args.Path, "path"); err != nil {
+		return adewire.Folder{}, err
+	}
+	r, err := s.Engine.SetFolderWatch(ctx, args.Path, args.Watch)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) RemoveFolder(ctx context.Context, args adewire.PathArgs) error {
+	if err := validateAdePath(args.Path, "path"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RemoveFolder(ctx, args.Path))
+}
+
+func (s *AdeTaskService) RecordMerge(ctx context.Context, args adewire.RecordMergeArgs) error {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return err
+	}
+	if err := validateAdeBranchName(args.Target, "target"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.RecordMerge(ctx, args.BranchID, args.Target))
 }
