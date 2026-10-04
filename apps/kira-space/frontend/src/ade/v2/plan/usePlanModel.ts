@@ -1,0 +1,239 @@
+import { useIntervalFn } from '@vueuse/core';
+import { computed, ref } from 'vue';
+import { useCodeReposStore } from '../../../state/coderepos';
+import { useSettingsStore } from '../../../state/settings';
+import { type BranchTag, branchTag, taskCell } from '../board/actions';
+import { type BaseMarker, baseMarker } from '../board/baseMarker';
+import { isDraft } from '../board/branchGraph';
+import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
+import { taskTitle } from '../board/labels';
+import { buildNeedsYou } from '../board/needsYou';
+import { buildTaskProgress, type TaskProgress } from '../board/progress';
+import { deriveStatus } from '../board/status';
+import {
+  buildTimeline,
+  type Ripple,
+  rippleOf,
+  type TimelineEntry,
+  type TimelineView,
+} from '../board/timeline';
+import { localIso, localIsoOfMs } from '../localDay';
+import { taskColor } from '../palette';
+import { useBoard, usePrs, useRepos, useWorkflows } from '../queries';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import type { Board, Branch, Task, Workflow } from '../wire';
+
+export interface BranchRowModel {
+  id: string;
+  depth: number;
+  branch: Branch;
+  repo: string;
+  base: BaseMarker | null;
+  draft: boolean;
+  /** Branch name, `new branch` until created. */
+  name: string;
+  isReview: boolean;
+  /** Second line: `no branch yet · from main`, or a review item's PR title. */
+  context: string;
+  tag: BranchTag;
+  ripple: boolean;
+  /** Tooltip of the `!` circle; `''` when the branch needs nothing from the user. */
+  attention: string;
+}
+
+export interface CardModel {
+  task: Task;
+  entry: TimelineEntry;
+  color: string;
+  title: string;
+  progress: TaskProgress;
+  tag: { label: string; tone: BranchTag['tone']; tip: string } | null;
+  /** `3d → Mon 28 · PAY-102 · api · web-app`. */
+  meta: string;
+  attention: string;
+  rows: BranchRowModel[];
+  review: boolean;
+  parked: boolean;
+  allMerged: boolean;
+  selected: boolean;
+  ripple: boolean;
+}
+
+type NeedsYou = ReturnType<typeof buildNeedsYou>;
+
+interface Ctx {
+  board: Board;
+  view: TimelineView;
+  cal: Calendar;
+  progress: ReadonlyMap<string, TaskProgress>;
+  needs: NeedsYou;
+  ripple: Ripple | null;
+  selectedId: string | null;
+  mainName: ReadonlyMap<string, string>;
+  prTitle: (branchId: string) => string;
+  repoLabel: (codeRepoId: string) => string;
+  nowMs: number;
+}
+
+function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowModel {
+  const graph = c.view.graph;
+  const br = graph.byBranch.get(bid) as Branch;
+  const draft = isDraft(br);
+  const parent = graph.parentOf.get(bid);
+  const parentName = parent === undefined ? undefined : graph.byBranch.get(parent)?.name;
+  const attn = c.needs.items.find((n) => n.kind === 'question' && n.branchId === bid);
+  const main = c.mainName.get(br.codeRepoId) ?? '';
+  let context = '';
+  if (draft) context = `no branch yet · from ${parentName || br.base || 'main'}`;
+  else if (br.kind === 'review') context = c.prTitle(bid);
+  return {
+    id: bid,
+    depth: task.kind === 'review' ? 0 : depth + 1,
+    branch: br,
+    repo: c.repoLabel(br.codeRepoId),
+    base: baseMarker(br, graph, main),
+    draft,
+    name: draft ? 'new branch' : br.name,
+    isReview: br.kind === 'review',
+    context,
+    tag: branchTag({
+      branch: br,
+      graph,
+      plan: c.board.plan,
+      after: c.view.after,
+      nowMs: c.nowMs,
+      hadSession: false,
+      mainName: main,
+    }),
+    ripple: c.ripple?.branchIds.includes(bid) ?? false,
+    attention: attn?.what ?? '',
+  };
+}
+
+function cardMeta(c: Ctx, entry: TimelineEntry, task: Task, branches: Branch[]): string {
+  const repoNames: string[] = [];
+  for (const br of branches) {
+    const label = c.repoLabel(br.codeRepoId);
+    if (!repoNames.includes(label)) repoNames.push(label);
+  }
+  const jira = task.jira?.key;
+  return (
+    (entry.days.length > 1 ? `${entry.span}d → ${dayLabel(c.cal, entry.end)} · ` : '') +
+    (jira ? `${jira} · ` : '') +
+    repoNames.join(' · ')
+  );
+}
+
+function buildCard(c: Ctx, id: string): CardModel | null {
+  const graph = c.view.graph;
+  const entry = c.view.entries.get(id);
+  const task = graph.byTask.get(id);
+  if (!entry || !task) return null;
+  const progress = c.progress.get(id) as TaskProgress;
+  const branches = task.branchIds.flatMap((bid) => graph.byBranch.get(bid) ?? []);
+  const status = deriveStatus({ task, progress, branches, hasSessions: false });
+  const cell = taskCell({ task, progress, status, branches, sessions: [] });
+  const first = branches[0];
+  const mine = branches.filter((br) => br.kind === 'mine');
+  const needsOf = c.needs.items.find((n) => n.kind === 'question' && n.taskId === id);
+  return {
+    task,
+    entry,
+    color: taskColor(task.color),
+    title: taskTitle(task, first, first ? c.prTitle(first.id) : ''),
+    progress,
+    tag: cell?.tag ?? null,
+    meta: cardMeta(c, entry, task, branches),
+    attention: needsOf?.what ?? '',
+    rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
+    review: task.kind === 'review',
+    parked: task.kind === 'parked',
+    allMerged: mine.length > 0 && mine.every((br) => br.mergedIntoMain),
+    selected: c.selectedId === id,
+    ripple: c.ripple?.taskIds.includes(id) ?? false,
+  };
+}
+
+/** Everything the Plan view renders, derived from the four cached queries and the view state. */
+export function usePlanModel() {
+  const board = useBoard();
+  const prs = usePrs();
+  const workflows = useWorkflows();
+  const repos = useRepos();
+  const settingsStore = useSettingsStore();
+  const codeReposStore = useCodeReposStore();
+  const ui = useAdeBoardUiStore();
+
+  const now = ref(new Date());
+  useIntervalFn(() => {
+    now.value = new Date();
+  }, 60_000);
+  const today = computed(() => localIso(now.value));
+
+  function repoLabel(codeRepoId: string): string {
+    const cfg = repos.data.value?.repos.find((r) => r.codeRepoId === codeRepoId);
+    return (
+      cfg?.nickname || cfg?.name || codeReposStore.codeRepoRecord(codeRepoId)?.name || codeRepoId
+    );
+  }
+
+  const planSettings = computed(() => ({
+    ...settingsStore.ade,
+    historyDays: ui.historyReach ?? settingsStore.ade.historyDays,
+  }));
+
+  const model = computed(() => {
+    const b = board.data.value;
+    if (!b) return null;
+    const view = buildTimeline({
+      board: b,
+      settings: planSettings.value,
+      today: today.value,
+      localDayOf: localIsoOfMs,
+      repoLabel,
+      showAllItems: ui.showAllItems,
+      showHistory: ui.showHistory,
+      hiddenRepoIds: new Set(ui.hiddenRepoIds),
+    });
+    const graph = view.graph;
+    const wf = new Map<string, Workflow>();
+    for (const e of workflows.data.value?.workflows ?? []) {
+      if (e.workflow) wf.set(e.workflow.id, e.workflow);
+    }
+    const progress = new Map<string, TaskProgress>();
+    for (const t of b.tasks) {
+      progress.set(
+        t.id,
+        buildTaskProgress({
+          task: t,
+          workflow: wf.get(t.workflowId) ?? null,
+          branch: (id) => graph.byBranch.get(id),
+          repoNick: repoLabel,
+        }),
+      );
+    }
+    const nowMs = now.value.getTime();
+    const selectedId = ui.selectedTaskId;
+    const ctx: Ctx = {
+      board: b,
+      view,
+      cal: buildCalendar(today.value, planSettings.value),
+      progress,
+      needs: buildNeedsYou({ board: b, sessions: [], progress, repoNick: repoLabel, nowMs }),
+      ripple: selectedId ? rippleOf(view, { kind: 'task', id: selectedId }) : null,
+      selectedId,
+      mainName: new Map(b.repos.map((r) => [r.codeRepoId, r.mainName])),
+      prTitle: (id) => prs.data.value?.branches[id]?.title ?? '',
+      repoLabel,
+      nowMs,
+    };
+    const cards = new Map<string, CardModel>();
+    for (const id of view.shownTaskIds) {
+      const card = buildCard(ctx, id);
+      if (card) cards.set(id, card);
+    }
+    return { board: b, view, cards, ripple: ctx.ripple, cal: ctx.cal };
+  });
+
+  return { model, today, now, repoLabel, settings: planSettings, boardQuery: board };
+}
