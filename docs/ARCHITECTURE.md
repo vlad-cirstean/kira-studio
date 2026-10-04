@@ -3156,6 +3156,21 @@ standard library and knows nothing about repositories, sessions or approval; `gi
 every policy decision and this package owns only the mechanism, letting the whole
 feature be tested without ever spawning a real shell.
 
+**ADE v2 facts (P145).**
+
+- Prepare timeout: per-repo `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
+  shared by git-ui worktree add and ADE. `Spec.Timeout` is required (> 0). G25 D12 ("no setting
+  raises it") is superseded.
+- Integration and deploy facts: one evaluator over `git cherry` plus `patch-id` (`gitclient` only, no
+  go-git), cached per repo by shas. Migration `0009` stores branch marks (`ade_branch_marks`) and
+  environment state (`ade_env_state`) for "was merged", "rebased since", "moved back".
+  `RecordMerge` is the only writer of `recorded = 1`.
+- Deploy scripts run through `gitprepare` plumbing in the repo root, 60s fixed timeout; failure
+  reports `unknown`.
+- The workflows folder under the app home is watched (`fsnotify`); a broken edit keeps the last
+  valid version. No workflow is seeded.
+- Full ADE rewrite of this document stays P149.
+
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
 any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
 reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
