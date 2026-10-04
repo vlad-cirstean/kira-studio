@@ -1,0 +1,4 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_9","name":"Bash","input":{"command":"touch x\nrm y"}}]}}
+{"type":"system","subtype":"permission_denied","tool_name":"Bash"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_9","is_error":true,"content":"Permission to use Bash has been denied.\nmore"}]}}
+{"type":"result","subtype":"success","num_turns":2,"permission_denials":[{"tool_name":"Bash"}]}
