@@ -179,6 +179,9 @@ type engine struct {
 	mu      sync.Mutex
 	logs    []adewire.LogEvent
 	code    map[string]model.CodeRepo
+	tracker *Tracker
+	live    *fakeLive
+	closed  []string
 }
 
 func newEngine(t *testing.T, scen map[string][]string) *engine {
@@ -209,7 +212,20 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		t.Fatal(err)
 	}
 	e.workdir = wfDir
+	e.live = newFakeLive()
+	e.tracker = NewTracker(TrackerDeps{
+		Store: r.AdeSessions, LiveAgents: e.live.AgentSessions, WriteTerminal: e.live.Write, Now: time.Now,
+		Grace: 20 * time.Millisecond, PendingTTL: time.Minute,
+	})
 	e.board = NewTaskBoard(TaskBoardDeps{
+		Tracker: e.tracker,
+		CloseTerminal: func(id string) error {
+			e.live.remove(id)
+			e.mu.Lock()
+			e.closed = append(e.closed, id)
+			e.mu.Unlock()
+			return nil
+		},
 		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos,
 		GitRepoSettings: r.GitRepoSettings.Get, Runner: gitclient.NewExecRunner(), Registry: registry,
 		GitPath:   func() string { return "git" },
@@ -219,6 +235,7 @@ func newEngine(t *testing.T, scen map[string][]string) *engine {
 		OnLog:            func(ev adewire.LogEvent) { e.mu.Lock(); e.logs = append(e.logs, ev); e.mu.Unlock() },
 		AutofetchMinutes: func() int { return 0 }, HomeDir: e.home,
 	})
+	e.tracker.SetStoppedHandler(e.board.OnTUIStopped)
 	t.Cleanup(e.board.Close)
 	return e
 }
@@ -529,8 +546,8 @@ func TestRunEngine_setupGate(t *testing.T) {
 		s, _ := e.repos.AdeTasks.GetSetup(branch)
 		return s != nil && s.State == model.AdeSetupFailed
 	})
-	if r := e.runs(id)["first/api"]; r.State != model.AdeRunPending {
-		t.Fatalf("run after a failed setup = %+v; want pending", r)
+	if r := e.runs(id)["first/api"]; r.State != model.AdeRunPending || r.Note != noteSetupFailed {
+		t.Fatalf("run after a failed setup = %+v; want pending with %q", r, noteSetupFailed)
 	}
 	if !strings.Contains(e.logText("setup", branch), "exited with status 3") {
 		t.Fatal("setup log does not name the failure")
