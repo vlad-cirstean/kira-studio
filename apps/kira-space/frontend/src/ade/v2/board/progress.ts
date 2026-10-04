@@ -216,7 +216,7 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
     hasWorkflow: true,
     finished,
     stage: finished ? null : stage,
-    stageIndex: finished ? stages.length : found,
+    stageIndex: workflow ? idx : -1,
     steps,
     doneSteps,
     bad,
