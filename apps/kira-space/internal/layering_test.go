@@ -24,10 +24,13 @@ var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal/appshell": true,
 }
 
+// adewire (P143) is a pure wire-type leaf the v2 ADE engine returns directly, so domain packages
+// may import it; every other internal/bridge dependency stays banned.
+//
 // TestDomainPackagesDoNotImportBridge is Kira Studio's own test (see its own doc comment for the
 // full rationale), enumerating every internal/* package under this app straight from `go list`.
 // The runner itself is shared (P107 I2-28, internal/layeringtest.Run) — only modulePrefix and the
 // exemption set differ per app.
 func TestDomainPackagesDoNotImportBridge(t *testing.T) {
-	layeringtest.Run(t, modulePrefix, packagesExemptFromBridgeCheck)
+	layeringtest.RunAllowing(t, modulePrefix, packagesExemptFromBridgeCheck, []string{"/internal/bridge/adewire"})
 }

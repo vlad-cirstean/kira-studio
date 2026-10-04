@@ -5,6 +5,7 @@ package layeringtest
 
 import (
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,6 +18,14 @@ import (
 // exempt holds the packages that sit at or above internal/bridge in the intended layering, keyed
 // by their internal/-relative name (e.g. "internal/bridge").
 func Run(t *testing.T, modulePrefix string, exempt map[string]bool) {
+	t.Helper()
+	RunAllowing(t, modulePrefix, exempt, nil)
+}
+
+// RunAllowing is Run with a set of bridge subpackages (matched as a suffix of the dependency path,
+// e.g. "/internal/bridge/adewire") domain packages may import anyway: pure wire-type leaves that
+// import nothing from the transport layer.
+func RunAllowing(t *testing.T, modulePrefix string, exempt map[string]bool, allowedDeps []string) {
 	t.Helper()
 	listOut, err := exec.Command("go", "list", modulePrefix+"internal/...").CombinedOutput()
 	if err != nil {
@@ -39,7 +48,7 @@ func Run(t *testing.T, modulePrefix string, exempt map[string]bool) {
 				t.Fatalf("go list -deps %s: %v\n%s", pkg, err, out)
 			}
 			for _, dep := range strings.Fields(string(out)) {
-				if strings.Contains(dep, "/internal/bridge") {
+				if strings.Contains(dep, "/internal/bridge") && !slices.ContainsFunc(allowedDeps, func(a string) bool { return strings.HasSuffix(dep, a) }) {
 					t.Fatalf("%s depends on %s — a domain package must not import the IPC transport layer (internal/bridge)", pkg, dep)
 				}
 			}
