@@ -341,6 +341,11 @@ libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav lib
 writing) — install exactly those, not a generic `playwright install-deps`, which pulls far more
 than `webkit` alone needs.
 
+`scripts/prepare-ui-tests.sh` (called by `scripts/prepare-dev-environment.sh`) does both
+automatically: idempotent, skips when the browser and all five packages are present. Set
+`KIRA_SKIP_WEBKIT=1` to skip. Failure (offline, apt error) warns with the manual commands and
+exits 0. It overrides `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for that one install only.
+
 ## `tests/visual/*` pixel diffs — a sandbox font-package mismatch, not a code regression
 
 The `visual` Playwright project's baselines are captured on a specific CI Ubuntu image (P6 plan
