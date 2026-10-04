@@ -275,8 +275,10 @@ func (s *AdeTaskService) AddExistingBranch(ctx context.Context, args adewire.Add
 	if err := validateAdeBranchName(args.Name, "name"); err != nil {
 		return adewire.AddExistingBranchResult{}, err
 	}
-	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
-		return adewire.AddExistingBranchResult{}, err
+	if args.TaskID != "" { // '' = new task (wire contract)
+		if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+			return adewire.AddExistingBranchResult{}, err
+		}
 	}
 	r, err := s.Engine.AddExistingBranch(ctx, args)
 	return r, adeTaskError(err)
