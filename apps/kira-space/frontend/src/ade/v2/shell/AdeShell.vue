@@ -6,6 +6,7 @@ import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { useBacklog } from '../queries';
+import AdeReposPage from '../repos/AdeReposPage.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE, tagStyle } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
@@ -58,10 +59,19 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
         >
           Workflows
         </TabsTrigger>
+        <TabsTrigger
+          value="repos"
+          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
+          :style="ui.view === 'repos' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          data-testid="ade-tab-repos"
+        >
+          Repos
+        </TabsTrigger>
       </TabsList>
     </nav>
     <AdeBacklogPage v-if="ui.view === 'backlog'" />
     <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
+    <AdeReposPage v-else-if="ui.view === 'repos'" />
     <div v-else class="flex min-h-0 flex-1">
       <AdePlanView />
       <AdePanel v-if="ui.selectedTaskId" />
