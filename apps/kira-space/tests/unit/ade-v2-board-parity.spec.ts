@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { branchTag, taskCell } from '../../frontend/src/ade/v2/board/actions';
 import { baseMarker } from '../../frontend/src/ade/v2/board/baseMarker';
 import { buildBranchGraph } from '../../frontend/src/ade/v2/board/branchGraph';
+import { branchLine2 } from '../../frontend/src/ade/v2/board/labels';
 import { buildNeedsYou, NEEDS_RANK } from '../../frontend/src/ade/v2/board/needsYou';
 import { buildTaskProgress, type TaskProgress } from '../../frontend/src/ade/v2/board/progress';
 import { deriveStatus } from '../../frontend/src/ade/v2/board/status';
@@ -10,6 +11,7 @@ import type {
   Board,
   Branch,
   Pair,
+  PrsResult,
   ReposResult,
   SessionsResult,
   Workflow,
@@ -293,6 +295,30 @@ describe('per branch', () => {
           expect([b.id, m.tone === 'blue']).toEqual([b.id, row.baseStyle.includes('#93b6ff')]);
           expect([b.id, m.tip]).toEqual([b.id, row.baseTip]);
         }
+      }
+    }
+  });
+});
+
+describe('branch second line', () => {
+  test('context, merged and deployed chips equal the mockup', () => {
+    const prs = loadFixture<PrsResult>('prs');
+    for (const t of board.tasks) {
+      for (const b of t.branchIds.flatMap((id) => board.branches.filter((x) => x.id === id))) {
+        const box = boxOf(t.id);
+        const offset = box.rows[0].isTask ? 1 : 0;
+        const i = box.rows
+          .slice(offset)
+          .findIndex(
+            (r: MockupComponent) =>
+              r.label === (b.name || 'new branch') && r.repo === nick(b.codeRepoId),
+          );
+        const row = box.rows[offset + i];
+        const line = branchLine2(b, timeline.graph, prs.branches[b.id]?.title ?? '');
+        const pick = (c: { label: string; tip: string }) => [c.label, c.tip];
+        expect([b.id, line.context]).toEqual([b.id, row.hasSub ? row.sub : '']);
+        expect([b.id, line.merged.map(pick)]).toEqual([b.id, row.into.map(pick)]);
+        expect([b.id, line.deployed.map(pick)]).toEqual([b.id, row.deploys.map(pick)]);
       }
     }
   });
