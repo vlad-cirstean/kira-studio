@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
@@ -22,12 +23,14 @@ type Store interface {
 // Dir is the workflows directory under the app home.
 func Dir(home string) string { return filepath.Join(home, "workflows") }
 
-// Reader lists and resolves workflows. It reads the directory on every call, never creates it and
-// never writes a workflow file.
+// Reader lists and resolves workflows. It reads the directory on every call. Only the writer
+// methods (writer.go) create the directory or write a workflow file.
 type Reader struct {
 	Dir   string
 	Store Store
 	Now   func() time.Time
+
+	wmu sync.Mutex // serializes the writer methods
 }
 
 func (r *Reader) now() time.Time {
