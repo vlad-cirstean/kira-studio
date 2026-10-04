@@ -13,7 +13,7 @@ Inputs: `SPEC.md` P148 row, P145-P147 results; `plans/P143-ade-v2-preplan.md` (�
 `docs/ARCHITECTURE.md` Known open items; `docs/DEV_ENVIRONMENT.md` server-tag recipe. Base `B0`:
 `v2.0` tip after step 0 lands (current tip `b9bd8c1f`).
 
-**Status: proposed.** No open preplan item (O2-O5 resolved). Gaps found here resolved with the
+**Status: done** (see `## Result`). No open preplan item (O2-O5 resolved). Gaps found here resolved with the
 recommended option (R-table).
 
 ## 0. Findings from the current tree
@@ -490,3 +490,48 @@ labels) is a defect fixed before landing. Verdict + image paths in the B notes.
 - P154: tests still on the real `review.db` (unchanged).
 - Open for the user (unchanged): todo progress unobservable in `claude -p` 2.1.289; interactive
   `claude --resume` TUI unobservable in the sandbox.
+
+## Result
+
+**Commits** (`4dc1d3fb..v2.0`, 22): step 0 and plan before it. Stream A: `f4140f4a`, `59edd807`, `3897fa6b`
+(remove v1 service, queue, channels), `12b2a645` (migration `0011`), `a7b9193c`, notes `f4a4c854`. Stream B:
+`31cba801`, `0a2c1862`, `b3e7da8a`, `926b0b9f`, `9b8bb053`, `663ecca4`, `57cadc1b`, `cc38380a`, specs
+`086567d6` `d0686d77` `5720a0e8` `b0e242f2` `aecbacf8`, mockup fix `cb29d9ad`, notes `4e531695`. Closing: `668b2dd7`
+and docs.
+
+**Counts:** 47 `func (s *AdeTaskService) [A-Z]` = 47 `adeTask*` entries; `grep -rn AdeService` in code
+(excluding `AdeTaskService`) empty; v1 tables only in migrations `0005`-`0007`, `0011`.
+
+**Wave-end suite on the landed tip:** `go build ./...` ok; `go test ./apps/kira-space/...` ok;
+`go test -race` on `ade`, `adeagent`, `adeflow`, `gitsession` ok; `bun run test:unit` 1764 pass;
+`typecheck`, `lint:all` ok; `test:ui:space` 154 pass (webkit). One stale comment fixed (`mockRuntime.ts`).
+
+**R6 / migration on a v1 home:** Stream A's scratch test (notes). Wave end: server built at `4dc1d3fb`
+made a home at version 10; seeded one row in each v1 table, a v1 session, a v2 task and a v2 session;
+landed tip booted: version 11, v1 tables gone, v1 session dropped, v2 task and session intact, board loads,
+Sessions tab lists the v2 row.
+
+**Live run** (server-tag build, real `claude` 2.1.289, temp home, scratch repos `api` and `web`, `git.path`
+seeded, Playwright Chromium; no `Locate` patch needed, so nothing to revert). Ran and passed:
+- Spec stage (`user`, `session: true`): `▶ Spec` dialog default text, `Open session` gave a `TUI` tab with an xterm.
+- Agent step `needs_input`: run `stuck` `which file?`; Needs you listed `stuck run` with `Take over`;
+  Take over (no confirm, run not live) opened `TUI … (resumed)`; DB row `resumes` = headless Claude id.
+- Live run: Sessions headless bar showed `Take over` and `Stop`; Take over showed the confirm; `Stop and take over`
+  gave run `stuck` `taken over in Claude Code` and a resumed TUI tab. A second run `Stop` gave `stuck` `stopped by you`.
+- `web` after a scratch commit on `main`: `↓1 main`, `Rebase` dialog text names the repo, send to `new session` opened a TUI tab (`StartBranch`).
+- `develop` as integration branch: right-click menu `Merge into develop`; dialog shows the develop worktree path; `Also push develop` switches `Do not push.` to `Then push: git push origin develop`.
+- Archive of a task with a dirty worktree: dialog showed risk and `Delete anyway`; task gone, worktrees removed, history row with repos, click lists its sessions.
+- Settings: toggling the headless sources switch then Cancel left the DB unchanged; Save wrote `ade.headlessSettingSources` = `"user"`.
+- Needs you tab, badge, `▶ Spec` and `▶ Start` buttons rendered.
+
+Not observed: TUI first-run screen of `claude`, a real `Stop` hook ending a turn (so `RecordMerge` and
+send-then-archive completion), the mockup screenshot comparison repeated at wave end (no UI change after
+Stream B's verdict). Covered by the mock specs. Smoke finding: `claude -p` blocks a standalone
+`sleep N` and backgrounds it; a long-running step needs `until [ -f flag ]; do sleep 2; done`.
+
+**Mockup verdict:** Stream B notes. **Licenses:** none new; `go.mod`, `go.sum`, `package.json`, `bun.lock` unchanged.
+
+**Deviations:** R15 `Stop` button; R20 shared context-menu look; `archive/useArchive.ts` not created (flow in
+`dialog/flow.ts`); A and B notes list the rest. Run dialog default text keeps `{repo}`, `{branch}`, `{worktree}`
+placeholders for a `once` step (expanded per branch at launch).
+

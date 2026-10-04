@@ -3204,6 +3204,17 @@ feature be tested without ever spawning a real shell.
 - Archive stops the task's runs and prepare scripts, closes its terminals, then archives; no discard flag.
 - Adding an existing branch that is not checked out creates its worktree and runs setup.
 
+**ADE v2 v1 removal and dialogs (P148).**
+
+- v1 is gone: `AdeService`, the queue, `ade_branches`/`ade_new_work`/`ade_plan`/`ade_colors`/`ade_dependencies`/
+  `ade_blockers` and the v1 `ade_sessions` rows (migration `0011`, no data migration). `ade_sessions` is
+  v2-only. Agent-session hydration is `TerminalService.AgentSessions`.
+- Claude dialogs (rebase, queue after, merge, stage, start, archive) share one flow in
+  `ade/v2/dialog/flow.ts` and the `adeDialogs` store: pick a target (new session via `StartBranch`, or `Send`
+  to a running session), a turn watch follows the agent, and a finished merge calls `RecordMerge`.
+- Take over calls `TakeOver{stopIfRunning:true}` after a confirm when the run is live. `Stop` on the headless
+  status bar calls `StopRun`.
+
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
 any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
 reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
@@ -4472,8 +4483,8 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
+- **Held fix runs lose their resume spec across restart (P147).** `runOpts` live in memory; a held `back:<step>` run relaunches as a plain fresh attempt after `Recover()`. Delete once the spec persists on the run row.
 - **Interactive `claude --resume` TUI is unobservable in the dev sandbox (P147).** No display; argv shape is covered by tests only. Delete once checked on a real desktop build.
-- **Run held behind a failed worktree setup keeps note `waiting for worktree setup` (P146).** `worktree setup failed` shows only on runs queued after the failure; the setup state itself shows failed.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's
@@ -4490,7 +4501,7 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   privacy rule for one tool) or Claude Code itself distinguishing a "waiting" background run from an
   ordinary one at the hook level — neither is this phase's call to make.
 
-- **The agent merge queue's conflict pairs drop a rename/delete conflict whose two paths differ and
+- **The ADE board's conflict pairs drop a rename/delete conflict whose two paths differ and
   neither lies in the pair's own shared-file set (P129 Part 2 §0.7)**. `pairFacts` intersects
   `git merge-tree --write-tree`'s conflicted paths against `shared` (each branch's own changed-path
   set) before reporting `conflicts`; a rename or delete on one side names a path the other side
@@ -4500,18 +4511,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   call, since it changes the wire shape `pairs` promises — P129 closed at Part 7, so no later P129
   part remains to make it).
 
-- **A linked worktree's own dirty state is refreshed only on `Snapshot`/`ArchiveRisk`, an explicit
-  `Refresh`, or a session's own `Stop` (P129 Part 3 §0.11/§0.22 narrows P129 Part 2 §6.3/§9) — never
-  watched.** Part 3's `installAdeSignals` invalidates a repo's cached snapshot on that repo's own
-  agent session `Stop`, closing the window for the one case Part 2 could name exactly (Claude's own
-  edits, which always end in a `Stop`). Still open: a worktree a *person* dirties by hand, with no
-  session `Stop` to key off, between two snapshots (or right before `Archive`'s own `ArchiveRisk`
+- **A linked worktree's own dirty state is read only on board load, an explicit `Refresh` and
+  `ArchiveRisk` — never watched (P129 Part 3 §0.11/§0.22, kept in P148).** A worktree a *person* or
+  an agent dirties between two board loads (or right before `Archive`'s own `ArchiveRisk`
   call and the confirmed `Archive` call that follows it) can still go stale for that window — no file
   watcher covers a linked worktree's own working tree the way `gitsession`'s existing repo watcher
   covers `.git` itself.
 
 - **A pending "Send to Claude, then archive" lives in the renderer, not persisted (P129 Part 4
-  §0.15/§0.16)**. `adeActions.ts`'s in-flight-archive bookkeeping is a plain reactive `Map`, gone on
+  §0.15/§0.16, P148)**. The v2 `adeDialogs` store's in-flight bookkeeping (`archive:<task>`) is a plain reactive `Map`, gone on
   reload or window close; a reload or close between the Send and the agent's own `Stop` drops the
   pending archive with no record it was ever requested, and the branch stays unarchived with no
   further prompt. Closing this needs the pending archive itself surviving a reload (a persisted

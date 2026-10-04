@@ -371,7 +371,7 @@ check), §13 (audit). Size M.
 | §5.2 | Long text rules | P144 B (helpers), P145-P148 B (each surface) |
 | §6 | Merged/stale/not merged compute, after rebase, recorded merge on dialog finish only (D14) | P145 A |
 | §6 | Rebase-conflict check of every visible branch after refresh (D1) | P144 A |
-| §6 | Row text, panel Merged into (P146 B); fix menu, Merge dialog, Merge / Re-merge (P148 B, M1) | P146 B, P148 B |
+| §6 | Row text, panel Merged into (P146 B); fix menu, Merge dialog, Merge / Re-merge (P148 B, M1). Fix menu uses the shared context-menu look, not the mockup's bespoke popup (R20) | P146 B, P148 B |
 | §6.1 | Prepare script run, states, gate, persist | P146 A |
 | §6.1 | "Add existing branch" trigger: worktree and setup for a branch not checked out (R19) | P147 A |
 | §5 | Workflow switch restarts at first stage (R1) | P147 step 0 |
@@ -382,7 +382,7 @@ check), §13 (audit). Size M.
 | §6.3 | Repos page UI, repo pickers `nickname · full name` | P147 B (page), P145 B (pickers) |
 | §7 | Panel task mode header, Task tab, Notes tab | P146 B |
 | §7 | Workflow block, one per stage (D11) | P147 B |
-| §7 | Sessions tab | P148 B |
+| §7 | Sessions tab. Headless status bar also has `Stop` (R15, not in SPEC2) | P148 B |
 | §7 | Branch mode | P146 B (+ setup P147 B) |
 | §8 | Add new task / existing branch | P144 A, P145 B |
 | §9 | Start task / Start step / repo-named rebase templates, worktree path rule | P146 A (paths), P147 A, P148 B (templates, Start) |

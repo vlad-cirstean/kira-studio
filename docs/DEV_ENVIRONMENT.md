@@ -334,6 +334,11 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   `false`, so real git features never come up in this recipe as shipped. Exercising them needs a
   throwaway local patch to `Locate` returning a real `git` binary path — **never commit that
   patch**; revert it before finishing the session, same as any other sandbox-only workaround.
+- **The ADE v2 flows need no `Locate` patch** (P148 live run): seed `code_repos`, `windows('main')` and
+  `git.path` rows, and the board, runs, Take over, archive and dialogs all work.
+- **`claude -p` blocks a standalone `sleep N` and backgrounds it**, so the run ends `ended without
+  finish_step`. A live-run step that must stay running prompts `until [ -f <flag> ]; do sleep 2; done`.
+  Kill leftover `claude` TUI processes after a run.
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
