@@ -80,6 +80,17 @@ export const CHANNEL = {
   // brought forward, telling it which repo/item/session to show (bridge/ade.go's own
   // ChannelAdeOpenSession).
   adeOpenSession: 'kira:ade:open-session',
+  // P143: ADE v2 channels (`apps/kira-space/internal/bridge/adewire/channels.go`, verbatim).
+  // Payload types live in apps/kira-space/frontend/src/ade/v2/wire.ts.
+  adeTaskBoard: 'kira:adetask:board',
+  adeTaskBacklog: 'kira:adetask:backlog',
+  adeTaskCredential: 'kira:adetask:credential',
+  adeTaskWorkflows: 'kira:adetask:workflows',
+  adeTaskRepos: 'kira:adetask:repos',
+  adeTaskRuns: 'kira:adetask:runs',
+  adeTaskLog: 'kira:adetask:log',
+  adeTaskSessions: 'kira:adetask:sessions',
+  adeTaskOpenSession: 'kira:adetask:open-session',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

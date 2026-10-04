@@ -64,8 +64,9 @@
       "project": ["src/**/*.{ts,vue}"]
     },
     "apps/kira-space/frontend": {
-      // Mirrors apps/kira-studio/frontend's own block above.
-      "entry": ["index.html"],
+      // Mirrors apps/kira-studio/frontend's own block above. ade/v2/wire.ts is the frozen P143
+      // contract, unconsumed until P145 B's UI reaches it from index.html; drop the entry then.
+      "entry": ["index.html", "src/ade/v2/wire.ts"],
       "project": ["src/**/*.{ts,vue}"]
     },
     "apps/kira-space-vscode": {
