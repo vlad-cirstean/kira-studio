@@ -26,8 +26,8 @@ import (
 
 // board.go is the ADE v2 engine: tasks hold branches across repos; this type assembles the
 // adewire.Board snapshot from the task store plus git facts. It returns wire types directly
-// (internal/bridge/adewire is a pure type leaf the layering test allows). The v1 Queue stays
-// untouched until P148; the two share only the package-level fact helpers.
+// (internal/bridge/adewire is a pure type leaf the layering test allows). Shared git fact helpers
+// live in gitfacts.go.
 
 const (
 	boardConnID    = gitsession.ConnID("ade-board")

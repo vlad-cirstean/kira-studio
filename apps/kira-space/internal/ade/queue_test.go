@@ -1096,24 +1096,3 @@ func TestQueue_ConcurrentSnapshotRefreshSetPlan(t *testing.T) {
 		t.Errorf("concurrent op error: %v", err)
 	}
 }
-
-// TestMainDisplay covers P129 Part 4 §0.5/§2.2: a local-only main, a remote-tracking main, and a
-// nested branch name under a remote (`a/b`) — the one place MainRef's full refname is shortened for
-// display, `countRefsChanged` keeps keying on the full refname untouched.
-func TestMainDisplay(t *testing.T) {
-	cases := []struct {
-		name, full, wantName, wantRef string
-	}{
-		{"local", "refs/heads/main", "main", "main"},
-		{"remote", "refs/remotes/origin/main", "main", "origin/main"},
-		{"remote nested branch", "refs/remotes/origin/a/b", "a/b", "origin/a/b"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			gotName, gotRef := mainDisplay(c.full)
-			if gotName != c.wantName || gotRef != c.wantRef {
-				t.Errorf("mainDisplay(%q) = (%q, %q), want (%q, %q)", c.full, gotName, gotRef, c.wantName, c.wantRef)
-			}
-		})
-	}
-}
