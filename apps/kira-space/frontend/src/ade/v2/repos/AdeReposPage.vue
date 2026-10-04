@@ -95,6 +95,7 @@ async function onAddRepo(): Promise<void> {
           <Switch
             :id="`ade-folder-watch-${fi}`"
             :model-value="f.watch"
+            class="data-[state=checked]:border-ok data-[state=checked]:bg-ok"
             data-testid="ade-folder-watch"
             @update:model-value="(v: boolean) => onWatch(f.path, v)"
           />
@@ -134,7 +135,7 @@ async function onAddRepo(): Promise<void> {
       </div>
       <p v-if="folderNote" class="m-0 px-1 text-kira-sm text-muted-foreground" data-testid="ade-folder-note">{{ folderNote }}</p>
       <p v-if="folderError" class="m-0 px-1 text-kira-sm text-error" data-testid="ade-folder-error">{{ folderError }}</p>
-      <h2 class="m-0 border-t border-border px-1 pb-1.5 pt-1 text-kira-lg font-semibold">Repos</h2>
+      <h2 class="m-0 px-1 pb-1.5 pt-3 text-kira-lg font-semibold">Repos</h2>
       <button
         v-for="r in list"
         :key="r.codeRepoId"

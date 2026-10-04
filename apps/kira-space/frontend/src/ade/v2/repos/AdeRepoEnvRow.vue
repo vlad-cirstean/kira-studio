@@ -43,9 +43,9 @@ const script = useCommitField(
         @keydown.enter="script.onCommit"
       />
       <Button
-        variant="dialog-danger"
+        variant="dialog"
         size="icon-xs"
-        class="size-7"
+        class="size-7 text-error"
         aria-label="Remove environment"
         data-testid="ade-env-remove"
         @click="emit('remove')"

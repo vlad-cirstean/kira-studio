@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
       <Input
         id="ade-wf-form-name"
         :model-value="wf.name"
-        class="h-[30px] w-80 bg-field text-kira-xl font-semibold"
+        class="h-[30px] w-80 bg-field text-kira-lg font-semibold"
         data-testid="ade-wf-form-name"
         @update:model-value="(v: string | number) => edit({ ...wf as Workflow, name: String(v) })"
       />

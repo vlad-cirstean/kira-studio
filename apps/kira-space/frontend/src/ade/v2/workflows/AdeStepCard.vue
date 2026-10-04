@@ -63,7 +63,7 @@ const FINISH_NOTE = `${FINISH_STEP_SUFFIX}\n\nValues of {task} {jira} {repo} {br
       />
       <Button variant="dialog" size="icon-xs" class="size-6" aria-label="Move step up" :disabled="first" data-testid="ade-wf-step-up" @click="emit('up')">↑</Button>
       <Button variant="dialog" size="icon-xs" class="size-6" aria-label="Move step down" :disabled="last" data-testid="ade-wf-step-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog-danger" size="icon-xs" class="size-6" aria-label="Remove step" data-testid="ade-wf-step-remove" @click="emit('remove')">✕</Button>
+      <Button variant="dialog" size="icon-xs" class="size-6 text-error" aria-label="Remove step" data-testid="ade-wf-step-remove" @click="emit('remove')">✕</Button>
     </div>
     <div class="flex flex-wrap items-center gap-3 pl-[38px] text-kira-sm text-muted-foreground">
       <label :for="id('scope')">Runs on</label>

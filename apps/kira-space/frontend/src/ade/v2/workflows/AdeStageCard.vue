@@ -7,11 +7,13 @@ import { Textarea } from '@theme/components/ui/textarea';
 import AdeChip from '../AdeChip.vue';
 import type { Tone } from '../board/actions';
 import { FAILURE_OPTIONS, moved, newStep, STATUS_OPTIONS, withKind, withValidBacks } from '../board/workflowForm';
+import { actionStyle } from '../tones';
 import type { OnFailure, Stage, StageKind } from '../wire';
 import AdeStepCard from './AdeStepCard.vue';
 
 // One stage of the form: header (name, type, task status, order), then the fields of its kind.
 const props = defineProps<{ index: number; scopes: string[]; first: boolean; last: boolean }>();
+const sessionOn = { background: actionStyle('claude').background, borderColor: actionStyle('claude').background };
 const stage = defineModel<Stage>('stage', { required: true });
 const emit = defineEmits<{ up: []; down: []; remove: [] }>();
 
@@ -39,7 +41,7 @@ function removeStep(i: number): void {
     :data-stage-id="stage.id"
   >
     <div class="flex items-center gap-2">
-      <span class="w-6 shrink-0 font-data text-kira-lg font-bold">{{ index + 1 }}</span>
+      <span class="w-6 shrink-0 font-data text-kira-lg font-bold">{{ index + 1 }}.</span>
       <AdeChip :label="stage.kind" :tone="KIND_TONE[stage.kind]" />
       <label :for="n('name')" class="sr-only">Stage name</label>
       <Input
@@ -53,7 +55,7 @@ function removeStep(i: number): void {
       <NativeSelect
         :id="n('kind')"
         variant="bordered"
-        class="h-[26px] text-kira-md"
+        class="h-[26px] min-w-[124px] text-kira-md"
         :model-value="stage.kind"
         data-testid="ade-wf-stage-kind"
         @update:model-value="(v) => (stage = withKind(stage, String(v) as StageKind))"
@@ -76,7 +78,7 @@ function removeStep(i: number): void {
       </NativeSelect>
       <Button variant="dialog" size="icon-xs" class="size-[26px]" aria-label="Move stage up" :disabled="first" data-testid="ade-wf-stage-up" @click="emit('up')">↑</Button>
       <Button variant="dialog" size="icon-xs" class="size-[26px]" aria-label="Move stage down" :disabled="last" data-testid="ade-wf-stage-down" @click="emit('down')">↓</Button>
-      <Button variant="dialog-danger" size="icon-xs" class="size-[26px]" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
+      <Button variant="dialog" size="icon-xs" class="size-[26px] text-error" aria-label="Remove stage" data-testid="ade-wf-stage-remove" @click="emit('remove')">✕</Button>
     </div>
 
     <template v-if="stage.kind === 'user'">
@@ -84,6 +86,7 @@ function removeStep(i: number): void {
         <Switch
           :id="n('session')"
           :model-value="stage.session"
+          :style="stage.session ? sessionOn : undefined"
           data-testid="ade-wf-stage-session"
           @update:model-value="(v: boolean) => patch({ session: v, prompt: v ? stage.prompt : '' })"
         />

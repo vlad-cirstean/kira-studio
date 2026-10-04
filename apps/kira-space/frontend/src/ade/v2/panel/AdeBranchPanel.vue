@@ -37,6 +37,11 @@ const baseName = computed(() => {
 const facts = computed(
   () => `${props.row.repo} · base ${baseName.value} · ↑${branch.value.ahead} ↓${branch.value.behind}`,
 );
+const chipLabel = computed(() => {
+  const state = branch.value.setup?.state;
+  if (state === 'running') return 'preparing';
+  return state === 'failed' ? 'setup failed' : props.row.tag.label;
+});
 const setupFailed = computed(() => branch.value.setup?.state === 'failed');
 async function onRetrySetup(): Promise<void> {
   setupError.value = '';
@@ -149,7 +154,7 @@ function deployNote(d: Deployment): string {
           data-testid="ade-panel-dot"
         />
         <AdeTip :text="row.tag.tip">
-          <AdeChip :label="row.tag.label" :tone="row.tag.tone" />
+          <AdeChip :label="chipLabel" :tone="row.tag.tone" />
         </AdeTip>
         <h3
           class="m-0 min-w-0 flex-1 break-all font-data text-kira-lg font-semibold leading-[18px]"
@@ -193,7 +198,7 @@ function deployNote(d: Deployment): string {
       <div class="grid grid-cols-[70px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
         <span class="text-kira-sm text-muted-foreground">Branch</span>
         <div class="flex h-7 min-w-0 items-center gap-2">
-          <AdeChip :label="row.tag.label" :tone="row.tag.tone" wide />
+          <AdeChip :label="chipLabel" :tone="row.tag.tone" wide />
           <template v-if="branch.name">
             <a
               v-if="branchUrl"

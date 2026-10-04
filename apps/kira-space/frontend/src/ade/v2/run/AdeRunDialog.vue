@@ -10,6 +10,7 @@ import { branchSlug, defaultRunMessage, FINISH_STEP_SUFFIX } from '../board/runM
 import { usePlanModel } from '../plan/usePlanModel';
 import { useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { actionStyle } from '../tones';
 
 // Agent stage Run dialog (SPEC2 section 5, R24): per-branch names for branches not created yet, the
 // editable message and the read-only finish_step suffix the server always appends.
@@ -71,7 +72,23 @@ async function send(): Promise<void> {
   <Dialog :open="open" @update:open="(v) => !v && close()">
     <DialogContent :show-close-button="false" class="w-135" data-testid="ade-run-dialog">
       <DialogHeader>
-        <DialogTitle>Run {{ stage?.name ?? '' }} in the background</DialogTitle>
+        <DialogTitle class="flex items-center gap-2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            :style="{ stroke: actionStyle('claude').background }"
+          >
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="M7 10l3 2-3 2M12 15h5" />
+          </svg>
+          Run {{ stage?.name ?? '' }} in the background
+        </DialogTitle>
       </DialogHeader>
       <div class="flex flex-col gap-3 px-3 py-2 text-kira-md">
         <div v-if="pending.length" class="flex flex-col gap-1.5" data-testid="ade-run-branches">
@@ -122,7 +139,14 @@ async function send(): Promise<void> {
       </div>
       <DialogFooter>
         <Button variant="dialog" size="kira-lg" data-testid="ade-run-cancel" @click="close">Cancel</Button>
-        <Button variant="dialog-primary" size="kira-lg" :disabled="busy" data-testid="ade-run-send" @click="send">
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          :style="actionStyle('claude')"
+          :disabled="busy"
+          data-testid="ade-run-send"
+          @click="send"
+        >
           Run in background
         </Button>
       </DialogFooter>
