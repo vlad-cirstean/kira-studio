@@ -1,0 +1,73 @@
+package codeworkspace
+
+import (
+	"context"
+	"errors"
+	"path/filepath"
+
+	"github.com/google/uuid"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+)
+
+// Import failure kinds, matched with errors.Is.
+var (
+	ErrNotRepo         = errors.New("codeworkspace: not a git repository")
+	ErrBare            = errors.New("codeworkspace: bare repository")
+	ErrLinkedWorktree  = errors.New("codeworkspace: linked worktree")
+	ErrAlreadyImported = errors.New("codeworkspace: already imported")
+)
+
+type importError struct {
+	kind error
+	msg  string
+}
+
+func (e *importError) Error() string        { return e.msg }
+func (e *importError) Is(target error) bool { return target == e.kind }
+
+// RepoStore is the slice of storage/repos.CodeReposRepo Import needs.
+type RepoStore interface {
+	List() ([]model.CodeRepo, error)
+	Create(model.CodeRepo) (model.CodeRepo, error)
+}
+
+// ImportOptions tunes Import. RejectLinkedWorktree is set by the ade folder scan, which must never
+// import a worktree checked out under a scanned folder.
+type ImportOptions struct {
+	RejectLinkedWorktree bool
+}
+
+// Import identifies path with git (gitPath is the resolved binary), refuses a bare repository, a
+// non-repository, an already imported checkout (by RepoID) and, when asked, a linked worktree, then
+// stores it. The error messages are the user-facing text.
+func Import(ctx context.Context, store RepoStore, runner gitclient.Runner, gitPath, path string, opts ImportOptions) (model.CodeRepo, error) {
+	summary, err := gitclient.Identify(ctx, runner, gitPath, path)
+	if err != nil {
+		return model.CodeRepo{}, &importError{ErrNotRepo, "not a git repository: " + err.Error()}
+	}
+	if summary.IsBare {
+		return model.CodeRepo{}, &importError{ErrBare, "a bare repository has no worktree to browse"}
+	}
+	if opts.RejectLinkedWorktree && summary.IsLinkedWorktree {
+		return model.CodeRepo{}, &importError{ErrLinkedWorktree, summary.Root + " is a linked worktree"}
+	}
+	existing, err := store.List()
+	if err != nil {
+		return model.CodeRepo{}, err
+	}
+	for _, r := range existing {
+		if r.RepoID == summary.RepoID {
+			return model.CodeRepo{}, &importError{ErrAlreadyImported, r.Name + " is already imported"}
+		}
+	}
+	return store.Create(model.CodeRepo{
+		ID:        uuid.NewString(),
+		Name:      filepath.Base(summary.Root),
+		Root:      summary.Root,
+		RepoID:    summary.RepoID,
+		CreatedAt: kiratime.NowISO(),
+	})
+}

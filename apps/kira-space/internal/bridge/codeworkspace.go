@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -273,32 +271,14 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 	if status.Kind != "ok" {
 		return model.CodeRepo{}, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
 	}
-	summary, err := gitclient.Identify(ctx, s.Runner, status.Path, args.Path)
-	if err != nil {
-		return model.CodeRepo{}, ipcerr.New("E_INVALID", "not a git repository: "+err.Error())
+	rec, err := codeworkspace.Import(ctx, s.Deps.Repos.CodeRepos, s.Runner, status.Path, args.Path, codeworkspace.ImportOptions{})
+	switch {
+	case errors.Is(err, codeworkspace.ErrNotRepo), errors.Is(err, codeworkspace.ErrBare):
+		return model.CodeRepo{}, ipcerr.New("E_INVALID", err.Error())
+	case errors.Is(err, codeworkspace.ErrAlreadyImported):
+		return model.CodeRepo{}, ipcerr.New("E_ALREADY_IMPORTED", err.Error())
 	}
-	if summary.IsBare {
-		return model.CodeRepo{}, ipcerr.New("E_INVALID", "a bare repository has no worktree to browse")
-	}
-
-	existing, err := s.Deps.Repos.CodeRepos.List()
-	if err != nil {
-		return model.CodeRepo{}, ipcerr.InternalErr(err)
-	}
-	for _, r := range existing {
-		if r.RepoID == summary.RepoID {
-			return model.CodeRepo{}, ipcerr.New("E_ALREADY_IMPORTED", r.Name+" is already imported")
-		}
-	}
-
-	rec := model.CodeRepo{
-		ID:        uuid.NewString(),
-		Name:      filepath.Base(summary.Root),
-		Root:      summary.Root,
-		RepoID:    summary.RepoID,
-		CreatedAt: kiratime.NowISO(),
-	}
-	return ipcerr.InternalResult(s.Deps.Repos.CodeRepos.Create(rec))
+	return ipcerr.InternalResult(rec, err)
 }
 
 func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.CodeRepo, error) {
