@@ -2,12 +2,15 @@
 import { Tabs, TabsList, TabsTrigger } from '@theme/components/ui/tabs';
 import { ref } from 'vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
+import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
-// Top bar (tabs, capture box, Add) over the active tab. Plan is the only tab so far.
+// Top bar (tabs, capture box, Add) over the active tab; the Plan opens the panel beside it.
 const tab = ref('plan');
+const ui = useAdeBoardUiStore();
 </script>
 
 <template>
@@ -29,6 +32,9 @@ const tab = ref('plan');
         <AdeAddPopover />
       </div>
     </nav>
-    <AdePlanView v-if="tab === 'plan'" />
+    <div v-if="tab === 'plan'" class="flex min-h-0 flex-1">
+      <AdePlanView />
+      <AdePanel v-if="ui.selectedTaskId" />
+    </div>
   </Tabs>
 </template>

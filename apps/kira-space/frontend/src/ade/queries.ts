@@ -1,14 +1,24 @@
 import type { QueryClient } from '@tanstack/vue-query';
 import { control } from '../bridge/control';
+import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
-import { boardKey, prsKey } from './v2/queries';
+import { backlogKey, boardKey, prsKey, reposKey } from './v2/queries';
 
 /** Called once from `main.ts`, app lifetime, no teardown. Every board push re-reads the board and
- *  PR facts; a credential prompt joins the shared queue and is answered through the v2 broker. */
+ *  PR facts; a backlog push re-reads the backlog; a repos push re-reads the repo settings and the
+ *  shared code repo list; a credential prompt joins the shared queue and is answered through the
+ *  v2 broker. */
 export function installAdeSignals(queryClient: QueryClient): void {
   control.onAdeTaskBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: prsKey, exact: true });
+  });
+  control.onAdeTaskBacklog(() => {
+    void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });
+  });
+  control.onAdeTaskRepos(() => {
+    void queryClient.invalidateQueries({ queryKey: reposKey, exact: true });
+    void useCodeReposStore().hydrateCodeRepos();
   });
   control.onAdeTaskCredential((request) => {
     useGitCredentialStore().enqueueCredentialRequest({

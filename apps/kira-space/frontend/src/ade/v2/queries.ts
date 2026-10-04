@@ -4,11 +4,18 @@ import { control } from '../../bridge/control';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
+  AddTaskRepoArgs,
+  BacklogItemArgs,
+  BacklogResult,
   Board,
   BranchArgs,
   CreateTaskArgs,
+  MoveBacklogItemArgs,
   RefreshArgs,
   SetPlanArgs,
+  Task,
+  UpdateBacklogItemArgs,
+  UpdateTaskArgs,
 } from './wire';
 
 // Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so every
@@ -19,7 +26,8 @@ import type {
 export const boardKey = ['adetask', 'board'] as const;
 export const prsKey = ['adetask', 'prs'] as const;
 const workflowsKey = ['adetask', 'workflows'] as const;
-const reposKey = ['adetask', 'repos'] as const;
+export const backlogKey = ['adetask', 'backlog'] as const;
+export const reposKey = ['adetask', 'repos'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
 
 export function useBoard() {
@@ -64,6 +72,14 @@ export function useCandidates(enabled: () => boolean) {
   }));
 }
 
+export function useBacklog() {
+  return useQuery({
+    queryKey: backlogKey,
+    queryFn: () => control.adeTaskBacklog(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 export function useRefresh() {
   return useMutation({
     mutationKey: ['adetask', 'refresh'],
@@ -88,6 +104,85 @@ export function useAddExistingBranch() {
 export function useAddBacklogItem() {
   return useMutation({
     mutationFn: (args: AddBacklogItemArgs) => control.adeTaskAddBacklogItem(args),
+  });
+}
+
+export function useAddTaskRepo() {
+  return useMutation({ mutationFn: (args: AddTaskRepoArgs) => control.adeTaskAddTaskRepo(args) });
+}
+
+/** Applies a task patch to a board snapshot: a `null` field is unchanged, `clearJira` drops Jira. */
+function withTaskPatch(board: Board, args: UpdateTaskArgs): Board {
+  const p = args.patch;
+  const tasks = board.tasks.map((t): Task => {
+    if (t.id !== args.taskId) return t;
+    return {
+      ...t,
+      title: p.title ?? t.title,
+      jira: p.clearJira ? null : (p.jira ?? t.jira),
+      githubUrl: p.githubUrl ?? t.githubUrl,
+      est: p.est ?? t.est,
+      notes: p.notes ?? t.notes,
+      color: p.color ?? t.color,
+      kind: p.kind ?? t.kind,
+    };
+  });
+  return { ...board, tasks };
+}
+
+export function useUpdateTask() {
+  return useMutation({
+    mutationFn: (args: UpdateTaskArgs) => control.adeTaskUpdateTask(args),
+    onMutate: async (args) => {
+      await queryClient.cancelQueries({ queryKey: boardKey, exact: true });
+      const prev = queryClient.getQueryData<Board>(boardKey);
+      if (prev) queryClient.setQueryData<Board>(boardKey, withTaskPatch(prev, args));
+      return { prev };
+    },
+    onError: (_err, _args, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData<Board>(boardKey, ctx.prev);
+      void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
+    },
+  });
+}
+
+export function useUpdateBacklogItem() {
+  return useMutation({
+    mutationFn: (args: UpdateBacklogItemArgs) => control.adeTaskUpdateBacklogItem(args),
+  });
+}
+
+export function useMoveBacklogItem() {
+  return useMutation({
+    mutationFn: (args: MoveBacklogItemArgs) => control.adeTaskMoveBacklogItem(args),
+    onMutate: async (args) => {
+      await queryClient.cancelQueries({ queryKey: backlogKey, exact: true });
+      const prev = queryClient.getQueryData<BacklogResult>(backlogKey);
+      if (prev) {
+        const items = [...prev.items];
+        const from = items.findIndex((i) => i.id === args.id);
+        const [moved] = items.splice(from, 1);
+        if (moved) items.splice(args.toIndex, 0, moved);
+        queryClient.setQueryData<BacklogResult>(backlogKey, { items });
+      }
+      return { prev };
+    },
+    onError: (_err, _args, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData<BacklogResult>(backlogKey, ctx.prev);
+      void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });
+    },
+  });
+}
+
+export function useDeleteBacklogItem() {
+  return useMutation({
+    mutationFn: (args: BacklogItemArgs) => control.adeTaskDeleteBacklogItem(args),
+  });
+}
+
+export function usePromoteBacklogItem() {
+  return useMutation({
+    mutationFn: (args: BacklogItemArgs) => control.adeTaskPromoteBacklogItem(args),
   });
 }
 

@@ -1,4 +1,4 @@
-import { useIntervalFn } from '@vueuse/core';
+import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
@@ -15,7 +15,7 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
-import { deriveStatus } from '../board/status';
+import { type DerivedStatus, deriveStatus } from '../board/status';
 import {
   buildTimeline,
   type Ripple,
@@ -54,7 +54,10 @@ export interface CardModel {
   entry: TimelineEntry;
   color: string;
   title: string;
+  /** Title with no custom name set: the Name field placeholder. */
+  defaultTitle: string;
   progress: TaskProgress;
+  status: DerivedStatus;
   tag: { label: string; tone: BranchTag['tone']; tip: string } | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
   meta: string;
@@ -152,7 +155,9 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     entry,
     color: taskColor(task.color),
     title: taskTitle(task, first, first ? c.prTitle(first.id) : ''),
+    defaultTitle: taskTitle({ ...task, title: '' }, first, first ? c.prTitle(first.id) : ''),
     progress,
+    status,
     tag: cell?.tag ?? null,
     meta: cardMeta(c, entry, task, branches),
     attention: needsOf?.what ?? '',
@@ -165,8 +170,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   };
 }
 
-/** Everything the Plan view renders, derived from the four cached queries and the view state. */
-export function usePlanModel() {
+function buildPlanModel() {
   const board = useBoard();
   const prs = usePrs();
   const workflows = useWorkflows();
@@ -243,8 +247,16 @@ export function usePlanModel() {
       const card = buildCard(ctx, id);
       if (card) cards.set(id, card);
     }
-    return { board: b, view, cards, ripple: ctx.ripple, cal: ctx.cal };
+    // The panel opens tasks the Plan hides (first-10 cap, repo filter), so it builds them on demand.
+    const cardFor = (id: string): CardModel | null => cards.get(id) ?? buildCard(ctx, id);
+    return { board: b, view, cards, cardFor, ripple: ctx.ripple, cal: ctx.cal };
   });
 
   return { model, today, now, repoLabel, settings: planSettings, boardQuery: board };
 }
+
+/** Everything the Plan and the panel render, derived from the four cached queries and the view
+ *  state. One instance serves every caller, so the panel never recomputes the Plan's model. */
+export const usePlanModel = createSharedComposable(buildPlanModel);
+
+export type PlanModel = NonNullable<ReturnType<typeof buildPlanModel>['model']['value']>;

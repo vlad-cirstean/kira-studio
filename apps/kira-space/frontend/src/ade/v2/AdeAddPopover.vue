@@ -15,7 +15,13 @@ import type { CandidateBranch } from './wire';
 
 // Add: a new task (lands in Later, branchless) or an existing branch of any repo.
 const ui = useAdeBoardUiStore();
-const open = ref(false);
+const open = computed({
+  get: () => ui.addOpen,
+  set: (v) => {
+    ui.addOpen = v;
+  },
+});
+const attachTo = computed(() => ui.attachTo);
 const tab = ref('new');
 const error = ref('');
 
@@ -32,8 +38,12 @@ const picked = ref<string[]>([]);
 const createTask = useCreateTask();
 
 watch(open, (o) => {
-  if (!o) return;
+  if (!o) {
+    ui.attachTo = null;
+    return;
+  }
   error.value = '';
+  if (ui.attachTo) tab.value = 'branch';
   if (picked.value.length === 0) {
     const first = repos.data.value?.repos[0];
     if (first) picked.value = [first.codeRepoId];
@@ -85,7 +95,11 @@ const shown = computed<CandidateBranch[]>(() => {
 async function pick(b: CandidateBranch): Promise<void> {
   error.value = '';
   try {
-    const res = await addBranch.mutateAsync({ codeRepoId: b.codeRepoId, name: b.name, taskId: '' });
+    const res = await addBranch.mutateAsync({
+      codeRepoId: b.codeRepoId,
+      name: b.name,
+      taskId: attachTo.value?.taskId ?? '',
+    });
     ui.select(res.task.id);
     open.value = false;
   } catch (err) {
@@ -108,7 +122,7 @@ const tabClass =
     <PopoverContent align="end" class="w-[460px] gap-0 overflow-hidden rounded-[10px] p-0" data-testid="ade-add-popover">
       <Tabs v-model="tab" class="gap-0">
         <TabsList class="w-full gap-0.5 border-b border-border px-2">
-          <TabsTrigger value="new" :class="tabClass" data-testid="ade-add-tab-new">New task</TabsTrigger>
+          <TabsTrigger v-if="!attachTo" value="new" :class="tabClass" data-testid="ade-add-tab-new">New task</TabsTrigger>
           <TabsTrigger value="branch" :class="tabClass" data-testid="ade-add-tab-branch">Existing branch</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -160,6 +174,13 @@ const tabClass =
         </div>
       </div>
       <div v-else>
+        <p
+          v-if="attachTo"
+          class="truncate border-b border-border px-3 py-1.5 text-kira-sm text-muted-foreground"
+          data-testid="ade-add-attach"
+        >
+          adding to: <span class="font-semibold text-fg">{{ attachTo.title }}</span>
+        </p>
         <label for="ade-branch-search" class="sr-only">Search branches</label>
         <Input
           id="ade-branch-search"

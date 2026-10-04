@@ -1,0 +1,235 @@
+<script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { NativeSelect } from '@theme/components/ui/native-select';
+import { Switch } from '@theme/components/ui/switch';
+import { computed, ref, watch } from 'vue';
+import AdeChip from '../AdeChip.vue';
+import AdeTip from '../AdeTip.vue';
+import { STATUS_TONE } from '../board/actions';
+import { integrationChips } from '../board/labels';
+import { parseGithub, statusWhy, taskPatch } from '../board/panelFacts';
+import { parseJira } from '../jira';
+import { repoColor } from '../palette';
+import type { CardModel } from '../plan/usePlanModel';
+import { useAddTaskRepo, useRepos, useUpdateTask } from '../queries';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { TONE } from '../tones';
+import type { TaskPatch } from '../wire';
+import AdeEstimateField from './AdeEstimateField.vue';
+import AdeLinkRow from './AdeLinkRow.vue';
+
+// Task tab: the editable fields, then the branches. Status is read-only (D10).
+const props = defineProps<{ card: CardModel }>();
+
+const ui = useAdeBoardUiStore();
+const update = useUpdateTask();
+const addRepo = useAddTaskRepo();
+const repos = useRepos();
+
+const task = computed(() => props.card.task);
+const review = computed(() => props.card.review);
+const fieldError = ref('');
+const jiraError = ref('');
+const githubError = ref('');
+const estError = ref<string | null>(null);
+
+async function write(patch: Partial<TaskPatch>): Promise<boolean> {
+  fieldError.value = '';
+  try {
+    await update.mutateAsync({ taskId: task.value.id, patch: taskPatch(patch) });
+    return true;
+  } catch (err) {
+    fieldError.value = err instanceof Error ? err.message : String(err);
+    return false;
+  }
+}
+
+// ---- name
+const name = ref(task.value.title);
+watch(
+  () => [task.value.id, task.value.title] as const,
+  () => {
+    name.value = task.value.title;
+  },
+);
+function commitName(): void {
+  const next = name.value.trim();
+  if (next !== task.value.title) void write({ title: next });
+}
+
+// ---- status
+const statusTone = computed(() =>
+  props.card.parked ? 'grey' : STATUS_TONE[props.card.status],
+);
+const statusLabel = computed(() => (props.card.parked ? 'not merging' : props.card.status));
+const why = computed(() => statusWhy(task.value, props.card.status, props.card.progress));
+
+// ---- links
+const jira = computed(() => task.value.jira);
+async function saveJira(raw: string): Promise<void> {
+  const j = parseJira(raw);
+  jiraError.value = j.key ? '' : 'Not a Jira key or link';
+  if (j.key && !(await write({ jira: j }))) jiraError.value = fieldError.value;
+}
+const github = computed(() => parseGithub(task.value.githubUrl));
+async function saveGithub(raw: string): Promise<void> {
+  githubError.value = parseGithub(raw) ? '' : 'Not a GitHub PR or issue link';
+  if (!githubError.value && !(await write({ githubUrl: raw }))) githubError.value = fieldError.value;
+}
+
+// ---- estimate
+async function saveEst(value: string): Promise<void> {
+  estError.value = null;
+  try {
+    await update.mutateAsync({ taskId: task.value.id, patch: taskPatch({ est: value }) });
+  } catch (err) {
+    estError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+const spanDays = computed(() => props.card.entry.span);
+
+// ---- branches
+const lackedRepos = computed(() => {
+  const used = new Set(props.card.rows.map((r) => r.branch.codeRepoId));
+  return (repos.data.value?.repos ?? []).filter((r) => !used.has(r.codeRepoId));
+});
+const addRepoValue = ref('');
+async function onAddRepo(value: unknown): Promise<void> {
+  const id = String(value ?? '');
+  addRepoValue.value = '';
+  if (!id) return;
+  fieldError.value = '';
+  try {
+    await addRepo.mutateAsync({ taskId: task.value.id, codeRepoId: id });
+  } catch (err) {
+    fieldError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+function branchLabel(row: CardModel['rows'][number]): string {
+  return row.draft ? `new branch · ${row.context.replace(/^no branch yet · /, '')}` : row.name;
+}
+
+const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? TONE.amber[1] : 'var(--kira-fg-muted)');
+</script>
+
+<template>
+  <div
+    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-3 text-kira-md"
+    data-testid="ade-task-tab"
+  >
+    <div class="grid grid-cols-[56px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">
+      <label for="ade-task-name" class="text-kira-sm text-muted-foreground">Name</label>
+      <Input
+        id="ade-task-name"
+        v-model="name"
+        :placeholder="card.defaultTitle"
+        class="h-7 bg-field text-kira-lg font-semibold"
+        data-testid="ade-task-name"
+        @blur="commitName"
+        @keydown.enter="commitName"
+      />
+      <span class="text-kira-sm text-muted-foreground">Status</span>
+      <div class="flex h-7 items-center gap-2">
+        <AdeChip :label="statusLabel" :tone="statusTone" />
+        <span class="text-kira-sm text-subtle" data-testid="ade-task-status-why">follows the workflow: {{ why }}</span>
+      </div>
+      <AdeLinkRow
+        id="ade-task-jira"
+        label="Jira"
+        chip=""
+        :text="jira?.key ?? ''"
+        :url="jira?.url ?? ''"
+        placeholder="paste Jira link or key"
+        :error="jiraError"
+        @save="saveJira"
+        @clear="write({ clearJira: true })"
+      />
+      <AdeLinkRow
+        id="ade-task-github"
+        label="GitHub"
+        :chip="github?.kind ?? ''"
+        :text="github?.ref ?? ''"
+        :url="github ? task.githubUrl : ''"
+        placeholder="paste GitHub issue or PR link"
+        :error="githubError"
+        @save="saveGithub"
+        @clear="write({ githubUrl: '' })"
+      />
+      <span class="text-kira-sm text-muted-foreground">Estimate</span>
+      <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
+      <template v-if="!review">
+        <span />
+        <div class="flex h-7 items-center gap-2">
+          <Switch
+            id="ade-task-parked"
+            :model-value="card.parked"
+            data-testid="ade-task-parked"
+            @update:model-value="(v: boolean) => write({ kind: v ? 'parked' : 'task' })"
+          />
+          <label for="ade-task-parked" class="text-kira-md">Not merging</label>
+          <span class="text-kira-sm text-subtle">stays on the plan, never merged</span>
+        </div>
+      </template>
+    </div>
+    <p v-if="fieldError" class="text-kira-sm text-error" data-testid="ade-task-error">{{ fieldError }}</p>
+
+    <div class="flex flex-col gap-0.5">
+      <div class="flex items-center gap-2 pb-0.5">
+        <span class="text-kira-sm text-muted-foreground">Branches</span>
+        <span class="flex-1" />
+        <template v-if="!review">
+          <label for="ade-add-repo" class="sr-only">Add a repo to this task</label>
+          <NativeSelect
+            id="ade-add-repo"
+            :model-value="addRepoValue"
+            variant="default"
+            class="h-[22px] max-w-50 border border-dashed border-border-strong text-kira-sm"
+            title="Add a new branch in this repo (created when work starts)"
+            data-testid="ade-add-repo"
+            @update:model-value="onAddRepo"
+          >
+            <option value="">+ Add repo…</option>
+            <option v-for="r in lackedRepos" :key="r.codeRepoId" :value="r.codeRepoId">
+              {{ r.nickname || r.name }} · {{ r.name }}
+            </option>
+          </NativeSelect>
+        </template>
+        <Button
+          variant="dialog"
+          size="xs"
+          class="h-[22px] text-kira-sm"
+          data-testid="ade-add-branch"
+          @click="ui.openAttach(task.id, card.title)"
+        >
+          + Add branch
+        </Button>
+      </div>
+      <button
+        v-for="row in card.rows"
+        :key="row.id"
+        type="button"
+        class="flex h-[30px] cursor-pointer items-center gap-2 rounded-kira border-0 bg-elevated px-1.5 text-left text-fg"
+        data-testid="ade-task-branch"
+        :data-branch-id="row.id"
+        @click="ui.selectBranch(task.id, row.id)"
+      >
+        <AdeChip :label="row.tag.label" :tone="row.tag.tone" wide />
+        <span
+          class="shrink-0 rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
+          :style="{ background: `${repoColor(row.branch.codeRepoId)}1f`, color: repoColor(row.branch.codeRepoId) }"
+          >{{ row.repo }}</span
+        >
+        <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
+          <span class="shrink-0 text-kira-sm font-semibold" :style="{ color: chipTone(c.tone) }">{{ c.label }}</span>
+        </AdeTip>
+        <span
+          class="min-w-0 flex-1 truncate font-data text-kira-md"
+          :class="row.draft ? 'italic text-muted-foreground' : ''"
+          >{{ branchLabel(row) }}</span
+        >
+      </button>
+    </div>
+  </div>
+</template>
