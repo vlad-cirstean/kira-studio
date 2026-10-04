@@ -252,15 +252,8 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 	lastCommit := row.CommitterUnix * 1000
 	wb.LastCommitAt = &lastCommit
 	wb.Worktree = row.WorktreePath
-	wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = row.Upstream, row.UpstreamAhead, row.UpstreamBehind
-	if row.Upstream == "" && sc.remote != "" {
-		if remoteRow, found := findRemoteRow(sc.inv, sc.remote, sb.Name); found {
-			ahead, behind, err := sc.entry.AheadBehind(ctx, row.Tip, remoteRow.Tip)
-			if err != nil {
-				return out, err
-			}
-			wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = remoteRow.Ref, ahead, behind
-		}
+	if err := sc.fillUpstream(ctx, wb, sb, row); err != nil {
+		return out, err
 	}
 
 	base := sc.resolveBase(sb)
@@ -276,17 +269,9 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 		wb.Commits = toWireCommits(rf.Commits)
 		files = rf.Files
 	}
-	depth := 0
-	if sc.hasMain {
-		if sb.Base == "" || sb.Base == sc.mainName {
-			depth = wb.Ahead
-		} else {
-			ahead, _, err := sc.entry.AheadBehind(ctx, row.Tip, sc.mainTip)
-			if err != nil {
-				return out, err
-			}
-			depth = ahead
-		}
+	depth, err := sc.mainDepth(ctx, sb, row, wb.Ahead)
+	if err != nil {
+		return out, err
 	}
 	wb.CommitCount = depth
 
@@ -327,6 +312,36 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 		}
 	}
 	return out, nil
+}
+
+// fillUpstream sets the tracked upstream, falling back to a same-named remote branch.
+func (sc *boardCtx) fillUpstream(ctx context.Context, wb *adewire.Branch, sb model.AdeTaskBranch, row porcelain.InventoryRef) error {
+	wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = row.Upstream, row.UpstreamAhead, row.UpstreamBehind
+	if row.Upstream != "" || sc.remote == "" {
+		return nil
+	}
+	remoteRow, found := findRemoteRow(sc.inv, sc.remote, sb.Name)
+	if !found {
+		return nil
+	}
+	ahead, behind, err := sc.entry.AheadBehind(ctx, row.Tip, remoteRow.Tip)
+	if err != nil {
+		return err
+	}
+	wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = remoteRow.Ref, ahead, behind
+	return nil
+}
+
+// mainDepth is the branch's commit count over main; baseAhead is reused when main is the base.
+func (sc *boardCtx) mainDepth(ctx context.Context, sb model.AdeTaskBranch, row porcelain.InventoryRef, baseAhead int) (int, error) {
+	if !sc.hasMain {
+		return 0, nil
+	}
+	if sb.Base == "" || sb.Base == sc.mainName {
+		return baseAhead, nil
+	}
+	ahead, _, err := sc.entry.AheadBehind(ctx, row.Tip, sc.mainTip)
+	return ahead, err
 }
 
 func toWireFiles(changes []porcelain.FileChange) []adewire.FileChange {
