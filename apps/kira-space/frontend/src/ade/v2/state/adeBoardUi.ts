@@ -6,6 +6,8 @@ import { ref } from 'vue';
 // selection is in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   const selectedTaskId = ref<string | null>(null);
+  /** Days of history shown beyond the settings window after a Go to; in memory only. */
+  const historyReach = ref<number | null>(null);
   const showAllItems = useLocalStorage('kira.ade.showAllItems', false);
   const showHistory = useLocalStorage('kira.ade.showHistory', false);
   const hiddenRepoIds = useLocalStorage<string[]>('kira.ade.hiddenRepoIds', []);
@@ -20,5 +22,13 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
       : [...hiddenRepoIds.value, codeRepoId];
   }
 
-  return { selectedTaskId, showAllItems, showHistory, hiddenRepoIds, select, toggleRepo };
+  return {
+    selectedTaskId,
+    historyReach,
+    showAllItems,
+    showHistory,
+    hiddenRepoIds,
+    select,
+    toggleRepo,
+  };
 });
