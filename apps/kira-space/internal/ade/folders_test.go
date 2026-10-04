@@ -94,9 +94,9 @@ func TestAddFolder_importsRealReposOnly(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	repos, rerr := h.board.Repos(context.Background())
-		if rerr != nil {
-			t.Fatal(rerr)
-		}
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
 	sources := map[string]string{}
 	for _, r := range repos.Repos {
 		sources[r.Name] = r.Source

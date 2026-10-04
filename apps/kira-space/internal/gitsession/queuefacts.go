@@ -3,9 +3,11 @@ package gitsession
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
@@ -229,4 +231,85 @@ func (e *RepoEntry) StackParents(ctx context.Context) (map[string]string, error)
 		}
 	}
 	return out, nil
+}
+
+// IsAncestor reports whether a is reachable from b (`merge-base --is-ancestor`); an unresolvable
+// ref reads as false.
+func (e *RepoEntry) IsAncestor(ctx context.Context, a, b string) (bool, error) {
+	return e.isAncestorOrNot(ctx, a, b)
+}
+
+// CountRange counts the commits reachable from tip but not from base.
+func (e *RepoEntry) CountRange(ctx context.Context, base, tip string) (int, error) {
+	return e.countRange(ctx, base, tip)
+}
+
+// Cherry runs `git cherry <upstream> <head> <limit>` and returns how many commits of head have no
+// equivalent patch in upstream (plus) and how many do (minus). Commits reachable from upstream are
+// not listed at all.
+func (e *RepoEntry) Cherry(ctx context.Context, upstream, head, limit string) (plus, minus int, err error) {
+	out, err := e.runOne(ctx, porcelain.CherryArgs(upstream, head, limit))
+	if err != nil {
+		return 0, 0, err
+	}
+	plus, minus = porcelain.ParseCherry(out)
+	return plus, minus, nil
+}
+
+// DiffPatchID is the patch id of the PR-shaped diff base...tip ("" when that diff is empty).
+func (e *RepoEntry) DiffPatchID(ctx context.Context, base, tip string) (string, error) {
+	ids, err := e.pipePatchID(ctx, porcelain.ThreeDotDiffArgs(base, tip))
+	if err != nil || len(ids) == 0 {
+		return "", err
+	}
+	return ids[0], nil
+}
+
+// RecentPatchIDs returns the patch ids of the last n non-merge commits reachable from ref.
+func (e *RepoEntry) RecentPatchIDs(ctx context.Context, ref string, n int) ([]string, error) {
+	return e.pipePatchID(ctx, porcelain.LogPatchArgs(ref, n))
+}
+
+// pipePatchID streams a patch-producing read into `git patch-id --stable` and returns its ids.
+// Read-only: neither process touches the worktree, the index, HEAD or any ref.
+func (e *RepoEntry) pipePatchID(ctx context.Context, producer []string) ([]string, error) {
+	var ids []string
+	err := e.Repo.Read(ctx, func(ctx context.Context) error {
+		runner, gitPath, dir := e.Repo.Runner(), e.Repo.GitPath(), repoWorkingDir(e.Summary)
+		src, err := runner.Start(ctx, gitPath, gitclient.Spec{Dir: dir, Args: producer, ReadOnly: true})
+		if err != nil {
+			return err
+		}
+		defer src.Close() //nolint:errcheck
+		sink, err := runner.Start(ctx, gitPath, gitclient.Spec{Dir: dir, Args: porcelain.PatchIDArgs(), ReadOnly: true, Stdin: true})
+		if err != nil {
+			return err
+		}
+		defer sink.Close() //nolint:errcheck
+		go func() {
+			_, _ = io.Copy(sink.Stdin(), src.Stdout())
+			_ = sink.Stdin().Close()
+		}()
+		out, rerr := io.ReadAll(sink.Stdout())
+		sinkRes, werr := sink.Wait()
+		if rerr != nil {
+			return rerr
+		}
+		if werr != nil {
+			return werr
+		}
+		if cerr := gitclient.Classify(ctx, porcelain.PatchIDArgs(), sinkRes, nil); cerr != nil {
+			return cerr
+		}
+		srcRes, werr := src.Wait()
+		if werr != nil {
+			return werr
+		}
+		if cerr := gitclient.Classify(ctx, producer, srcRes, nil); cerr != nil {
+			return cerr
+		}
+		ids = porcelain.ParsePatchIDs(out)
+		return nil
+	})
+	return ids, err
 }

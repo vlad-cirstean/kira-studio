@@ -562,6 +562,10 @@ func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefr
 	if err != nil {
 		return refreshFailure(id, err)
 	}
+	marksBefore, err := b.marksOfRepo(id)
+	if err != nil {
+		return refreshFailure(id, err)
+	}
 	beforeTips := make(map[string]string, len(before))
 	for _, r := range before {
 		beforeTips[r.Ref] = r.Tip
@@ -590,6 +594,7 @@ func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefr
 	}
 
 	facts := b.repoFacts(ctx, id, mine, nil)
+	out.MergedInto = newlyMerged(mine, facts, marksBefore)
 	if err := b.deps.Tasks.MarkBranchFacts(facts.hadCommits, facts.merged); err != nil {
 		return refreshFailure(id, err)
 	}

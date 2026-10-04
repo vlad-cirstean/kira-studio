@@ -46,6 +46,7 @@ const adeRepoChangedDebounce = 250 * time.Millisecond
 const (
 	branchFactsCacheCap = 512
 	mergeTreeCacheCap   = 512
+	patchIDCacheCap     = 32
 )
 
 // SessionRef is QueueDeps.Sessions' own per-session shape — a purpose-built projection of
@@ -232,12 +233,16 @@ type mergeTreeKey struct{ TipA, TipB string }
 type repoCaches struct {
 	branch    *lru.Cache[branchFactsKey, branchFactsValue]
 	mergeTree *lru.Cache[mergeTreeKey, []string]
+	contain   *lru.Cache[containKey, containment]
+	patchIDs  *lru.Cache[string, map[string]struct{}] // target tip -> patch ids of its recent commits
 }
 
 func newRepoCaches() *repoCaches {
 	b, _ := lru.New[branchFactsKey, branchFactsValue](branchFactsCacheCap)
 	m, _ := lru.New[mergeTreeKey, []string](mergeTreeCacheCap)
-	return &repoCaches{branch: b, mergeTree: m}
+	c, _ := lru.New[containKey, containment](branchFactsCacheCap)
+	p, _ := lru.New[string, map[string]struct{}](patchIDCacheCap)
+	return &repoCaches{branch: b, mergeTree: m, contain: c, patchIDs: p}
 }
 
 // --- Queue -----------------------------------------------------------------------------------

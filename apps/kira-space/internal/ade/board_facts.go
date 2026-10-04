@@ -54,6 +54,11 @@ type boardCtx struct {
 	nowMs     int64
 	resolved  map[string]resolvedRef // branch id -> resolved ref
 	byName    map[string]model.AdeTaskBranch
+	// P145 facts: configured integration targets and environments, the stored marks and env states.
+	targets  []string
+	envs     []model.AdeRepoEnv
+	envState map[string]model.AdeEnvState
+	marks    map[string][]model.AdeBranchMark // branch id -> marks
 }
 
 // ownerOf is the display owner of a ref: empty for the user's own commits.
@@ -164,6 +169,9 @@ func (b *TaskBoard) collectRepo(ctx context.Context, entry *gitsession.RepoEntry
 		sc.mainName, _ = mainDisplay(mainRefName)
 	}
 	res.state = adewire.RepoState{CodeRepoID: codeRepoID, MainName: sc.mainName, Remote: remote, LastFetchAt: lastFetchAt(entry)}
+	if err := b.loadFacts(sc, branches); err != nil {
+		return err
+	}
 	for _, sb := range branches {
 		if sb.Name == "" {
 			continue
@@ -285,6 +293,10 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 		}
 	}
 
+	if sb.Kind == model.AdeBranchKindMine && base.ok {
+		wb.Integration = b.integrationFacts(ctx, sc, sb, base.tip, row.Tip)
+	}
+
 	hadCommits := sb.HadCommits || depth > 0
 	out.hadNew = hadCommits && !sb.HadCommits
 	byAncestor := mergedRule(sc.hasMain && depth == 0, hadCommits, "")
@@ -358,4 +370,32 @@ func toWireCommits(commits []porcelain.RangeCommit) []adewire.Commit {
 		out[i] = adewire.Commit{Sha: c.Sha, Message: c.Subject}
 	}
 	return out
+}
+
+// loadFacts reads the configured integration targets, environments, stored marks and env states of
+// one repo into sc.
+func (b *TaskBoard) loadFacts(sc *boardCtx, branches []model.AdeTaskBranch) error {
+	configs, err := b.deps.RepoConfig.List()
+	if err != nil {
+		return err
+	}
+	for _, c := range configs {
+		if c.CodeRepoID == sc.repoID {
+			sc.targets, sc.envs = c.IntegrationBranches, c.Environments
+		}
+	}
+	if b.deps.Facts == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(branches))
+	for _, sb := range branches {
+		if sb.Kind == model.AdeBranchKindMine && sb.Name != "" {
+			ids = append(ids, sb.ID)
+		}
+	}
+	if sc.marks, err = b.deps.Facts.Marks(ids); err != nil {
+		return err
+	}
+	sc.envState, err = b.deps.Facts.EnvStates(sc.repoID)
+	return err
 }
