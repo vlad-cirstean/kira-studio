@@ -17,7 +17,7 @@ import type {
   Workflow,
   WorkflowsResult,
 } from '../../frontend/src/ade/v2/wire';
-import { loadFixture, mkBranch, mkPlan, mkTask } from './support/adeV2Fixtures';
+import { loadFixture, mkBranch, mkPlan, mkRun, mkStage, mkTask } from './support/adeV2Fixtures';
 import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 
 // Parity: the board logic over the P143 fixtures equals the mockup's own `renderVals()` for status,
@@ -404,5 +404,38 @@ describe('rebase-conflict check states', () => {
     expect(
       tagFor({ conflictCheck: 'failed', conflictCheckReason: 'git 2.30 is older than 2.38' }),
     ).toEqual(['conflict check failed', [], 'git 2.30 is older than 2.38']);
+  });
+});
+
+describe('script stage recovery', () => {
+  const actionFor = (state: 'failed' | 'stuck') => {
+    const script = mkStage({
+      id: 'release',
+      kind: 'script',
+      command: 'make release',
+      runsOn: 'each repo',
+    });
+    const b = mkBranch({ id: 'b', taskId: 't', setup: null });
+    const t = mkTask({
+      id: 't',
+      branchIds: ['b'],
+      workflowId: 'w',
+      stageId: 'release',
+      currentStage: script,
+      runs: [mkRun({ taskId: 't', stageId: 'release', stepId: 'release', branchId: 'b', state })],
+    });
+    const p = buildTaskProgress({
+      task: t,
+      workflow: { id: 'w', name: 'w', stages: [script] },
+      branch: () => b,
+      repoNick: (id) => id,
+    });
+    const status = deriveStatus({ task: t, progress: p, branches: [b], hasSessions: false });
+    return taskCell({ task: t, progress: p, status, branches: [b], sessions: [] })?.action;
+  };
+
+  test('a stuck script run offers Retry like a failed one (R23)', () => {
+    expect(actionFor('failed')?.kind).toBe('retry');
+    expect(actionFor('stuck')?.kind).toBe('retry');
   });
 });

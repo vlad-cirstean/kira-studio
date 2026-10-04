@@ -170,7 +170,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
           >
             Retry
           </Button>
-          <AdeTip :text="rl.note">
+          <AdeTip v-if="rl.note" :text="rl.note">
             <span class="min-w-0 truncate text-kira-sm text-muted-foreground" data-testid="ade-run-note">{{ rl.note }}</span>
           </AdeTip>
         </div>

@@ -273,3 +273,46 @@ test('Details lists every environment of the repo, not deployed where the branch
   await expect(rows.first()).toContainText('not deployed');
   await expect(page.locator('[data-testid="ade-branch-deploy"][data-env="prod"]')).toBeVisible();
 });
+
+// ---- worktree setup
+
+test('a running setup shows a ticking preparing tag', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const tag = page
+    .locator('[data-testid="ade-task"][data-task-id="T_push"] [data-testid="ade-tag"]')
+    .filter({ hasText: 'preparing' });
+  await expect(tag).toHaveCount(1);
+  const first = await tag.textContent();
+  await expect.poll(async () => tag.textContent()).not.toBe(first);
+});
+
+test('See error opens the branch with the failed setup log, Retry setup sends the branch', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await page
+    .locator('[data-testid="ade-task"][data-task-id="T_search"] [data-testid="ade-see-error"]')
+    .click();
+  await expect(page.locator('[data-testid="ade-branch-details"]')).toBeVisible();
+  const setup = page.locator('[data-testid="ade-worktree-setup"]');
+  await expect(setup).toBeVisible();
+  await expect(setup).toContainText('failed');
+  await expect(setup).toContainText('prepare-worktree script of');
+  await expect(setup.locator('[data-testid="ade-run-log"]')).toContainText('ERR_PNPM_FETCH_404');
+
+  await page.locator('[data-testid="ade-setup-retry"]').click();
+  await expect
+    .poll(() => control.log().filter((e) => e.channel === IPC.adeTaskRetrySetup))
+    .toHaveLength(1);
+  expect(control.log().find((e) => e.channel === IPC.adeTaskRetrySetup)?.args).toEqual({
+    branchId: 'b_searchui',
+  });
+});
+
+test('a ready setup shows its status without a log', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_search"]').click();
+  const setup = page.locator('[data-testid="ade-worktree-setup"]');
+  await expect(setup).toContainText('ready');
+  await expect(setup.locator('[data-testid="ade-run-log"]')).toHaveCount(0);
+});

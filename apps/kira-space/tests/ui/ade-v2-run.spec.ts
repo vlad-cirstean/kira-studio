@@ -1,0 +1,240 @@
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import {
+  type AdeBoardFx,
+  adeBoard,
+  adeFixture,
+  emitLog,
+  emitRuns,
+  openPlan,
+} from './support/adeV2';
+import { IPC } from './support/ipcChannels';
+import type { ControlSnapshot } from './support/types';
+
+// Workflow block, run lines, the Run dialog and the stage actions on the Plan.
+
+const t = (id: string) => `[data-testid="${id}"]`;
+const task = (id: string) => `[data-testid="ade-task"][data-task-id="${id}"]`;
+const cellAction = (id: string, kind: string) =>
+  `${task(id)} ${t('ade-task-cells')} ${t(`ade-task-action-${kind}`)}`;
+
+function boardWith(edit: (b: AdeBoardFx) => void): ControlSnapshot[] {
+  return [{ channel: IPC.adeTaskBoard, response: adeBoard(edit) }];
+}
+
+function calls(control: { log(): { channel: string; args?: unknown }[] }, channel: string) {
+  return control.log().filter((e) => e.channel === channel);
+}
+
+async function open(page: Page, id: string): Promise<void> {
+  await page
+    .locator(`[data-testid="ade-card"][data-task-id="${id}"] [data-testid="ade-card-head"]`)
+    .click();
+  await expect(page.locator(t('ade-panel'))).toBeVisible();
+}
+
+const stage = (page: Page, stageId: string) =>
+  page.locator(`${t('ade-stage-block')}[data-stage-id="${stageId}"]`);
+
+/** T_alerts moved to a not yet started Implement stage of the standard workflow. */
+function alertsInImpl(b: AdeBoardFx): void {
+  const bill = b.tasks.find((x) => x.id === 'T_bill');
+  const alerts = b.tasks.find((x) => x.id === 'T_alerts');
+  if (!bill || !alerts) throw new Error('fixture tasks missing');
+  alerts.stageId = 'impl';
+  alerts.workflowId = 'standard';
+  alerts.currentStage = bill.currentStage;
+  alerts.runs = [];
+}
+
+test('the Workflow select sends SetTaskWorkflow', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await open(page, 'T_bill');
+  await page.locator(t('ade-workflow-select')).selectOption('bugfix');
+  await expect.poll(() => calls(control, IPC.adeTaskSetTaskWorkflow)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskSetTaskWorkflow)[0]?.args).toEqual({
+    taskId: 'T_bill',
+    workflowId: 'bugfix',
+  });
+});
+
+test('Edit workflows opens the Workflows page', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_bill');
+  await page.locator(t('ade-edit-workflows')).click();
+  await expect(page.locator(t('ade-workflows'))).toBeVisible();
+});
+
+test('the Run dialog shows the default message and the read-only suffix', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  await page.locator(cellAction('T_alerts', 'run')).click();
+  const dialog = page.locator(t('ade-run-dialog'));
+  await expect(dialog).toContainText('Run Implement in the background');
+  await expect(dialog.locator(t('ade-run-branch'))).toHaveCount(2);
+  const msg = dialog.locator(t('ade-run-message'));
+  await expect(msg).toHaveValue(
+    /^Task: .*\n- Jira: PAY-130 \S+\n- Repo: \{repo\} · Branch: \{branch\} · Worktree: \{worktree\}\nStep 1\/5: Plan from spec\n/,
+  );
+  await expect(dialog.locator(t('ade-run-suffix'))).toContainText('call the finish_step tool');
+  await expect(msg).not.toHaveValue(/finish_step/);
+
+  await dialog.locator(t('ade-run-branch')).nth(1).fill('feat/alerts-web');
+  await dialog.locator(t('ade-run-send')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskStartRun)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStartRun)[0]?.args).toEqual({
+    taskId: 'T_alerts',
+    branchNames: { d_alerts_api: '', d_alerts_web: 'feat/alerts-web' },
+    message: '',
+  });
+  await expect(dialog).toBeHidden();
+});
+
+test('an edited message is sent and Reset restores the default', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  await page.locator(cellAction('T_alerts', 'run')).click();
+  const dialog = page.locator(t('ade-run-dialog'));
+  const msg = dialog.locator(t('ade-run-message'));
+  const original = await msg.inputValue();
+  await msg.fill('Do it differently');
+  await dialog.locator(t('ade-run-reset')).click();
+  await expect(msg).toHaveValue(original);
+  await msg.fill('Do it differently');
+  await dialog.locator(t('ade-run-send')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskStartRun)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStartRun)[0]?.args).toMatchObject({
+    message: 'Do it differently',
+  });
+});
+
+test('Cancel closes the Run dialog without a call', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch, boardWith(alertsInImpl));
+  await page.locator(cellAction('T_alerts', 'run')).click();
+  await page.locator(t('ade-run-cancel')).click();
+  await expect(page.locator(t('ade-run-dialog'))).toBeHidden();
+  expect(calls(control, IPC.adeTaskStartRun)).toHaveLength(0);
+});
+
+test('a pushed runs event updates the step line', async ({ relaunch }) => {
+  const ev = adeFixture<{ runs: Record<string, unknown>[] }>('event-runs');
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_bill');
+  const line = stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '4/10' });
+  await expect(line).toHaveCount(1);
+  await emitRuns(page, [{ ...ev.runs[0], todo: [7, 10] }]);
+  await expect(
+    stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '7/10' }),
+  ).toHaveCount(1);
+});
+
+test('Approve sends the gated step', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(
+    relaunch,
+    boardWith((b) => {
+      const hooks = b.tasks.find((x) => x.id === 'T_hooks');
+      if (hooks) hooks.runs = hooks.runs.filter((r) => r.stepId !== 'pr');
+    }),
+  );
+  await page.locator(cellAction('T_hooks', 'approve')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskApprove)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskApprove)[0]?.args).toEqual({
+    taskId: 'T_hooks',
+    stageId: 'impl',
+    stepId: 'pr',
+  });
+});
+
+test('Retry re-runs a failed script run', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(relaunch);
+  await page.locator(cellAction('T_cart', 'retry')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRetryRun)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskRetryRun)[0]?.args).toEqual({
+    runId: 'r_T_cart_release_b_cart',
+  });
+});
+
+test('Retry also covers a stuck run and the step line offers it', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(
+    relaunch,
+    boardWith((b) => {
+      const cart = b.tasks.find((x) => x.id === 'T_cart');
+      const run = cart?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
+      if (run) run.state = 'stuck';
+    }),
+  );
+  await open(page, 'T_cart');
+  await stage(page, 'release').locator(t('ade-run-retry')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskRetryRun)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskRetryRun)[0]?.args).toEqual({
+    runId: 'r_T_cart_release_b_cart',
+  });
+});
+
+test('Done and Finish call StageDone', async ({ relaunch }) => {
+  const { window: page, control } = await openPlan(
+    relaunch,
+    boardWith((b) => {
+      const cart = b.tasks.find((x) => x.id === 'T_cart');
+      const run = cart?.runs.find((r) => r.id === 'r_T_cart_release_b_cart');
+      if (run) run.state = 'done';
+      for (const r of b.tasks.find((x) => x.id === 'T_hooks')?.runs ?? []) r.state = 'done';
+    }),
+  );
+  await page.locator(cellAction('T_hooks', 'done')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskStageDone)).toHaveLength(1);
+  expect(calls(control, IPC.adeTaskStageDone)[0]?.args).toEqual({ taskId: 'T_hooks' });
+  await page.locator(cellAction('T_cart', 'finish')).click();
+  await expect.poll(() => calls(control, IPC.adeTaskStageDone)).toHaveLength(2);
+  expect(calls(control, IPC.adeTaskStageDone)[1]?.args).toEqual({ taskId: 'T_cart' });
+});
+
+test('a failed action shows its error in the panel', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskRetryRun, error: { code: 'invalid', message: 'run is not failed' } },
+  ]);
+  await page.locator(cellAction('T_cart', 'retry')).click();
+  await expect(page.locator(t('ade-panel-action-error'))).toContainText('run is not failed');
+});
+
+test('a send-back shows on the step line with its loop and note', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_push');
+  const impl = stage(page, 'impl');
+  await expect(impl.locator(t('ade-run-todo')).filter({ hasText: 'sent back' })).toHaveCount(1);
+  await expect(
+    impl.locator(t('ade-run-note')).filter({ hasText: '2 failing tests' }),
+  ).not.toHaveCount(0);
+});
+
+test('Log opens the run log and appends pushed chunks', async ({ relaunch }) => {
+  const page0 = await openPlan(relaunch);
+  const page = page0.window;
+  await open(page, 'T_bill');
+  const line = stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '4/10' });
+  await line.locator(t('ade-run-log-toggle')).click();
+  const log = page.locator(t('ade-run-log'));
+  await expect(log).toBeVisible();
+  const before = await log.locator(t('ade-run-log-line')).count();
+  expect(before).toBeGreaterThan(0);
+  const lastSeq = 99;
+  await emitLog(page, 'run', 'r_T_bill_impl_b_bill', [
+    { seq: lastSeq, at: 1790067600000, stream: 'event', text: 'Edit src/appended.ts' },
+  ]);
+  await expect(log).toContainText('Edit src/appended.ts');
+});
+
+test('a script run offers Output, and the Release block lists the branches', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_cart');
+  await expect(stage(page, 'release').locator(t('ade-run-log-toggle'))).toHaveText('Output');
+  await expect(stage(page, 'release').locator(t('ade-release-row'))).toHaveCount(1);
+});
+
+test('Take over, Start and Archive buttons are not offered', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await open(page, 'T_bill');
+  for (const name of [/Take over/, /▶ Start/, /Archive/]) {
+    await expect(page.getByRole('button', { name })).toHaveCount(0);
+  }
+});
