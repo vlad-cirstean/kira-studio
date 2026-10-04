@@ -466,9 +466,9 @@ Runnable form of the ad-hoc sweeps P107/P113/P115 ran against `.codegraph/codegr
 never committed as a script; method text lives in `docs/v1.9/plans/P107-duplication-findings*.md`
 §0 and `P113-duplication-sweep.md` §0). Opens the index read-only via `bun:sqlite`, reads each
 function/method body from disk by `nodes.file_path` + line span, never writes. Needs an index
-(`scripts/codegraph-setup.sh`); with none it prints how to build one and exits 0. In a fresh
-worktree, point at another checkout's index: `--db /path/.codegraph/codegraph.db --root .`
-(`--root` = where the source files are read from).
+(`scripts/codegraph-setup.sh`); with none it prints how to build one and exits 0. In a linked
+worktree with no index of its own, falls back to the main checkout's (`git worktree list`); override
+with `--db`/`CODEGRAPH_DB`. `--root` = where source files are read from.
 
 ```sh
 bun scripts/codegraph-duplicates.ts --path apps/kira-studio/internal --lang go --top 10

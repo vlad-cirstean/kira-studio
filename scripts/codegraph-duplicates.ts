@@ -12,6 +12,7 @@
  * Every hit is a candidate to read, never a verdict.
  */
 import { Database } from 'bun:sqlite';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -21,7 +22,7 @@ const HELP = `codegraph-duplicates.ts - duplication candidates from .codegraph/c
 
   bun scripts/codegraph-duplicates.ts [options]
 
-  --db <path>         index (env CODEGRAPH_DB; default <root>/.codegraph/codegraph.db)
+  --db <path>         index (env CODEGRAPH_DB; default <root>/.codegraph/codegraph.db, else main checkout's)
   --root <dir>        source root the index paths are relative to (default: repo root)
   --path <substr>     keep groups with a member whose file path contains substr (repeatable)
   --lang <name>       go | typescript | vue | ... (default: all)
@@ -61,9 +62,32 @@ if (o.help) {
 }
 
 const root = resolve(o.root ?? join(dirname(new URL(import.meta.url).pathname), '..'));
-const dbPath = resolve(
-  o.db ?? process.env.CODEGRAPH_DB ?? join(root, '.codegraph', 'codegraph.db'),
-);
+
+// Linked worktrees often lack their own index; fall back to the main checkout's.
+function mainCheckoutDb(): string | undefined {
+  try {
+    const out = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    const main = out
+      .split('\n')
+      .find((l) => l.startsWith('worktree '))
+      ?.slice(9);
+    return main ? join(main, '.codegraph', 'codegraph.db') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+let dbPath = resolve(o.db ?? process.env.CODEGRAPH_DB ?? join(root, '.codegraph', 'codegraph.db'));
+if (!o.db && !process.env.CODEGRAPH_DB && !existsSync(dbPath)) {
+  const fallback = mainCheckoutDb();
+  if (fallback && existsSync(fallback)) {
+    console.error(`codegraph-duplicates: no index in worktree, using ${fallback}`);
+    dbPath = fallback;
+  }
+}
 if (!existsSync(dbPath)) {
   console.error(
     `codegraph-duplicates: no index at ${dbPath}\n` +
