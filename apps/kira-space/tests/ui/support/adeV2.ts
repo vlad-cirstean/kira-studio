@@ -112,6 +112,7 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskArchiveTask },
     { channel: IPC.adeTaskRecordMerge },
     { channel: IPC.adeTaskSetQueuedAfter },
+    { channel: IPC.terminalOpen, response: { shell: '/bin/zsh' } },
   ];
   const overridden = new Set(extra.map((s) => s.channel));
   return [...defaults.filter((s) => !overridden.has(s.channel)), ...extra];
