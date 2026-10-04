@@ -27,6 +27,9 @@ type Repos struct {
 	Tabs            *TabsRepo
 	AdeSessions     *AdeSessionsRepo
 	AdeQueue        *AdeQueueRepo
+	AdeTasks        *AdeTaskRepo
+	AdeBacklog      *AdeBacklogRepo
+	AdeRepoConfig   *AdeRepoConfigRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -58,6 +61,9 @@ func New(db *sql.DB) (*Repos, error) {
 		Tabs:            &TabsRepo{DB: db, selectAll: tabsSelectAll},
 		AdeSessions:     &AdeSessionsRepo{DB: db},
 		AdeQueue:        &AdeQueueRepo{DB: db},
+		AdeTasks:        &AdeTaskRepo{DB: db},
+		AdeBacklog:      &AdeBacklogRepo{DB: db},
+		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }
