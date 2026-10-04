@@ -4,8 +4,9 @@
 import { globSync, readFileSync } from 'node:fs';
 import { matchesGlob } from 'node:path';
 
+/** @type {{ globalExcludes: string[], areas: Record<string, { mutate: string[], tests: string[], excludeTests: { path: string }[] }> }} */
 const spec = JSON.parse(readFileSync(new URL('./areas.json', import.meta.url), 'utf8'));
-const name = process.env.MUTATION_AREA;
+const name = process.env.MUTATION_AREA ?? '';
 const area = spec.areas[name];
 if (!area) throw new Error(`unknown mutation area: ${name}`);
 
@@ -21,7 +22,9 @@ const tests = area.tests
 
 let mutate = area.mutate;
 if (process.env.MUTATION_ONLY) {
-  mutate = JSON.parse(process.env.MUTATION_ONLY).filter(
+  /** @type {string[]} */
+  const changed = JSON.parse(process.env.MUTATION_ONLY);
+  mutate = changed.filter(
     (f) =>
       area.mutate.some((g) => matchesGlob(f, g)) &&
       !spec.globalExcludes.some((g) => matchesGlob(f, g)),
