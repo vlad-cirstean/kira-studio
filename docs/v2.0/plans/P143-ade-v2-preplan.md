@@ -2,7 +2,8 @@
 
 Phasing plan only, not an implementation plan. Every phase below still gets its own Opus plan
 under `plans/` before implementation (`CLAUDE.md` loop). That plan restates and may tighten the
-stream split proposed here; it must not loosen it. **Status: proposed, pending user approval.**
+stream split proposed here; it must not loosen it. **Status: proposed, pending user approval.
+User decisions on the former open questions recorded in §6.**
 
 ## 0. Inputs and base
 
@@ -20,25 +21,31 @@ Kira Space `ade` today (P129 Parts 1-7, P135-P140) is per-repo branch planning.
 | Area | Today | SPEC2 effect |
 |---|---|---|
 | Agent runtime | `internal/ade/tracker.go` (`Tracker.Prepare/Compose/Reconcile/HandleEvent/Send`), `command.go` (`claude --session-id`, `claude --resume`), interactive PTY only via `terminal.Registry`; hook activity via `internal/agenthooks` (`Manager.ComposeLaunch`) | **Extend.** TUI launch kept for user stages, Start, Take over. New: headless `claude -p --output-format stream-json` runner (no PTY), per-run session ids, `claude -p --resume` for send-back, TUI `--resume` of a headless id |
-| Sessions store | `storage/repos/adesessions.go`, table `ade_sessions` (0004), keyed by `code_repo_id` + `branch`/`new_work_id` | **Extend.** Add `mode` (`tui`/`headless`), `task_id`, `step_id`, `branch_id`, `resumes` |
-| Queue / git facts | `internal/ade/queue.go` (`Queue.snapshotLocked`, `Refresh`, `ForcePush`, `Archive`, `ArchiveRisk`, `reconcileNewWork`), `facts.go` (`pairFacts` via `git merge-tree --write-tree`, `atRisk`), LRU caches (`hashicorp/golang-lru`) | **Reuse per repo**, re-keyed from per-repo items to task branches. New facts: integration merged/stale, deployments, base marker inputs. v1-only parts (new-work rebind heuristics, per-repo plan, dependencies, work types) go |
-| Queue store | `storage/repos/adequeue.go`, tables `ade_branches`, `ade_new_work`, `ade_plan`, `ade_colors` (0005), `ade_dependencies`/`ade_blockers` (0006), `work_type` (0007) | **Replace.** New task model (§12). Data migration from v1 rows (open question Q5) |
+| Sessions store | `storage/repos/adesessions.go`, table `ade_sessions` (0004), keyed by `code_repo_id` + `branch`/`new_work_id` | **Extend.** Add `mode` (`tui`/`headless`), `task_id`, `step_id`, `branch_id`, `resumes`. Existing v1 rows stay unread |
+| Queue / git facts | `internal/ade/queue.go` (`Queue.snapshotLocked`, `Refresh`, `ForcePush`, `Archive`, `ArchiveRisk`, `reconcileNewWork`), `facts.go` (`pairFacts` via `git merge-tree --write-tree`, `atRisk`), LRU caches (`hashicorp/golang-lru`) | **Reuse per repo**, re-keyed from per-repo items to task branches. New facts: integration merged/stale, deployments, base marker inputs, rebase-conflict check (D1). v1-only parts (new-work rebind heuristics, per-repo plan, dependencies, work types) go |
+| Queue store | `storage/repos/adequeue.go`, tables `ade_branches`, `ade_new_work`, `ade_plan`, `ade_colors` (0005), `ade_dependencies`/`ade_blockers` (0006), `work_type` (0007) | **Replace.** New task model (§12). No data migration: v1 tables dropped, app starts empty (D5) |
 | Bridge | `internal/bridge/ade.go` (`AdeService`, ~1500 lines, 19+ bound methods), TS `frontend/src/bridge/index.ts` + `ade/wire.ts`; bindings generated, not tracked | **Replace** with a new task-based surface; v1 methods removed last (P148) |
 | Prepare script | `internal/gitprepare` (fixed `PrepareTimeout` 15m), per-repo leaf `GitRepoSettings.WorktreePrepareScript`, run from `gitsession/worktree.go` for git-ui's worktree add | **Extend.** Per-repo timeout (§6.3), state/log persisted per worktree, gate agent starts (§6.1) |
 | Repos | `code_repos` (`name`, `root`, `repo_id`, `sort_order`), `CodeReposRepo`, `bridge/codeworkspace.go` (`ImportRepo`, `RenameRepo`, `ReorderRepos`, `RemoveRepo`); shared with the Git module | **Extend.** Nickname, folders + watch, integration branches, environments, prepare timeout |
 | MCP | `apps/kira-studio/internal/dbmcp` (HTTP MCP on `modelcontextprotocol/go-sdk`, `internal/mcpauth` tokens) — Studio only | **New in Space:** `finish_step` MCP server, same SDK, same auth pattern |
-| YAML | `go.yaml.in/yaml/v3` indirect only; no YAML in Space | **New:** workflow files, folder watch via `fsnotify` (already direct) |
+| YAML | `go.yaml.in/yaml/v3` indirect only; no YAML in Space | **New:** workflow files in a `workflows/` subfolder of the app home folder, no seeded defaults (D2), folder watch via `fsnotify` (already direct) |
 | Frontend | `frontend/src/ade/*` (35 `.vue`, 30 `.ts`): `AdeView` -> `AdeRepoTabs` + `AdeRepoView` / `AdeAllAgentsView`; `useQueue.ts` (2400 lines, pure); TanStack `queries.ts`/`mutations.ts`; Pinia `adeUi`, `adeActions`, `adeDrag`, `adeTerminals`, `agentSessions`; `AdeClaudeDialog` + `dialogCompose.ts`/`dialogFlow.ts`; TipTap notes; xterm via terminal module | **Replace** views and `useQueue`; **reuse** Claude dialog machinery (busy check, override, editable message, Reset, push switch), notes editor, estimate field, activity icons, terminals, tab strip, panel resize, day controls |
 | Tests | `tests/unit/ade-*.spec.ts` (queue parity/rules, dialog rules), `tests/ui/ade-*.spec.ts` (mock control runtime `tests/ui/support/mockRuntime`) | v1 specs deleted with v1 code; v2 specs written against the mock runtime |
 
-Design §3.1 "native Go git library": already declined app-wide (`docs/ARCHITECTURE.md` ~line 2240:
-go-git `Merge` is fast-forward only; `git merge-tree --write-tree` used, no worktree touched).
-SPEC2 §6/§6.2 repeat "native Go git". Plan carries the precedent: `git merge-base --is-ancestor`
-plus `git cherry`/`git patch-id --stable` through `gitclient`, in memory, no checkout (Q1 confirms).
+Design §3.1 / SPEC2 §6, §6.2 "native Go git": previously declined app-wide (`docs/ARCHITECTURE.md`
+~line 2240: go-git v5 `Merge` is fast-forward only; `git merge-tree --write-tree` used, no worktree
+touched). **D1 satisfies SPEC2 this way:** `git` CLI through `gitclient` for every operation
+(`--is-ancestor`, `git cherry`/`patch-id --stable`, fetch, push, worktree, rebase); go-git
+(`github.com/go-git/go-git/v5`, Apache-2.0, actively maintained v5 line, v5.19.2 in the module cache,
+not yet in `go.mod`) only for the plain merge-conflict check. After every refresh, every visible
+branch is checked for conflicts if rebased onto the latest base; results feed the existing conflict
+tags. go-git v5 has no three-way merge, so that check is built on its object plumbing (merge-base,
+tree walk, per-path three-way compare); the P144 plan verifies it against `merge-tree` results
+(§6 open item O1).
 
 **Migration need:** one Space migration (`0008`) adds task tables, extends `ade_sessions`, adds repo
-config tables, then migrates v1 rows (Q5). A later migration (P148) drops v1 tables once nothing
-reads them.
+config tables. No v1 row migration (D5). A later migration (P148) drops v1 tables once nothing
+reads them; v1 UI is gone from P145, so v1 rows are unreachable from then.
 
 ## 2. Phase list and waves
 
@@ -88,7 +95,9 @@ XL stream into `Part 1`/`Part 2` of the same `P` (agent split rule), still two s
 - **Scope.** Wire contract for the whole v2 surface, frozen: Go wire structs (`bridge/adev2_wire.go`)
   and TS mirror (`frontend/src/ade/v2/wire.ts`) for SPEC2 §12 (`Task`, `Branch`, `Run`, `Session`,
   `Workflow`, `Stage`, `PipelineStep`, `Plan`, `BacklogItem`, `Repo`, `Folder`, `WorktreeSetup`,
-  `Deployment`, integration status) plus result/args/event shapes. Method and push-channel list for
+  `Deployment`, integration status, `AdeSettings`, run log chunk) plus result/args/event shapes. Workflow
+  `PipelineStep` carries `allowed_tools` (D6); `Branch` carries `conflictsIfRebased` (D1); `Task.status`
+  is derived, read-only (D10); no dependency nodes, work types or top-5 field (D16). Method and push-channel list for
   P144-P148 written into the P143 plan (name, args, result, owning wave). Fixtures transcribed from
   `mockup.html` mock data. Go test decoding every fixture with `DisallowUnknownFields` into the Go
   wire types (the one mechanism keeping two languages' contract identical across streams; earns
@@ -101,19 +110,22 @@ XL stream into `Part 1`/`Part 2` of the same `P` (agent split rule), still two s
 ### P144 wave 1: task store ‖ board logic
 
 **Stream A — task store, workflow reader, snapshot, CRUD.**
-- Migration `0008`: `ade_tasks`, `ade_task_branches`, `ade_runs`, `ade_task_plan` (day/order/
+- Migration `0008` (no v1 data migration, D5): `ade_tasks`, `ade_task_branches`, `ade_runs`, `ade_task_plan` (day/order/
   queuedAfter/unpushed), `ade_backlog`, `ade_task_colors`, repo config (`ade_repo_config`:
   nickname, integration branches, prepare timeout; `ade_repo_envs`; `ade_folders`), `ade_worktree_setup`,
-  `ade_sessions` new columns. v1 row migration per Q5. Models + `storage/repos/adetask*.go`.
+  `ade_sessions` new columns. Models + `storage/repos/adetask*.go`. Repo config reads/writes the shared
+  `code_repos` list (D15), no parallel repo table.
 - Workflow reader: `internal/adeflow` parses/validates YAML (`go.yaml.in/yaml/v3`, promoted to
-  direct; MIT/Apache-2.0), line-numbered errors, `manual`/`automated` aliases, `back:<step>` and
-  `only <repo>` validation, durations. Defaults embedded (`go:embed`) and seeded to the workflows
-  dir on first run (Q4). Read-only this wave.
+  direct; MIT/Apache-2.0; plus go-git v5 for D1), line-numbered errors, `manual`/`automated` aliases, `back:<step>` (must name an earlier step of the same stage; script stages take none; stage and step
+  ids are separate namespaces, D13), `allowed_tools` (D6) and `only <repo>` validation, durations.
+  Workflows dir: `workflows/` under the app home folder; nothing seeded or embedded (D2). Missing or
+  empty dir is a valid empty list. Read-only this wave.
 - Board snapshot: tasks + branches with per-repo git facts by reusing `Queue`'s fact code
-  (ahead/behind, files, commits, dirty, pairs, merged, worktree) keyed by task branch; base marker
+  (ahead/behind, files, commits, dirty, pairs, merged, worktree) keyed by task branch; after every
+  refresh, a go-git rebase-conflict check of every visible branch against the latest base (D1); base marker
   inputs (base branch, base owner/task). Refresh per repo + Refresh all (repos used by tasks only).
-- Bound methods: task CRUD (add new task with repos, rename, Jira/GitHub link, estimate, notes,
-  color), add existing branch (new task or attach; review item), plan set (day/order, drag
+- Bound methods: task CRUD (add new task with repos, rename, Jira key/url and GitHub link stored and displayed only, no sync (D9), estimate
+  (extend-only, D16), notes, color), add existing branch (new task or attach; review item), plan set (day/order, drag
   semantics, queued after), backlog CRUD/reorder/promote-to-task, workflow list/get, repos list
   (nickname), snapshot, refresh, force push, push channel `ade:board`.
 - **SPEC2:** §2 (model, base marker data, cross-task relationships), §3 (refresh semantics, repo
@@ -122,11 +134,11 @@ XL stream into `Part 1`/`Part 2` of the same `P` (agent split rule), still two s
 
 **Stream B — pure board logic** (`frontend/src/ade/v2/board/*.ts`, pure, fixture-driven):
 - Port of `useQueue` to tasks: per-task day/order/span, merge order (merge day, start day,
-  position), capacity/overflow, overdue, weekends/days off, Later, first-10 cap with load-all,
+  position), capacity/overflow, overdue, weekends/days off, Later, first-10 cap with load-all and show-first-10-again (D4),
   history list, ripple + "On merge" (§13 says keep), review item placement above dependents/conflicts,
   parked.
 - Stage progress model (segments, current label, percent: done runs 1, running by todo fraction,
-  averaged over repos), per-branch progress line, derived task status (§5), task action first-match
+  averaged over repos), per-branch progress line, derived task status (§5, read-only, D10), task action first-match
   (§4.2), branch tag/action first-match (§4.2 incl. `⚙ preparing`, `✕ setup failed`), base marker
   text, merged/deployed short labels (`dev`/`stg`/`rel`, `▲env`), Needs-you item derivation and
   ordering (§11), long-text helpers (§5.2 rules that are logic, not CSS).
@@ -153,19 +165,20 @@ kira-space/...`, `bun run lint:go`, migration up on a copy of a real v1 DB. End 
 ### P145 wave 2: config + facts ‖ shell + timeline
 
 **Stream A.** Workflow write (form edits rewrite the file through `yaml.Node`, keeping order/
-comments), import, copy, new; `fsnotify` watch of the workflows dir; last-valid-version rule;
+comments), import, copy, new (the `workflows/` dir is created on first write); `fsnotify` watch of the workflows dir; last-valid-version rule;
 validation result method (`✓ valid` / `✕ line N: …`). "Changes apply from next stage/step on":
 snapshot current stage per task. Repos: nickname, folders add/remove/watch (`fsnotify`, BSD-3)
 importing every git repo found, add single repo, integration branches, environments with
 deployed-SHA scripts (run via existing `gitprepare` shell plumbing), prepare script + timeout
 (lift `PrepareTimeout` to a per-repo value). Integration facts: merged / stale / not merged per
-branch × target (`--is-ancestor`, then patch-id set via `git cherry`), `intoNote`, recorded merges,
-rebase marks merged targets stale. Deployment facts: run env scripts on startup/Refresh/chip,
+branch × target from git facts (`--is-ancestor`, then patch-id set via `git cherry`), `intoNote`;
+a merge is recorded by the app only when its own merge dialog finishes (D14); rebase marks merged
+targets stale. Deployment facts: run env scripts on startup/Refresh/chip,
 deployed / stale / not deployed, missing count, env-moved-back detection (last seen SHA stored).
 Refresh result summary (`3 refs changed · 1 merged into develop`). Fix-menu data (per-branch
 available fixes).
 **SPEC2:** §5.1 (backend), §5.1.1 (write, watch, import), §6 (compute, after-rebase, recorded
-merge), §6.2 (compute), §6.3 (backend), §3 (fetch summary).
+merge on dialog finish), §6.2 (compute), §6.3 (backend), §3 (fetch summary).
 
 **Stream B.** Replace `AdeView` root: tab bar (`Backlog` grey badge · `Needs you` amber badge ·
 `Plan`; right: capture box, `+ Add task`, `Workflows`, `Repos`), capture box (Enter adds to top,
@@ -200,7 +213,8 @@ merged/stale/patch-id rules interact). Wave end: both suites + live `bun run dev
 segment>` per §9, reuse `gitsession` worktree add), prepare script run with per-repo timeout,
 states `preparing`/`ready`/`failed` + full log persisted, Retry setup, gate (no step/Start/Take
 over until ready). Headless runner: spawn `claude -p --output-format stream-json --session-id
-<uuid> --mcp-config <app server>` (permission flags per Q8) in the branch worktree, stream-json
+<uuid> --mcp-config <app server>` (permissions per D6: no default mode set by the app; `--allowedTools` from the step's
+`allowed_tools`; deny rules still win; `--setting-sources` per the app setting) in the branch worktree, stream-json
 line parser (TodoWrite → `todo [n,m]`, log events), timeout kill (`procgroup`), exit without
 `finish_step` → `failed: ended without finish_step`. `finish_step(status, summary)` MCP tool on
 an app-local HTTP MCP server (`modelcontextprotocol/go-sdk`, MIT→Apache-2.0 transition, both
@@ -208,7 +222,12 @@ fully open; auth via a per-run token on the `internal/mcpauth` pattern). Mandato
 appended server-side. Step machine: `once`/`each repo`/`only <repo>` fan-out, gates `auto`/
 `approval`, `stop`/`retry 1`/`retry 2`, worst-of-runs step state, stage advance, user stage Done/
 Finish, Approve, Retry. Script stages: variables `{task} {jira} {repo} {branch} {worktree}`,
-multi-line command, timeout, exit code, full output. Run log persistence (bounded; plan sets cap).
+multi-line command, timeout, exit code, full output. Run log persisted per run (bounded; plan sets cap) and readable live without Take over (D3). App setting
+`AdeSettings.headlessSettingSources`: ignore repo-committed settings via `--setting-sources user`.
+Installed `claude --help` lists `--allowedTools` and `--setting-sources <user,project,local>`; the P146
+plan re-verifies both against the installed CLI, confirms `-p` denies un-allowed tools, and picks the
+default. `runs_on: once` runs in the first branch's worktree in task order, created first if missing
+(D12). No concurrency cap, queue or setting (D8). Script stages never send back (D13).
 Push channel for run progress. Unit tests: step state aggregation, gate/retry transitions, stream-
 json todo extraction.
 **SPEC2:** §2 (Run, Step, Session headless), §5 (agent stages, per-repo runs, script stages,
@@ -216,7 +235,7 @@ release script), §5.1.2, §6.1 (backend).
 
 **Stream B.** Panel (resizable, default half; reuse `AdePanelResizeHandle`): task mode header
 (color · status chip · 2-line title; mono line; actions), tabs `Task` · `Notes` (`Sessions N`
-lands whole in P148), Task tab (Name, Status read-only per Q2, Jira, GitHub row, Estimate, Branches list +
+lands whole in P148), Task tab (Name, Status read-only and derived (D10), Jira key/url display only, GitHub row, Estimate, Branches list +
 `+ Add repo…` select + `+ Add branch`), Notes tab (TipTap, full height). Branch mode (`← task`,
 header, mono line, actions, Details: Branch + PR rows, Merged into rows with Merge/Re-merge,
 Deployed to rows; Changes tab reused). Branch row line 2 merged/deployed text with stale amber and
@@ -239,21 +258,22 @@ available in env. Stream B end: `test:ui:space`. Wave end: both + live smoke.
 branch (`claude -p --resume <id>`) with failure output appended (template from §5), `↩ sent back`,
 `· fix N`, note, chain continues, max 3 rounds then `failed`. Take over: TUI session resuming a
 headless id through `Tracker.Prepare` (resume of a headless record, `resumes` link, same worktree),
-from running or finished runs; stops the headless process first if running (Q9). Interactive user
+from running or finished runs; stops the headless process first if running; B's confirm dialog says the run must be stopped first (D3). Interactive user
 stage launch with the stage prompt + task context (§5 example; read-only main checkouts when no
 worktree). Single-branch Start / Start step (§9). Archive per task: risk over every branch, stop
-all headless + TUI sessions, delete all worktrees, history by task. Restart recovery for runs left
-`running` by a previous process (Q10). Workflow switch restarts at first stage.
+all headless + TUI sessions, delete all worktrees, history by task. Restart recovery: runs left
+`running` by a previous process become `stuck`, note `interrupted by restart`; no auto-resume; user acts
+manually with Take over / Retry / Run (D7). Workflow switch restarts at first stage.
 **SPEC2:** §5 (Take over, Release extras data, send back, workflow switch), §9, §10 (backend).
 
-**Stream B.** Workflows page (§5.1/§5.1.1 UI: list with stages, `used by N`, `+ New`, `Import
+**Stream B.** Workflows page (§5.1/§5.1.1 UI: empty state with `Import YAML` / `+ New` when the dir holds no workflow (D2); list with stages, `used by N`, `+ New`, `Import
 YAML`; editor Form | YAML switch, path, Copy YAML; stage cards with type badge/select/status
 select/↑↓✕; script/user/agent fields; nested step cards; `+ finish_step instruction…` note with
 hover text; YAML mode mono textarea with live validation message). Repos page (§6.3). Run UI:
 live stage progress + percent on cards, per-branch progress line 2, task action column live
 states (`▶ Run`, `Approve`, `Take over` (link only until P148), `Retry`, `Done ›`, `Finish ✓`,
 `✓ merged` + Archive gating), panel Workflow block (select + `Edit workflows ↗`, one block per
-stage, agent steps with one line per repo: glyph · repo · mini bar · `4/10` · Log/Output/Retry ·
+stage, agent steps with one line per repo: glyph · repo · mini bar · `4/10` · Log (read-only live log, D3)/Output/Retry ·
 note), Run dialog (branch name per repo, editable message with step prompt + finish_step text),
 Release block (`main ✓/—` + merged-into chips). Worktree setup UI (`⚙ preparing 3m 40s`,
 `✕ setup failed` + See error, Details → Worktree setup with log, Retry setup).
@@ -266,23 +286,25 @@ validator; no JS YAML lib).
 **Ownership.** Same split. **No ordering dependency:** B consumes P144-P146 methods; A's new
 methods unused by B until P148.
 **Accept.** Stream A end: `go test` (fake claude: needs_input → stuck, failed → back:impl round
-trip, 3-round cap). B end: `test:ui:space`. Wave end: live run of the `standard` workflow on a
-scratch two-repo task with real `claude` if available (Q8 decides flags).
+trip, 3-round cap). B end: `test:ui:space`. Wave end: live run of a workflow (the zip samples
+under `design/ade-v2/workflows/`, imported by hand, never shipped) on a scratch two-repo task with real `claude` if available (flags per D6).
 
 ### P148 wave 5: v1 backend removal ‖ sessions, take over, Needs you
 
 **Stream A.** Delete v1-only backend: `AdeService` v1 methods, `Queue` new-work rebind,
 dependencies/blockers, work type, per-repo plan; v1 `ade/wire.ts` and its `bridge/index.ts`
-entries; migration `0009` dropping v1 tables (Q5). Keep shared fact code used by v2.
+entries; migration `0009` dropping v1 tables, no data migration (D5). Keep shared fact code used by v2.
 **SPEC2:** §13 (dropped items, backend).
 
 **Stream B.** Sessions tab (task: spec sessions + all runs; branch: its own): tab strip with
 `TUI` / dashed `claude -p` badges, interactive first; headless status bar + read-only log + note +
 Take over; TUI tab terminal (reuse terminal module); `Finished / stopped` list with Take over.
-Take over wiring everywhere (Sessions bar, step rows, Needs you), opening `TUI … (resumed)` tab.
+Take over wiring everywhere (Sessions bar, step rows, Needs you), opening `TUI … (resumed)` tab; on a
+running headless run a confirm dialog says the run must be stopped first (D3). Read-only live log of a
+headless run reachable without taking over from Sessions tab, step rows and Needs you (D3).
 `▶ <Stage>` dialog with stage prompt. `▶ Start` on branch rows. Task Archive dialog (§10 template,
 every branch at risk) reusing archive-at-risk flow. Needs you page (§11: kinds, ordering, one
-action each, footer counts, `All sessions` toggle grouped by task, tab badge count). History rows
+action each (`interrupted by restart` stuck runs included), footer counts, `All sessions` toggle grouped by task, tab badge count). History rows
 per task with repos.
 **SPEC2:** §4.1 (`!` click targets), §5 (Take over UI), §7 (Sessions tab), §10 (UI), §11.
 
@@ -322,29 +344,32 @@ check), §13 (audit). Size M.
 | §4.1 | Branch row line 1/line 2 incl. merged/deployed | P145 B (line 1), P146 B (line 2) |
 | §4.2 | Task row status tag + stage action | P144 B (rules), P147 B |
 | §4.2 | Branch row tags/actions incl. preparing/setup failed, ▶ Start | P144 B (rules), P145 B (git), P147 B (setup), P148 B (Start) |
-| §5 | Task status derived | P144 B |
+| §5 | Task status derived, read-only; §7 toggle dropped (D10) | P144 B, P146 B |
 | §5 | User stages: dialog with prompt + context | P147 A, P148 B |
 | §5 | Agent stages: headless runs, Run dialog, approval, stuck/failed | P146 A, P147 B |
-| §5 | Take over | P147 A, P148 B |
+| §5 | Take over (confirm dialog if running, D3) | P147 A, P148 B |
+| §5 / §7 | Read-only live headless log, persisted per run (D3) | P146 A, P147 B (step rows), P148 B (Sessions, Needs you) |
+| §5 | Restart recovery: `running` -> `stuck` (D7) | P147 A, P148 B (Needs you) |
 | §5 | Release extras | P147 B |
 | §5 | Per-repo runs, todo progress, panel lines | P146 A, P147 B |
 | §5 | Send back (3 rounds) | P147 A, P147 B (display) |
 | §5 | Script stages, Output, Retry | P146 A, P147 B |
 | §5.1 | Workflows page, stage/step editor, panel Workflow select | P145 A, P147 B |
-| §5.1.1 | YAML files, reader, aliases, defaults | P144 A |
-| §5.1.1 | Form/YAML switch, Copy, Import, validation, last-valid, folder watch | P145 A, P147 B |
+| §5.1.1 | YAML files, reader, aliases, `allowed_tools`; no defaults (D2) | P144 A |
+| §5.1.1 | Form/YAML switch, Copy, Import, validation, last-valid, folder watch, empty state | P145 A, P147 B |
 | §5.1.2 | `finish_step` MCP, auto suffix, outcomes, no-call failure | P146 A, P147 B (editor note/dialog) |
 | §5.2 | Long text rules | P144 B (helpers), P145-P148 B (each surface) |
-| §6 | Merged/stale/not merged compute, after rebase, recorded merge | P145 A |
+| §6 | Merged/stale/not merged compute, after rebase, recorded merge on dialog finish only (D14) | P145 A |
+| §6 | Rebase-conflict check of every visible branch after refresh (D1) | P144 A |
 | §6 | Row text, fix menu, panel Merged into, Merge dialog | P146 B |
 | §6.1 | Prepare script run, states, gate, persist | P146 A |
 | §6.1 | Graph/panel/Needs you display | P147 B, P148 B |
 | §6.2 | Deploy compute | P145 A |
 | §6.2 | Deploy display | P146 B |
-| §6.3 | Repos page backend | P145 A |
+| §6.3 | Repos page backend, same list as Git module `code_repos` (D15) | P145 A |
 | §6.3 | Repos page UI, repo pickers `nickname · full name` | P147 B (page), P145 B (pickers) |
 | §7 | Panel task mode header, Task tab, Notes tab | P146 B |
-| §7 | Workflow block | P147 B |
+| §7 | Workflow block, one per stage (D11) | P147 B |
 | §7 | Sessions tab | P148 B |
 | §7 | Branch mode | P146 B (+ setup P147 B) |
 | §8 | Add new task / existing branch | P144 A, P145 B |
@@ -353,55 +378,41 @@ check), §13 (audit). Size M.
 | §11 | Needs you page, All sessions, badge | P144 B (derivation), P148 B |
 | §11.1 | Backlog | P144 A, P146 B |
 | §12 | Data model | P143, P144 A |
-| §13 | Dropped items | P145 B (UI), P148 A (backend), P149 (audit) |
+| §13 | Dropped items, plus P135 dependency nodes, P136 work types and top-5 filter (D16, D4) | P145 B (UI), P148 A (backend), P149 (audit) |
 | §13 | Ripple + "On merge" kept | P144 B, P145 B |
 
-## 6. Open questions (user decides; plans do not invent answers)
+## 6. Decisions (user-approved) and open items
 
-1. **Native Go git.** SPEC2 §6/§6.2 say native Go git; the app declined go-git (no three-way merge)
-   and uses `git` CLI in memory (`merge-tree`, `--is-ancestor`). Keep CLI + `git cherry`/`patch-id`?
-2. **Task status.** §5 opens "still set by you (5 values)", §7 lists `Status (5 toggle buttons)`;
-   §5 later and §13 say derived, not set by hand. Derived + read-only panel chip? And the 5 values
-   = To do / In progress / In review / Done / Blocked?
-3. **Panel Workflow block.** §7 says "three phase blocks" + "Pipeline select" on Implementation;
-   §5.1 says one block per stage + Workflow select. Follow §5.1?
-4. **Workflows dir.** `~/.config/agent-planner/workflows/` and defaults in `handoff/workflows/`:
-   Kira Space path instead (e.g. its own config dir)? Seed defaults on first run, and re-seed if
-   deleted?
-5. **v1 data.** Migrate existing v1 queue (branches, new work, plan, colors, P135 dependency nodes,
-   P136 work types) into tasks (one task per v1 stack? per item?), or start empty? Drop v1 tables
-   in P148?
-6. **P135/P136 features.** Dependency nodes (external blockers) and work types (`investigate`/
-   `test`) and the top-5 "my work" filter are not in SPEC2. Dropped (SPEC2's first-10 cap replaces
-   top-5)?
-7. **Jira / CI.** v1 decided Jira is a plain link with no sync and no `CI failing` rung (P129 Part 3/
-   6). SPEC2 shows Jira status chip + title "after sync", `CI failing` tag, `2 waiting on CI`. In
-   scope now? If yes, which Jira auth?
-8. **Headless permissions.** `claude -p` needs a permission mode (`--permission-mode`,
-   `--allowedTools`, or skip-permissions) to edit/commit unattended. Which? Per workflow/step?
-   Security-relevant: agents run unattended in worktrees.
-9. **Take over a running headless run.** Stop the headless process first (two writers on one
-   session otherwise)? Or offer Take over only once stopped?
-10. **App restart.** Headless runs alive at quit: kill and mark `failed`, or auto-resume on next
-    start?
-11. **Concurrency cap.** Max simultaneous headless runs (global/per repo)? None stated.
-12. **`runs_on: once` cwd.** Which directory does a `once` step run in for a multi-repo task (e.g.
-    `Plan from spec`)? First repo's worktree, a task scratch dir, or main checkouts read-only?
-13. **Script stage send-back.** §5.1 lists `↩ send back to <earlier step of this stage>` for
-    script stages, which have no steps. Drop it for scripts, or allow back to a step of an earlier
-    agent stage?
-14. **`back:impl` id clash.** `standard.yaml` uses `impl` as both stage id and step id; `back:`
-    resolves to a step id within the same stage — confirm, and whether step ids must be unique
-    workflow-wide.
-15. **Recorded merge.** §6 "or the app recorded the merge": record when the merge dialog's Claude
-    turn reports done, or only from git?
-16. **Repos page scope.** Repos are `code_repos`, shared with the Git module. Is the ade Repos page
-    the same list (removing a repo there removes it from Git too), and is nickname the existing
-    `code_repos.name`?
-17. **Backlog storage.** "Stored locally" = app SQLite (shared across windows), not browser storage?
-18. **Parked tasks / review items.** How does a task become `parked` (a toggle where)? A review item
-    added from the main Add creates a `review` task: can it hold more than one branch?
-19. **`{jira}` variable.** Key only, or `KEY URL`?
+Former open questions Q1-Q16 answered. Each wave plan restates the decisions it implements.
+
+| # | Decision |
+|---|---|
+| D1 | Git: `git` CLI for all ops. go-git (`github.com/go-git/go-git/v5`, Apache-2.0, maintained) only for the plain merge-conflict check. After every refresh, check every visible branch for conflicts if rebased onto the latest base; surface as the existing conflict tags. SPEC2 "native Go git" satisfied this way. |
+| D2 | Workflow YAMLs live in a `workflows/` subfolder of the app home folder. No seeded defaults. Zip YAMLs (`design/ade-v2/workflows`) are optional samples, not shipped. Workflows page has an empty state (`Import YAML` / `+ New`). |
+| D3 | Take over of a running headless run: confirm dialog saying the run must be stopped first. Read-only live log of headless runs reachable without taking over (Sessions tab, step rows, Needs you); logs persisted per run. |
+| D4 | Top-5 "my work" filter (P136) becomes top-10 as SPEC2 §4: first 10 items, `Load all` button, `Show only the first 10 again`. |
+| D5 | v1 ade tables dropped, no data migration, app starts empty. |
+| D6 | Headless `claude -p` loads `~/.claude/settings.json` plus the worktree's `.claude/settings.json` and `settings.local.json`; un-allowed tools denied in `-p` mode. App sets no default mode. Per-step `allowed_tools` from YAML via `--allowedTools`; deny rules still win. App setting for `--setting-sources user` (ignore repo-committed settings); default decided in the P146 plan after verifying against the installed `claude --help`. `allowed_tools` added to YAML schema and wire types. |
+| D7 | App restart: `running` runs become `stuck`, note `interrupted by restart`. No auto-resume; user acts manually. |
+| D8 | No concurrency limit for now. No cap, queue or setting. |
+| D9 | Jira sync and CI status out of scope: stored Jira key/url displayed only, no CI badge. |
+| D10 | Task status derived from workflow (SPEC2 §5), read-only. §7's 5-button toggle dropped. |
+| D11 | Panel: one block per stage (§5.1), not three fixed phase blocks. |
+| D12 | `runs_on: once` runs in the first branch's worktree in task order; created first if missing. |
+| D13 | Script stages cannot send back. `back:` target must be an earlier step of the same stage. Stage ids and step ids are separate namespaces. |
+| D14 | App records a merge only when its own merge dialog finishes; otherwise merged/stale from git facts (ancestor / patch-id). |
+| D15 | Repos page = same list as Git module `code_repos`; repo added once. |
+| D16 | P135 dependency nodes and P136 work types dropped (workflow + base markers/`↻` tags replace them). Estimate field kept, extend-only. |
+
+**Still open (not answered by the user; the owning phase's plan proposes, user confirms):**
+
+- O1. go-git has no three-way merge. The P144 plan verifies the plumbing-based conflict check agrees
+  with `git merge-tree --write-tree` on a fixture set. If it cannot, ask the user before falling
+  back to `merge-tree` for that check.
+- O2. Backlog storage (old Q17): app SQLite shared across windows, not browser storage? Plan assumes SQLite.
+- O3. Parked tasks / review items (old Q18): where is `parked` toggled; can a `review` task hold more than one branch?
+- O4. `{jira}` script variable (old Q19): key only, or `KEY URL`? Plan assumes key only (D9: no sync).
+- O5. Default for the `--setting-sources` app setting: decided in the P146 plan (D6).
 
 ## 7. Deviation note
 
@@ -410,3 +421,7 @@ the only concurrency is two streams inside one wave phase, per the streams rule 
 ownership overlap, explicit no-ordering confirmation). The user asked for two-stream parallelism
 explicitly. Each wave plan re-verifies its ownership table against the current tree; if a split
 fails that check, that wave runs as one sequential implementer.
+
+SPEC2 "native Go git" (§6, §6.2) is met by D1: `git` CLI for all operations, go-git only for the
+rebase-conflict check. This reverses the app-wide go-git decline for that one use; `docs/ARCHITECTURE.md`
+records it in P149.
