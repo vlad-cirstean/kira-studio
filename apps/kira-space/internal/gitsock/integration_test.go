@@ -292,7 +292,7 @@ func newIntegrationServerWithRunner(t *testing.T, gitRunner gitclient.Runner) (s
 	t.Cleanup(func() { _ = repositories.Close() })
 
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry := isolatedRegistry(gitRunner, kiraHome)
 	// G18 D8: wired to the real, per-test SQLite database above (main.go's own wiring, restated)
 	// so a test that never overrides these closures itself still exercises the real storage path
 	// for repoSettings.get/set, rather than silently falling back to NewRegistry's own in-memory,
@@ -481,10 +481,10 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 		t.Fatalf("deny: got %v", got)
 	}
 
-	// --- 7. a second Server.Start() against the same KIRA_HOME does not listen, does not error,
+	// --- 7. a second Server.Start() against the same home dir does not listen, does not error,
 	// and does not disturb the first one's socket.
 	secondRunner := gitclient.NewExecRunner()
-	secondRegistry := gitsession.NewRegistry(secondRunner)
+	secondRegistry := isolatedRegistry(secondRunner, filepath.Dir(sockPath))
 	second := New(Deps{
 		SocketPath: sockPath,
 		LockPath:   filepath.Join(filepath.Dir(sockPath), "git.sock.lock"),

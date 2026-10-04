@@ -361,7 +361,7 @@ func TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken(t *testin
 
 	gitRunner := gitclient.NewExecRunner()
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry := isolatedRegistry(gitRunner, kiraHome)
 	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
 	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
 

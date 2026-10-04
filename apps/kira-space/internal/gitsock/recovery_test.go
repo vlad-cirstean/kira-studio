@@ -22,18 +22,12 @@ import (
 
 // TestRecovery_AfterSIGKILLWithRepositoriesOpen is D11's full sequence: a real helper process is
 // SIGKILLed with a repository genuinely open (a watcher, a subscriber pump, a persistent cat-file
-// pair), and a fresh Server against the same KIRA_HOME recovers cleanly.
+// pair), and a fresh Server against the same home dir recovers cleanly.
 func TestRecovery_AfterSIGKILLWithRepositoriesOpen(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
 	kiraHome := t.TempDir()
-	// The helper process gets KIRA_HOME through its own env (launchGitsockHelper); this process
-	// needs it too, since the "fresh Server" built below calls storage.Open() itself and must find
-	// the SAME kira.db the killed helper created (config.KiraHome falls back to a real
-	// $HOME/.kira-studio otherwise -- exactly the state this phase must never touch, G4 D15's own
-	// rule extended to KIRA_HOME).
-	t.Setenv("KIRA_HOME", kiraHome)
 	repoDir := initFixtureRepo(t)
 	sockPath := filepath.Join(kiraHome, "git.sock")
 
@@ -51,7 +45,7 @@ func TestRecovery_AfterSIGKILLWithRepositoriesOpen(t *testing.T) {
 	}
 
 	gitRunner := gitclient.NewExecRunner()
-	db, err := storage.Open()
+	db, err := storage.OpenAt(kiraHome)
 	if err != nil {
 		t.Fatalf("storage.Open: %v", err)
 	}
@@ -62,7 +56,7 @@ func TestRecovery_AfterSIGKILLWithRepositoriesOpen(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = repositories.Close() })
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry := isolatedRegistry(gitRunner, kiraHome)
 	server := New(Deps{
 		SocketPath: sockPath,
 		LockPath:   filepath.Join(kiraHome, "git.sock.lock"),
@@ -109,7 +103,7 @@ func TestRecovery_AfterSIGKILLWithRepositoriesOpen(t *testing.T) {
 
 // TestRecovery_SecondInstanceDoesNotListenOrUnlink re-asserts G1 D5's in-process property now that
 // a Registry with a live watcher and an open stream is actually attached (G1's own version predates
-// all of it) — a second Start() against the same KIRA_HOME must neither listen nor disturb the
+// all of it) — a second Start() against the same home dir must neither listen nor disturb the
 // first instance's socket, its live connection, or its open walk.
 func TestRecovery_SecondInstanceDoesNotListenOrUnlink(t *testing.T) {
 	server, sockPath, clientsRepo, _ := newIntegrationServer(t)
@@ -121,7 +115,7 @@ func TestRecovery_SecondInstanceDoesNotListenOrUnlink(t *testing.T) {
 	drainStreamToEnd(t, client)
 
 	secondRunner := gitclient.NewExecRunner()
-	secondRegistry := gitsession.NewRegistry(secondRunner)
+	secondRegistry := isolatedRegistry(secondRunner, filepath.Dir(sockPath))
 	second := New(Deps{
 		SocketPath: sockPath,
 		LockPath:   filepath.Join(filepath.Dir(sockPath), "git.sock.lock"),
@@ -139,7 +133,7 @@ func TestRecovery_SecondInstanceDoesNotListenOrUnlink(t *testing.T) {
 	}
 	defer second.Close()
 	if isListening(second) {
-		t.Fatal("a second instance against the same KIRA_HOME must not listen")
+		t.Fatal("a second instance against the same home dir must not listen")
 	}
 
 	client2 := dialTestClient(t, sockPath)

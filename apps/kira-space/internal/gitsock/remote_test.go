@@ -174,9 +174,7 @@ func newRemoteIntegrationServerWithRunner(t *testing.T, timeout time.Duration, g
 	t.Cleanup(func() { _ = broker.Close() })
 
 	kiraHome := t.TempDir()
-	t.Setenv("KIRA_HOME", kiraHome)
-
-	db, err := storage.Open()
+	db, err := storage.OpenAt(kiraHome)
 	if err != nil {
 		t.Fatalf("storage.Open: %v", err)
 	}
@@ -189,7 +187,7 @@ func newRemoteIntegrationServerWithRunner(t *testing.T, timeout time.Duration, g
 	t.Cleanup(func() { _ = repositories.Close() })
 
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry := isolatedRegistry(gitRunner, kiraHome)
 	// G18 D8: same real-storage wiring newIntegrationServerWithRunner's own copy carries.
 	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
 	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set

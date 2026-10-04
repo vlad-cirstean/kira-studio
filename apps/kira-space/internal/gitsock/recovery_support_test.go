@@ -13,7 +13,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 )
@@ -28,6 +27,8 @@ const (
 	envGitsockHelper = "KIRA_GITSOCK_HELPER"
 	// envGitsockHelperRepo names the fixture repository the helper should repo.open.
 	envGitsockHelperRepo = "KIRA_GITSOCK_HELPER_REPO"
+	// envGitsockHelperHome is the per-test home the helper opens kira.db and review.db under.
+	envGitsockHelperHome = "KIRA_GITSOCK_HELPER_HOME"
 )
 
 // isListening reports whether s is actually accepting connections -- Start() returns nil even when
@@ -50,15 +51,15 @@ func TestHelperProcess_GitsockServer(t *testing.T) {
 	if os.Getenv(envGitsockHelper) != "1" {
 		return
 	}
-	kiraHome := os.Getenv("KIRA_HOME")
+	kiraHome := os.Getenv(envGitsockHelperHome)
 	repoDir := os.Getenv(envGitsockHelperRepo)
 	if kiraHome == "" || repoDir == "" {
-		fmt.Fprintln(os.Stderr, "gitsock helper: KIRA_HOME and "+envGitsockHelperRepo+" must both be set")
+		fmt.Fprintln(os.Stderr, "gitsock helper: "+envGitsockHelperHome+" and "+envGitsockHelperRepo+" must both be set")
 		os.Exit(1)
 	}
 
 	gitRunner := gitclient.NewExecRunner()
-	db, err := storage.Open()
+	db, err := storage.OpenAt(kiraHome)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "gitsock helper: storage.Open:", err)
 		os.Exit(1)
@@ -69,7 +70,7 @@ func TestHelperProcess_GitsockServer(t *testing.T) {
 		os.Exit(1)
 	}
 	gitDiscovery := gitclient.NewDiscovery(lookPathLocator{}, gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
+	gitRegistry := isolatedRegistry(gitRunner, kiraHome)
 
 	server := New(Deps{
 		SocketPath: filepath.Join(kiraHome, "git.sock"),
@@ -139,7 +140,7 @@ func launchGitsockHelper(t *testing.T, kiraHome, repoDir string) *exec.Cmd {
 	cmd := exec.Command(self, "-test.run=TestHelperProcess_GitsockServer")
 	cmd.Env = append(os.Environ(),
 		envGitsockHelper+"=1",
-		"KIRA_HOME="+kiraHome,
+		envGitsockHelperHome+"="+kiraHome,
 		envGitsockHelperRepo+"="+repoDir,
 	)
 	stdout, err := cmd.StdoutPipe()
