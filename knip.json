@@ -17,6 +17,14 @@
   // its `--include` filter and turned the `binaries` rule on.
   "ignoreBinaries": ["go"],
   "ignoreDependencies": [
+    // Temporary (P145 -> P146): the v1 notes editor was the only consumer; P146's Notes tab
+    // restores it (`git show 13e99974:apps/kira-space/frontend/src/ade/AdeNotesEditor.vue`). Drop then.
+    "@tiptap/core",
+    "@tiptap/extension-list",
+    "@tiptap/extensions",
+    "@tiptap/markdown",
+    "@tiptap/starter-kit",
+    "@tiptap/vue-3",
     // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
     // (apps/kira-space-vscode/tsconfig.json), never a static import.
     "@types/vscode",
@@ -65,9 +73,9 @@
     },
     "apps/kira-space/frontend": {
       // Mirrors apps/kira-studio/frontend's own block above. ade/v2/wire.ts is the frozen P143
-      // contract, unconsumed until P145 B's UI reaches it from index.html; drop the entry then.
-      // src/ade/v2/board/*.ts: pure board logic, consumed from index.html once P145 B's UI imports it;
-      // drop the entry then (same as wire.ts).
+      // contract and src/ade/v2/board/*.ts the pure board logic. P145 B's UI reaches them from
+      // index.html, but 14 exports and 83 types (steps, deployments, integrations, Needs-you items)
+      // have no caller until P146+; drop both entries once those waves land.
       "entry": ["index.html", "src/ade/v2/wire.ts", "src/ade/v2/board/*.ts"],
       "project": ["src/**/*.{ts,vue}"]
     },

@@ -57,51 +57,19 @@ import type {
   AdeRefreshResult,
   AdeRepoChangedEvent,
   AdeRepoPrs,
-  AdeRepoSnapshot,
   AdeSendArgs,
-  AdeSessionsResult,
   AdeSetBlockerArgs,
-  AdeSetBranchMetaArgs,
   AdeSetPlanArgs,
   AdeSetQueuedAfterArgs,
-  AdeSetWorkTypeArgs,
   AdeUpdateDependencyArgs,
-  AdeUpdateNewWorkArgs,
 } from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
-// P129 Part 3 §2.3's own doc comment (ade/wire.ts): every `toWire*` helper in `bridge/ade.go`
-// builds its array/map fields with an explicit `make(...)`, so only these four "straight
-// passthrough" spots (never `make()`'d at the wire layer) can really arrive as JSON `null` — an
-// empty queue's own plan, an unreferenced repo's colors, a pair with no overlap at all, or
-// `Refresh`'s own zero-value error path. Normalized once, here, rather than a null check at every
-// `useQueue()` call site (the existing `codeWorkspaceListFiles` binding above sets this precedent
-// for a nested field, not just a top-level array).
-function normalizeAdeRepoSnapshot(raw: AdeRepoSnapshot): AdeRepoSnapshot {
-  return {
-    ...raw,
-    remote: raw.remote ?? '',
-    plan: {
-      day: raw.plan.day ?? {},
-      order: raw.plan.order ?? [],
-      queuedAfter: raw.plan.queuedAfter ?? {},
-      unpushed: raw.plan.unpushed ?? {},
-    },
-    colors: raw.colors ?? {},
-    pairs: (raw.pairs ?? []).map((p) => ({
-      ...p,
-      shared: p.shared ?? [],
-      conflicts: p.conflicts ?? [],
-    })),
-    dependencies: (raw.dependencies ?? []).map((d) => ({ ...d, blocks: d.blocks ?? [] })),
-  };
-}
-
 /** P129 Part 4 §2.3: `ArchiveRisk`'s own `dirty` follows the same straight-passthrough shape as the
- *  snapshot's own plan/colors/pairs fields above — normalized here, once. */
+ *  straight-passthrough shape — normalized here, once. */
 function normalizeAdeArchiveRisk(raw: AdeArchiveRisk): AdeArchiveRisk {
   return { ...raw, dirty: raw.dirty ?? [] };
 }
@@ -217,12 +185,6 @@ const spaceControl = {
     on(CHANNEL.agentSessions, cb),
   onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),
 
-  adeSessions: (): Promise<AdeSessionsResult> =>
-    unwrap(AdeService.Sessions()).then((r) => trust<AdeSessionsResult>(r)),
-  adeRepoSnapshot: (codeRepoId: string): Promise<AdeRepoSnapshot> =>
-    unwrap(AdeService.RepoSnapshot({ codeRepoId })).then((r) =>
-      normalizeAdeRepoSnapshot(trust<AdeRepoSnapshot>(r)),
-    ),
   adeRepoPrs: (codeRepoId: string): Promise<AdeRepoPrs> =>
     unwrap(AdeService.RepoPrs({ codeRepoId })).then((r) =>
       normalizeAdeRepoPrs(trust<AdeRepoPrs>(r)),
@@ -255,14 +217,6 @@ const spaceControl = {
   adeArchive: (args: AdeArchiveArgs): Promise<void> => unwrap(AdeService.Archive(args)),
   adeSetQueuedAfter: (args: AdeSetQueuedAfterArgs): Promise<void> =>
     unwrap(AdeService.SetQueuedAfter(args)),
-  adeUpdateNewWork: (args: AdeUpdateNewWorkArgs): Promise<void> =>
-    unwrap(AdeService.UpdateNewWork(args)),
-  // P129 Part 6 §0.23: the two members left of `AdeService`'s 19 (bound count 17 -> 19) — the
-  // detail panel's own field writes (`SetBranchMeta`) and the candidate picker's resolution
-  // (`BindNewWork`).
-  adeSetBranchMeta: (args: AdeSetBranchMetaArgs): Promise<void> =>
-    unwrap(AdeService.SetBranchMeta(args)),
-  adeSetWorkType: (args: AdeSetWorkTypeArgs): Promise<void> => unwrap(AdeService.SetWorkType(args)),
   adeBindNewWork: (args: AdeBindNewWorkArgs): Promise<void> => unwrap(AdeService.BindNewWork(args)),
 
   // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.

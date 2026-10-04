@@ -9,168 +9,6 @@
 // or `Refresh`'s own zero-value error path), so the coercion lives once, at the one place raw JSON
 // enters this app, rather than a null check at every `useQueue()` call site.
 
-/** `AdeSessionWire` — `Sessions()`'s own list element; `terminalId` is `""` once stopped.
- *  `cwdMissing` (P129 Part 7 §0.12): a fresh `os.Stat` per call, never cached — true when `cwd` no
- *  longer exists as a directory. */
-export interface AdeSession {
-  id: string;
-  claudeSessionId: string;
-  codeRepoId: string;
-  branch: string;
-  newWorkId: string;
-  cwd: string;
-  state: string;
-  terminalId: string;
-  startedAt: number;
-  lastActiveAt: number;
-  cwdMissing: boolean;
-}
-
-export interface AdeSessionsResult {
-  sessions: AdeSession[];
-}
-
-/** `AdeMain` — `RepoSnapshot.main`'s own shape; absent means main is unresolved (§0.6). */
-interface AdeMain {
-  name: string;
-  ref: string;
-  tip: string;
-}
-
-export interface AdeFile {
-  path: string;
-  added?: number | null;
-  deleted?: number | null;
-  binary: boolean;
-}
-
-export interface AdeCommit {
-  sha: string;
-  message: string;
-}
-
-interface AdeDirty {
-  code: string;
-  path: string;
-}
-
-/** A branch's or new-work item's own read-side Jira link — always present, empty meaning "none". */
-interface AdeJira {
-  key: string;
-  url: string;
-}
-
-/** User-chosen work type (P136): `work`/`investigate` pair with kind mine/parked, `review`/`test`
- *  with kind review. */
-export type AdeWorkType = 'work' | 'investigate' | 'review' | 'test';
-
-/** `AdeBranchWire` — one queued branch's own assembled facts. */
-export interface AdeBranch {
-  id: string;
-  branch: string;
-  kind: string;
-  workType: AdeWorkType;
-  name: string;
-  draftTitle: string;
-  startFrom: string;
-  exists: boolean;
-  ref: string;
-  tip: string;
-  owner: string;
-  authorEmail: string;
-  isMine: boolean;
-  lastCommitAt: number;
-  base: string;
-  ahead: number;
-  behind: number;
-  merged: boolean;
-  mergedAt?: number | null;
-  worktree: string;
-  files: AdeFile[];
-  commits: AdeCommit[];
-  commitCount: number;
-  dirty: AdeDirty[];
-  upstream: string;
-  upstreamAhead: number;
-  upstreamBehind: number;
-  jira: AdeJira;
-  prUrl: string;
-  est: string;
-  notes: string;
-  addedAt: number;
-}
-
-/** `AdeNewWorkWire` — one queued piece of work with no branch yet. */
-export interface AdeNewWork {
-  id: string;
-  title: string;
-  workType: AdeWorkType;
-  startFrom: string;
-  branchName: string;
-  est: string;
-  notes: string;
-  jira: AdeJira;
-  createdAt: number;
-  branchCandidates?: string[];
-}
-
-/** `AdePlanWire` — `day[item]` absent/null means no own day (Part 2 §2.1: `NULL` = Later). */
-export interface AdePlan {
-  day: Record<string, string | null>;
-  order: string[];
-  queuedAfter: Record<string, string>;
-  unpushed: Record<string, boolean>;
-}
-
-/** `AdePair` — a mine×mine or mine×review overlap; `conflicts` is Part 2's merge-tree result
- *  (§0.3: a mine×review conflict only where this is non-empty, never file overlap alone). */
-export interface AdePair {
-  a: string;
-  b: string;
-  shared: string[];
-  conflicts: string[];
-}
-
-interface AdeHistoryItem {
-  item: string;
-  kind: string;
-  title: string;
-  branch: string;
-  mergedAt?: number | null;
-  archivedAt: number;
-}
-
-/** `AdeDependencyWire` — one live external dependency's own assembled facts (P135 §4.4). No git
- *  field of any kind: a dependency never has a branch. */
-export interface AdeDependency {
-  id: string;
-  title: string;
-  waitingOn: string;
-  expectedBy: string | null;
-  createdAt: number;
-  blocks: string[];
-}
-
-/** `AdeRepoSnapshot` — the queue board's own full read (§5.1 of Part 2's plan). */
-export interface AdeRepoSnapshot {
-  codeRepoId: string;
-  gitRepoId: string;
-  main?: AdeMain;
-  /** P129 Part 4 §2.3: the repo's own default remote, `''` when none — `AdeMainLine`'s dialog
-   *  templates read this for `git fetch <remote>` rather than a hardcoded "origin". */
-  remote: string;
-  branches: AdeBranch[];
-  newWork: AdeNewWork[];
-  plan: AdePlan;
-  colors: Record<string, number>;
-  pairs: AdePair[];
-  history: AdeHistoryItem[];
-  dependencies: AdeDependency[];
-  lastFetchAt?: number | null;
-  autofetchMinutes: number;
-  worktreeBasePath: string;
-}
-
 /** `AdePr` — `ResolveBranchPr`'s raw state plus title, verbatim (no Merge action, §0). */
 export interface AdePr {
   number: number;
@@ -275,6 +113,11 @@ export interface AdeArchiveArgs {
   discard: boolean;
 }
 
+interface AdeDirty {
+  code: string;
+  path: string;
+}
+
 /** `AdeArchiveRiskResult` — `blocked`, when non-empty, names the reason `Archive` would refuse
  *  outright (§0.16 step 2). */
 export interface AdeArchiveRisk {
@@ -288,55 +131,6 @@ export interface AdeSetQueuedAfterArgs {
   codeRepoId: string;
   item: string;
   after: string;
-}
-
-/** `AdeJiraPatch` — the wire's own nested Jira half of `AdeNewWorkPatch`/`AdeBranchMetaPatch`
- *  (§5.3 of Part 2's plan: `patch{..., jira, ...}`) — the store's flat key/URL pointer pair, grouped
- *  to match the read side's own nested `AdeJira`. Module-private: only `AdeNewWorkPatch`/
- *  `AdeBranchMetaPatch` (both exported) are ever imported by name outside this file; knip flagged
- *  the earlier `export` here as unused. */
-interface AdeJiraPatch {
-  key?: string;
-  url?: string;
-}
-
-/** `AdeNewWorkPatchArgs`, widened for Part 6's own writes (§0.12) — Part 4's only field was
- *  `branchName` (the Start-new-work dialog's own draft-to-branch rename). */
-export interface AdeNewWorkPatch {
-  title?: string;
-  jira?: AdeJiraPatch;
-  startFrom?: string;
-  notes?: string;
-  est?: string;
-  branchName?: string;
-}
-
-export interface AdeUpdateNewWorkArgs {
-  codeRepoId: string;
-  id: string;
-  patch: AdeNewWorkPatch;
-}
-
-/** `AdeBranchMetaPatchArgs` (§0.11/§0.12) — `SetBranchMeta` never turns a branch back into
- *  "review" and nothing in Part 6 changes `kind`, so this patch has no `kind` field at all. */
-export interface AdeBranchMetaPatch {
-  name?: string;
-  jira?: AdeJiraPatch;
-  prUrl?: string;
-  est?: string;
-  notes?: string;
-}
-
-export interface AdeSetWorkTypeArgs {
-  codeRepoId: string;
-  item: string;
-  workType: AdeWorkType;
-}
-
-export interface AdeSetBranchMetaArgs {
-  codeRepoId: string;
-  branch: string;
-  patch: AdeBranchMetaPatch;
 }
 
 /** §0.15: the candidate picker's own resolution — binds an ambiguous new-work draft to the branch
