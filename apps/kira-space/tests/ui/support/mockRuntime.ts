@@ -84,43 +84,22 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
 
-  // P129 Part 3 §2.2/§3.3: the ade module's own 6 bound calls (of AdeService's 19 methods).
+  // Boot: the ade module's agent-session hydration. The v1 `AdeService` surface is no longer called.
   terminalAgentSessions: 'AdeService.AgentSessions',
-  adeSessions: 'AdeService.Sessions',
-  adeRepoSnapshot: 'AdeService.RepoSnapshot',
-  adeRepoPrs: 'AdeService.RepoPrs',
-  adeRefresh: 'AdeService.Refresh',
-  adeProvideCredential: 'AdeService.ProvideCredential',
 
-  // P129 Part 4 §3.4: the dialog's own six delivery/archive bound calls.
-  adePrepareLaunch: 'AdeService.PrepareLaunch',
-  adeSend: 'AdeService.Send',
-  adeArchiveRisk: 'AdeService.ArchiveRisk',
-  adeArchive: 'AdeService.Archive',
-  adeSetQueuedAfter: 'AdeService.SetQueuedAfter',
-  adeUpdateNewWork: 'AdeService.UpdateNewWork',
-
-  // P129 Part 5 §3.4: SetPlan/ForcePush plus the Add popover's three bound calls.
-  adeSetPlan: 'AdeService.SetPlan',
-  adeForcePush: 'AdeService.ForcePush',
-  adeCandidateBranches: 'AdeService.CandidateBranches',
-  adeAddBranch: 'AdeService.AddBranch',
-  adeAddNewWork: 'AdeService.AddNewWork',
-
-  // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
-  adeSetBranchMeta: 'AdeService.SetBranchMeta',
-  adeBindNewWork: 'AdeService.BindNewWork',
-  adeSetWorkType: 'AdeService.SetWorkType',
-
-  // P135 §4.5: the four dependency-node bound calls (creation tab, detail panel, blocker linking).
-  adeAddDependency: 'AdeService.AddDependency',
-  adeUpdateDependency: 'AdeService.UpdateDependency',
-  adeResolveDependency: 'AdeService.ResolveDependency',
-  adeSetBlocker: 'AdeService.SetBlocker',
-
-  // P129 Part 7 §0.9: cross-window Open's own bound call — `kira:ade:open-session` (the emit half)
-  // is a push channel, not a bound call, so it needs no FQN entry here (only `emitWailsEvent`).
-  adeFocusSession: 'AdeService.FocusSession',
+  // P145: the ade v2 board surface (AdeTaskService, bridge/index.ts `adeTask*`).
+  adeTaskBoard: 'AdeTaskService.Board',
+  adeTaskPrs: 'AdeTaskService.Prs',
+  adeTaskRefresh: 'AdeTaskService.Refresh',
+  adeTaskForcePush: 'AdeTaskService.ForcePush',
+  adeTaskProvideCredential: 'AdeTaskService.ProvideCredential',
+  adeTaskCreateTask: 'AdeTaskService.CreateTask',
+  adeTaskCandidateBranches: 'AdeTaskService.CandidateBranches',
+  adeTaskAddExistingBranch: 'AdeTaskService.AddExistingBranch',
+  adeTaskSetPlan: 'AdeTaskService.SetPlan',
+  adeTaskAddBacklogItem: 'AdeTaskService.AddBacklogItem',
+  adeTaskWorkflows: 'AdeTaskService.Workflows',
+  adeTaskRepos: 'AdeTaskService.Repos',
 };
 
 export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
@@ -183,12 +162,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     latestVersion: '',
     installLogPath: '',
   }),
-  // P129 Part 3 §3.3: every boot now calls AdeService.AgentSessions (createAgentSessionsStore's own
-  // initAgentSessions) and, once `ade` is the active mode, AdeService.Sessions too — same
-  // "no committed fixture will ever snapshot this" reasoning as the rest of this table. A spec that
-  // cares (ade-module.spec.ts) still wins with its own snapshot.
+  // Every boot calls AdeService.AgentSessions (createAgentSessionsStore's own initAgentSessions);
+  // no committed fixture will ever snapshot it.
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
-  [IPC.adeSessions]: JSON.stringify({ sessions: [] }),
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at
@@ -211,44 +187,30 @@ export async function installControlMocks(
     runtimeJsPath: WAILS_RUNTIME_JS,
     canonicalOptions: CANONICAL_OPTIONS,
   });
-  emulateAdeRepoPush(page);
+  emulateAdeTaskPush(page);
   return handle;
 }
 
-// Go's queue writes each emit `kira:ade:repo` (Queue.notifyChanged) and the renderer refetches off
-// that push alone, so the mock repeats it after every successful write.
-const ADE_PUSHING_WRITES = new Set<string>([
-  IPC.adeAddBranch,
-  IPC.adeAddNewWork,
-  IPC.adeUpdateNewWork,
-  IPC.adeSetBranchMeta,
-  IPC.adeSetWorkType,
-  IPC.adeSetPlan,
-  IPC.adeSetQueuedAfter,
-  IPC.adeAddDependency,
-  IPC.adeUpdateDependency,
-  IPC.adeResolveDependency,
-  IPC.adeSetBlocker,
-  IPC.adeArchive,
-  IPC.adeForcePush,
-  IPC.adeRefresh,
+// Every ade board write emits `kira:adetask:board` and the renderer refetches off that push alone,
+// so the mock repeats it after every successful write.
+const ADE_TASK_PUSHING_WRITES = new Set<string>([
+  IPC.adeTaskSetPlan,
+  IPC.adeTaskCreateTask,
+  IPC.adeTaskAddExistingBranch,
+  IPC.adeTaskForcePush,
+  IPC.adeTaskRefresh,
 ]);
 
-function emulateAdeRepoPush(page: Page): void {
+function emulateAdeTaskPush(page: Page): void {
   page.on('requestfinished', async (request) => {
     if (request.method() !== 'POST' || !request.url().includes('/wails/')) return;
     try {
-      const body = JSON.parse(request.postData() ?? '{}') as {
-        args?: { methodName?: string; args?: { codeRepoId?: string }[] };
-      };
+      const body = JSON.parse(request.postData() ?? '{}') as { args?: { methodName?: string } };
       const channel = FQN_TO_CHANNEL[body.args?.methodName ?? ''];
-      const codeRepoId = body.args?.args?.[0]?.codeRepoId;
-      if (!channel || !ADE_PUSHING_WRITES.has(channel) || !codeRepoId) return;
+      if (!channel || !ADE_TASK_PUSHING_WRITES.has(channel)) return;
       const response = await request.response();
       if (!response?.ok()) return;
-      // A Refresh git failure resolves with `.error` and pushes nothing.
-      if (channel === IPC.adeRefresh && (await response.text()).includes('"error":{')) return;
-      await emitWailsEvent(page, IPC.adeRepo, { codeRepoId });
+      await emitWailsEvent(page, IPC.adeTaskBoardChanged, null);
     } catch {
       // page closed mid-request
     }

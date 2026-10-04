@@ -18,9 +18,9 @@ import type {
 
 export const boardKey = ['adetask', 'board'] as const;
 export const prsKey = ['adetask', 'prs'] as const;
-export const workflowsKey = ['adetask', 'workflows'] as const;
-export const reposKey = ['adetask', 'repos'] as const;
-export const candidatesKey = ['adetask', 'candidates'] as const;
+const workflowsKey = ['adetask', 'workflows'] as const;
+const reposKey = ['adetask', 'repos'] as const;
+const candidatesKey = ['adetask', 'candidates'] as const;
 
 export function useBoard() {
   return useQuery({

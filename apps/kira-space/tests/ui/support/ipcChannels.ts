@@ -86,48 +86,24 @@ export const IPC = {
   terminalClose: 'kira:terminal:close',
   terminal: 'kira:terminal:data',
 
-  // P129 Part 3 §2.2/§3.3: the ade module's own bound-call surface (6 of AdeService's 19 methods)
-  // plus its push channels. `adeSessions` names the bound call (AdeService.Sessions, matching
-  // control.ts's own method name) — its push counterpart is `adeSessionsChanged`, not `adeSessions`
-  // again, the same `gitClientsList`/`gitClientsChanged` split this file already uses elsewhere, to
-  // avoid two entries needing the same object key.
+  // Boot: the ade module's agent-session hydration, and the agent push channels the workbench shares.
   terminalAgentSessions: 'kira:ade:agentSessions',
-  adeSessions: 'kira:ade:sessions:call',
-  adeRepoSnapshot: 'kira:ade:repoSnapshot',
-  adeRepoPrs: 'kira:ade:repoPrs',
-  adeRefresh: 'kira:ade:refresh',
-  adeProvideCredential: 'kira:ade:provideCredential',
-  adeSessionsChanged: 'kira:ade:sessions',
-  adeRepo: 'kira:ade:repo',
-  adeCredential: 'kira:ade:credential',
-  // P129 Part 4 §3.4: the dialog's own six delivery/archive bound calls (PrepareLaunch, Send,
-  // ArchiveRisk, Archive, SetQueuedAfter, UpdateNewWork) — the launch/archive half of
-  // AdeService's 19 methods this part first calls.
-  adePrepareLaunch: 'kira:ade:prepareLaunch',
-  adeSend: 'kira:ade:send',
-  adeArchiveRisk: 'kira:ade:archiveRisk',
-  adeArchive: 'kira:ade:archive',
-  adeSetQueuedAfter: 'kira:ade:setQueuedAfter',
-  adeUpdateNewWork: 'kira:ade:updateNewWork',
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
-  // P129 Part 5 §3.4/§2.2: the timeline's own five remaining bound calls (SetPlan, ForcePush, the
-  // Add popover's three) — first mocked-UI consumer, so this is their first entry here.
-  adeSetPlan: 'kira:ade:setPlan',
-  adeForcePush: 'kira:ade:forcePush',
-  adeCandidateBranches: 'kira:ade:candidateBranches',
-  adeAddBranch: 'kira:ade:addBranch',
-  adeAddNewWork: 'kira:ade:addNewWork',
-  // P129 Part 6 §3.4: the detail panel's own two remaining bound calls.
-  adeSetBranchMeta: 'kira:ade:setBranchMeta',
-  adeBindNewWork: 'kira:ade:bindNewWork',
-  adeSetWorkType: 'kira:ade:setWorkType',
-  // P135 §4.5: the four dependency-node bound calls (creation tab, detail panel, blocker linking).
-  adeAddDependency: 'kira:ade:addDependency',
-  adeUpdateDependency: 'kira:ade:updateDependency',
-  adeResolveDependency: 'kira:ade:resolveDependency',
-  adeSetBlocker: 'kira:ade:setBlocker',
-  // P129 Part 7 §3.4: the All agents view's own bound call and its push counterpart.
-  adeFocusSession: 'kira:ade:focusSession',
-  adeOpenSession: 'kira:ade:open-session',
+  // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is
+  // `adeTaskBoardChanged` (the same call/push split as `gitClientsList`/`gitClientsChanged`).
+  adeTaskBoard: 'kira:adetask:board:call',
+  adeTaskPrs: 'kira:adetask:prs',
+  adeTaskRefresh: 'kira:adetask:refresh',
+  adeTaskForcePush: 'kira:adetask:forcePush',
+  adeTaskProvideCredential: 'kira:adetask:provideCredential',
+  adeTaskCreateTask: 'kira:adetask:createTask',
+  adeTaskCandidateBranches: 'kira:adetask:candidateBranches',
+  adeTaskAddExistingBranch: 'kira:adetask:addExistingBranch',
+  adeTaskSetPlan: 'kira:adetask:setPlan',
+  adeTaskAddBacklogItem: 'kira:adetask:addBacklogItem',
+  adeTaskWorkflows: 'kira:adetask:workflows',
+  adeTaskRepos: 'kira:adetask:repos',
+  adeTaskBoardChanged: 'kira:adetask:board',
+  adeTaskCredential: 'kira:adetask:credential',
 } as const;

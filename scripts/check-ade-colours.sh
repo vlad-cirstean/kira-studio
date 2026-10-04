@@ -1,7 +1,7 @@
 #!/bin/sh
 # P138: `ade` colours are `--kira-*` tokens; the only literals allowed are data values that encode
-# queue state, not theme (P129 Part 1 §2.1): tones with their ink and alpha tints, the dependency
-# kind colour and the 20-slot work palette. Any other colour literal under `ade/`, comments
+# queue state, not theme (P129 Part 1 §2.1): tones with their ink and the 20-slot work
+# palette. Any other colour literal under `ade/`, comments
 # included, fails. So does an allowlist entry with no hit left, keeping the list exactly the kept
 # set. A kept value reused as chrome (selection, link, error text) is not visible here; review it.
 # Docs: docs/v2.0/plans/P138-ade-theme-tokens.md §4.
@@ -38,26 +38,7 @@ rgba(163,113,247,0.16)
 ; ink on a tone solid (`TONE_INK`)
 #15161a
 #ffffff
-; tone alpha tints, halos and borders
-rgba(232,163,61,0.04)
-rgba(232,163,61,0.07)
-rgba(232,163,61,0.08)
-rgba(108,197,138,0.28)
-rgba(163,113,247,0.06)
-rgba(163,113,247,0.08)
-rgba(163,113,247,0.18)
-rgba(163,113,247,0.55)
-rgba(122,167,255,0.03)
-rgba(122,167,255,0.07)
-rgba(122,167,255,0.12)
-rgba(122,167,255,0.16)
-rgba(122,167,255,0.35)
-rgba(239,107,91,0.08)
-; dependency kind colour, text and tint
-#4fb8c4
-#9fdde4
-rgba(79,184,196,0.07)
-; work palette (`PALETTE`, useQueue.ts)
+; work palette (`PALETTE`, palette.ts)
 #e07a4f
 #e3a53c
 #c9c23a

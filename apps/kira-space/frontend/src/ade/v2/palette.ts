@@ -1,5 +1,5 @@
 // Work colours: `Task.color` is an index into this 20-slot table, assigned server-side.
-export const PALETTE = [
+const PALETTE = [
   '#e07a4f',
   '#e3a53c',
   '#c9c23a',
