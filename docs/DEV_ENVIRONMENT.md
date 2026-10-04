@@ -214,16 +214,18 @@ historical prose.
   `unsupportedLocator` on every non-darwin `runtime.GOOS`, whose `Locate` always reports `notFound`
   regardless of a configured `git.path` — this app's git *discovery* is macOS-only by its own design
   comment ("docs/v1.3/SPEC.md, macOS only"), so `ImportRepo`'s `Discovery.Status` gate can never pass
-  here. `AdeService`'s own git operations (`AddBranch`, `RepoSnapshot`, `SetPlan`, `ForcePush`,
-  `Archive`, …) do **not** go through that gate — they read `settings.Git.GitPath` directly
+  here. `AdeTaskService`'s own git operations (`StartRun`, `Archive`, …) do **not** go through that
+  gate — they read `settings.Git.GitPath` directly
   (`main.go`'s `adeGitPathSetting`) and run real git via `gitclient.Run` unconditionally. A live
   check against a real repo therefore: (1) inserts a `model.CodeRepo` row directly (a throwaway
   `internal/storage`/`internal/storage/repos` Go program, `repos.New(db.DB)` then
   `CodeRepos.Create`, against the same `KIRA_SPACE_HOME` the server will open, run with the server
   stopped), bypassing `ImportRepo` entirely; (2) calls `SettingsService.Set` with
   `{"git":{"gitPath":"/usr/bin/git"}}` once the server is up, since the default `git.path` setting
-  is `""` and `exec.CommandContext(ctx, "", …)` fails outright; (3) drives `AdeService`'s bound
-  calls as usual. The `/wails/runtime` POST body for a bound call, driven with a plain `curl` (no
+  is `""` and `exec.CommandContext(ctx, "", …)` fails outright (or seed the `settings` row
+  alongside the windows / code_repos rows: `INSERT INTO settings (key, value) VALUES ('git.path',
+  '"/usr/bin/git"')`; without it `StartRun` fails `E_INTERNAL … exec: no command`); (3) drives
+  `AdeTaskService`'s bound calls as usual. The `/wails/runtime` POST body for a bound call, driven with a plain `curl` (no
   browser, no `wails3` client): `{"object":0,"method":0,"args":{"call-id":"<uuid>","methodName":
   "github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge.<Service>.<Method>",
   "methodID":0,"args":[<positional JSON args>]}}` — `object:0`/`method:0` select Wails v3's own
