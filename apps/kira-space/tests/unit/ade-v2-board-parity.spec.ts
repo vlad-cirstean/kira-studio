@@ -316,7 +316,11 @@ describe('branch second line', () => {
           );
         const row = box.rows[offset + i];
         const line = branchLine2(b, timeline.graph, prs.branches[b.id]?.title ?? '');
-        const pick = (c: { label: string; tip: string }) => [c.label, c.tip];
+        // Re-merge is out of scope (P146 R5): the mockup's `Right-click to re-merge.` tip suffix is dropped.
+        const pick = (c: { label: string; tip: string }) => [
+          c.label,
+          c.tip.replace('. Right-click to re-merge.', ''),
+        ];
         expect([b.id, line.context]).toEqual([b.id, row.hasSub ? row.sub : '']);
         expect([b.id, line.merged.map(pick)]).toEqual([b.id, row.into.map(pick)]);
         expect([b.id, line.deployed.map(pick)]).toEqual([b.id, row.deploys.map(pick)]);
