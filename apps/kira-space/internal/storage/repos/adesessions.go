@@ -117,6 +117,26 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 	return nil
 }
 
+// InsertTUI writes a v2 task session row for an interactive Claude Code terminal (no code repo).
+func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
+	if rec.TaskID == "" || rec.Mode != model.AdeSessionModeTUI {
+		return fmt.Errorf("repos: insert tui ade session %s: a tui task row needs taskId and mode tui", rec.ID)
+	}
+	if err := rec.Validate(); err != nil {
+		return fmt.Errorf("repos: %w", err)
+	}
+	if _, err := r.DB.Exec(
+		`INSERT INTO ade_sessions (id, code_repo_id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
+			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
+		 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes,
+		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
+	); err != nil {
+		return fmt.Errorf("repos: insert tui ade session %s: %w", rec.ID, err)
+	}
+	return nil
+}
+
 // MarkRunning sets state='running' and terminal_id — Tracker.Compose's own resume path (a
 // previously stopped session picked back up under a fresh terminal id).
 func (r *AdeSessionsRepo) MarkRunning(id, terminalID string, lastActiveAt int64) error {

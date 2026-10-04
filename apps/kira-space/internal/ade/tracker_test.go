@@ -495,3 +495,62 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 		t.Fatalf("second Compose: err = %v, want ErrSessionRunning", err)
 	}
 }
+
+func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
+	tr, store, live, clock, _ := newTestTracker(t)
+	var mu sync.Mutex
+	var stopped []string
+	tr.deps.OnStopped = func(id string) { mu.Lock(); stopped = append(stopped, id); mu.Unlock() }
+	cwd := t.TempDir()
+
+	res, err := tr.Prepare(PrepareArgs{
+		TaskID: "t1", BranchID: "b1", StageID: "impl", StepID: "s1", Cwd: cwd, Resumes: "claude-9",
+		ExtraArgs: []string{"--add-dir", "/x y"}, Message: "go on",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	composed, _, err := tr.Compose(res.TerminalID, res.Command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "claude --resume 'claude-9' '--add-dir' '/x y' -- 'go on'"; composed != want {
+		t.Fatalf("composed = %q, want %q", composed, want)
+	}
+	rec, err := store.Get(res.RecordID)
+	if err != nil || rec == nil {
+		t.Fatalf("record = %v, %v", rec, err)
+	}
+	if rec.Mode != model.AdeSessionModeTUI || rec.TaskID != "t1" || rec.BranchID != "b1" || rec.StageID != "impl" ||
+		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.ClaudeSessionID != "claude-9" || rec.CodeRepoID != "" || rec.RunID != "" {
+		t.Fatalf("record = %+v", rec)
+	}
+
+	live.add(res.TerminalID)
+	live.remove(res.TerminalID)
+	clock.advance(time.Minute)
+	tr.Reconcile()
+	mu.Lock()
+	got := append([]string(nil), stopped...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != res.RecordID {
+		t.Fatalf("OnStopped = %v, want [%s]", got, res.RecordID)
+	}
+
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "other", Resume: res.RecordID}); err != ErrSessionWrongRepo {
+		t.Fatalf("resume under another task: %v", err)
+	}
+	again, err := tr.Prepare(PrepareArgs{TaskID: "t1", Resume: res.RecordID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.RecordID != res.RecordID || again.Command != "claude --resume 'claude-9'" {
+		t.Fatalf("resume = %+v", again)
+	}
+	if _, _, err := tr.Compose(again.TerminalID, again.Command); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ = store.Get(res.RecordID); rec.State != model.AdeSessionStateRunning {
+		t.Fatalf("resumed record state = %s", rec.State)
+	}
+}

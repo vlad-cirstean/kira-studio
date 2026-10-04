@@ -55,6 +55,9 @@ type TrackerDeps struct {
 	// session, a stop, a claude_session_id update after /clear) — main.go wires it to
 	// bridge.AdeSessionsChanged, never called with the lock held.
 	OnChange func()
+	// OnStopped is called with a record id after Reconcile marked it stopped (its terminal is gone);
+	// the v2 engine releases per-session state here. Never called with the lock held.
+	OnStopped func(recordID string)
 	// Grace/PendingTTL default to defaultGrace/defaultPendingTTL when zero — a test shortens Grace
 	// to make Reconcile's own grace-window behaviour observable in milliseconds, not 30 real
 	// seconds.
@@ -81,6 +84,8 @@ type pendingIntent struct {
 	Message         string
 	Resume          bool
 	CreatedAt       time.Time
+	// v2 task session fields; TaskID != "" marks a v2 intent.
+	TaskID, BranchID, StageID, StepID, Resumes string
 }
 
 // PrepareArgs is Prepare's own argument shape — bridge/ade.go's AdePrepareLaunchArgs, already
@@ -94,6 +99,11 @@ type PrepareArgs struct {
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
+	// v2 task session (TaskID != ""): no CodeRepoID/Branch/NewWorkID; the row is keyed to the task,
+	// branch ("" = task level), stage and step. Resumes is the Claude session id a new record
+	// continues (`claude --resume`), ExtraArgs are added to the base command, quoted.
+	TaskID, BranchID, StageID, StepID, Resumes string
+	ExtraArgs                                  []string
 }
 
 // PrepareResult is Prepare's own return shape — bridge/ade.go's AdePrepareLaunchResult. SessionID
@@ -103,9 +113,12 @@ type PrepareArgs struct {
 // resume — the caller opens the terminal there, so the PTY and the record always agree.
 type PrepareResult struct {
 	TerminalID string
-	SessionID  string
-	Command    string
-	Cwd        string
+	// RecordID is the ade_sessions row id (the handle Send and FocusSession take); SessionID is the
+	// Claude session id.
+	RecordID  string
+	SessionID string
+	Command   string
+	Cwd       string
 }
 
 // Tracker is Kira Space's own agent session tracker (§4.4) — one instance, constructed in main.go
@@ -191,11 +204,15 @@ func (t *Tracker) pruneExpiredPendingLocked(now time.Time) {
 // openTerminalSession is about to trigger.
 func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	now := t.deps.Now()
+	v2 := args.TaskID != ""
 
 	var recordID, claudeSessionID, cwd, branch, newWorkID string
 	if args.Resume == "" {
 		recordID = uuid.NewString()
 		claudeSessionID = uuid.NewString()
+		if args.Resumes != "" {
+			claudeSessionID = args.Resumes
+		}
 		cwd = args.Cwd
 		branch = args.Branch
 		newWorkID = args.NewWorkID
@@ -207,7 +224,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		if existing == nil {
 			return PrepareResult{}, ErrSessionNotFound
 		}
-		if existing.CodeRepoID != args.CodeRepoID {
+		if (v2 && existing.TaskID != args.TaskID) || (!v2 && existing.CodeRepoID != args.CodeRepoID) {
 			return PrepareResult{}, ErrSessionWrongRepo
 		}
 		if existing.State != model.AdeSessionStateStopped {
@@ -220,9 +237,13 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		// archived, or the folder deleted by hand), recreate it empty rather than fail — the dialog
 		// forces "new worktree" for this case (§0.10), so the message itself tells Claude to create
 		// one there. The folder-trust entry stays keyed by this same path, so no new trust prompt.
+		// A v2 row has no such dialog: a missing directory is an error.
 		if info, err := os.Stat(existing.Cwd); err != nil {
 			if !os.IsNotExist(err) {
 				return PrepareResult{}, fmt.Errorf("ade: prepare: stat resume cwd: %w", err)
+			}
+			if v2 {
+				return PrepareResult{}, fmt.Errorf("%w: %s no longer exists", ErrInvalidInput, existing.Cwd)
 			}
 			if err := os.MkdirAll(existing.Cwd, 0o755); err != nil {
 				return PrepareResult{}, fmt.Errorf("ade: prepare: recreate resume cwd: %w", err)
@@ -237,8 +258,11 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 
 	claudeBin := t.deps.ClaudeBin
 	command := newCommand(claudeBin, claudeSessionID)
-	if args.Resume != "" {
+	if args.Resume != "" || args.Resumes != "" {
 		command = resumeCommand(claudeBin, claudeSessionID)
+	}
+	for _, a := range args.ExtraArgs {
+		command += " " + quotePOSIX(a)
 	}
 
 	terminalID := uuid.NewString()
@@ -246,6 +270,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		RecordID: recordID, ClaudeSessionID: claudeSessionID, CodeRepoID: args.CodeRepoID,
 		Branch: branch, NewWorkID: newWorkID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
+		TaskID: args.TaskID, BranchID: args.BranchID, StageID: args.StageID, StepID: args.StepID, Resumes: args.Resumes,
 	}
 
 	t.mu.Lock()
@@ -265,7 +290,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	t.pending[terminalID] = intent
 	t.mu.Unlock()
 
-	return PrepareResult{TerminalID: terminalID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
+	return PrepareResult{TerminalID: terminalID, RecordID: recordID, SessionID: claudeSessionID, Command: command, Cwd: cwd}, nil
 }
 
 // Compose is BoundService.ComposeAgent's own target (wired in main.go) — internal/terminal.Open
@@ -317,7 +342,13 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 			State: model.AdeSessionStateRunning, TerminalID: terminalID,
 			StartedAt: now.UnixMilli(), LastActiveAt: now.UnixMilli(),
 		}
-		if err := t.deps.Store.Insert(rec); err != nil {
+		insert := t.deps.Store.Insert
+		if intent.TaskID != "" {
+			rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.Resumes =
+				model.AdeSessionModeTUI, intent.TaskID, intent.BranchID, intent.StageID, intent.StepID, intent.Resumes
+			insert = t.deps.Store.InsertTUI
+		}
+		if err := insert(rec); err != nil {
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
 		}
 	}
@@ -339,7 +370,12 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 		composed, env = hooks(terminalID, command)
 	}
 	if intent.Message != "" {
-		composed += " " + quotePOSIX(normalizeMessage(intent.Message))
+		// A v2 command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
+		sep := " "
+		if intent.TaskID != "" {
+			sep = " -- "
+		}
+		composed += sep + quotePOSIX(normalizeMessage(intent.Message))
 	}
 
 	if t.deps.OnChange != nil {
@@ -393,16 +429,21 @@ func (t *Tracker) Reconcile() {
 	}
 	t.mu.Unlock()
 
-	changed := false
+	var stopped []string
 	for _, recordID := range toStop {
 		if err := t.deps.Store.MarkStopped(recordID, flushed[recordID]); err != nil {
 			slog.Warn("ade: reconcile: mark stopped", "scope", "ade", "recordId", recordID, "err", err)
 			continue
 		}
-		changed = true
+		stopped = append(stopped, recordID)
 	}
-	if changed && t.deps.OnChange != nil {
+	if len(stopped) > 0 && t.deps.OnChange != nil {
 		t.deps.OnChange()
+	}
+	if t.deps.OnStopped != nil {
+		for _, recordID := range stopped {
+			t.deps.OnStopped(recordID)
+		}
 	}
 }
 
