@@ -12,6 +12,18 @@ const repoStyle = computed(() => {
   const c = repoColor(props.row.branch.codeRepoId);
   return { background: `${c}1f`, color: c };
 });
+const SEG: Record<string, string> = {
+  done: TONE.green[2],
+  running: TONE.amber[2],
+  bad: TONE.red[2],
+};
+const segColor = (state: string): string => SEG[state] ?? 'var(--kira-border-strong)';
+const progColor = computed(() => {
+  const tone = props.row.prog?.tone;
+  if (tone === 'red') return TONE.red[1];
+  if (tone === 'green') return TONE.green[1];
+  return tone === 'grey' ? 'var(--kira-fg-muted)' : TONE.amber[1];
+});
 const elbowColor = computed(() =>
   props.row.base?.tone === 'blue' ? TONE.blue[2] : 'var(--kira-border-strong)',
 );
@@ -67,13 +79,28 @@ const elbowColor = computed(() =>
           >{{ row.name }}</span
         >
       </AdeTip>
-      <span
-        v-if="row.context"
-        class="truncate text-kira-sm leading-[14px] text-subtle"
-        :class="row.draft ? 'italic' : ''"
-        data-testid="ade-branch-context"
-        >{{ row.context }}</span
-      >
+      <span v-if="row.context || row.prog" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-[14px]">
+        <AdeTip v-if="row.prog" :text="row.prog.tip">
+          <span class="inline-flex shrink-0 items-center gap-[5px]" data-testid="ade-branch-prog">
+            <span class="inline-flex gap-0.5">
+              <span
+                v-for="(seg, i) in row.prog.segs"
+                :key="i"
+                class="h-[5px] w-[7px] rounded-[2px]"
+                :style="{ background: segColor(seg) }"
+              />
+            </span>
+            <span class="text-kira-sm font-semibold" :style="{ color: progColor }">{{ row.prog.label }}</span>
+          </span>
+        </AdeTip>
+        <span
+          v-if="row.context"
+          class="truncate text-kira-sm text-subtle"
+          :class="row.draft ? 'italic' : ''"
+          data-testid="ade-branch-context"
+          >{{ row.context }}</span
+        >
+      </span>
     </div>
   </div>
 </template>

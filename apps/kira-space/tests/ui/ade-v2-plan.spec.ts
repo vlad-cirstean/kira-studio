@@ -172,3 +172,24 @@ test('a card is a 10px rounded box with a 4px task edge, a 68px header and 10px 
   expect(rects.length).toBeGreaterThanOrEqual(2);
   expect((rects[1]?.top ?? 0) - (rects[0]?.bottom ?? 0)).toBe(10);
 });
+
+test('the Plan scrolls inside the window instead of growing it', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const m = await page
+    .locator('[data-testid="ade-plan"]')
+    .evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight, win: innerHeight }));
+  expect(m.client).toBeLessThan(m.win);
+  expect(m.scroll).toBeGreaterThan(m.client);
+});
+
+test('a branch row shows its own progress under the name', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch);
+  const row = page.locator('[data-testid="ade-branch-row"][data-branch-id="b_meter"]');
+  await expect(row.locator('[data-testid="ade-branch-prog"]')).toHaveText('Implement 6/9');
+  await expect(
+    page.locator(
+      '[data-testid="ade-branch-row"][data-branch-id="b_cart"] [data-testid="ade-branch-prog"]',
+    ),
+  ).toHaveText('Release · failed');
+});

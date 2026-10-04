@@ -27,7 +27,7 @@ async function onImport(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col" data-testid="ade-view">
+  <div class="flex h-full min-h-0 flex-col" data-testid="ade-view">
     <Empty v-if="codeReposStore.records.length === 0" class="flex-1">
       <EmptyMedia variant="icon">
         <CodiconIcon name="robot" :size="20" />

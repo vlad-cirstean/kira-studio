@@ -8,7 +8,13 @@ import { isDraft } from '../board/branchGraph';
 import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
 import { taskTitle } from '../board/labels';
 import { buildNeedsYou } from '../board/needsYou';
-import { buildTaskProgress, type TaskProgress } from '../board/progress';
+import {
+  type BranchProgress,
+  type BranchSegState,
+  branchProgress,
+  buildTaskProgress,
+  type TaskProgress,
+} from '../board/progress';
 import { deriveStatus } from '../board/status';
 import {
   buildTimeline,
@@ -36,6 +42,8 @@ export interface BranchRowModel {
   /** Second line: `no branch yet · from main`, or a review item's PR title. */
   context: string;
   tag: BranchTag;
+  /** Own progress line while the task is in an agent or script stage. */
+  prog: { segs: BranchSegState[]; label: string; tone: BranchProgress['tone']; tip: string } | null;
   ripple: boolean;
   /** Tooltip of the `!` circle; `''` when the branch needs nothing from the user. */
   attention: string;
@@ -83,6 +91,8 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
   const parentName = parent === undefined ? undefined : graph.byBranch.get(parent)?.name;
   const attn = c.needs.items.find((n) => n.kind === 'question' && n.branchId === bid);
   const main = c.mainName.get(br.codeRepoId) ?? '';
+  const taskProgress = c.progress.get(task.id);
+  const prog = taskProgress ? branchProgress(taskProgress, bid) : null;
   let context = '';
   if (draft) context = `no branch yet · from ${parentName || br.base || 'main'}`;
   else if (br.kind === 'review') context = c.prTitle(bid);
@@ -105,6 +115,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
       hadSession: false,
       mainName: main,
     }),
+    prog: prog ? { segs: prog.segments, label: prog.label, tone: prog.tone, tip: prog.tip } : null,
     ripple: c.ripple?.branchIds.includes(bid) ?? false,
     attention: attn?.what ?? '',
   };
