@@ -31,6 +31,7 @@ type Repos struct {
 	AdeBacklog      *AdeBacklogRepo
 	AdeRepoConfig   *AdeRepoConfigRepo
 	AdeFacts        *AdeFactsRepo
+	AdeLogs         *AdeLogsRepo
 
 	stmts []*sql.Stmt // every prepared statement below, for Close.
 }
@@ -66,6 +67,7 @@ func New(db *sql.DB) (*Repos, error) {
 		AdeBacklog:      &AdeBacklogRepo{DB: db},
 		AdeRepoConfig:   &AdeRepoConfigRepo{DB: db},
 		AdeFacts:        &AdeFactsRepo{DB: db},
+		AdeLogs:         &AdeLogsRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll},
 	}, nil
 }

@@ -118,6 +118,28 @@ type AdeRun struct {
 	FinishedAt *int64
 }
 
+// AdeRunState* mirror ade_runs.state's CHECK.
+const (
+	AdeRunPending = "pending"
+	AdeRunRunning = "running"
+	AdeRunStuck   = "stuck"
+	AdeRunFailed  = "failed"
+	AdeRunBack    = "back"
+	AdeRunDone    = "done"
+)
+
+// AdeRunPatch holds only the run leaves the caller changes; nil = unchanged.
+type AdeRunPatch struct {
+	State      *string
+	Todo       *[2]int
+	Note       *string
+	Summary    *string
+	SessionID  *string
+	ExitCode   *int
+	StartedAt  *int64
+	FinishedAt *int64
+}
+
 // AdeWorktreeSetup is one row of ade_worktree_setup.
 type AdeWorktreeSetup struct {
 	BranchID   string
