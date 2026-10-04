@@ -152,11 +152,6 @@ func main() {
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
 	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry))
-	adeTracker.SetStoppedHandler(adeTaskBoard.OnTUIStopped)
-	if err := adeTaskBoard.Recover(); err != nil {
-		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
-	}
-	adeTaskBoard.Start()
 	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry, Queue: adeQueue}
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
@@ -447,6 +442,7 @@ func wireAde(
 
 // wireAdeTask builds the v2 task board engine (P144) beside the v1 queue: its own Conn, the
 // workflow reader over <home>/workflows, and the cached git discovery gating merge-tree checks.
+// It recovers rows a restart left running, then starts the board.
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
 ) *ade.TaskBoard {
@@ -455,7 +451,7 @@ func wireAdeTask(
 		slog.Warn("ade: user home", "scope", "ade", "err", err)
 	}
 	gitPath := adeGitPathSetting(repositories)
-	return ade.NewTaskBoard(ade.TaskBoardDeps{
+	board := ade.NewTaskBoard(ade.TaskBoardDeps{
 		Tasks: repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
 		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
 		Registry: git.registry, GitPath: gitPath,
@@ -489,6 +485,12 @@ func wireAdeTask(
 		HomeDir:          userHome,
 		Now:              time.Now,
 	})
+	tracker.SetStoppedHandler(board.OnTUIStopped)
+	if err := board.Recover(); err != nil {
+		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
+	}
+	board.Start()
+	return board
 }
 
 // adeSessionsFor is QueueDeps.Sessions' own construction (§5.1): Tracker.ListByRepo mapped to ade.SessionRef, Part 1's own already-recorded session rows.

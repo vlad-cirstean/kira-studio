@@ -266,7 +266,11 @@ func quotedAfter(t *testing.T, command, flag string) string {
 		t.Fatalf("command lacks %s: %s", flag, command)
 	}
 	rest := command[i+len(marker):]
-	return rest[:strings.Index(rest, "'")]
+	end := strings.Index(rest, "'")
+	if end < 0 {
+		t.Fatalf("unterminated word after %s: %s", flag, command)
+	}
+	return rest[:end]
 }
 
 // spawn composes a launch the way the terminal host would and registers it live.
