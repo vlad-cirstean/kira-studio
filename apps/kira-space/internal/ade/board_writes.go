@@ -522,17 +522,11 @@ func (b *TaskBoard) PromoteBacklogItem(_ context.Context, args adewire.BacklogIt
 
 // Workflows lists the workflow files with how many live tasks use each.
 func (b *TaskBoard) Workflows(_ context.Context) (adewire.WorkflowsResult, error) {
-	tasks, err := b.deps.Tasks.ListLive()
+	usedBy, err := b.workflowUsage()
 	if err != nil {
 		return adewire.WorkflowsResult{}, err
 	}
-	used := make(map[string]int)
-	for _, t := range tasks {
-		if t.WorkflowID != "" {
-			used[t.WorkflowID]++
-		}
-	}
-	return b.deps.Workflows.List(func(id string) int { return used[id] }), nil
+	return b.deps.Workflows.List(usedBy), nil
 }
 
 // Repos lists every code repo with its ade config and the folders it was imported from.

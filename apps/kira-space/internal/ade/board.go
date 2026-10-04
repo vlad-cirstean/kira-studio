@@ -38,16 +38,24 @@ type TaskBoardDeps struct {
 	Tasks           *repos.AdeTaskRepo
 	Backlog         *repos.AdeBacklogRepo
 	RepoConfig      *repos.AdeRepoConfigRepo
+	Facts           *repos.AdeFactsRepo
 	CodeRepos       *repos.CodeReposRepo
 	GitRepoSettings func(repoID string) (model.GitRepoSettings, error)
 	Registry        *gitsession.Registry
 	GitPath         func() string
 	// GitStatus is the app's git discovery (cached); every rebase-conflict check consults it first.
-	GitStatus        func(ctx context.Context) gitclient.GitStatus
-	Askpass          *gitaskpass.Broker
-	Workflows        *adeflow.Reader
+	GitStatus func(ctx context.Context) gitclient.GitStatus
+	Askpass   *gitaskpass.Broker
+	Workflows *adeflow.Reader
+	// Runner spawns git for repo identification (folder import).
+	Runner gitclient.Runner
+	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
+	// uses, notification included, so git-ui sees a new prepare script.
+	SetRepoSettings  func(repoID string, patch model.GitRepoSettingsPatch) error
 	OnBoard          func()
 	OnBacklog        func()
+	OnWorkflows      func()
+	OnRepos          func()
 	OnCredential     func(payload any)
 	AutofetchMinutes func() int
 	HomeDir          string
@@ -60,7 +68,15 @@ type TaskBoard struct {
 	deps    TaskBoardDeps
 	conn    *gitsession.Conn
 	checker *rebaseChecker
+	ctx     context.Context
 	cancel  context.CancelFunc
+
+	importMu  sync.Mutex // serializes repo imports (folder add, folder watch rescans)
+	folderWMu sync.Mutex
+	folderW   map[string]*folderWatcher
+	stopFlowW func()
+	wfTimer   *time.Timer
+	startOnce sync.Once
 
 	mu          sync.Mutex
 	repoMus     map[string]*sync.Mutex
@@ -78,7 +94,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	b := &TaskBoard{
-		deps: deps, cancel: cancel,
+		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{},
 	}
@@ -94,7 +110,11 @@ func (b *TaskBoard) Close() {
 	if b.boardTimer != nil {
 		b.boardTimer.Stop()
 	}
+	if b.wfTimer != nil {
+		b.wfTimer.Stop()
+	}
 	b.mu.Unlock()
+	b.stopWatchers()
 	b.conn.Close()
 }
 

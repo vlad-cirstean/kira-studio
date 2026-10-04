@@ -37,9 +37,9 @@ func newBoardHarness(t *testing.T) *boardHarness {
 	registry := gitsession.NewRegistry(gitclient.NewExecRunner())
 	t.Cleanup(registry.Close)
 	h := &boardHarness{t: t, repos: r}
-	h.status.Store(gitclient.GitStatus{Kind: "ok"})
+	h.status.Store(gitclient.GitStatus{Kind: "ok", Path: "git"})
 	h.board = NewTaskBoard(TaskBoardDeps{
-		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, CodeRepos: r.CodeRepos,
+		Tasks: r.AdeTasks, Backlog: r.AdeBacklog, RepoConfig: r.AdeRepoConfig, Facts: r.AdeFacts, CodeRepos: r.CodeRepos, Runner: gitclient.NewExecRunner(),
 		Registry: registry, GitPath: func() string { return "git" },
 		GitStatus: func(context.Context) gitclient.GitStatus { return h.status.Load().(gitclient.GitStatus) },
 		Workflows: &adeflow.Reader{Dir: t.TempDir(), Store: r.AdeTasks},
@@ -229,5 +229,17 @@ func TestTaskBoard_notCreatedAndTooOldGit(t *testing.T) {
 	b1 := boardBranch(t, board, "b1")
 	if b1.ConflictCheck != conflictFailed || b1.ConflictCheckReason == "" || len(b1.ConflictsIfRebased) != 0 {
 		t.Fatalf("tooOld git: %+v", b1)
+	}
+}
+
+// addRepoFromPath imports a real checkout the way the Git module would.
+func (h *boardHarness) addRepoFromPath(id, root string) {
+	h.t.Helper()
+	sum, err := gitclient.Identify(context.Background(), gitclient.NewExecRunner(), "git", root)
+	if err != nil {
+		h.t.Fatalf("identify: %v", err)
+	}
+	if _, err := h.repos.CodeRepos.Create(model.CodeRepo{ID: id, Name: id, Root: sum.Root, RepoID: sum.RepoID}); err != nil {
+		h.t.Fatalf("create code repo: %v", err)
 	}
 }
