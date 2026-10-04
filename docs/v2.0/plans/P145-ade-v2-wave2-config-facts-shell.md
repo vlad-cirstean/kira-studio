@@ -561,7 +561,7 @@ defect fixed before landing. Verdict + image paths in the B notes.
 
 Streams landed fast-forward on `v2.0` from `13e99974`. Notes: `P145-streamA-notes.md`, `P145-streamB-notes.md`.
 
-**Commits:** 25 from `13e99974` to `886f57db` (A 11, B 10, closing 4: dead code, ARCHITECTURE, SPEC
+**Commits:** 26 from `13e99974` to `886f57db` (A 12, B 10, closing 4: dead code, ARCHITECTURE, SPEC
 and preplan, `AddExistingBranch` fix).
 
 **Counts:** 31 `AdeTaskService` methods, 31 `adeTask*` entries; migration `0009`; `test:unit` 1727 pass;

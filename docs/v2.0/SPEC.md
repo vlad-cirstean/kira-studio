@@ -3731,7 +3731,7 @@ pre-existing and outside P144; needs its own numbered row, see plan `## Result`.
 Plan and `## Result` in `plans/P145-ade-v2-wave2-config-facts-shell.md`; notes in
 `plans/P145-streamA-notes.md` and `plans/P145-streamB-notes.md`.
 
-**Commits:** 25 on `v2.0` from `13e99974`.
+**Commits:** 26 on `v2.0` from `13e99974`, plus this result.
 
 **Counts:** 31 bound methods, 31 `index.ts` entries, migration `0009`, `test:unit` 1727 pass,
 `test:ui:space` 61 pass.
