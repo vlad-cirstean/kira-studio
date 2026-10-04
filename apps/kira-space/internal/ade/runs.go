@@ -415,16 +415,19 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 	b.emitRuns(updated)
 
 	timeout := parseStepTimeout(def.Timeout)
+	runCtx, endRun := b.beginLive(b.live, run.ID)
 	b.wg.Add(1)
 	if tc.stage.Kind == "agent" {
 		go func() {
 			defer b.wg.Done()
-			b.superviseAgent(updated, def, sessionID, path, prompt, timeout)
+			defer endRun()
+			b.superviseAgent(runCtx, updated, def, sessionID, path, prompt, timeout)
 		}()
 	} else {
 		go func() {
 			defer b.wg.Done()
-			b.superviseScript(updated, def, *rec, sb, path, substitute(def.Prompt, vars, true), timeout)
+			defer endRun()
+			b.superviseScript(runCtx, updated, def, *rec, sb, path, substitute(def.Prompt, vars, true), timeout)
 		}()
 	}
 	return updated, nil
@@ -441,6 +444,7 @@ func parseStepTimeout(s string) time.Duration {
 type outcome struct {
 	state, note, summary string
 	exit                 *int
+	noAdvance            bool // a user stop: the engine does not move the task on
 }
 
 func (b *TaskBoard) settingSources() string {
@@ -458,7 +462,7 @@ func allowedTools(step []string) []string {
 	return out
 }
 
-func (b *TaskBoard) superviseAgent(run model.AdeRun, def stepDef, sessionID, path, prompt string, timeout time.Duration) {
+func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, path, prompt string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	cfg, release, err := b.agent.Register(run.ID)
 	if err != nil {
@@ -472,7 +476,7 @@ func (b *TaskBoard) superviseAgent(run model.AdeRun, def stepDef, sessionID, pat
 		bin = "claude"
 	}
 	cwdEnv := gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path})
-	exit, runErr := adeagent.Run(b.ctx, adeagent.Spec{
+	exit, runErr := adeagent.Run(ctx, adeagent.Spec{
 		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), MCPConfigPath: cfg,
 		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools), Timeout: timeout, Env: cwdEnv,
 	}, adeagent.Handler{
@@ -483,6 +487,13 @@ func (b *TaskBoard) superviseAgent(run model.AdeRun, def stepDef, sessionID, pat
 	release()
 	if b.ctx.Err() != nil {
 		return // app quit: rows stay running (R18)
+	}
+	if out, ok := stopOutcome(ctx); ok {
+		b.takeFinish(run.ID)
+		code := exit.Code
+		out.exit = &code
+		b.completeRun(run, sessionID, out)
+		return
 	}
 	b.completeRun(run, sessionID, b.agentOutcome(run.ID, exit, runErr, def.Timeout))
 }
@@ -527,10 +538,10 @@ func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error,
 	return out
 }
 
-func (b *TaskBoard) superviseScript(run model.AdeRun, def stepDef, rec model.CodeRepo, sb model.AdeTaskBranch, path, command string, timeout time.Duration) {
+func (b *TaskBoard) superviseScript(ctx context.Context, run model.AdeRun, def stepDef, rec model.CodeRepo, sb model.AdeTaskBranch, path, command string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
-	res, err := b.scriptRunner().Run(b.ctx, gitprepare.Spec{
+	res, err := b.scriptRunner().Run(ctx, gitprepare.Spec{
 		Shell: shell, LoginShell: login, Script: command, Dir: path, Timeout: timeout,
 		Env: gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path, WorktreeBranch: sb.Name, RepoRoot: rec.Root}),
 		OnBatch: func(lines []gitprepare.Line) {
@@ -544,6 +555,11 @@ func (b *TaskBoard) superviseScript(run model.AdeRun, def stepDef, rec model.Cod
 		return // app quit: rows stay running (R18)
 	}
 	code := res.ExitCode
+	if out, ok := stopOutcome(ctx); ok {
+		out.exit = &code
+		b.completeRun(run, "", out)
+		return
+	}
 	out := outcome{state: model.AdeRunDone, exit: &code}
 	switch {
 	case err != nil:
@@ -576,7 +592,9 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 		return
 	}
 	b.emitRuns(updated)
-	b.advanceLocked(b.ctx, run.TaskID)
+	if !out.noAdvance {
+		b.advanceLocked(b.ctx, run.TaskID)
+	}
 }
 
 // advanceLocked applies the step machine's next action; the task mutex is held.
@@ -615,6 +633,12 @@ func (b *TaskBoard) onSetupReady(branchID string) {
 	mu := b.taskMu(sb.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
+	b.launchHeldLocked(sb)
+}
+
+// launchHeldLocked launches the pending runs of a branch whose setup finished; the task mutex is held.
+func (b *TaskBoard) launchHeldLocked(sb model.AdeTaskBranch) {
+	branchID := sb.ID
 	tc, err := b.loadTaskCtx(sb.TaskID)
 	if err != nil || tc.stage == nil || tc.stage.Kind == "user" {
 		return
@@ -785,7 +809,67 @@ func (b *TaskBoard) RetrySetup(ctx context.Context, branchID string) error {
 	if rec == nil {
 		return invalid("code repo %s not found", sb.CodeRepoID)
 	}
-	return b.startSetup(*rec, sb, sb.Name, path, b.onSetupReady)
+	if err := b.startSetup(*rec, sb, sb.Name, path, b.onSetupReady); err != nil {
+		return err
+	}
+	if setup, err = b.deps.Tasks.GetSetup(branchID); err == nil && setup != nil && setup.State == model.AdeSetupReady {
+		b.launchHeldLocked(sb) // no prepare script: ready at once, nobody else will launch the held runs
+		return nil
+	}
+	if setup != nil && setup.State == model.AdeSetupRunning {
+		b.setPendingNote(branchID, noteWaitingSetup)
+	}
+	return nil
+}
+
+// setPendingNote rewrites the note of a branch's pending runs (they wait behind its setup).
+func (b *TaskBoard) setPendingNote(branchID, note string) {
+	runs, err := b.deps.Tasks.SetPendingNote(branchID, note)
+	if err != nil {
+		slog.Warn("ade: pending run note", "scope", "ade", "branch", branchID, "err", err)
+		return
+	}
+	b.emitRuns(runs...)
+}
+
+// StopRun stops a running run (it becomes stuck, "stopped by you") or a pending one.
+func (b *TaskBoard) StopRun(_ context.Context, runID string) error {
+	run, err := b.deps.Tasks.GetRun(runID)
+	if err != nil {
+		return err
+	}
+	switch run.State {
+	case model.AdeRunRunning:
+		done := b.cancelLive(b.live, runID, errStopped)
+		if done == nil {
+			return invalid("run %s has no live process", runID)
+		}
+		return b.awaitEnd(done)
+	case model.AdeRunPending:
+		mu := b.taskMu(run.TaskID)
+		mu.Lock()
+		defer mu.Unlock()
+		if run, err = b.deps.Tasks.GetRun(runID); err != nil {
+			return err
+		}
+		if run.State != model.AdeRunPending {
+			return invalid("run %s is no longer pending", runID)
+		}
+		return b.markStopped(run)
+	}
+	return invalid("only a running or pending run can be stopped")
+}
+
+// markStopped makes a run that has no process stuck.
+func (b *TaskBoard) markStopped(run model.AdeRun) error {
+	now := b.deps.Now().UnixMilli()
+	stuck, note := model.AdeRunStuck, errStopped.Error()
+	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{State: &stuck, Note: &note, FinishedAt: &now})
+	if err != nil {
+		return err
+	}
+	b.emitRuns(updated)
+	return nil
 }
 
 // --- reads -------------------------------------------------------------------------------------

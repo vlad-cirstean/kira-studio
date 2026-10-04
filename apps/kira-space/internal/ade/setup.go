@@ -279,11 +279,12 @@ func (b *TaskBoard) startSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name,
 		defer b.notifyBoard()
 		return b.deps.Tasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: sb.ID, State: model.AdeSetupReady, StartedAt: now, FinishedAt: &now, ExitCode: &zero})
 	}
-	if !b.claimSetup(sb.ID) {
+	sctx, endSetup, ok := b.claimSetup(sb.ID)
+	if !ok {
 		return invalid("a setup is already running for this branch")
 	}
 	if err := b.deps.Tasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: sb.ID, State: model.AdeSetupRunning, StartedAt: now}); err != nil {
-		b.releaseSetup(sb.ID)
+		endSetup()
 		return err
 	}
 	b.notifyBoard()
@@ -291,35 +292,31 @@ func (b *TaskBoard) startSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name,
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		defer b.releaseSetup(sb.ID)
-		b.runSetup(rec, sb, name, path, settings.WorktreePrepareScript, timeout, timeoutText, sink, now, onReady)
+		defer endSetup()
+		b.runSetup(sctx, rec, sb, name, path, settings.WorktreePrepareScript, timeout, timeoutText, sink, now, onReady)
 	}()
 	return nil
 }
 
-func (b *TaskBoard) claimSetup(branchID string) bool {
+// claimSetup registers the branch's running prepare script; ok is false when one already runs.
+func (b *TaskBoard) claimSetup(branchID string) (context.Context, func(), bool) {
 	b.runMu.Lock()
-	defer b.runMu.Unlock()
-	if b.setupBusy[branchID] {
-		return false
-	}
-	b.setupBusy[branchID] = true
-	return true
-}
-
-func (b *TaskBoard) releaseSetup(branchID string) {
-	b.runMu.Lock()
-	delete(b.setupBusy, branchID)
+	_, busy := b.setupLive[branchID]
 	b.runMu.Unlock()
+	if busy {
+		return nil, nil, false
+	}
+	ctx, end := b.beginLive(b.setupLive, branchID)
+	return ctx, end, true
 }
 
-func (b *TaskBoard) runSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name, path, script string, timeout time.Duration, timeoutText string, sink *logSink, startedAt int64, onReady func(string)) {
+func (b *TaskBoard) runSetup(ctx context.Context, rec model.CodeRepo, sb model.AdeTaskBranch, name, path, script string, timeout time.Duration, timeoutText string, sink *logSink, startedAt int64, onReady func(string)) {
 	commonDir := rec.Root
-	if entry, err := b.openRepo(b.ctx, sb.CodeRepoID); err == nil {
+	if entry, err := b.openRepo(ctx, sb.CodeRepoID); err == nil {
 		commonDir = entry.Summary.CommonDir
 	}
 	shell, login := gitprepare.ResolveShell(os.Getenv, gitprepare.IsExecutableFile)
-	res, err := b.scriptRunner().Run(b.ctx, gitprepare.Spec{
+	res, err := b.scriptRunner().Run(ctx, gitprepare.Spec{
 		Shell: shell, LoginShell: login, Script: script, Dir: path, Timeout: timeout,
 		Env: gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path, WorktreeBranch: name, RepoRoot: rec.Root, RepoCommonDir: commonDir}),
 		OnBatch: func(lines []gitprepare.Line) {
@@ -330,9 +327,12 @@ func (b *TaskBoard) runSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name, p
 	})
 	state, exit := model.AdeSetupReady, res.ExitCode
 	switch {
-	case res.Cancelled && err == nil:
+	case res.Cancelled && err == nil && b.ctx.Err() != nil:
 		sink.flush()
 		return // app quit: the row stays running (R18)
+	case res.Cancelled && err == nil:
+		state = model.AdeSetupFailed
+		sink.add(logEvent, "cancelled: "+context.Cause(ctx).Error())
 	case err != nil:
 		state = model.AdeSetupFailed
 		sink.add(logEvent, "could not start: "+err.Error())
@@ -349,6 +349,9 @@ func (b *TaskBoard) runSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name, p
 	if err := b.deps.Tasks.UpsertSetup(row); err != nil {
 		slog.Warn("ade: record setup", "scope", "ade", "branch", sb.ID, "err", err)
 		return
+	}
+	if state == model.AdeSetupFailed {
+		b.setPendingNote(sb.ID, noteSetupFailed)
 	}
 	b.notifyBoard()
 	if state == model.AdeSetupReady && onReady != nil {

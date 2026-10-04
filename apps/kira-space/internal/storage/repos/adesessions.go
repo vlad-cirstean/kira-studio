@@ -178,6 +178,18 @@ func (r *AdeSessionsRepo) StopAllRunning(now int64) error {
 	return nil
 }
 
+// StopAllTaskRunning marks every still-'running' v2 row 'stopped' and clears its terminal_id (boot
+// recovery: no process or PTY of the previous life survives).
+func (r *AdeSessionsRepo) StopAllTaskRunning(now int64) error {
+	if _, err := r.DB.Exec(
+		`UPDATE ade_sessions SET state = ?, terminal_id = NULL, last_active_at = ? WHERE state = ? AND task_id <> ''`,
+		model.AdeSessionStateStopped, now, model.AdeSessionStateRunning,
+	); err != nil {
+		return fmt.Errorf("repos: stop all running task sessions: %w", err)
+	}
+	return nil
+}
+
 func nullableString(s string) any {
 	if s == "" {
 		return nil

@@ -785,3 +785,71 @@ func (r *AdeTaskRepo) GetSetup(branchID string) (*model.AdeWorktreeSetup, error)
 	s.FinishedAt, s.ExitCode = nullInt64Ptr(finished), nullIntPtr(exit)
 	return &s, nil
 }
+
+// SetPendingNote rewrites the note of a branch's pending runs and returns them.
+func (r *AdeTaskRepo) SetPendingNote(branchID, note string) ([]model.AdeRun, error) {
+	if _, err := r.DB.Exec(`UPDATE ade_runs SET note = ? WHERE branch_id = ? AND state = ?`, note, branchID, model.AdeRunPending); err != nil {
+		return nil, fmt.Errorf("repos: set pending ade run note %s: %w", branchID, err)
+	}
+	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs WHERE branch_id = ? AND state = ? ORDER BY id`, branchID, model.AdeRunPending)
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
+		run, err := scanAdeRun(rows)
+		return run, true, err
+	})
+}
+
+// RecoverRunning turns every running run stuck with note and returns them (boot recovery).
+func (r *AdeTaskRepo) RecoverRunning(now int64, note string) ([]model.AdeRun, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("repos: begin recover ade runs: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	rows, err := tx.Query(`SELECT ` + adeRunColumns + ` FROM ade_runs WHERE state = 'running' ORDER BY id`)
+	runs, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeRun, bool, error) {
+		run, err := scanAdeRun(rows)
+		return run, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repos: select running ade runs: %w", err)
+	}
+	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, finished_at = ? WHERE state = 'running'`,
+		model.AdeRunStuck, note, now); err != nil {
+		return nil, fmt.Errorf("repos: recover ade runs: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("repos: commit recover ade runs: %w", err)
+	}
+	for i := range runs {
+		runs[i].State, runs[i].Note, runs[i].FinishedAt = model.AdeRunStuck, note, &now
+	}
+	return runs, nil
+}
+
+// FailRunningSetups marks every running worktree setup failed and returns their branch and task ids
+// (boot recovery).
+func (r *AdeTaskRepo) FailRunningSetups(now int64) ([]model.AdeTaskBranch, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("repos: begin recover ade setups: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	rows, err := tx.Query(`SELECT b.id, b.task_id FROM ade_worktree_setup s JOIN ade_task_branches b ON b.id = s.branch_id
+		WHERE s.state = 'running' ORDER BY b.id`)
+	out, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.AdeTaskBranch, bool, error) {
+		var b model.AdeTaskBranch
+		err := rows.Scan(&b.ID, &b.TaskID)
+		return b, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repos: select running ade setups: %w", err)
+	}
+	if _, err := tx.Exec(`UPDATE ade_worktree_setup SET state = ?, finished_at = ? WHERE state = 'running'`,
+		model.AdeSetupFailed, now); err != nil {
+		return nil, fmt.Errorf("repos: recover ade setups: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("repos: commit recover ade setups: %w", err)
+	}
+	return out, nil
+}
