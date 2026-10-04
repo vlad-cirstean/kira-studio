@@ -1,0 +1,84 @@
+{
+  "globalExcludes": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.d.ts",
+    "**/generated/**",
+    "**/bindings/**",
+    "packages/shared/protocol/wire.ts",
+    "packages/shared/protocol/wire/**",
+    "**/components/ui/**",
+    "**/testing/**",
+    "**/main.ts"
+  ],
+  "noUnitSuite": ["packages/theme", "packages/kira-ui"],
+  "areas": {
+    "kira-studio": {
+      "mutate": ["apps/kira-studio/frontend/src/**/*.ts"],
+      "tests": ["apps/kira-studio/tests/unit"],
+      "excludeTests": [
+        {
+          "path": "apps/kira-studio/tests/unit/tabs-save-retries-after-failure.spec.ts",
+          "reason": "setTimeout(0) race fails under Stryker instrumentation (also in a plain instrumented sandbox)"
+        },
+        {
+          "path": "apps/kira-studio/tests/unit/tabs-save-serialized.spec.ts",
+          "reason": "setTimeout(0) race fails under Stryker instrumentation (also in a plain instrumented sandbox)"
+        }
+      ]
+    },
+    "kira-space": {
+      "mutate": ["apps/kira-space/frontend/src/**/*.ts"],
+      "tests": ["apps/kira-space/tests/unit"],
+      "excludeTests": []
+    },
+    "api-core": {
+      "mutate": ["packages/api-core/src/**/*.ts"],
+      "tests": ["packages/api-core/test"],
+      "excludeTests": []
+    },
+    "git-core": {
+      "mutate": ["packages/git-core/src/**/*.ts"],
+      "tests": ["packages/git-core/src"],
+      "excludeTests": []
+    },
+    "git-ipc": {
+      "mutate": ["packages/git-ipc/src/**/*.ts"],
+      "tests": ["packages/git-ipc/src"],
+      "excludeTests": []
+    },
+    "git-ui": {
+      "mutate": ["packages/git-ui/src/**/*.ts"],
+      "tests": ["packages/git-ui/src"],
+      "excludeTests": []
+    },
+    "kira-space-vscode": {
+      "mutate": ["apps/kira-space-vscode/src/**/*.ts"],
+      "tests": ["apps/kira-space-vscode/src"],
+      "excludeTests": []
+    },
+    "cross": {
+      "mutate": ["packages/shared/**/*.ts", "packages/workbench/src/**/*.ts"],
+      "tests": [
+        "apps/kira-studio/tests/unit",
+        "apps/kira-space/tests/unit",
+        "packages/api-core/test",
+        "packages/git-core/src",
+        "packages/git-ipc/src",
+        "apps/kira-space-vscode/src",
+        "packages/git-ui/src",
+        "packages/workbench/src"
+      ],
+      "excludeTests": [
+        {
+          "path": "apps/kira-studio/tests/unit/tabs-save-retries-after-failure.spec.ts",
+          "reason": "setTimeout(0) race fails under Stryker instrumentation"
+        },
+        {
+          "path": "apps/kira-studio/tests/unit/tabs-save-serialized.spec.ts",
+          "reason": "setTimeout(0) race fails under Stryker instrumentation"
+        }
+      ]
+    }
+  }
+}

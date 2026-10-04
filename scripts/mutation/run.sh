@@ -85,10 +85,10 @@ mkdir -p "$SNAP"
 
 echo "mutation: snapshot $SNAP_REF -> $SNAP"
 git -C "$ROOT_DIR" archive "$SNAP_REF" | tar -x -C "$SNAP"
-# Dependency trees are untracked; symlink them rather than copy ~800MB.
-for nm in "$ROOT_DIR/node_modules" "$ROOT_DIR"/apps/*/node_modules "$ROOT_DIR"/packages/*/node_modules; do
-  [ -e "$nm" ] || continue
-  ln -s "$nm" "$SNAP${nm#"$ROOT_DIR"}"
+# Dependency trees are untracked and every workspace package has its own (isolated linker);
+# symlink them all rather than copy ~800MB.
+(cd "$ROOT_DIR" && find . -name node_modules -prune -not -path './tools/*' -print) | while read -r nm; do
+  [ -d "$SNAP/$(dirname "$nm")" ] && ln -s "$ROOT_DIR/${nm#./}" "$SNAP/${nm#./}"
 done
 
 # Resumable-unit helper: unit_done <kind> <slug> succeeds when the unit already has a result.
@@ -96,13 +96,15 @@ unit_done() { [ -f "$RUN_DIR/$1/$2.info.json" ]; }
 
 # shellcheck source=go.sh
 . "$SCRIPT_DIR/go.sh"
+# shellcheck source=ts.sh
+. "$SCRIPT_DIR/ts.sh"
 
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 START_S="$(date +%s)"
 case "$MODE" in
   go) mutation_go ;;
-  ts) echo "run.sh: ts mode not available yet" >&2; exit 2 ;;
-  all) mutation_go ;;
+  ts) mutation_ts ;;
+  all) mutation_go; mutation_ts ;;
 esac
 END_S="$(date +%s)"
 
