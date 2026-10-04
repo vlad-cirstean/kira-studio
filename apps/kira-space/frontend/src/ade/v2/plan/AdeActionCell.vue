@@ -39,5 +39,6 @@ const emit = defineEmits<{ forcePush: [] }>();
         {{ forcePush.label }}
       </Button>
     </AdeTip>
+    <slot />
   </div>
 </template>

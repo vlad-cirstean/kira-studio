@@ -4,6 +4,7 @@ import { NativeSelect } from '@theme/components/ui/native-select';
 import { computed, ref } from 'vue';
 import type { CardModel } from '../plan/usePlanModel';
 import { useSetTaskWorkflow, useWorkflows } from '../queries';
+import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import AdeStageBlock from './AdeStageBlock.vue';
 
@@ -60,6 +61,10 @@ function edit(): void {
       </Button>
     </div>
     <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-workflow-error">{{ error }}</p>
-    <AdeStageBlock v-for="b in card.blocks" :key="b.stage.id" :block="b" :card="card" />
+    <AdeStageBlock v-for="b in card.blocks" :key="b.stage.id" :block="b" :card="card">
+      <template #action>
+        <AdeTaskActionButton v-if="b.state === 'now'" :card="card" />
+      </template>
+    </AdeStageBlock>
   </div>
 </template>

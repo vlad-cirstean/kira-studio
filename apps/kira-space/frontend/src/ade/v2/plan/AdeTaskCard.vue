@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
+import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { TONE, TONE_INK } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
@@ -53,7 +54,9 @@ const headStyle = computed(() => ({
     :data-selected="card.selected || undefined"
   >
     <div class="flex w-[210px] shrink-0 flex-col pt-px" data-testid="ade-task-cells">
-      <AdeActionCell v-if="card.tag" :tag="card.tag" tall />
+      <AdeActionCell v-if="card.tag" :tag="card.tag" tall>
+        <AdeTaskActionButton :card="card" />
+      </AdeActionCell>
       <AdeActionCell
         v-for="row in card.rows"
         :key="row.id"

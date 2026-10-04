@@ -18,6 +18,10 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   /** The Add popover: open state, and the task it attaches an existing branch to (else a new task). */
   const addOpen = ref(false);
   const attachTo = ref<{ taskId: string; title: string } | null>(null);
+  /** Task whose agent Run dialog is open. */
+  const runTaskId = ref<string | null>(null);
+  /** Last failed stage action per task, shown in the panel header until the next attempt. */
+  const actionError = ref<Record<string, string>>({});
   /** Per repo: what the last fetch changed, shown on its chip until the next fetch. */
   const refreshSummary = ref<Record<string, string>>({});
   const showAllItems = useLocalStorage('kira.ade.showAllItems', false);
@@ -67,6 +71,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     historyReach,
     addOpen,
     attachTo,
+    runTaskId,
+    actionError,
     refreshSummary,
     showAllItems,
     showHistory,

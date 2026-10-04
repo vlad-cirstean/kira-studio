@@ -8,6 +8,8 @@ import { taskFacts, taskPatch } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
 import { useUpdateTask } from '../queries';
+import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
@@ -16,6 +18,7 @@ import AdeTaskTab from './AdeTaskTab.vue';
 const props = defineProps<{ card: CardModel; model: PlanModel }>();
 
 const tab = ref('task');
+const ui = useAdeBoardUiStore();
 const update = useUpdateTask();
 const notesError = ref('');
 
@@ -74,8 +77,12 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
             {{ card.title }}
           </h3>
         </AdeTip>
+        <AdeTaskActionButton :card="card" />
       </div>
       <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
+      <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">
+        {{ ui.actionError[card.task.id] }}
+      </p>
       <div
         v-if="card.review"
         class="mt-0.5 flex items-center gap-2 rounded-kira px-2.5 py-[7px] text-kira-md"

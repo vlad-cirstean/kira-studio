@@ -2,7 +2,7 @@ import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
-import { type BranchTag, branchTag, taskCell } from '../board/actions';
+import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
 import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
@@ -66,6 +66,8 @@ export interface CardModel {
   blocks: StageBlock[];
   status: DerivedStatus;
   tag: { label: string; tone: BranchTag['tone']; tip: string } | null;
+  /** Task stage action; which kinds render is `useTaskAction`'s call. */
+  action: TaskAction | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
   meta: string;
   attention: string;
@@ -186,6 +188,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
         ),
     status,
     tag: cell?.tag ?? null,
+    action: cell?.action ?? null,
     meta: cardMeta(c, entry, task, branches),
     attention: needsOf?.what ?? '',
     rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
