@@ -17,8 +17,9 @@ const logLevelSettingKey = "logLevel"
 // worktreePrepareScriptKey/worktreeBasePathKey are G25 D10's own two new leaves — ordinary
 // per-repo rows, same shape as every other leaf including logLevel now (P72 §9.2).
 const (
-	worktreePrepareScriptKey = "worktreePrepareScript"
-	worktreeBasePathKey      = "worktreeBasePath"
+	worktreePrepareScriptKey  = "worktreePrepareScript"
+	worktreeBasePathKey       = "worktreeBasePath"
+	worktreePrepareTimeoutKey = "worktreePrepareTimeout"
 )
 
 // checkoutAutoStashKey is G28 D16's own eleventh leaf (kiraSpace.checkout.autoStash) — same
@@ -53,6 +54,10 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	appsettings.LeafValid(stored, "pullStrategy", &result.PullStrategy, model.ValidPullStrategy)
 	appsettings.Leaf(stored, "githubEnabled", &result.GithubEnabled)
 	appsettings.Leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
+	appsettings.LeafValid(stored, worktreePrepareTimeoutKey, &result.WorktreePrepareTimeout, func(v string) bool {
+		_, err := model.ParsePrepareTimeout(v)
+		return err == nil
+	})
 	appsettings.Leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
 	appsettings.LeafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
 	appsettings.Leaf(stored, checkoutAutoStashKey, &result.CheckoutAutoStash)
@@ -112,6 +117,7 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		{logLevelSettingKey, patch.LogLevel != nil, derefAny(patch.LogLevel)},
 		{"githubEnabled", patch.GithubEnabled != nil, derefAny(patch.GithubEnabled)},
 		{worktreePrepareScriptKey, patch.WorktreePrepareScript != nil, derefAny(patch.WorktreePrepareScript)},
+		{worktreePrepareTimeoutKey, patch.WorktreePrepareTimeout != nil, derefAny(patch.WorktreePrepareTimeout)},
 		{worktreeBasePathKey, patch.WorktreeBasePath != nil, derefAny(patch.WorktreeBasePath)},
 		{checkoutAutoStashKey, patch.CheckoutAutoStash != nil, derefAny(patch.CheckoutAutoStash)},
 	}

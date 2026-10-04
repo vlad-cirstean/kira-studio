@@ -173,7 +173,6 @@ type AdeRepoConfig struct {
 	Name                string
 	Root                string
 	Nickname            string
-	PrepareTimeout      string
 	Source              string
 	IntegrationBranches []string
 	Environments        []AdeRepoEnv
@@ -184,4 +183,34 @@ type AdeFolder struct {
 	Path      string
 	Watch     bool
 	RepoCount int
+}
+
+// AdeRepoConfigPatch holds only the ade_repo_config leaves the caller changes; nil = unchanged.
+// Integration branches and environments are dense rewrites. The prepare script and timeout live in
+// git_repo_settings, not here.
+type AdeRepoConfigPatch struct {
+	Nickname            *string
+	IntegrationBranches *[]string
+	Environments        *[]AdeRepoEnv
+}
+
+// AdeBranchMark is the last branch tip seen fully contained in a target (kind 'target') or an
+// environment (kind 'env'). Recorded is set only by an explicit RecordMerge.
+type AdeBranchMark struct {
+	BranchID  string
+	Kind      string
+	Name      string
+	MergedTip string
+	Recorded  bool
+	UpdatedAt int64
+}
+
+// AdeEnvState is one environment's last deploy-script result.
+type AdeEnvState struct {
+	CodeRepoID string
+	Env        string
+	Sha        string
+	PrevSha    string
+	Error      string
+	CheckedAt  int64
 }

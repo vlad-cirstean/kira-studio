@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
@@ -33,6 +34,9 @@ type GitRepoSettings struct {
 	// the single highest-value safety property in the whole feature). Deliberately NOT validated
 	// beyond being a string: it is shell text the user wrote, not a value this app parses.
 	WorktreePrepareScript string `json:"worktreePrepareScript"`
+	// WorktreePrepareTimeout is P145 F2's per-repo hard cap for that script (a Go duration, default
+	// 15m, max 2h), shared by git-ui's worktree add and ade. Not on the git-ui wire.
+	WorktreePrepareTimeout string `json:"worktreePrepareTimeout"`
 	// WorktreeBasePath is G25 D10's own tenth leaf (kiraSpace.worktree.basePath) — pure UX, never
 	// a security boundary: it only pre-fills WorktreeDialog's own path field. "" means no
 	// suggestion beyond the dialog's own basename default.
@@ -48,17 +52,18 @@ type GitRepoSettings struct {
 // for the seven keys that moved here (G18 D1).
 func DefaultGitRepoSettings() GitRepoSettings {
 	return GitRepoSettings{
-		GraphPageSize:         5000,
-		GraphScope:            "all",
-		StashShowInGraph:      true,
-		StashIncludeUntracked: false,
-		ReviewBaseCandidates:  []string{"main", "master"},
-		PullStrategy:          "auto",
-		LogLevel:              "info",
-		GithubEnabled:         true,
-		WorktreePrepareScript: "",
-		WorktreeBasePath:      "",
-		CheckoutAutoStash:     true,
+		GraphPageSize:          5000,
+		GraphScope:             "all",
+		StashShowInGraph:       true,
+		StashIncludeUntracked:  false,
+		ReviewBaseCandidates:   []string{"main", "master"},
+		PullStrategy:           "auto",
+		LogLevel:               "info",
+		GithubEnabled:          true,
+		WorktreePrepareScript:  "",
+		WorktreePrepareTimeout: DefaultPrepareTimeout,
+		WorktreeBasePath:       "",
+		CheckoutAutoStash:      true,
 	}
 }
 
@@ -77,8 +82,29 @@ type GitRepoSettingsPatch struct {
 	// WorktreePrepareScript/WorktreeBasePath: G25 D10's two new leaves.
 	WorktreePrepareScript *string `json:"worktreePrepareScript,omitempty"`
 	WorktreeBasePath      *string `json:"worktreeBasePath,omitempty"`
+	// WorktreePrepareTimeout: P145 F2.
+	WorktreePrepareTimeout *string `json:"worktreePrepareTimeout,omitempty"`
 	// CheckoutAutoStash: G28 D16's own eleventh leaf.
 	CheckoutAutoStash *bool `json:"checkoutAutoStash,omitempty"`
+}
+
+// DefaultPrepareTimeout is WorktreePrepareTimeout's default; MaxPrepareTimeout its ceiling.
+const (
+	DefaultPrepareTimeout = "15m"
+	MaxPrepareTimeout     = 2 * time.Hour
+)
+
+// ParsePrepareTimeout parses a stored or patched timeout: a positive Go duration up to
+// MaxPrepareTimeout.
+func ParsePrepareTimeout(v string) (time.Duration, error) {
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("worktreePrepareTimeout: invalid duration %q", v)
+	}
+	if d <= 0 || d > MaxPrepareTimeout {
+		return 0, fmt.Errorf("worktreePrepareTimeout: %q must be above 0 and at most %s", v, MaxPrepareTimeout)
+	}
+	return d, nil
 }
 
 // ValidGraphScope mirrors schema.ts's kiraSpace.graph.scope enum.
@@ -113,6 +139,11 @@ func (p GitRepoSettingsPatch) Validate() error {
 	}
 	if p.LogLevel != nil && !appsettings.ValidLogLevel(*p.LogLevel) {
 		return fmt.Errorf("model: logLevel: invalid value %q", *p.LogLevel)
+	}
+	if p.WorktreePrepareTimeout != nil {
+		if _, err := ParsePrepareTimeout(*p.WorktreePrepareTimeout); err != nil {
+			return fmt.Errorf("model: %w", err)
+		}
 	}
 	return nil
 }
