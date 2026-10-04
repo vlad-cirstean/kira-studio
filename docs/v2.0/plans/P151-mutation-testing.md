@@ -336,3 +336,48 @@ keeps any rebase conflict trivial.
    `bridge/adewire` as a domain package importing the bridge layer. CLAUDE.md says fix on the spot,
    but that tree belongs to P144 (`internal/**`). Route it to P144 or a follow-up phase?
    (`gitsock` `TestMatrix_M3_FullIndependence` also failed once: timing flake.)
+
+## Result
+
+Implemented as planned, 6 commits (`ab035847` manifest, `bb58aa81` Go runner, `6e430f7f` TS runner,
+`252c7773` summary, `725d30e1` docs, baseline commit last). Baseline: `P151-mutation-baseline.md`
+(sample, user-approved: Go 25 packages / 2,031 mutants, TS 4 areas / 8,892 mutants, about 43 min at
+2 workers). Go 0 survived / 735 not covered; TS score 45.3%, covered score 79.2%.
+
+Q1-Q5 answered by user: single-maintainer bun runner accepted; sample baseline now (full later,
+resumable); container-gated adapters stay "not covered"; CI job manual-dispatch only (no weekly
+schedule); no root `bun run mutation` alias. Q6: `go test ./apps/kira-space/internal` passes on the
+rebased tree (P144 Stream A's `layeringtest.RunAllowing`).
+
+Deviations from the plan:
+
+- `tools/mutation/tsconfig.json` ships in the summary commit, not the manifest commit: an `include`
+  of files that do not exist yet fails `tsgo` (TS18003). `stryker.config.mjs` carries JSDoc types so
+  `checkJs` passes.
+- Unit marker is `<unit>.info.json` (status, reason, duration, darwin files), not the mutation JSON:
+  red units have no mutation JSON. TS layout is flat: `ts/<area>.json|.log|.info.json`.
+- Go `--changed` does not use `gremlins --diff`: the snapshot has no `.git`. It limits packages to
+  changed `.go` files and excludes every other file of the package with `-E`. Verified with
+  `--dirty --changed HEAD` for Go and TS.
+- A fourth Stryker workaround: workspace packages carry their own `node_modules` (isolated linker),
+  which Stryker's sandbox does not link (`Cannot find package 'zod'`). Fix: `inPlace: true` on the
+  disposable snapshot, and `run.sh` symlinks every `node_modules`. Added `progress-append-only`
+  reporter for visible progress. Workarounds 1 (bun timeout) and 2 (preload) kept from planning; not
+  re-verified individually after `inPlace`.
+- Transitive licence read of `tools/mutation/node_modules` (172 packages): MIT 139, Apache-2.0 15, ISC
+  10, BSD-3-Clause 4, BlueOak-1.0.0 1, 0BSD 1, CC-BY-4.0 1 (`caniuse-lite`, data, dev-only). No
+  copyleft.
+- The worktree's generated Wails bindings were stale (`adetaskservice` missing, so `typecheck` and
+  `knip` failed); refreshed from the main checkout's gitignored copy. Not a tracked change.
+- `internal/terminal` `TestSessionCloseKillsProcessGroup` fails in plain `go test` here. Not touched
+  (user: no test fixes). Needs its own follow-up phase if it reproduces outside this container.
+
+Acceptance checks (real runs):
+
+- `git diff 13e99974 --stat` touches only `scripts/mutation/**`, `tools/mutation/**`,
+  `docs/pending-workflows/mutation.yml`, `docs/DEV_ENVIRONMENT.md`, and the two `P151-*` docs.
+- No mutation reference in `.githooks`, `package.json`, `.github` (only the word "permutation" in
+  `release.yml`). Root `bun.lock` and `package.json` byte-identical. Hooks passed on every commit
+  without `--no-verify`; `knip` exit 0, `bun run lint` and `typecheck` pass, `tsgo -p
+  tools/mutation/tsconfig.json` clean.
+- After runs `git status --short` is empty; `out/latest/summary.json` totals match the baseline note.
