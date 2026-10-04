@@ -134,6 +134,7 @@ func (b *TaskBoard) Start() {
 				b.folderWMu.Unlock()
 			}
 		}
+		go b.RunAllEnvScripts(b.ctx)
 		folders, err := b.deps.RepoConfig.Folders()
 		if err != nil {
 			slog.Warn("ade folders: list", "scope", "ade", "err", err)

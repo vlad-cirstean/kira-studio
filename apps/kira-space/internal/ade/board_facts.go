@@ -295,6 +295,7 @@ func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.Ad
 
 	if sb.Kind == model.AdeBranchKindMine && base.ok {
 		wb.Integration = b.integrationFacts(ctx, sc, sb, base.tip, row.Tip)
+		wb.Deployments = b.deploymentFacts(ctx, sc, sb, base.tip, row.Tip)
 	}
 
 	hadCommits := sb.HadCommits || depth > 0

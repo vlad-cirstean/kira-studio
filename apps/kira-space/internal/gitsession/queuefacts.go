@@ -313,3 +313,16 @@ func (e *RepoEntry) pipePatchID(ctx context.Context, producer []string) ([]strin
 	})
 	return ids, err
 }
+
+// ResolveCommit resolves a (possibly abbreviated) commit sha to its full id; ok is false when this
+// clone has no such commit.
+func (e *RepoEntry) ResolveCommit(ctx context.Context, sha string) (full string, ok bool, err error) {
+	res, err := e.runAllowingExit(ctx, []string{"rev-parse", "--verify", "--quiet", sha + "^{commit}"}, 0, 1)
+	if err != nil {
+		return "", false, err
+	}
+	if res.ExitCode != 0 {
+		return "", false, nil
+	}
+	return strings.TrimSpace(string(res.Stdout)), true, nil
+}

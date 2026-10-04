@@ -235,6 +235,7 @@ type repoCaches struct {
 	mergeTree *lru.Cache[mergeTreeKey, []string]
 	contain   *lru.Cache[containKey, containment]
 	patchIDs  *lru.Cache[string, map[string]struct{}] // target tip -> patch ids of its recent commits
+	commits   *lru.Cache[string, string]              // printed sha -> full commit id (found shas only)
 }
 
 func newRepoCaches() *repoCaches {
@@ -242,7 +243,8 @@ func newRepoCaches() *repoCaches {
 	m, _ := lru.New[mergeTreeKey, []string](mergeTreeCacheCap)
 	c, _ := lru.New[containKey, containment](branchFactsCacheCap)
 	p, _ := lru.New[string, map[string]struct{}](patchIDCacheCap)
-	return &repoCaches{branch: b, mergeTree: m, contain: c, patchIDs: p}
+	r, _ := lru.New[string, string](patchIDCacheCap)
+	return &repoCaches{branch: b, mergeTree: m, contain: c, patchIDs: p, commits: r}
 }
 
 // --- Queue -----------------------------------------------------------------------------------

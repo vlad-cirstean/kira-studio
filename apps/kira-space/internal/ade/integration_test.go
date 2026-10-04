@@ -219,3 +219,67 @@ func TestIntegration_cacheAndRefreshMergedInto(t *testing.T) {
 		t.Fatalf("second refresh mergedInto = %+v", got)
 	}
 }
+
+func (f *integFixture) setEnv(script string) {
+	f.t.Helper()
+	envs := []adewire.Environment{{Name: "staging", DeployedShaScript: script}}
+	if _, err := f.board.UpdateRepo(context.Background(), adewire.UpdateRepoArgs{
+		CodeRepoID: "r", Patch: adewire.RepoPatch{Environments: &envs},
+	}); err != nil {
+		f.t.Fatalf("UpdateRepo: %v", err)
+	}
+	if err := f.board.RunEnvScripts(context.Background(), "r"); err != nil {
+		f.t.Fatalf("RunEnvScripts: %v", err)
+	}
+}
+
+func (f *integFixture) deployment(name string) adewire.Deployment {
+	f.t.Helper()
+	b, err := f.board.Board(context.Background())
+	if err != nil {
+		f.t.Fatalf("Board: %v", err)
+	}
+	d := boardBranch(f.t, b, "b-"+name).Deployments
+	if len(d) != 1 || d[0].Env != "staging" {
+		f.t.Fatalf("%s deployments = %+v", name, d)
+	}
+	return d[0]
+}
+
+func TestDeployment_scriptStates(t *testing.T) {
+	f := newIntegFixture(t)
+	f.feature("dep", "d1.txt", "d2.txt")
+	sha := func(rev string) string { return strings.TrimSpace(runGitQueue(t, f.dir, "rev-parse", rev)) }
+	tip, first, mainTip := sha("dep"), sha("dep~1"), sha("main")
+
+	f.setEnv("echo noise; echo " + tip)
+	if d := f.deployment("dep"); d.Status != "deployed" || d.DeployedSha != tip {
+		t.Fatalf("deployed: %+v", d)
+	}
+
+	f.setEnv("echo " + first[:10])
+	if d := f.deployment("dep"); d.Status != "stale" || d.MissingCommits != 1 {
+		t.Fatalf("partial: %+v", d)
+	}
+
+	f.setEnv("echo " + mainTip)
+	if d := f.deployment("dep"); d.Status != "stale" || d.MissingCommits != 2 {
+		t.Fatalf("none of the branch: %+v", d)
+	}
+
+	f.setEnv("echo " + tip)
+	f.setEnv("echo " + first)
+	if d := f.deployment("dep"); d.Status != "stale" || !strings.Contains(d.Note, "moved back to") {
+		t.Fatalf("moved back: %+v", d)
+	}
+
+	f.setEnv("exit 3")
+	if d := f.deployment("dep"); d.Status != "unknown" || d.Error == "" || d.DeployedSha != first {
+		t.Fatalf("script failure keeps last sha: %+v", d)
+	}
+
+	f.setEnv("echo " + strings.Repeat("a", 40))
+	if d := f.deployment("dep"); d.Status != "unknown" || !strings.Contains(d.Error, "not in this clone") {
+		t.Fatalf("unknown object: %+v", d)
+	}
+}

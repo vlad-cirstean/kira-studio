@@ -17,6 +17,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
@@ -49,6 +50,8 @@ type TaskBoardDeps struct {
 	Workflows *adeflow.Reader
 	// Runner spawns git for repo identification (folder import).
 	Runner gitclient.Runner
+	// Scripts runs the environment deploy-sha scripts; nil = the OS runner.
+	Scripts gitprepare.Runner
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
 	// uses, notification included, so git-ui sees a new prepare script.
 	SetRepoSettings  func(repoID string, patch model.GitRepoSettingsPatch) error
@@ -544,6 +547,10 @@ func refreshFailure(id string, err error) adewire.RepoRefresh {
 }
 
 func (b *TaskBoard) refreshRepo(ctx context.Context, id string) adewire.RepoRefresh {
+	// Scripts first and outside the repo mutex: they can be slow and need nothing the fetch brings.
+	if err := b.RunEnvScripts(ctx, id); err != nil {
+		slog.Warn("ade env scripts", "scope", "ade", "repo", id, "err", err)
+	}
 	mu := b.repoMutex(id)
 	mu.Lock()
 	defer mu.Unlock()

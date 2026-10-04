@@ -117,6 +117,9 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 			}
 		}
 	}
+	if patch.Environments != nil {
+		go b.refreshEnvScripts(args.CodeRepoID)
+	}
 	b.notifyRepos()
 	b.notifyBoard()
 	return b.repoByID(ctx, args.CodeRepoID)
