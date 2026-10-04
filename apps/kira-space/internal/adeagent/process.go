@@ -28,8 +28,11 @@ type Spec struct {
 	ClaudeBin string
 	Dir       string
 	// Prompt goes to stdin: variadic flags would swallow a positional prompt, and stdin keeps it off argv.
-	Prompt        string
-	SessionID     string
+	Prompt    string
+	SessionID string
+	// Resume, when set, continues that Claude session (--resume <id>) instead of starting one with
+	// SessionID; the session id stays the same.
+	Resume        string
 	MCPConfigPath string
 	// SettingSources is the --setting-sources value ("user" or "user,project,local").
 	SettingSources string
@@ -66,9 +69,12 @@ func Script(s Spec) string {
 	if bin == "" {
 		bin = "claude"
 	}
-	words := []string{"exec", bin, "-p", "--output-format", "stream-json", "--verbose",
-		"--session-id", quotePOSIX(s.SessionID), "--mcp-config", quotePOSIX(s.MCPConfigPath),
-		"--setting-sources", quotePOSIX(s.SettingSources)}
+	session := []string{"--session-id", quotePOSIX(s.SessionID)}
+	if s.Resume != "" {
+		session = []string{"--resume", quotePOSIX(s.Resume)}
+	}
+	words := append([]string{"exec", bin, "-p", "--output-format", "stream-json", "--verbose"}, session...)
+	words = append(words, "--mcp-config", quotePOSIX(s.MCPConfigPath), "--setting-sources", quotePOSIX(s.SettingSources))
 	if len(s.AllowedTools) > 0 {
 		words = append(words, "--allowedTools")
 		for _, t := range s.AllowedTools {

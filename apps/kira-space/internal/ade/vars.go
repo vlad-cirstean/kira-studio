@@ -36,6 +36,8 @@ type promptInput struct {
 	Def                     stepDef
 	// Message, when non-empty, replaces the composed prompt (the Run dialog's edited text).
 	Message string
+	// Extra, when non-empty, is added after the body (the failure line of a fresh send-back run).
+	Extra string
 }
 
 // composePrompt builds an agent run's prompt (SPEC2 section 9 "Start step" shape) and always ends
@@ -55,5 +57,14 @@ func composePrompt(in promptInput) string {
 		sb.WriteString(substitute(in.Def.Prompt, in.Vars, false))
 		body = sb.String()
 	}
-	return strings.TrimRight(body, "\n") + "\n\n" + adeagent.FinishStepSuffix + "\n"
+	body = strings.TrimRight(body, "\n")
+	if in.Extra != "" {
+		body += "\n\n" + in.Extra
+	}
+	return body + "\n\n" + adeagent.FinishStepSuffix + "\n"
+}
+
+// composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
+func composeResumePrompt(line string) string {
+	return line + "\n\n" + adeagent.FinishStepSuffix + "\n"
 }

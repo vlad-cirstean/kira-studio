@@ -444,7 +444,6 @@ func TestRunEngine_failureRules(t *testing.T) {
 		{"needs_input is stuck", []string{"needs_input"}, agentStep("first", ""), "first/api", model.AdeRunStuck, "summary-needs_input"},
 		{"stop keeps a failure", []string{"failed"}, agentStep("first", "        on_failure: stop\n"), "first/api", model.AdeRunFailed, "summary-failed"},
 		{"no finish_step", []string{"nofinish"}, agentStep("first", ""), "first/api", model.AdeRunFailed, noteNoFinish},
-		{"back is a plain failure", []string{"done", "failed"}, agentStep("first", "") + agentStep("second", "        on_failure: back:first\n"), "second/api", model.AdeRunFailed, "summary-failed"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -106,6 +106,7 @@ type TaskBoard struct {
 
 	runMu     sync.Mutex             // guards live, setupLive, taskMus, finishes, stepMsgs
 	live      map[string]*liveRun    // run id -> its process
+	runOpts   map[string]runOpts     // run id -> extras for its launch
 	setupLive map[string]*liveRun    // branch id -> its running prepare script
 	taskMus   map[string]*sync.Mutex // task id -> serializes that task's run transitions
 	finishes  map[string]finishCall  // run id -> last finish_step call
@@ -123,7 +124,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	b := &TaskBoard{
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
-		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, setupLive: map[string]*liveRun{},
+		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, runOpts: map[string]runOpts{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
 	}
 	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)

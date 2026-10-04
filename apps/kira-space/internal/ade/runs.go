@@ -319,7 +319,7 @@ func (b *TaskBoard) stepMessage(taskID, stageID, stepID string) string {
 func (b *TaskBoard) startStep(ctx context.Context, tc *taskCtx, plan []stepView, idx int, paths map[string]string) ([]model.AdeRun, error) {
 	out := make([]model.AdeRun, 0, len(plan[idx].Targets))
 	for _, bid := range plan[idx].Targets {
-		run, err := b.queueRun(ctx, tc, plan, idx, bid, 1, paths[bid])
+		run, err := b.queueRun(ctx, tc, plan, idx, bid, 1, paths[bid], runOpts{})
 		if err != nil {
 			return out, err
 		}
@@ -329,7 +329,7 @@ func (b *TaskBoard) startStep(ctx context.Context, tc *taskCtx, plan []stepView,
 }
 
 // queueRun inserts a run attempt and launches it, or leaves it pending behind the worktree gate.
-func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, idx int, branchID string, attempt int, path string) (model.AdeRun, error) {
+func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, idx int, branchID string, attempt int, path string, opts runOpts) (model.AdeRun, error) {
 	sb, ok := tc.branch(branchID)
 	if !ok {
 		return model.AdeRun{}, invalid("branch %s is not on this task", branchID)
@@ -346,7 +346,7 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	}
 	run := model.AdeRun{
 		ID: b.newID(), TaskID: tc.task.ID, StageID: tc.stage.ID, StepID: plan[idx].Def.ID, BranchID: branchID,
-		Attempt: attempt, State: model.AdeRunPending,
+		Attempt: attempt, State: model.AdeRunPending, Loops: opts.Loops,
 	}
 	open := b.setupReady(sb, path, setups)
 	if !open {
@@ -357,6 +357,9 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	}
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
 		return model.AdeRun{}, err
+	}
+	if opts != (runOpts{Loops: opts.Loops}) {
+		b.setRunOpts(run.ID, opts)
 	}
 	if !open {
 		b.emitRuns(run)
@@ -386,23 +389,29 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 		return run, err
 	}
 	now := b.deps.Now().UnixMilli()
-	empty := ""
+	opts := b.takeRunOpts(run.ID)
+	note := opts.Note
 	running := model.AdeRunRunning
-	patch := model.AdeRunPatch{State: &running, StartedAt: &now, Note: &empty}
+	patch := model.AdeRunPatch{State: &running, StartedAt: &now, Note: &note}
 	vars := b.runVarsFor(tc, sb, path)
 
 	var sessionID, prompt string
 	if tc.stage.Kind == "agent" {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
-		prompt = composePrompt(promptInput{
-			Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
-			Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID),
-		})
+		claudeID := cmpNonEmpty(opts.ResumeID, b.newID())
+		if opts.ResumeID != "" {
+			prompt = composeResumePrompt(opts.Prompt)
+		} else {
+			prompt = composePrompt(promptInput{
+				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
+				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: opts.Extra,
+			})
+		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID, StageID: tc.stage.ID,
-			StepID: def.ID, RunID: run.ID, ClaudeSessionID: b.newID(), Cwd: path, State: model.AdeSessionStateRunning,
-			StartedAt: now, LastActiveAt: now,
+			StepID: def.ID, RunID: run.ID, Resumes: opts.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
+			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
 		}
@@ -421,7 +430,7 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, def, sessionID, path, prompt, timeout)
+			b.superviseAgent(runCtx, updated, def, sessionID, opts.ResumeID, path, prompt, timeout)
 		}()
 	} else {
 		go func() {
@@ -462,7 +471,7 @@ func allowedTools(step []string) []string {
 	return out
 }
 
-func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, path, prompt string, timeout time.Duration) {
+func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def stepDef, sessionID, resume, path, prompt string, timeout time.Duration) {
 	sink := b.newLogSink(repos.AdeLogRun, run.ID, run.TaskID)
 	cfg, release, err := b.agent.Register(run.ID)
 	if err != nil {
@@ -477,7 +486,7 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 	}
 	cwdEnv := gitprepare.BuildEnv(os.Environ(), gitprepare.Vars{WorktreePath: path})
 	exit, runErr := adeagent.Run(ctx, adeagent.Spec{
-		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), MCPConfigPath: cfg,
+		ClaudeBin: bin, Dir: path, Prompt: prompt, SessionID: b.sessionClaudeID(sessionID), Resume: resume, MCPConfigPath: cfg,
 		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools), Timeout: timeout, Env: cwdEnv,
 	}, adeagent.Handler{
 		OnLine: func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
@@ -577,12 +586,22 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 	mu := b.taskMu(run.TaskID)
 	mu.Lock()
 	defer mu.Unlock()
+	b.recordOutcomeLocked(run, sessionID, out)
+}
+
+// recordOutcomeLocked stores a run's outcome and acts on it: a failed `back:` step is sent back, any
+// other outcome moves the task on unless it was a user stop. The task mutex is held.
+func (b *TaskBoard) recordOutcomeLocked(run model.AdeRun, sessionID string, out outcome) {
 	now := b.deps.Now().UnixMilli()
 	if sessionID != "" {
 		if err := b.deps.Sessions.MarkStopped(sessionID, now); err != nil {
 			slog.Warn("ade: stop headless session", "scope", "ade", "session", sessionID, "err", err)
 		}
 		b.notifySessions()
+	}
+	var back *sendBack
+	if out.state == model.AdeRunFailed && !out.noAdvance {
+		back, out = b.decideSendBack(run, out)
 	}
 	updated, err := b.deps.Tasks.UpdateRun(run.ID, model.AdeRunPatch{
 		State: &out.state, Note: &out.note, Summary: &out.summary, ExitCode: out.exit, FinishedAt: &now,
@@ -592,7 +611,10 @@ func (b *TaskBoard) completeRun(run model.AdeRun, sessionID string, out outcome)
 		return
 	}
 	b.emitRuns(updated)
-	if !out.noAdvance {
+	switch {
+	case back != nil:
+		back.queue(b)
+	case !out.noAdvance:
 		b.advanceLocked(b.ctx, run.TaskID)
 	}
 }
@@ -609,6 +631,14 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 		slog.Warn("ade: plan step", "scope", "ade", "task", taskID, "err", err)
 		return
 	}
+	if rr := chainRerun(plan); len(rr) > 0 {
+		for _, r := range rr {
+			if _, err := b.queueRun(ctx, tc, plan, r.Step, r.Branch, r.Attempt, "", runOpts{Loops: r.Loops}); err != nil {
+				slog.Warn("ade: rerun after send-back", "scope", "ade", "branch", r.Branch, "err", err)
+			}
+		}
+		return
+	}
 	act := nextAction(plan)
 	switch act.Kind {
 	case actStart:
@@ -617,7 +647,7 @@ func (b *TaskBoard) advanceLocked(ctx context.Context, taskID string) {
 		}
 	case actRetry:
 		for _, r := range act.Retry {
-			if _, err := b.queueRun(ctx, tc, plan, act.Step, r.BranchID, r.Attempt+1, ""); err != nil {
+			if _, err := b.queueRun(ctx, tc, plan, act.Step, r.BranchID, r.Attempt+1, "", runOpts{Loops: r.Loops}); err != nil {
 				slog.Warn("ade: retry run", "scope", "ade", "run", r.ID, "err", err)
 			}
 		}
@@ -723,7 +753,7 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	if run.State != model.AdeRunFailed && run.State != model.AdeRunStuck {
 		return invalid("only a failed or stuck run can be retried")
 	}
-	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "")
+	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops})
 	return err
 }
 

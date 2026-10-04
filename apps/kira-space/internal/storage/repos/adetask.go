@@ -853,3 +853,13 @@ func (r *AdeTaskRepo) FailRunningSetups(now int64) ([]model.AdeTaskBranch, error
 	}
 	return out, nil
 }
+
+// CountRuns counts a step's runs on one branch in the given state, across attempts.
+func (r *AdeTaskRepo) CountRuns(taskID, stageID, stepID, branchID, state string) (int, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE task_id = ? AND stage_id = ? AND step_id = ? AND branch_id = ? AND state = ?`,
+		taskID, stageID, stepID, branchID, state).Scan(&n); err != nil {
+		return 0, fmt.Errorf("repos: count ade runs %s: %w", taskID, err)
+	}
+	return n, nil
+}

@@ -2,6 +2,7 @@ package ade
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -132,6 +133,76 @@ type action struct {
 	Retry []model.AdeRun
 }
 
+// sendBackTarget resolves steps[idx]'s `back:<step>` rule to the index of an earlier step of the
+// same stage (D13).
+func sendBackTarget(steps []stepView, idx int) (int, bool) {
+	id, ok := strings.CutPrefix(steps[idx].Def.OnFailure, "back:")
+	if !ok {
+		return 0, false
+	}
+	for i := 0; i < idx; i++ {
+		if steps[i].Def.ID == id {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// rerun is one step run chainRerun queues again on a branch.
+type rerun struct {
+	Step    int
+	Branch  string
+	Attempt int
+	Loops   int
+}
+
+// chainRerun finds, per target branch, the first step that must run again after a send-back fix
+// (R4). Walking the stage's steps in order, round is the highest loops among the done runs so far; a
+// done or `back` run with fewer loops than the round is stale and is queued again with loops =
+// round. A missing, running, pending, stuck or failed run ends the walk.
+func chainRerun(steps []stepView) []rerun {
+	var branches []string
+	seen := map[string]bool{}
+	for _, s := range steps {
+		for _, id := range s.Targets {
+			if !seen[id] {
+				seen[id] = true
+				branches = append(branches, id)
+			}
+		}
+	}
+	var out []rerun
+walk:
+	for _, bid := range branches {
+		round := 0
+		for i, s := range steps {
+			if !slices.Contains(s.Targets, bid) {
+				continue
+			}
+			r, ok := s.Runs[bid]
+			if !ok {
+				continue walk
+			}
+			switch r.State {
+			case model.AdeRunDone:
+				if r.Loops < round {
+					out = append(out, rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round})
+					continue walk
+				}
+				round = max(round, r.Loops)
+			case model.AdeRunBack:
+				if r.Loops < round {
+					out = append(out, rerun{Step: i, Branch: bid, Attempt: r.Attempt + 1, Loops: round})
+				}
+				continue walk
+			default:
+				continue walk
+			}
+		}
+	}
+	return out
+}
+
 // retryLimit is N of `retry N`; 0 for any other rule (stop, back:<step>).
 func retryLimit(onFailure string) int {
 	n, ok := strings.CutPrefix(onFailure, "retry ")
@@ -146,7 +217,8 @@ func retryLimit(onFailure string) int {
 }
 
 // nextAction looks at the first step that is not done. A running or stuck step waits. A failed step
-// retries the runs whose rule still allows an attempt (`back:` is a plain failure this wave). A
+// retries the runs whose rule still allows an attempt (a `back:` failure was decided when it was
+// recorded: sent back, or failed for good). A
 // pending step with runs waits on its worktree gate; without runs it starts (auto) or waits for
 // Approve, except the first, which only StartRun starts. All steps done = the stage is complete;
 // the user moves on with StageDone.
