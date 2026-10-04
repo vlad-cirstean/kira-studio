@@ -9,6 +9,7 @@ import { useGitCredentialStore } from '../state/gitCredential';
 import { useModeStore } from '../state/mode';
 import { useAdeUiStore } from './state/adeUi';
 import { adeTurns } from './turnWatch';
+import { boardKey, prsKey } from './v2/queries';
 import type {
   AdeCandidateBranch,
   AdeOpenSessionEvent,
@@ -157,6 +158,29 @@ function installAdeCredentialSignal(): () => void {
   });
 }
 
+/** v2 board: every push re-reads the board and PR facts; a credential prompt joins the shared
+ *  queue, answered through the v2 broker. */
+function installAdeTaskSignals(queryClient: QueryClient): void {
+  control.onAdeTaskBoard(() => {
+    void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: prsKey, exact: true });
+  });
+  control.onAdeTaskCredential((request) => {
+    useGitCredentialStore().enqueueCredentialRequest({
+      codeRepoId: request.codeRepoId,
+      prompt: request.prompt,
+      masked: request.masked,
+      answer: (secret: string | null) => {
+        void control
+          .adeTaskProvideCredential({ requestId: request.requestId, secret })
+          .catch(() => {
+            /* the broker's own bound already ended the wait. */
+          });
+      },
+    });
+  });
+}
+
 /** Called once from `main.ts`, app lifetime — no teardown, the window is the lifetime (§2.4). The
  *  three §0.11 push subscriptions plus the §0.14 credential handler; every invalidation targets an
  *  exact key so an unrelated repo's cached snapshot/prs is left alone. */
@@ -188,6 +212,7 @@ export function installAdeSignals(queryClient: QueryClient): void {
   });
 
   installAdeCredentialSignal();
+  installAdeTaskSignals(queryClient);
 
   // P129 Part 7 §0.9: FocusSession's own emit half — this window was just brought forward, so show
   // what it named. `openSession` only when `itemId` is non-empty (an orphan row's own `''`, §0.6
