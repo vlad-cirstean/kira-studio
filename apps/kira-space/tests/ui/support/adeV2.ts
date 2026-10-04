@@ -42,7 +42,17 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskPrs, response: adeFixture('prs') },
     { channel: IPC.adeTaskWorkflows, response: adeFixture('workflows') },
     { channel: IPC.adeTaskRepos, response: adeFixture('repos') },
+    { channel: IPC.adeTaskBacklog, response: adeFixture('backlog') },
     { channel: IPC.adeTaskSetPlan },
+    { channel: IPC.adeTaskUpdateTask, response: adeFixture('task') },
+    { channel: IPC.adeTaskAddTaskRepo, response: adeFixture('branch') },
+    {
+      channel: IPC.adeTaskUpdateBacklogItem,
+      response: adeFixture<{ items: unknown[] }>('backlog').items[0],
+    },
+    { channel: IPC.adeTaskMoveBacklogItem },
+    { channel: IPC.adeTaskDeleteBacklogItem },
+    { channel: IPC.adeTaskPromoteBacklogItem, response: adeFixture('task') },
   ];
   const overridden = new Set(extra.map((s) => s.channel));
   return [...defaults.filter((s) => !overridden.has(s.channel)), ...extra];

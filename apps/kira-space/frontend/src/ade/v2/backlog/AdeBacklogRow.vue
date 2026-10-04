@@ -117,7 +117,6 @@ const ICON_BTN =
       v-model="draft"
       class="h-[30px] min-w-0 flex-1 border-transparent bg-transparent px-2 text-kira-lg"
       data-testid="ade-backlog-text"
-      @click.stop
       @blur="commit"
       @keydown.enter="commit"
     />

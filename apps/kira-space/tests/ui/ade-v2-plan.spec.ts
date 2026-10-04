@@ -193,3 +193,35 @@ test('a branch row shows its own progress under the name', async ({ relaunch }) 
     ),
   ).toHaveText('Release · failed');
 });
+
+test('line 2 shows merged and deployed chips with stale in amber and tooltips', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  const cart = page.locator('[data-testid="ade-branch-row"][data-branch-id="b_cart"]').first();
+  await expect(cart.locator('[data-testid="ade-branch-merged"]')).toHaveText(['dev ✓']);
+  await expect(cart.locator('[data-testid="ade-branch-deployed"]')).toHaveText([
+    '▲staging ✓',
+    '▲prod ✓',
+  ]);
+  const auth = page.locator('[data-testid="ade-branch-row"][data-branch-id="b_auth"]').first();
+  const stale = auth.locator('[data-testid="ade-branch-merged"]');
+  await expect(stale).toHaveText('dev ⚠');
+  await expect(stale).toHaveCSS('color', 'rgb(240, 184, 92)');
+  await stale.hover();
+  await expect(
+    page.getByText('stale in develop: 2 commits since it was merged').first(),
+  ).toBeVisible();
+});
+
+test('a repo chip reports what the last fetch changed', async ({ relaunch }) => {
+  const { window: page } = await openPlan(relaunch, [
+    { channel: IPC.adeTaskRefresh, response: adeFixture('refresh') },
+  ]);
+  await page.locator('[data-testid="ade-refresh-all"]').click();
+  await expect(
+    page.locator(
+      '[data-testid="ade-repo-chip"][data-repo-id="repo-web-app"] [data-testid="ade-repo-note"]',
+    ),
+  ).toContainText('3 refs changed · 1 merged into develop');
+});

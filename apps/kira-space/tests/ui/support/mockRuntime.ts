@@ -96,7 +96,14 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskCreateTask: 'AdeTaskService.CreateTask',
   adeTaskCandidateBranches: 'AdeTaskService.CandidateBranches',
   adeTaskAddExistingBranch: 'AdeTaskService.AddExistingBranch',
+  adeTaskUpdateTask: 'AdeTaskService.UpdateTask',
+  adeTaskAddTaskRepo: 'AdeTaskService.AddTaskRepo',
   adeTaskSetPlan: 'AdeTaskService.SetPlan',
+  adeTaskBacklog: 'AdeTaskService.Backlog',
+  adeTaskUpdateBacklogItem: 'AdeTaskService.UpdateBacklogItem',
+  adeTaskMoveBacklogItem: 'AdeTaskService.MoveBacklogItem',
+  adeTaskDeleteBacklogItem: 'AdeTaskService.DeleteBacklogItem',
+  adeTaskPromoteBacklogItem: 'AdeTaskService.PromoteBacklogItem',
   adeTaskAddBacklogItem: 'AdeTaskService.AddBacklogItem',
   adeTaskWorkflows: 'AdeTaskService.Workflows',
   adeTaskRepos: 'AdeTaskService.Repos',
@@ -191,15 +198,22 @@ export async function installControlMocks(
   return handle;
 }
 
-// Every ade board write emits `kira:adetask:board` and the renderer refetches off that push alone,
-// so the mock repeats it after every successful write.
-const ADE_TASK_PUSHING_WRITES = new Set<string>([
-  IPC.adeTaskSetPlan,
-  IPC.adeTaskCreateTask,
-  IPC.adeTaskAddExistingBranch,
-  IPC.adeTaskForcePush,
-  IPC.adeTaskRefresh,
-]);
+// Every ade write emits its `kira:adetask:*` push and the renderer refetches off that push alone,
+// so the mock repeats the push after every successful write (the refetch answers the same static
+// snapshot the spec supplied). Move is left out: its optimistic order is the final state.
+const ADE_TASK_PUSHES: Readonly<Record<string, readonly string[]>> = {
+  [IPC.adeTaskSetPlan]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskCreateTask]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskAddExistingBranch]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskForcePush]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskRefresh]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskUpdateTask]: [IPC.adeTaskBoardChanged],
+  [IPC.adeTaskAddTaskRepo]: [IPC.adeTaskBoardChanged, IPC.adeTaskReposChanged],
+  [IPC.adeTaskAddBacklogItem]: [IPC.adeTaskBacklogChanged],
+  [IPC.adeTaskUpdateBacklogItem]: [IPC.adeTaskBacklogChanged],
+  [IPC.adeTaskDeleteBacklogItem]: [IPC.adeTaskBacklogChanged],
+  [IPC.adeTaskPromoteBacklogItem]: [IPC.adeTaskBacklogChanged, IPC.adeTaskBoardChanged],
+};
 
 function emulateAdeTaskPush(page: Page): void {
   page.on('requestfinished', async (request) => {
@@ -207,10 +221,11 @@ function emulateAdeTaskPush(page: Page): void {
     try {
       const body = JSON.parse(request.postData() ?? '{}') as { args?: { methodName?: string } };
       const channel = FQN_TO_CHANNEL[body.args?.methodName ?? ''];
-      if (!channel || !ADE_TASK_PUSHING_WRITES.has(channel)) return;
+      const pushes = channel ? ADE_TASK_PUSHES[channel] : undefined;
+      if (!pushes) return;
       const response = await request.response();
       if (!response?.ok()) return;
-      await emitWailsEvent(page, IPC.adeTaskBoardChanged, null);
+      for (const push of pushes) await emitWailsEvent(page, push, null);
     } catch {
       // page closed mid-request
     }
