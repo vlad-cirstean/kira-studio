@@ -17,3 +17,12 @@ export const adeAgoOptions: UseTimeAgoOptions<false, 'minute' | 'hour' | 'day'> 
     { max: Number.POSITIVE_INFINITY, value: 86_400_000, name: 'day' },
   ],
 };
+
+/** Needs-you age column: `now` / `5m` / `3h` / `2d` from elapsed milliseconds; `''` when unknown. */
+export function shortAge(ms: number | null): string {
+  if (ms === null) return '';
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return 'now';
+  if (min < 60) return `${min}m`;
+  return min < 1440 ? `${Math.floor(min / 60)}h` : `${Math.floor(min / 1440)}d`;
+}

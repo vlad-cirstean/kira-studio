@@ -4,8 +4,10 @@ import { computed } from 'vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
 import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
+import AdeNeedsPage from '../needs/AdeNeedsPage.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
+import { usePlanModel } from '../plan/usePlanModel';
 import { useBacklog } from '../queries';
 import AdeReposPage from '../repos/AdeReposPage.vue';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
@@ -19,6 +21,8 @@ import AdeCaptureBox from './AdeCaptureBox.vue';
 const ui = useAdeBoardUiStore();
 const backlog = useBacklog();
 const count = computed(() => backlog.data.value?.items.length ?? 0);
+const { model } = usePlanModel();
+const needsCount = computed(() => model.value?.needs.badge ?? 0);
 </script>
 
 <template>
@@ -37,6 +41,21 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
             :style="tagStyle('grey')"
             data-testid="ade-backlog-count"
             >{{ count }}</span
+          >
+        </TabsTrigger>
+        <TabsTrigger
+          value="needs"
+          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
+          :style="ui.view === 'needs' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          data-testid="ade-tab-needs"
+        >
+          Needs you
+          <span
+            v-if="needsCount > 0"
+            class="rounded-kira-pill px-1.5 text-kira-sm font-semibold"
+            :style="tagStyle('amber')"
+            data-testid="ade-needs-count"
+            >{{ needsCount }}</span
           >
         </TabsTrigger>
         <TabsTrigger
@@ -73,6 +92,7 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
       </TabsList>
     </nav>
     <AdeBacklogPage v-if="ui.view === 'backlog'" />
+    <AdeNeedsPage v-else-if="ui.view === 'needs'" />
     <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
     <AdeReposPage v-else-if="ui.view === 'repos'" />
     <div v-else class="flex min-h-0 flex-1">
