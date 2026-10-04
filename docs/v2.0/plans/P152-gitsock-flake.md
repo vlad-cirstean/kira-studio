@@ -3,7 +3,7 @@
 Plan for `docs/v2.0/SPEC.md`'s **P152** row. Planned on branch `v2.0` at `79af0ca8`. Line numbers
 are at that commit.
 
-**Status: plan complete, ready to implement.**
+**Status: implemented.**
 
 **Discovery method, disclosed.** `codegraph_explore` ran before `Read`/`Grep` for: gitsock test
 harness (`newIntegrationServerWithRunner`, `pairAndReady`, `recvEvent`, `drainStragglerEvents`);
@@ -315,5 +315,37 @@ Result.
 
 ## Result
 
-_Placeholder — implementer fills: commits, §5 check outputs (one decisive line each), whether the
-hang recurred (§3.4) and what blocked if so, any gitsock production file touched and why._
+Branch `v2.0-p152` off `v2.0` `69274703`. Commits, in order:
+
+- `c236796e` fix(gitclient): stop catfile ctx watcher synchronously so a post-success cancel cannot kill the session (RC1; `session.go`, regression test `TestSession_CancelAfterSuccessDoesNotKillProcess`)
+- `7ca262a0` test(gitsock): isolate kira.db and review.db per test, never the real KIRA_SPACE_HOME (RC2; `main_test.go`, `isolatedRegistry`, `envGitsockHelperHome`)
+- `fcc21793` test(gitsock): release queued broker goroutines in pairing tests (3.3.7)
+- `13741138` test(gitsock): await repo.changed by kind with deadlines; queue events seen during requests (RC3)
+- `f946eecf` test(gitsock): wait for broker queued-count emissions instead of racing onEnqueued (found by check 4, see below)
+
+No gitsock production file touched. Only production change: `catfile/session.go`.
+
+### Deviations
+
+- Event-order and deadline work (RC3): `wireFrame.String()` prints the server error text, so every existing `%+v` failure message names it (covers all `got %+v` sites without editing each). `readStreamFrameIgnoringEvents` and `requestIgnoringEvents` collapsed into `readStreamFrame` / `request`. Goroutine readers and "expect closed" reads call `armReadDeadline` rather than `readRaw`.
+- Not deadline-bounded: `handshake_test.go` `clientReceive` (in-process `net.Pipe`, no socket). No test asserts "no further event" via drain; `matrix_test.go` cross-repo leakage check keeps its own 300 ms read deadline.
+- Extra finding, fixed in `f946eecf`: `TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead` read its subscriber slice right after `onEnqueued`, which runs before the emit (`pairing.go:187-202`). Failed 1 of 20 passes in check 4 (`got [1 2], want [1 2 3]`). Test-only race; now waits on a channel.
+
+### Broker hang finding (3.4)
+
+`TestBroker_QueueBoundedAgainstUnlimitedEnqueue` is deterministic (fake clock, no I/O); it was only listed in the timeout dump because it is parallel and paused. Likely cause of the 10-minute hang: a serial test blocked on a deadline-less read (RC3) or a `SQLITE_BUSY`-stalled shared DB (RC2). Not reproduced on demand before or after. After the fixes: 3 load passes (4 busy loops, `-race -count=4`) plus one concurrent with gitsession/gitrpc, all passed, no timeout, no hang. Nothing to root-cause; none invented. The test also leaked 200 goroutines; fixed (`fcc21793`).
+
+### End checks
+
+1. Build/vet: `go build ./... && go vet ./internal/gitsock/ ./internal/gitclient/catfile/` clean.
+2. `gofmt -l internal/gitsock internal/gitclient/catfile` empty; every commit passed the pre-commit hook, none with `--no-verify`.
+3. `go test -race -count=20 -run CancelAfterSuccess ./internal/gitclient/catfile/` ok (5.97s); `go test -race -count=3 ./internal/gitclient/...` all ok.
+4. `go test -race -count=20 ./internal/gitsock/` ok on the final tip (22m33s). First attempt failed once on the broker race above; fixed and rerun clean.
+5. Load, 4 busy loops, `-race -count=4 -timeout 15m`: pass 1 ok 474s, pass 2 ok 310s, pass 3 ok 400s. Concurrent with `go test -race ./internal/gitsession/ ./internal/gitrpc/`: gitsock ok 320s, gitsession ok 25s, gitrpc ok 18s.
+6. Real home: `rm -rf ~/.kira-space` then a `-count=1` run: not recreated. A later `-count=20` run left `~/.kira-space/{kira.db,review.db,logs}` with mtimes mid-run, but P146 stream worktrees were running ade/bridge tests concurrently (see open item). Proof it is not gitsock: `HOME=$(mktemp -d) GIT_CONFIG_GLOBAL=/root/.gitconfig go test -race -count=1 ./internal/gitsock/` ok and `$HOME/.kira-space` absent.
+7. Before/after: on `69274703` (session.go reverted), `go test -race -count=5 -run CancelAfterSuccess` passes with no load (window too narrow here), but with 4 busy loops and `-count=20` it fails: `iteration 52: write |1: file already closed` and `iteration 44: ...`. On the tip it passes `-count=20`.
+8. `git diff 69274703 -- '*_test.go' | grep -E '^\+.*(t\.Skip|retry|Retry)'` empty. Every `RepoID`/kind assertion kept; kind checks moved from "first event" to `awaitRepoChanged(kind)`.
+
+### Open item
+
+23 test files in `gitrpc`, `gitsession`, `ade` and `bridge` still call `gitsession.NewRegistry` without overriding `Review`, so they open the real `~/.kira-space/review.db` (and `ade`/`bridge` tests likely `kira.db`). Same RC2 class, outside P152 ownership; two of those packages are owned by P146. List: `grep -rln "NewRegistry(" --include=*_test.go apps/kira-space/internal | xargs grep -L "\.Review = "`. Recommend a follow-up row after P146 lands (per-package `TestMain` setting `KIRA_SPACE_HOME`, or a shared `testx` helper).
