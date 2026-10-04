@@ -17,6 +17,7 @@ import { TONE } from '../tones';
 import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
+import AdeWorkflowBlock from './AdeWorkflowBlock.vue';
 import { useLinkFields } from './useLinkFields';
 
 // Task tab: the editable fields, then the branches. Status is read-only (D10).
@@ -167,6 +168,8 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       </template>
     </div>
     <p v-if="fieldError" class="text-kira-sm text-error" data-testid="ade-task-error">{{ fieldError }}</p>
+
+    <AdeWorkflowBlock v-if="!review && !card.parked" :card="card" />
 
     <div class="flex flex-col gap-0.5">
       <div class="flex items-center gap-2 pb-0.5">

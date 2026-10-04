@@ -35,6 +35,8 @@ rgba(163,113,247,0.16)
 #23252b
 #b4b6bd
 #6b6f7a
+; Claude launch button solid (`CLAUDE_SOLID`, tones.ts)
+#d97757
 ; ink on a tone solid (`TONE_INK`)
 #15161a
 #ffffff

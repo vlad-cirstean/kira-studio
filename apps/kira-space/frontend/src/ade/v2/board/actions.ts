@@ -89,11 +89,11 @@ function scriptStageAction(p: TaskProgress): TaskAction | null {
   const sc = p.steps[0];
   const stage = p.stage;
   if (!sc || !stage) return null;
-  if (sc.state === 'failed') {
+  if (sc.state === 'failed' || sc.state === 'stuck') {
     return {
       kind: 'retry',
       label: 'Retry',
-      tip: `${stage.name} failed: see its output in the Task tab`,
+      tip: `${stage.name} ${sc.state}: see its output in the Task tab`,
       tone: 'red',
       stepId: sc.id,
     };

@@ -1,0 +1,203 @@
+<script setup lang="ts">
+import { Button } from '@theme/components/ui/button';
+import { computed, ref } from 'vue';
+import AdeChip from '../AdeChip.vue';
+import AdeRepoTag from '../AdeRepoTag.vue';
+import AdeTip from '../AdeTip.vue';
+import type { Tone } from '../board/actions';
+import { integrationChips } from '../board/labels';
+import type { StageBlock } from '../board/stageBlocks';
+import type { CardModel } from '../plan/usePlanModel';
+import { useApprove, useRetryRun } from '../queries';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { solidStyle, TONE, tagStyle } from '../tones';
+import AdeRunLog from './AdeRunLog.vue';
+
+// One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
+// steps with their per-repo run lines, or the branches of the Release stage.
+const props = defineProps<{ block: StageBlock; card: CardModel }>();
+const ui = useAdeBoardUiStore();
+const approve = useApprove();
+const retry = useRetryRun();
+
+const error = ref('');
+const openLog = ref<string | null>(null);
+
+const STATE_TONE: Record<StageBlock['state'], Tone> = { done: 'green', now: 'amber', next: 'grey' };
+const current = computed(() => props.block.state === 'now');
+const boxStyle = computed(() =>
+  current.value
+    ? {
+        borderColor: `color-mix(in srgb, ${TONE.amber[2]} 40%, var(--kira-bg))`,
+        background: `color-mix(in srgb, ${TONE.amber[2]} 5%, transparent)`,
+      }
+    : undefined,
+);
+const stateLabel = (s: StageBlock['state']): string => (s === 'now' ? 'now' : s);
+
+const GLYPH_BOX: Record<string, { bg: string; ink: string; ring: string }> = {
+  done: { bg: TONE.green[2], ink: 'var(--kira-bg)', ring: 'none' },
+  stuck: { bg: TONE.amber[2], ink: 'var(--kira-bg)', ring: 'none' },
+  failed: { bg: TONE.red[2], ink: 'var(--kira-bg)', ring: 'none' },
+  running: { bg: 'transparent', ink: TONE.amber[2], ring: TONE.amber[2] },
+  pending: { bg: 'transparent', ink: 'var(--kira-fg-subtle)', ring: 'var(--kira-border-strong)' },
+};
+const STEP_GLYPH: Record<string, string> = { done: '✓', running: '●', stuck: '!', failed: '✕', pending: '' };
+function boxStyleOf(state: string): Record<string, string> {
+  const g = GLYPH_BOX[state] ?? GLYPH_BOX.pending;
+  return {
+    background: g?.bg ?? '',
+    color: g?.ink ?? '',
+    border: g && g.ring !== 'none' ? `1.5px solid ${g.ring}` : 'none',
+  };
+}
+const TEXT_TONE: Record<string, string> = {
+  stuck: TONE.red[1],
+  failed: TONE.red[1],
+  running: TONE.amber[1],
+  done: TONE.green[1],
+};
+const statusColor = (state: string): string => TEXT_TONE[state] ?? 'var(--kira-fg-subtle)';
+
+async function run(fn: () => Promise<unknown>): Promise<void> {
+  error.value = '';
+  try {
+    await fn();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  }
+}
+const onApprove = (stepId: string): Promise<void> =>
+  run(() => approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }));
+const onRetry = (runId: string): Promise<void> => run(() => retry.mutateAsync({ runId }));
+
+const released = computed(() =>
+  props.block.release
+    ? props.card.rows.filter((r) => r.branch.kind === 'mine' && !r.draft)
+    : [],
+);
+const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? TONE.amber[1] : 'var(--kira-fg-muted)');
+</script>
+
+<template>
+  <div
+    class="flex flex-col gap-1 rounded-kira border border-border bg-elevated px-2.5 py-2"
+    :style="boxStyle"
+    data-testid="ade-stage-block"
+    :data-stage-id="block.stage.id"
+    :data-state="block.state"
+  >
+    <div class="flex min-h-6 items-center gap-2">
+      <AdeChip :label="stateLabel(block.state)" :tone="STATE_TONE[block.state]" class="min-w-10 text-center" />
+      <slot name="action" />
+      <span class="text-kira-lg font-bold" data-testid="ade-stage-block-name">{{ block.stage.name }}</span>
+      <span class="font-data text-kira-md font-bold" :style="{ color: TONE.amber[1] }" data-testid="ade-stage-block-count">{{ block.count }}</span>
+      <span class="min-w-0 truncate text-kira-sm text-subtle" data-testid="ade-stage-block-mode">{{ block.mode }}</span>
+    </div>
+
+    <div
+      v-for="sv in block.steps"
+      :key="sv.step.id"
+      class="flex flex-col gap-0.5 rounded-kira-sm bg-bg px-1.5 py-1"
+      data-testid="ade-step"
+      :data-step-id="sv.step.id"
+    >
+      <div class="flex min-h-[22px] items-center gap-2">
+        <span
+          class="box-border flex size-4 shrink-0 items-center justify-center rounded-[4px] text-kira-sm font-extrabold"
+          :style="boxStyleOf(sv.step.state)"
+          >{{ STEP_GLYPH[sv.step.state] }}</span
+        >
+        <span class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: statusColor(sv.step.state) }" data-testid="ade-step-status">{{
+          sv.statusText
+        }}</span>
+        <Button
+          v-if="sv.step.approval"
+          size="xs"
+          class="h-5 shrink-0 rounded-kira-xs px-2 text-kira-sm font-semibold"
+          :style="solidStyle('amber')"
+          data-testid="ade-step-approve"
+          @click="onApprove(sv.step.id)"
+        >
+          Approve
+        </Button>
+        <span class="shrink-0 font-data text-kira-sm text-subtle">{{ sv.step.n }}.</span>
+        <span
+          class="min-w-0 flex-1 truncate text-kira-md font-semibold"
+          :class="sv.step.state === 'done' ? 'text-subtle' : 'text-fg'"
+          data-testid="ade-step-name"
+          >{{ sv.step.name }}</span
+        >
+        <span v-if="sv.failText" class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.blue[1] }">{{ sv.failText }}</span>
+        <span v-if="sv.gated" class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.amber[1] }">needs approval</span>
+        <AdeTip :text="sv.scope">
+          <span
+            class="min-w-0 shrink truncate text-kira-sm text-subtle"
+            :class="block.stage.kind === 'script' ? 'font-data' : ''"
+            data-testid="ade-step-scope"
+            >{{ sv.scope }}</span
+          >
+        </AdeTip>
+      </div>
+      <template v-for="rl in sv.runs" :key="rl.run.branchId">
+        <div class="flex min-h-[22px] items-center gap-[7px] pl-6" data-testid="ade-run-line" :data-branch-id="rl.run.branchId">
+          <span class="w-3.5 shrink-0 text-center text-kira-sm font-extrabold" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-glyph">{{ rl.glyph }}</span>
+          <AdeRepoTag
+            :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
+            :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
+          />
+          <span class="inline-block h-1 w-10 shrink-0 overflow-hidden rounded-[2px] bg-border-strong">
+            <span class="block h-full" :style="{ width: `${rl.pct}%`, background: TONE[rl.tone][1] }" />
+          </span>
+          <span class="w-16 shrink-0 whitespace-nowrap font-data text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-todo">{{ rl.todo }}</span>
+          <Button
+            v-if="rl.hasLog"
+            variant="dialog"
+            size="xs"
+            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm"
+            data-testid="ade-run-log-toggle"
+            @click="openLog = openLog === rl.run.runId ? null : rl.run.runId"
+          >
+            {{ block.stage.kind === 'script' ? (openLog === rl.run.runId ? 'Hide output' : 'Output') : openLog === rl.run.runId ? 'Hide log' : 'Log' }}
+          </Button>
+          <Button
+            v-if="rl.canRetry"
+            size="xs"
+            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm font-semibold"
+            :style="solidStyle('red')"
+            data-testid="ade-run-retry"
+            @click="onRetry(rl.run.runId)"
+          >
+            Retry
+          </Button>
+          <AdeTip :text="rl.note">
+            <span class="min-w-0 truncate text-kira-sm text-muted-foreground" data-testid="ade-run-note">{{ rl.note }}</span>
+          </AdeTip>
+        </div>
+        <div v-if="openLog === rl.run.runId && rl.run.runId" class="my-0.5 ml-6">
+          <AdeRunLog kind="run" :id="rl.run.runId" max-height="140px" />
+        </div>
+      </template>
+    </div>
+
+    <button
+      v-for="row in released"
+      :key="row.id"
+      type="button"
+      class="flex h-7 cursor-pointer items-center gap-2 rounded-kira-sm border-0 bg-bg px-1.5 text-left text-fg"
+      data-testid="ade-release-row"
+      :data-branch-id="row.id"
+      @click="ui.selectBranch(card.task.id, row.id)"
+    >
+      <span class="shrink-0 rounded-kira-sm px-[7px] py-px text-kira-sm font-semibold" :style="tagStyle(row.branch.mergedIntoMain ? 'purple' : 'grey')">{{
+        row.branch.mergedIntoMain ? 'main ✓' : 'main —'
+      }}</span>
+      <AdeTip v-for="c in integrationChips(row.branch)" :key="c.label" :text="c.tip">
+        <span class="shrink-0 text-kira-sm font-semibold" :style="{ color: chipTone(c.tone) }">{{ c.label }}</span>
+      </AdeTip>
+      <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
+      <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>
+    </button>
+    <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-stage-block-error">{{ error }}</p>
+  </div>
+</template>

@@ -1,5 +1,5 @@
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
 import { type BranchTag, branchTag, taskCell } from '../board/actions';
@@ -15,6 +15,7 @@ import {
   buildTaskProgress,
   type TaskProgress,
 } from '../board/progress';
+import { buildStageBlocks, type StageBlock } from '../board/stageBlocks';
 import { type DerivedStatus, deriveStatus } from '../board/status';
 import {
   buildTimeline,
@@ -59,6 +60,10 @@ export interface CardModel {
   /** Title with no custom name set: the Name field placeholder. */
   defaultTitle: string;
   progress: TaskProgress;
+  /** The task's workflow file, `null` when it has none or the file is gone. */
+  workflow: Workflow | null;
+  /** Panel Workflow block: one per stage; empty for a review or parked task. */
+  blocks: StageBlock[];
   status: DerivedStatus;
   tag: { label: string; tone: BranchTag['tone']; tip: string } | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
@@ -79,6 +84,7 @@ interface Ctx {
   view: TimelineView;
   cal: Calendar;
   progress: ReadonlyMap<string, TaskProgress>;
+  workflows: ReadonlyMap<string, Workflow>;
   needs: NeedsYou;
   ripple: Ripple | null;
   selectedId: string | null;
@@ -151,6 +157,8 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   const branches = task.branchIds.flatMap((bid) => graph.byBranch.get(bid) ?? []);
   const status = deriveStatus({ task, progress, branches, hasSessions: false });
   const cell = taskCell({ task, progress, status, branches, sessions: [] });
+  const workflow = c.workflows.get(task.workflowId) ?? null;
+  const hidden = task.kind !== 'task';
   const first = branches[0];
   const mine = branches.filter((br) => br.kind === 'mine');
   const needsOf = c.needs.items.find((n) => n.kind === 'question' && n.taskId === id);
@@ -161,6 +169,21 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     title: taskTitle(task, first, first ? c.prTitle(first.id) : ''),
     defaultTitle: taskTitle({ ...task, title: '' }, first, first ? c.prTitle(first.id) : ''),
     progress,
+    workflow,
+    blocks: hidden
+      ? []
+      : buildStageBlocks(
+          {
+            task,
+            workflow,
+            branch: (bid) => graph.byBranch.get(bid),
+            repoNick: c.repoLabel,
+          },
+          workflow,
+          progress.stage,
+          progress.stageIndex,
+          progress.finished,
+        ),
     status,
     tag: cell?.tag ?? null,
     meta: cardMeta(c, entry, task, branches),
@@ -187,6 +210,25 @@ function buildPlanModel() {
   useIntervalFn(() => {
     now.value = new Date();
   }, 60_000);
+  // `⚙ preparing 3m 40s` needs seconds: tick every second only while a setup runs.
+  const setupRunning = computed(
+    () => board.data.value?.branches.some((b) => b.setup?.state === 'running') ?? false,
+  );
+  const secondTick = useIntervalFn(
+    () => {
+      now.value = new Date();
+    },
+    1000,
+    { immediate: false },
+  );
+  watch(
+    setupRunning,
+    (running) => {
+      if (running) secondTick.resume();
+      else secondTick.pause();
+    },
+    { immediate: true },
+  );
   const today = computed(() => localIso(now.value));
 
   function repoLabel(codeRepoId: string): string {
@@ -238,6 +280,7 @@ function buildPlanModel() {
       view,
       cal: buildCalendar(today.value, planSettings.value),
       progress,
+      workflows: wf,
       needs: buildNeedsYou({ board: b, sessions: [], progress, repoNick: repoLabel, nowMs }),
       ripple: selectedId ? rippleOf(view, { kind: 'task', id: selectedId }) : null,
       selectedId,

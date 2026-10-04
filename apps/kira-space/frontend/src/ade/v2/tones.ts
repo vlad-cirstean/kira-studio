@@ -1,4 +1,4 @@
-import type { Tone } from './board/actions';
+import type { TaskAction, Tone } from './board/actions';
 
 // Literal tint, text and solid per tone: tones encode state, not theme, so they stay literal
 // (scripts/check-ade-colours.sh allowlist). `[background, foreground, solid]`.
@@ -29,4 +29,12 @@ export function tagStyle(tone: Tone): Record<string, string> {
 /** Solid button colours (tone solid, fixed ink). */
 export function solidStyle(tone: Tone): Record<string, string> {
   return { background: TONE[tone][2], color: TONE_INK[tone] };
+}
+
+/** Solid of the Claude launch buttons (`▶ Run`), a brand colour rather than a state tone. */
+const CLAUDE_SOLID = '#d97757';
+
+/** Solid button colours of a task action: its tone, or Claude's for a launch. */
+export function actionStyle(tone: TaskAction['tone']): Record<string, string> {
+  return tone === 'claude' ? { background: CLAUDE_SOLID, color: TONE_INK.amber } : solidStyle(tone);
 }
