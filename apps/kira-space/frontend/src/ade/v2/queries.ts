@@ -1,6 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { queryClient } from '@workbench/state/queryClient';
+import type { MaybeRefOrGetter } from 'vue';
+import { toValue } from 'vue';
 import { control } from '../../bridge/control';
+import { useCodeReposStore } from '../../state/coderepos';
 import type {
   AddBacklogItemArgs,
   AddExistingBranchArgs,
@@ -10,12 +13,26 @@ import type {
   Board,
   BranchArgs,
   CreateTaskArgs,
+  FolderArgs,
+  ImportWorkflowArgs,
+  LogKind,
   MoveBacklogItemArgs,
+  NewWorkflowArgs,
+  PathArgs,
   RefreshArgs,
+  RunArgs,
+  SaveWorkflowArgs,
+  SaveWorkflowYamlArgs,
   SetPlanArgs,
+  SetTaskWorkflowArgs,
+  StartRunArgs,
+  StepArgs,
   Task,
+  TaskArgs,
   UpdateBacklogItemArgs,
+  UpdateRepoArgs,
   UpdateTaskArgs,
+  ValidateWorkflowYamlArgs,
 } from './wire';
 
 // Board state is push-driven (`kira:adetask:board`, subscribed once in `ade/queries.ts`), so every
@@ -25,7 +42,9 @@ import type {
 
 export const boardKey = ['adetask', 'board'] as const;
 export const prsKey = ['adetask', 'prs'] as const;
-const workflowsKey = ['adetask', 'workflows'] as const;
+export const workflowsKey = ['adetask', 'workflows'] as const;
+export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
+export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
 export const reposKey = ['adetask', 'repos'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
@@ -211,4 +230,105 @@ export function useSetPlan() {
       void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     },
   });
+}
+
+export function useWorkflowYaml(fileName: MaybeRefOrGetter<string>) {
+  return useQuery(() => ({
+    queryKey: [...workflowYamlKey, toValue(fileName)] as const,
+    queryFn: () => control.adeTaskWorkflowYaml({ fileName: toValue(fileName) }),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: toValue(fileName) !== '',
+  }));
+}
+
+/** One log from its first chunk; `onAdeTaskLog` appends to this cache (`ade/queries.ts`). */
+export function useLog(kind: MaybeRefOrGetter<LogKind>, id: MaybeRefOrGetter<string>) {
+  return useQuery(() => ({
+    queryKey: logKey(toValue(kind), toValue(id)),
+    queryFn: () => control.adeTaskReadLog({ kind: toValue(kind), id: toValue(id), afterSeq: 0 }),
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 30_000,
+  }));
+}
+
+export function useValidateWorkflowYaml() {
+  return useMutation({
+    mutationFn: (args: ValidateWorkflowYamlArgs) => control.adeTaskValidateWorkflowYaml(args),
+  });
+}
+
+export function useSaveWorkflow() {
+  return useMutation({ mutationFn: (args: SaveWorkflowArgs) => control.adeTaskSaveWorkflow(args) });
+}
+
+export function useSaveWorkflowYaml() {
+  return useMutation({
+    mutationFn: (args: SaveWorkflowYamlArgs) => control.adeTaskSaveWorkflowYaml(args),
+  });
+}
+
+export function useImportWorkflow() {
+  return useMutation({
+    mutationFn: (args: ImportWorkflowArgs) => control.adeTaskImportWorkflow(args),
+  });
+}
+
+export function useNewWorkflow() {
+  return useMutation({ mutationFn: (args: NewWorkflowArgs) => control.adeTaskNewWorkflow(args) });
+}
+
+export function useUpdateRepo() {
+  return useMutation({ mutationFn: (args: UpdateRepoArgs) => control.adeTaskUpdateRepo(args) });
+}
+
+export function useAddFolder() {
+  return useMutation({ mutationFn: (args: FolderArgs) => control.adeTaskAddFolder(args) });
+}
+
+export function useSetFolderWatch() {
+  return useMutation({ mutationFn: (args: FolderArgs) => control.adeTaskSetFolderWatch(args) });
+}
+
+export function useRemoveFolder() {
+  return useMutation({ mutationFn: (args: PathArgs) => control.adeTaskRemoveFolder(args) });
+}
+
+/** Imports one repo by path, then refreshes the settings list and the shared code repo list. */
+export function useImportRepo() {
+  return useMutation({
+    mutationFn: async (path: string) => {
+      const repo = await control.codeWorkspaceImportRepo(path);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: reposKey, exact: true }),
+        useCodeReposStore().hydrateCodeRepos(),
+      ]);
+      return repo;
+    },
+  });
+}
+
+export function useSetTaskWorkflow() {
+  return useMutation({
+    mutationFn: (args: SetTaskWorkflowArgs) => control.adeTaskSetTaskWorkflow(args),
+  });
+}
+
+export function useStartRun() {
+  return useMutation({ mutationFn: (args: StartRunArgs) => control.adeTaskStartRun(args) });
+}
+
+export function useApprove() {
+  return useMutation({ mutationFn: (args: StepArgs) => control.adeTaskApprove(args) });
+}
+
+export function useRetryRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskRetryRun(args) });
+}
+
+export function useStageDone() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskStageDone(args) });
+}
+
+export function useRetrySetup() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRetrySetup(args) });
 }

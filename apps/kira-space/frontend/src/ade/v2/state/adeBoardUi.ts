@@ -5,9 +5,14 @@ import { ref } from 'vue';
 // Board view state: which page is open and what the panel shows. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
-  const view = ref<'plan' | 'backlog'>('plan');
+  const view = ref<'plan' | 'backlog' | 'workflows' | 'repos'>('plan');
   const selectedTaskId = ref<string | null>(null);
   const selectedBranchId = ref<string | null>(null);
+  /** Workflows page: selected file name (`null` = first listed) and editor mode. */
+  const workflowFile = ref<string | null>(null);
+  const workflowMode = ref<'form' | 'yaml'>('form');
+  /** Repos page: selected repo (`null` = first listed). */
+  const repoId = ref<string | null>(null);
   /** Days of history shown beyond the settings window after a Go to; in memory only. */
   const historyReach = ref<number | null>(null);
   /** The Add popover: open state, and the task it attaches an existing branch to (else a new task). */
@@ -35,6 +40,12 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     select(taskId);
   }
 
+  /** Opens the Workflows page on `fileName`. */
+  function openWorkflow(fileName: string | null): void {
+    workflowFile.value = fileName;
+    view.value = 'workflows';
+  }
+
   function openAttach(taskId: string, title: string): void {
     attachTo.value = { taskId, title };
     addOpen.value = true;
@@ -50,6 +61,9 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     view,
     selectedTaskId,
     selectedBranchId,
+    workflowFile,
+    workflowMode,
+    repoId,
     historyReach,
     addOpen,
     attachTo,
@@ -60,6 +74,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     select,
     selectBranch,
     openTask,
+    openWorkflow,
     openAttach,
     toggleRepo,
   };

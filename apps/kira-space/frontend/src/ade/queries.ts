@@ -2,12 +2,45 @@ import type { QueryClient } from '@tanstack/vue-query';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
-import { backlogKey, boardKey, prsKey, reposKey } from './v2/queries';
+import {
+  backlogKey,
+  boardKey,
+  logKey,
+  prsKey,
+  reposKey,
+  workflowsKey,
+  workflowYamlKey,
+} from './v2/queries';
+import type { Board, LogPage, RunsChangedEvent } from './v2/wire';
+
+/** Merges pushed runs into the cached board by id (unknown ones append to their task); the board
+ *  push that follows reconciles. */
+function mergeRuns(board: Board, event: RunsChangedEvent): Board {
+  const tasks = board.tasks.map((t) => {
+    const incoming = event.runs.filter((r) => r.taskId === t.id);
+    if (!incoming.length) return t;
+    const byId = new Map(incoming.map((r) => [r.id, r]));
+    const runs = t.runs.map((r) => byId.get(r.id) ?? r);
+    const known = new Set(t.runs.map((r) => r.id));
+    for (const r of incoming) if (!known.has(r.id)) runs.push(r);
+    return { ...t, runs };
+  });
+  return { ...board, tasks };
+}
+
+/** Appends pushed chunks to a cached log page, skipping sequence numbers it already holds. */
+function appendChunks(page: LogPage, chunks: LogPage['chunks']): LogPage {
+  const last = page.chunks.at(-1)?.seq ?? page.nextSeq - 1;
+  const fresh = chunks.filter((c) => c.seq > last);
+  if (!fresh.length) return page;
+  return { ...page, chunks: [...page.chunks, ...fresh], nextSeq: (fresh.at(-1)?.seq ?? last) + 1 };
+}
 
 /** Called once from `main.ts`, app lifetime, no teardown. Every board push re-reads the board and
  *  PR facts; a backlog push re-reads the backlog; a repos push re-reads the repo settings and the
- *  shared code repo list; a credential prompt joins the shared queue and is answered through the
- *  v2 broker. */
+ *  shared code repo list; a workflows push re-reads the list and any open YAML; a runs push merges
+ *  into the cached board; a log push appends to the cached log; a credential prompt joins the
+ *  shared queue and is answered through the v2 broker. */
 export function installAdeSignals(queryClient: QueryClient): void {
   control.onAdeTaskBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
@@ -19,6 +52,18 @@ export function installAdeSignals(queryClient: QueryClient): void {
   control.onAdeTaskRepos(() => {
     void queryClient.invalidateQueries({ queryKey: reposKey, exact: true });
     void useCodeReposStore().hydrateCodeRepos();
+  });
+  control.onAdeTaskWorkflows(() => {
+    void queryClient.invalidateQueries({ queryKey: workflowsKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: workflowYamlKey });
+  });
+  control.onAdeTaskRuns((event) => {
+    queryClient.setQueryData<Board>(boardKey, (board) => (board ? mergeRuns(board, event) : board));
+  });
+  control.onAdeTaskLog((event) => {
+    queryClient.setQueryData<LogPage>(logKey(event.kind, event.id), (page) =>
+      page ? appendChunks(page, event.chunks) : page,
+    );
   });
   control.onAdeTaskCredential((request) => {
     useGitCredentialStore().enqueueCredentialRequest({

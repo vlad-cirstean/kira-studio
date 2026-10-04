@@ -8,6 +8,7 @@ import AdePlanView from '../plan/AdePlanView.vue';
 import { useBacklog } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE, tagStyle } from '../tones';
+import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
 import AdeCaptureBox from './AdeCaptureBox.vue';
 
 // Top bar (tabs, capture box, Add) over the active tab; the Plan opens the panel beside it.
@@ -48,8 +49,19 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
         <AdeCaptureBox />
         <AdeAddPopover />
       </div>
+      <TabsList class="gap-0">
+        <TabsTrigger
+          value="workflows"
+          class="h-full cursor-pointer gap-1.5 border-b-2 border-transparent px-3.5 text-kira-lg text-muted-foreground data-[state=active]:font-semibold data-[state=active]:text-fg"
+          :style="ui.view === 'workflows' ? { borderBottomColor: TONE.amber[2] } : undefined"
+          data-testid="ade-tab-workflows"
+        >
+          Workflows
+        </TabsTrigger>
+      </TabsList>
     </nav>
     <AdeBacklogPage v-if="ui.view === 'backlog'" />
+    <AdeWorkflowsPage v-else-if="ui.view === 'workflows'" />
     <div v-else class="flex min-h-0 flex-1">
       <AdePlanView />
       <AdePanel v-if="ui.selectedTaskId" />
