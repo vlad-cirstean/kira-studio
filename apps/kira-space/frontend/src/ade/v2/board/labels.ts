@@ -32,7 +32,7 @@ export function integrationChips(b: Branch): LabelChip[] {
       tone: merged ? 'muted' : 'stale',
       tip: merged
         ? `merged into ${i.target}, up to date`
-        : `stale in ${i.target}${i.note ? `: ${i.note}` : `: has changes not in ${i.target}`}`,
+        : `stale in ${i.target}${i.note ? `: ${i.note}` : `: has changes not in ${i.target}`}. Right-click to re-merge.`,
     });
   }
   return out;

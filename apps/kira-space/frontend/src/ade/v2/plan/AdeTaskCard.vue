@@ -158,7 +158,7 @@ const headStyle = computed(() => ({
           </button>
         </AdeTip>
       </div>
-      <AdeBranchRow v-for="row in card.rows" :key="row.id" :row="row" :merged="row.branch.mergedIntoMain" />
+      <AdeBranchRow v-for="row in card.rows" :key="row.id" :row="row" :merged="row.branch.mergedIntoMain" @force-push="emit('forcePush', row)" />
     </div>
   </div>
 </template>

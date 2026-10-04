@@ -1,19 +1,63 @@
 <script setup lang="ts">
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
+import { fixItems } from '../board/fixMenu';
 import { repoColor } from '../palette';
+import { useRepos } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeDialogsStore } from '../state/adeDialogs';
 import { TONE } from '../tones';
 import AdeAttention from './AdeAttention.vue';
-import type { BranchRowModel } from './usePlanModel';
+import { type BranchRowModel, usePlanModel } from './usePlanModel';
 
 const props = defineProps<{ row: BranchRowModel; merged: boolean }>();
+const emit = defineEmits<{ forcePush: [] }>();
 const ui = useAdeBoardUiStore();
+const dialogs = useAdeDialogsStore();
+const contextMenu = useContextMenuStore();
+const { model } = usePlanModel();
+const repos = useRepos();
 const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
 const selected = computed(() => ui.selectedBranchId === props.row.id);
 
 function pick(): void {
   ui.selectBranch(props.row.branch.taskId, props.row.id);
+}
+
+function onMenu(ev: MouseEvent): void {
+  const m = model.value;
+  const items = m
+    ? fixItems({
+        branchId: props.row.id,
+        graph: m.view.graph,
+        targets:
+          repos.data.value?.repos.find((r) => r.codeRepoId === props.row.branch.codeRepoId)
+            ?.integrationBranches ?? [],
+        after: m.view.after,
+        unpushed: m.board.plan.unpushed,
+      })
+    : null;
+  if (!items) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  const id = props.row.id;
+  contextMenu.openContextMenu(ev, [
+    { type: 'label', label: `${props.row.repo} · ${props.row.name}` },
+    ...(items.length === 0
+      ? [{ type: 'item' as const, id: 'ade-fix-none', label: 'Nothing to fix', disabled: true, run: () => {} }]
+      : items.map((it) => ({
+          type: 'item' as const,
+          id: it.id,
+          label: it.label,
+          run: () => {
+            if (it.kind === 'merge') dialogs.merge(id, it.target);
+            else if (it.kind === 'rebaseMain') dialogs.rebaseOnto(it.rootId, 'main', it.label);
+            else if (it.kind === 'rebaseOnto') dialogs.rebaseOnto(id, it.onto, it.label);
+            else emit('forcePush');
+          },
+        }))),
+  ]);
 }
 
 const repoStyle = computed(() => {
@@ -53,6 +97,7 @@ const elbowColor = computed(() =>
     data-testid="ade-branch-row"
     :data-branch-id="row.id"
     @click="pick"
+    @contextmenu="onMenu"
     @keydown.enter="pick"
   >
     <span class="relative shrink-0 self-stretch" :style="{ width: `${row.depth * 16}px` }">

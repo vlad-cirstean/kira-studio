@@ -137,6 +137,9 @@ const deployRows = computed((): Deployment[] => {
   return [...rows, ...branch.value.deployments.filter((d) => !listed.has(d.env))];
 });
 
+/** Merging acts on a created branch of mine. */
+const canMerge = computed(() => branch.value.kind === 'mine' && branch.value.name !== '');
+
 const INTO_TONE: Record<Integration['status'], Tone> = { merged: 'green', stale: 'amber', 'not merged': 'grey' };
 function intoNote(i: Integration): string {
   if (i.note) return i.note;
@@ -296,7 +299,18 @@ function deployNote(d: Deployment): string {
         >
           <AdeChip :label="i.status" :tone="INTO_TONE[i.status]" wide />
           <span class="font-data text-kira-md">{{ i.target }}</span>
-          <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
+          <span class="min-w-0 flex-1 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
+          <button
+            v-if="canMerge && i.status !== 'merged'"
+            type="button"
+            class="h-[22px] shrink-0 cursor-pointer rounded-kira-sm border-0 px-2 text-kira-sm font-semibold"
+            :style="actionStyle(i.status === 'stale' ? 'amber' : 'claude')"
+            :disabled="dialogs.pending.has(`merge:${branch.id}:${i.target}`)"
+            data-testid="ade-branch-merge"
+            @click="dialogs.merge(branch.id, i.target)"
+          >
+            {{ i.status === 'stale' ? 'Re-merge' : 'Merge' }}
+          </button>
         </div>
         <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
           This repo has no integration branches besides main.
