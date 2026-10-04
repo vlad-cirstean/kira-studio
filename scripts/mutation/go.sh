@@ -105,7 +105,7 @@ mutation_go() {
       while :; do
         # shellcheck disable=SC2086
         if "$TOOLS_DIR/bin/gremlins" unleash -o "$RUN_DIR/go/$_slug.json" --workers "$WORKERS" \
-          --test-cpu 2 --timeout-coefficient "$_coef" $_excl "./$_rel" >"$RUN_DIR/go/$_slug.log" 2>&1; then
+          --timeout-coefficient "$_coef" $_excl "./$_rel" >"$RUN_DIR/go/$_slug.log" 2>&1; then
           break
         fi
         if [ "$_attempt" -ge 2 ]; then

@@ -158,7 +158,7 @@ tools/mutation/summarize.ts    gremlins + Stryker JSON → summary.json + summar
   plus any file whose `//go:build` line requires `darwin` (scan, not just name). These compile only
   on macOS; on Linux a mutant there is invisible. Count reported as "darwin-only, not mutated".
 - Per package: pre-check `go test -count=1 <pkg>` timed as `t`. Red → record `status: red` with
-  first `--- FAIL` line, skip. Green → `gremlins unleash -o go/<slug>.json --workers W --test-cpu 2
+  first `--- FAIL` line, skip. Green → `gremlins unleash -o go/<slug>.json --workers W
   --timeout-coefficient C -E ... <dir>`; `C = max(3, ceil(max(60, 3t) / t))`. Coverage failure
   (recursive child flake) → retry once, then `status: red`.
 - Resume: a package whose `go/<slug>.json` exists is skipped (`--resume <run-dir>`). Halting mid-run
@@ -211,8 +211,8 @@ tools/mutation/summarize.ts    gremlins + Stryker JSON → summary.json + summar
 ### 4.5 Concurrency and resources
 
 - `W` = `MUTATION_WORKERS` or `max(1, nproc/2)`. Half the cores: Go suites use `t.Parallel` and
-  timing-sensitive concurrency tests; oversubscription turns flakes into false kills. Go
-  `--test-cpu 2`.
+  timing-sensitive concurrency tests; oversubscription turns flakes into false kills. Never pass
+  gremlins `--test-cpu` (see Result).
 - Disk per run ≈ snapshot 52MB + W gremlins copies + one Stryker sandbox.
 - `run.sh all` runs Go then TS sequentially, never both at once.
 
