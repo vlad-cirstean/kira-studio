@@ -10,7 +10,7 @@ const emit = defineEmits<{ pick: [id: string] }>();
 </script>
 
 <template>
-  <div class="flex shrink-0 overflow-x-auto border-b border-border bg-chrome" data-testid="ade-session-strip">
+  <div class="flex shrink-0 overflow-x-auto [scrollbar-width:none] border-b border-border bg-chrome" data-testid="ade-session-strip">
     <button
       v-for="v in views"
       :key="v.session.id"

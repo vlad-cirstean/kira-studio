@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { useTimeAgo } from '@vueuse/core';
 import { useTerminalModule } from '@workbench/terminal/module';
 import TerminalHostView from '@workbench/terminal/TerminalHostView.vue';
 import { computed, ref } from 'vue';
 import { useTerminalsStore } from '../../../state/terminals';
 import AdeActivityIcon from '../AdeActivityIcon.vue';
 import { ACTIVITY_LABEL } from '../activity';
+import { adeAgoOptions } from '../ago';
 import { useFocusSession } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
@@ -20,6 +22,7 @@ const terminal = useTerminalModule();
 const focus = useFocusSession();
 const ui = useAdeBoardUiStore();
 const missing = ref(false);
+const ago = useTimeAgo(() => props.view.session.lastActiveAt, adeAgoOptions);
 
 const held = computed(() => terminals.terminalSession(props.view.session.terminalId) !== undefined);
 const needsYou = computed(() => props.view.kind === 'input');
@@ -51,7 +54,7 @@ async function show(): Promise<void> {
       :style="needsYou ? { color: TONE.amber[1], background: `color-mix(in srgb, ${TONE.amber[2]} 8%, transparent)` } : undefined"
     >
       <AdeActivityIcon :kind="view.kind" :size="14" />
-      <span class="truncate" data-testid="ade-tui-label">interactive · {{ ACTIVITY_LABEL[view.kind] }}</span>
+      <span class="truncate" data-testid="ade-tui-label">interactive · {{ ACTIVITY_LABEL[view.kind] }} · {{ ago }}</span>
     </div>
     <TerminalHostView v-if="held" :key="view.session.terminalId" class="min-h-0 flex-1" :tab="tab" :deps="terminal.host" />
     <div v-else class="flex flex-col items-start gap-2 p-3 text-kira-md" data-testid="ade-tui-elsewhere">
