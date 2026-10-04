@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeagent"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
 )
 
 // runVars are the prompt and command variables of one run (SPEC2 section 5.1.1).
@@ -67,4 +68,65 @@ func composePrompt(in promptInput) string {
 // composeResumePrompt is the message a resumed run gets: the line, then the finish_step instruction.
 func composeResumePrompt(line string) string {
 	return line + "\n\n" + adeagent.FinishStepSuffix + "\n"
+}
+
+// repoLine is one repo of a launch message.
+type repoLine struct {
+	Nick, Branch, Worktree string
+	// ReadOnlyRoot, when set, makes the line a read-only repo in that directory.
+	ReadOnlyRoot string
+}
+
+func (l repoLine) String() string {
+	if l.ReadOnlyRoot != "" {
+		return fmt.Sprintf("- Repo: %s (read only, in %s)", l.Nick, l.ReadOnlyRoot)
+	}
+	return fmt.Sprintf("- Repo: %s · Branch: %s · Worktree: %s", l.Nick, l.Branch, l.Worktree)
+}
+
+func jiraLine(key, url string) string {
+	if key == "" {
+		return ""
+	}
+	return fmt.Sprintf("- Jira: %s %s", key, url)
+}
+
+// composeStageMessage is the first message of a user stage's interactive session (SPEC2 section 5).
+// The stage prompt sees every writable repo, joined with ", ".
+func composeStageMessage(stage adewire.Stage, title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("%s: %s", stage.Name, title))
+	if l := jiraLine(jiraKey, jiraURL); l != "" {
+		lines = append(lines, l)
+	}
+	vars := runVars{Task: title, Jira: jiraKey}
+	var nicks, names, trees []string
+	for _, r := range repos {
+		lines = append(lines, r.String())
+		if r.ReadOnlyRoot == "" {
+			nicks, names, trees = append(nicks, r.Nick), append(names, r.Branch), append(trees, r.Worktree)
+		}
+	}
+	vars.Repo, vars.Branch, vars.Worktree = strings.Join(nicks, ", "), strings.Join(names, ", "), strings.Join(trees, ", ")
+	if notes != "" {
+		lines = append(lines, "- Notes: "+notes)
+	}
+	if stage.Prompt != "" {
+		lines = append(lines, substitute(stage.Prompt, vars, false))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// composeStartMessage is the first message of a branch-level Start session (SPEC2 section 9); step
+// is the first step not done, "" when the stage has none.
+func composeStartMessage(title, jiraKey, jiraURL string, repo repoLine, step string) string {
+	lines := []string{"Task: " + title}
+	if l := jiraLine(jiraKey, jiraURL); l != "" {
+		lines = append(lines, l)
+	}
+	lines = append(lines, repo.String())
+	if step != "" {
+		lines = append(lines, "Step: "+step)
+	}
+	return strings.Join(lines, "\n")
 }

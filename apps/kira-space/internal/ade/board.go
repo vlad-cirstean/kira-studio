@@ -65,6 +65,10 @@ type TaskBoardDeps struct {
 	AgentDir string
 	// ClaudeBin defaults to "claude" (a test points it at a fake).
 	ClaudeBin string
+	// Tracker records and launches interactive (TUI) task sessions.
+	Tracker *Tracker
+	// CloseTerminal closes a running terminal by id (Archive).
+	CloseTerminal func(terminalID string) error
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set
@@ -107,6 +111,7 @@ type TaskBoard struct {
 	runMu     sync.Mutex             // guards live, setupLive, taskMus, finishes, stepMsgs
 	live      map[string]*liveRun    // run id -> its process
 	runOpts   map[string]runOpts     // run id -> extras for its launch
+	tuiRuns   map[string]tuiBinding  // run id -> the TUI that can finish it
 	setupLive map[string]*liveRun    // branch id -> its running prepare script
 	taskMus   map[string]*sync.Mutex // task id -> serializes that task's run transitions
 	finishes  map[string]finishCall  // run id -> last finish_step call
@@ -124,7 +129,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	b := &TaskBoard{
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
-		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, runOpts: map[string]runOpts{}, setupLive: map[string]*liveRun{},
+		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, runOpts: map[string]runOpts{}, tuiRuns: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
 	}
 	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)

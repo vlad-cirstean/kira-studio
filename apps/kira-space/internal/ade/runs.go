@@ -35,6 +35,10 @@ type finishCall struct{ status, summary string }
 
 // recordFinish is the MCP server's callback; the last call of a run wins and is applied at exit.
 func (b *TaskBoard) recordFinish(runID, status, summary string) {
+	if b.tuiBound(runID) {
+		go b.applyTUIFinish(runID, status, summary) // a taken-over run: applied at call time (R14)
+		return
+	}
 	b.runMu.Lock()
 	b.finishes[runID] = finishCall{status, summary}
 	b.runMu.Unlock()

@@ -863,3 +863,12 @@ func (r *AdeTaskRepo) CountRuns(taskID, stageID, stepID, branchID, state string)
 	}
 	return n, nil
 }
+
+// HasRunningOn reports whether a run on the branch is running.
+func (r *AdeTaskRepo) HasRunningOn(branchID string) (bool, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE branch_id = ? AND state = ?`, branchID, model.AdeRunRunning).Scan(&n); err != nil {
+		return false, fmt.Errorf("repos: count running ade runs on %s: %w", branchID, err)
+	}
+	return n > 0, nil
+}
