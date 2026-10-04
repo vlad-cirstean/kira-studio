@@ -101,7 +101,7 @@ const top = Number(o.top);
 const simMin = Number(o.similarity);
 const lcsMin = Number(o.lcs);
 const minCallees = Number(o['min-callees']);
-const sweeps = new Set(o.sweep!.split(','));
+const sweeps = new Set((o.sweep ?? '').split(','));
 const pathFilters = o.path ?? [];
 const TEST_RE = /(_test\.go|\.test\.[jt]sx?|\.spec\.[jt]sx?)$/;
 
@@ -131,7 +131,7 @@ function fileLines(rel: string): string[] | null {
     const p = join(root, rel);
     fileCache.set(rel, existsSync(p) ? readFileSync(p, 'utf8').split('\n') : null);
   }
-  return fileCache.get(rel)!;
+  return fileCache.get(rel) ?? null;
 }
 
 function stripComments(src: string): string[] {
@@ -218,11 +218,17 @@ const push = (sweep: string, score: number, g: Fn[]) =>
   });
 const rank = (a: Group, b: Group) => b.members.length * b.lines - a.members.length * a.lines;
 
+function pushTo(by: Map<string, Fn[]>, key: string, f: Fn) {
+  const list = by.get(key);
+  if (list) list.push(f);
+  else by.set(key, [f]);
+}
+
 function hashSweep(sweep: 'exact' | 'blind') {
   const by = new Map<string, Fn[]>();
   for (const f of fns) {
     const key = hash((sweep === 'exact' ? f.norm : f.norm.map(blindLine)).join('\n'));
-    (by.get(key) ?? by.set(key, []).get(key)!).push(f);
+    pushTo(by, key, f);
   }
   const groups = [...by.values()].filter(
     (g) => new Set(g.map((f) => f.file)).size > 1 && keepGroup(g),
@@ -245,11 +251,7 @@ function hashSweep(sweep: 'exact' | 'blind') {
 }
 function exactGroupKeys(): Set<string> {
   const by = new Map<string, Fn[]>();
-  for (const f of fns)
-    (
-      by.get(hash(f.norm.join('\n'))) ??
-      by.set(hash(f.norm.join('\n')), []).get(hash(f.norm.join('\n')))!
-    ).push(f);
+  for (const f of fns) pushTo(by, hash(f.norm.join('\n')), f);
   return new Set(
     [...by.values()]
       .filter((g) => g.length > 1)
@@ -277,7 +279,7 @@ function nameSweep() {
   const by = new Map<string, Fn[]>();
   for (const f of fns) {
     const k = `${f.lang}\0${f.name}`;
-    (by.get(k) ?? by.set(k, []).get(k)!).push(f);
+    pushTo(by, k, f);
   }
   for (const g of by.values()) {
     if (g.length < 2 || g.length > 30) continue; // New/Close/render-style names are noise
