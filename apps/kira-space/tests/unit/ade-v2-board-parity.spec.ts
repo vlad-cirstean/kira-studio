@@ -439,3 +439,62 @@ describe('script stage recovery', () => {
     expect(actionFor('stuck')?.kind).toBe('retry');
   });
 });
+
+describe('Needs you extras (R16)', () => {
+  const needsFor = (sessionId: string, finishedAt: number | null) => {
+    const script = mkStage({
+      id: 'release',
+      kind: 'script',
+      command: 'make release',
+      runsOn: 'each repo',
+    });
+    const b = mkBranch({ id: 'b', taskId: 't', setup: null });
+    const t = mkTask({
+      id: 't',
+      branchIds: ['b'],
+      workflowId: 'w',
+      stageId: 'release',
+      currentStage: script,
+      runs: [
+        mkRun({
+          id: 'run-1',
+          taskId: 't',
+          stageId: 'release',
+          stepId: 'release',
+          branchId: 'b',
+          state: 'stuck',
+          note: 'timed out after 10m',
+          sessionId,
+          finishedAt,
+        }),
+      ],
+    });
+    const p = buildTaskProgress({
+      task: t,
+      workflow: { id: 'w', name: 'w', stages: [script] },
+      branch: () => b,
+      repoNick: (id) => id,
+    });
+    return buildNeedsYou({
+      board: { tasks: [t], branches: [b] },
+      sessions: [],
+      progress: new Map([['t', p]]),
+      repoNick: (id) => id,
+      nowMs: 10_000,
+    }).items.filter((n) => n.kind === 'stuck run');
+  };
+
+  test('a stuck script run is retried, carries its run id and note, and ages from its finish', () => {
+    const [n] = needsFor('', 4_000);
+    expect(n?.action).toBe('Retry');
+    expect(n?.runIds).toEqual(['run-1']);
+    expect(n?.detail).toBe('timed out after 10m');
+    expect(n?.ageMs).toBe(6_000);
+  });
+
+  test('a stuck run with a session is taken over', () => {
+    const [n] = needsFor('s1', 4_000);
+    expect(n?.action).toBe('Take over');
+    expect(n?.sessionId).toBe('s1');
+  });
+});
