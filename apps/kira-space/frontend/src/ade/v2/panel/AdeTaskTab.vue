@@ -8,8 +8,7 @@ import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
 import { STATUS_TONE } from '../board/actions';
 import { integrationChips } from '../board/labels';
-import { parseGithub, statusWhy, taskPatch } from '../board/panelFacts';
-import { parseJira } from '../jira';
+import { statusWhy, taskPatch } from '../board/panelFacts';
 import { repoColor } from '../palette';
 import type { CardModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useRepos, useUpdateTask } from '../queries';
@@ -18,6 +17,7 @@ import { TONE } from '../tones';
 import type { TaskPatch } from '../wire';
 import AdeEstimateField from './AdeEstimateField.vue';
 import AdeLinkRow from './AdeLinkRow.vue';
+import { useLinkFields } from './useLinkFields';
 
 // Task tab: the editable fields, then the branches. Status is read-only (D10).
 const props = defineProps<{ card: CardModel }>();
@@ -30,8 +30,6 @@ const repos = useRepos();
 const task = computed(() => props.card.task);
 const review = computed(() => props.card.review);
 const fieldError = ref('');
-const jiraError = ref('');
-const githubError = ref('');
 const estError = ref<string | null>(null);
 
 async function write(patch: Partial<TaskPatch>): Promise<boolean> {
@@ -67,16 +65,11 @@ const why = computed(() => statusWhy(task.value, props.card.status, props.card.p
 
 // ---- links
 const jira = computed(() => task.value.jira);
-async function saveJira(raw: string): Promise<void> {
-  const j = parseJira(raw);
-  jiraError.value = j.key ? '' : 'Not a Jira key or link';
-  if (j.key && !(await write({ jira: j }))) jiraError.value = fieldError.value;
-}
-const github = computed(() => parseGithub(task.value.githubUrl));
-async function saveGithub(raw: string): Promise<void> {
-  githubError.value = parseGithub(raw) ? '' : 'Not a GitHub PR or issue link';
-  if (!githubError.value && !(await write({ githubUrl: raw }))) githubError.value = fieldError.value;
-}
+const links = useLinkFields(
+  () => task.value.githubUrl,
+  async (patch) => ((await write(patch)) ? null : fieldError.value),
+);
+const github = links.github;
 
 // ---- estimate
 async function saveEst(value: string): Promise<void> {
@@ -142,9 +135,9 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         :text="jira?.key ?? ''"
         :url="jira?.url ?? ''"
         placeholder="paste Jira link or key"
-        :error="jiraError"
-        @save="saveJira"
-        @clear="write({ clearJira: true })"
+        :error="links.jiraError.value"
+        @save="links.saveJira"
+        @clear="links.clearJira"
       />
       <AdeLinkRow
         id="ade-task-github"
@@ -153,9 +146,9 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         :text="github?.ref ?? ''"
         :url="github ? task.githubUrl : ''"
         placeholder="paste GitHub issue or PR link"
-        :error="githubError"
-        @save="saveGithub"
-        @clear="write({ githubUrl: '' })"
+        :error="links.githubError.value"
+        @save="links.saveGithub"
+        @clear="links.clearGithub"
       />
       <span class="text-kira-sm text-muted-foreground">Estimate</span>
       <AdeEstimateField :est="task.est" :days="spanDays" :error="estError" @save="saveEst" />
