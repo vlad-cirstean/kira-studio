@@ -64,7 +64,7 @@ function saveNotes(_id: string, value: string): void {
     <header class="flex shrink-0 flex-col gap-1.5 border-b border-border px-3.5 pb-2.5 pt-3">
       <div class="flex items-center gap-2">
         <AdeChip label="backlog · not planned" tone="grey" />
-        <h3 class="m-0 min-w-0 flex-1 truncate text-kira-xl font-bold" data-testid="ade-backlog-title">{{ item.text }}</h3>
+        <h3 class="m-0 min-w-0 flex-1 truncate text-kira-lg font-bold" data-testid="ade-backlog-title">{{ item.text }}</h3>
       </div>
       <div class="text-kira-sm text-muted-foreground">captured {{ ago }}</div>
       <div class="flex gap-2">
@@ -123,7 +123,7 @@ function saveNotes(_id: string, value: string): void {
       />
       <span v-if="error" class="col-span-2 text-kira-sm text-error" data-testid="ade-backlog-error">{{ error }}</span>
     </div>
-    <div class="min-h-0 flex-1 border-t border-border">
+    <div class="flex min-h-0 flex-1 flex-col px-3.5 pb-3.5">
       <AdeNotesEditor :notes="item.notes" :item-id="item.id" @save="saveNotes" />
     </div>
   </div>

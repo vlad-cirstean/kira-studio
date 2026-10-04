@@ -262,3 +262,14 @@ test('the Advanced switch writes ade.headlessSettingSources', async ({ relaunch 
     )
     .toBe(true);
 });
+
+test('Details lists every environment of the repo, not deployed where the branch has none', async ({
+  relaunch,
+}) => {
+  const { window: page } = await openPlan(relaunch);
+  await page.locator('[data-testid="ade-branch-row"][data-branch-id="b_bill"]').first().click();
+  const rows = page.locator('[data-testid="ade-branch-deploy"]');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.first()).toContainText('not deployed');
+  await expect(page.locator('[data-testid="ade-branch-deploy"][data-env="prod"]')).toBeVisible();
+});

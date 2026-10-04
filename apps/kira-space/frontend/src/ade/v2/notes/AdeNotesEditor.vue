@@ -40,6 +40,7 @@ const PROSE = [
   '[&_ul]:mb-[0.6em] [&_ul]:list-disc [&_ul]:pl-[1.4em] [&_ol]:mb-[0.6em] [&_ol]:list-decimal [&_ol]:pl-[1.4em]',
   "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-[0.2em]",
   "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:items-start [&_ul[data-type='taskList']_li]:gap-[0.4em]",
+  "[&_input[type='checkbox']]:cursor-pointer [&_input[type='checkbox']]:accent-[#6cc58a]",
   "[&_li[data-checked='true']>div]:text-subtle [&_li[data-checked='true']>div]:line-through",
   '[&_code]:rounded-[3px] [&_code]:bg-field [&_code]:px-[0.3em] [&_code]:py-[0.1em] [&_code]:font-data [&_code]:text-kira-sm',
   '[&_a]:text-info',

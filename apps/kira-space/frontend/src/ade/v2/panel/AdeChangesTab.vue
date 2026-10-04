@@ -27,9 +27,9 @@ const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).j
 function fileDelta(f: Branch['files'][number]): string {
   if (f.binary) return 'binary';
   const parts: string[] = [];
-  if (f.added !== null) parts.push(`+${f.added}`);
-  if (f.deleted !== null) parts.push(`−${f.deleted}`);
-  return parts.join(' ');
+  if (f.added) parts.push(`+${f.added}`);
+  if (f.deleted) parts.push(`−${f.deleted}`);
+  return parts.join(' ') || '0';
 }
 </script>
 

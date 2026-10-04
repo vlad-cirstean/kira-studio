@@ -7,7 +7,7 @@ import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
-import { usePrs } from '../queries';
+import { usePrs, useRepos } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { solidStyle, TONE } from '../tones';
 import type { Deployment, Integration } from '../wire';
@@ -19,6 +19,7 @@ const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; mod
 
 const ui = useAdeBoardUiStore();
 const prs = usePrs();
+const repos = useRepos();
 const tab = ref('details');
 const forcePush = ref(false);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
@@ -58,6 +59,39 @@ function open(url: string, e: MouseEvent): void {
   e.preventDefault();
   void control.linkOpenExternal(url);
 }
+
+const repoInfo = computed(() =>
+  repos.data.value?.repos.find((r) => r.codeRepoId === branch.value.codeRepoId),
+);
+
+// The repo's own integration branches and environments, each filled from the branch when it has an
+// entry, else `not merged` / `not deployed`; an entry the repo no longer lists still shows.
+const intoRows = computed((): Integration[] => {
+  const have = new Map(branch.value.integration.map((i) => [i.target, i]));
+  const rows = (repoInfo.value?.integrationBranches ?? []).map(
+    (target): Integration =>
+      have.get(target) ?? { target, status: 'not merged', note: '', recorded: false },
+  );
+  const listed = new Set(rows.map((r) => r.target));
+  return [...rows, ...branch.value.integration.filter((i) => !listed.has(i.target))];
+});
+const deployRows = computed((): Deployment[] => {
+  const have = new Map(branch.value.deployments.map((d) => [d.env, d]));
+  const rows = (repoInfo.value?.environments ?? []).map(
+    (e): Deployment =>
+      have.get(e.name) ?? {
+        env: e.name,
+        deployedSha: '',
+        checkedAt: 0,
+        status: 'not deployed',
+        missingCommits: 0,
+        note: '',
+        error: '',
+      },
+  );
+  const listed = new Set(rows.map((r) => r.env));
+  return [...rows, ...branch.value.deployments.filter((d) => !listed.has(d.env))];
+});
 
 const INTO_TONE: Record<Integration['status'], Tone> = { merged: 'green', stale: 'amber', 'not merged': 'grey' };
 function intoNote(i: Integration): string {
@@ -185,7 +219,7 @@ function deployNote(d: Deployment): string {
       <div class="flex flex-col gap-0.5">
         <div class="pb-0.5 text-kira-sm text-muted-foreground">Merged into</div>
         <div
-          v-for="i in branch.integration"
+          v-for="i in intoRows"
           :key="i.target"
           class="flex h-[30px] items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-into"
@@ -195,7 +229,7 @@ function deployNote(d: Deployment): string {
           <span class="font-data text-kira-md">{{ i.target }}</span>
           <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{ intoNote(i) }}</span>
         </div>
-        <div v-if="branch.integration.length === 0" class="text-kira-md text-subtle">
+        <div v-if="intoRows.length === 0" class="text-kira-md text-subtle">
           This repo has no integration branches besides main.
         </div>
       </div>
@@ -203,7 +237,7 @@ function deployNote(d: Deployment): string {
       <div class="flex flex-col gap-0.5">
         <div class="pb-0.5 text-kira-sm text-muted-foreground">Deployed to</div>
         <div
-          v-for="d in branch.deployments"
+          v-for="d in deployRows"
           :key="d.env"
           class="flex h-[30px] items-center gap-2 rounded-kira bg-elevated px-1.5"
           data-testid="ade-branch-deploy"
@@ -213,7 +247,7 @@ function deployNote(d: Deployment): string {
           <span class="font-data text-kira-md">{{ d.env }}</span>
           <span class="min-w-0 truncate text-kira-sm text-muted-foreground">{{ deployNote(d) }}</span>
         </div>
-        <div v-if="branch.deployments.length === 0" class="text-kira-md text-subtle">
+        <div v-if="deployRows.length === 0" class="text-kira-md text-subtle">
           No environments configured for this repo.
         </div>
       </div>

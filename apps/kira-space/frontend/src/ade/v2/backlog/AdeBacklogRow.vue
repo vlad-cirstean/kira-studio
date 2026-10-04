@@ -5,11 +5,11 @@ import { computed, ref, watch } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { adeAgoOptions } from '../ago';
 import { parseGithub } from '../board/panelFacts';
-import { solidStyle } from '../tones';
+import { solidStyle, TONE } from '../tones';
 import type { BacklogItem } from '../wire';
 
 // One backlog line: reorder, promote, delete, added-ago, inline-edit text and quiet link facts.
-const props = defineProps<{ item: BacklogItem; selected: boolean; first: boolean; last: boolean }>();
+const props = defineProps<{ item: BacklogItem; selected: boolean }>();
 const emit = defineEmits<{
   pick: [];
   move: [delta: -1 | 1];
@@ -48,14 +48,15 @@ function commit(): void {
 }
 
 const ICON_BTN =
-  'size-6 shrink-0 cursor-pointer rounded-kira-sm border border-border-strong bg-transparent p-0 text-kira-md text-fg disabled:cursor-default disabled:opacity-40';
+  'size-6 shrink-0 cursor-pointer rounded-kira-sm border border-border-strong bg-transparent p-0 text-kira-md text-fg';
 </script>
 
 <template>
   <!-- biome-ignore lint/a11y/useSemanticElements: the row holds inputs and buttons a button cannot. -->
   <div
     class="box-border flex min-h-10 cursor-pointer items-center gap-2 rounded-kira-lg border px-2 py-1"
-    :class="selected ? 'border-focus bg-elevated' : 'border-border bg-chrome'"
+    :class="selected ? 'bg-elevated' : 'border-border bg-chrome'"
+    :style="selected ? { borderColor: TONE.amber[2] } : undefined"
     role="button"
     tabindex="0"
     :data-selected="selected || undefined"
@@ -68,7 +69,6 @@ const ICON_BTN =
       <button
         type="button"
         :class="ICON_BTN"
-        :disabled="first"
         aria-label="Move up"
         data-testid="ade-backlog-up"
         @click.stop="emit('move', -1)"
@@ -80,7 +80,6 @@ const ICON_BTN =
       <button
         type="button"
         :class="ICON_BTN"
-        :disabled="last"
         aria-label="Move down"
         data-testid="ade-backlog-down"
         @click.stop="emit('move', 1)"
@@ -115,7 +114,7 @@ const ICON_BTN =
     <Input
       :id="`ade-backlog-${item.id}`"
       v-model="draft"
-      class="h-[30px] min-w-0 flex-1 border-transparent bg-transparent px-2 text-kira-lg"
+      class="h-[30px] min-w-0 flex-1 border-transparent bg-transparent px-2 text-kira-lg focus-visible:border-focus dark:bg-transparent"
       data-testid="ade-backlog-text"
       @blur="commit"
       @keydown.enter="commit"

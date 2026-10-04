@@ -48,7 +48,8 @@ async function capture(): Promise<void> {
 
 function onMove(index: number, delta: -1 | 1): void {
   const item = items.value[index];
-  if (item) void run(() => move.mutateAsync({ id: item.id, toIndex: index + delta }));
+  const to = index + delta;
+  if (item && to >= 0 && to < items.value.length) void run(() => move.mutateAsync({ id: item.id, toIndex: to }));
 }
 
 async function onPromote(id: string): Promise<void> {
@@ -74,7 +75,7 @@ function onEdit(id: string, value: string): void {
   <div class="flex min-h-0 flex-1" data-testid="ade-backlog">
     <div class="flex min-w-0 flex-1 flex-col gap-2.5 overflow-auto px-6 pb-7 pt-[18px]">
       <div class="flex items-baseline gap-2.5">
-        <h2 class="m-0 text-kira-xl font-bold">Backlog</h2>
+        <h2 class="m-0 text-kira-lg font-bold">Backlog</h2>
         <span class="text-kira-md text-muted-foreground">Get it out of your head. Order it later: top is most important. Not on the plan yet.</span>
       </div>
       <label for="ade-backlog-add" class="sr-only">Add to backlog</label>
@@ -92,8 +93,6 @@ function onEdit(id: string, value: string): void {
         :key="item.id"
         :item="item"
         :selected="selected?.id === item.id"
-        :first="i === 0"
-        :last="i === items.length - 1"
         @pick="pickedId = item.id"
         @move="(d) => onMove(i, d)"
         @promote="onPromote(item.id)"
