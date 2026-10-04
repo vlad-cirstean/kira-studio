@@ -135,7 +135,7 @@ function onOverflowMove(band: TimelineBand): void {
   void shift(band.overflowTaskIds, band.overflowMoveTo);
 }
 
-const drag = usePlanDrag(scrollEl, (taskId, target) => {
+const drag = usePlanDrag((taskId, target) => {
   const m = model.value;
   if (!m) return;
   const verdict = dropVerdict(m.view, m.board.plan, today.value, taskId, target);
@@ -319,6 +319,8 @@ function onForcePush(row: BranchRowModel): void {
           @overflow-move="onOverflowMove(band)"
           @day-menu="(ev) => onDayMenu(band, ev)"
           @force-push="onForcePush"
+          @drag-start="drag.begin"
+          @drag-end="drag.end"
         />
       </template>
       <button

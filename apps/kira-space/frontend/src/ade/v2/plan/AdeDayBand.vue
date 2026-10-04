@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
 import { TONE, TONE_INK } from '../tones';
 import AdeTaskCard from './AdeTaskCard.vue';
@@ -24,7 +25,26 @@ const emit = defineEmits<{
   overflowMove: [];
   dayMenu: [ev: MouseEvent];
   forcePush: [row: BranchRowModel];
+  dragStart: [taskId: string];
+  dragEnd: [];
 }>();
+
+// SortableJS only drags direct children of its list, so each band's drop area is its own list.
+// `sort: false` and no group pull/put mean it never moves Vue-managed DOM; the parent resolves the
+// drop target from the pointer instead.
+const dropEl = ref<HTMLElement | null>(null);
+useDraggable(dropEl, {
+  draggable: '[data-ade-task]',
+  sort: false,
+  group: { name: 'ade-plan', pull: false, put: false },
+  forceFallback: true,
+  fallbackOnBody: true,
+  fallbackTolerance: 4,
+  ghostClass: 'opacity-40',
+  chosenClass: 'ring-2',
+  onStart: (evt) => emit('dragStart', evt.item.dataset.taskId ?? ''),
+  onEnd: () => emit('dragEnd'),
+});
 
 const greyed = computed(() => props.band.weekend || props.band.dayOff);
 const empty = computed(
@@ -106,6 +126,7 @@ const solidBorder = computed(
         highlight ? 'outline outline-1 outline-dashed outline-focus' : '',
       ]"
       :style="highlight ? { background: 'color-mix(in srgb, var(--kira-focus) 10%, transparent)' } : undefined"
+      ref="dropEl"
       data-testid="ade-band-drop"
     >
       <div

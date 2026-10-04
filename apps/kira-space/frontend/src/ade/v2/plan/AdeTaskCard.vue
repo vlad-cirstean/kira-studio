@@ -47,6 +47,7 @@ const headStyle = computed(() => ({
 <template>
   <div
     class="flex items-start gap-2"
+    :data-ade-task="card.review ? undefined : ''"
     data-testid="ade-task"
     :data-task-id="card.task.id"
     :data-selected="card.selected || undefined"
@@ -62,7 +63,6 @@ const headStyle = computed(() => ({
       />
     </div>
     <div
-      :data-ade-card="card.review ? undefined : ''"
       :data-task-id="card.task.id"
       class="box-border flex min-w-0 max-w-[600px] flex-1 flex-col rounded-[10px] border border-l-4 border-border-strong bg-elevated shadow-[0_2px_0_color-mix(in_srgb,black_35%,transparent),0_6px_16px_color-mix(in_srgb,black_18%,transparent)]"
       :class="[card.parked ? 'border-dashed' : '', card.review ? 'cursor-default' : 'cursor-grab']"
