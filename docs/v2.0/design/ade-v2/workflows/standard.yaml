@@ -1,0 +1,71 @@
+id: standard
+name: Standard feature
+stages:
+  - id: spec
+    name: Spec
+    kind: user
+    status: In progress
+    session: true
+    prompt: |
+      Let's write the spec for {task} ({jira}). Ask me questions until it is clear. Do not change any code.
+  - id: impl
+    name: Implement
+    kind: agent
+    status: In progress
+    steps:
+      - id: plan
+        name: Plan from spec
+        runs_on: once
+        before: auto
+        on_failure: stop
+        timeout: 20m
+        prompt: |
+          Read the task spec and the Jira ticket {jira}. Write an implementation plan per repo. Do not change code yet.
+      - id: impl
+        name: Implement
+        runs_on: each repo
+        before: auto
+        on_failure: retry 1
+        timeout: 2h
+        prompt: |
+          Implement the plan for {repo} on {branch} in {worktree}. Commit in small steps.
+      - id: tests
+        name: Write tests
+        runs_on: each repo
+        before: auto
+        on_failure: "back:impl"
+        timeout: 1h
+        prompt: |
+          Add or update tests for the changes on {branch}. If they fail because of the implementation, report what fails.
+      - id: ci
+        name: Make CI green
+        runs_on: each repo
+        before: auto
+        on_failure: "back:impl"
+        timeout: 1h
+        prompt: |
+          Run the checks for {branch}. Fix failures until they pass.
+      - id: pr
+        name: Open PRs
+        runs_on: each repo
+        before: approval
+        on_failure: stop
+        timeout: 15m
+        prompt: |
+          Open a draft PR for {branch} and link {jira}.
+  - id: review
+    name: Review
+    kind: user
+    status: In review
+    session: true
+    prompt: |
+      Help me go through the review comments on {branch} and address them.
+  - id: release
+    name: Release
+    kind: script
+    status: In review
+    runs_on: each repo
+    on_failure: stop
+    timeout: 15m
+    command: |
+      ./scripts/release.sh --branch {branch}

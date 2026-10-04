@@ -1,0 +1,33 @@
+id: chore
+name: Maintenance
+stages:
+  - id: update
+    name: Update
+    kind: agent
+    status: In progress
+    steps:
+      - id: update
+        name: Apply the change
+        runs_on: each repo
+        before: auto
+        on_failure: stop
+        timeout: 1h
+        prompt: |
+          Apply the change described in the task on {branch}.
+      - id: ci
+        name: Make CI green
+        runs_on: each repo
+        before: auto
+        on_failure: retry 2
+        timeout: 1h
+        prompt: |
+          Run the checks for {branch}. Fix failures until they pass.
+  - id: release
+    name: Release
+    kind: script
+    status: In review
+    runs_on: each repo
+    on_failure: stop
+    timeout: 10m
+    command: |
+      make release

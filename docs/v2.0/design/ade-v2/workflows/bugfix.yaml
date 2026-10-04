@@ -1,0 +1,56 @@
+id: bugfix
+name: Bugfix
+stages:
+  - id: triage
+    name: Triage
+    kind: user
+    status: In progress
+    session: true
+    prompt: |
+      Help me understand {jira} and find where it happens. Do not change any code.
+  - id: fix
+    name: Fix
+    kind: agent
+    status: In progress
+    steps:
+      - id: repro
+        name: Reproduce with a failing test
+        runs_on: each repo
+        before: auto
+        on_failure: stop
+        timeout: 30m
+        prompt: |
+          Reproduce {jira} with a failing test on {branch}.
+      - id: fix
+        name: Fix
+        runs_on: each repo
+        before: auto
+        on_failure: retry 1
+        timeout: 1h
+        prompt: |
+          Make the failing test pass with the smallest change.
+      - id: ci
+        name: Make CI green
+        runs_on: each repo
+        before: auto
+        on_failure: retry 2
+        timeout: 1h
+        prompt: |
+          Run the checks for {branch}. Fix failures until they pass.
+      - id: pr
+        name: Open PR
+        runs_on: each repo
+        before: approval
+        on_failure: stop
+        timeout: 15m
+        prompt: |
+          Open a draft PR for {branch} and link {jira}.
+  - id: release
+    name: Release
+    kind: script
+    status: In review
+    runs_on: each repo
+    on_failure: stop
+    timeout: 15m
+    command: |
+      ./scripts/release.sh --branch {branch}
