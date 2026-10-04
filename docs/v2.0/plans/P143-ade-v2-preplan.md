@@ -43,7 +43,7 @@ HEAD or refs, so it is safe next to running agents; it needs git >= 2.38, alread
 are checked for conflicts if rebased onto the latest base; results feed the existing conflict tags.
 
 **Migration need:** one Space migration (`0008`) adds task tables and repo
-config tables. No v1 row migration (D5). P146's migration (`0009`) extends `ade_sessions` (table
+config tables. No v1 row migration (D5). P146's migration (`0010`; P145 took `0009`) extends `ade_sessions` (table
 rebuild with widened CHECK, v1 `List` filter). A later migration (P148) drops v1 tables once nothing
 reads them; v1 UI is gone from P145, so v1 rows are unreachable from then.
 
@@ -189,14 +189,14 @@ geometry, header line 1 facts + stage progress + `!`, line 2 title 2-line clamp)
 (line 1 repo · base marker · `!` · owner · name; quiet line 2 context only this wave), left action
 column (task stage action rendered from B's P144 rules; git tags/actions). Add popover (§8: New task
 with repo chips → Add to Later, select new task, switch to Plan; Existing branch across all repos).
-Port Claude dialog for Rebase / Queue after / Force push with repo-named templates (§9). Delete v1
+Force push confirm dialog (Rebase / Queue after dialogs move to P148 B, U1 (a)). Delete v1
 frontend files and v1 unit/UI specs no longer reachable. Tab bar entries `Backlog`, `Workflows`,
 `Repos`, `Needs you` land with their pages (P146/P147/P148), never as placeholders.
 **Libraries:** shadcn-vue (Tabs, Popover, Tooltip, Badge, ContextMenu), Tailwind utilities only,
 VueUse (`onKeyStroke`, `useElementSize`), Pinia (`adeBoardUi` store: selection, show/hide repos,
 `showAllItems`, `showHistory`), TanStack Query over P144 methods, `vue-draggable-plus` (MIT).
 **SPEC2:** §3, §4, §4.1 (except live run progress), §4.2 (git column), §5.2, §8, §9 (rebase/queue
-templates), §13 (drops applied in UI).
+templates: P148 B), §13 (drops applied in UI).
 
 **Ownership.** A: as P144 A. B: `frontend/src/ade/**` except `ade/v2/wire.ts`; `packages/theme/src/
 components/ui/**` (new shadcn primitives only); `scripts/check-ade-colours.sh`; `apps/kira-space/
@@ -209,7 +209,7 @@ merged/stale/patch-id rules interact). Wave end: both suites + live `bun run dev
 
 ### P146 wave 3: run engine ‖ panel + facts UI
 
-**Stream A.** Migration `0009` (moved here from P144): `ade_sessions` rebuild (SQLite cannot alter a
+**Stream A.** Migration `0010` (moved here from P144; `0009` is P145's): `ade_sessions` rebuild (SQLite cannot alter a
 CHECK) adding `mode` (`tui`/`headless`), `task_id`, `branch_id`, `stage_id`, `step_id`, `run_id`,
 `resumes`, `code_repo_id` nullable, CHECK widened for task-level sessions; copy v1 rows, recreate
 `ade_sessions_repo`, index on `task_id`; v1 `AdeSessionsRepo.List`/`ListByRepo`/`StopAllRunning` gain
@@ -298,7 +298,7 @@ under `design/ade-v2/workflows/`, imported by hand, never shipped) on a scratch 
 
 **Stream A.** Delete v1-only backend: `AdeService` v1 methods, `Queue` new-work rebind,
 dependencies/blockers, work type, per-repo plan; v1 `ade/wire.ts` and its `bridge/index.ts`
-entries; migration `0009` dropping v1 tables, no data migration (D5). Keep shared fact code used by v2.
+entries; migration `0011` dropping v1 tables, no data migration (D5). Keep shared fact code used by v2.
 **SPEC2:** §13 (dropped items, backend).
 
 **Stream B.** Sessions tab (task: spec sessions + all runs; branch: its own): tab strip with
@@ -378,7 +378,7 @@ check), §13 (audit). Size M.
 | §7 | Sessions tab | P148 B |
 | §7 | Branch mode | P146 B (+ setup P147 B) |
 | §8 | Add new task / existing branch | P144 A, P145 B |
-| §9 | Start task / Start step / repo-named rebase templates, worktree path rule | P146 A (paths), P147 A, P145 B (templates), P148 B (Start) |
+| §9 | Start task / Start step / repo-named rebase templates, worktree path rule | P146 A (paths), P147 A, P148 B (templates, Start) |
 | §10 | Archive per task | P147 A, P148 B |
 | §11 | Needs you page, All sessions, badge | P144 B (derivation), P148 B |
 | §11.1 | Backlog | P144 A, P146 B |
