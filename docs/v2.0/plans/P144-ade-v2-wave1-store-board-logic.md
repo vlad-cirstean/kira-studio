@@ -591,3 +591,56 @@ reviewed_at_sha, …)` table and per-file viewed state keyed `(branch_id, path, 
 without touching 0008; branch rows are archived, never deleted, so review history survives task
 archive; `ade_sessions` gets `branch_id` and `mode` in P146, so a persistent per-branch review agent can be
 a session row (widening the `mode` CHECK then needs one more table rebuild, a known cost).
+
+## Result
+
+Streams A and B landed on `v2.0` from base `8dd60e10`; notes in `P144-streamA-notes.md` and
+`P144-streamB-notes.md`.
+
+**Commits:** step 0 `8dd60e10`. A: `3f8a02c7` store, `17842497` YAML reader, `f39b8600` shared
+`rangeFacts`, `390dbe55` merge-tree check, `a40b37cb` board snapshot, `b21ce5b7` writes, `1bb41bc2`
+bridge, `78a7a344` gocognit split, `d68c53f4` notes. B: `cdf3691a` calendar move, `ece69a30`
+timeline, `3f28f685` progress/status, `68f77ff1` actions/baseMarker/labels, `d3be25fe` needsYou,
+`2ced3211` parity spec, `c4e9fb2d` labels coverage and notes.
+
+**Counts:** 20 bound `AdeTaskService` methods = 20 `adeTask*` entries in `index.ts` = 20 generated
+binding exports. 3 channels emitted (`kira:adetask:board|backlog|credential`) via
+`TaskBoard.OnBoard|OnBacklog|OnCredential` (`board.go`) wired in `main.go`. 9 board logic files,
+all imported. Migration `0008`: 11 v2 tables.
+
+**Wave-end suite on tip:** `go build ./...` ok. `bun run test:unit` 1888 pass, 0 fail. `bun run
+lint:all` exit 0. `bun run test:ui:space` 104 passed. `go test ./apps/kira-space/...` all ok except
+`internal/gitsock`, see open item.
+
+**Acceptance (§6):**
+
+1. 20 methods bound, 20 `index.ts` entries.
+2. Channels emitted from Go real call sites.
+3. Migration `0008` on a v1-shaped DB (migrations 1-7, one `ade_sessions` row, then full `OpenAt`):
+   all v2 tables 0 rows, v1 session still readable. Throwaway test, not committed.
+4. No `standard.yaml` embed under `apps/kira-space` (only fixtures mention it); readers never create
+   `workflows/` (`adeflow.Dir(home)` join only, no `MkdirAll` in `adeflow`/`ade` for it).
+5. `grep go-git go.mod go.sum apps/kira-space` empty. `MergeTreeConflicts` called from
+   `internal/ade/rebasecheck.go:160`. `checking…`, `✕ conflict`, `conflict check failed` in
+   `actions.ts`. Conflict states exercised by Stream A Go tests (`TestRebaseChecker_realRepos`,
+   `TestTaskBoard_snapshotAssembly`, too-old-git failed path); no GUI launch possible in container.
+6. Every `board/*.ts` imported; knip clean (`lint:all`).
+7. `git diff 8dd60e10 -- wire.ts tests/fixtures/ade-v2 packages/shared` empty.
+
+**Licenses:** none new. `go.yaml.in/yaml/v3` (Apache-2.0/MIT) moved indirect to direct; `go.sum`
+unchanged.
+
+**Deviations:** see both notes files. Highlights: A added `layeringtest.RunAllowing` (repo root,
+allows suffix `/internal/bridge/adewire` only; verified minimal and sound, adewire imports nothing
+else from bridge); queue.go helpers became package funcs; branch owner `""` for own commits;
+`lastCommitAt` in ms. B added `branchGraph.ts`; `needsYou` takes no `Prs`; parity normalizes
+fixtures vs mockup and keeps `DIVERGENCE` (`b_deps` CI chip dropped per D9).
+
+**Open, outside scope:** `go test ./apps/kira-space/internal/gitsock` flakes intermittently
+(different integration test each run, passes alone): `review.files`/`review.comment.add` return
+`E_INTERNAL: read |0: file already closed`. Code untouched since `8dd60e10` (`git diff` empty for
+`gitclient`, `gitsession`, `gitrpc`, `gitsock`); likely a pipe-close race in `gitclient` streaming
+`Process` under CPU load. Needs its own follow-up row (git subsystem, root-cause work); number left
+to the orchestrator since P151 planning is in flight.
+Environment: `test:ui:space` needs `apt-get install libavif16` besides webkit libs; added to
+`docs/DEV_ENVIRONMENT.md`.
