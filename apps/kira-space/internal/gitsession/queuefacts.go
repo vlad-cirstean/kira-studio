@@ -2,9 +2,7 @@ package gitsession
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -120,7 +118,7 @@ func (e *RepoEntry) RangeCommits(ctx context.Context, base, tip string, limit in
 }
 
 // Ancestors reports which of among (a set of refnames) are ancestors of tip — `for-each-ref
-// --merged=<tip> <among...>`, inferParents' own ancestry input (§0.5).
+// --merged=<tip> <among...>`, computeAncestry's ancestry input.
 func (e *RepoEntry) Ancestors(ctx context.Context, tip string, among []string) ([]string, error) {
 	if len(among) == 0 {
 		return nil, nil
@@ -175,32 +173,6 @@ func (e *RepoEntry) WorktreeStatus(ctx context.Context, dir string) ([]porcelain
 	return result.Entries, nil
 }
 
-// ReflogCreatedAt is §0.10's own new-work rebind heuristic input: refs/heads/<branch>'s own reflog,
-// oldest entry (git prints newest first, so the LAST line), as a unix second. ok=false for a branch
-// with no reflog history to read (never existed, or reflog is disabled) — tolerated via
-// runAllowingExit(0,128), the "ref does not exist" precedent every other bad-ref read in this
-// package already follows.
-func (e *RepoEntry) ReflogCreatedAt(ctx context.Context, branch string) (int64, bool, error) {
-	res, err := e.runAllowingExit(ctx, []string{"reflog", "show", "--format=%ct", "refs/heads/" + branch}, 0, 128)
-	if err != nil {
-		return 0, false, err
-	}
-	if res.ExitCode != 0 {
-		return 0, false, nil
-	}
-	trimmed := strings.TrimSpace(string(res.Stdout))
-	if trimmed == "" {
-		return 0, false, nil
-	}
-	lines := strings.Split(trimmed, "\n")
-	last := lines[len(lines)-1]
-	unix, err := strconv.ParseInt(last, 10, 64)
-	if err != nil {
-		return 0, false, fmt.Errorf("gitsession: parse reflog created-at for %s: %w", branch, err)
-	}
-	return unix, true, nil
-}
-
 // ConfigValue is a plain `git config --get <key>` read (§0.11's own `user.email` lookup) —
 // tolerated via runAllowingExit(0,1), CoreAskPassArgs' own precedent for "no such config is the
 // common case".
@@ -213,24 +185,6 @@ func (e *RepoEntry) ConfigValue(ctx context.Context, key string) (string, error)
 		return "", nil
 	}
 	return strings.TrimSpace(string(res.Stdout)), nil
-}
-
-// StackParents is inferParents' own config input (§0.5 rule 1): branch -> its recorded
-// `branch.<b>.kirastackparent`, empty parents dropped — rawStackConfig's own read, reduced to just
-// the parent name Stacks' own richer StackListResult would otherwise require a second, unrelated
-// refs read to assemble.
-func (e *RepoEntry) StackParents(ctx context.Context) (map[string]string, error) {
-	config, err := e.rawStackConfig(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string]string, len(config))
-	for branch, entry := range config {
-		if entry.Parent != "" {
-			out[branch] = entry.Parent
-		}
-	}
-	return out, nil
 }
 
 // IsAncestor reports whether a is reachable from b (`merge-base --is-ancestor`); an unresolvable
