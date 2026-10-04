@@ -46,6 +46,8 @@
     ],
     "deployments": [],
     "conflictsIfRebased": [],
+    "conflictCheck": "done",
+    "conflictCheckReason": "",
     "files": [
       {
         "path": "src/api/limits.ts",

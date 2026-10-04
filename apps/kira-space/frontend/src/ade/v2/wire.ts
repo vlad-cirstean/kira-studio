@@ -170,6 +170,8 @@ export interface Branch {
   integration: Integration[] /* one per configured target */;
   deployments: Deployment[];
   conflictsIfRebased: string[] /* D1: paths conflicting if rebased onto latest base */;
+  conflictCheck: 'checking' | 'done' | 'failed';
+  conflictCheckReason: string /* '' unless failed */;
   files: FileChange[];
   commits: Commit[];
   commitCount: number;

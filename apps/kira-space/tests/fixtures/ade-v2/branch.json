@@ -21,6 +21,8 @@
   "integration": [],
   "deployments": [],
   "conflictsIfRebased": [],
+  "conflictCheck": "done",
+  "conflictCheckReason": "",
   "files": [],
   "commits": [],
   "commitCount": 0,

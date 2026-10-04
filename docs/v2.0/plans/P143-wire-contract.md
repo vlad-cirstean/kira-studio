@@ -167,6 +167,8 @@ export interface Branch {
   setup: WorktreeSetup | null /* null until a worktree exists */;
   integration: Integration[] /* one per configured target */; deployments: Deployment[];
   conflictsIfRebased: string[] /* D1: paths conflicting if rebased onto latest base */;
+  conflictCheck: 'checking' | 'done' | 'failed';
+  conflictCheckReason: string /* '' unless failed */;
   files: FileChange[]; commits: Commit[]; commitCount: number; dirty: DirtyEntry[];
   lastCommitAt: number | null; addedAt: number;
 }
@@ -481,3 +483,10 @@ Schema equivalent `tsc` would infer).
   Stream A; fixes the run-log cap behind `LogPage.truncated`.
 - B streams add mock FQNs (`AdeTaskService.<Method>`) to `tests/ui/support/{ipcChannels,mockRuntime}.ts`
   in the wave they first consume a method.
+
+## 12. Amendments
+
+- P144 Step 0 (rule 1, E11): `Branch` gains `conflictCheck` (`'checking' | 'done' | 'failed'`) and
+  `conflictCheckReason` (`''` unless `failed`), after `conflictsIfRebased`. Fixtures `board.json`,
+  `branch.json`, `add-existing-branch.json` updated: all `done`/`''`, except `board.json` one
+  `checking` and one `failed` with a reason.

@@ -176,34 +176,36 @@ type PR struct {
 }
 
 type Branch struct {
-	ID                 string         `json:"id"`
-	TaskID             string         `json:"taskId"`
-	CodeRepoID         string         `json:"codeRepoId"`
-	Name               string         `json:"name"`
-	Kind               string         `json:"kind"` // 'mine' | 'review' | 'parked'
-	Owner              string         `json:"owner"`
-	Base               string         `json:"base"`
-	BaseBranchID       string         `json:"baseBranchId"`
-	BaseOwner          string         `json:"baseOwner"`
-	Tip                string         `json:"tip"`
-	Ahead              int            `json:"ahead"`
-	Behind             int            `json:"behind"`
-	Upstream           string         `json:"upstream"`
-	UpstreamAhead      int            `json:"upstreamAhead"`
-	UpstreamBehind     int            `json:"upstreamBehind"`
-	MergedIntoMain     bool           `json:"mergedIntoMain"`
-	MergedAt           *int64         `json:"mergedAt"`
-	Worktree           string         `json:"worktree"`
-	Setup              *WorktreeSetup `json:"setup"`
-	Integration        []Integration  `json:"integration"`
-	Deployments        []Deployment   `json:"deployments"`
-	ConflictsIfRebased []string       `json:"conflictsIfRebased"`
-	Files              []FileChange   `json:"files"`
-	Commits            []Commit       `json:"commits"`
-	CommitCount        int            `json:"commitCount"`
-	Dirty              []DirtyEntry   `json:"dirty"`
-	LastCommitAt       *int64         `json:"lastCommitAt"`
-	AddedAt            int64          `json:"addedAt"`
+	ID                  string         `json:"id"`
+	TaskID              string         `json:"taskId"`
+	CodeRepoID          string         `json:"codeRepoId"`
+	Name                string         `json:"name"`
+	Kind                string         `json:"kind"` // 'mine' | 'review' | 'parked'
+	Owner               string         `json:"owner"`
+	Base                string         `json:"base"`
+	BaseBranchID        string         `json:"baseBranchId"`
+	BaseOwner           string         `json:"baseOwner"`
+	Tip                 string         `json:"tip"`
+	Ahead               int            `json:"ahead"`
+	Behind              int            `json:"behind"`
+	Upstream            string         `json:"upstream"`
+	UpstreamAhead       int            `json:"upstreamAhead"`
+	UpstreamBehind      int            `json:"upstreamBehind"`
+	MergedIntoMain      bool           `json:"mergedIntoMain"`
+	MergedAt            *int64         `json:"mergedAt"`
+	Worktree            string         `json:"worktree"`
+	Setup               *WorktreeSetup `json:"setup"`
+	Integration         []Integration  `json:"integration"`
+	Deployments         []Deployment   `json:"deployments"`
+	ConflictsIfRebased  []string       `json:"conflictsIfRebased"`
+	ConflictCheck       string         `json:"conflictCheck"`       // 'checking' | 'done' | 'failed'
+	ConflictCheckReason string         `json:"conflictCheckReason"` // '' unless failed
+	Files               []FileChange   `json:"files"`
+	Commits             []Commit       `json:"commits"`
+	CommitCount         int            `json:"commitCount"`
+	Dirty               []DirtyEntry   `json:"dirty"`
+	LastCommitAt        *int64         `json:"lastCommitAt"`
+	AddedAt             int64          `json:"addedAt"`
 }
 
 type Pair struct {

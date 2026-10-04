@@ -1489,6 +1489,8 @@
         }
       ],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/cart/cart.test.ts",
@@ -1543,6 +1545,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/payments/client.ts",
@@ -1618,6 +1622,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "checking",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/ui/billing/Dashboard.tsx",
@@ -1698,6 +1704,8 @@
         }
       ],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/metering/store.ts",
@@ -1786,6 +1794,8 @@
           "binary": false
         }
       ],
+      "conflictCheck": "failed",
+      "conflictCheckReason": "git merge-tree exited 128: unable to read base tree",
       "commits": [
         {
           "sha": "e41a7d2",
@@ -1849,6 +1859,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/ui/LoginScreen.tsx",
@@ -1933,6 +1945,8 @@
         }
       ],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/auth/callback.ts",
@@ -2003,6 +2017,8 @@
         }
       ],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/hooks/registry.ts",
@@ -2073,6 +2089,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/hooks/retry.ts",
@@ -2132,6 +2150,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/payments/client.ts",
@@ -2192,6 +2212,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/search/schema.ts",
@@ -2246,6 +2268,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/search/indexer.ts",
@@ -2321,6 +2345,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/ui/search/Results.tsx",
@@ -2370,6 +2396,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/notifications/model.ts",
@@ -2430,6 +2458,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "package.json",
@@ -2477,6 +2507,8 @@
       "integration": [],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "app/settings/Push.tsx",
@@ -2537,6 +2569,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/push/tokens.ts",
@@ -2591,6 +2625,8 @@
       ],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [
         {
           "path": "src/ui/Header.tsx",
@@ -2633,6 +2669,8 @@
       "integration": [],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [],
       "commits": [],
       "commitCount": 0,
@@ -2663,6 +2701,8 @@
       "integration": [],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [],
       "commits": [],
       "commitCount": 0,
@@ -2693,6 +2733,8 @@
       "integration": [],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [],
       "commits": [],
       "commitCount": 0,
@@ -2723,6 +2765,8 @@
       "integration": [],
       "deployments": [],
       "conflictsIfRebased": [],
+      "conflictCheck": "done",
+      "conflictCheckReason": "",
       "files": [],
       "commits": [],
       "commitCount": 0,
