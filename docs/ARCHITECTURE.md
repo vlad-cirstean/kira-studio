@@ -2264,6 +2264,8 @@ tracking ref. `Archive` runs `WorktreeRemovePreflight`, refusing a blocked workt
 dirty one unless the caller opts to discard, before removing any linked worktree and moving the
 item to history.
 
+P144 adds `rebaseChecker` (`ade/rebasecheck.go`) for the v2 task board: predicts whether a branch conflicts if rebased onto its base by calling `gitsession.RepoEntry.MergeTreeConflicts`, i.e. `git merge-tree --write-tree` (git >= 2.38; older git reports `failed`, no spawn). Results cache by base and tip sha. go-git stays declined, same reason as above.
+
 **P135 adds a third node kind to the queue, `dependency` — an external blocker with no git identity
 at all.** `ade_dependencies`/`ade_blockers` (migration `0006`) hold it: `AddDependency`/
 `UpdateDependency`/`ResolveDependency`/`SetBlocker` (`queue.go`) touch only those two tables and

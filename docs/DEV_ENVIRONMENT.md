@@ -337,7 +337,7 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 
 This container ships only Chromium preinstalled. `bunx playwright install webkit` downloads the
 browser itself; its own post-install warning names the missing system libraries (`apt-get install
-libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav` at the time of
+libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav libavif16` at the time of
 writing) — install exactly those, not a generic `playwright install-deps`, which pulls far more
 than `webkit` alone needs.
 
