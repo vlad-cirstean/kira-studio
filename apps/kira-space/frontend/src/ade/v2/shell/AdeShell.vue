@@ -9,6 +9,7 @@ import AdePlanView from '../plan/AdePlanView.vue';
 import { useBacklog } from '../queries';
 import AdeReposPage from '../repos/AdeReposPage.vue';
 import AdeRunDialog from '../run/AdeRunDialog.vue';
+import AdeTakeOverDialog from '../sessions/AdeTakeOverDialog.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE, tagStyle } from '../tones';
 import AdeWorkflowsPage from '../workflows/AdeWorkflowsPage.vue';
@@ -80,5 +81,6 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
     </div>
     <AdeRunDialog />
     <AdeClaudeDialog />
+    <AdeTakeOverDialog />
   </Tabs>
 </template>

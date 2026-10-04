@@ -230,11 +230,3 @@ test('a script run offers Output, and the Release block lists the branches', asy
   await expect(stage(page, 'release').locator(t('ade-run-log-toggle'))).toHaveText('Output');
   await expect(stage(page, 'release').locator(t('ade-release-row'))).toHaveCount(1);
 });
-
-test('Take over, Start and Archive buttons are not offered', async ({ relaunch }) => {
-  const { window: page } = await openPlan(relaunch);
-  await open(page, 'T_bill');
-  for (const name of [/Take over/, /▶ Start/, /Archive/]) {
-    await expect(page.getByRole('button', { name })).toHaveCount(0);
-  }
-});

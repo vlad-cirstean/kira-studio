@@ -8,6 +8,7 @@ import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
 import { usePrs, useRepos, useRetrySetup } from '../queries';
+import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { actionStyle, solidStyle, TONE } from '../tones';
@@ -23,9 +24,11 @@ const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; mod
 const ui = useAdeBoardUiStore();
 const dialogs = useAdeDialogsStore();
 const { sessions } = usePlanModel();
+const sessionCount = computed(
+  () => sessions.value.filter((x) => x.branchId === props.row.id).length,
+);
 const prs = usePrs();
 const repos = useRepos();
-const tab = ref('details');
 const retrySetup = useRetrySetup();
 const setupError = ref('');
 const forcePush = ref(false);
@@ -162,10 +165,11 @@ function deployNote(d: Deployment): string {
 
 <template>
   <AdePanelFrame
-    v-model="tab"
+    v-model="ui.branchTab"
     :tabs="[
       { value: 'details', label: 'Details' },
       { value: 'changes', label: 'Changes' },
+      { value: 'sessions', label: `Sessions ${sessionCount}` },
     ]"
   >
     <template #header>
@@ -233,7 +237,7 @@ function deployNote(d: Deployment): string {
     </template>
 
     <div
-      v-if="tab === 'details'"
+      v-if="ui.branchTab === 'details'"
       class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-3 text-kira-md"
       data-testid="ade-branch-details"
     >
@@ -335,6 +339,7 @@ function deployNote(d: Deployment): string {
         </div>
       </div>
     </div>
+    <AdeSessionsTab v-else-if="ui.branchTab === 'sessions'" :task-id="card.task.id" :branch-id="branch.id" />
     <AdeChangesTab v-else :branch="branch" :base="baseName" :shared="shared" />
 
     <AdeForcePushDialog

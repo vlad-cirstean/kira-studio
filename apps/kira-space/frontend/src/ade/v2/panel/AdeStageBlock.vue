@@ -6,17 +6,20 @@ import AdeRepoTag from '../AdeRepoTag.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import { integrationChips } from '../board/labels';
+import type { StepRun } from '../board/progress';
 import type { StageBlock } from '../board/stageBlocks';
 import type { CardModel } from '../plan/usePlanModel';
 import { useApprove, useRetryRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { solidStyle, TONE, tagStyle } from '../tones';
+import { useAdeTakeOverStore } from '../state/adeTakeOver';
+import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
 import AdeRunLog from './AdeRunLog.vue';
 
 // One stage of the Workflow block: header (state chip, action slot, name, count, mode), then its
 // steps with their per-repo run lines, or the branches of the Release stage.
 const props = defineProps<{ block: StageBlock; card: CardModel }>();
 const ui = useAdeBoardUiStore();
+const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
 
@@ -70,6 +73,11 @@ async function run(fn: () => Promise<unknown>): Promise<void> {
 const onApprove = (stepId: string): Promise<void> =>
   run(() => approve.mutateAsync({ taskId: props.card.task.id, stageId: props.block.stage.id, stepId }));
 const onRetry = (runId: string): Promise<void> => run(() => retry.mutateAsync({ runId }));
+
+const canTakeOver = (r: StepRun): boolean =>
+  props.block.stage.kind === 'agent' &&
+  r.sessionId !== '' &&
+  (r.state === 'stuck' || r.state === 'failed' || r.state === 'running');
 
 const released = computed(() =>
   props.block.release
@@ -159,6 +167,17 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             @click="openLog = openLog === rl.run.runId ? null : rl.run.runId"
           >
             {{ block.stage.kind === 'script' ? (openLog === rl.run.runId ? 'Hide output' : 'Output') : openLog === rl.run.runId ? 'Hide log' : 'Log' }}
+          </Button>
+          <Button
+            v-if="canTakeOver(rl.run)"
+            size="xs"
+            class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm font-semibold"
+            :style="actionStyle('claude')"
+            :disabled="takeOver.pending.has(rl.run.sessionId)"
+            data-testid="ade-run-takeover"
+            @click="takeOver.request(rl.run.sessionId)"
+          >
+            Take over
           </Button>
           <Button
             v-if="rl.canRetry"

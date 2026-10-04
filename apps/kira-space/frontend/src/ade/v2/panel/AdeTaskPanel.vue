@@ -9,16 +9,21 @@ import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
 import { useUpdateTask } from '../queries';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
+import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
 
-// Task mode: header facts (no actions yet), the Task tab and the Notes tab.
+// Task mode: header facts, the Task, Notes and Sessions tabs.
 const props = defineProps<{ card: CardModel; model: PlanModel }>();
 
-const tab = ref('task');
 const ui = useAdeBoardUiStore();
+const { sessions } = useSessionViews();
+const sessionCount = computed(
+  () => sessions.value.filter((x) => x.taskId === props.card.task.id).length,
+);
 const update = useUpdateTask();
 const notesError = ref('');
 
@@ -54,10 +59,11 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
 
 <template>
   <AdePanelFrame
-    v-model="tab"
+    v-model="ui.taskTab"
     :tabs="[
       { value: 'task', label: 'Task' },
       { value: 'notes', label: 'Notes' },
+      { value: 'sessions', label: `Sessions ${sessionCount}` },
     ]"
   >
     <template #header>
@@ -92,7 +98,8 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
         {{ card.task.owner || 'Someone' }}’s work. Read-only here: you can keep your own notes.
       </div>
     </template>
-    <AdeTaskTab v-if="tab === 'task'" :card="card" />
+    <AdeTaskTab v-if="ui.taskTab === 'task'" :card="card" />
+    <AdeSessionsTab v-else-if="ui.taskTab === 'sessions'" :task-id="card.task.id" />
     <div v-else class="flex min-h-0 flex-1 flex-col px-3.5 pb-3.5 pt-3" data-testid="ade-notes-tab">
       <AdeNotesEditor :notes="card.task.notes" :item-id="card.task.id" @save="saveNotes" />
       <p v-if="notesError" class="pt-1 text-kira-sm text-error" data-testid="ade-notes-error">{{ notesError }}</p>

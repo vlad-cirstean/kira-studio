@@ -316,7 +316,16 @@ function buildPlanModel() {
     }
     // The panel opens tasks the Plan hides (first-10 cap, repo filter), so it builds them on demand.
     const cardFor = (id: string): CardModel | null => cards.get(id) ?? buildCard(ctx, id);
-    return { board: b, view, cards, cardFor, ripple: ctx.ripple, cal: ctx.cal, needs: ctx.needs };
+    return {
+      board: b,
+      view,
+      cards,
+      cardFor,
+      ripple: ctx.ripple,
+      cal: ctx.cal,
+      needs: ctx.needs,
+      workflows: wf,
+    };
   });
 
   return { model, sessions, today, now, repoLabel, settings: planSettings, boardQuery: board };

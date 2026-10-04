@@ -29,7 +29,10 @@ export interface LaunchDeps {
 }
 
 /** Opens a launched session's terminal in this window; throws when the terminal fails to start. */
-export async function openLaunch(deps: LaunchDeps, launch: Launch): Promise<void> {
+export async function openLaunch(
+  deps: Pick<LaunchDeps, 'openTerminalSession' | 'terminalSession'>,
+  launch: Launch,
+): Promise<void> {
   await deps.openTerminalSession(
     launch.terminalId,
     '',
