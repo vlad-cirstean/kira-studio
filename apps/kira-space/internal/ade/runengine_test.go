@@ -651,3 +651,47 @@ func branchOf(t *testing.T, e *engine, taskID, repo string) string {
 func argAfterJoined(args, flag string) string {
 	return argAfter(strings.Split(args, "\n"), flag)
 }
+
+func TestRunEngine_setTaskWorkflow(t *testing.T) {
+	e := newEngine(t, map[string][]string{"*": {"done"}})
+	e.repo("api")
+	e.workflow(flowYAML(agentStage("build", agentStep("first", "")) + userStage))
+	other := "id: other\nname: Other\nstages:\n" + userStage
+	if err := os.WriteFile(filepath.Join(e.workdir, "other.yaml"), []byte(other), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	id := e.task("api")
+	e.start(id)
+	run := e.waitRun(id, "first/api", model.AdeRunDone)
+	if _, err := e.board.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: id, WorkflowID: "flow"}); err != nil {
+		t.Fatalf("same id: %v", err)
+	}
+	if len(e.runs(id)) != 1 {
+		t.Fatal("same id deleted runs")
+	}
+	task, err := e.board.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: id, WorkflowID: "other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.WorkflowID != "other" || len(e.runs(id)) != 0 {
+		t.Fatalf("workflow = %q, runs = %d", task.WorkflowID, len(e.runs(id)))
+	}
+	if _, err := e.board.ReadLog(ctx, adewire.ReadLogArgs{Kind: "run", ID: run.ID}); err == nil {
+		t.Fatal("run log survived")
+	}
+	if _, err := e.board.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: id, WorkflowID: "nope"}); err == nil {
+		t.Fatal("unknown workflow accepted")
+	}
+
+	sleeper := newEngine(t, map[string][]string{"*": {"sleep"}})
+	sleeper.repo("api")
+	sleeper.workflow(flowYAML(agentStage("build", agentStep("first", ""))))
+	sid := sleeper.task("api")
+	sleeper.start(sid)
+	sleeper.waitRun(sid, "first/api", model.AdeRunRunning)
+	if _, err := sleeper.board.SetTaskWorkflow(ctx, adewire.SetTaskWorkflowArgs{TaskID: sid, WorkflowID: ""}); err == nil ||
+		!strings.Contains(err.Error(), "stop its running agents first") {
+		t.Fatalf("running run: err = %v", err)
+	}
+}

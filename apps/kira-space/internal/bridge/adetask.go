@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
@@ -74,6 +75,8 @@ func adeTaskError(err error) error {
 	}
 	return ipcerr.InternalErr(err)
 }
+
+var adeWorkflowIDRe = regexp.MustCompile(`^[a-z0-9_-]{1,64}$`)
 
 func adeTaskInvalid(msg string) error { return ipcerr.New("E_INVALID", msg) }
 
@@ -537,6 +540,17 @@ func (s *AdeTaskService) StartRun(ctx context.Context, args adewire.StartRunArgs
 	}
 	r, err := s.Engine.StartRun(ctx, args)
 	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) SetTaskWorkflow(ctx context.Context, args adewire.SetTaskWorkflowArgs) (adewire.Task, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Task{}, err
+	}
+	if args.WorkflowID != "" && !adeWorkflowIDRe.MatchString(args.WorkflowID) {
+		return adewire.Task{}, adeTaskInvalid("workflowId must be 1-64 chars of a-z, 0-9, _ or -")
+	}
+	t, err := s.Engine.SetTaskWorkflow(ctx, args)
+	return t, adeTaskError(err)
 }
 
 func (s *AdeTaskService) Approve(ctx context.Context, args adewire.StepArgs) error {

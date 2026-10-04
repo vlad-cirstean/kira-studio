@@ -605,6 +605,51 @@ func (r *AdeTaskRepo) SetStage(taskID, stageID, stageJSON string) error {
 	return sqlitex.RequireOneRow(res, "ade task "+taskID)
 }
 
+// ResetWorkflow switches the task's workflow and restarts it: the task's runs and run logs are
+// deleted and the stage is set in one transaction ("" stageJSON stores NULL).
+func (r *AdeTaskRepo) ResetWorkflow(taskID, workflowID, stageID, stageJSON string) error {
+	var stage any
+	if stageJSON != "" {
+		stage = stageJSON
+	}
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin reset ade task workflow %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	const runIDs = `SELECT id FROM ade_runs WHERE task_id = ?`
+	if _, err := tx.Exec(`DELETE FROM ade_log_chunks WHERE kind = 'run' AND id IN (`+runIDs+`)`, taskID); err != nil {
+		return fmt.Errorf("repos: delete ade run log chunks %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM ade_logs WHERE kind = 'run' AND id IN (`+runIDs+`)`, taskID); err != nil {
+		return fmt.Errorf("repos: delete ade run logs %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM ade_runs WHERE task_id = ?`, taskID); err != nil {
+		return fmt.Errorf("repos: delete ade runs %s: %w", taskID, err)
+	}
+	res, err := tx.Exec(`UPDATE ade_tasks SET workflow_id = ?, stage_id = ?, current_stage_json = ? WHERE id = ?`,
+		workflowID, stageID, stage, taskID)
+	if err != nil {
+		return fmt.Errorf("repos: reset ade task workflow %s: %w", taskID, err)
+	}
+	if err := sqlitex.RequireOneRow(res, "ade task "+taskID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit reset ade task workflow %s: %w", taskID, err)
+	}
+	return nil
+}
+
+// HasRunning reports whether any run of the task is running.
+func (r *AdeTaskRepo) HasRunning(taskID string) (bool, error) {
+	var n int
+	if err := r.DB.QueryRow(`SELECT COUNT(*) FROM ade_runs WHERE task_id = ? AND state = ?`, taskID, model.AdeRunRunning).Scan(&n); err != nil {
+		return false, fmt.Errorf("repos: count running ade runs %s: %w", taskID, err)
+	}
+	return n > 0, nil
+}
+
 // SetSnapshot rewrites only the stage snapshot, keeping the stage id.
 func (r *AdeTaskRepo) SetSnapshot(taskID, stageJSON string) error {
 	res, err := r.DB.Exec(`UPDATE ade_tasks SET current_stage_json = ? WHERE id = ?`, stageJSON, taskID)

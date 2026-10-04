@@ -326,6 +326,8 @@ const spaceControl = {
     unwrap(AdeTaskService.RecordMerge(args)),
   adeTaskStartRun: (args: V2.StartRunArgs): Promise<V2.StartRunResult> =>
     unwrap(AdeTaskService.StartRun(args)).then((r) => trust<V2.StartRunResult>(r)),
+  adeTaskSetTaskWorkflow: (args: V2.SetTaskWorkflowArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.SetTaskWorkflow(args)).then((r) => trust<V2.Task>(r)),
   adeTaskApprove: (args: V2.StepArgs): Promise<void> => unwrap(AdeTaskService.Approve(args)),
   adeTaskRetryRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.RetryRun(args)),
   adeTaskStageDone: (args: V2.TaskArgs): Promise<V2.Task> =>
