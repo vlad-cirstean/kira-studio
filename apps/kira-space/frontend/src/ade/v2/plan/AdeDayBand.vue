@@ -2,12 +2,14 @@
 import { computed, ref } from 'vue';
 import { useDraggable } from 'vue-draggable-plus';
 import type { TimelineBand } from '../board/timeline';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE, TONE_INK } from '../tones';
 import AdeTaskCard from './AdeTaskCard.vue';
 import type { BranchRowModel, CardModel } from './usePlanModel';
 
 // One day of the timeline: ruler, history rows, overdue and overflow strips, the day's cards and
 // the continuation rows of multi-day tasks. Plan writes are the parent's: this only emits intent.
+const ui = useAdeBoardUiStore();
 const props = defineProps<{
   band: TimelineBand;
   cards: CardModel[];
@@ -129,18 +131,21 @@ const solidBorder = computed(
       ref="dropEl"
       data-testid="ade-band-drop"
     >
-      <div
+      <button
         v-for="h in history"
         :key="h.key"
-        class="ml-[218px] flex h-[30px] max-w-140 items-center gap-2 rounded-kira-sm px-2.5 text-kira-md text-muted-foreground"
+        type="button"
+        class="ml-[218px] flex h-[30px] w-full max-w-140 cursor-pointer items-center gap-2 border-0 text-left rounded-kira-sm px-2.5 text-kira-md text-muted-foreground"
         :style="{ background: `color-mix(in srgb, ${TONE.purple[2]} 6%, transparent)` }"
+        :data-selected="ui.selectedTaskId === h.key || undefined"
         data-testid="ade-history-row"
+        @click="ui.select(h.key)"
       >
         <span class="font-bold" :style="{ color: TONE.purple[1] }">✓</span>
         <span class="shrink-0 whitespace-nowrap text-kira-sm" :style="{ color: TONE.purple[1] }">{{ h.how }}</span>
         <span class="shrink-0 whitespace-nowrap font-data text-kira-sm text-muted-foreground">{{ h.repos }}</span>
         <span class="min-w-0 truncate font-semibold text-fg">{{ h.title }}</span>
-      </div>
+      </button>
       <div
         v-if="overdue"
         class="flex items-center gap-2 pl-[218px] text-kira-sm"

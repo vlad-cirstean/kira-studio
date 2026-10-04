@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import { STATUS_TONE } from '../board/actions';
+import { ARCHIVE_TIP, STATUS_TONE } from '../board/actions';
 import { dayLabel, LATER } from '../board/calendar';
 import { taskFacts, taskPatch } from '../board/panelFacts';
 import AdeNotesEditor from '../notes/AdeNotesEditor.vue';
@@ -12,7 +12,8 @@ import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useSessionViews } from '../sessions/useSessionViews';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { TONE } from '../tones';
+import { useAdeDialogsStore } from '../state/adeDialogs';
+import { solidStyle, TONE } from '../tones';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeTaskTab from './AdeTaskTab.vue';
 
@@ -20,12 +21,18 @@ import AdeTaskTab from './AdeTaskTab.vue';
 const props = defineProps<{ card: CardModel; model: PlanModel }>();
 
 const ui = useAdeBoardUiStore();
+const dialogs = useAdeDialogsStore();
 const { sessions } = useSessionViews();
 const sessionCount = computed(
   () => sessions.value.filter((x) => x.taskId === props.card.task.id).length,
 );
 const update = useUpdateTask();
 const notesError = ref('');
+
+/** A finished task shows Archive as its stage action; any other task gets the quiet one. */
+const quietArchive = computed(
+  () => props.card.task.kind !== 'review' && props.card.action?.kind !== 'archive',
+);
 
 const tone = computed(() => (props.card.parked ? 'grey' : STATUS_TONE[props.card.status]));
 const label = computed(() => (props.card.parked ? 'not merging' : props.card.status));
@@ -84,6 +91,18 @@ async function saveNotes(taskId: string, value: string): Promise<void> {
           </h3>
         </AdeTip>
         <AdeTaskActionButton :card="card" />
+        <AdeTip v-if="quietArchive" :text="ARCHIVE_TIP">
+          <button
+            type="button"
+            class="h-[22px] shrink-0 cursor-pointer rounded-kira-sm border-0 px-[9px] text-kira-sm font-semibold"
+            :style="solidStyle('grey')"
+            :disabled="dialogs.pending.has(`archive:${card.task.id}`)"
+            data-testid="ade-panel-archive"
+            @click="dialogs.archive(card.task.id)"
+          >
+            Archive
+          </button>
+        </AdeTip>
       </div>
       <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
       <p v-if="ui.actionError[card.task.id]" class="m-0 text-kira-sm text-error" data-testid="ade-panel-action-error">

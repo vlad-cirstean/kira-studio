@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import AdeArchivedPanel from './AdeArchivedPanel.vue';
 import AdeBranchPanel from './AdeBranchPanel.vue';
 import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeTaskPanel from './AdeTaskPanel.vue';
@@ -34,6 +35,10 @@ async function commit(w: number): Promise<void> {
 }
 
 const card = computed(() => (ui.selectedTaskId ? (model.value?.cardFor(ui.selectedTaskId) ?? null) : null));
+/** The selected task when it is archived: it left the board and survives in History. */
+const archived = computed(() =>
+  card.value ? null : (model.value?.board.history.find((h) => h.taskId === ui.selectedTaskId) ?? null),
+);
 const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBranchId) ?? null);
 </script>
 
@@ -48,6 +53,7 @@ const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBran
       <AdeBranchPanel v-if="row" :card="card" :row="row" :model="model" />
       <AdeTaskPanel v-else :card="card" :model="model" />
     </template>
+    <AdeArchivedPanel v-else-if="archived" :entry="archived" />
     <p v-else class="p-5 text-kira-md text-muted-foreground" data-testid="ade-panel-empty">
       Select a task to see its details.
     </p>

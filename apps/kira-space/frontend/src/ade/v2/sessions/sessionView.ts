@@ -32,6 +32,8 @@ export interface SessionView {
   allLabel: string;
 }
 
+const basename = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
+
 export function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
   for (const stage of workflow?.stages ?? []) {
     for (const step of stage.steps) if (step.id === stepId) return step.name;
@@ -47,7 +49,7 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const branchName = branch?.name ?? '';
   const step = headless ? stepNameOf(look.workflow(task?.workflowId ?? ''), s.stepId) : '';
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
-  const scope = branch ? `${repo} · ${branchName}` : 'spec';
+  const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : 'spec';
   const id = shortId(s.id);
   const tabName = headless
     ? `run · ${step}${repo ? ` · ${repo}` : ''}`
