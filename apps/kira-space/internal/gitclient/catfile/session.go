@@ -99,20 +99,32 @@ func (p *persistentProcess) fail() {
 // watchCtx interrupts an in-flight write/read by closing proc once ctx is done (F11: Check/Read/
 // CheckMany previously took no context at all, so a stalled reply blocked the caller — and every
 // later caller queued behind it on mu — with no way to cancel). It never touches persistentProcess
-// state itself (only the main goroutine, already holding mu, does that, via fail() once the
-// interrupted call returns its own error) — Process.Close is documented safe to call concurrently
-// with an in-flight Read/Write on the same process, same pattern logsession.readChunkLocked
-// already relies on. Returns a func to stop the watcher once the call completes normally.
-func watchCtx(ctx context.Context, proc gitclient.Process) (stop func()) {
-	done := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = proc.Close()
-		case <-done:
+// state itself (only the main goroutine, already holding mu, does that) — Process.Close is
+// documented safe to call concurrently with an in-flight Read/Write on the same process, same
+// pattern logsession.readChunkLocked already relies on.
+//
+// stop is synchronous: it reports whether the watcher fired, and when it did, waits until Close
+// has finished. rpcstream cancels a request's ctx the instant the handler returns, so an async
+// watcher could close a healthy process after a successful request and fail the next one.
+func watchCtx(ctx context.Context, proc gitclient.Process) (stop func() (fired bool)) {
+	closed := make(chan struct{})
+	stopAfter := context.AfterFunc(ctx, func() {
+		defer close(closed)
+		_ = proc.Close()
+	})
+	return func() bool {
+		if stopAfter() {
+			return false
 		}
-	}()
-	return func() { close(done) }
+		<-closed
+		return true
+	}
+}
+
+// drop discards the current child without counting a failure: a ctx cancel is not a process
+// fault and must not trip the circuit breaker. Caller holds mu.
+func (p *persistentProcess) drop() {
+	p.proc, p.stdin, p.reader = nil, nil, nil
 }
 
 // request writes line to the child's stdin and hands its stdout reader to readResp — the whole
@@ -124,18 +136,26 @@ func watchCtx(ctx context.Context, proc gitclient.Process) (stop func()) {
 func (p *persistentProcess) request(ctx context.Context, line string, readResp func(*bufio.Reader) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := p.ensureStarted(); err != nil {
 		return err
 	}
 	stop := watchCtx(ctx, p.proc)
-	defer stop()
 	if _, err := io.WriteString(p.stdin, line); err != nil {
+		stop()
 		p.fail()
 		return err
 	}
 	if err := readResp(p.reader); err != nil {
+		stop()
 		p.fail()
 		return err
+	}
+	if stop() {
+		p.drop()
+		return nil
 	}
 	p.failures = 0
 	return nil
@@ -154,11 +174,13 @@ func (p *persistentProcess) request(ctx context.Context, line string, readResp f
 func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, readResp func(*bufio.Reader) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := p.ensureStarted(); err != nil {
 		return err
 	}
 	stop := watchCtx(ctx, p.proc)
-	defer stop()
 	// stdin is captured into a local before the goroutine starts, not read as p.stdin from
 	// inside it: fail() (below, and F8's own new early call on a respErr) nils p.stdin under mu
 	// as soon as readResp returns, which could otherwise race this goroutine's own unsynchronized
@@ -176,14 +198,20 @@ func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, 
 		// blocked writing a response to a reader that just stopped reading, on the very same
 		// batch), so waiting on writeErrCh first, as this used to, could deadlock this call
 		// itself, wedging p.mu — and every later Check/Read queued behind it — forever.
+		stop()
 		p.fail()
 		<-writeErrCh // drain: the writer goroutine must not leak past this call's own return.
 		return respErr
 	}
 	writeErr := <-writeErrCh
 	if writeErr != nil {
+		stop()
 		p.fail()
 		return writeErr
+	}
+	if stop() {
+		p.drop()
+		return nil
 	}
 	p.failures = 0
 	return nil

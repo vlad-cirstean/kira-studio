@@ -745,3 +745,23 @@ func TestSession_Check_CtxCancellationUnblocksAStalledReply(t *testing.T) {
 		t.Fatal("Check hung past ctx cancellation — watchCtx must kill the process to unblock the stalled reply")
 	}
 }
+
+// rpcstream cancels a request's ctx the instant the handler returns. The ctx watcher must not
+// close the healthy persistent process (or trip the circuit breaker) when that cancel lands.
+func TestSession_CancelAfterSuccessDoesNotKillProcess(t *testing.T) {
+	skipWithoutGit(t)
+	dir := initRepo(t)
+	s := catfile.NewSession(catfile.Deps{Runner: gitclient.NewExecRunner(), GitPath: "git", Dir: dir}, 0)
+	defer s.Close()
+	for i := 0; i < 300; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		_, _, err := s.Read(ctx, "HEAD:hello.txt")
+		cancel()
+		if err != nil {
+			t.Fatalf("iteration %d: %v", i, err)
+		}
+	}
+	if _, _, err := s.Read(context.Background(), "HEAD:hello.txt"); err != nil {
+		t.Fatalf("final read: %v", err)
+	}
+}
