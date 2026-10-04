@@ -556,3 +556,50 @@ defect fixed before landing. Verdict + image paths in the B notes.
   Task stage action buttons (F11).
 - P148 B (U1 (a)): Rebase / Queue after dialogs from `git show B0:apps/kira-space/frontend/src/ade/
   {AdeClaudeDialog.vue,dialogCompose.ts,dialogFlow.ts,launch.ts,turnWatch.ts}`.
+
+## Result
+
+Streams landed fast-forward on `v2.0` from `13e99974`. Notes: `P145-streamA-notes.md`, `P145-streamB-notes.md`.
+
+**Commits:** 25 from `13e99974` to `886f57db` (A 11, B 10, closing 4: dead code, ARCHITECTURE, SPEC
+and preplan, `AddExistingBranch` fix).
+
+**Counts:** 31 `AdeTaskService` methods, 31 `adeTask*` entries; migration `0009`; `test:unit` 1727 pass;
+`test:ui:space` 61 pass; `go test -race` on `ade`, `adeflow`, `gitsession` ok; `go build ./...` ok;
+`lint:all` exit 0.
+
+**gitsock flake (P152).** Not fixed. Same flake on `B0` and tip.
+- Isolated `KIRA_SPACE_HOME`, `go test -count=3 ./apps/kira-space/internal/gitsock/...`: tip fails 1 test
+  (`TestIntegration_FileReadBranches`), `B0` fails 2 (`TestIntegration_FileReadBranches`,
+  `TestIntegration_ClearRemovesOnlyComments`). Both show `file.read` / `review.comment.add` error
+  responses, a different test per run; both pass alone with `-run '^Name$' -count=5`.
+  `gitsock` is untouched since `B0`. Comparable rate, so recorded as P152.
+- Hang seen once on tip (`TestBroker_QueueBoundedAgainstUnlimitedEnqueue`, 10m timeout) while bun
+  lint and typecheck ran concurrently. Not reproduced with `-run Broker -count=20` on tip or `B0`.
+- Finding for P152: `gitsock` tests set `KIRA_HOME`, but `storage.Open()` reads `KIRA_SPACE_HOME`.
+  Tests that call `storage.Open()` share `~/.kira-space/kira.db` across packages and runs. A `B0`
+  worktree run against a DB already migrated to schema 9 fails with `schema_version (9) is newer`.
+  Likely contributor to the flake.
+
+**Dead code.** `lint:dead` clean. 11 unused v1 exported types deleted from `ade/wire.ts` with the v1
+bridge calls and types only they used (`adeSessions`, `adeRepoSnapshot`, `adeUpdateNewWork`,
+`adeSetBranchMeta`, `adeSetWorkType`, `normalizeAdeRepoSnapshot`). The six `@tiptap/*` packages stay
+under a temporary `knip.json` ignore until P146's Notes tab. `knip.json` entries `ade/v2/wire.ts` and
+`ade/v2/board/*.ts` stay: 14 exports and 83 types have no caller until P146+ (§7 drop deferred).
+
+**Mockup verdict.** Plan view matches `mockup.html` within the accepted list (B notes §Mockup
+comparison). Defects found by the pass fixed before landing.
+
+**Live smoke** (server-tag build, temp `KIRA_SPACE_HOME`, local `Locate` patch reverted, two scratch
+repos, `git.path` setting seeded, Playwright Chromium on `/?window=main`, screenshot
+`scratchpad/smoke/shots/plan.png`): Plan renders real tasks; Add `New task` and `Existing branch` (two
+branches) create tasks; Refresh all updates chips; Force push confirm runs and closes; `not pushed` and
+`clean` tags render. Found and fixed one real defect: bridge `AddExistingBranch` rejected `taskId: ''`
+(new task) with `taskId is required` (`886f57db`). Not run live: drag (covered by UI spec), workflow
+save/watch and folder import (covered by engine tests `TestWorkflows_writesAndExternalEdits`,
+`TestAddFolder_importsRealReposOnly`, `TestFolderWatch_importsNewRepo`), deploy script state and the
+env/integration chips (tests `TestDeployment_scriptStates`, `TestIntegration_*`; no merged chip UI
+until P146).
+
+**Licenses:** none new. **Deviations:** see notes files; plus `AdeBranchMetaPatch` family and dead v1
+bridge calls removed with the types.

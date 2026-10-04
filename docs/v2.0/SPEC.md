@@ -3725,3 +3725,23 @@ go-git, no seeded workflow, contract untouched. No new licenses.
 
 **Open:** intermittent `gitsock` integration flake (`E_INTERNAL: read |0: file already closed`),
 pre-existing and outside P144; needs its own numbered row, see plan `## Result`.
+
+## P145 result
+
+Plan and `## Result` in `plans/P145-ade-v2-wave2-config-facts-shell.md`; notes in
+`plans/P145-streamA-notes.md` and `plans/P145-streamB-notes.md`.
+
+**Commits:** 25 on `v2.0` from `13e99974`.
+
+**Counts:** 31 bound methods, 31 `index.ts` entries, migration `0009`, `test:unit` 1727 pass,
+`test:ui:space` 61 pass.
+
+**Acceptance:** `go build ./...`, `go test ./apps/kira-space/...` (except `gitsock`), `go test -race`
+on `ade`, `adeflow`, `gitsession`, `lint:all` green. Live smoke on a server-tag build found and fixed
+one bridge defect (`AddExistingBranch` empty `taskId`). v1 frontend deleted. No new licenses.
+
+**Deviations:** Rebase / Queue after dialogs moved to P148 (U1 (a)). P146 migration is `0010`.
+`@tiptap/*` kept under a temporary knip ignore for P146. Both `ade/v2` knip entries stay.
+
+**Open:** `gitsock` flake persists at the `B0` rate (P152). Root-cause hint in the plan `## Result`:
+tests set `KIRA_HOME` but `storage.Open()` reads `KIRA_SPACE_HOME`, so they share `~/.kira-space`.
