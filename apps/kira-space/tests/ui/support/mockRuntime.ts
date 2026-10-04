@@ -85,7 +85,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   updateCancelInstall: 'UpdateService.CancelInstall',
 
   // Boot: the ade module's agent-session hydration. The v1 `AdeService` surface is no longer called.
-  terminalAgentSessions: 'AdeService.AgentSessions',
+  terminalAgentSessions: 'TerminalService.AgentSessions',
 
   // P145: the ade v2 board surface (AdeTaskService, bridge/index.ts `adeTask*`).
   adeTaskBoard: 'AdeTaskService.Board',
@@ -186,7 +186,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     latestVersion: '',
     installLogPath: '',
   }),
-  // Every boot calls AdeService.AgentSessions (createAgentSessionsStore's own initAgentSessions);
+  // Every boot calls TerminalService.AgentSessions (createAgentSessionsStore's own initAgentSessions);
   // no committed fixture will ever snapshot it.
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
 });

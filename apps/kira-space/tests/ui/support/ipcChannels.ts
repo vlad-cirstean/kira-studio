@@ -87,7 +87,7 @@ export const IPC = {
   terminal: 'kira:terminal:data',
 
   // Boot: the ade module's agent-session hydration, and the agent push channels the workbench shares.
-  terminalAgentSessions: 'kira:ade:agentSessions',
+  terminalAgentSessions: 'kira:terminal:agentSessions',
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
   // P145: the ade v2 board surface. `adeTaskBoard` names the bound call; its push counterpart is

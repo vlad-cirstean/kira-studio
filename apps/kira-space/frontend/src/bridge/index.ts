@@ -180,7 +180,7 @@ const spaceControl = {
   // store factory, `ade/state/agentSessions.ts`'s own call), the same "no adapter" shape
   // `createAgentSessionsStore`'s own doc comment states.
   terminalAgentSessions: (): Promise<AgentSessionsEvent> =>
-    unwrap(AdeService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
+    unwrap(TerminalService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
   onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
     on(CHANNEL.agentSessions, cb),
   onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),

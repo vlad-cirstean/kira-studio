@@ -159,7 +159,7 @@ func main() {
 	// (P129 Part 1 §4.2 step 4).
 	terminalRegistry.OnChange = func() {
 		adeTracker.Reconcile()
-		bridge.AgentSessionsChanged(adeSvc)
+		bridge.AgentSessionsChanged(emitter, terminalRegistry)
 	}
 
 	// keepAwakeCtl/keepAwakeSvc are P116 G5's own addition — the title bar's keep-awake toggle,

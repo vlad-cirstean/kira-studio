@@ -14,8 +14,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/internal/agenthooks"
-	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
@@ -28,28 +26,6 @@ const adeMaxMessageBytes = 32 * 1024
 // adeMaxBranchBytes bounds AdePrepareLaunchArgs.Branch — a git ref name has no reason to approach
 // this, so it exists only to reject a malformed/hostile value before it ever reaches Tracker.
 const adeMaxBranchBytes = 255
-
-// AgentSessionWire is terminal.AgentSession's own wire projection — AgentSessionsEvent's own list
-// element. Byte-identical shape to Kira Studio's own deleted precedent (P127, d20bc970^).
-type AgentSessionWire struct {
-	TerminalID string `json:"terminalId"`
-	Cwd        string `json:"cwd"`
-}
-
-// AgentSessionsEvent is ChannelAgentSessions' own payload, and AdeService.AgentSessions' own
-// return shape (the boot-time hydrate: a window opened after every currently-live session already
-// started needs a snapshot, since the channel only fires on change).
-type AgentSessionsEvent struct {
-	Sessions []AgentSessionWire `json:"sessions"`
-}
-
-func toWireAgentSessions(sessions []terminal.AgentSession) []AgentSessionWire {
-	out := make([]AgentSessionWire, len(sessions))
-	for i, s := range sessions {
-		out[i] = AgentSessionWire{TerminalID: s.ID, Cwd: s.Cwd}
-	}
-	return out
-}
 
 // AdeSessionWire is model.AdeSession's own wire projection (§4.6) — TerminalID is "" once stopped,
 // mirroring the stored row exactly (never synthesised). CwdMissing (P129 Part 7 §0.12) is the one
@@ -198,13 +174,6 @@ type AdeService struct {
 	FocusWindow func(key string) bool
 }
 
-// AgentSessions is the boot-time hydrate for the P127 agent-activity store (§1.1) — a window
-// opened after every currently-live session already started needs a snapshot, since
-// ChannelAgentSessions only fires on change.
-func (s *AdeService) AgentSessions() AgentSessionsEvent {
-	return AgentSessionsEvent{Sessions: toWireAgentSessions(s.Registry.AgentSessions())}
-}
-
 // Sessions returns every session this app has ever recorded, running or stopped.
 func (s *AdeService) Sessions() (AdeSessionsResult, error) {
 	sessions, err := s.Tracker.List()
@@ -343,24 +312,6 @@ func (s *AdeService) Send(args AdeSendArgs) error {
 		return adeTrackerError(err)
 	}
 	return nil
-}
-
-// AgentSessionsChanged is Registry.OnChange's own target for the ade-aware wiring (main.go) — a
-// package-level function rather than a call to an exported method, the same "Wails binds every
-// exported method of a registered service" reasoning Kira Studio's deleted
-// TerminalAgentSessionsChanged followed (P127, d20bc970^): emit itself must never become
-// renderer-triggerable.
-func AgentSessionsChanged(s *AdeService) {
-	s.Deps.Events.Emit(ChannelAgentSessions, s.AgentSessions())
-}
-
-// EmitAgentEvent is agenthooks.Options.OnEvent's own broadcast half (main.go wires it alongside
-// Tracker.HandleEvent) — emitted verbatim: agenthooks.Event's JSON tags already match
-// ChannelAgentEvent's own payload shape field for field (packages/shared/domain/agent.ts's
-// AgentEvent), so no separate wire-projection type is needed, matching Kira Studio's own deleted
-// precedent (P127, d20bc970^).
-func EmitAgentEvent(e appevent.Emitter, ev agenthooks.Event) {
-	e.Emit(ChannelAgentEvent, ev)
 }
 
 // AdeSessionsChanged is ade.TrackerDeps.OnChange's own target (main.go) — a payload-free broadcast

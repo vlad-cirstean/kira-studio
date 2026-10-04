@@ -198,7 +198,7 @@ func TestAdeService_SpawnTrackAndExit(t *testing.T) {
 	adeSvc := &AdeService{Deps: deps, Tracker: tr, Registry: registry}
 	registry.OnChange = func() {
 		tr.Reconcile()
-		AgentSessionsChanged(adeSvc)
+		AgentSessionsChanged(emitter, registry)
 	}
 
 	prep, err := adeSvc.PrepareLaunch(AdePrepareLaunchArgs{CodeRepoID: codeRepo.ID, Branch: "main", Cwd: cwd})
