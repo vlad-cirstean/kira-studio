@@ -1,14 +1,14 @@
 import { ACTIVITY_LABEL, type ActivityKind, activityKind, shortId } from '../activity';
 import type { BranchAction } from '../board/actions';
 import type { BranchGraph } from '../board/branchGraph';
-import type { ArchiveRisk, Branch, Session, Task } from '../wire';
+import type { ArchiveRisk, Branch, BranchRisk, Session, Task } from '../wire';
 
 // Pure templates and view model of the Claude dialog (mockup `dlg`, SPEC2 sections 5, 6, 9, 10).
 // No Vue, no clock; `AdeClaudeDialog.vue` wraps `composeDialog` in a computed. The stage and start
 // templates mirror the server defaults (`composeStageMessage`, `composeStartMessage`): an unedited
 // message is sent as `''` and the server composes it, so these only show what it will say.
 
-export type DialogKind = 'rebase' | 'queue' | 'merge' | 'stage' | 'start' | 'archive';
+type DialogKind = 'rebase' | 'queue' | 'merge' | 'stage' | 'start' | 'archive';
 
 export interface DialogTarget {
   branchId: string;
@@ -53,7 +53,7 @@ export interface DialogCtx {
   openStep: (taskId: string) => string;
 }
 
-export interface DialogChip {
+interface DialogChip {
   value: string;
   label: string;
   on: boolean;
@@ -112,7 +112,7 @@ function baseDir(ctx: DialogCtx): string {
 }
 
 /** The branch's worktree, else where the server would create it. */
-export function wtOf(ctx: DialogCtx, b: Branch): string {
+function wtOf(ctx: DialogCtx, b: Branch): string {
   if (b.worktree) return b.worktree;
   const repo = ctx.repo(b.codeRepoId);
   return `${baseDir(ctx)}/${repoSegment(repo.name)}/${lastSegment(b.name)}`;
@@ -142,7 +142,7 @@ function ontoRef(ctx: DialogCtx, b: Branch, onto: string): string {
 }
 
 /** The root plus every created branch of mine stacked on it, depth first. */
-export function stackOf(ctx: DialogCtx, rootId: string): string[] {
+function stackOf(ctx: DialogCtx, rootId: string): string[] {
   const out = [rootId];
   const down = (id: string): void => {
     for (const c of ctx.graph.kids.get(id) ?? []) {
@@ -222,16 +222,19 @@ export function startSpec(branchId: string): DialogSpec {
   return { kind: 'start', title: 'Start Claude Code (interactive)', branchId, targets: [] };
 }
 
+/** Work that archiving would lose: uncommitted files or commits no integration branch holds. */
+export const atRisk = (r: BranchRisk): boolean => r.dirty.length > 0 || r.unmerged > 0;
+
 export function archiveSpec(ctx: DialogCtx, risk: ArchiveRisk): DialogSpec {
-  const atRisk = risk.branches.filter((r) => r.dirty.length > 0 || r.unmerged > 0);
+  const atRiskBranches = risk.branches.filter(atRisk);
   return {
     kind: 'archive',
     title: 'Archive: work would be lost',
     taskId: risk.taskId,
-    risk: { ...risk, branches: atRisk },
+    risk: { ...risk, branches: atRiskBranches },
     targets: targetsFor(
       ctx,
-      atRisk.map((r) => r.branchId),
+      atRiskBranches.map((r) => r.branchId),
     ),
   };
 }
@@ -274,7 +277,7 @@ function rebaseMessage(ctx: DialogCtx, spec: DialogSpec, push: boolean): string 
 }
 
 /** Worktree of the integration branch `T`, kept apart from the branch's own. */
-export function mergeWorktree(ctx: DialogCtx, b: Branch, target: string): string {
+function mergeWorktree(ctx: DialogCtx, b: Branch, target: string): string {
   return `${baseDir(ctx)}/${repoSegment(ctx.repo(b.codeRepoId).name)}/_${target}`;
 }
 

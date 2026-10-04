@@ -8,6 +8,7 @@ import type {
 } from '../wire';
 import {
   archiveSpec,
+  atRisk,
   type DialogCtx,
   type DialogSpec,
   type DialogState,
@@ -248,7 +249,7 @@ async function archiveIfClear(deps: FlowDeps, taskId: string): Promise<void> {
     deps.setActionError(taskId, blockedText(deps, risk));
     return;
   }
-  if (risk.branches.some((r) => r.dirty.length > 0 || r.unmerged > 0)) {
+  if (risk.branches.some(atRisk)) {
     deps.openDialog(archiveSpec(deps.ctx, risk));
     return;
   }

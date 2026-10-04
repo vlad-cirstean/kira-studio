@@ -34,7 +34,7 @@ export interface SessionView {
 
 const basename = (path: string): string => path.split('/').filter(Boolean).pop() ?? path;
 
-export function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
+function stepNameOf(workflow: Workflow | undefined, stepId: string): string {
   for (const stage of workflow?.stages ?? []) {
     for (const step of stage.steps) if (step.id === stepId) return step.name;
   }

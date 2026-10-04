@@ -12,7 +12,7 @@ export const STATUS_OPTIONS: readonly Stage['status'][] = [
 export const FAILURE_OPTIONS: readonly OnFailure[] = ['stop', 'retry 1', 'retry 2'];
 
 /** `prefix-N` with the lowest N not in `taken`. */
-export function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
+function nextId(prefix: 'stage' | 'step', taken: readonly string[]): string {
   const used = new Set(taken);
   let n = 1;
   while (used.has(`${prefix}-${n}`)) n++;

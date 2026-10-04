@@ -5,7 +5,7 @@ import type { BranchGraph } from './branchGraph';
 const SHORT_TARGET: Record<string, string> = { develop: 'dev', staging: 'stg', release: 'rel' };
 
 /** Integration branch short label: `develop` -> `dev`, `staging` -> `stg`, `release` -> `rel`. */
-export function integrationLabel(target: string): string {
+function integrationLabel(target: string): string {
   return SHORT_TARGET[target] ?? target;
 }
 
@@ -39,7 +39,7 @@ export function integrationChips(b: Branch): LabelChip[] {
 }
 
 /** `▲staging ✓` / `▲prod ⚠`; nothing for an environment the branch is not deployed to. */
-export function deploymentChips(b: Branch): LabelChip[] {
+function deploymentChips(b: Branch): LabelChip[] {
   if (!chipsApply(b)) return [];
   const out: LabelChip[] = [];
   for (const d of b.deployments) {

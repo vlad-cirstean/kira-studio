@@ -10,7 +10,7 @@ import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../board/calendar';
 import { dayMenuFor } from '../board/dayMenu';
 import { dropVerdict, shiftPlanArgs } from '../board/dropPlan';
-import { refreshNote } from '../board/panelFacts';
+import { refreshNote, remoteErrorText } from '../board/panelFacts';
 import type { TimelineBand } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -49,7 +49,7 @@ async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
     const res = await refresh.mutateAsync({ codeRepoIds: all ? [] : codeRepoIds });
     const summaries = { ...ui.refreshSummary };
     for (const r of res.repos) {
-      if (r.error) errs[r.codeRepoId] = r.error.message;
+      if (r.error) errs[r.codeRepoId] = remoteErrorText(r.error);
       else summaries[r.codeRepoId] = refreshNote(r);
     }
     ui.refreshSummary = summaries;

@@ -3,7 +3,7 @@ import type { Board, Branch, Pair, Task } from '../wire';
 /** Relations between planner branches, derived once per snapshot and shared by the timeline and the
  *  action rules. Mirrors mockup `renderVals()` lines 1504-1522 on the v2 wire. */
 
-export interface BranchConflict {
+interface BranchConflict {
   with: string;
   files: string[];
 }

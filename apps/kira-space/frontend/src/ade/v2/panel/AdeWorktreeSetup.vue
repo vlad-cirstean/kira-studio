@@ -9,6 +9,7 @@ import type { CardModel } from '../plan/usePlanModel';
 import { useRetrySetup } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { solidStyle } from '../tones';
+import type { WorktreeSetup } from '../wire';
 import AdeRunLog from './AdeRunLog.vue';
 
 // Details tab Worktree setup block (SPEC2 section 6.1): status, Retry setup, duration and the
@@ -16,7 +17,7 @@ import AdeRunLog from './AdeRunLog.vue';
 const props = defineProps<{ row: CardModel['rows'][number] }>();
 const ui = useAdeBoardUiStore();
 const retry = useRetrySetup();
-const setup = computed(() => props.row.branch.setup);
+const setup = computed((): WorktreeSetup | null => props.row.branch.setup);
 const running = computed(() => setup.value?.state === 'running');
 const now = ref(Date.now());
 const ticker = useIntervalFn(

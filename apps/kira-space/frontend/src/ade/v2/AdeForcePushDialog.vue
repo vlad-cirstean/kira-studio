@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AdeConfirmDialog from './AdeConfirmDialog.vue';
+import { remoteErrorText } from './board/panelFacts';
 import { useForcePush } from './queries';
 
 // Force push with lease for one branch; the backend refuses a stale lease and the message shows here.
@@ -15,7 +16,7 @@ const title = computed(() =>
 async function run(): Promise<string | null> {
   if (!props.target) return null;
   const res = await forcePush.mutateAsync({ branchId: props.target.branchId });
-  return res.error ? res.error.message : null;
+  return res.error ? remoteErrorText(res.error) : null;
 }
 </script>
 

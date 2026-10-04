@@ -6,7 +6,7 @@ import type { Settings } from '../../../state/settingsDomain';
 /** Mockup line 934: the sentinel "no day assigned yet" offset. */
 export const LATER = 9999;
 
-export const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 export const MO = [
   'Jan',
   'Feb',
@@ -22,7 +22,7 @@ export const MO = [
   'Dec',
 ] as const;
 
-export const DAY_MS = 86_400_000;
+const DAY_MS = 86_400_000;
 
 // -------------------------------------------------------------------------------------------------
 // §0.7: estimates from settings, not constants
@@ -93,18 +93,12 @@ export function buildCalendar(today: string, settings: Settings['ade']): Calenda
   };
 }
 
-/** `plan.day[id]` (an ISO date or `null` = Later, §0.6) as a day offset, `undefined` when unset. */
-export function planDayOffset(cal: Calendar, iso: string | null | undefined): number | undefined {
-  if (iso === null || iso === undefined) return undefined;
-  return isoToDays(iso) - cal.todayDays;
-}
-
 /** Days-since-epoch → proleptic-Gregorian {year, month0 (0-based), date} — Howard Hinnant's
  *  `civil_from_days`, pure integer arithmetic. Deliberately avoids the JS `Date` constructor: the
  *  closing audit's own clock-read grep matches that constructor's name as a plain substring
  *  regardless of arguments, so building one here — even from a fully deterministic offset, never the
  *  live clock — would leave that check non-empty. */
-export function civilFromDays(daysSinceEpoch: number): {
+function civilFromDays(daysSinceEpoch: number): {
   year: number;
   month0: number;
   date: number;
@@ -139,7 +133,7 @@ export function isDayOff(cal: Calendar, k: number): boolean {
   return cal.offDays.has(k);
 }
 
-export function isOff(cal: Calendar, k: number): boolean {
+function isOff(cal: Calendar, k: number): boolean {
   return isDayOff(cal, k) || (isWeekend(cal, k) && !cal.workWeekend.has(k));
 }
 

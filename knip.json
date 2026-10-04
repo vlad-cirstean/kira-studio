@@ -64,11 +64,8 @@
       "project": ["src/**/*.{ts,vue}"]
     },
     "apps/kira-space/frontend": {
-      // Mirrors apps/kira-studio/frontend's own block above. ade/v2/wire.ts is the frozen P143
-      // contract and src/ade/v2/board/*.ts the pure board logic. The UI reaches them from
-      // index.html, but exports for runs, steps, sessions and Needs-you items have no caller until
-      // P147/P148 B (P146 dry run: dropping both entries fails lint:dead); drop both then.
-      "entry": ["index.html", "src/ade/v2/wire.ts", "src/ade/v2/board/*.ts"],
+      // Mirrors apps/kira-studio/frontend's own block above.
+      "entry": ["index.html"],
       "project": ["src/**/*.{ts,vue}"]
     },
     "apps/kira-space-vscode": {

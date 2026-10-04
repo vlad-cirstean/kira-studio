@@ -33,7 +33,7 @@ export interface StepProgress {
   frac: number;
 }
 
-export interface StageSegment {
+interface StageSegment {
   id: string;
   name: string;
   kind: Stage['kind'];
@@ -42,7 +42,7 @@ export interface StageSegment {
   state: 'done' | 'current' | 'blocked' | 'todo';
 }
 
-export type ProgressTone = 'green' | 'red' | 'amber';
+type ProgressTone = 'green' | 'red' | 'amber';
 
 export interface TaskProgress {
   hasWorkflow: boolean;
@@ -76,7 +76,7 @@ export interface ProgressInput {
 
 /** Branches a step runs on: `once` is the first mine branch (D12), `each repo` every mine branch,
  *  `only <nick>` the mine branches in that repo. An unmatched `only` has no targets. */
-export function stepTargets(i: ProgressInput, runsOn: RunsOn | ''): string[] {
+function stepTargets(i: ProgressInput, runsOn: RunsOn | ''): string[] {
   const mine = i.task.branchIds.filter((id) => i.branch(id)?.kind === 'mine');
   if (runsOn === 'once') return mine.slice(0, 1);
   if (runsOn.startsWith('only ')) {

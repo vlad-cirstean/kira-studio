@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useRepos } from '../queries';
+import type { RepoState } from '../wire';
 import type { DialogCtx } from './compose';
 
 /** The facts the dialog templates read, off the cached board, repos and sessions. */
@@ -13,7 +14,7 @@ export function useDialogCtx() {
   return computed((): DialogCtx | null => {
     const m = model.value;
     if (!m) return null;
-    const states = new Map(m.board.repos.map((r) => [r.codeRepoId, r]));
+    const states = new Map<string, RepoState>(m.board.repos.map((r) => [r.codeRepoId, r]));
     return {
       graph: m.view.graph,
       sessions: sessions.value,

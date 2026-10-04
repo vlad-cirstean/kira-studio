@@ -12,7 +12,7 @@ import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { actionStyle, solidStyle, TONE } from '../tones';
-import type { Deployment, Integration } from '../wire';
+import type { Deployment, Integration, PR, RepoPrs } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
@@ -89,10 +89,11 @@ const shared = computed(() => {
 });
 
 // ---- Details rows
-const pr = computed(() => prs.data.value?.branches[branch.value.id] ?? null);
-const webUrl = computed(
-  () => prs.data.value?.repos.find((r) => r.codeRepoId === branch.value.codeRepoId)?.webUrl ?? '',
+const pr = computed((): PR | null => prs.data.value?.branches[branch.value.id] ?? null);
+const repoPrs = computed((): RepoPrs | undefined =>
+  prs.data.value?.repos.find((r) => r.codeRepoId === branch.value.codeRepoId),
 );
+const webUrl = computed(() => repoPrs.value?.webUrl ?? '');
 const branchUrl = computed(() =>
   webUrl.value && branch.value.name ? `${webUrl.value}/tree/${branch.value.name}` : '',
 );

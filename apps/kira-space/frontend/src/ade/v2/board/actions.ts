@@ -18,7 +18,7 @@ export const STATUS_TONE: Record<DerivedStatus, Tone> = {
 
 // ---- task cell
 
-export type TaskActionKind =
+type TaskActionKind =
   | 'archive'
   | 'stage'
   | 'done'
@@ -176,7 +176,7 @@ export function taskCell(i: TaskCellInput): TaskCell | null {
 
 // ---- branch cell
 
-export type BranchActionKind = 'seeError' | 'queueAfter' | 'forcePush' | 'rebase' | 'start';
+type BranchActionKind = 'seeError' | 'queueAfter' | 'forcePush' | 'rebase' | 'start';
 
 export interface BranchAction {
   kind: BranchActionKind;

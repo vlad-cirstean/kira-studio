@@ -1,4 +1,11 @@
-import type { BacklogPatch, RepoRefresh, Task, TaskPatch } from '../wire';
+import type {
+  BacklogPatch,
+  MergedInto,
+  RemoteOpError,
+  RepoRefresh,
+  Task,
+  TaskPatch,
+} from '../wire';
 import type { TaskProgress } from './progress';
 import type { DerivedStatus } from './status';
 
@@ -44,10 +51,20 @@ export function taskFacts(i: {
   return parts.join(' · ');
 }
 
+/** A remote operation's failure as one line: the remote's own words when it sent any. */
+export function remoteErrorText(e: RemoteOpError): string {
+  return e.remoteMessage ? `${e.message}: ${e.remoteMessage}` : e.message;
+}
+
+function countByTarget(merged: readonly MergedInto[]): Map<string, number> {
+  const byTarget = new Map<string, number>();
+  for (const m of merged) byTarget.set(m.target, (byTarget.get(m.target) ?? 0) + 1);
+  return byTarget;
+}
+
 /** `3 refs changed · 1 merged into develop`; `no changes` when the fetch moved nothing. */
 export function refreshNote(r: RepoRefresh): string {
-  const byTarget = new Map<string, number>();
-  for (const m of r.mergedInto) byTarget.set(m.target, (byTarget.get(m.target) ?? 0) + 1);
+  const byTarget = countByTarget(r.mergedInto);
   if (r.refsChanged === 0 && byTarget.size === 0) return 'no changes';
   const parts = [`${r.refsChanged} ${r.refsChanged === 1 ? 'ref' : 'refs'} changed`];
   for (const [target, n] of byTarget) parts.push(`${n} merged into ${target}`);

@@ -11,7 +11,7 @@ import {
 // Task panel Workflow block (SPEC2 section 7, mockup `phaseBlocks`): one block per stage, steps with
 // their per-repo run lines. Pure, so the card model carries it ready to render.
 
-export interface RunLine {
+interface RunLine {
   run: StepRun;
   glyph: string;
   tone: Tone;
@@ -25,7 +25,7 @@ export interface RunLine {
   canRetry: boolean;
 }
 
-export interface StepView {
+interface StepView {
   step: StepProgress;
   statusText: string;
   tone: Tone;

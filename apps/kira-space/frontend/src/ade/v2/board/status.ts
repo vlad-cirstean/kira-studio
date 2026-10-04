@@ -4,8 +4,6 @@ import type { TaskProgress } from './progress';
 /** Derived, never stored (D10). `Blocked` is not a workflow status, so it is not on the wire (W8). */
 export type DerivedStatus = TaskStatus | 'Blocked';
 
-export const BLOCKED_PANEL_TEXT = 'Blocked · follows the workflow: a step is stuck or failed';
-
 export interface StatusInput {
   task: Task;
   progress: TaskProgress;

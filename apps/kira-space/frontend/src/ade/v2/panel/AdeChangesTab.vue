@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { TONE } from '../tones';
-import type { Branch } from '../wire';
+import type { Branch, Commit, DirtyEntry, FileChange } from '../wire';
 
 // Branch Changes tab: base, worktree, rebase conflicts, shared files, uncommitted, commits, files.
 const props = defineProps<{
@@ -24,7 +24,10 @@ const worktree = computed(() => {
 });
 const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).join(', '));
 
-function fileDelta(f: Branch['files'][number]): string {
+const dirtyColor = (d: DirtyEntry): string => (d.code === 'M' ? TONE.amber[1] : TONE.green[1]);
+const commitTitle = (c: Commit): string => `${c.sha} ${c.message}`;
+
+function fileDelta(f: FileChange): string {
   if (f.binary) return 'binary';
   const parts: string[] = [];
   if (f.added) parts.push(`+${f.added}`);
@@ -70,7 +73,7 @@ function fileDelta(f: Branch['files'][number]): string {
         class="flex gap-2 font-data text-kira-sm"
         data-testid="ade-changes-dirty-row"
       >
-        <span class="w-4" :style="{ color: d.code === 'M' ? TONE.amber[1] : TONE.green[1] }">{{ d.code }}</span>
+        <span class="w-4" :style="{ color: dirtyColor(d) }">{{ d.code }}</span>
         <span class="text-fg">{{ d.path }}</span>
       </div>
     </div>
@@ -84,7 +87,7 @@ function fileDelta(f: Branch['files'][number]): string {
         data-testid="ade-changes-commit-row"
       >
         <span class="font-data text-kira-sm" :style="{ color: TONE.amber[2] }">{{ c.sha }}</span>
-        <span class="truncate">{{ c.message }}</span>
+        <span class="truncate" :title="commitTitle(c)">{{ c.message }}</span>
       </div>
       <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
         + {{ branch.commitCount - branch.commits.length }} more

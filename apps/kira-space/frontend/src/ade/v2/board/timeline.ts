@@ -21,9 +21,9 @@ import {
 // hours, bands) on the wire types. No clock read: `today` and `localDayOf` are inputs.
 
 /** SPEC2 §4: only the first 10 work items are shown until the user loads the rest. */
-export const ITEM_LIMIT = 10;
+const ITEM_LIMIT = 10;
 
-export type TimelineBoard = Pick<Board, 'tasks' | 'branches' | 'plan' | 'pairs' | 'history'>;
+type TimelineBoard = Pick<Board, 'tasks' | 'branches' | 'plan' | 'pairs' | 'history'>;
 
 export interface TimelineInput {
   board: TimelineBoard;
@@ -56,7 +56,7 @@ export interface TimelineEntry {
   done: boolean;
 }
 
-export interface TimelineSpan {
+interface TimelineSpan {
   taskId: string;
   /** 1-based index of this day inside the task's span. */
   dayNumber: number;
@@ -65,7 +65,7 @@ export interface TimelineSpan {
   startDay: number;
 }
 
-export interface TimelineHistoryItem {
+interface TimelineHistoryItem {
   taskId: string;
   title: string;
   day: number;
