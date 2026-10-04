@@ -459,3 +459,37 @@ index lives in `.codegraph/` (gitignored). `.mcp.json` registers
 (`codegraph prompt-hook`) injects matching symbols into every prompt — this hook still fires
 per-message regardless of how the index got built. If a worktree was never provisioned with
 `scripts/codegraph-setup.sh` (a manual clone, say), run it by hand once before relying on the index.
+
+## CodeGraph duplicate finder — `scripts/codegraph-duplicates.ts`
+
+Runnable form of the ad-hoc sweeps P107/P113/P115 ran against `.codegraph/codegraph.db` (they were
+never committed as a script; method text lives in `docs/v1.9/plans/P107-duplication-findings*.md`
+§0 and `P113-duplication-sweep.md` §0). Opens the index read-only via `bun:sqlite`, reads each
+function/method body from disk by `nodes.file_path` + line span, never writes. Needs an index
+(`scripts/codegraph-setup.sh`); with none it prints how to build one and exits 0. In a fresh
+worktree, point at another checkout's index: `--db /path/.codegraph/codegraph.db --root .`
+(`--root` = where the source files are read from).
+
+```sh
+bun scripts/codegraph-duplicates.ts --path apps/kira-studio/internal --lang go --top 10
+bun scripts/codegraph-duplicates.ts --sweep calls --lcs 0.6 --min-callees 4 --json
+```
+
+Options: `--db`/`CODEGRAPH_DB`, `--root`, `--path` (repeatable), `--lang`, `--min-lines` (6),
+`--sweep exact,blind,name,calls`, `--similarity` (0.6), `--lcs` (0.7), `--min-callees` (6),
+`--top` (20), `--include-tests`, `--include-generated`, `--json`.
+
+Sweeps (function/method nodes only, groups need >=2 files):
+
+- `exact`: same body after stripping comments and whitespace.
+- `blind`: same after collapsing identifiers, string and number literals. Excludes groups `exact` has.
+- `name`: same symbol name and language across files, line-set ratio >= `--similarity`. Names with
+  >30 definitions skipped.
+- `calls`: ordered `calls` edges, LCS/max >= `--lcs`. Resolved edges only; P113's widening to
+  unresolved stdlib refs is not reproduced.
+
+Ranking: members x lines. False positives: one-line delegates and `Get`/`Remove`/`Close`-style repo
+boilerplate (`blind`), per-adapter shape that is deliberate (`name`/`calls`), cross-language and
+`kira-space` vs `kira-studio` mirrors, tests (dropped by default), generated bindings (dropped via
+`files.generated`). Anonymous callbacks and struct fields are not graph nodes, so unseen. Read every
+hit with `codegraph_explore` before calling it duplication.
