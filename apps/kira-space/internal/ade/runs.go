@@ -147,7 +147,6 @@ func (b *TaskBoard) refreshSnapshot(tc *taskCtx) {
 			return
 		}
 		tc.task.CurrentStageJSON = string(raw)
-		st := st
 		tc.stage = &st
 		return
 	}

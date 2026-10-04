@@ -175,8 +175,9 @@ func (p *Parser) progress() *Todo {
 }
 
 func splitLines(stream, text string) []Line {
-	var out []Line
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+	parts := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	out := make([]Line, 0, len(parts))
+	for _, l := range parts {
 		out = append(out, Line{stream, l})
 	}
 	return out
