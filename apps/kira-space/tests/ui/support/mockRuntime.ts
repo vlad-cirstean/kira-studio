@@ -84,7 +84,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   updateInstall: 'UpdateService.InstallUpdate',
   updateCancelInstall: 'UpdateService.CancelInstall',
 
-  // Boot: the ade module's agent-session hydration. The v1 `AdeService` surface is no longer called.
+  // Boot: the ade module's agent-session hydration.
   terminalAgentSessions: 'TerminalService.AgentSessions',
 
   // P145: the ade v2 board surface (AdeTaskService, bridge/index.ts `adeTask*`).
