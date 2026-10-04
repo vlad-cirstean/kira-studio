@@ -1,0 +1,10 @@
+{
+  "name": "kira-mutation-tools",
+  "private": true,
+  "type": "module",
+  "description": "Isolated StrykerJS toolchain for report-only mutation testing (P151). Not a root workspace.",
+  "devDependencies": {
+    "@hughescr/stryker-bun-runner": "1.4.0",
+    "@stryker-mutator/core": "10.0.0"
+  }
+}
