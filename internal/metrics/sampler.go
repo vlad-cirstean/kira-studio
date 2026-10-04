@@ -374,6 +374,9 @@ func processCreateTime(pid int32) (int64, bool) {
 // unchanged, on every platform without a native footprint syscall (or without cgo to reach the one
 // that exists); probe_darwin.go's EPERM fallback also calls gopsutilCreateTime below for its
 // identity tag, since struct proc_taskinfo has no start-time field of its own (D3).
+// Consumed only by probe_other.go (!darwin || !cgo) — invisible to a darwin+cgo lint run.
+//
+//nolint:unused // build-tag-only consumer, see above
 func gopsutilProbe(pid int32) (procSample, bool) {
 	p, err := process.NewProcess(pid)
 	if err != nil {

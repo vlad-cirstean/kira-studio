@@ -43,10 +43,10 @@ func listProcesses() ([]procEntry, error) {
 	}
 	pids := buf[:n/pidSize]
 
-	var pathBuf [pidPathBufSize]C.char
+	pathBuf := make([]C.char, pidPathBufSize)
 	entries := make([]procEntry, 0, len(pids))
 	for _, pid := range pids {
-		ret := C.proc_pidpath(C.int(pid), unsafe.Pointer(&pathBuf[0]), C.uint32_t(pidPathBufSize))
+		ret := C.proc_pidpath(pid, unsafe.Pointer(&pathBuf[0]), pidPathBufSize)
 		if ret <= 0 {
 			continue
 		}
