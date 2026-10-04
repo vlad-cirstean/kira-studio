@@ -58,6 +58,7 @@ func TestRevoke_WhileIdle(t *testing.T) {
 	if row.RevokedAt == nil {
 		t.Fatal("revoked_at not set after Revoke returns (D8 clause 1)")
 	}
+	client.armReadDeadline()
 	if _, err := readFrame(client.r); err == nil {
 		t.Fatal("expected the revoked connection's read to error (D8 clause 2)")
 	}
@@ -106,6 +107,7 @@ func TestRevoke_WhileHoldingAGraphWalk(t *testing.T) {
 	if err := server.Revoke("revoke-walk"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
+	client.armReadDeadline()
 	if _, err := readFrame(client.r); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
@@ -150,6 +152,7 @@ func TestRevoke_WhileHoldingAReviewSession(t *testing.T) {
 	if err := server.Revoke("revoke-review"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
+	client.armReadDeadline()
 	if _, err := readFrame(client.r); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
@@ -294,9 +297,9 @@ func TestRevoke_DoesNotDisturbAnotherClient(t *testing.T) {
 
 	requestIgnoringEvents(t, clientB, "refs.list", gitrpc.RefsListParams{RepoID: repoID})
 	runGitIn(t, dir, "commit", "--allow-empty", "-q", "-m", "still alive")
-	ev := clientB.recvEvent("repo.changed")
-	if ev.RepoID != repoID || ev.Kind != "refsChanged" {
-		t.Fatalf("B's event after A was revoked = %+v, want {%s refsChanged}", ev, repoID)
+	ev := clientB.awaitRepoChanged("refsChanged")
+	if ev.RepoID != repoID {
+		t.Fatalf("B's event after A was revoked = %+v, want repoId %s", ev, repoID)
 	}
 
 	client3 := dialTestClient(t, sockPath)
@@ -397,6 +400,7 @@ func TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken(t *testin
 	if kind != "ready" {
 		t.Fatalf("reconnect with a still-valid-at-the-time token = %q, want ready (the race window is AFTER admission's own token check, not at it)", kind)
 	}
+	client2.armReadDeadline()
 	if _, err := readFrame(client2.r); err == nil {
 		t.Fatal("expected the connection admitted with a since-revoked token to be closed by the post-admission re-check, not served")
 	}

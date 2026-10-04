@@ -75,6 +75,50 @@ type testClient struct {
 	nc   net.Conn
 	r    *bufio.Reader
 	next int
+	// events holds 'evt' frames read while awaiting something else (a response, a stream frame),
+	// mirroring the production client (git-ipc's rpc.ts), which dispatches every frame by its T.
+	events []wireFrame
+}
+
+// testReadTimeout bounds every test-side frame read: a hang guard (a lost event or stalled
+// server becomes a fast named failure), not a timing assertion.
+const testReadTimeout = 30 * time.Second
+
+// armReadDeadline bounds the next read on c.nc. For reads outside readRaw, such as goroutines.
+func (c *testClient) armReadDeadline() {
+	_ = c.nc.SetReadDeadline(time.Now().Add(testReadTimeout))
+}
+
+// readRaw reads one frame under testReadTimeout, failing the test with what it awaited.
+func (c *testClient) readRaw(what string) []byte {
+	c.t.Helper()
+	c.armReadDeadline()
+	raw, err := readFrame(c.r)
+	_ = c.nc.SetReadDeadline(time.Time{})
+	if err != nil {
+		c.t.Fatalf("read %s: %v", what, err)
+	}
+	return raw
+}
+
+// readEnvelope is readRaw plus decoding.
+func (c *testClient) readEnvelope(what string) wireEnvelope {
+	c.t.Helper()
+	raw := c.readRaw(what)
+	var env wireEnvelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		c.t.Fatalf("unmarshal %s: %v\n%s", what, err, raw)
+	}
+	return env
+}
+
+// String renders the server's error text rather than a pointer address in %+v failure output.
+func (f wireFrame) String() string {
+	b, err := json.Marshal(f)
+	if err != nil {
+		return fmt.Sprintf("wireFrame{T:%s ID:%d}", f.T, f.ID)
+	}
+	return string(b)
 }
 
 func dialTestClient(t *testing.T, path string) *testClient {
@@ -100,10 +144,7 @@ func (c *testClient) sendRaw(v any) {
 
 func (c *testClient) recvHandshake() handshakeResponse {
 	c.t.Helper()
-	raw, err := readFrame(c.r)
-	if err != nil {
-		c.t.Fatalf("read frame: %v", err)
-	}
+	raw := c.readRaw("handshake response")
 	var resp handshakeResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		c.t.Fatalf("unmarshal handshake response: %v\n%s", err, raw)
@@ -152,20 +193,12 @@ func (c *testClient) request(method string, params any) wireFrame {
 	c.sendRaw(env)
 
 	// The op this request triggers can itself emit an 'evt' frame (repo.changed) before its own
-	// 'res' arrives — the production client (git-ipc's rpc.ts, createRpcClient) dispatches every
-	// frame by its own T and only matches 'res' frames against a pending request id, so an 'evt'
-	// never gets mistaken for a response. Mirror that here instead of trusting positional order:
-	// skip any interleaved event rather than failing on its zero-value id.
+	// 'res' arrives. Queue it for awaitRepoChanged/recvEvent rather than failing on its
+	// zero-value id or dropping it.
 	for {
-		raw, err := readFrame(c.r)
-		if err != nil {
-			c.t.Fatalf("read response: %v", err)
-		}
-		var respEnv wireEnvelope
-		if err := json.Unmarshal(raw, &respEnv); err != nil {
-			c.t.Fatalf("unmarshal response: %v\n%s", err, raw)
-		}
+		respEnv := c.readEnvelope(fmt.Sprintf("response to %s (id %d)", method, id))
 		if respEnv.Body.T == "evt" {
+			c.events = append(c.events, respEnv.Body)
 			continue
 		}
 		if respEnv.Body.ID != id {
@@ -203,36 +236,39 @@ type streamFrame struct {
 	Blob []byte
 }
 
-// readStreamFrame reads exactly one frame off the wire, recognising D4's blob-frame body
+// readStreamFrame reads the next non-event frame off the wire (events are queued), recognising D4's blob-frame body
 // (0x00 | uint32BE headerLen | headerJSON | blob) itself — a real client's own framing, not a
 // helper the server provides.
 func (c *testClient) readStreamFrame() streamFrame {
 	c.t.Helper()
-	raw, err := readFrame(c.r)
-	if err != nil {
-		c.t.Fatalf("read stream frame: %v", err)
-	}
-	if len(raw) > 0 && raw[0] == 0x00 {
-		if len(raw) < 5 {
-			c.t.Fatalf("blob frame too short: %d bytes", len(raw))
+	for {
+		raw := c.readRaw("stream frame")
+		if len(raw) > 0 && raw[0] == 0x00 {
+			if len(raw) < 5 {
+				c.t.Fatalf("blob frame too short: %d bytes", len(raw))
+			}
+			headerLen := binary.BigEndian.Uint32(raw[1:5])
+			if 5+int(headerLen) > len(raw) {
+				c.t.Fatalf("blob frame header length %d exceeds frame (%d bytes)", headerLen, len(raw))
+			}
+			header := raw[5 : 5+int(headerLen)]
+			blob := raw[5+int(headerLen):]
+			var env wireEnvelope
+			if err := json.Unmarshal(header, &env); err != nil {
+				c.t.Fatalf("unmarshal blob frame header: %v\n%s", err, header)
+			}
+			return streamFrame{Body: env.Body, Blob: blob}
 		}
-		headerLen := binary.BigEndian.Uint32(raw[1:5])
-		if 5+int(headerLen) > len(raw) {
-			c.t.Fatalf("blob frame header length %d exceeds frame (%d bytes)", headerLen, len(raw))
-		}
-		header := raw[5 : 5+int(headerLen)]
-		blob := raw[5+int(headerLen):]
 		var env wireEnvelope
-		if err := json.Unmarshal(header, &env); err != nil {
-			c.t.Fatalf("unmarshal blob frame header: %v\n%s", err, header)
+		if err := json.Unmarshal(raw, &env); err != nil {
+			c.t.Fatalf("unmarshal stream frame: %v\n%s", err, raw)
 		}
-		return streamFrame{Body: env.Body, Blob: blob}
+		if env.Body.T == "evt" {
+			c.events = append(c.events, env.Body)
+			continue
+		}
+		return streamFrame{Body: env.Body}
 	}
-	var env wireEnvelope
-	if err := json.Unmarshal(raw, &env); err != nil {
-		c.t.Fatalf("unmarshal stream frame: %v\n%s", err, raw)
-	}
-	return streamFrame{Body: env.Body}
 }
 
 // repoChangedPayload is repo.changed's wire payload (D20).
@@ -241,27 +277,50 @@ type repoChangedPayload struct {
 	Kind   string `json:"kind"`
 }
 
-// recvEvent reads one frame and requires it to be an 'evt' frame for method, decoding its payload
-// — used only at points in a test where no request() is outstanding on the same client, so there
-// is no risk of an event interleaving with a response this test is also waiting on.
+// nextEvent returns the next 'evt' frame for method: a queued one first, else read frames,
+// queueing events of other methods. Any non-event frame fails the test.
+func (c *testClient) nextEvent(method string) wireFrame {
+	c.t.Helper()
+	for i, e := range c.events {
+		if e.Method == method {
+			c.events = append(c.events[:i], c.events[i+1:]...)
+			return e
+		}
+	}
+	for {
+		env := c.readEnvelope("evt " + method)
+		if env.Body.T != "evt" {
+			c.t.Fatalf("frame = %+v, want an evt frame for %s", env.Body, method)
+		}
+		if env.Body.Method == method {
+			return env.Body
+		}
+		c.events = append(c.events, env.Body)
+	}
+}
+
+// recvEvent is nextEvent for repo.changed-shaped payloads, any kind.
 func (c *testClient) recvEvent(method string) repoChangedPayload {
 	c.t.Helper()
-	raw, err := readFrame(c.r)
-	if err != nil {
-		c.t.Fatalf("read event: %v", err)
-	}
-	var env wireEnvelope
-	if err := json.Unmarshal(raw, &env); err != nil {
-		c.t.Fatalf("unmarshal event: %v\n%s", err, raw)
-	}
-	if env.Body.T != "evt" || env.Body.Method != method {
-		c.t.Fatalf("frame = %+v, want an evt frame for %s", env.Body, method)
-	}
+	body := c.nextEvent(method)
 	var payload repoChangedPayload
-	if err := json.Unmarshal(env.Body.Payload, &payload); err != nil {
-		c.t.Fatalf("unmarshal payload: %v\n%s", err, env.Body.Payload)
+	if err := json.Unmarshal(body.Payload, &payload); err != nil {
+		c.t.Fatalf("unmarshal payload: %v\n%s", err, body.Payload)
 	}
 	return payload
+}
+
+// awaitRepoChanged returns the next repo.changed event of kind, dropping repo.changed events of
+// other kinds. The watcher reports a commit's index write (worktreeChanged) and ref write
+// (refsChanged) separately and, under load, in either order.
+func (c *testClient) awaitRepoChanged(kind string) repoChangedPayload {
+	c.t.Helper()
+	for {
+		ev := c.recvEvent("repo.changed")
+		if ev.Kind == kind {
+			return ev
+		}
+	}
 }
 
 // newIntegrationServer is the full-blown harness §8.1(c)'s own tests build on. registry is
@@ -457,6 +516,7 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 	if err := server.Revoke("client-1"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
+	client2.armReadDeadline()
 	if _, err := readFrame(bufio.NewReader(client2.nc)); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
@@ -590,9 +650,9 @@ func TestIntegration_RepoChangedReachesEveryHolder(t *testing.T) {
 
 	runGitIn(t, repoDir, "commit", "--allow-empty", "-q", "-m", "second")
 	for _, c := range []*testClient{clientA, clientB} {
-		ev := c.recvEvent("repo.changed")
-		if ev.RepoID != repoID || ev.Kind != "refsChanged" {
-			t.Fatalf("event = %+v, want {%s refsChanged}", ev, repoID)
+		ev := c.awaitRepoChanged("refsChanged")
+		if ev.RepoID != repoID {
+			t.Fatalf("event = %+v, want repoId %s", ev, repoID)
 		}
 	}
 
@@ -601,9 +661,9 @@ func TestIntegration_RepoChangedReachesEveryHolder(t *testing.T) {
 	}
 	runGitIn(t, repoDir, "add", "new-file.txt")
 	for _, c := range []*testClient{clientA, clientB} {
-		ev := c.recvEvent("repo.changed")
-		if ev.RepoID != repoID || ev.Kind != "worktreeChanged" {
-			t.Fatalf("event = %+v, want {%s worktreeChanged}", ev, repoID)
+		ev := c.awaitRepoChanged("worktreeChanged")
+		if ev.RepoID != repoID {
+			t.Fatalf("event = %+v, want repoId %s", ev, repoID)
 		}
 	}
 }
@@ -645,9 +705,9 @@ func TestIntegration_RefcountAndDisconnectTeardown(t *testing.T) {
 
 	// F7, provably fixed: A's repo.close must not have evicted the repo for B.
 	runGitIn(t, repoDir, "commit", "--allow-empty", "-q", "-m", "second")
-	ev := clientB.recvEvent("repo.changed")
-	if ev.RepoID != repoID || ev.Kind != "refsChanged" {
-		t.Fatalf("client B event = %+v, want {%s refsChanged}", ev, repoID)
+	ev := clientB.awaitRepoChanged("refsChanged")
+	if ev.RepoID != repoID {
+		t.Fatalf("client B event = %+v, want repoId %s", ev, repoID)
 	}
 
 	// Disconnect B from the test side — its own deferred gconn.Close() (D19) must release its ref
@@ -738,6 +798,7 @@ func TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest(t *testing.T) {
 	helloDone := make(chan struct{})
 	go func() {
 		defer close(helloDone)
+		client.armReadDeadline()
 		_, _ = readFrame(client.r)
 		_, _ = readFrame(client.r)
 	}()

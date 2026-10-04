@@ -406,10 +406,7 @@ func TestIntegration_CheckoutPreflightAndRun(t *testing.T) {
 	if runResp.Head.Kind != "branch" || runResp.Head.Name != "main" {
 		t.Fatalf("head after checkout = %+v", runResp.Head)
 	}
-	ev := client.recvEvent("repo.changed")
-	if ev.Kind != "refsChanged" {
-		t.Fatalf("event = %+v, want refsChanged", ev)
-	}
+	client.awaitRepoChanged("refsChanged")
 }
 
 func TestIntegration_RevertPreflightAndConflict(t *testing.T) {
@@ -655,31 +652,7 @@ func waitForHeadName(t *testing.T, c *testClient, repoID, want string) gitsessio
 // interleaving entirely, per graphstream_test.go's own recvEvent doc comment).
 func requestIgnoringEvents(t *testing.T, c *testClient, method string, params any) wireFrame {
 	t.Helper()
-	id := c.next
-	c.next++
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
-	env := wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: id, Method: method, Params: paramsJSON}}
-	c.sendRaw(env)
-	for {
-		raw, err := readFrame(c.r)
-		if err != nil {
-			c.t.Fatalf("read response: %v", err)
-		}
-		var respEnv wireEnvelope
-		if err := json.Unmarshal(raw, &respEnv); err != nil {
-			c.t.Fatalf("unmarshal response: %v\n%s", err, raw)
-		}
-		if respEnv.Body.T == "evt" {
-			continue
-		}
-		if respEnv.Body.ID != id {
-			c.t.Fatalf("response id %d, want %d", respEnv.Body.ID, id)
-		}
-		return respEnv.Body
-	}
+	return c.request(method, params)
 }
 
 func argvContains(args []string, needle string) bool {

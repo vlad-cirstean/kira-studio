@@ -242,10 +242,7 @@ func runRemoteAnsweringCredentials(t *testing.T, c *testClient, params gitrpc.Re
 	c.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: runID, Method: "remote.run", Params: paramsJSON}})
 
 	for {
-		raw, err := readFrame(c.r)
-		if err != nil {
-			t.Fatalf("read frame: %v", err)
-		}
+		raw := c.readRaw("frame")
 		var env wireEnvelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			t.Fatalf("unmarshal: %v\n%s", err, raw)
@@ -289,10 +286,7 @@ func runRemoteIgnoringCredentialRequests(t *testing.T, c *testClient, params git
 	}
 	c.sendRaw(wireEnvelope{Version: gitrpc.ContractVersion, Body: wireFrame{T: "req", ID: runID, Method: "remote.run", Params: paramsJSON}})
 	for {
-		raw, err := readFrame(c.r)
-		if err != nil {
-			t.Fatalf("read frame: %v", err)
-		}
+		raw := c.readRaw("frame")
 		var env wireEnvelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			t.Fatalf("unmarshal: %v\n%s", err, raw)
@@ -806,10 +800,7 @@ func TestIntegration_CredentialRelayAnswersAndNeverHangs(t *testing.T) {
 
 		// Wait for the credential.request event, then close the connection without answering.
 		for {
-			raw, err := readFrame(clientA.r)
-			if err != nil {
-				t.Fatalf("read frame: %v", err)
-			}
+			raw := clientA.readRaw("frame")
 			var env wireEnvelope
 			if err := json.Unmarshal(raw, &env); err != nil {
 				t.Fatalf("unmarshal: %v\n%s", err, raw)
@@ -928,10 +919,7 @@ func TestIntegration_SecondRemoteOpIsRefusedAndCancelIsHonest(t *testing.T) {
 	// Read A's own fetch reply — it must resolve Cancelled, not hang, and the slot must free up
 	// afterward (checked by C below succeeding without OperationInProgress).
 	for {
-		raw, err := readFrame(clientA.r)
-		if err != nil {
-			t.Fatalf("read frame: %v", err)
-		}
+		raw := clientA.readRaw("frame")
 		var env wireEnvelope
 		if err := json.Unmarshal(raw, &env); err != nil {
 			t.Fatalf("unmarshal: %v\n%s", err, raw)

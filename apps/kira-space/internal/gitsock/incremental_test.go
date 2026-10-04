@@ -2,13 +2,11 @@ package gitsock
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
@@ -129,36 +127,12 @@ func reviewFileDiff(t *testing.T, c *testClient, repoID, branch, base, path, mod
 // required after every git mutation made OUTSIDE the socket (a direct `git` call in the test),
 // since RepoEntry.Refs is cached and branchTip/mergeBase read that cache: without this, the very
 // next request can race the fsnotify watcher and observe the OLD tip. A commit is usually preceded
-// by `git add` (an index write the watcher reports as a SEPARATE worktreeChanged event,
-// subscriber.go's own "refs first, then worktree" ordering when both fire on the same wake) — that
-// straggler is drained here too, so it can never be mistaken for the next request's own response.
+// by `git add` (an index write the watcher reports as a SEPARATE worktreeChanged event, in either
+// order relative to refsChanged under load) — awaitRepoChanged drops those, and request queues any
+// that arrive mid-request, so none is mistaken for a response.
 func waitForRefsChanged(t *testing.T, c *testClient) {
 	t.Helper()
-	ev := c.recvEvent("repo.changed")
-	if ev.Kind != "refsChanged" {
-		t.Fatalf("event = %+v, want refsChanged", ev)
-	}
-	drainStragglerEvents(t, c)
-}
-
-// drainStragglerEvents best-effort reads any immediately-following event frames using a short
-// read deadline — a timeout (nothing more queued) ends the drain silently; any actual "res"/
-// "chunk" frame arriving here would mean this helper was called at the wrong point and is a real
-// test bug, so that case still fails loudly.
-func drainStragglerEvents(t *testing.T, c *testClient) {
-	t.Helper()
-	for {
-		_ = c.nc.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
-		raw, err := readFrame(c.r)
-		if err != nil {
-			break
-		}
-		var env wireEnvelope
-		if jsonErr := json.Unmarshal(raw, &env); jsonErr != nil || env.Body.T != "evt" {
-			t.Fatalf("drainStragglerEvents: unexpected non-event frame: %s", raw)
-		}
-	}
-	_ = c.nc.SetReadDeadline(time.Time{})
+	c.awaitRepoChanged("refsChanged")
 }
 
 func findEntry(files []gitsession.ReviewFileEntry, path string) (gitsession.ReviewFileEntry, bool) {
@@ -655,10 +629,7 @@ func TestIntegration_RefsChangedDoesNotDropReviewState(t *testing.T) {
 
 	// An unrelated ref move — nothing to do with the reviewed branch or file at all.
 	runGitIn(t, dir, "branch", "unrelated-branch")
-	ev := client.recvEvent("repo.changed")
-	if ev.Kind != "refsChanged" {
-		t.Fatalf("event = %+v, want refsChanged", ev)
-	}
+	client.awaitRepoChanged("refsChanged")
 
 	files := reviewFiles(t, client, repoID, "feature", "main")
 	entry, ok := findEntry(files.Files, "a.txt")

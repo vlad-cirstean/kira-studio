@@ -12,20 +12,10 @@ import (
 // repo.changed, restated here since that helper's own return type is repo.changed-specific.
 func recvRepoSettingsChanged(c *testClient) gitrpc.RepoSettingsChangedPayload {
 	c.t.Helper()
-	raw, err := readFrame(c.r)
-	if err != nil {
-		c.t.Fatalf("read event: %v", err)
-	}
-	var env wireEnvelope
-	if err := json.Unmarshal(raw, &env); err != nil {
-		c.t.Fatalf("unmarshal event: %v\n%s", err, raw)
-	}
-	if env.Body.T != "evt" || env.Body.Method != "repoSettings.changed" {
-		c.t.Fatalf("frame = %+v, want an evt frame for repoSettings.changed", env.Body)
-	}
+	body := c.nextEvent("repoSettings.changed")
 	var payload gitrpc.RepoSettingsChangedPayload
-	if err := json.Unmarshal(env.Body.Payload, &payload); err != nil {
-		c.t.Fatalf("unmarshal payload: %v\n%s", err, env.Body.Payload)
+	if err := json.Unmarshal(body.Payload, &payload); err != nil {
+		c.t.Fatalf("unmarshal payload: %v\n%s", err, body.Payload)
 	}
 	return payload
 }

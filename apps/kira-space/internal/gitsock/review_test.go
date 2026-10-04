@@ -151,50 +151,11 @@ func rangedGraphStatusOK(t *testing.T, c *testClient, repoID string, rng *gitrpc
 	return unmarshalResult[graphStatusResult](t, resp.Result)
 }
 
-// readStreamFrameIgnoringEvents is readStreamFrame, tolerant of 'evt' frames interleaved before
-// the next chunk/end frame -- a force-move fires repo.changed (refsChanged, and often
-// worktreeChanged alongside it) on the same connection a stream is then re-opened on, so this
-// avoids guessing exactly how many events land before the response (integration_test.go's own
-// requestIgnoringEvents, generalised to a stream).
-func (c *testClient) readStreamFrameIgnoringEvents() streamFrame {
-	c.t.Helper()
-	for {
-		raw, err := readFrame(c.r)
-		if err != nil {
-			c.t.Fatalf("read stream frame: %v", err)
-		}
-		if len(raw) > 0 && raw[0] == 0x00 {
-			if len(raw) < 5 {
-				c.t.Fatalf("blob frame too short: %d bytes", len(raw))
-			}
-			headerLen := int(raw[1])<<24 | int(raw[2])<<16 | int(raw[3])<<8 | int(raw[4])
-			if 5+headerLen > len(raw) {
-				c.t.Fatalf("blob frame header length %d exceeds frame (%d bytes)", headerLen, len(raw))
-			}
-			header := raw[5 : 5+headerLen]
-			blob := raw[5+headerLen:]
-			var env wireEnvelope
-			if err := json.Unmarshal(header, &env); err != nil {
-				c.t.Fatalf("unmarshal blob frame header: %v\n%s", err, header)
-			}
-			return streamFrame{Body: env.Body, Blob: blob}
-		}
-		var env wireEnvelope
-		if err := json.Unmarshal(raw, &env); err != nil {
-			c.t.Fatalf("unmarshal stream frame: %v\n%s", err, raw)
-		}
-		if env.Body.T == "evt" {
-			continue
-		}
-		return streamFrame{Body: env.Body}
-	}
-}
-
 func drainStreamToEndIgnoringEvents(t *testing.T, c *testClient) []streamFrame {
 	t.Helper()
 	var chunks []streamFrame
 	for {
-		f := c.readStreamFrameIgnoringEvents()
+		f := c.readStreamFrame()
 		if f.Body.T == "end" {
 			if f.Body.Error != nil {
 				t.Fatalf("stream ended with error: %+v", f.Body.Error)
@@ -480,17 +441,9 @@ func TestIntegration_ReviewWalkResetsAfterRefsChange(t *testing.T) {
 	// Wait for the watcher's own debounced refsChanged to actually reach this connection before
 	// re-opening the stream -- otherwise the re-open can race ahead of MarkStale and legitimately
 	// replay the still-fresh cache. The force-move can fire more than one event (refsChanged, and
-	// often worktreeChanged alongside it, per ops_test.go's own note); readStreamFrameIgnoringEvents
-	// below tolerates any further ones that arrive after this loop stops.
-	foundRefsChanged := false
-	for i := 0; i < 20 && !foundRefsChanged; i++ {
-		if client.recvEvent("repo.changed").Kind == "refsChanged" {
-			foundRefsChanged = true
-		}
-	}
-	if !foundRefsChanged {
-		t.Fatal("no refsChanged event arrived after the force-move")
-	}
+	// often worktreeChanged alongside it, per ops_test.go's own note); awaitRepoChanged drops the
+	// others, and readStreamFrame queues any that arrive later.
+	client.awaitRepoChanged("refsChanged")
 
 	id2 := client.openStream("graph.stream", gitrpc.GraphStreamParams{RepoID: repoID, Range: rng})
 	client.sendCredit(id2, 10)

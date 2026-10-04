@@ -47,9 +47,9 @@ func TestMatrix_M1_WriteInOneWindowIsVisibleInTheOther(t *testing.T) {
 		t.Fatal("A's own refs.list right after its own write does not list the new branch (D7)")
 	}
 
-	ev := clientB.recvEvent("repo.changed")
-	if ev.RepoID != repoID || ev.Kind != "refsChanged" {
-		t.Fatalf("B's event = %+v, want {%s refsChanged}", ev, repoID)
+	ev := clientB.awaitRepoChanged("refsChanged")
+	if ev.RepoID != repoID {
+		t.Fatalf("B's event = %+v, want repoId %s", ev, repoID)
 	}
 	refsB := unmarshalResult[gitsession.RefsResult](t, requestIgnoringEvents(t, clientB, "refs.list", gitrpc.RefsListParams{RepoID: repoID}).Result)
 	if findRefRow(refsB.Branches, "matrix-m1-branch") == nil {
@@ -125,12 +125,8 @@ func TestMatrix_M1_DetailCacheIsSharedAndDroppedForBoth(t *testing.T) {
 	}
 
 	runGitIn(t, f.dir, "tag", "v-matrix-shared", f.root)
-	if ev := clientA.recvEvent("repo.changed"); ev.Kind != "refsChanged" {
-		t.Fatalf("A's event = %+v, want refsChanged", ev)
-	}
-	if ev := clientB.recvEvent("repo.changed"); ev.Kind != "refsChanged" {
-		t.Fatalf("B's event = %+v, want refsChanged", ev)
-	}
+	clientA.awaitRepoChanged("refsChanged")
+	clientB.awaitRepoChanged("refsChanged")
 
 	requestIgnoringEvents(t, clientA, "commit.detail", gitrpc.CommitDetailParams{RepoID: repoID, SHA: f.root})
 	afterA2 := atomic.LoadInt32(&showSpawns)
@@ -173,6 +169,7 @@ func TestMatrix_M1_StreamStalledOnCreditsBlocksOnlyItsOwnConnection(t *testing.T
 	loadMoreDone := make(chan wireFrame, 1)
 	go func() {
 		for {
+			clientA.armReadDeadline()
 			raw, err := readFrame(clientA.r)
 			if err != nil {
 				return
@@ -290,6 +287,7 @@ func TestMatrix_M2_SimultaneousRemoteRunsAdmitExactlyOne(t *testing.T) {
 	for i := 0; i < n; i++ {
 		go func(i int) {
 			for {
+				clients[i].armReadDeadline()
 				raw, err := readFrame(clients[i].r)
 				if err != nil {
 					return
@@ -406,10 +404,7 @@ func TestMatrix_M2_LocalOpAndRemoteOpAreNotMutuallyExclusive(t *testing.T) {
 		t.Fatal("cancelling A's still-running fetch reported false")
 	}
 	for {
-		raw, err := readFrame(clientA.r)
-		if err != nil {
-			t.Fatalf("read: %v", err)
-		}
+		raw := clientA.readRaw("frame")
 		var env wireEnvelope
 		if unmarshalErr := json.Unmarshal(raw, &env); unmarshalErr != nil {
 			t.Fatalf("unmarshal: %v", unmarshalErr)
@@ -443,9 +438,9 @@ func TestMatrix_M3_FullIndependence(t *testing.T) {
 	}
 
 	runGitIn(t, repoA, "commit", "--allow-empty", "-q", "-m", "repo A only")
-	ev := clientA.recvEvent("repo.changed")
-	if ev.RepoID != repoIDA || ev.Kind != "refsChanged" {
-		t.Fatalf("A's event = %+v, want {%s refsChanged}", ev, repoIDA)
+	ev := clientA.awaitRepoChanged("refsChanged")
+	if ev.RepoID != repoIDA {
+		t.Fatalf("A's event = %+v, want repoId %s", ev, repoIDA)
 	}
 	_ = clientB.nc.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
 	if _, err := readFrame(clientB.r); err == nil {

@@ -439,10 +439,7 @@ func TestIntegration_DetailCacheDropsOnRefsChanged(t *testing.T) {
 	}
 
 	runGitIn(t, f.dir, "tag", "v-cache-test", f.root)
-	ev := client.recvEvent("repo.changed")
-	if ev.Kind != "refsChanged" {
-		t.Fatalf("event = %+v, want refsChanged", ev)
-	}
+	client.awaitRepoChanged("refsChanged")
 
 	resp3 := requestOK(t, client, "commit.detail", gitrpc.CommitDetailParams{RepoID: repoID, SHA: f.root})
 	detail3 := unmarshalResult[porcelain.CommitDetail](t, resp3.Result)

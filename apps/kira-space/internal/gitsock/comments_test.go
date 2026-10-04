@@ -479,10 +479,7 @@ func TestIntegration_RefsChangedDoesNotDropComments(t *testing.T) {
 	added := addComment(t, client, repoID, "feature", "a.txt", featureSha, gitreview.LineRange{Start: 2, End: 2}, "note")
 
 	runGitIn(t, dir, "branch", "unrelated-branch")
-	ev := client.recvEvent("repo.changed")
-	if ev.Kind != "refsChanged" {
-		t.Fatalf("event = %+v, want refsChanged", ev)
-	}
+	client.awaitRepoChanged("refsChanged")
 
 	result := listComments(t, client, repoID, "feature", "")
 	if len(result.Comments) != 1 || result.Comments[0].ID != added.ID {

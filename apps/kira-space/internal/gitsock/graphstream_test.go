@@ -543,10 +543,7 @@ func TestFixtures_CaptureGraphChunkFrame(t *testing.T) {
 	id := client.openStream("graph.stream", map[string]any{"repoId": repoID})
 	client.sendCredit(id, 2)
 
-	raw, err := readFrame(client.r)
-	if err != nil {
-		t.Fatalf("read frame: %v", err)
-	}
+	raw := client.readRaw("frame")
 	if len(raw) == 0 || raw[0] != 0x00 {
 		t.Fatalf("first chunk frame is not a blob frame: %v", raw)
 	}
