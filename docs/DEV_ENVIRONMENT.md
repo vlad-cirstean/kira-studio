@@ -498,3 +498,61 @@ boilerplate (`blind`), per-adapter shape that is deliberate (`name`/`calls`), cr
 `kira-space` vs `kira-studio` mirrors, tests (dropped by default), generated bindings (dropped via
 `files.generated`). Anonymous callbacks and struct fields are not graph nodes, so unseen. Read every
 hit with `codegraph_explore` before calling it duplication.
+
+## Mutation testing (P151, report-only)
+
+Measures unit-test strength. Never wired into hooks, `package.json`, `pr.yml` or any gate; survivors
+are data, not failures. Scope: Go `go test` packages and `bun test` unit specs only (no Playwright
+suites). Tooling lives in `scripts/mutation/` and `tools/mutation/` (own `package.json` and
+`bun.lock`, not a root workspace).
+
+- **Prerequisites**: `bun run setup` (generated Wails bindings; the TS runner exits without them),
+  Go per `go.mod`, `jq`, `node` 22+. Go tool `gremlins` v0.6.0 installs itself into
+  `tools/mutation/bin/` (gitignored); Stryker installs via `bun install --frozen-lockfile` in
+  `tools/mutation/`.
+- **Run**: `nice -n 19 sh scripts/mutation/run.sh go|ts|all [target...]`. Go targets are package
+  dirs (`apps/kira-studio/internal/mask`); TS targets are area names from
+  `tools/mutation/areas.json`. Default: every Go package with tests, every TS area.
+- **Flags**: `--changed <ref>` mutates only files changed since `<ref>` (Go: other files of a package
+  are excluded; TS: intersected with the area globs). `--resume <run-dir>` continues a halted run
+  (units with an `.info.json` are skipped; a halt loses at most one unit). `--dirty` snapshots
+  uncommitted tracked changes. `MUTATION_WORKERS` sets workers (default half the cores; more
+  turns timing-sensitive tests into false kills). `MUTATION_STRYKER_ARGS=--dryRunOnly` checks an
+  area's initial test run without mutating.
+- **Isolation**: each run mutates a tracked-files snapshot in a temp dir (`TMPDIR` is redirected
+  there), never the live checkout; `git status` stays clean. Disk: snapshot ~52MB plus one gremlins
+  copy per worker.
+- **Output**: `tools/mutation/out/<utc>-<sha>/` (gitignored), `out/latest` symlinks the newest.
+  `summary.md` / `summary.json` are generated at the end of every run, or by hand with
+  `bun tools/mutation/summarize.ts <run-dir>`. `meta.json` records per-segment wall time.
+  Score = (killed + timeout) / (killed + timeout + survived + no coverage), same for both languages.
+- **Runtime**: Go ~0.7 s per mutant per worker at a 2s suite, more for slow suites; TS ~0.4 s per
+  covered mutant per worker, plus 10s per timed-out mutant (infinite-loop mutants are common). A
+  full run takes hours: run it in resumable chunks (one `run.sh` call per target group,
+  `--resume` the same run dir). Heaviest Go suites: `gitsession`, `ade`, `gitrpc`,
+  `apps/kira-studio/internal`.
+- **Go details**: a package whose plain `go test` is red is recorded `red` and skipped. gremlins
+  scales its per-mutant timeout from the coverage run, so `go.sh` passes a coefficient that floors
+  it at 60s. `_darwin.go` and `//go:build darwin` files are not mutated (invisible on Linux).
+  Container-gated adapter tests `t.Skip` without Docker, so their mutants report "no coverage";
+  there is no container mode.
+- **TS workarounds** (all inside the scripts and `stryker.config.mjs`, no repo test/source edit):
+  1. Bun's 5s per-test timeout kills the 100k-sha `shaTable` test under instrumentation:
+     `bun.bunArgs --timeout 60000`.
+  2. The runner eager-imports every mutated module before any spec, so modules reaching
+     `/wails/runtime.js` fail before `wailsRuntime.ts` registers its `mock.module`. `ts.sh`
+     appends a `[test] preload` block (`window.ts`, `wailsRuntime.ts`) to the snapshot's
+     `bunfig.toml` only.
+  3. `tabs-save-retries-after-failure` and `tabs-save-serialized` specs race on `setTimeout(0)`
+     under instrumentation: excluded from the area's test list in `areas.json`, with reason.
+  4. Workspace packages carry their own `node_modules` (isolated linker) which Stryker's sandbox
+     does not link: `inPlace: true` on the disposable snapshot, and `run.sh` symlinks every
+     `node_modules`.
+- **TS limits**: no type checker (bun strips types, so some survivors are type-invalid code), `.vue`
+  files are not mutated, static mutants are ignored, `packages/theme` and `packages/kira-ui` have no
+  unit suite.
+- **CI**: `docs/pending-workflows/mutation.yml` (manual dispatch only, `continue-on-error`, never
+  a required check) waits to be applied per the "Git push" section above (delete it once applied).
+- **Risks**: gremlins and `@hughescr/stryker-bun-runner` are single-maintainer, slow-moving tools.
+  Fallbacks if either breaks: `avito-tech/go-mutesting` (about 5x slower, no coverage split),
+  Stryker's `command` runner with `coverageAnalysis: 'off'` (10-30x slower).
