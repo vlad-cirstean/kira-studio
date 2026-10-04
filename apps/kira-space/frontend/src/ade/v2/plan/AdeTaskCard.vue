@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE, TONE_INK } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
@@ -10,6 +11,12 @@ import type { BranchRowModel, CardModel } from './usePlanModel';
 
 const props = defineProps<{ card: CardModel }>();
 const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
+
+const ui = useAdeBoardUiStore();
+function seeError(row: BranchRowModel): void {
+  ui.selectBranch(row.branch.taskId, row.id);
+  ui.focusSetup = true;
+}
 
 const p = computed(() => props.card.progress);
 const segColor = (state: string): string => {
@@ -62,7 +69,9 @@ const headStyle = computed(() => ({
         :key="row.id"
         :tag="row.tag"
         :force-push="row.tag.actions.find((a) => a.kind === 'forcePush')"
+        :see-error="row.tag.actions.find((a) => a.kind === 'seeError')"
         @force-push="emit('forcePush', row)"
+        @see-error="seeError(row)"
       />
     </div>
     <div

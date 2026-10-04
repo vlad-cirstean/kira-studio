@@ -10,8 +10,9 @@ defineProps<{
   tag: { label: string; tone: Tone; tip: string };
   tall?: boolean;
   forcePush?: { label: string; tip: string };
+  seeError?: { label: string; tip: string };
 }>();
-const emit = defineEmits<{ forcePush: [] }>();
+const emit = defineEmits<{ forcePush: []; seeError: [] }>();
 </script>
 
 <template>
@@ -37,6 +38,17 @@ const emit = defineEmits<{ forcePush: [] }>();
         @click="emit('forcePush')"
       >
         {{ forcePush.label }}
+      </Button>
+    </AdeTip>
+    <AdeTip v-if="seeError" :text="seeError.tip">
+      <Button
+        size="xs"
+        class="h-[22px] shrink-0 rounded-kira-sm px-[9px] text-kira-sm font-semibold"
+        :style="solidStyle('red')"
+        data-testid="ade-see-error"
+        @click.stop="emit('seeError')"
+      >
+        {{ seeError.label }}
       </Button>
     </AdeTip>
     <slot />

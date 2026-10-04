@@ -18,6 +18,8 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
   /** The Add popover: open state, and the task it attaches an existing branch to (else a new task). */
   const addOpen = ref(false);
   const attachTo = ref<{ taskId: string; title: string } | null>(null);
+  /** A See error click asked the open branch panel to scroll to its Worktree setup block. */
+  const focusSetup = ref(false);
   /** Task whose agent Run dialog is open. */
   const runTaskId = ref<string | null>(null);
   /** Last failed stage action per task, shown in the panel header until the next attempt. */
@@ -72,6 +74,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     addOpen,
     attachTo,
     runTaskId,
+    focusSetup,
     actionError,
     refreshSummary,
     showAllItems,

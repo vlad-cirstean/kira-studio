@@ -7,12 +7,13 @@ import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import type { CardModel, PlanModel } from '../plan/usePlanModel';
-import { usePrs, useRepos } from '../queries';
+import { usePrs, useRepos, useRetrySetup } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { solidStyle, TONE } from '../tones';
 import type { Deployment, Integration } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
+import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
 
 // Branch mode: header (back link, git status, name, facts, Force push), Details and Changes tabs.
 const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; model: PlanModel }>();
@@ -21,6 +22,8 @@ const ui = useAdeBoardUiStore();
 const prs = usePrs();
 const repos = useRepos();
 const tab = ref('details');
+const retrySetup = useRetrySetup();
+const setupError = ref('');
 const forcePush = ref(false);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
 const copiedKey = ref('');
@@ -34,6 +37,15 @@ const baseName = computed(() => {
 const facts = computed(
   () => `${props.row.repo} · base ${baseName.value} · ↑${branch.value.ahead} ↓${branch.value.behind}`,
 );
+const setupFailed = computed(() => branch.value.setup?.state === 'failed');
+async function onRetrySetup(): Promise<void> {
+  setupError.value = '';
+  try {
+    await retrySetup.mutateAsync({ branchId: branch.value.id });
+  } catch (err) {
+    setupError.value = err instanceof Error ? err.message : String(err);
+  }
+}
 const canForcePush = computed(() => props.row.tag.actions.some((a) => a.kind === 'forcePush'));
 const shared = computed(() => {
   const a = props.model.view.after.get(branch.value.id);
@@ -147,7 +159,18 @@ function deployNote(d: Deployment): string {
         </h3>
       </div>
       <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
-      <div v-if="canForcePush" class="flex flex-wrap gap-1.5 pt-[3px]">
+      <p v-if="setupError" class="m-0 text-kira-sm text-error" data-testid="ade-panel-setup-error">{{ setupError }}</p>
+      <div v-if="canForcePush || setupFailed" class="flex flex-wrap gap-1.5 pt-[3px]">
+        <button
+          v-if="setupFailed"
+          type="button"
+          class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold"
+          :style="solidStyle('amber')"
+          data-testid="ade-panel-retry-setup"
+          @click="onRetrySetup"
+        >
+          Retry setup
+        </button>
         <AdeTip text="git push --force-with-lease">
           <button
             type="button"
@@ -215,6 +238,8 @@ function deployNote(d: Deployment): string {
           </template>
         </div>
       </div>
+
+      <AdeWorktreeSetup :row="row" />
 
       <div class="flex flex-col gap-0.5">
         <div class="pb-0.5 text-kira-sm text-muted-foreground">Merged into</div>
