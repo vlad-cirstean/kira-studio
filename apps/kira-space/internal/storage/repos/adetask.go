@@ -872,3 +872,29 @@ func (r *AdeTaskRepo) HasRunningOn(branchID string) (bool, error) {
 	}
 	return n > 0, nil
 }
+
+// ArchiveTask archives the task and its branches and drops its plan row in one transaction.
+func (r *AdeTaskRepo) ArchiveTask(taskID string, now int64) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos: begin archive ade task %s: %w", taskID, err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	res, err := tx.Exec(`UPDATE ade_tasks SET archived_at = ? WHERE id = ? AND archived_at IS NULL`, now, taskID)
+	if err != nil {
+		return fmt.Errorf("repos: archive ade task %s: %w", taskID, err)
+	}
+	if err := sqlitex.RequireOneRow(res, "ade task "+taskID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE ade_task_branches SET archived_at = ? WHERE task_id = ? AND archived_at IS NULL`, now, taskID); err != nil {
+		return fmt.Errorf("repos: archive ade task branches %s: %w", taskID, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM ade_task_plan WHERE task_id = ?`, taskID); err != nil {
+		return fmt.Errorf("repos: drop ade task plan row %s: %w", taskID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos: commit archive ade task %s: %w", taskID, err)
+	}
+	return nil
+}

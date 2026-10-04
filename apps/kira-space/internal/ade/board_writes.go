@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -266,8 +267,44 @@ func (b *TaskBoard) repoCandidates(ctx context.Context, codeRepoID string, taken
 }
 
 // AddExistingBranch attaches an existing git branch to a live task, or (taskId "") to a new task:
-// a review task when the tip author is not the user, else a plain task.
+// a review task when the tip author is not the user, else a plain task. A mine or parked branch that
+// is not checked out anywhere gets a worktree and its prepare script (R19); a review branch gets
+// none until Start or Take over.
 func (b *TaskBoard) AddExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs) (adewire.AddExistingBranchResult, error) {
+	var sb model.AdeTaskBranch
+	res, err := b.attachExistingBranch(ctx, args, &sb)
+	if err != nil {
+		return res, err
+	}
+	if sb.Kind != model.AdeBranchKindReview {
+		b.prepareAttached(ctx, sb)
+	}
+	return res, nil
+}
+
+// prepareAttached gives an attached branch its worktree and setup. A failure leaves the branch
+// attached: the next Start or Take over retries through the launch gate.
+func (b *TaskBoard) prepareAttached(ctx context.Context, sb model.AdeTaskBranch) {
+	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
+	if err != nil || rec == nil {
+		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
+		return
+	}
+	res, err := b.ensureWorktree(ctx, "", *rec, sb, "")
+	if err != nil {
+		slog.Warn("ade: attached branch worktree", "scope", "ade", "branch", sb.ID, "err", err)
+		return
+	}
+	if !res.Fresh {
+		return
+	}
+	if err := b.startSetup(*rec, sb, res.Name, res.Path, b.onSetupReady); err != nil {
+		slog.Warn("ade: attached branch setup", "scope", "ade", "branch", sb.ID, "err", err)
+	}
+	b.notifyBoard()
+}
+
+func (b *TaskBoard) attachExistingBranch(ctx context.Context, args adewire.AddExistingBranchArgs, attached *model.AdeTaskBranch) (adewire.AddExistingBranchResult, error) {
 	if err := b.requireRepos([]string{args.CodeRepoID}); err != nil {
 		return adewire.AddExistingBranchResult{}, err
 	}
@@ -329,6 +366,7 @@ func (b *TaskBoard) AddExistingBranch(ctx context.Context, args adewire.AddExist
 			return adewire.AddExistingBranchResult{}, err
 		}
 	}
+	*attached = sb
 	b.notifyBoard()
 	facts := b.repoFacts(ctx, args.CodeRepoID, []model.AdeTaskBranch{sb}, nil)
 	b.applyChecks(args.CodeRepoID, facts)
