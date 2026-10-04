@@ -123,13 +123,8 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 	b := NewBroker(clock.Now)
 	t.Cleanup(b.Shutdown) // releases the three Request goroutines.
 
-	var mu sync.Mutex
-	var queuedSeen []int
-	unsub := b.Subscribe(func(snap PairingSnapshot) {
-		mu.Lock()
-		defer mu.Unlock()
-		queuedSeen = append(queuedSeen, snap.Queued)
-	})
+	seen := make(chan int, 8)
+	unsub := b.Subscribe(func(snap PairingSnapshot) { seen <- snap.Queued })
 	defer unsub()
 
 	enqueuedA := make(chan PairingRequest, 1)
@@ -144,8 +139,16 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 	go func() { b.Request("c", "c", func(req PairingRequest) { enqueuedC <- req }) }()
 	<-enqueuedC // c queues behind a and b — Queued: 3.
 
-	mu.Lock()
-	defer mu.Unlock()
+	// onEnqueued runs before the emit, so wait for each emission rather than assuming it landed.
+	var queuedSeen []int
+	for len(queuedSeen) < 3 {
+		select {
+		case q := <-seen:
+			queuedSeen = append(queuedSeen, q)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %v queued counts emitted, want 3", queuedSeen)
+		}
+	}
 	if len(queuedSeen) != 3 || queuedSeen[0] != 1 || queuedSeen[1] != 2 || queuedSeen[2] != 3 {
 		t.Fatalf("queued counts seen by the subscriber: got %v, want [1 2 3] — "+
 			"an enqueue behind an already-presented head must still emit its own updated count", queuedSeen)
