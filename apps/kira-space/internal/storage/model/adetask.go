@@ -169,6 +169,7 @@ type AdeRepoEnv struct {
 // A repo with no ade_repo_config row carries the column defaults.
 type AdeRepoConfig struct {
 	CodeRepoID          string
+	RepoID              string // code_repos.repo_id: the git_repo_settings key
 	Name                string
 	Root                string
 	Nickname            string

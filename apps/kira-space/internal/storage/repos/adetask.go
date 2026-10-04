@@ -15,7 +15,7 @@ var (
 	ErrTaskNotFound  = errors.New("repos: task not found")
 	ErrBranchOnTask  = errors.New("repos: branch is already on a task")
 	ErrRepoOnTask    = errors.New("repos: task already has a branch in that repo")
-	ErrReviewKind    = errors.New("repos: a review task cannot change kind")
+	ErrReviewKind    = errors.New("repos: a task only moves between task and parked, and a review task keeps its kind")
 	ErrBranchMissing = errors.New("repos: branch not found")
 	ErrBacklogGone   = errors.New("repos: backlog item not found")
 )
@@ -237,6 +237,7 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 	if err != nil {
 		return model.AdeTask{}, fmt.Errorf("repos: select ade task %s: %w", id, err)
 	}
+	prevKind := cur.Kind
 	if p.Est != nil {
 		if err := checkEstExtends(cur.Est, *p.Est); err != nil {
 			return model.AdeTask{}, err
@@ -269,6 +270,15 @@ func (r *AdeTaskRepo) UpdateTask(id string, p model.AdeTaskPatch) (model.AdeTask
 			return model.AdeTask{}, fmt.Errorf("repos: color %d out of range", *p.Color)
 		}
 		cur.Color = *p.Color
+	}
+	if p.Kind != nil && *p.Kind != prevKind {
+		from, to := model.AdeBranchKindMine, model.AdeBranchKindParked
+		if *p.Kind == model.AdeTaskKindTask {
+			from, to = to, from
+		}
+		if _, err := tx.Exec(`UPDATE ade_task_branches SET kind = ? WHERE task_id = ? AND kind = ?`, to, id, from); err != nil {
+			return model.AdeTask{}, fmt.Errorf("repos: move ade task branches to %s: %w", to, err)
+		}
 	}
 	if _, err := tx.Exec(`UPDATE ade_tasks SET kind = ?, title = ?, jira_key = ?, jira_url = ?, github_url = ?, est = ?, notes = ?, color = ? WHERE id = ?`,
 		cur.Kind, cur.Title, cur.JiraKey, cur.JiraURL, cur.GithubURL, cur.Est, cur.Notes, cur.Color, id); err != nil {

@@ -15,7 +15,7 @@ type AdeRepoConfigRepo struct {
 // List returns every code repo (sort order) joined with its ade config, integration branches and
 // environments. A repo with no config row carries the column defaults.
 func (r *AdeRepoConfigRepo) List() ([]model.AdeRepoConfig, error) {
-	rows, err := r.DB.Query(`SELECT c.id, c.name, c.root, COALESCE(a.nickname, ''), COALESCE(a.prepare_timeout, '10m'),
+	rows, err := r.DB.Query(`SELECT c.id, c.repo_id, c.name, c.root, COALESCE(a.nickname, ''), COALESCE(a.prepare_timeout, '10m'),
 		COALESCE(a.source, 'added')
 		FROM code_repos c LEFT JOIN ade_repo_config a ON a.code_repo_id = c.id ORDER BY c.sort_order, c.id`)
 	if err != nil {
@@ -25,7 +25,7 @@ func (r *AdeRepoConfigRepo) List() ([]model.AdeRepoConfig, error) {
 	idx := make(map[string]int)
 	for rows.Next() {
 		var c model.AdeRepoConfig
-		if err := rows.Scan(&c.CodeRepoID, &c.Name, &c.Root, &c.Nickname, &c.PrepareTimeout, &c.Source); err != nil {
+		if err := rows.Scan(&c.CodeRepoID, &c.RepoID, &c.Name, &c.Root, &c.Nickname, &c.PrepareTimeout, &c.Source); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("repos: scan ade repo config: %w", err)
 		}
