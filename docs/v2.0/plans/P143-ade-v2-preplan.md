@@ -59,9 +59,9 @@ earlier; Stream A (backend) owns all IPC glue. No stubbed method ever exists.
 | P143 | serial | Contract freeze: wire types (Go + TS), IPC method/channel names, fixtures | — | M |
 | P144 | wave 1 | Task store, migration, workflow reader, board snapshot, CRUD surface | Pure board logic on fixtures | A L · B L |
 | P145 | wave 2 | Workflow editing + watch, repos config, folders, integration + deploy facts | New shell, Plan timeline, task cards, Add, ported git dialogs; v1 frontend removed | A L · B XL |
-| P146 | wave 3 | Worktree setup gate + headless run engine + `finish_step` MCP + script stages | Panel (task + branch), Backlog page, merged/deployed UI, fix menu, merge dialog | A XL · B L |
+| P146 | wave 3 | Worktree setup gate + headless run engine + `finish_step` MCP + script stages | Panel (task + branch), Backlog page, merged/deployed UI (display only; fix menu and merge dialog moved to P148 B, M1) | A XL · B L |
 | P147 | wave 4 | Send-back, Take over, interactive stage launch, single-branch Start, task archive, restart recovery | Workflows page, Repos page, run UI (progress, steps per repo, Run dialog, Approve/Retry/Done), setup UI | A L · B XL |
-| P148 | wave 5 | v1 backend removal, drop v1 tables | Sessions tab + Take over, `▶ <Stage>`, `▶ Start`, task Archive dialog, Needs you + All sessions, History per task | A M · B L |
+| P148 | wave 5 | v1 backend removal, drop v1 tables | Sessions tab + Take over, `▶ <Stage>`, `▶ Start`, task Archive dialog, Needs you + All sessions, History per task, merge dialog, fix menu, Merge / Re-merge (M1) | A M · B L |
 | P149 | serial | Closing: full UI + Go suites, live run vs mockup, `ARCHITECTURE.md`, open items | — | M |
 
 Sizes: S < 300 changed lines, M 300-1000, L 1000-2500, XL > 2500. Any planner may split an
@@ -242,13 +242,12 @@ release script), §5.1.2, §6.1 (backend).
 (color · status chip · 2-line title; mono line; actions), tabs `Task` · `Notes` (`Sessions N`
 lands whole in P148), Task tab (Name, Status read-only and derived (D10), Jira key/url display only, GitHub row, Estimate, Branches list +
 `+ Add repo…` select + `+ Add branch`), Notes tab (TipTap, full height). Branch mode (`← task`,
-header, mono line, actions, Details: Branch + PR rows, Merged into rows with Merge/Re-merge,
+header, mono line, actions, Details: Branch + PR rows, Merged into rows (display only; Merge/Re-merge moved to P148 B, M1),
 Deployed to rows; Changes tab reused). Branch row line 2 merged/deployed text with stale amber and
-tooltips. Right-click fix menu (shadcn ContextMenu). Merge dialog (Claude dialog, `Also push
-develop` default off, develop worktree template). Refresh chip summary. Backlog page (§11.1: list +
+tooltips. Right-click fix menu and Merge dialog moved to P148 B (M1). Refresh chip summary. Backlog page (§11.1: list +
 520px panel, capture input, ↑/↓, `→ Task`, ✕, inline edit, Jira/GitHub/Notes fields, `→ Plan as
 task` opening the new task).
-**SPEC2:** §6 (display, menu, panel, merge dialog), §6.2 (display), §7 (panel except Workflow block
+**SPEC2:** §6 (display, panel), §6.2 (display), §7 (panel except Workflow block
 and Sessions), §11.1, §3 (fetch summary display).
 
 **Ownership.** Same split as P145. **No ordering dependency:** B consumes P144/P145 methods; A's
@@ -307,7 +306,7 @@ Take over; TUI tab terminal (reuse terminal module); `Finished / stopped` list w
 Take over wiring everywhere (Sessions bar, step rows, Needs you), opening `TUI … (resumed)` tab; on a
 running headless run a confirm dialog says the run must be stopped first (D3). Read-only live log of a
 headless run reachable without taking over from Sessions tab, step rows and Needs you (D3).
-`▶ <Stage>` dialog with stage prompt. `▶ Start` on branch rows. Task Archive dialog (§10 template,
+Merge dialog (Claude dialog, `Also push develop` default off, develop worktree template, `RecordMerge` on finish), right-click fix menu (shadcn ContextMenu), Merge / Re-merge buttons and `Right-click to re-merge.` tip (M1, from P146 B). `▶ <Stage>` dialog with stage prompt. `▶ Start` on branch rows. Task Archive dialog (§10 template,
 every branch at risk) reusing archive-at-risk flow. Needs you page (§11: kinds, ordering, one
 action each (`interrupted by restart` stuck runs included), footer counts, `All sessions` toggle grouped by task, tab badge count). History rows
 per task with repos.
@@ -366,7 +365,7 @@ check), §13 (audit). Size M.
 | §5.2 | Long text rules | P144 B (helpers), P145-P148 B (each surface) |
 | §6 | Merged/stale/not merged compute, after rebase, recorded merge on dialog finish only (D14) | P145 A |
 | §6 | Rebase-conflict check of every visible branch after refresh (D1) | P144 A |
-| §6 | Row text, fix menu, panel Merged into, Merge dialog | P146 B |
+| §6 | Row text, panel Merged into (P146 B); fix menu, Merge dialog, Merge / Re-merge (P148 B, M1) | P146 B, P148 B |
 | §6.1 | Prepare script run, states, gate, persist | P146 A |
 | §6.1 | Graph/panel/Needs you display | P147 B, P148 B |
 | §6.2 | Deploy compute | P145 A |
@@ -412,9 +411,9 @@ Former open questions Q1-Q16 answered. Each wave plan restates the decisions it 
 **Still open (not answered by the user; the owning phase's plan proposes, user confirms):**
 
 - O2. Resolved: backlog in app SQLite, shared across windows.
-- O3. Parked tasks / review items (old Q18): where is `parked` toggled; can a `review` task hold more than one branch?
-- O4. `{jira}` script variable (old Q19): key only, or `KEY URL`? Plan assumes key only (D9: no sync).
-- O5. Default for the `--setting-sources` app setting: decided in the P146 plan (D6).
+- O3. Resolved in the P146 plan (R3): `Not merging` switch in the Task tab; review tasks hold any number of branches. Parked tasks / review items (old Q18): where is `parked` toggled; can a `review` task hold more than one branch?
+- O4. Resolved in the P146 plan (R4): key only. `{jira}` script variable (old Q19): key only, or `KEY URL`? Plan assumes key only (D9: no sync).
+- O5. Resolved in the P146 plan (R2): default `all`. Default for the `--setting-sources` app setting: decided in the P146 plan (D6).
 
 ## 7. Deviation note
 

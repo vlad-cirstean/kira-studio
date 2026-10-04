@@ -3171,6 +3171,25 @@ feature be tested without ever spawning a real shell.
   valid version. No workflow is seeded.
 - Full ADE rewrite of this document stays P149.
 
+**ADE v2 run engine (P146).**
+
+- Headless run: `$SHELL -l -c 'exec claude -p --output-format stream-json --verbose --session-id <uuid>
+  --mcp-config <file> --setting-sources <src> [--allowedTools …]'`, cwd the worktree, prompt on stdin,
+  `Setsid` + `procgroup.GracefulCancel`. No `--permission-mode`, no `--strict-mcp-config`;
+  `--allowedTools` is the step list plus `mcp__kira-ade__finish_step`.
+- `--setting-sources` (verified on CLI 2.1.289): in a fresh worktree repo allow rules are ignored
+  anyway; repo deny rules apply only with `project`. App setting `ade.headlessSettingSources` is
+  `all` (default, `user,project,local`) or `user`.
+- `finish_step` MCP server (`internal/adeagent`): one loopback listener, bearer token per run
+  (`tokenauth`), config file `<home>/ade/runs/<runId>.mcp.json` mode `0600`, deleted at process exit.
+  Token never on argv. Last call wins, applied at exit.
+- Run and setup logs live in SQLite (`ade_logs`, `ade_log_chunks`): tail 2 MiB per log, chunks of at
+  most 8 KiB, `truncated` set when head chunks drop. Writes batch every 250 ms.
+- `ade_sessions` (migration `0010`) holds v1 TUI rows (`task_id = ''`) and v2 rows (`mode`
+  `tui`/`headless`, `task_id`, `run_id`, `resumes`). v1 repo methods filter `task_id = ''`.
+- Todo progress `[n, m]` parses `TodoWrite` and `TaskCreate`/`TaskUpdate`. CLI 2.1.289 in `-p` mode
+  offers neither tool, so `todo` stays null live (see Known open items).
+
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
 any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
 reading of `gh`'s own keychain entry out from under it — PR lookups shell through `gh api`, under
@@ -4438,6 +4457,8 @@ own secrets.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
+- **Run held behind a failed worktree setup keeps note `waiting for worktree setup` (P146).** `worktree setup failed` shows only on runs queued after the failure; the setup state itself shows failed.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's

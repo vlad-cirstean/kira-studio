@@ -575,3 +575,54 @@ off-token colors) is a defect fixed before landing. Verdict + image paths in the
 - P148 B: merge dialog (`Also push develop` off, develop worktree template, `RecordMerge` on finish,
   D14), right-click fix menu (shadcn `context-menu` add), Merge / Re-merge buttons, re-add the
   `Right-click to re-merge.` tip (R5); Sessions tab reads `Sessions()` + `onAdeTaskSessions`.
+
+## Result
+
+Streams landed fast-forward on `v2.0` from `2ad7fdea` (`B0`). Notes: `P146-streamA-notes.md`,
+`P146-streamB-notes.md`.
+
+**Commits:** 18 from `B0` to `4248d638` (A 8 plus notes, B 8 plus notes), then closing commits.
+
+**Counts:** 38 `AdeTaskService` methods, 38 `adeTask*` entries; migration `0010`; `test:unit` 1739
+pass; `test:ui:space` 85 pass; `go build ./...`, `go test ./apps/kira-space/...`, `go test -race` on
+`ade`, `adeagent`, `adeflow`, `gitsession`, `lint:all` all exit 0 on the landed tip.
+
+**gitsock (P152).** Green on this tip's single run (`ok ... gitsock 59s`). No flake seen; not
+re-measured with `-count=3` since nothing failed.
+
+**Real `claude -p` smoke.** Ran in Stream A on its tip, as a scratch Go test (deleted) on the engine
+harness with `ClaudeBin=claude` (CLI 2.1.289): setup `prepared`, headless session row `stopped`,
+`finish_step` over MCP reached the engine (`done`, summary stored), script stage logged
+`feat/fix-login`. Not re-run on the landed tip: no UI caller can start a run before P147 B, and
+the engine code is unchanged since Stream A. Todo `[n, m]` not observed live (carry-forward).
+
+**Live smoke (landed tip, server-tag build, local `Locate` patch reverted).** Temp home, two scratch
+repos (`api` with `develop` and a squash-merged `feat/sq`, prepare script set; `web`), Playwright
+Chromium on `/?window=main`. Ran: Task tab rename persists across reload; Notes typing persists;
+`+ Add repo…` adds a branch row (1 to 2); Existing branch `feat/sq` added, Refresh all, branch mode
+shows `Merged into develop: merged`; Backlog capture then `→ Plan as task` opens the new task in the
+panel; settings switch round-trips (`ade.headlessSettingSources = "user"` stored, shown after
+reload). Not run live: worktree setup, step machine and `finish_step` through the bridge (no UI
+caller until P147 B; covered by engine tests with a fake claude and the Stream A real-claude
+smoke).
+
+**Mockup verdict.** Matches `mockup.html` within the accepted list (B notes). Branch-mode screenshot
+re-read at wave end; no new defect.
+
+**Closing items.** M1 (R5) recorded in `SPEC.md` P146/P148 rows, preplan §4/§5 and P145 plan §8.
+Preplan O3, O4, O5 marked resolved (R3, R4, R2). `knip.json` dry run: dropping the `ade/v2/wire.ts`
+and `ade/v2/board/*.ts` entries fails `lint:dead`, so both stay (comment updated). ARCHITECTURE.md
+gains run-engine notes and two Known open items.
+
+**Licenses:** none new. `go.mod`, `go.sum`, `package.json`, `bun.lock` unchanged.
+
+**Deviations / carry-forward:**
+- Todo progress unobservable in `claude -p` 2.1.289 (no TodoWrite/TaskCreate/TaskUpdate tool).
+  Open question for the user.
+- `{branch}` prints unquoted when `quotePOSIX` deems it safe.
+- Run held behind a failed setup keeps note `waiting for worktree setup`.
+- Headless-sources switch writes immediately, not on dialog Save. Draft-bound version needs
+  `SettingsDialog.vue` and `settings/types.ts`; assigned to P148 B (SPEC row).
+- 23 test files in `gitrpc`, `gitsession`, `ade`, `bridge` still open the real `review.db`: new
+  SPEC row P154 after P153.
+- `codegraph_explore`: not recorded after context compaction in Stream A (A notes).

@@ -548,7 +548,7 @@ defect fixed before landing. Verdict + image paths in the B notes.
 
 - P146 B: subscribe `onAdeTaskRepos` and refresh `state/coderepos.ts` too (folder watch imports in
   the background; Git module list otherwise stale until reload). Add-popover attach mode. Fetch
-  summary on the chip (`mergedInto`). Merge dialog calls `RecordMerge` on finish (D14).
+  summary on the chip (`mergedInto`). Merge dialog calls `RecordMerge` on finish (D14); moved to P148 B (P146 M1).
 - P146 A: migration `0010`; ade worktree setup uses `RepoSettings().WorktreePrepareTimeout`;
   stage advance against an edited workflow (snapshot rule).
 - P147 B: Workflows page uses `ValidateWorkflowYaml` (debounced) / `SaveWorkflowYaml`;
