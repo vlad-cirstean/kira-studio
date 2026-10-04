@@ -38,7 +38,7 @@ reserves band space.
 `packages/workbench/src/components/TabStrip.vue`. P138 (theme tokens) depends on P137 landing
 first so it doesn't retheme markup P137 is about to replace.
 
-**P143-P149 (proposed, pending user approval) rebuild `ade` as a task planner** per
+**P143-P150 (proposed, pending user approval) rebuild `ade` as a task planner** per
 `design/ade-v2/SPEC2.md`. Phasing: `plans/P143-ade-v2-preplan.md`. P143 and P149 run serially;
 P144-P148 each run as two streams (A backend, B frontend) in separate worktrees, per `CLAUDE.md`'s
 streams rule. B in each wave consumes only bridge methods landed in earlier waves.
@@ -79,6 +79,7 @@ streams rule. B in each wave consumes only bridge methods landed in earlier wave
 | **P147 ADE v2 wave 4: send-back, Take over, interactive stages, task archive (A) ‖ Workflows, Repos, run UI (B)** | **Proposed, pending user approval.** A: send back via `claude -p --resume` (3 rounds), Take over via `claude --resume` in a TUI, interactive user-stage launch with prompt, single-branch Start, archive per task, restart recovery (`running` becomes `stuck`, no auto-resume, D7). B: Workflows page (Form/YAML, empty state with Import YAML / + New, D2), Repos page, live stage progress, panel Workflow block with per-repo step lines, Run dialog, Approve/Retry/Done/Finish, Release block, worktree setup UI. | Needs P146. B consumes P144-P146 methods only. |
 | **P148 ADE v2 wave 5: v1 backend removal (A) ‖ Sessions, Take over, Needs you, task archive UI (B)** | **Proposed, pending user approval.** A: delete v1-only `AdeService` methods, queue code, v1 `ade/wire.ts`; migration dropping v1 tables, no data migration (D5). B: Sessions tab (TUI and headless read-only log, reachable without taking over), Take over everywhere (confirm dialog when run is live, D3), `▶ <Stage>` and `▶ Start` dialogs, task Archive dialog, Needs you page with All sessions and badge, History per task. | Needs P147. v1 frontend callers left in P145, so A's removals touch nothing B uses. |
 | **P149 ADE v2 closing: full suites, live mockup comparison, architecture docs** | **Proposed, pending user approval.** Serial. All Go and UI suites, live Kira Space run compared to `ade-v2/mockup.html` screen by screen, SPEC2 §13 and design §9 re-audit, `docs/ARCHITECTURE.md` ade section and Known open items. | Last: needs every wave landed. |
+| **P150 Review code: per-branch review window, per-task review agent, GitHub viewed sync** | **Proposed, pending user approval.** Added by user request at the end; no other phase renumbered. Plan `plans/P150-review-code.md`. Per-branch Review code button opens dedicated review window reusing the Git module review module. Content-based since-review diff: stored snapshot survives rebases, pinned against cleanup. AI questions panel forwards to one interactive TUI Claude Code review session per task (`Tracker.Send` path). One-way GitHub sync marks fully reviewed files viewed via `gh api graphql` `markFileAsViewed`. | Runs after P149. Re-verify plan against then-current tree first. |
 
 ## Layout
 
