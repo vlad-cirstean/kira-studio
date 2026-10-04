@@ -1,0 +1,111 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { TONE } from '../tones';
+import type { Branch } from '../wire';
+
+// Branch Changes tab: base, worktree, rebase conflicts, shared files, uncommitted, commits, files.
+const props = defineProps<{
+  branch: Branch;
+  /** Base ref name shown next to the ahead/behind counts. */
+  base: string;
+  /** `<earlier branch> · <file>` when an earlier-merging branch shares a file, else `''`. */
+  shared: string;
+}>();
+
+function basename(path: string): string {
+  return path.split('/').pop() ?? path;
+}
+
+const worktree = computed(() => {
+  const b = props.branch;
+  if (b.name === '') return 'created on Start';
+  const where = b.worktree || 'no worktree';
+  return b.dirty.length ? `${where} · ${b.dirty.length} uncommitted` : where;
+});
+const conflicts = computed(() => props.branch.conflictsIfRebased.map(basename).join(', '));
+
+function fileDelta(f: Branch['files'][number]): string {
+  if (f.binary) return 'binary';
+  const parts: string[] = [];
+  if (f.added !== null) parts.push(`+${f.added}`);
+  if (f.deleted !== null) parts.push(`−${f.deleted}`);
+  return parts.join(' ');
+}
+</script>
+
+<template>
+  <div
+    class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-3.5 pb-3.5 pt-2.5 text-kira-md"
+    data-testid="ade-changes-tab"
+  >
+    <div class="grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-2 gap-y-1.5">
+      <span class="text-muted-foreground">Base</span>
+      <span class="font-data text-kira-sm">{{ base }} · ↑{{ branch.ahead }} ↓{{ branch.behind }}</span>
+      <span class="text-muted-foreground">Worktree</span>
+      <span
+        class="font-data text-kira-sm"
+        :style="branch.dirty.length ? { color: TONE.amber[1] } : undefined"
+        data-testid="ade-changes-worktree"
+        >{{ worktree }}</span
+      >
+      <template v-if="conflicts">
+        <span class="text-muted-foreground">Conflicts</span>
+        <span class="font-data text-kira-sm" :style="{ color: TONE.red[1] }" data-testid="ade-changes-conflict">{{
+          conflicts
+        }}</span>
+      </template>
+      <template v-if="shared">
+        <span class="text-muted-foreground">Shares</span>
+        <span class="font-data text-kira-sm" :style="{ color: TONE.amber[1] }" data-testid="ade-changes-shared">{{
+          shared
+        }}</span>
+      </template>
+    </div>
+
+    <div v-if="branch.dirty.length" class="flex flex-col gap-0.5">
+      <div class="text-muted-foreground">Uncommitted</div>
+      <div
+        v-for="d in branch.dirty"
+        :key="d.path"
+        class="flex gap-2 font-data text-kira-sm"
+        data-testid="ade-changes-dirty-row"
+      >
+        <span class="w-4" :style="{ color: d.code === 'M' ? TONE.amber[1] : TONE.green[1] }">{{ d.code }}</span>
+        <span class="text-fg">{{ d.path }}</span>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-[3px]">
+      <div class="text-muted-foreground">Commits</div>
+      <div
+        v-for="c in branch.commits"
+        :key="c.sha"
+        class="flex items-baseline gap-2"
+        data-testid="ade-changes-commit-row"
+      >
+        <span class="font-data text-kira-sm" :style="{ color: TONE.amber[2] }">{{ c.sha }}</span>
+        <span class="truncate">{{ c.message }}</span>
+      </div>
+      <div v-if="branch.commitCount > branch.commits.length" class="text-kira-sm text-muted-foreground">
+        + {{ branch.commitCount - branch.commits.length }} more
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-0.5">
+      <div class="text-muted-foreground">Files</div>
+      <div
+        v-for="f in branch.files"
+        :key="f.path"
+        class="flex justify-between gap-2 rounded px-1.5 py-0.5 font-data text-kira-sm"
+        :class="branch.conflictsIfRebased.includes(f.path) ? '' : 'text-fg'"
+        :style="
+          branch.conflictsIfRebased.includes(f.path) ? { background: TONE.red[0], color: TONE.red[1] } : undefined
+        "
+        data-testid="ade-changes-file-row"
+      >
+        <span class="truncate">{{ f.path }}</span>
+        <span class="shrink-0 text-muted-foreground">{{ fileDelta(f) }}</span>
+      </div>
+    </div>
+  </div>
+</template>

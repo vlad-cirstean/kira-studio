@@ -1,0 +1,76 @@
+<script setup lang="ts">
+import { useDebounceFn, useDraggable } from '@vueuse/core';
+import { ref } from 'vue';
+
+// Hand-rolled on VueUse, not reka `ResizablePanelGroup`: a nested group hung the render process
+// (P132 Part 1 §0.1), and reka's px sizing re-runs layout on every container resize tick.
+// Tracks the gesture only; the caller clamps nothing beyond `min`/`max` and persists the width.
+const props = defineProps<{
+  /** Effective panel width: the drag and arrow-key start point. */
+  value: number;
+  min: number;
+  max: number;
+}>();
+
+const emit = defineEmits<{
+  /** While dragging and per arrow-key press: render the panel at this width. */
+  resize: [width: number];
+  /** Width to persist: on drag end, debounced on arrow-key repeats. */
+  commit: [width: number];
+}>();
+
+const handleEl = ref<HTMLElement | null>(null);
+const dragStartValue = ref(0);
+
+function clamp(w: number): number {
+  return Math.max(props.min, Math.min(props.max, w));
+}
+
+const commitDebounced = useDebounceFn((w: number) => emit('commit', w), 400);
+
+// A zero `initialValue` makes `position` the raw pointer delta since drag start; the handle never
+// moves. Dragging right narrows the panel.
+let lastDrag = 0;
+useDraggable(handleEl, {
+  axis: 'x',
+  preventDefault: true,
+  initialValue: { x: 0, y: 0 },
+  onStart: () => {
+    dragStartValue.value = props.value;
+  },
+  onMove: (position) => {
+    lastDrag = clamp(dragStartValue.value - position.x);
+    emit('resize', lastDrag);
+  },
+  onEnd: () => {
+    emit('commit', lastDrag);
+  },
+});
+
+function onKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  const next = clamp(props.value + (e.key === 'ArrowLeft' ? 16 : -16));
+  emit('resize', next);
+  void commitDebounced(next);
+}
+</script>
+
+<template>
+  <!-- biome-ignore lint/a11y/useSemanticElements: ARIA separator widget — <hr> can't carry aria-valuenow/tabindex/keydown -->
+  <div
+    ref="handleEl"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize panel"
+    :aria-valuenow="value"
+    :aria-valuemin="min"
+    :aria-valuemax="max"
+    tabindex="0"
+    class="flex w-1.5 shrink-0 cursor-col-resize items-center justify-center border-l border-border bg-chrome"
+    data-testid="ade-panel-resize-handle"
+    @keydown="onKeydown"
+  >
+    <span class="h-7 w-0.5 rounded-[1px] bg-border-strong" />
+  </div>
+</template>

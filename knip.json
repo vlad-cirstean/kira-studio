@@ -17,14 +17,6 @@
   // its `--include` filter and turned the `binaries` rule on.
   "ignoreBinaries": ["go"],
   "ignoreDependencies": [
-    // Temporary (P145 -> P146): the v1 notes editor was the only consumer; P146's Notes tab
-    // restores it (`git show 13e99974:apps/kira-space/frontend/src/ade/AdeNotesEditor.vue`). Drop then.
-    "@tiptap/core",
-    "@tiptap/extension-list",
-    "@tiptap/extensions",
-    "@tiptap/markdown",
-    "@tiptap/starter-kit",
-    "@tiptap/vue-3",
     // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
     // (apps/kira-space-vscode/tsconfig.json), never a static import.
     "@types/vscode",
