@@ -6,7 +6,7 @@ import { type BranchTag, branchTag, taskCell } from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
 import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
-import { taskTitle } from '../board/labels';
+import { type BranchLine2, branchLine2, taskTitle } from '../board/labels';
 import { buildNeedsYou } from '../board/needsYou';
 import {
   type BranchProgress,
@@ -45,6 +45,8 @@ export interface BranchRowModel {
   /** Own progress line while the task is in an agent or script stage. */
   prog: { segs: BranchSegState[]; label: string; tone: BranchProgress['tone']; tip: string } | null;
   ripple: boolean;
+  /** Merged-into and deployed chips of the second line, nothing for a branch not in any target. */
+  chips: Pick<BranchLine2, 'merged' | 'deployed' | 'divider'>;
   /** Tooltip of the `!` circle; `''` when the branch needs nothing from the user. */
   attention: string;
 }
@@ -96,6 +98,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
   const main = c.mainName.get(br.codeRepoId) ?? '';
   const taskProgress = c.progress.get(task.id);
   const prog = taskProgress ? branchProgress(taskProgress, bid) : null;
+  const line2 = branchLine2(br, graph, c.prTitle(bid));
   let context = '';
   if (draft) context = `no branch yet · from ${parentName || br.base || 'main'}`;
   else if (br.kind === 'review') context = c.prTitle(bid);
@@ -120,6 +123,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
     }),
     prog: prog ? { segs: prog.segments, label: prog.label, tone: prog.tone, tip: prog.tip } : null,
     ripple: c.ripple?.branchIds.includes(bid) ?? false,
+    chips: { merged: line2.merged, deployed: line2.deployed, divider: line2.divider },
     attention: attn?.what ?? '',
   };
 }

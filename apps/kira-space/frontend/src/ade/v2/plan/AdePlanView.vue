@@ -10,6 +10,7 @@ import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import { dayLabel, firstWork, isoToOffset, nextWork, offsetToIso } from '../board/calendar';
 import { dayMenuFor } from '../board/dayMenu';
 import { dropVerdict, shiftPlanArgs } from '../board/dropPlan';
+import { refreshNote } from '../board/panelFacts';
 import type { TimelineBand } from '../board/timeline';
 import { useRefresh, useSetPlan } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
@@ -46,7 +47,12 @@ async function runRefresh(codeRepoIds: string[], all: boolean): Promise<void> {
   for (const id of ids) delete errs[id];
   try {
     const res = await refresh.mutateAsync({ codeRepoIds: all ? [] : codeRepoIds });
-    for (const r of res.repos) if (r.error) errs[r.codeRepoId] = r.error.message;
+    const summaries = { ...ui.refreshSummary };
+    for (const r of res.repos) {
+      if (r.error) errs[r.codeRepoId] = r.error.message;
+      else summaries[r.codeRepoId] = refreshNote(r);
+    }
+    ui.refreshSummary = summaries;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     for (const id of ids) errs[id] = msg;
@@ -65,6 +71,7 @@ const chips = computed<RepoChipModel[]>(() =>
     shown: !ui.hiddenRepoIds.includes(r.codeRepoId),
     busy: busyIds.value.includes(r.codeRepoId),
     error: refreshErrors.value[r.codeRepoId] ?? '',
+    summary: ui.refreshSummary[r.codeRepoId] ?? '',
   })),
 );
 

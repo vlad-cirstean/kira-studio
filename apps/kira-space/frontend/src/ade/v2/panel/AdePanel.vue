@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../../state/settings';
 import { usePlanModel } from '../plan/usePlanModel';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import AdeBranchPanel from './AdeBranchPanel.vue';
 import AdePanelResizeHandle from './AdePanelResizeHandle.vue';
 import AdeTaskPanel from './AdeTaskPanel.vue';
 
@@ -33,6 +34,7 @@ async function commit(w: number): Promise<void> {
 }
 
 const card = computed(() => (ui.selectedTaskId ? (model.value?.cardFor(ui.selectedTaskId) ?? null) : null));
+const row = computed(() => card.value?.rows.find((r) => r.id === ui.selectedBranchId) ?? null);
 </script>
 
 <template>
@@ -43,7 +45,8 @@ const card = computed(() => (ui.selectedTaskId ? (model.value?.cardFor(ui.select
     data-testid="ade-panel"
   >
     <template v-if="model && card">
-      <AdeTaskPanel :card="card" :model="model" />
+      <AdeBranchPanel v-if="row" :card="card" :row="row" :model="model" />
+      <AdeTaskPanel v-else :card="card" :model="model" />
     </template>
     <p v-else class="p-5 text-kira-md text-muted-foreground" data-testid="ade-panel-empty">
       Select a task to see its details.

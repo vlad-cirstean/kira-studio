@@ -2,11 +2,19 @@
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { repoColor } from '../palette';
+import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
 import AdeAttention from './AdeAttention.vue';
 import type { BranchRowModel } from './usePlanModel';
 
 const props = defineProps<{ row: BranchRowModel; merged: boolean }>();
+const ui = useAdeBoardUiStore();
+const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
+const selected = computed(() => ui.selectedBranchId === props.row.id);
+
+function pick(): void {
+  ui.selectBranch(props.row.branch.taskId, props.row.id);
+}
 
 const repoStyle = computed(() => {
   const c = repoColor(props.row.branch.codeRepoId);
@@ -30,13 +38,22 @@ const elbowColor = computed(() =>
 </script>
 
 <template>
+  <!-- biome-ignore lint/a11y/useSemanticElements: the row holds block content a button cannot. -->
   <div
-    class="box-border flex h-10 w-full items-center gap-[7px] border-l-[3px] border-l-transparent px-2.5"
-    :class="row.isReview ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]' : ''"
+    class="box-border flex h-10 w-full cursor-pointer items-center gap-[7px] border-l-[3px] px-2.5"
+    :class="[
+      row.isReview ? 'bg-[repeating-linear-gradient(135deg,color-mix(in_srgb,var(--kira-info)_8%,transparent)_0_8px,color-mix(in_srgb,var(--kira-info)_3%,transparent)_8px_16px)]' : '',
+      selected ? 'border-l-focus' : 'border-l-transparent',
+    ]"
     :style="merged ? { background: `color-mix(in srgb, ${TONE.purple[2]} 8%, transparent)` } : undefined"
+    role="button"
+    tabindex="0"
+    :data-selected="selected || undefined"
     :data-ripple="row.ripple || undefined"
     data-testid="ade-branch-row"
     :data-branch-id="row.id"
+    @click="pick"
+    @keydown.enter="pick"
   >
     <span class="relative shrink-0 self-stretch" :style="{ width: `${row.depth * 16}px` }">
       <span
@@ -79,7 +96,7 @@ const elbowColor = computed(() =>
           >{{ row.name }}</span
         >
       </AdeTip>
-      <span v-if="row.context || row.prog" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-[14px]">
+      <span v-if="row.context || row.prog || hasChips" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap leading-[14px]">
         <AdeTip v-if="row.prog" :text="row.prog.tip">
           <span class="inline-flex shrink-0 items-center gap-[5px]" data-testid="ade-branch-prog">
             <span class="inline-flex gap-0.5">
@@ -100,6 +117,25 @@ const elbowColor = computed(() =>
           data-testid="ade-branch-context"
           >{{ row.context }}</span
         >
+        <AdeTip v-for="c in row.chips.merged" :key="c.label" :text="c.tip">
+          <span
+            class="shrink-0 font-data text-kira-sm font-medium"
+            :class="c.tone === 'stale' ? '' : 'text-subtle'"
+            :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
+            data-testid="ade-branch-merged"
+            >{{ c.label }}</span
+          >
+        </AdeTip>
+        <span v-if="row.chips.divider" class="h-2.5 w-px shrink-0 bg-border-strong" />
+        <AdeTip v-for="c in row.chips.deployed" :key="c.label" :text="c.tip">
+          <span
+            class="shrink-0 font-data text-kira-sm font-medium"
+            :class="c.tone === 'stale' ? '' : 'text-subtle'"
+            :style="c.tone === 'stale' ? { color: TONE.amber[1] } : undefined"
+            data-testid="ade-branch-deployed"
+            >{{ c.label }}</span
+          >
+        </AdeTip>
       </span>
     </div>
   </div>

@@ -15,6 +15,8 @@ const props = defineProps<{
   shown: boolean;
   busy: boolean;
   error: string;
+  /** What the last fetch changed, e.g. `3 refs changed`; `''` before any fetch. */
+  summary: string;
 }>();
 const emit = defineEmits<{ toggle: []; refresh: [] }>();
 
@@ -22,7 +24,8 @@ const ago = useTimeAgo(() => props.lastFetchAt ?? 0, adeAgoOptions);
 const note = computed(() => {
   if (props.busy) return 'fetching…';
   if (props.error) return props.error;
-  return props.lastFetchAt === null ? 'never fetched' : String(ago.value);
+  if (props.lastFetchAt === null) return 'never fetched';
+  return props.summary ? `${ago.value} · ${props.summary}` : String(ago.value);
 });
 const nameStyle = computed(() => {
   const c = repoColor(props.codeRepoId);

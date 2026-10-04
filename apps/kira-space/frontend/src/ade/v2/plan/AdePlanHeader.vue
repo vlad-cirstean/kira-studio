@@ -13,6 +13,7 @@ export interface RepoChipModel {
   shown: boolean;
   busy: boolean;
   error: string;
+  summary: string;
 }
 
 defineProps<{ repos: RepoChipModel[]; allBusy: boolean; ripple: Ripple | null }>();
