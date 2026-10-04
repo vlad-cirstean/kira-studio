@@ -1,0 +1,294 @@
+import { describe, expect, test } from 'bun:test';
+import { LATER } from '../../frontend/src/ade/v2/board/calendar';
+import {
+  buildTimeline,
+  rippleOf,
+  type TimelineInput,
+} from '../../frontend/src/ade/v2/board/timeline';
+import type { Board } from '../../frontend/src/ade/v2/wire';
+import { mkBranch, mkPlan, mkTask } from './support/adeV2Fixtures';
+
+// 2026-09-22 is a Tuesday: offsets 4 and 5 are Sat/Sun, 6 is Mon.
+const TODAY = '2026-09-22';
+const SETTINGS = {
+  panelWidth: 0,
+  allAgentsFilter: 'active' as const,
+  horizonDays: 14,
+  historyDays: 14,
+  extraDays: [] as string[],
+  offDays: [] as string[],
+  workWeekendDays: [] as string[],
+  workdayHours: 6,
+  spanDayShare: 0.5,
+};
+
+function iso(offset: number): string {
+  const d = new Date(Date.UTC(2026, 8, 22 + offset));
+  return d.toISOString().slice(0, 10);
+}
+
+interface TaskSpec {
+  id: string;
+  day?: number | null;
+  est?: string;
+  kind?: 'task' | 'review' | 'parked';
+  merged?: boolean;
+}
+
+function board(specs: TaskSpec[], extra: Partial<Board> = {}): Board {
+  const tasks = specs.map((s) =>
+    mkTask({ id: s.id, kind: s.kind ?? 'task', est: s.est ?? '', branchIds: [`b_${s.id}`] }),
+  );
+  const branches = specs.map((s) =>
+    mkBranch({
+      id: `b_${s.id}`,
+      taskId: s.id,
+      kind: s.kind === 'review' ? 'review' : s.kind === 'parked' ? 'parked' : 'mine',
+      mergedIntoMain: s.merged ?? false,
+    }),
+  );
+  const day: Record<string, string> = {};
+  for (const s of specs) if (s.day !== undefined && s.day !== null) day[s.id] = iso(s.day);
+  return {
+    tasks,
+    branches,
+    plan: mkPlan({ day, order: specs.map((s) => s.id) }),
+    pairs: [],
+    history: [],
+    repos: [],
+    worktreeBasePath: '',
+    autofetchMinutes: 0,
+    ...extra,
+  };
+}
+
+function view(b: Board, over: Partial<TimelineInput> = {}, settings = SETTINGS) {
+  return buildTimeline({
+    board: b,
+    settings,
+    today: TODAY,
+    localDayOf: (ms) => new Date(ms).toISOString().slice(0, 10),
+    repoLabel: (id) => id,
+    showAllItems: false,
+    showHistory: false,
+    ...over,
+  });
+}
+
+describe('merge order', () => {
+  test('sorts by merge day, then start day, then plan position; parked is not numbered', () => {
+    const v = view(
+      board([
+        { id: 'late', day: 1, est: '1h' }, // end 1, start 1, pos 0
+        { id: 'span', day: 0, est: '2d' }, // end 1, start 0, pos 1
+        { id: 'park', kind: 'parked', day: 0, est: '1h' },
+        { id: 'tie', day: 1, est: '1h' }, // end 1, start 1, pos 3
+      ]),
+    );
+    expect(v.seq.map((e) => e.taskId)).toEqual(['park', 'span', 'late', 'tie']);
+    expect(v.mergeOrder.get('park')).toBeUndefined();
+    expect([...v.mergeOrder]).toEqual([
+      ['span', 1],
+      ['late', 2],
+      ['tie', 3],
+    ]);
+  });
+
+  test('a review item sits right above the first task that builds on it', () => {
+    const b = board([
+      { id: 'a', day: 0, est: '1h' },
+      { id: 'b', day: 1, est: '1h' },
+      { id: 'rev', kind: 'review' },
+    ]);
+    const stacked = b.branches.find((x) => x.id === 'b_b');
+    if (stacked) stacked.baseBranchId = 'b_rev';
+    const v = view(b);
+    expect(v.seq.map((e) => e.taskId)).toEqual(['a', 'rev', 'b']);
+    expect(v.entries.get('rev')?.day).toBe(1);
+  });
+
+  test('an unplaced review item goes to Later', () => {
+    const v = view(
+      board([
+        { id: 'a', day: 0 },
+        { id: 'rev', kind: 'review' },
+      ]),
+    );
+    expect(v.entries.get('rev')?.day).toBe(LATER);
+    expect(v.seq.at(-1)?.taskId).toBe('rev');
+  });
+});
+
+describe('spans over weekends and days off', () => {
+  test('3d starting Thursday skips the weekend', () => {
+    const v = view(board([{ id: 'a', day: 2, est: '3d' }]));
+    expect(v.entries.get('a')?.days).toEqual([2, 3, 6]);
+    expect(v.entries.get('a')?.end).toBe(6);
+  });
+
+  test('a day off pushes the span, a worked weekend joins it', () => {
+    const off = view(
+      board([{ id: 'a', day: 2, est: '3d' }]),
+      {},
+      { ...SETTINGS, offDays: [iso(6)] },
+    );
+    expect(off.entries.get('a')?.days).toEqual([2, 3, 7]);
+    const work = view(
+      board([{ id: 'a', day: 2, est: '3d' }]),
+      {},
+      { ...SETTINGS, workWeekendDays: [iso(4)] },
+    );
+    expect(work.entries.get('a')?.days).toEqual([2, 3, 4]);
+  });
+
+  test('later days of a span get a continuation entry, the last one merges', () => {
+    const v = view(board([{ id: 'a', day: 2, est: '3d' }]));
+    const spans = v.bands.flatMap((x) => x.spans);
+    expect(spans.map((s) => [s.dayNumber, s.merges])).toEqual([
+      [2, false],
+      [3, true],
+    ]);
+  });
+});
+
+describe('capacity and overdue', () => {
+  test('hours over the workday cap flag the latest-starting tasks', () => {
+    const v = view(
+      board([
+        { id: 'a', day: 1, est: '4h' },
+        { id: 'b', day: 1, est: '4h' },
+      ]),
+    );
+    const band = v.bands.find((x) => x.key === 1);
+    expect(band?.hours).toBe(8);
+    expect(band?.overflowTaskIds).toEqual(['b']);
+    expect(band?.overflowHours).toBe(2);
+    expect(band?.overflowMoveTo).toBe(2);
+  });
+
+  test('a multi-day task spreads its hours; no overflow within the cap', () => {
+    const v = view(board([{ id: 'a', day: 0, est: '2d' }]));
+    expect(v.bands.find((x) => x.key === 0)?.hours).toBe(3);
+    expect(v.bands.find((x) => x.key === 1)?.hours).toBe(3);
+    expect(v.bands.every((x) => x.overflowTaskIds.length === 0)).toBe(true);
+  });
+
+  test('unmerged tasks that ended in the past are overdue; merged ones are not', () => {
+    const v = view(
+      board([
+        { id: 'a', day: -2, est: '1h' },
+        { id: 'b', day: -2, est: '1h', merged: true },
+      ]),
+      { showHistory: true },
+    );
+    const band = v.bands.find((x) => x.key === -2);
+    expect(band?.isPast).toBe(true);
+    expect(band?.overdueTaskIds).toEqual(['a']);
+  });
+
+  test('unplanned tasks land in the Later band, which is always last', () => {
+    const v = view(board([{ id: 'a' }, { id: 'b', day: 0 }]));
+    const last = v.bands.at(-1);
+    expect(last?.isLater).toBe(true);
+    expect(last?.taskIds).toEqual(['a']);
+  });
+});
+
+describe('first-10 cap', () => {
+  const many = (n: number, extra: TaskSpec[] = []) =>
+    board([...Array.from({ length: n }, (_, i) => ({ id: `t${i}`, day: i, est: '1h' })), ...extra]);
+
+  test('exactly 10 items show everything and no button', () => {
+    const v = view(many(10));
+    expect(v.hiddenCount).toBe(0);
+    expect(v.shownTaskIds).toHaveLength(10);
+    expect(v.canCollapse).toBe(false);
+  });
+
+  test('11 items hide the last, hide days after the 10th, and drop Later', () => {
+    const v = view(many(11));
+    expect(v.hiddenCount).toBe(1);
+    expect(v.moreButtonLabel).toBe('Load all items · 1 more');
+    expect(v.shownTaskIds).not.toContain('t10');
+    const keys = v.bands.map((x) => x.key);
+    expect(keys).toContain(9);
+    expect(keys).not.toContain(10);
+    expect(keys).not.toContain(LATER);
+  });
+
+  test('showing all items restores the days and offers to collapse', () => {
+    const v = view(many(11), { showAllItems: true });
+    expect(v.hiddenCount).toBe(0);
+    expect(v.canCollapse).toBe(true);
+    expect(v.bands.map((x) => x.key)).toContain(10);
+  });
+
+  test('a review item counts toward the cap: it can take the 10th slot', () => {
+    const b = many(10, [{ id: 'rev', kind: 'review' }]);
+    const stacked = b.branches.find((x) => x.id === 'b_t9');
+    if (stacked) stacked.baseBranchId = 'b_rev';
+    const v = view(b);
+    // rev is placed right above t9, so seq is t0..t8, rev, t9 and t9 falls past the cap.
+    expect(v.seq.map((e) => e.taskId).indexOf('rev')).toBe(9);
+    expect(v.shownTaskIds).toContain('rev');
+    expect(v.shownTaskIds).not.toContain('t9');
+    expect(v.hiddenCount).toBe(1);
+  });
+
+  test('a hidden repo does not count toward the cap', () => {
+    const b = many(11);
+    const hiddenBranch = b.branches[0];
+    if (hiddenBranch) hiddenBranch.codeRepoId = 'repo-hidden';
+    const v = view(b, { hiddenRepoIds: new Set(['repo-hidden']) });
+    expect(v.hiddenCount).toBe(0);
+    expect(v.shownTaskIds).not.toContain('t0');
+  });
+});
+
+describe('history', () => {
+  test('counts archived tasks inside the window and shows them on their day', () => {
+    const noon = (offset: number) => Date.UTC(2026, 8, 22 + offset, 12);
+    const v = view(
+      board([{ id: 'a', day: 0 }], {
+        history: [
+          { taskId: 'h1', title: 'one', codeRepoIds: [], mergedAt: null, archivedAt: noon(-1) },
+          { taskId: 'h2', title: 'two', codeRepoIds: [], mergedAt: null, archivedAt: noon(-20) },
+        ],
+      }),
+      { showHistory: true },
+    );
+    expect(v.historyCount).toBe(1);
+    expect(v.historyButtonLabel).toBe('Load history · 1 archived task in the last 2 weeks');
+    expect(v.bands.find((x) => x.key === -1)?.history.map((h) => h.taskId)).toEqual(['h1']);
+  });
+});
+
+describe('ripple', () => {
+  test('lists stacked children and branches that must rebase after the selection', () => {
+    const b = board([
+      { id: 'a', day: 0 },
+      { id: 'kid', day: 1 },
+      { id: 'sharer', day: 2 },
+    ]);
+    const kid = b.branches.find((x) => x.id === 'b_kid');
+    if (kid) kid.baseBranchId = 'b_a';
+    b.pairs = [{ a: 'b_a', b: 'b_sharer', shared: ['src/x.ts'], conflicts: [] }];
+    const v = view(b);
+    const r = rippleOf(v, { kind: 'task', id: 'a' });
+    expect(r.branchIds.sort()).toEqual(['b_kid', 'b_sharer']);
+    expect(r.taskIds.sort()).toEqual(['kid', 'sharer']);
+    expect(r.text).toBe('rebase b_kid, b_sharer');
+    expect(rippleOf(v, { kind: 'task', id: 'sharer' }).text).toBe('nothing to rebase');
+  });
+
+  test('review and parked selections show a dash', () => {
+    const v = view(
+      board([
+        { id: 'p', kind: 'parked' },
+        { id: 'r', kind: 'review' },
+      ]),
+    );
+    expect(rippleOf(v, { kind: 'task', id: 'p' }).text).toBe('—');
+    expect(rippleOf(v, { kind: 'branch', id: 'b_r' }).text).toBe('—');
+  });
+});
