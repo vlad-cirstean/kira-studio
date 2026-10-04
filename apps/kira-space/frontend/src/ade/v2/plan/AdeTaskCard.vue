@@ -136,7 +136,7 @@ const headStyle = computed(() => ({
               </span>
             </AdeTip>
           </template>
-          <AdeAttention v-if="card.attention" :tip="card.attention" />
+          <AdeAttention v-if="card.attention" :tip="card.attention" :item="card.attentionItem" />
           <AdeTip :text="card.meta">
             <span
               class="min-w-0 truncate font-data text-kira-sm leading-[14px] text-subtle"

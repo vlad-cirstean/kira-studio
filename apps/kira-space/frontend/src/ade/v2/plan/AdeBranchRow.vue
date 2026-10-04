@@ -122,7 +122,7 @@ const elbowColor = computed(() =>
         >{{ row.base.label }}</span
       >
     </AdeTip>
-    <AdeAttention v-if="row.attention" :tip="row.attention" />
+    <AdeAttention v-if="row.attention" :tip="row.attention" :item="row.attentionItem" />
     <AdeTip v-if="row.isReview" text="Someone else's branch: read-only here">
       <span
         class="inline-flex h-5 shrink-0 items-center gap-[5px] rounded-kira-pill px-2 text-kira-sm font-semibold"

@@ -1,38 +1,34 @@
 import { computed, type MaybeRefOrGetter, toValue } from 'vue';
-import type { TaskAction, TaskActionKind } from '../board/actions';
+import type { TaskAction } from '../board/actions';
 import type { CardModel } from '../plan/usePlanModel';
 import { useApprove, useRetryRun, useStageDone, useStartRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-
-// Stage actions rendered this wave (R22); Take over, `▶ <Stage>`, `▶ Start` and Archive wait for P148.
-const RENDERED: ReadonlySet<TaskActionKind> = new Set([
-  'run',
-  'approve',
-  'retry',
-  'done',
-  'finish',
-]);
+import { useAdeDialogsStore } from '../state/adeDialogs';
+import { useAdeTakeOverStore } from '../state/adeTakeOver';
 
 /** The task's rendered stage action and the call behind it. */
 export function useTaskAction(card: MaybeRefOrGetter<CardModel>) {
   const ui = useAdeBoardUiStore();
+  const dialogs = useAdeDialogsStore();
+  const takeOver = useAdeTakeOverStore();
   const start = useStartRun();
   const approve = useApprove();
   const retry = useRetryRun();
   const done = useStageDone();
 
-  const action = computed<TaskAction | null>(() => {
-    const a = toValue(card).action;
-    return a && RENDERED.has(a.kind) ? a : null;
-  });
+  const action = computed<TaskAction | null>(() => toValue(card).action);
 
   async function perform(): Promise<void> {
     const c = toValue(card);
     const a = action.value;
     const stage = c.progress.stage;
-    if (!a || !stage) return;
+    if (!a) return;
     const taskId = c.task.id;
     delete ui.actionError[taskId];
+    if (a.kind === 'archive') return dialogs.archive(taskId);
+    if (a.kind === 'stage') return dialogs.stage(taskId);
+    if (a.kind === 'takeOver') return takeOver.request(a.sessionId ?? '');
+    if (!stage) return;
     try {
       if (a.kind === 'run') {
         if (stage.kind === 'agent') ui.runTaskId = taskId;

@@ -5,7 +5,8 @@ import type { CardModel } from '../plan/usePlanModel';
 import { actionStyle } from '../tones';
 import { useTaskAction } from './useTaskAction';
 
-// The task's stage action (R22): `▶ Run`, `Approve`, `Retry`, `Done ›`, `Finish ✓`; nothing otherwise.
+// The task's stage action: `▶ Run`, `▶ <Stage>`, `Take over`, `Approve`, `Retry`, `Done ›`, `Finish ✓`,
+// `Archive`; nothing otherwise.
 const props = defineProps<{ card: CardModel }>();
 const { action, perform } = useTaskAction(() => props.card);
 </script>

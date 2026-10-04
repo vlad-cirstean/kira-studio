@@ -54,6 +54,12 @@ export interface NeedsItem {
   branchId: string;
   stepId: string;
   sessionId: string;
+  /** `approval`: the stage the step belongs to. */
+  stageId: string;
+  /** `stale merge`: the integration branch it is stale in. */
+  target: string;
+  /** `Retry`: the latest failed or stuck runs to re-run. */
+  runIds: string[];
   /** Repo nickname, `spec`, or the step's `runs_on`. */
   scope: string;
   what: string;
@@ -91,6 +97,9 @@ function item(kind: NeedsKind, o: Extra): NeedsItem {
     branchId: '',
     stepId: '',
     sessionId: '',
+    stageId: '',
+    target: '',
+    runIds: [],
     scope: '',
     detail: '',
     ageMs: null,
@@ -118,19 +127,27 @@ function stepItems(c: Ctx): NeedsItem[] {
             branchId: r.branchId,
             stepId: step.id,
             sessionId: r.sessionId,
+            // A script run has no session to take over: it is retried.
+            action: r.sessionId ? 'Take over' : 'Retry',
+            runIds: r.runId ? [r.runId] : [],
             scope: c.nick(r.branchId),
             what: `Step "${step.name}" is stuck on ${c.nameOf(r.branchId)}`,
-            ageMs: c.age(c.sessionsById.get(r.sessionId)?.lastActiveAt),
+            detail: r.note,
+            ageMs: c.age(c.sessionsById.get(r.sessionId)?.lastActiveAt ?? r.finishedAt),
           }),
         );
       }
       const base = { taskId: task.id, stepId: step.id, scope: step.runsOn };
       if (step.state === 'failed') {
+        const failed = step.runs.filter((x) => x.state === 'failed' || x.state === 'stuck');
         out.push(
           item('failed', {
             ...base,
             id: `failed:${task.id}:${step.id}`,
             what: `Step "${step.name}" failed`,
+            runIds: failed.flatMap((x) => (x.runId ? [x.runId] : [])),
+            detail: failed.find((x) => x.note)?.note ?? '',
+            ageMs: c.age(Math.max(0, ...failed.map((x) => x.finishedAt ?? 0))),
           }),
         );
       }
@@ -139,6 +156,7 @@ function stepItems(c: Ctx): NeedsItem[] {
           item('approval', {
             ...base,
             id: `approval:${task.id}:${step.id}`,
+            stageId: c.i.progress.get(task.id)?.stage?.id ?? '',
             what: `Approve step "${step.name}"`,
           }),
         );
@@ -193,6 +211,7 @@ function branchItems(c: Ctx): NeedsItem[] {
       out.push(
         item('stale merge', {
           id: `stale:${b.id}:${g.target}`,
+          target: g.target,
           taskId: b.taskId,
           branchId: b.id,
           scope: c.nick(b.id),

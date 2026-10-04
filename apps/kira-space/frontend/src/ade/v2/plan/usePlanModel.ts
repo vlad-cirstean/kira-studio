@@ -9,7 +9,7 @@ import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
 import { buildCalendar, type Calendar, dayLabel } from '../board/calendar';
 import { type BranchLine2, branchLine2, taskTitle } from '../board/labels';
-import { buildNeedsYou } from '../board/needsYou';
+import { buildNeedsYou, type NeedsItem, type NeedsKind } from '../board/needsYou';
 import {
   type BranchProgress,
   type BranchSegState,
@@ -32,6 +32,9 @@ import { useBoard, usePrs, useRepos, useSessions, useWorkflows } from '../querie
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { Board, Branch, Session, Task, Workflow } from '../wire';
 
+/** Needs-you kinds that put a `!` on a card and row: a waiting question, a stuck run. */
+const ASKS: ReadonlySet<NeedsKind> = new Set(['question', 'stuck run']);
+
 export interface BranchRowModel {
   id: string;
   depth: number;
@@ -52,6 +55,8 @@ export interface BranchRowModel {
   chips: Pick<BranchLine2, 'merged' | 'deployed' | 'divider'>;
   /** Tooltip of the `!` circle; `''` when the branch needs nothing from the user. */
   attention: string;
+  /** What a click on the `!` does. */
+  attentionItem: NeedsItem | null;
 }
 
 export interface CardModel {
@@ -73,6 +78,7 @@ export interface CardModel {
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
   meta: string;
   attention: string;
+  attentionItem: NeedsItem | null;
   rows: BranchRowModel[];
   review: boolean;
   parked: boolean;
@@ -105,7 +111,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
   const draft = isDraft(br);
   const parent = graph.parentOf.get(bid);
   const parentName = parent === undefined ? undefined : graph.byBranch.get(parent)?.name;
-  const attn = c.needs.items.find((n) => n.kind === 'question' && n.branchId === bid);
+  const attn = c.needs.items.find((n) => ASKS.has(n.kind) && n.branchId === bid);
   const main = c.mainName.get(br.codeRepoId) ?? '';
   const taskProgress = c.progress.get(task.id);
   const prog = taskProgress ? branchProgress(taskProgress, bid) : null;
@@ -136,6 +142,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
     ripple: c.ripple?.branchIds.includes(bid) ?? false,
     chips: { merged: line2.merged, deployed: line2.deployed, divider: line2.divider },
     attention: attn?.what ?? '',
+    attentionItem: attn ?? null,
   };
 }
 
@@ -167,7 +174,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   const hidden = task.kind !== 'task';
   const first = branches[0];
   const mine = branches.filter((br) => br.kind === 'mine');
-  const needsOf = c.needs.items.find((n) => n.kind === 'question' && n.taskId === id);
+  const needsOf = c.needs.items.find((n) => ASKS.has(n.kind) && n.taskId === id);
   return {
     task,
     entry,
@@ -195,6 +202,7 @@ function buildCard(c: Ctx, id: string): CardModel | null {
     action: cell?.action ?? null,
     meta: cardMeta(c, entry, task, branches),
     attention: needsOf?.what ?? '',
+    attentionItem: needsOf ?? null,
     rows: c.view.branchRows(id).map(({ id: bid, depth }) => buildRow(c, task, bid, depth)),
     review: task.kind === 'review',
     parked: task.kind === 'parked',
