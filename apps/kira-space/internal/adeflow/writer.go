@@ -293,12 +293,6 @@ func find(m *yaml.Node, key string) (int, *yaml.Node) {
 	return -1, nil
 }
 
-func remove(m *yaml.Node, key string) {
-	if i, _ := find(m, key); i >= 0 {
-		m.Content = append(m.Content[:i], m.Content[i+2:]...)
-	}
-}
-
 // put sets key to v, replacing in place or inserting after the nearest preceding key of order.
 func put(m *yaml.Node, key string, v *yaml.Node, order []string) {
 	if i, _ := find(m, key); i >= 0 {
@@ -461,10 +455,10 @@ func applyWorkflow(root *yaml.Node, wf adewire.Workflow) {
 func applyStage(m *yaml.Node, st adewire.Stage) {
 	setScalar(m, "id", kText, st.ID, true, stageOrder)
 	setScalar(m, "name", kText, st.Name, true, stageOrder)
-	if _, k := find(m, "kind"); k == nil || k.Kind != yaml.ScalarNode || stageKindAlias[strings.TrimSpace(k.Value)] != string(st.Kind) {
-		setScalar(m, "kind", kText, string(st.Kind), true, stageOrder)
+	if _, k := find(m, "kind"); k == nil || k.Kind != yaml.ScalarNode || stageKindAlias[strings.TrimSpace(k.Value)] != st.Kind {
+		setScalar(m, "kind", kText, st.Kind, true, stageOrder)
 	}
-	setScalar(m, "status", kText, string(st.Status), true, stageOrder)
+	setScalar(m, "status", kText, st.Status, true, stageOrder)
 	keep := map[string]bool{"id": true, "name": true, "kind": true, "status": true}
 	switch st.Kind {
 	case "user":

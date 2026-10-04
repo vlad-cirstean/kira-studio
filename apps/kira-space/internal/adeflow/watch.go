@@ -31,32 +31,8 @@ func Watch(dir string, onChange func()) (stop func(), err error) {
 	// Add after the parent: a dir created in between is caught by the parent's event.
 	_ = w.Add(dir)
 
-	var (
-		mu      sync.Mutex
-		timer   *time.Timer
-		stopped bool
-		done    = make(chan struct{})
-		fire    = func() {
-			mu.Lock()
-			if stopped {
-				mu.Unlock()
-				return
-			}
-			mu.Unlock()
-			onChange()
-		}
-		schedule = func() {
-			mu.Lock()
-			defer mu.Unlock()
-			if stopped {
-				return
-			}
-			if timer != nil {
-				timer.Stop()
-			}
-			timer = time.AfterFunc(watchDebounce, fire)
-		}
-	)
+	done := make(chan struct{})
+	d := &debouncer{fn: onChange}
 	go func() {
 		defer close(done)
 		for {
@@ -65,18 +41,11 @@ func Watch(dir string, onChange func()) (stop func(), err error) {
 				if !ok {
 					return
 				}
-				name := filepath.Clean(ev.Name)
-				switch {
-				case name == dir:
-					if ev.Has(fsnotify.Create) {
+				if relevantEvent(dir, ev) {
+					if filepath.Clean(ev.Name) == dir && ev.Has(fsnotify.Create) {
 						_ = w.Add(dir)
 					}
-					schedule()
-				case filepath.Dir(name) == dir:
-					base := filepath.Base(name)
-					if strings.HasSuffix(base, ".yaml") && !strings.HasPrefix(base, ".") {
-						schedule()
-					}
+					d.schedule()
 				}
 			case err, ok := <-w.Errors:
 				if !ok {
@@ -87,13 +56,56 @@ func Watch(dir string, onChange func()) (stop func(), err error) {
 		}
 	}()
 	return func() {
-		mu.Lock()
-		stopped = true
-		if timer != nil {
-			timer.Stop()
-		}
-		mu.Unlock()
+		d.stop()
 		w.Close()
 		<-done
 	}, nil
+}
+
+// relevantEvent reports whether ev touches dir itself or a visible *.yaml file in it.
+func relevantEvent(dir string, ev fsnotify.Event) bool {
+	name := filepath.Clean(ev.Name)
+	if name == dir {
+		return true
+	}
+	base := filepath.Base(name)
+	return filepath.Dir(name) == dir && strings.HasSuffix(base, ".yaml") && !strings.HasPrefix(base, ".")
+}
+
+// debouncer coalesces bursts into one fn call after watchDebounce and drops calls once stopped.
+type debouncer struct {
+	fn      func()
+	mu      sync.Mutex
+	timer   *time.Timer
+	stopped bool
+}
+
+func (d *debouncer) schedule() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stopped {
+		return
+	}
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+	d.timer = time.AfterFunc(watchDebounce, d.fire)
+}
+
+func (d *debouncer) fire() {
+	d.mu.Lock()
+	stopped := d.stopped
+	d.mu.Unlock()
+	if !stopped {
+		d.fn()
+	}
+}
+
+func (d *debouncer) stop() {
+	d.mu.Lock()
+	d.stopped = true
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+	d.mu.Unlock()
 }

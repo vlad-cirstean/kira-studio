@@ -120,8 +120,9 @@ func TestSave_edits(t *testing.T) {
 		if strings.Index(out, "id: review") > strings.Index(out, "id: spec") {
 			t.Fatalf("stages not reordered:\n%s", out)
 		}
-		tail := out[strings.Index(out, "id: lint"):]
-		if strings.Contains(tail[:strings.Index(tail, "prompt:")], "before:") || strings.Contains(tail[:strings.Index(tail, "prompt:")], "on_failure:") {
+		_, tail, _ := strings.Cut(out, "id: lint")
+		step, _, _ := strings.Cut(tail, "prompt:")
+		if strings.Contains(step, "before:") || strings.Contains(step, "on_failure:") {
 			t.Fatalf("default keys written for a new step:\n%s", tail)
 		}
 		if !strings.Contains(tail, "prompt: |") || !strings.Contains(tail, "allowed_tools:") {
@@ -141,8 +142,8 @@ func TestSave_edits(t *testing.T) {
 			}
 		}
 		out := saveOK(t, r, "standard.yaml", wf)
-		seg := out[strings.Index(out, "id: spec"):]
-		seg = seg[:strings.Index(seg[1:], "- id:")+1]
+		_, seg, _ := strings.Cut(out, "id: spec")
+		seg, _, _ = strings.Cut(seg, "- id:")
 		if strings.Contains(seg, "session:") || strings.Contains(seg, "prompt:") || !strings.Contains(seg, "command: make spec") {
 			t.Fatalf("spec stage:\n%s", seg)
 		}

@@ -53,43 +53,10 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 	if err != nil {
 		return adewire.Repo{}, err
 	}
-	p := args.Patch
-	patch := model.AdeRepoConfigPatch{}
-	if p.Nickname != nil {
-		nick := strings.TrimSpace(*p.Nickname)
-		if utf8.RuneCountInString(nick) > maxNicknameRunes || strings.ContainsAny(nick, "\r\n") {
-			return adewire.Repo{}, invalid("nickname must be at most %d characters on one line", maxNicknameRunes)
-		}
-		patch.Nickname = &nick
+	patch, settings, err := b.validatePatch(ctx, cfg, args.Patch)
+	if err != nil {
+		return adewire.Repo{}, err
 	}
-	if p.IntegrationBranches != nil {
-		branches, err := b.validateIntegration(ctx, cfg, *p.IntegrationBranches)
-		if err != nil {
-			return adewire.Repo{}, err
-		}
-		patch.IntegrationBranches = &branches
-	}
-	if p.Environments != nil {
-		envs, err := validateEnvironments(*p.Environments)
-		if err != nil {
-			return adewire.Repo{}, err
-		}
-		patch.Environments = &envs
-	}
-	settings := model.GitRepoSettingsPatch{}
-	if p.PrepareScript != nil {
-		if len(*p.PrepareScript) > maxPrepareBytes {
-			return adewire.Repo{}, invalid("prepareScript is too long")
-		}
-		settings.WorktreePrepareScript = p.PrepareScript
-	}
-	if p.PrepareTimeout != nil {
-		if _, err := model.ParsePrepareTimeout(*p.PrepareTimeout); err != nil {
-			return adewire.Repo{}, invalid("prepareTimeout must be a duration such as 15m, above 0 and at most %s", model.MaxPrepareTimeout)
-		}
-		settings.WorktreePrepareTimeout = p.PrepareTimeout
-	}
-
 	if err := b.deps.RepoConfig.Upsert(args.CodeRepoID, patch); err != nil {
 		if errors.Is(err, repos.ErrRepoConfigMissing) {
 			return adewire.Repo{}, invalid("code repo %s not found", args.CodeRepoID)
@@ -101,21 +68,8 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 			return adewire.Repo{}, err
 		}
 	}
-	if b.deps.Facts != nil {
-		if patch.IntegrationBranches != nil {
-			if err := b.deps.Facts.DeleteMarksNotIn("target", args.CodeRepoID, *patch.IntegrationBranches); err != nil {
-				return adewire.Repo{}, err
-			}
-		}
-		if patch.Environments != nil {
-			names := make([]string, len(*patch.Environments))
-			for i, e := range *patch.Environments {
-				names[i] = e.Name
-			}
-			if err := b.deps.Facts.DeleteMarksNotIn("env", args.CodeRepoID, names); err != nil {
-				return adewire.Repo{}, err
-			}
-		}
+	if err := b.pruneMarks(args.CodeRepoID, patch); err != nil {
+		return adewire.Repo{}, err
 	}
 	if patch.Environments != nil {
 		go b.refreshEnvScripts(args.CodeRepoID)
@@ -123,6 +77,67 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 	b.notifyRepos()
 	b.notifyBoard()
 	return b.repoByID(ctx, args.CodeRepoID)
+}
+
+// validatePatch checks every field before anything is written, so a bad field leaves both stores untouched.
+func (b *TaskBoard) validatePatch(ctx context.Context, cfg model.AdeRepoConfig, p adewire.RepoPatch) (model.AdeRepoConfigPatch, model.GitRepoSettingsPatch, error) {
+	patch := model.AdeRepoConfigPatch{}
+	if p.Nickname != nil {
+		nick := strings.TrimSpace(*p.Nickname)
+		if utf8.RuneCountInString(nick) > maxNicknameRunes || strings.ContainsAny(nick, "\r\n") {
+			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, invalid("nickname must be at most %d characters on one line", maxNicknameRunes)
+		}
+		patch.Nickname = &nick
+	}
+	if p.IntegrationBranches != nil {
+		branches, err := b.validateIntegration(ctx, cfg, *p.IntegrationBranches)
+		if err != nil {
+			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, err
+		}
+		patch.IntegrationBranches = &branches
+	}
+	if p.Environments != nil {
+		envs, err := validateEnvironments(*p.Environments)
+		if err != nil {
+			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, err
+		}
+		patch.Environments = &envs
+	}
+	settings := model.GitRepoSettingsPatch{}
+	if p.PrepareScript != nil {
+		if len(*p.PrepareScript) > maxPrepareBytes {
+			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, invalid("prepareScript is too long")
+		}
+		settings.WorktreePrepareScript = p.PrepareScript
+	}
+	if p.PrepareTimeout != nil {
+		if _, err := model.ParsePrepareTimeout(*p.PrepareTimeout); err != nil {
+			return model.AdeRepoConfigPatch{}, model.GitRepoSettingsPatch{}, invalid("prepareTimeout must be a duration such as 15m, above 0 and at most %s", model.MaxPrepareTimeout)
+		}
+		settings.WorktreePrepareTimeout = p.PrepareTimeout
+	}
+	return patch, settings, nil
+}
+
+// pruneMarks drops marks of targets and environments the patch removed.
+func (b *TaskBoard) pruneMarks(id string, patch model.AdeRepoConfigPatch) error {
+	if b.deps.Facts != nil {
+		if patch.IntegrationBranches != nil {
+			if err := b.deps.Facts.DeleteMarksNotIn("target", id, *patch.IntegrationBranches); err != nil {
+				return err
+			}
+		}
+		if patch.Environments != nil {
+			names := make([]string, len(*patch.Environments))
+			for i, e := range *patch.Environments {
+				names[i] = e.Name
+			}
+			if err := b.deps.Facts.DeleteMarksNotIn("env", id, names); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (b *TaskBoard) repoByID(ctx context.Context, id string) (adewire.Repo, error) {
