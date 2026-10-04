@@ -53,7 +53,7 @@ async function mountShell(): Promise<void> {
   const workspaceStore = useWorkspaceStore(pinia);
 
   // P129 Part 3 §2.8 item 2: right after the stores are built, before mount() below, so no push
-  // (`kira:ade:sessions`/`kira:ade:repo`/`kira:ade:credential`/agent `Stop`) is missed between mount
+  // (`kira:adetask:*` channels/agent `Stop`) is missed between mount
   // and this window's first `useAdeSnapshot`/`useAdeSessions` call. No teardown — the window is the
   // lifetime (queries.ts's own doc comment).
   installAdeSignals(queryClient);

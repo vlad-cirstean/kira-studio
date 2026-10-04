@@ -1,4 +1,3 @@
-import * as AdeService from '@bindings/adeservice.js';
 import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as FilesService from '@bindings/filesservice.js';
@@ -36,51 +35,10 @@ import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type * as V2 from '../ade/v2/wire';
-import type {
-  AdeAddBranchArgs,
-  AdeAddDependencyArgs,
-  AdeAddNewWorkArgs,
-  AdeArchiveArgs,
-  AdeArchiveRisk,
-  AdeBindNewWorkArgs,
-  AdeCandidateBranch,
-  AdeCredentialRequest,
-  AdeDependencyArgs,
-  AdeFocusSessionArgs,
-  AdeForcePushArgs,
-  AdeForcePushResult,
-  AdeItemArgs,
-  AdeLaunch,
-  AdeOpenSessionEvent,
-  AdePr,
-  AdePrepareLaunchArgs,
-  AdeRefreshResult,
-  AdeRepoChangedEvent,
-  AdeRepoPrs,
-  AdeSendArgs,
-  AdeSetBlockerArgs,
-  AdeSetPlanArgs,
-  AdeSetQueuedAfterArgs,
-  AdeUpdateDependencyArgs,
-} from '../ade/wire';
 import type { SpaceMode } from '../state/modeDomain';
 import type { SpaceOpRecord } from '../state/opsDomain';
 import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
-
-/** P129 Part 4 §2.3: `ArchiveRisk`'s own `dirty` follows the same straight-passthrough shape as the
- *  straight-passthrough shape — normalized here, once. */
-function normalizeAdeArchiveRisk(raw: AdeArchiveRisk): AdeArchiveRisk {
-  return { ...raw, dirty: raw.dirty ?? [] };
-}
-
-function normalizeAdeRepoPrs(raw: AdeRepoPrs): AdeRepoPrs {
-  const branches: Record<string, AdePr> = {};
-  for (const [branch, pr] of Object.entries(raw.branches ?? {})) {
-    if (pr) branches[branch] = pr;
-  }
-  return { ...raw, branches, webUrl: raw.webUrl ?? '' };
-}
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
 // to the 13 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
@@ -174,8 +132,7 @@ const spaceControl = {
     unwrap(CodeWorkspaceService.CancelSearch({ id })),
   onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
 
-  // P129 Part 3 §2.2: the ade module's own bound-call surface — 6 of `AdeService`'s 19 methods,
-  // the rest landing with their first consumer part (§0.10). `terminalAgentSessions`/
+  // Agent-monitor surface: `terminalAgentSessions`/
   // `onAgentSessions`/`onAgentEvent` satisfy `AgentSessionsControl` structurally (P127's shared
   // store factory, `ade/state/agentSessions.ts`'s own call), the same "no adapter" shape
   // `createAgentSessionsStore`'s own doc comment states.
@@ -184,73 +141,6 @@ const spaceControl = {
   onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
     on(CHANNEL.agentSessions, cb),
   onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),
-
-  adeRepoPrs: (codeRepoId: string): Promise<AdeRepoPrs> =>
-    unwrap(AdeService.RepoPrs({ codeRepoId })).then((r) =>
-      normalizeAdeRepoPrs(trust<AdeRepoPrs>(r)),
-    ),
-  adeRefresh: (codeRepoId: string): Promise<AdeRefreshResult> =>
-    unwrap(AdeService.Refresh({ codeRepoId })).then((r) => {
-      const result = trust<AdeRefreshResult>(r);
-      return { ...result, newlyMerged: result.newlyMerged ?? [] };
-    }),
-  adeProvideCredential: (requestId: string, secret: string | null): Promise<boolean> =>
-    unwrap(AdeService.ProvideCredential({ requestId, secret: secret ?? undefined })),
-  // P129 Part 3 §0.10 note: `adeSessions()`'s own push counterpart is payload-free (Go's
-  // `AdeSessionsChanged` calls `Broadcast`, never `Emit`) — `onFlushBeforeClose`'s own precedent
-  // just above in createCoreControl.ts, restated here since this file has no `() => void` push yet.
-  onAdeSessions: (cb: () => void): (() => void) => on(CHANNEL.adeSessions, cb),
-  onAdeRepo: (cb: (event: AdeRepoChangedEvent) => void): (() => void) => on(CHANNEL.adeRepo, cb),
-  onAdeCredential: (cb: (request: AdeCredentialRequest) => void): (() => void) =>
-    on(CHANNEL.adeCredential, cb),
-
-  // P129 Part 4 §2.3: the six remaining `AdeService` members this part consumes (launch, delivery,
-  // archive-at-risk, archive, queue placement, new-work branch name) — `ForcePush` stays unbound
-  // (§0.6, Part 5's own first caller).
-  adePrepareLaunch: (args: AdePrepareLaunchArgs): Promise<AdeLaunch> =>
-    unwrap(AdeService.PrepareLaunch(args)).then((r) => trust<AdeLaunch>(r)),
-  adeSend: (args: AdeSendArgs): Promise<void> => unwrap(AdeService.Send(args)),
-  adeArchiveRisk: (args: AdeItemArgs): Promise<AdeArchiveRisk> =>
-    unwrap(AdeService.ArchiveRisk(args)).then((r) =>
-      normalizeAdeArchiveRisk(trust<AdeArchiveRisk>(r)),
-    ),
-  adeArchive: (args: AdeArchiveArgs): Promise<void> => unwrap(AdeService.Archive(args)),
-  adeSetQueuedAfter: (args: AdeSetQueuedAfterArgs): Promise<void> =>
-    unwrap(AdeService.SetQueuedAfter(args)),
-  adeBindNewWork: (args: AdeBindNewWorkArgs): Promise<void> => unwrap(AdeService.BindNewWork(args)),
-
-  // P129 Part 5 §2.2/§0.2: `SetPlan` — drops, Move to today, overflow move, day-off confirm.
-  adeSetPlan: (args: AdeSetPlanArgs): Promise<void> => unwrap(AdeService.SetPlan(args)),
-  // §0.16: generated binding's own return type is `AdeForcePushResult[] | null` — `?? []` matches
-  // this file's other list-result normalizations (e.g. `adeCandidateBranches` below).
-  adeForcePush: (args: AdeForcePushArgs): Promise<AdeForcePushResult[]> =>
-    unwrap(AdeService.ForcePush(args)).then((r) => trust<AdeForcePushResult[]>(r ?? [])),
-  // §0.19: the Add popover's own three RPCs — candidates for the Existing-branch tab, the two
-  // queue-writes for either tab. `AddNewWork` alone takes no `AdeCodeRepoArgs` wrapper on the Go
-  // side (the args struct already carries `codeRepoId`), unlike `CandidateBranches`.
-  adeCandidateBranches: (codeRepoId: string): Promise<AdeCandidateBranch[]> =>
-    unwrap(AdeService.CandidateBranches({ codeRepoId })).then((r) =>
-      trust<AdeCandidateBranch[]>(r ?? []),
-    ),
-  adeAddBranch: (args: AdeAddBranchArgs): Promise<string> =>
-    unwrap(AdeService.AddBranch(args)).then((r) => trust<string>(r)),
-  adeAddNewWork: (args: AdeAddNewWorkArgs): Promise<string> =>
-    unwrap(AdeService.AddNewWork(args)).then((r) => trust<string>(r)),
-  // P135 §4.5: the four dependency-node calls (creation tab, detail panel, blocker linking).
-  adeAddDependency: (args: AdeAddDependencyArgs): Promise<string> =>
-    unwrap(AdeService.AddDependency(args)).then((r) => trust<string>(r)),
-  adeUpdateDependency: (args: AdeUpdateDependencyArgs): Promise<void> =>
-    unwrap(AdeService.UpdateDependency(args)),
-  adeResolveDependency: (args: AdeDependencyArgs): Promise<void> =>
-    unwrap(AdeService.ResolveDependency(args)),
-  adeSetBlocker: (args: AdeSetBlockerArgs): Promise<void> => unwrap(AdeService.SetBlocker(args)),
-
-  // P129 Part 7 §0.9: All agents' cross-window Open — `false` for every reason the caller's own
-  // local-window fallback already handles (§0.8), never a rejection.
-  adeFocusSession: (args: AdeFocusSessionArgs): Promise<boolean> =>
-    unwrap(AdeService.FocusSession(args)),
-  onAdeOpenSession: (cb: (event: AdeOpenSessionEvent) => void): (() => void) =>
-    on(CHANNEL.adeOpenSession, cb),
 
   // P132 Part 2: the in-memory git op log's snapshot, cancel and live-update push.
   opsRecent: (limit: number): Promise<SpaceOpRecord[]> =>

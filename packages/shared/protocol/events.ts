@@ -68,18 +68,6 @@ export const CHANNEL = {
   // this with the scopes it touched, so every window's TanStack Query cache invalidates exactly
   // those keys — customScriptsChanged's own shape, generalised to a batch of scopes per event.
   apiDataChanged: 'kira:api:dataChanged',
-  // P129 Part 1/2/3: Kira Space's own agent-merge-queue channels (`bridge/events.go`'s
-  // ChannelAdeSessions/ChannelAdeRepo/ChannelAdeCredential, verbatim) — no Kira Studio equivalent.
-  // `adeSessions` is agentSessions' own shape (every ade_sessions row changed, Emit'd app-wide);
-  // `adeRepo` is a debounced per-repo "re-fetch RepoSnapshot/RepoPrs for this codeRepoId" signal;
-  // `adeCredential` is EmitFocused (only the focused window prompts, §0.14).
-  adeSessions: 'kira:ade:sessions',
-  adeRepo: 'kira:ade:repo',
-  adeCredential: 'kira:ade:credential',
-  // P129 Part 7 §0.9: All agents' cross-window Open — EmitTo'd to the one window FocusSession just
-  // brought forward, telling it which repo/item/session to show (bridge/ade.go's own
-  // ChannelAdeOpenSession).
-  adeOpenSession: 'kira:ade:open-session',
   // P143: ADE v2 channels (`apps/kira-space/internal/bridge/adewire/channels.go`, verbatim).
   // Payload types live in apps/kira-space/frontend/src/ade/v2/wire.ts.
   adeTaskBoard: 'kira:adetask:board',
