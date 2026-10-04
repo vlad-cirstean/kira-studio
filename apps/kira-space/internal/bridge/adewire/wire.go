@@ -571,6 +571,7 @@ type RecordMergeArgs struct {
 	Target   string `json:"target"`
 }
 
+// StartRunArgs.BranchNames: branchId -> name; "" = derived from the task title.
 type StartRunArgs struct {
 	TaskID      string            `json:"taskId"`
 	BranchNames map[string]string `json:"branchNames"`

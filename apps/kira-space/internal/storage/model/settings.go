@@ -66,6 +66,9 @@ type AdeSettings struct {
 	WorkWeekendDays []string `json:"workWeekendDays"`
 	WorkdayHours    float64  `json:"workdayHours"`
 	SpanDayShare    float64  `json:"spanDayShare"`
+	// HeadlessSettingSources is the claude -p --setting-sources scope: "all" (user, project, local)
+	// or "user" (ignore repo-committed settings).
+	HeadlessSettingSources string `json:"headlessSettingSources"`
 }
 
 type Settings struct {
@@ -98,6 +101,8 @@ func DefaultAdeSettings() AdeSettings {
 		WorkWeekendDays: []string{},
 		WorkdayHours:    6,
 		SpanDayShare:    0.5,
+
+		HeadlessSettingSources: "all",
 	}
 }
 
@@ -154,6 +159,8 @@ type AdePatch struct {
 	WorkWeekendDays *[]string `json:"workWeekendDays,omitempty"`
 	WorkdayHours    *float64  `json:"workdayHours,omitempty"`
 	SpanDayShare    *float64  `json:"spanDayShare,omitempty"`
+
+	HeadlessSettingSources *string `json:"headlessSettingSources,omitempty"`
 }
 
 type SettingsPatch struct {
@@ -223,6 +230,11 @@ func ValidAdeAllAgentsFilter(v string) bool {
 	return v == "active" || v == "older"
 }
 
+// ValidAdeHeadlessSettingSources mirrors adeSettingsSchema.headlessSettingSources' enum.
+func ValidAdeHeadlessSettingSources(v string) bool {
+	return v == "user" || v == "all"
+}
+
 func floatInRange(lo, hi float64) func(float64) bool {
 	return func(v float64) bool { return v >= lo && v <= hi }
 }
@@ -281,6 +293,9 @@ func validateAdeSection(a *AdePatch) error {
 	}
 	if a.SpanDayShare != nil && !ValidAdeSpanDayShare(*a.SpanDayShare) {
 		return fmt.Errorf("model: ade.spanDayShare: out of range value %v", *a.SpanDayShare)
+	}
+	if a.HeadlessSettingSources != nil && !ValidAdeHeadlessSettingSources(*a.HeadlessSettingSources) {
+		return fmt.Errorf("model: ade.headlessSettingSources: invalid value %q", *a.HeadlessSettingSources)
 	}
 	return nil
 }

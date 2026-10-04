@@ -44,6 +44,7 @@ const SETTINGS = {
   workWeekendDays: [] as string[],
   workdayHours: 6,
   spanDayShare: 0.5,
+  headlessSettingSources: 'all' as const,
 };
 
 /** Branch id -> what the new logic shows instead of the mockup, with the reason. */

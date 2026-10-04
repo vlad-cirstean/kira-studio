@@ -121,6 +121,7 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
     .min(ADE_SPAN_DAY_SHARE_RANGE.min)
     .max(ADE_SPAN_DAY_SHARE_RANGE.max)
     .default(0.5),
+  headlessSettingSources: z.enum(['user', 'all']).default('all'),
 });
 
 // `.default(...)` on every section is load-bearing: an older kira-space.sqlite has a settings row
@@ -144,6 +145,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
     workWeekendDays: [],
     workdayHours: 6,
     spanDayShare: 0.5,
+    headlessSettingSources: 'all',
   }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -185,5 +187,6 @@ export const defaultSettings: Settings = {
     workWeekendDays: [],
     workdayHours: 6,
     spanDayShare: 0.5,
+    headlessSettingSources: 'all',
   },
 };

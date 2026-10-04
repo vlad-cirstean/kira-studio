@@ -506,7 +506,7 @@ export interface RecordMergeArgs {
 }
 export interface StartRunArgs {
   taskId: string;
-  branchNames: Record<string, string> /* branchId -> name, '' = Claude picks */;
+  branchNames: Record<string, string> /* branchId -> name, '' = derived from the task title */;
   message: string;
 }
 export interface StepArgs {

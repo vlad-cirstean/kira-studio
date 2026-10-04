@@ -20,6 +20,7 @@ const SETTINGS = {
   workWeekendDays: [] as string[],
   workdayHours: 6,
   spanDayShare: 0.5,
+  headlessSettingSources: 'all' as const,
 };
 
 function iso(offset: number): string {

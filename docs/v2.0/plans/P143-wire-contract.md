@@ -490,3 +490,5 @@ Schema equivalent `tsc` would infer).
   `conflictCheckReason` (`''` unless `failed`), after `conflictsIfRebased`. Fixtures `board.json`,
   `branch.json`, `add-existing-branch.json` updated: all `done`/`''`, except `board.json` one
   `checking` and one `failed` with a reason.
+- P146 Step 0 (R1): `StartRunArgs.branchNames` `''` means derived from the task title (comment only).
+  Settings leaf `ade.headlessSettingSources` (`'user' | 'all'`, default `all`) added.
