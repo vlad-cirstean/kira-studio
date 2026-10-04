@@ -14,13 +14,6 @@ import (
 
 // Git fact helpers the v2 TaskBoard shares: ref resolution, dirty mapping, range facts, per-repo caches.
 
-// adeConnID/adeConnLabel identify ade's own gitsession.Conn (§0.3) — one shared connection this
-// whole service holds repositories open on, distinct from the git module's per-window Conns.
-const (
-	adeConnID    = gitsession.ConnID("ade")
-	adeConnLabel = "Kira Space ade"
-)
-
 // adeRepoChangedDebounce is §5.1's own "Signal" rule: a held repo's own repo.changed is coalesced
 // per repo before OnRepoChanged fires — a fetch or a background ref move commonly touches several
 // refs in a burst.
@@ -37,11 +30,7 @@ const (
 	patchIDCacheCap     = 32
 )
 
-type Commit struct{ Sha, Message string }
-
 type DirtyEntry struct{ Code, Path string }
-
-type Jira struct{ Key, URL string }
 
 type PairFact struct {
 	A, B      string
@@ -127,16 +116,15 @@ func resolveKind(row porcelain.InventoryRef, userEmail, override string) string 
 	return model.AdeBranchKindReview
 }
 
-// resolvedRef is snapshotLocked's own per-item ref resolution result (§0.14).
+// resolvedRef is the board's per-branch ref resolution result.
 type resolvedRef struct {
 	row   porcelain.InventoryRef
 	found bool
 }
 
-// mainDisplay is P129 Part 4 §0.5's own short-form split of MainRef's full refname:
+// mainDisplay is the short-form split of MainRef's full refname:
 // `refs/heads/X` -> name X, ref X (a local-only main); `refs/remotes/<r>/X` -> name X, ref
-// `<r>/X` (a remote-tracking main, the common case) — `countRefsChanged` keeps keying on the full
-// refname unchanged, only this display pair is shortened. A refname this doesn't recognize (never
+// `<r>/X` (a remote-tracking main, the common case); only this display pair is shortened. A refname this doesn't recognize (never
 // produced by MainRef today) passes through unchanged in both fields, rather than panicking.
 func mainDisplay(full string) (name, ref string) {
 	if rest, ok := strings.CutPrefix(full, "refs/heads/"); ok {
@@ -193,8 +181,8 @@ func findRemoteRow(inventory []porcelain.InventoryRef, remote, short string) (po
 }
 
 // rangeFacts is the (parentTip, tip)-keyed LRU cache (§4.2's own 512-entry bound) around
-// ahead/behind/files/commits — the one git-cost-bearing step both the v1 Queue and the v2 TaskBoard
-// repeat often enough (every Snapshot, every branch) to be worth caching on immutable object ids.
+// ahead/behind/files/commits — the one git-cost-bearing step the TaskBoard
+// repeats often enough (every board build, every branch) to be worth caching on immutable object ids.
 func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, parentTip, tip string) (branchFactsValue, error) {
 	key := branchFactsKey{TipParent: parentTip, TipBranch: tip}
 	if v, ok := caches.branch.Get(key); ok {
@@ -219,7 +207,7 @@ func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCa
 
 // computePairFacts wraps pairFacts (§0.7) with its own isAncestor/mergeTree callbacks — the
 // mergeTree side is the (tipA, tipB)-keyed LRU cache (§4.2), so a repeat pair whose tips are
-// unchanged since the last Snapshot/Refresh never re-spawns merge-tree.
+// unchanged since the last board build or refresh never re-spawns merge-tree.
 func computePairFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, ancestryOf map[string][]string, pairItems []pairItem) ([]PairFact, error) {
 	isAncestorFn := func(x, y string) bool {
 		for _, a := range ancestryOf[y] {

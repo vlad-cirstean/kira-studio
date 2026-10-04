@@ -82,7 +82,7 @@ func adeTaskError(err error) error {
 		errors.Is(err, repos.ErrBranchOnTask), errors.Is(err, repos.ErrRepoOnTask),
 		errors.Is(err, repos.ErrReviewKind):
 		return ipcerr.New("E_INVALID", err.Error())
-	case errors.Is(err, ade.ErrSessionWrongRepo), errors.Is(err, ade.ErrSessionRunning),
+	case errors.Is(err, ade.ErrSessionWrongTask), errors.Is(err, ade.ErrSessionRunning),
 		errors.Is(err, ade.ErrSessionNotRunning), errors.Is(err, ade.ErrCommandMismatch),
 		errors.Is(err, ade.ErrResumeCwdNotDir):
 		return ipcerr.New("E_INVALID", err.Error())

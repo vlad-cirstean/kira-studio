@@ -1,6 +1,7 @@
 package ade
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -74,7 +75,7 @@ func (c *fakeClock) advance(d time.Duration) {
 	c.now = c.now.Add(d)
 }
 
-func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, *fakeClock, string) {
+func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, *fakeClock) {
 	t.Helper()
 	db, err := storage.OpenAt(t.TempDir())
 	if err != nil {
@@ -86,18 +87,13 @@ func newTestTracker(t *testing.T) (*Tracker, *repos.AdeSessionsRepo, *fakeLive, 
 		t.Fatalf("repos.New: %v", err)
 	}
 
-	codeRepo, err := repositories.CodeRepos.Create(model.CodeRepo{ID: "cr1", Name: "n", Root: "/repo", RepoID: "rid"})
-	if err != nil {
-		t.Fatalf("create code repo: %v", err)
-	}
-
 	live := newFakeLive()
 	clock := newFakeClock()
 	tr := NewTracker(TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: live.AgentSessions, WriteTerminal: live.Write,
 		Now: clock.Now, Grace: 20 * time.Millisecond, PendingTTL: time.Minute,
 	})
-	return tr, repositories.AdeSessions, live, clock, codeRepo.ID
+	return tr, repositories.AdeSessions, live, clock
 }
 
 // composeAndSpawn drives the full launch flow a real BoundService.Open would (Prepare then
@@ -115,12 +111,16 @@ func composeAndSpawn(t *testing.T, tr *Tracker, live *fakeLive, args PrepareArgs
 	return res
 }
 
+func listSessions(tr *Tracker) ([]model.AdeSession, error) {
+	return tr.deps.Store.ListTask()
+}
+
 func TestTracker_PrepareComposeReconcileLive(t *testing.T) {
-	tr, _, live, _, repoID := newTestTracker(t)
+	tr, _, live, _ := newTestTracker(t)
 
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 
-	sessions, err := tr.List()
+	sessions, err := listSessions(tr)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -136,28 +136,28 @@ func TestTracker_PrepareComposeReconcileLive(t *testing.T) {
 
 	// Still live: Reconcile must not stop it, grace or not.
 	tr.Reconcile()
-	sessions, _ = tr.List()
+	sessions, _ = listSessions(tr)
 	if sessions[0].State != model.AdeSessionStateRunning {
 		t.Fatalf("state after Reconcile while live = %q, want running", sessions[0].State)
 	}
 }
 
 func TestTracker_ReconcileStopsOnExitAfterGrace(t *testing.T) {
-	tr, _, live, clock, repoID := newTestTracker(t)
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	tr, _, live, clock := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 
 	live.remove(res.TerminalID)
 	// Within the grace window: Reconcile must not stop it yet (Compose runs before the PTY
 	// registers, so a Reconcile racing the spawn must never stop a record that only just started).
 	tr.Reconcile()
-	sessions, _ := tr.List()
+	sessions, _ := listSessions(tr)
 	if sessions[0].State != model.AdeSessionStateRunning {
 		t.Fatalf("state within grace = %q, want still running", sessions[0].State)
 	}
 
 	clock.advance(50 * time.Millisecond)
 	tr.Reconcile()
-	sessions, _ = tr.List()
+	sessions, _ = listSessions(tr)
 	if sessions[0].State != model.AdeSessionStateStopped {
 		t.Fatalf("state past grace = %q, want stopped", sessions[0].State)
 	}
@@ -167,8 +167,8 @@ func TestTracker_ReconcileStopsOnExitAfterGrace(t *testing.T) {
 }
 
 func TestTracker_ComposeMismatchedCommandRefused(t *testing.T) {
-	tr, _, _, _, repoID := newTestTracker(t)
-	res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	tr, _, _, _ := newTestTracker(t)
+	res, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
@@ -178,8 +178,8 @@ func TestTracker_ComposeMismatchedCommandRefused(t *testing.T) {
 }
 
 func TestTracker_SpawnNeverRegisteredStopsAfterGrace(t *testing.T) {
-	tr, _, _, clock, repoID := newTestTracker(t)
-	res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	tr, _, _, clock := newTestTracker(t)
+	res, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
@@ -190,65 +190,50 @@ func TestTracker_SpawnNeverRegisteredStopsAfterGrace(t *testing.T) {
 
 	clock.advance(50 * time.Millisecond)
 	tr.Reconcile()
-	sessions, _ := tr.List()
+	sessions, _ := listSessions(tr)
 	if len(sessions) != 1 || sessions[0].State != model.AdeSessionStateStopped {
 		t.Fatalf("sessions = %+v, want one stopped", sessions)
 	}
 }
 
 func TestTracker_ResumeRejectsRunningRecord(t *testing.T) {
-	tr, _, live, _, repoID := newTestTracker(t)
-	composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+	tr, _, live, _ := newTestTracker(t)
+	composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 
 	// The record id, not the returned SessionID (Claude session id) — recover it via List since
 	// Prepare/Compose never hand the record id back directly.
-	sessions, _ := tr.List()
+	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 
-	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo", Resume: recordID}); err != ErrSessionRunning {
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo", Resume: recordID}); err != ErrSessionRunning {
 		t.Fatalf("resume of a running record: err = %v, want ErrSessionRunning", err)
 	}
 }
 
 func TestTracker_ResumeUnknownRecordRefused(t *testing.T) {
-	tr, _, _, _, repoID := newTestTracker(t)
-	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Resume: "does-not-exist"}); err != ErrSessionNotFound {
+	tr, _, _, _ := newTestTracker(t)
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", Resume: "does-not-exist"}); err != ErrSessionNotFound {
 		t.Fatalf("resume of an unknown record: err = %v, want ErrSessionNotFound", err)
 	}
 }
 
-func TestTracker_ResumeWrongRepoRefused(t *testing.T) {
-	tr, _, live, clock, repoID := newTestTracker(t)
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
-	sessions, _ := tr.List()
-	recordID := sessions[0].ID
-
-	live.remove(res.TerminalID)
-	clock.advance(50 * time.Millisecond)
-	tr.Reconcile()
-
-	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: "other-repo", Branch: "main", Cwd: "/repo", Resume: recordID}); err != ErrSessionWrongRepo {
-		t.Fatalf("resume from another repo: err = %v, want ErrSessionWrongRepo", err)
-	}
-}
-
 func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
-	tr, _, live, clock, repoID := newTestTracker(t)
+	tr, _, live, clock := newTestTracker(t)
 	// A real, existing directory (unlike the bare "/repo" other cases in this file use): the resume
 	// branch now os.Stat()s the recorded cwd (§0.12), so this needs to be an actual path.
 	original := filepath.Join(t.TempDir(), "original")
 	if err := os.MkdirAll(original, 0o755); err != nil {
 		t.Fatalf("mkdir original: %v", err)
 	}
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: original})
-	sessions, _ := tr.List()
+	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: original})
+	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 
 	live.remove(res.TerminalID)
 	clock.advance(50 * time.Millisecond)
 	tr.Reconcile()
 
-	resumeRes, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/somewhere/else", Resume: recordID})
+	resumeRes, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/somewhere/else", Resume: recordID})
 	if err != nil {
 		t.Fatalf("Prepare resume: %v", err)
 	}
@@ -261,7 +246,7 @@ func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	if _, _, err := tr.Compose(resumeRes.TerminalID, resumeRes.Command); err != nil {
 		t.Fatalf("Compose resume: %v", err)
 	}
-	sessions, _ = tr.List()
+	sessions, _ = listSessions(tr)
 	if sessions[0].Cwd != original {
 		t.Fatalf("cwd after resume = %q, want the originally recorded cwd", sessions[0].Cwd)
 	}
@@ -270,68 +255,10 @@ func TestTracker_ResumeUsesRecordedCwdAndReusesClaudeSessionID(t *testing.T) {
 	}
 }
 
-// TestPrepareResumeRecreatesMissingCwd is P129 Part 7 §0.12/§3.3: a stopped record whose worktree
-// directory was since removed (branch archived, or the folder deleted by hand) resumes anyway —
-// Prepare recreates the directory empty and returns it as PrepareResult.Cwd — while a recorded cwd
-// that exists but is a plain file refuses outright (ErrResumeCwdNotDir).
-func TestPrepareResumeRecreatesMissingCwd(t *testing.T) {
-	tr, _, live, clock, repoID := newTestTracker(t)
-	missing := filepath.Join(t.TempDir(), "gone", "worktree")
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: missing})
-	sessions, _ := tr.List()
-	recordID := sessions[0].ID
-
-	live.remove(res.TerminalID)
-	clock.advance(50 * time.Millisecond)
-	tr.Reconcile()
-
-	if err := os.RemoveAll(missing); err != nil {
-		t.Fatalf("remove worktree dir: %v", err)
-	}
-	if _, err := os.Stat(missing); !os.IsNotExist(err) {
-		t.Fatalf("precondition: %q should not exist, stat err = %v", missing, err)
-	}
-
-	resumeRes, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Resume: recordID})
-	if err != nil {
-		t.Fatalf("Prepare resume with missing cwd: %v", err)
-	}
-	if resumeRes.Cwd != missing {
-		t.Fatalf("resume result cwd = %q, want recreated %q", resumeRes.Cwd, missing)
-	}
-	info, err := os.Stat(missing)
-	if err != nil || !info.IsDir() {
-		t.Fatalf("cwd not recreated as a directory: stat = %v, err = %v", info, err)
-	}
-
-	// A second record whose recorded cwd is a plain file, not a directory: refused outright. Prepare
-	// never validates Cwd for a *new* launch (bridge/ade.go's Validate does, at the wire boundary),
-	// so recording a file path this way is enough to set the case up without a store-mutation seam.
-	fileCwd := filepath.Join(t.TempDir(), "not-a-dir")
-	if err := os.WriteFile(fileCwd, []byte("x"), 0o644); err != nil {
-		t.Fatalf("write file cwd: %v", err)
-	}
-	res2 := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "other", Cwd: fileCwd})
-	sessions, _ = tr.List()
-	var recordID2 string
-	for _, s := range sessions {
-		if s.ID != recordID {
-			recordID2 = s.ID
-		}
-	}
-	live.remove(res2.TerminalID)
-	clock.advance(50 * time.Millisecond)
-	tr.Reconcile()
-
-	if _, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "other", Resume: recordID2}); err != ErrResumeCwdNotDir {
-		t.Fatalf("resume with a file cwd: err = %v, want ErrResumeCwdNotDir", err)
-	}
-}
-
 func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
-	tr, store, live, _, repoID := newTestTracker(t)
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
-	sessions, _ := tr.List()
+	tr, store, live, _ := newTestTracker(t)
+	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
+	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 
 	newClaudeID := "11111111-1111-1111-1111-111111111111"
@@ -347,39 +274,15 @@ func TestTracker_HandleEventUpdatesClaudeSessionIDOnClear(t *testing.T) {
 }
 
 func TestTracker_HandleEventUnknownTerminalIgnored(t *testing.T) {
-	tr, _, _, _, _ := newTestTracker(t)
+	tr, _, _, _ := newTestTracker(t)
 	// Must not panic or error for a terminal this tracker never Composed.
 	tr.HandleEvent(agenthooks.Event{TerminalID: "unknown", Event: "Stop"})
 }
 
-func TestTracker_Recover_StopsLeftoverRunningRows(t *testing.T) {
-	tr, store, live, _, repoID := newTestTracker(t)
-	res := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
-	sessions, _ := tr.List()
-	recordID := sessions[0].ID
-	_ = res
-
-	// A fresh process life: a new Tracker over the same store, as main.go's own boot does.
-	fresh := NewTracker(TrackerDeps{Store: store, LiveAgents: func() []terminal.AgentSession { return nil }, WriteTerminal: live.Write, Now: time.Now})
-	if err := fresh.Recover(); err != nil {
-		t.Fatalf("Recover: %v", err)
-	}
-	rec, err := store.Get(recordID)
-	if err != nil || rec == nil {
-		t.Fatalf("Get after Recover: %v %v", rec, err)
-	}
-	if rec.State != model.AdeSessionStateStopped {
-		t.Fatalf("state after Recover = %q, want stopped", rec.State)
-	}
-	if rec.TerminalID != "" {
-		t.Fatalf("terminalId after Recover = %q, want empty", rec.TerminalID)
-	}
-}
-
 func TestTracker_SendWritesBracketedPasteThenEnter(t *testing.T) {
-	tr, _, live, _, repoID := newTestTracker(t)
-	composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
-	sessions, _ := tr.List()
+	tr, _, live, _ := newTestTracker(t)
+	composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
+	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 
 	if err := tr.Send(recordID, "hello"); err != nil {
@@ -394,7 +297,7 @@ func TestTracker_SendWritesBracketedPasteThenEnter(t *testing.T) {
 }
 
 func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
-	tr, _, _, _, _ := newTestTracker(t)
+	tr, _, _, _ := newTestTracker(t)
 	if err := tr.Send("no-such-record", "hello"); err != ErrSessionNotRunning {
 		t.Fatalf("Send to an unknown record: err = %v, want ErrSessionNotRunning", err)
 	}
@@ -405,12 +308,12 @@ func TestTracker_SendRefusedWhenNotRunning(t *testing.T) {
 // via Reconcile, agenthooks' own request-handler goroutine via HandleEvent) genuinely run
 // concurrently in production. Run with -race.
 func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
-	tr, _, live, _, repoID := newTestTracker(t)
+	tr, _, live, _ := newTestTracker(t)
 
 	const n = 20
 	results := make([]PrepareResult, n)
 	for i := 0; i < n; i++ {
-		res, err := tr.Prepare(PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
+		res, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: "/repo"})
 		if err != nil {
 			t.Fatalf("Prepare %d: %v", i, err)
 		}
@@ -444,7 +347,7 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 	}
 	wg2.Wait()
 
-	sessions, err := tr.List()
+	sessions, err := listSessions(tr)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -454,15 +357,15 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 }
 
 func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
-	tr, _, live, clock, repoID := newTestTracker(t)
-	first := composeAndSpawn(t, tr, live, PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo"})
-	sessions, _ := tr.List()
+	tr, _, live, clock := newTestTracker(t)
+	first := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
+	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 	live.remove(first.TerminalID)
 	clock.advance(50 * time.Millisecond)
 	tr.Reconcile()
 
-	args := PrepareArgs{CodeRepoID: repoID, Branch: "main", Cwd: "/repo", Resume: recordID}
+	args := PrepareArgs{TaskID: "t1", Cwd: "/repo", Resume: recordID}
 	abandoned, err := tr.Prepare(args) // never composed: Open failed before ComposeAgent
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
@@ -486,7 +389,7 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 	tr.Reconcile()
 	p1, _ := tr.Prepare(args)
 	tr.mu.Lock()
-	tr.pending["second"] = pendingIntent{RecordID: recordID, ClaudeSessionID: p1.SessionID, CodeRepoID: repoID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
+	tr.pending["second"] = pendingIntent{RecordID: recordID, ClaudeSessionID: p1.SessionID, Command: p1.Command, Resume: true, CreatedAt: clock.Now()}
 	tr.mu.Unlock()
 	if _, _, err := tr.Compose(p1.TerminalID, p1.Command); err != nil {
 		t.Fatalf("first Compose: %v", err)
@@ -497,7 +400,7 @@ func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 }
 
 func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
-	tr, store, live, clock, _ := newTestTracker(t)
+	tr, store, live, clock := newTestTracker(t)
 	var mu sync.Mutex
 	var stopped []string
 	tr.deps.OnStopped = func(id string) { mu.Lock(); stopped = append(stopped, id); mu.Unlock() }
@@ -522,7 +425,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 		t.Fatalf("record = %v, %v", rec, err)
 	}
 	if rec.Mode != model.AdeSessionModeTUI || rec.TaskID != "t1" || rec.BranchID != "b1" || rec.StageID != "impl" ||
-		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.ClaudeSessionID != "claude-9" || rec.CodeRepoID != "" || rec.RunID != "" {
+		rec.StepID != "s1" || rec.Resumes != "claude-9" || rec.ClaudeSessionID != "claude-9" || rec.RunID != "" {
 		t.Fatalf("record = %+v", rec)
 	}
 
@@ -537,7 +440,7 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 		t.Fatalf("OnStopped = %v, want [%s]", got, res.RecordID)
 	}
 
-	if _, err := tr.Prepare(PrepareArgs{TaskID: "other", Resume: res.RecordID}); err != ErrSessionWrongRepo {
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "other", Resume: res.RecordID}); err != ErrSessionWrongTask {
 		t.Fatalf("resume under another task: %v", err)
 	}
 	again, err := tr.Prepare(PrepareArgs{TaskID: "t1", Resume: res.RecordID})
@@ -552,5 +455,52 @@ func TestTracker_TaskSessionComposeResumeAndStopped(t *testing.T) {
 	}
 	if rec, _ = store.Get(res.RecordID); rec.State != model.AdeSessionStateRunning {
 		t.Fatalf("resumed record state = %s", rec.State)
+	}
+}
+
+func TestTracker_ResumeRefusesMissingOrNonDirectoryCwd(t *testing.T) {
+	tr, _, live, clock := newTestTracker(t)
+	missing := filepath.Join(t.TempDir(), "gone")
+	if err := os.MkdirAll(missing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	res := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: missing})
+	sessions, _ := listSessions(tr)
+	recordID := sessions[0].ID
+	live.remove(res.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+
+	if err := os.RemoveAll(missing); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", Resume: recordID}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("resume with a missing cwd: err = %v, want ErrInvalidInput", err)
+	}
+
+	fileCwd := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(fileCwd, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res2 := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: fileCwd})
+	live.remove(res2.TerminalID)
+	clock.advance(50 * time.Millisecond)
+	tr.Reconcile()
+	sessions, _ = listSessions(tr)
+	var recordID2 string
+	for _, s := range sessions {
+		if s.ID != recordID {
+			recordID2 = s.ID
+		}
+	}
+	if _, err := tr.Prepare(PrepareArgs{TaskID: "t1", Resume: recordID2}); err != ErrResumeCwdNotDir {
+		t.Fatalf("resume with a file cwd: err = %v, want ErrResumeCwdNotDir", err)
+	}
+}
+
+func TestTracker_PrepareRequiresTask(t *testing.T) {
+	tr, _, _, _ := newTestTracker(t)
+	if _, err := tr.Prepare(PrepareArgs{Cwd: "/repo"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("Prepare without a task: err = %v, want ErrInvalidInput", err)
 	}
 }

@@ -1,8 +1,7 @@
-// Package ade is Kira Space's agent runtime (P129 Part 1): it spawns and tracks the Claude Code
-// sessions its own "agent merge queue" UI (Parts 3-7) opens, over the shared internal/terminal and
-// internal/agenthooks packages. No apps/kira-space/internal/bridge import (this app's own
-// layering_test.go rule) — Tracker is plain domain code; bridge/ade.go is the one place that turns
-// it into a Wails-bound surface.
+// Package ade is Kira Space's ADE engine: the task board, the run engine and the Claude Code session
+// tracker, over the shared internal/terminal and internal/agenthooks packages. No
+// apps/kira-space/internal/bridge import (layering_test.go rule); bridge/adetask.go is the one
+// place that turns it into a Wails-bound surface.
 package ade
 
 import (
@@ -28,17 +27,15 @@ const (
 	defaultClaudeBin  = "claude"
 )
 
-// Sentinel errors Prepare/Compose/Send return — bridge/ade.go maps each to ipcerr.New("E_INVALID",
-// ...); anything else it treats as an internal error.
+// Sentinel errors Prepare/Compose/Send return — bridge/adetask.go maps each to an invalid-input
+// error; anything else is internal.
 var (
 	ErrSessionNotFound   = errors.New("ade: session not found")
-	ErrSessionWrongRepo  = errors.New("ade: session belongs to a different repo")
+	ErrSessionWrongTask  = errors.New("ade: session belongs to another task")
 	ErrSessionRunning    = errors.New("ade: session is already running")
 	ErrSessionNotRunning = errors.New("ade: session is not running")
 	ErrCommandMismatch   = errors.New("ade: composed command does not match the prepared command")
-	// ErrResumeCwdNotDir is P129 Part 7 §0.12: a resume's recorded cwd exists but is a file, not a
-	// directory — recreating it (the missing-cwd fallback below) would be unsafe, so Prepare refuses
-	// outright rather than guessing.
+	// ErrResumeCwdNotDir: a resume's recorded cwd exists but is a file, not a directory.
 	ErrResumeCwdNotDir = errors.New("ade: resume cwd exists and is not a directory")
 )
 
@@ -53,7 +50,7 @@ type TrackerDeps struct {
 	Now           func() time.Time
 	// OnChange is called whenever a persisted record's own state changes (a new or revived
 	// session, a stop, a claude_session_id update after /clear) — main.go wires it to
-	// bridge.AdeSessionsChanged, never called with the lock held.
+	// bridge.AdeTaskSessionsChanged, never called with the lock held.
 	OnChange func()
 	// OnStopped is called with a record id after Reconcile marked it stopped (its terminal is gone);
 	// the v2 engine releases per-session state here. Never called with the lock held.
@@ -74,43 +71,34 @@ type TrackerDeps struct {
 // pendingIntent is one PrepareLaunch call's own record, keyed by the terminalId Prepare mints —
 // consumed exactly once, by the Compose call the renderer's own openTerminalSession triggers.
 type pendingIntent struct {
-	RecordID        string
-	ClaudeSessionID string
-	CodeRepoID      string
-	Branch          string
-	NewWorkID       string
-	Cwd             string
-	Command         string // the exact base command Prepare returned; Compose refuses a mismatch
-	Message         string
-	Resume          bool
-	CreatedAt       time.Time
-	// v2 task session fields; TaskID != "" marks a v2 intent.
+	RecordID                                   string
+	ClaudeSessionID                            string
+	Cwd                                        string
+	Command                                    string // the exact base command Prepare returned; Compose refuses a mismatch
+	Message                                    string
+	Resume                                     bool
+	CreatedAt                                  time.Time
 	TaskID, BranchID, StageID, StepID, Resumes string
 }
 
-// PrepareArgs is Prepare's own argument shape — bridge/ade.go's AdePrepareLaunchArgs, already
-// validated at the wire boundary (§4.6): exactly one of Branch/NewWorkID, CodeRepoID known to
-// exist, Cwd an absolute existing directory.
+// PrepareArgs is Prepare's own argument shape. TaskID is required: the row is keyed to the task,
+// branch ("" = task level), stage and step. Cwd is an absolute existing directory.
 type PrepareArgs struct {
-	CodeRepoID string
-	Branch     string
-	NewWorkID  string
-	Cwd        string
+	Cwd string
 	// Resume is "" for a new session, or an existing ade_sessions.id to resume.
 	Resume  string
 	Message string
-	// v2 task session (TaskID != ""): no CodeRepoID/Branch/NewWorkID; the row is keyed to the task,
-	// branch ("" = task level), stage and step. Resumes is the Claude session id a new record
-	// continues (`claude --resume`), ExtraArgs are added to the base command, quoted.
+	// Resumes is the Claude session id a new record continues (`claude --resume`), ExtraArgs are
+	// added to the base command, quoted.
 	TaskID, BranchID, StageID, StepID, Resumes string
 	ExtraArgs                                  []string
 }
 
-// PrepareResult is Prepare's own return shape — bridge/ade.go's AdePrepareLaunchResult. SessionID
-// is the Claude session id (stable across Compose but not across a /clear inside the session);
-// Command is the base launch, without hooks or a prompt — Compose adds both. Cwd is the effective
-// cwd (P129 Part 7 §0.12): args.Cwd for a new launch, existing.Cwd (recreated if missing) for a
-// resume — the caller opens the terminal there, so the PTY and the record always agree.
+// PrepareResult is Prepare's own return shape. SessionID is the Claude session id (stable across
+// Compose but not across a /clear inside the session); Command is the base launch, without hooks
+// or a prompt — Compose adds both. Cwd is the effective cwd: args.Cwd for a new launch,
+// existing.Cwd for a resume — the caller opens the terminal there, so the PTY and the record
+// always agree.
 type PrepareResult struct {
 	TerminalID string
 	// RecordID is the ade_sessions row id (the handle Send and FocusSession take); SessionID is the
@@ -123,7 +111,7 @@ type PrepareResult struct {
 
 // Tracker is Kira Space's own agent session tracker (§4.4) — one instance, constructed in main.go
 // and shared by BoundService.ComposeAgent (via Compose), Registry.OnChange (via Reconcile),
-// agenthooks.Manager's OnEvent (via HandleEvent) and AdeService (via Prepare/Send/List).
+// agenthooks.Manager's OnEvent (via HandleEvent) and AdeTaskService (via Send/Get).
 type Tracker struct {
 	deps TrackerDeps
 
@@ -211,10 +199,12 @@ func (t *Tracker) pruneExpiredPendingLocked(now time.Time) {
 // terminalId and records a pending intent for the Compose call the renderer's own
 // openTerminalSession is about to trigger.
 func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
+	if args.TaskID == "" {
+		return PrepareResult{}, fmt.Errorf("%w: taskId is required", ErrInvalidInput)
+	}
 	now := t.deps.Now()
-	v2 := args.TaskID != ""
 
-	var recordID, claudeSessionID, cwd, branch, newWorkID string
+	var recordID, claudeSessionID, cwd string
 	if args.Resume == "" {
 		recordID = uuid.NewString()
 		claudeSessionID = uuid.NewString()
@@ -222,8 +212,6 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 			claudeSessionID = args.Resumes
 		}
 		cwd = args.Cwd
-		branch = args.Branch
-		newWorkID = args.NewWorkID
 	} else {
 		existing, err := t.deps.Store.Get(args.Resume)
 		if err != nil {
@@ -232,8 +220,8 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		if existing == nil {
 			return PrepareResult{}, ErrSessionNotFound
 		}
-		if (v2 && existing.TaskID != args.TaskID) || (!v2 && existing.CodeRepoID != args.CodeRepoID) {
-			return PrepareResult{}, ErrSessionWrongRepo
+		if existing.TaskID != args.TaskID {
+			return PrepareResult{}, ErrSessionWrongTask
 		}
 		if existing.State != model.AdeSessionStateStopped {
 			return PrepareResult{}, ErrSessionRunning
@@ -241,27 +229,16 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 		recordID = existing.ID
 		claudeSessionID = existing.ClaudeSessionID
 		// Resume always uses the recorded cwd, never args.Cwd — a session must not appear to resume
-		// somewhere it never ran. §0.12: if that worktree directory was since removed (the branch
-		// archived, or the folder deleted by hand), recreate it empty rather than fail — the dialog
-		// forces "new worktree" for this case (§0.10), so the message itself tells Claude to create
-		// one there. The folder-trust entry stays keyed by this same path, so no new trust prompt.
-		// A v2 row has no such dialog: a missing directory is an error.
+		// somewhere it never ran. A missing directory is an error.
 		if info, err := os.Stat(existing.Cwd); err != nil {
 			if !os.IsNotExist(err) {
 				return PrepareResult{}, fmt.Errorf("ade: prepare: stat resume cwd: %w", err)
 			}
-			if v2 {
-				return PrepareResult{}, fmt.Errorf("%w: %s no longer exists", ErrInvalidInput, existing.Cwd)
-			}
-			if err := os.MkdirAll(existing.Cwd, 0o755); err != nil {
-				return PrepareResult{}, fmt.Errorf("ade: prepare: recreate resume cwd: %w", err)
-			}
+			return PrepareResult{}, fmt.Errorf("%w: %s no longer exists", ErrInvalidInput, existing.Cwd)
 		} else if !info.IsDir() {
 			return PrepareResult{}, ErrResumeCwdNotDir
 		}
 		cwd = existing.Cwd
-		branch = existing.Branch
-		newWorkID = existing.NewWorkID
 	}
 
 	claudeBin := t.deps.ClaudeBin
@@ -275,8 +252,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 
 	terminalID := uuid.NewString()
 	intent := pendingIntent{
-		RecordID: recordID, ClaudeSessionID: claudeSessionID, CodeRepoID: args.CodeRepoID,
-		Branch: branch, NewWorkID: newWorkID, Cwd: cwd, Command: command, Message: args.Message,
+		RecordID: recordID, ClaudeSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
 		TaskID: args.TaskID, BranchID: args.BranchID, StageID: args.StageID, StepID: args.StepID, Resumes: args.Resumes,
 	}
@@ -345,18 +321,13 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 		}
 	} else {
 		rec := model.AdeSession{
-			ID: intent.RecordID, CodeRepoID: intent.CodeRepoID, Branch: intent.Branch,
-			NewWorkID: intent.NewWorkID, ClaudeSessionID: intent.ClaudeSessionID, Cwd: intent.Cwd,
+			ID: intent.RecordID, ClaudeSessionID: intent.ClaudeSessionID, Cwd: intent.Cwd,
 			State: model.AdeSessionStateRunning, TerminalID: terminalID,
 			StartedAt: now.UnixMilli(), LastActiveAt: now.UnixMilli(),
+			Mode: model.AdeSessionModeTUI, TaskID: intent.TaskID, BranchID: intent.BranchID,
+			StageID: intent.StageID, StepID: intent.StepID, Resumes: intent.Resumes,
 		}
-		insert := t.deps.Store.Insert
-		if intent.TaskID != "" {
-			rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.Resumes =
-				model.AdeSessionModeTUI, intent.TaskID, intent.BranchID, intent.StageID, intent.StepID, intent.Resumes
-			insert = t.deps.Store.InsertTUI
-		}
-		if err := insert(rec); err != nil {
+		if err := t.deps.Store.InsertTUI(rec); err != nil {
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
 		}
 	}
@@ -378,12 +349,8 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 		composed, env = hooks(terminalID, command)
 	}
 	if intent.Message != "" {
-		// A v2 command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
-		sep := " "
-		if intent.TaskID != "" {
-			sep = " -- "
-		}
-		composed += sep + quotePOSIX(normalizeMessage(intent.Message))
+		// The command can end in a variadic flag (--add-dir a b), which would swallow the prompt.
+		composed += " -- " + quotePOSIX(normalizeMessage(intent.Message))
 	}
 
 	if t.deps.OnChange != nil {
@@ -518,54 +485,10 @@ func (t *Tracker) Send(sessionID, message string) error {
 	return nil
 }
 
-// Get returns id's own recorded session, nil if none exists — AdeService.FocusSession's own
-// lookup (P129 Part 7 §0.9), the same *model.AdeSession shape Prepare's own resume branch already
-// reads. No lastActive override (List's own): FocusSession only reads State/TerminalID, neither of
-// which that in-memory clock touches.
+// Get returns id's own recorded session, nil if none exists — AdeTaskService.FocusSession's own
+// lookup. It reads State/TerminalID only, neither touched by the in-memory lastActive clock.
 func (t *Tracker) Get(id string) (*model.AdeSession, error) {
 	return t.deps.Store.Get(id)
-}
-
-// List returns every recorded session, newest last-active first, with the in-memory lastActive
-// clock overriding the stored value for a still-live record (the DB row is only refreshed on
-// Stop/SessionEnd/a grace-timeout stop/Close, so a live session's own freshest activity time
-// exists only in memory until one of those happens).
-func (t *Tracker) List() ([]model.AdeSession, error) {
-	rows, err := t.deps.Store.List()
-	if err != nil {
-		return nil, fmt.Errorf("ade: list: %w", err)
-	}
-	return t.withLiveActivity(rows), nil
-}
-
-// ListByRepo is List narrowed to one code repo.
-func (t *Tracker) ListByRepo(codeRepoID string) ([]model.AdeSession, error) {
-	rows, err := t.deps.Store.ListByRepo(codeRepoID)
-	if err != nil {
-		return nil, fmt.Errorf("ade: list by repo: %w", err)
-	}
-	return t.withLiveActivity(rows), nil
-}
-
-func (t *Tracker) withLiveActivity(rows []model.AdeSession) []model.AdeSession {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for i := range rows {
-		if v, ok := t.lastActive[rows[i].ID]; ok {
-			rows[i].LastActiveAt = v
-		}
-	}
-	return rows
-}
-
-// Recover marks every row left "running" by a previous process life "stopped" — called once at
-// boot, before any window exists: a fresh Registry never has any of the previous life's PTYs
-// live, so every such row is unconditionally stale.
-func (t *Tracker) Recover() error {
-	if err := t.deps.Store.StopAllRunning(t.deps.Now().UnixMilli()); err != nil {
-		return fmt.Errorf("ade: recover: %w", err)
-	}
-	return nil
 }
 
 // Close flushes every still-in-memory lastActive value to the store — main.go's own teardown,

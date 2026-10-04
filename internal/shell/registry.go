@@ -65,7 +65,7 @@ func (r *WindowRegistry) Count() int {
 	return len(r.entries)
 }
 
-// Focus brings key's own window to the front — AdeService.FocusSession's own cross-window Open
+// Focus brings key's own window to the front — AdeTaskService.FocusSession's own cross-window Open
 // (P129 Part 7 §0.9). false for an unknown key (the window closed between the lookup and this
 // call). Show/UnMinimise/Focus each wrap their real work in application.InvokeSync internally
 // (vendored webview_window.go), so this is safe to call from any goroutine.

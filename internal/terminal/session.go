@@ -410,7 +410,7 @@ func (r *Registry) AgentSessions() []AgentSession {
 }
 
 // WindowOf returns id's own live session's window key, reading the byWindow index CloseWindow
-// already keys off of — AdeService.FocusSession's own lookup (P129 Part 7 §0.9): "is this session's
+// already keys off of — AdeTaskService.FocusSession's own lookup (P129 Part 7 §0.9): "is this session's
 // PTY owned by some window, and which one". false for an id with no live session.
 func (r *Registry) WindowOf(id string) (string, bool) {
 	r.mu.Lock()

@@ -83,10 +83,10 @@ func TestRebaseChecker_cacheKeyFailureAndVersionGate(t *testing.T) {
 
 func TestRebaseChecker_realRepos(t *testing.T) {
 	skipWithoutGitQueue(t)
-	h := newQueueHarness(t)
+	h := newBoardHarness(t)
 	_, dir := initQueueRepo(t)
 	h.addRepo("r", dir)
-	entry, err := h.q.openRepo(context.Background(), "r")
+	entry, err := h.board.openRepo(context.Background(), "r")
 	if err != nil {
 		t.Fatal(err)
 	}

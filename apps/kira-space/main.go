@@ -143,7 +143,7 @@ func main() {
 	// Registry, since Tracker.Reconcile/Send both need the same live-session set and PTYs the
 	// terminal service itself opens.
 	terminalRegistry := terminal.NewRegistry()
-	adeTracker, adeQueue, agentHooks := wireAde(repositories, terminalRegistry, emitter, events, git)
+	adeTracker, agentHooks := wireTracker(repositories, terminalRegistry, emitter, events)
 
 	// P128 §2.1: the bound terminal methods live once in internal/terminal.BoundService; this
 	// app's own TerminalService only embeds it (own binding-name FQN, no behaviour of its own).
@@ -152,7 +152,6 @@ func main() {
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
 	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry))
-	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry, Queue: adeQueue}
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -185,9 +184,8 @@ func main() {
 	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
 	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
 	windows := shell.NewWindowRegistry()
-	// adeSvc.FocusWindow: the same two-step windowsSvc.OpenNewWindow (below) uses — FocusSession
-	// (P129 Part 7 §0.9) needs windows, which doesn't exist yet when adeSvc is constructed above.
-	adeSvc.FocusWindow = windows.Focus
+	// FocusSession needs windows, which doesn't exist yet when adeTaskSvc is constructed above (the
+	// same two-step windowsSvc.OpenNewWindow uses).
 	adeTaskSvc.FocusWindow = windows.Focus
 	closeFlush := shell.NewCloseFlushCoordinator(events)
 
@@ -209,11 +207,10 @@ func main() {
 		keepAwakeCtl.Close()
 		// terminalSvc.Shutdown() first: every PTY dies, and each one's own exit fires
 		// Registry.OnChange (Reconcile marks its row stopped) while the DB is still open. Then
-		// shutdownAde flushes whatever last-active time is still only in memory, closes the queue's
-		// own Conn (releasing every repo it held), and stops the hooks listener (P129 Part 1 §4.3,
-		// Part 2 §5.4).
+		// shutdownTracker flushes whatever last-active time is still only in memory and stops the
+		// hooks listener.
 		terminalSvc.Shutdown()
-		shutdownAde(adeTracker, adeQueue, agentHooks)
+		shutdownTracker(adeTracker, agentHooks)
 		adeTaskBoard.Close()
 		detachGitPush()
 		if err := gitSock.Close(); err != nil {
@@ -255,7 +252,6 @@ func main() {
 			application.NewService(layoutSvc),
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
-			application.NewService(adeSvc),
 			application.NewService(adeTaskSvc),
 			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
@@ -388,29 +384,20 @@ func acquireSingleInstance(reporter *startupfail.Reporter) *os.File {
 	return instanceLock
 }
 
-// wireAde constructs and starts Kira Space's own agent runtime (P129 Part 1 §4.3/§4.4) plus the
-// merge-queue's own git-facts and persistence surface (Part 2 §5.4): the ade.Tracker and the
-// agenthooks.Manager it drives, and the ade.Queue holding its own gitsession.Conn, wired together
-// before any window exists so Compose never races an unset hooks func with a real launch. Recover
-// runs here too — a fresh Registry never has any of a previous process life's PTYs live, so every
-// row that life left "running" is unconditionally stale. Kira Studio's own main.go has no
-// equivalent: its ComposeAgent stays nil, and it has no ade module at all.
-func wireAde(
+// wireTracker constructs and starts the ade.Tracker and the agenthooks.Manager it drives, wired
+// together before any window exists so Compose never races an unset hooks func with a real launch.
+// Rows a previous process life left running are stopped by the task board's Recover.
+func wireTracker(
 	repositories *repos.Repos, registry *terminal.Registry, emitter appevent.Emitter, events *bridge.Events,
-	git gitWired,
-) (*ade.Tracker, *ade.Queue, *agenthooks.Manager) {
+) (*ade.Tracker, *agenthooks.Manager) {
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
 		WriteTerminal: registry.Write, Now: time.Now,
-		OnChange: func() { bridge.AdeSessionsChanged(events); bridge.AdeTaskSessionsChanged(events) },
+		OnChange: func() { bridge.AdeTaskSessionsChanged(events) },
 	})
-	if err := tracker.Recover(); err != nil {
-		slog.Warn("ade: recover", "scope", "ade", "err", err)
-	}
 
-	// agentHooks is P129 Part 1 §4.3's own "always on" posture: the design has no toggle, and a
-	// start failure (curl missing, a bind conflict) is logged, never fatal — sessions still spawn
-	// and track, activity icons stay absent.
+	// Hooks are always on: a start failure (curl missing, a bind conflict) is logged, never fatal —
+	// sessions still spawn and track, activity icons stay absent.
 	hooks := agenthooks.NewManager(agenthooks.Options{OnEvent: func(ev agenthooks.Event) {
 		tracker.HandleEvent(ev)
 		bridge.EmitAgentEvent(emitter, ev)
@@ -419,28 +406,10 @@ func wireAde(
 		slog.Warn("agent hooks: start", "scope", "ade", "err", err)
 	}
 	tracker.SetHooks(hooks.ComposeLaunch)
-
-	queue := ade.NewQueue(ade.QueueDeps{
-		Store:         repositories.AdeQueue,
-		Sessions:      adeSessionsFor(tracker),
-		CodeRepo:      adeCodeRepoLookup(repositories),
-		Registry:      git.registry,
-		GitPath:       adeGitPathSetting(repositories),
-		Askpass:       git.askpassBroker,
-		CloseTerminal: adeCloseTerminal(registry),
-		OnRepoChanged: func(codeRepoID string) { bridge.AdeRepoChanged(events, codeRepoID) },
-		OnCredential:  func(payload any) { bridge.AdeCredentialRequested(events, payload) },
-		// §6.4's own rebind signal reuses the same broadcast the tracker's own OnChange above fires
-		// — either subsystem changing ade_sessions rows means the same "re-fetch Sessions" fact.
-		OnSessionsChanged: func() { bridge.AdeSessionsChanged(events) },
-		AutofetchMinutes:  adeAutofetchMinutes(repositories),
-		Now:               time.Now,
-	})
-
-	return tracker, queue, hooks
+	return tracker, hooks
 }
 
-// wireAdeTask builds the v2 task board engine (P144) beside the v1 queue: its own Conn, the
+// wireAdeTask builds the v2 task board engine (P144): its own Conn, the
 // workflow reader over <home>/workflows, and the cached git discovery gating merge-tree checks.
 // It recovers rows a restart left running, then starts the board.
 func wireAdeTask(
@@ -493,38 +462,7 @@ func wireAdeTask(
 	return board
 }
 
-// adeSessionsFor is QueueDeps.Sessions' own construction (§5.1): Tracker.ListByRepo mapped to ade.SessionRef, Part 1's own already-recorded session rows.
-func adeSessionsFor(tracker *ade.Tracker) func(codeRepoID string) []ade.SessionRef {
-	return func(codeRepoID string) []ade.SessionRef {
-		sessions, err := tracker.ListByRepo(codeRepoID)
-		if err != nil {
-			slog.Warn("ade: list sessions for queue", "scope", "ade", "err", err)
-			return nil
-		}
-		var out []ade.SessionRef
-		for _, sess := range sessions {
-			out = append(out, ade.SessionRef{
-				ID: sess.ID, Branch: sess.Branch, NewWorkID: sess.NewWorkID,
-				State: sess.State, TerminalID: sess.TerminalID, StartedAt: sess.StartedAt,
-			})
-		}
-		return out
-	}
-}
-
-// adeCodeRepoLookup is QueueDeps.CodeRepo's own construction — codeRepoId to its filesystem root,
-// "" and false when it names no real repo.
-func adeCodeRepoLookup(repositories *repos.Repos) func(id string) (string, bool) {
-	return func(id string) (string, bool) {
-		repo, err := repositories.CodeRepos.Get(id)
-		if err != nil || repo == nil {
-			return "", false
-		}
-		return repo.Root, true
-	}
-}
-
-// adeGitPathSetting is QueueDeps.GitPath's own construction — git.gitPath's own configured value
+// adeGitPathSetting is TaskBoardDeps.GitPath's own construction — git.gitPath's own configured value
 // verbatim (never resolved through Discovery.Status here), the same shape gitPathFrom
 // (gitrpc/handlers.go) and CodeWorkspaceService.gitPathSetting already read it in: Registry.Acquire
 // resolves an unset/relative path itself.
@@ -538,8 +476,8 @@ func adeGitPathSetting(repositories *repos.Repos) func() string {
 	}
 }
 
-// adeAutofetchMinutes is QueueDeps.AutofetchMinutes' own construction — echoes
-// git.fetchAutoIntervalMinutes into AdeRepoSnapshot (§5.2), the same leaf gitRegistry.Settings
+// adeAutofetchMinutes is TaskBoardDeps.AutofetchMinutes' own construction — echoes
+// git.fetchAutoIntervalMinutes into the board, the same leaf gitRegistry.Settings
 // (wireGit) already reads.
 func adeAutofetchMinutes(repositories *repos.Repos) func() int {
 	return func() int {
@@ -551,9 +489,8 @@ func adeAutofetchMinutes(repositories *repos.Repos) func() int {
 	}
 }
 
-// adeCloseTerminal is QueueDeps.CloseTerminal's own construction — terminal.Registry.Close never
-// errors, so this just satisfies the func(id string) error seam Archive's own stopRunningSessions
-// expects.
+// adeCloseTerminal is the board's CloseTerminal seam — terminal.Registry.Close never
+// errors, so this just satisfies the func(id string) error signature.
 func adeCloseTerminal(registry *terminal.Registry) func(id string) error {
 	return func(id string) error {
 		registry.Close(id)
@@ -561,15 +498,12 @@ func adeCloseTerminal(registry *terminal.Registry) func(id string) error {
 	}
 }
 
-// shutdownAde is wireAde's own teardown half (main.go's teardown func): flushes adeTracker's
-// still-in-memory lastActive values, closes the queue's own Conn (releasing every repo it held),
-// then stops the hooks listener — a plain helper so main's own gocognit score doesn't carry three
-// more nested error checks for a call site used exactly once.
-func shutdownAde(tracker *ade.Tracker, queue *ade.Queue, hooks *agenthooks.Manager) {
+// shutdownTracker is wireTracker's teardown half: flushes the tracker's still-in-memory lastActive
+// values, then stops the hooks listener.
+func shutdownTracker(tracker *ade.Tracker, hooks *agenthooks.Manager) {
 	if err := tracker.Close(); err != nil {
 		slog.Warn("ade: close", "scope", "ade", "err", err)
 	}
-	queue.Close()
 	if err := hooks.Stop(); err != nil {
 		slog.Warn("agent hooks: stop", "scope", "ade", "err", err)
 	}
