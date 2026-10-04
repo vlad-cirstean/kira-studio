@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
 const (
@@ -27,6 +30,16 @@ const (
 // workflow/repo reads. Run, session and workflow-edit methods land with later waves.
 type AdeTaskService struct {
 	Engine *ade.TaskBoard
+	// Registry, Emit and FocusWindow serve FocusSession; nil in a fixture that never calls it.
+	// FocusWindow is a func field, not a method, so it adds nothing to the bound surface.
+	Registry    *terminal.Registry
+	Emit        appcore.Emitter
+	FocusWindow func(key string) bool
+}
+
+// AdeTaskOpenSession is FocusSession's emit half: addressed to the one window just brought forward.
+func AdeTaskOpenSession(e appcore.Emitter, windowKey string, payload adewire.OpenSessionEvent) {
+	e.EmitTo(windowKey, adewire.ChannelOpenSession, payload)
 }
 
 // AdeTaskBoardChanged is TaskBoard.OnBoard's target: payload-free, every window re-fetches Board.
@@ -69,8 +82,13 @@ func adeTaskError(err error) error {
 		errors.Is(err, repos.ErrBranchOnTask), errors.Is(err, repos.ErrRepoOnTask),
 		errors.Is(err, repos.ErrReviewKind):
 		return ipcerr.New("E_INVALID", err.Error())
+	case errors.Is(err, ade.ErrSessionWrongRepo), errors.Is(err, ade.ErrSessionRunning),
+		errors.Is(err, ade.ErrSessionNotRunning), errors.Is(err, ade.ErrCommandMismatch),
+		errors.Is(err, ade.ErrResumeCwdNotDir):
+		return ipcerr.New("E_INVALID", err.Error())
 	case errors.Is(err, repos.ErrTaskNotFound), errors.Is(err, repos.ErrBranchMissing),
-		errors.Is(err, repos.ErrBacklogGone), errors.Is(err, repos.ErrRunNotFound):
+		errors.Is(err, repos.ErrBacklogGone), errors.Is(err, repos.ErrRunNotFound),
+		errors.Is(err, ade.ErrSessionNotFound):
 		return ipcerr.New("E_NOT_FOUND", err.Error())
 	}
 	return ipcerr.InternalErr(err)
@@ -605,4 +623,103 @@ func (s *AdeTaskService) ReadLog(ctx context.Context, args adewire.ReadLogArgs) 
 func (s *AdeTaskService) Sessions(ctx context.Context) (adewire.SessionsResult, error) {
 	r, err := s.Engine.Sessions(ctx)
 	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) StopRun(ctx context.Context, args adewire.RunArgs) error {
+	if err := validateAdeItemID(args.RunID, "runId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.StopRun(ctx, args.RunID))
+}
+
+func (s *AdeTaskService) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (adewire.Launch, error) {
+	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
+		return adewire.Launch{}, err
+	}
+	l, err := s.Engine.TakeOver(ctx, args)
+	return l, adeTaskError(err)
+}
+
+func (s *AdeTaskService) LaunchStage(ctx context.Context, args adewire.LaunchStageArgs) (adewire.Launch, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.Launch{}, err
+	}
+	if len(args.Message) > adeMaxMessageBytes {
+		return adewire.Launch{}, adeTaskInvalid("message is too long")
+	}
+	l, err := s.Engine.LaunchStage(ctx, args)
+	return l, adeTaskError(err)
+}
+
+func (s *AdeTaskService) StartBranch(ctx context.Context, args adewire.StartBranchArgs) (adewire.Launch, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return adewire.Launch{}, err
+	}
+	if len(args.Message) > adeMaxMessageBytes {
+		return adewire.Launch{}, adeTaskInvalid("message is too long")
+	}
+	l, err := s.Engine.StartBranch(ctx, args)
+	return l, adeTaskError(err)
+}
+
+func (s *AdeTaskService) Send(ctx context.Context, args adewire.SendArgs) error {
+	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
+		return err
+	}
+	if args.Message == "" {
+		return adeTaskInvalid("message is required")
+	}
+	if len(args.Message) > adeMaxMessageBytes {
+		return adeTaskInvalid("message is too long")
+	}
+	return adeTaskError(s.Engine.Send(ctx, args))
+}
+
+// FocusSession brings the window that owns a running session's terminal forward and tells it which
+// task, branch and session to show. It returns false, never an error, when the session stopped or its
+// window closed meanwhile.
+func (s *AdeTaskService) FocusSession(_ context.Context, args adewire.FocusSessionArgs) (bool, error) {
+	if err := validateAdeItemID(args.SessionID, "sessionId"); err != nil {
+		return false, err
+	}
+	if args.TaskID != "" {
+		if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+			return false, err
+		}
+	}
+	rec, err := s.Engine.TUISession(args.SessionID)
+	if err != nil {
+		return false, adeTaskError(err)
+	}
+	if rec == nil {
+		return false, adeTaskError(ade.ErrSessionNotFound)
+	}
+	if rec.Mode != model.AdeSessionModeTUI || rec.State != model.AdeSessionStateRunning || s.Registry == nil {
+		return false, nil
+	}
+	windowKey, ok := s.Registry.WindowOf(rec.TerminalID)
+	if !ok || s.FocusWindow == nil || !s.FocusWindow(windowKey) {
+		return false, nil
+	}
+	taskID := args.TaskID
+	if taskID == "" {
+		taskID = rec.TaskID
+	}
+	AdeTaskOpenSession(s.Emit, windowKey, adewire.OpenSessionEvent{TaskID: taskID, BranchID: rec.BranchID, SessionID: rec.ID})
+	return true, nil
+}
+
+func (s *AdeTaskService) ArchiveRisk(ctx context.Context, args adewire.TaskArgs) (adewire.ArchiveRisk, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ArchiveRisk{}, err
+	}
+	r, err := s.Engine.ArchiveRisk(ctx, args.TaskID)
+	return r, adeTaskError(err)
+}
+
+func (s *AdeTaskService) ArchiveTask(ctx context.Context, args adewire.TaskArgs) error {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return err
+	}
+	return adeTaskError(s.Engine.ArchiveTask(ctx, args.TaskID))
 }

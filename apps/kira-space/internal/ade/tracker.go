@@ -173,6 +173,14 @@ func NewTracker(deps TrackerDeps) *Tracker {
 	}
 }
 
+// SetStoppedHandler installs TrackerDeps.OnStopped after construction: the handler's owner (the v2
+// engine) is built after the tracker. Call it before any window exists.
+func (t *Tracker) SetStoppedHandler(fn func(recordID string)) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.deps.OnStopped = fn
+}
+
 // SetHooks installs the launch-composition callback (agenthooks.Manager.ComposeLaunch) — called
 // once in main.go before any window exists, so Compose never races an unset hooks func with a
 // real launch.
@@ -440,9 +448,12 @@ func (t *Tracker) Reconcile() {
 	if len(stopped) > 0 && t.deps.OnChange != nil {
 		t.deps.OnChange()
 	}
-	if t.deps.OnStopped != nil {
+	t.mu.Lock()
+	onStopped := t.deps.OnStopped
+	t.mu.Unlock()
+	if onStopped != nil {
 		for _, recordID := range stopped {
-			t.deps.OnStopped(recordID)
+			onStopped(recordID)
 		}
 	}
 }

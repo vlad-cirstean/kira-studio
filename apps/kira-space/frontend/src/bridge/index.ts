@@ -338,6 +338,20 @@ const spaceControl = {
     unwrap(AdeTaskService.ReadLog(args)).then((r) => trust<V2.LogPage>(r)),
   adeTaskSessions: (): Promise<V2.SessionsResult> =>
     unwrap(AdeTaskService.Sessions()).then((r) => trust<V2.SessionsResult>(r)),
+  adeTaskStopRun: (args: V2.RunArgs): Promise<void> => unwrap(AdeTaskService.StopRun(args)),
+  adeTaskTakeOver: (args: V2.TakeOverArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.TakeOver(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskLaunchStage: (args: V2.LaunchStageArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.LaunchStage(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskStartBranch: (args: V2.StartBranchArgs): Promise<V2.Launch> =>
+    unwrap(AdeTaskService.StartBranch(args)).then((r) => trust<V2.Launch>(r)),
+  adeTaskSend: (args: V2.SendArgs): Promise<void> => unwrap(AdeTaskService.Send(args)),
+  adeTaskFocusSession: (args: V2.FocusSessionArgs): Promise<boolean> =>
+    unwrap(AdeTaskService.FocusSession(args)),
+  adeTaskArchiveRisk: (args: V2.TaskArgs): Promise<V2.ArchiveRisk> =>
+    unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
+  adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>
+    unwrap(AdeTaskService.ArchiveTask(args)),
   onAdeTaskBoard: (cb: () => void): (() => void) => on('kira:adetask:board', cb),
   onAdeTaskBacklog: (cb: () => void): (() => void) => on('kira:adetask:backlog', cb),
   onAdeTaskWorkflows: (cb: () => void): (() => void) => on('kira:adetask:workflows', cb),
@@ -348,6 +362,8 @@ const spaceControl = {
   onAdeTaskSessions: (cb: () => void): (() => void) => on('kira:adetask:sessions', cb),
   onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
     on('kira:adetask:credential', cb),
+  onAdeTaskOpenSession: (cb: (event: V2.OpenSessionEvent) => void): (() => void) =>
+    on('kira:adetask:open-session', cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

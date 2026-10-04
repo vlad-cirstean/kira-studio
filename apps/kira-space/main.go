@@ -151,9 +151,14 @@ func main() {
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
-	adeTaskBoard := wireAdeTask(repositories, events, git)
+	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry))
+	adeTracker.SetStoppedHandler(adeTaskBoard.OnTUIStopped)
+	if err := adeTaskBoard.Recover(); err != nil {
+		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
+	}
 	adeTaskBoard.Start()
 	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry, Queue: adeQueue}
+	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
 	// (P129 Part 1 §4.2 step 4).
@@ -188,6 +193,7 @@ func main() {
 	// adeSvc.FocusWindow: the same two-step windowsSvc.OpenNewWindow (below) uses — FocusSession
 	// (P129 Part 7 §0.9) needs windows, which doesn't exist yet when adeSvc is constructed above.
 	adeSvc.FocusWindow = windows.Focus
+	adeTaskSvc.FocusWindow = windows.Focus
 	closeFlush := shell.NewCloseFlushCoordinator(events)
 
 	beforeFlush := sync.OnceFunc(func() {
@@ -255,7 +261,7 @@ func main() {
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
 			application.NewService(adeSvc),
-			application.NewService(&bridge.AdeTaskService{Engine: adeTaskBoard}),
+			application.NewService(adeTaskSvc),
 			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
@@ -401,7 +407,7 @@ func wireAde(
 	tracker := ade.NewTracker(ade.TrackerDeps{
 		Store: repositories.AdeSessions, LiveAgents: registry.AgentSessions,
 		WriteTerminal: registry.Write, Now: time.Now,
-		OnChange: func() { bridge.AdeSessionsChanged(events) },
+		OnChange: func() { bridge.AdeSessionsChanged(events); bridge.AdeTaskSessionsChanged(events) },
 	})
 	if err := tracker.Recover(); err != nil {
 		slog.Warn("ade: recover", "scope", "ade", "err", err)
@@ -441,7 +447,9 @@ func wireAde(
 
 // wireAdeTask builds the v2 task board engine (P144) beside the v1 queue: its own Conn, the
 // workflow reader over <home>/workflows, and the cached git discovery gating merge-tree checks.
-func wireAdeTask(repositories *repos.Repos, events *bridge.Events, git gitWired) *ade.TaskBoard {
+func wireAdeTask(
+	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
+) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		slog.Warn("ade: user home", "scope", "ade", "err", err)
@@ -464,6 +472,8 @@ func wireAdeTask(repositories *repos.Repos, events *bridge.Events, git gitWired)
 		OnCredential:    func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
 		Logs:            repositories.AdeLogs,
 		Sessions:        repositories.AdeSessions,
+		Tracker:         tracker,
+		CloseTerminal:   closeTerminal,
 		OnRuns:          func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
 		OnLog:           func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
 		OnSessions:      func() { bridge.AdeTaskSessionsChanged(events) },
