@@ -521,7 +521,7 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 	if err != nil {
 		return RepoSnapshot{}, err
 	}
-	ancestryOf, err := q.computeAncestry(ctx, entry, existing, tips, refs)
+	ancestryOf, err := computeAncestry(ctx, entry, existing, tips, refs)
 	if err != nil {
 		return RepoSnapshot{}, err
 	}
@@ -545,7 +545,7 @@ func (q *Queue) snapshotLocked(ctx context.Context, codeRepoID string) (RepoSnap
 			return RepoSnapshot{}, err
 		}
 	}
-	pairFactsOut, err := q.computePairFacts(ctx, sc, pairItems)
+	pairFactsOut, err := computePairFacts(ctx, sc.entry, sc.caches, sc.ancestryOf, pairItems)
 	if err != nil {
 		return RepoSnapshot{}, err
 	}
@@ -637,7 +637,7 @@ func (q *Queue) computeDepthsAndTips(ctx context.Context, entry *gitsession.Repo
 
 // computeAncestry is §0.5's own Ancestors input: for each existing item, which OTHER existing
 // items are strict (non-equal-tip) ancestors of it — also pairFacts' own isAncestor callback data.
-func (q *Queue) computeAncestry(ctx context.Context, entry *gitsession.RepoEntry, existing []string, tips, refs map[string]string) (map[string][]string, error) {
+func computeAncestry(ctx context.Context, entry *gitsession.RepoEntry, existing []string, tips, refs map[string]string) (map[string][]string, error) {
 	ancestryOf := make(map[string][]string, len(existing))
 	refToItem := make(map[string]string, len(existing))
 	for _, item := range existing {
@@ -846,14 +846,14 @@ func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCa
 // computePairFacts wraps pairFacts (§0.7) with its own isAncestor/mergeTree callbacks — the
 // mergeTree side is the (tipA, tipB)-keyed LRU cache (§4.2), so a repeat pair whose tips are
 // unchanged since the last Snapshot/Refresh never re-spawns merge-tree.
-func (q *Queue) computePairFacts(ctx context.Context, sc *snapshotContext, pairItems []pairItem) ([]PairFact, error) {
+func computePairFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, ancestryOf map[string][]string, pairItems []pairItem) ([]PairFact, error) {
 	isAncestorFn := func(x, y string) bool {
-		for _, a := range sc.ancestryOf[y] {
+		for _, a := range ancestryOf[y] {
 			if a == x {
 				return true
 			}
 		}
-		for _, a := range sc.ancestryOf[x] {
+		for _, a := range ancestryOf[x] {
 			if a == y {
 				return true
 			}
@@ -862,10 +862,10 @@ func (q *Queue) computePairFacts(ctx context.Context, sc *snapshotContext, pairI
 	}
 	mergeTreeFn := func(tipA, tipB string) ([]string, error) {
 		key := mergeTreeKey{TipA: tipA, TipB: tipB}
-		if v, ok := sc.caches.mergeTree.Get(key); ok {
+		if v, ok := caches.mergeTree.Get(key); ok {
 			return v, nil
 		}
-		pred, err := sc.entry.MergeTreeConflicts(ctx, tipA, tipB)
+		pred, err := entry.MergeTreeConflicts(ctx, tipA, tipB)
 		if err != nil {
 			return nil, err
 		}
@@ -873,7 +873,7 @@ func (q *Queue) computePairFacts(ctx context.Context, sc *snapshotContext, pairI
 		if paths == nil {
 			paths = []string{}
 		}
-		sc.caches.mergeTree.Add(key, paths)
+		caches.mergeTree.Add(key, paths)
 		return paths, nil
 	}
 	pairs, err := pairFacts(pairItems, isAncestorFn, mergeTreeFn)
@@ -1550,7 +1550,7 @@ func (q *Queue) countRefsChanged(ctx context.Context, entry *gitsession.RepoEntr
 
 // --- ForcePush (§6.2) --------------------------------------------------------------------------
 
-func (q *Queue) forcePushRemote(ctx context.Context, entry *gitsession.RepoEntry, branch string) string {
+func forcePushRemote(ctx context.Context, entry *gitsession.RepoEntry, branch string) string {
 	if inv, err := entry.BranchInventory(ctx); err == nil {
 		for _, r := range inv {
 			if r.Remote == "" && r.Short == branch && r.Upstream != "" {
@@ -1581,7 +1581,7 @@ func (q *Queue) ForcePush(ctx context.Context, codeRepoID string, branches, conf
 
 	out := make([]ForcePushResult, 0, len(branches))
 	for _, branch := range branches {
-		remote := q.forcePushRemote(ctx, entry, branch)
+		remote := forcePushRemote(ctx, entry, branch)
 		pf, err := entry.PushPreflight(ctx, remote, branch)
 		if err != nil {
 			out = append(out, ForcePushResult{Branch: branch, Error: &gitsession.RemoteOpError{Kind: "Unknown", Message: err.Error()}})

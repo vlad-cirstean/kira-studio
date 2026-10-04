@@ -1,0 +1,346 @@
+package ade
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"strings"
+
+	"golang.org/x/sync/errgroup"
+
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+)
+
+// repoResult is one repo's computed branch facts. jobs holds the rebase-conflict check of every
+// visible branch (created, resolved, unmerged), keyed by branch id; the caller decides whether to
+// peek, queue or await them.
+type repoResult struct {
+	state      adewire.RepoState
+	branches   map[string]adewire.Branch
+	pairs      []adewire.Pair
+	hadCommits []string
+	merged     map[string]int64
+	jobs       map[string]rebaseJob
+}
+
+// zeroBranch is a branch with only its stored meta: not created, or no git facts available.
+func zeroBranch(sb model.AdeTaskBranch, base string, setup *adewire.WorktreeSetup) adewire.Branch {
+	return adewire.Branch{
+		ID: sb.ID, TaskID: sb.TaskID, CodeRepoID: sb.CodeRepoID, Name: sb.Name, Kind: sb.Kind, Base: base,
+		Setup: setup, Integration: []adewire.Integration{}, Deployments: []adewire.Deployment{},
+		ConflictsIfRebased: []string{}, ConflictCheck: conflictDone, Files: []adewire.FileChange{},
+		Commits: []adewire.Commit{}, Dirty: []adewire.DirtyEntry{}, AddedAt: sb.AddedAt,
+	}
+}
+
+func toWireSetup(s model.AdeWorktreeSetup) *adewire.WorktreeSetup {
+	return &adewire.WorktreeSetup{State: s.State, StartedAt: s.StartedAt, FinishedAt: s.FinishedAt, ExitCode: s.ExitCode}
+}
+
+// boardCtx holds one repo's git inputs shared by every branch computation.
+type boardCtx struct {
+	entry     *gitsession.RepoEntry
+	repoID    string
+	inv       []porcelain.InventoryRef
+	userEmail string
+	remote    string
+	mainName  string
+	mainTip   string
+	hasMain   bool
+	caches    *repoCaches
+	nowMs     int64
+	resolved  map[string]resolvedRef // branch id -> resolved ref
+	byName    map[string]model.AdeTaskBranch
+}
+
+// ownerOf is the display owner of a ref: empty for the user's own commits.
+func (sc *boardCtx) ownerOf(row porcelain.InventoryRef) string {
+	if sc.userEmail != "" && strings.EqualFold(row.AuthorEmail, sc.userEmail) {
+		return ""
+	}
+	return row.AuthorName
+}
+
+// baseRef is a branch's resolved latest base.
+type baseRef struct {
+	tip      string
+	branchID string
+	owner    string
+	ok       bool
+}
+
+// resolveBase: main for ” or the main short name; another live planner branch of the repo; else
+// the default remote's branch, else the local one.
+func (sc *boardCtx) resolveBase(sb model.AdeTaskBranch) baseRef {
+	if sb.Base == "" || sb.Base == sc.mainName {
+		return baseRef{tip: sc.mainTip, ok: sc.hasMain}
+	}
+	if other, ok := sc.byName[sb.Base]; ok && other.ID != sb.ID {
+		if rr := sc.resolved[other.ID]; rr.found {
+			owner := ""
+			if other.Kind != model.AdeBranchKindMine {
+				owner = sc.ownerOf(rr.row)
+			}
+			return baseRef{tip: rr.row.Tip, branchID: other.ID, owner: owner, ok: true}
+		}
+	}
+	if row, ok := findRemoteRow(sc.inv, sc.remote, sb.Base); ok && sc.remote != "" {
+		return baseRef{tip: row.Tip, owner: sc.ownerOf(row), ok: true}
+	}
+	for _, r := range sc.inv {
+		if r.Remote == "" && r.Short == sb.Base {
+			return baseRef{tip: r.Tip, owner: sc.ownerOf(r), ok: true}
+		}
+	}
+	return baseRef{}
+}
+
+type branchOut struct {
+	wb        adewire.Branch
+	pi        *pairItem
+	tip, ref  string
+	hadNew    bool
+	mergedNew bool
+	job       *rebaseJob
+}
+
+// repoFacts computes one repo's branch facts. A repo that cannot be read degrades to stored-meta
+// branches (logged), never failing the whole board.
+func (b *TaskBoard) repoFacts(ctx context.Context, codeRepoID string, branches []model.AdeTaskBranch, setups map[string]model.AdeWorktreeSetup) *repoResult {
+	res := &repoResult{
+		state:    adewire.RepoState{CodeRepoID: codeRepoID},
+		branches: make(map[string]adewire.Branch, len(branches)), pairs: []adewire.Pair{},
+		merged: map[string]int64{}, jobs: map[string]rebaseJob{},
+	}
+	setupOf := func(id string) *adewire.WorktreeSetup {
+		if s, ok := setups[id]; ok {
+			return toWireSetup(s)
+		}
+		return nil
+	}
+	fallback := func() {
+		for _, sb := range branches {
+			res.branches[sb.ID] = zeroBranch(sb, sb.Base, setupOf(sb.ID))
+		}
+	}
+	entry, err := b.openRepo(ctx, codeRepoID)
+	if err != nil {
+		slog.Warn("ade board: open repo", "repo", codeRepoID, "err", err)
+		fallback()
+		return res
+	}
+	if err := b.collectRepo(ctx, entry, codeRepoID, branches, setupOf, res); err != nil {
+		slog.Warn("ade board: repo facts", "repo", codeRepoID, "err", err)
+		res.hadCommits, res.merged, res.jobs, res.pairs = nil, map[string]int64{}, map[string]rebaseJob{}, []adewire.Pair{}
+		fallback()
+	}
+	return res
+}
+
+func (b *TaskBoard) collectRepo(ctx context.Context, entry *gitsession.RepoEntry, codeRepoID string, branches []model.AdeTaskBranch, setupOf func(string) *adewire.WorktreeSetup, res *repoResult) error {
+	inv, err := entry.BranchInventory(ctx)
+	if err != nil {
+		return err
+	}
+	mainRefName, mainTip, hasMain, err := entry.MainRef(ctx)
+	if err != nil {
+		return err
+	}
+	userEmail, err := entry.ConfigValue(ctx, "user.email")
+	if err != nil {
+		return err
+	}
+	remote, _ := entry.DefaultRemote(ctx)
+	caches, rebaseC := b.cachesFor(codeRepoID)
+	sc := &boardCtx{
+		entry: entry, repoID: codeRepoID, inv: inv, userEmail: userEmail, remote: remote, mainTip: mainTip,
+		hasMain: hasMain, caches: caches, nowMs: b.deps.Now().UnixMilli(),
+		resolved: map[string]resolvedRef{}, byName: map[string]model.AdeTaskBranch{},
+	}
+	if hasMain {
+		sc.mainName, _ = mainDisplay(mainRefName)
+	}
+	res.state = adewire.RepoState{CodeRepoID: codeRepoID, MainName: sc.mainName, Remote: remote, LastFetchAt: lastFetchAt(entry)}
+	for _, sb := range branches {
+		if sb.Name == "" {
+			continue
+		}
+		sc.byName[sb.Name] = sb
+		row, found := resolveQueuedRef(inv, sb.Name, remote)
+		sc.resolved[sb.ID] = resolvedRef{row: row, found: found}
+	}
+
+	outs := make([]branchOut, len(branches))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(boardFanOut)
+	for i, sb := range branches {
+		g.Go(func() error {
+			out, err := b.computeBranch(gctx, sc, sb, rebaseC, setupOf(sb.ID))
+			outs[i] = out
+			return err
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	var items []pairItem
+	tips, refs := map[string]string{}, map[string]string{}
+	var existing []string
+	for i, sb := range branches {
+		o := outs[i]
+		res.branches[sb.ID] = o.wb
+		if o.hadNew {
+			res.hadCommits = append(res.hadCommits, sb.ID)
+		}
+		if o.mergedNew {
+			res.merged[sb.ID] = sc.nowMs
+		}
+		if o.job != nil {
+			res.jobs[sb.ID] = *o.job
+		}
+		if o.tip != "" {
+			existing = append(existing, sb.ID)
+			tips[sb.ID], refs[sb.ID] = o.tip, o.ref
+		}
+		if o.pi != nil {
+			items = append(items, *o.pi)
+		}
+	}
+	if len(items) < 2 {
+		return nil
+	}
+	ancestry, err := computeAncestry(ctx, entry, existing, tips, refs)
+	if err != nil {
+		return err
+	}
+	pairs, err := computePairFacts(ctx, entry, caches, ancestry, items)
+	if err != nil {
+		return err
+	}
+	for _, p := range pairs {
+		res.pairs = append(res.pairs, adewire.Pair{A: p.A, B: p.B, Shared: nonNil(p.Shared), Conflicts: nonNil(p.Conflicts)})
+	}
+	return nil
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+// computeBranch assembles one branch's wire facts.
+func (b *TaskBoard) computeBranch(ctx context.Context, sc *boardCtx, sb model.AdeTaskBranch, rebaseC *rebaseCache, setup *adewire.WorktreeSetup) (branchOut, error) {
+	baseName := sb.Base
+	if baseName == "" {
+		baseName = sc.mainName
+	}
+	out := branchOut{wb: zeroBranch(sb, baseName, setup)}
+	rr, resolved := sc.resolved[sb.ID]
+	if sb.Name == "" || !resolved || !rr.found {
+		return out, nil
+	}
+	row := rr.row
+	wb := &out.wb
+	out.tip, out.ref = row.Tip, row.Ref
+	wb.Tip, wb.Owner = row.Tip, sc.ownerOf(row)
+	lastCommit := row.CommitterUnix * 1000
+	wb.LastCommitAt = &lastCommit
+	wb.Worktree = row.WorktreePath
+	wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = row.Upstream, row.UpstreamAhead, row.UpstreamBehind
+	if row.Upstream == "" && sc.remote != "" {
+		if remoteRow, found := findRemoteRow(sc.inv, sc.remote, sb.Name); found {
+			ahead, behind, err := sc.entry.AheadBehind(ctx, row.Tip, remoteRow.Tip)
+			if err != nil {
+				return out, err
+			}
+			wb.Upstream, wb.UpstreamAhead, wb.UpstreamBehind = remoteRow.Ref, ahead, behind
+		}
+	}
+
+	base := sc.resolveBase(sb)
+	wb.BaseBranchID, wb.BaseOwner = base.branchID, base.owner
+	var files []porcelain.FileChange
+	if base.ok {
+		rf, err := rangeFacts(ctx, sc.entry, sc.caches, base.tip, row.Tip)
+		if err != nil {
+			return out, err
+		}
+		wb.Ahead, wb.Behind = rf.Ahead, rf.Behind
+		wb.Files = toWireFiles(rf.Files)
+		wb.Commits = toWireCommits(rf.Commits)
+		files = rf.Files
+	}
+	depth := 0
+	if sc.hasMain {
+		if sb.Base == "" || sb.Base == sc.mainName {
+			depth = wb.Ahead
+		} else {
+			ahead, _, err := sc.entry.AheadBehind(ctx, row.Tip, sc.mainTip)
+			if err != nil {
+				return out, err
+			}
+			depth = ahead
+		}
+	}
+	wb.CommitCount = depth
+
+	if wb.Worktree != "" {
+		status, err := sc.entry.WorktreeStatus(ctx, wb.Worktree)
+		if err != nil {
+			return out, err
+		}
+		for _, d := range toDirtyEntries(status) {
+			wb.Dirty = append(wb.Dirty, adewire.DirtyEntry{Code: d.Code, Path: d.Path})
+		}
+	}
+
+	hadCommits := sb.HadCommits || depth > 0
+	out.hadNew = hadCommits && !sb.HadCommits
+	byAncestor := mergedRule(sc.hasMain && depth == 0, hadCommits, "")
+	wb.MergedIntoMain = byAncestor || sb.MergedAt != nil
+	switch {
+	case sb.MergedAt != nil:
+		wb.MergedAt = sb.MergedAt
+	case byAncestor:
+		now := sc.nowMs
+		wb.MergedAt = &now
+		out.mergedNew = true
+	}
+
+	if sb.Kind == model.AdeBranchKindMine || sb.Kind == model.AdeBranchKindReview {
+		out.pi = &pairItem{Item: sb.ID, Tip: row.Tip, Kind: sb.Kind, Merged: wb.MergedIntoMain, Files: filesSet(files)}
+	}
+	switch {
+	case wb.MergedIntoMain:
+	case !base.ok:
+		wb.ConflictCheck, wb.ConflictCheckReason = conflictFailed, fmt.Sprintf("base %s not found", baseName)
+	default:
+		out.job = &rebaseJob{
+			repoID: sc.repoID, key: rebaseKey{BaseTip: base.tip, Tip: row.Tip}, cache: rebaseC,
+			run: mergeTreeRun(sc.entry), branch: sb.Name, base: baseName,
+		}
+	}
+	return out, nil
+}
+
+func toWireFiles(changes []porcelain.FileChange) []adewire.FileChange {
+	out := make([]adewire.FileChange, len(changes))
+	for i, c := range changes {
+		out[i] = adewire.FileChange{Path: c.Path, Added: c.Additions, Deleted: c.Deletions, Binary: c.IsBinary}
+	}
+	return out
+}
+
+func toWireCommits(commits []porcelain.RangeCommit) []adewire.Commit {
+	out := make([]adewire.Commit, len(commits))
+	for i, c := range commits {
+		out[i] = adewire.Commit{Sha: c.Sha, Message: c.Subject}
+	}
+	return out
+}
