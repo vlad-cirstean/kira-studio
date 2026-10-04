@@ -180,7 +180,7 @@ func TestPairFacts_CacheHitOnUnchangedTips(t *testing.T) {
 	}
 	// A tip-keyed cache wrapping mergeTree — the property under test is that pairFacts' own
 	// tip-based callback signature (not item ids) lets the CALLER cache across repeat calls with
-	// unchanged tips, exactly as queue.go's own golang-lru wrapper does (§4.2).
+	// unchanged tips, exactly as the golang-lru wrapper in gitfacts.go does.
 	cache := map[[2]string][]string{}
 	cached := func(a, b string) ([]string, error) {
 		key := [2]string{a, b}
@@ -245,14 +245,6 @@ func TestMergedRule(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------------------
-// rebindCandidates (§0.10)
-// ---------------------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------------------
-// colorSlot (§0.13)
-// ---------------------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------------------
 // atRisk (§0.9)

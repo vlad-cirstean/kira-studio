@@ -2,7 +2,7 @@ package model
 
 import "fmt"
 
-// AdeTaskKind* are ade_tasks.kind's CHECK values; AdeBranchKind* (adequeue.go) are the branch kinds.
+// AdeTaskKind* are ade_tasks.kind's CHECK values; AdeBranchKind* (below) are the branch kinds.
 const (
 	AdeTaskKindTask   = "task"
 	AdeTaskKindReview = "review"

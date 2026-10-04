@@ -151,8 +151,7 @@ func (r *AdeTaskRepo) GetTask(id string) (model.AdeTask, error) {
 }
 
 // insertTask writes the task, its branches and a plan row at the end (Later), in tx. It assigns
-// the task's color: the first slot no live task uses, else the least-used slot overall. This is a
-// SQL twin of ade.colorSlot (storage/repos is a leaf package ade imports, not the reverse).
+// the task's color: the first slot no live task uses, else the least-used slot overall.
 func insertTask(tx *sql.Tx, t model.AdeTask, branches []model.AdeTaskBranch) (model.AdeTask, error) {
 	if err := t.Validate(); err != nil {
 		return model.AdeTask{}, err
