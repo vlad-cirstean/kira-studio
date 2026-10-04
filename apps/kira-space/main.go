@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log/slog"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ade"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/adeflow"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appshell"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
@@ -148,6 +150,7 @@ func main() {
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
+	adeTaskBoard := wireAdeTask(repositories, events, git)
 	adeSvc := &bridge.AdeService{Deps: deps, Tracker: adeTracker, Registry: terminalRegistry, Queue: adeQueue}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -208,6 +211,7 @@ func main() {
 		// Part 2 §5.4).
 		terminalSvc.Shutdown()
 		shutdownAde(adeTracker, adeQueue, agentHooks)
+		adeTaskBoard.Close()
 		detachGitPush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
@@ -249,6 +253,7 @@ func main() {
 			application.NewService(tabsSvc),
 			application.NewService(terminalSvc),
 			application.NewService(adeSvc),
+			application.NewService(&bridge.AdeTaskService{Engine: adeTaskBoard}),
 			application.NewService(&bridge.OpsService{Log: git.opLog}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 			application.NewService(keepAwakeSvc),
@@ -430,6 +435,30 @@ func wireAde(
 	})
 
 	return tracker, queue, hooks
+}
+
+// wireAdeTask builds the v2 task board engine (P144) beside the v1 queue: its own Conn, the
+// workflow reader over <home>/workflows, and the cached git discovery gating merge-tree checks.
+func wireAdeTask(repositories *repos.Repos, events *bridge.Events, git gitWired) *ade.TaskBoard {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		slog.Warn("ade: user home", "scope", "ade", "err", err)
+	}
+	gitPath := adeGitPathSetting(repositories)
+	return ade.NewTaskBoard(ade.TaskBoardDeps{
+		Tasks: repositories.AdeTasks, Backlog: repositories.AdeBacklog, RepoConfig: repositories.AdeRepoConfig,
+		CodeRepos: repositories.CodeRepos, GitRepoSettings: repositories.GitRepoSettings.Get,
+		Registry: git.registry, GitPath: gitPath,
+		GitStatus:        func(ctx context.Context) gitclient.GitStatus { return git.discovery.Status(ctx, gitPath()) },
+		Askpass:          git.askpassBroker,
+		Workflows:        &adeflow.Reader{Dir: adeflow.Dir(config.KiraSpaceHome()), Store: repositories.AdeTasks},
+		OnBoard:          func() { bridge.AdeTaskBoardChanged(events) },
+		OnBacklog:        func() { bridge.AdeTaskBacklogChanged(events) },
+		OnCredential:     func(payload any) { bridge.AdeTaskCredentialRequested(events, payload) },
+		AutofetchMinutes: adeAutofetchMinutes(repositories),
+		HomeDir:          userHome,
+		Now:              time.Now,
+	})
 }
 
 // adeSessionsFor is QueueDeps.Sessions' own construction (§5.1): Tracker.ListByRepo mapped to ade.SessionRef, Part 1's own already-recorded session rows.

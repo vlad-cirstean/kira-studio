@@ -1,4 +1,5 @@
 import * as AdeService from '@bindings/adeservice.js';
+import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
@@ -34,6 +35,7 @@ import type {
 import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type * as V2 from '../ade/v2/wire';
 import type {
   AdeAddBranchArgs,
   AdeAddDependencyArgs,
@@ -301,6 +303,53 @@ const spaceControl = {
     unwrap(OpsService.Recent({ limit })).then((r) => trust<SpaceOpRecord[]>(r ?? [])),
   opsCancel: (opId: string): Promise<void> => unwrap(OpsService.Cancel({ opId })),
   onOpUpdate: (cb: (record: SpaceOpRecord) => void): (() => void) => on(CHANNEL.opUpdate, cb),
+
+  // P144: AdeTaskService (v2 task board). Types from ../ade/v2/wire; payload-free pushes invalidate queries.
+  adeTaskBoard: (): Promise<V2.Board> =>
+    unwrap(AdeTaskService.Board()).then((r) => trust<V2.Board>(r)),
+  adeTaskPrs: (): Promise<V2.PrsResult> =>
+    unwrap(AdeTaskService.Prs()).then((r) => trust<V2.PrsResult>(r)),
+  adeTaskRefresh: (args: V2.RefreshArgs): Promise<V2.RefreshResult> =>
+    unwrap(AdeTaskService.Refresh(args)).then((r) => trust<V2.RefreshResult>(r)),
+  adeTaskForcePush: (args: V2.BranchArgs): Promise<V2.ForcePushResult> =>
+    unwrap(AdeTaskService.ForcePush(args)).then((r) => trust<V2.ForcePushResult>(r)),
+  adeTaskProvideCredential: (args: V2.ProvideCredentialArgs): Promise<boolean> =>
+    unwrap(AdeTaskService.ProvideCredential(args)).then((r) => trust<boolean>(r)),
+  adeTaskCreateTask: (args: V2.CreateTaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.CreateTask(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskUpdateTask: (args: V2.UpdateTaskArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.UpdateTask(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskAddTaskRepo: (args: V2.AddTaskRepoArgs): Promise<V2.Branch> =>
+    unwrap(AdeTaskService.AddTaskRepo(args)).then((r) => trust<V2.Branch>(r)),
+  adeTaskCandidateBranches: (): Promise<V2.CandidateBranchesResult> =>
+    unwrap(AdeTaskService.CandidateBranches()).then((r) => trust<V2.CandidateBranchesResult>(r)),
+  adeTaskAddExistingBranch: (args: V2.AddExistingBranchArgs): Promise<V2.AddExistingBranchResult> =>
+    unwrap(AdeTaskService.AddExistingBranch(args)).then((r) =>
+      trust<V2.AddExistingBranchResult>(r),
+    ),
+  adeTaskSetPlan: (args: V2.SetPlanArgs): Promise<void> => unwrap(AdeTaskService.SetPlan(args)),
+  adeTaskSetQueuedAfter: (args: V2.SetQueuedAfterArgs): Promise<void> =>
+    unwrap(AdeTaskService.SetQueuedAfter(args)),
+  adeTaskBacklog: (): Promise<V2.BacklogResult> =>
+    unwrap(AdeTaskService.Backlog()).then((r) => trust<V2.BacklogResult>(r)),
+  adeTaskAddBacklogItem: (args: V2.AddBacklogItemArgs): Promise<V2.BacklogItem> =>
+    unwrap(AdeTaskService.AddBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
+  adeTaskUpdateBacklogItem: (args: V2.UpdateBacklogItemArgs): Promise<V2.BacklogItem> =>
+    unwrap(AdeTaskService.UpdateBacklogItem(args)).then((r) => trust<V2.BacklogItem>(r)),
+  adeTaskMoveBacklogItem: (args: V2.MoveBacklogItemArgs): Promise<void> =>
+    unwrap(AdeTaskService.MoveBacklogItem(args)),
+  adeTaskDeleteBacklogItem: (args: V2.BacklogItemArgs): Promise<void> =>
+    unwrap(AdeTaskService.DeleteBacklogItem(args)),
+  adeTaskPromoteBacklogItem: (args: V2.BacklogItemArgs): Promise<V2.Task> =>
+    unwrap(AdeTaskService.PromoteBacklogItem(args)).then((r) => trust<V2.Task>(r)),
+  adeTaskWorkflows: (): Promise<V2.WorkflowsResult> =>
+    unwrap(AdeTaskService.Workflows()).then((r) => trust<V2.WorkflowsResult>(r)),
+  adeTaskRepos: (): Promise<V2.ReposResult> =>
+    unwrap(AdeTaskService.Repos()).then((r) => trust<V2.ReposResult>(r)),
+  onAdeTaskBoard: (cb: () => void): (() => void) => on('kira:adetask:board', cb),
+  onAdeTaskBacklog: (cb: () => void): (() => void) => on('kira:adetask:backlog', cb),
+  onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
+    on('kira:adetask:credential', cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus

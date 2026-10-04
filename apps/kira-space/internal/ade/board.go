@@ -106,9 +106,26 @@ func (b *TaskBoard) handleEmit(method string, payload any) {
 		}
 	case "credential.request":
 		if b.deps.OnCredential != nil {
-			b.deps.OnCredential(payload)
+			b.deps.OnCredential(b.credentialRequest(payload))
 		}
 	}
+}
+
+// credentialRequest re-keys the Conn's credential payload (git repo id) to the wire's codeRepoId.
+func (b *TaskBoard) credentialRequest(payload any) adewire.CredentialRequest {
+	var in struct {
+		RequestID string `json:"requestId"`
+		RepoID    string `json:"repoId"`
+		Prompt    string `json:"prompt"`
+		Masked    bool   `json:"masked"`
+	}
+	if raw, err := json.Marshal(payload); err == nil {
+		_ = json.Unmarshal(raw, &in)
+	}
+	b.mu.Lock()
+	codeRepoID := b.byGitRepoID[in.RepoID]
+	b.mu.Unlock()
+	return adewire.CredentialRequest{RequestID: in.RequestID, CodeRepoID: codeRepoID, Prompt: in.Prompt, Masked: in.Masked}
 }
 
 // scheduleBoard debounces a board invalidation (a burst of ref moves or check completions).
