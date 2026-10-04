@@ -775,13 +775,13 @@ func (q *Queue) computeOneBranchFact(ctx context.Context, sc *snapshotContext, b
 		return fact, nil, false, false, nil
 	}
 
-	rangeFacts, err := q.rangeFactsFor(ctx, sc, parentTip, r.row.Tip)
+	rf, err := rangeFacts(ctx, sc.entry, sc.caches, parentTip, r.row.Tip)
 	if err != nil {
 		return BranchFact{}, nil, false, false, err
 	}
-	fact.Ahead, fact.Behind = rangeFacts.Ahead, rangeFacts.Behind
-	fact.Files = toFileDeltas(rangeFacts.Files)
-	fact.Commits = toCommits(rangeFacts.Commits)
+	fact.Ahead, fact.Behind = rf.Ahead, rf.Behind
+	fact.Files = toFileDeltas(rf.Files)
+	fact.Commits = toCommits(rf.Commits)
 	fact.CommitCount = sc.depths[b.Branch]
 
 	if fact.Worktree != "" {
@@ -804,7 +804,7 @@ func (q *Queue) computeOneBranchFact(ctx context.Context, sc *snapshotContext, b
 	}
 
 	if fact.Kind == model.AdeBranchKindMine || fact.Kind == model.AdeBranchKindReview {
-		pi = &pairItem{Item: b.Branch, Tip: fact.Tip, Kind: fact.Kind, Merged: fact.Merged, Files: filesSet(rangeFacts.Files)}
+		pi = &pairItem{Item: b.Branch, Tip: fact.Tip, Kind: fact.Kind, Merged: fact.Merged, Files: filesSet(rf.Files)}
 	}
 	return fact, pi, hadCommitsNew, mergedNew, nil
 }
@@ -818,28 +818,28 @@ func findRemoteRow(inventory []porcelain.InventoryRef, remote, short string) (po
 	return porcelain.InventoryRef{}, false
 }
 
-// rangeFactsFor is the (parentTip, tip)-keyed LRU cache (§4.2's own 512-entry bound) around
-// ahead/behind/files/commits — the one git-cost-bearing step computeOneBranchFact repeats often
-// enough (every Snapshot, every branch) to be worth caching on immutable object ids.
-func (q *Queue) rangeFactsFor(ctx context.Context, sc *snapshotContext, parentTip, tip string) (branchFactsValue, error) {
+// rangeFacts is the (parentTip, tip)-keyed LRU cache (§4.2's own 512-entry bound) around
+// ahead/behind/files/commits — the one git-cost-bearing step both the v1 Queue and the v2 TaskBoard
+// repeat often enough (every Snapshot, every branch) to be worth caching on immutable object ids.
+func rangeFacts(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, parentTip, tip string) (branchFactsValue, error) {
 	key := branchFactsKey{TipParent: parentTip, TipBranch: tip}
-	if v, ok := sc.caches.branch.Get(key); ok {
+	if v, ok := caches.branch.Get(key); ok {
 		return v, nil
 	}
-	ahead, behind, err := sc.entry.AheadBehind(ctx, tip, parentTip)
+	ahead, behind, err := entry.AheadBehind(ctx, tip, parentTip)
 	if err != nil {
 		return branchFactsValue{}, err
 	}
-	files, err := sc.entry.RangeChanges(ctx, parentTip, tip)
+	files, err := entry.RangeChanges(ctx, parentTip, tip)
 	if err != nil {
 		return branchFactsValue{}, err
 	}
-	commits, err := sc.entry.RangeCommits(ctx, parentTip, tip, 50)
+	commits, err := entry.RangeCommits(ctx, parentTip, tip, 50)
 	if err != nil {
 		return branchFactsValue{}, err
 	}
 	v := branchFactsValue{Ahead: ahead, Behind: behind, Files: files, Commits: commits}
-	sc.caches.branch.Add(key, v)
+	caches.branch.Add(key, v)
 	return v, nil
 }
 
