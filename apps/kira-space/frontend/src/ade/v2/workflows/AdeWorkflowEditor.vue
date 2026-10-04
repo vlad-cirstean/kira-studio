@@ -6,6 +6,7 @@ import AdeTip from '../AdeTip.vue';
 import { useWorkflowYaml } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import type { WorkflowEntry } from '../wire';
+import AdeWorkflowForm from './AdeWorkflowForm.vue';
 import AdeWorkflowYaml from './AdeWorkflowYaml.vue';
 
 // One workflow: mode toggle, file path, Copy YAML, then the Form or YAML pane.
@@ -51,5 +52,6 @@ function setMode(v: unknown): void {
       </Button>
     </div>
     <AdeWorkflowYaml v-if="ui.workflowMode === 'yaml'" :entry="entry" />
+    <AdeWorkflowForm v-else :entry="entry" />
   </div>
 </template>
