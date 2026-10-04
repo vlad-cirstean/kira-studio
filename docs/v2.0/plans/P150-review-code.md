@@ -1,8 +1,7 @@
 # P150 Review code: per-branch review window, review agent, GitHub viewed sync
 
-Plan only. User-requested phase, placed after P149. **Status: proposed, pending user answers to §12.**
-`SPEC.md` row not written by this plan (a concurrent P144 planner owns `SPEC.md` edits right now);
-the orchestrator adds the `P150` row after both land.
+Plan only. User-requested phase, placed after P149. **Status: approved by user, ready to implement
+(all of §12's Q1-Q7 resolved); P150 still must be re-verified against the then-current tree (§0).**
 
 ## 0. Base and re-verification
 
@@ -24,9 +23,11 @@ the orchestrator adds the `P150` row after both land.
    leave, come back, review the delta.
 3. **AI questions panel** in that window. Questions go to the task's **review agent**: an interactive
    TUI Claude Code session, **one per task**, reused (resumed) for the whole task, with every branch of
-   the task as context. Interactive chat for any intent.
+   the task as context. Interactive chat for any intent. The `▶ Review` stage button uses the same
+   agent (§5.4).
 4. **GitHub sync**: when the branch has a PR (now or later), a button marks the user's fully
-   reviewed files as viewed on GitHub. One-way app -> GitHub. Partial-file reviews never sync.
+   reviewed files as viewed on GitHub, and un-reviewing a file unmarks it (only files this app
+   marked). One-way app -> GitHub. Partial-file reviews never sync.
 5. Reuse the existing Git-module review stack, not a parallel one.
 
 ## 2. Assumptions about P144-P149 (re-verify at start)
@@ -34,11 +35,11 @@ the orchestrator adds the `P150` row after both land.
 | # | Assumption | Source | If false |
 |---|---|---|---|
 | A1 | `ade_tasks`, `ade_task_branches` exist; a `Branch` has `codeRepoId`, `name`, `base`, `worktree`, `taskId` | P143 wire, P144 A | Stop, re-plan data model |
-| A2 | `ade_sessions` has `mode`, `task_id`, `branch_id`, `stage_id`; TUI sessions spawn/resume through `ade.Tracker.Prepare`/`Compose` (`claude --session-id` / `claude --resume`) | P144 A, P147 A | Stop |
+| A2 | `ade_sessions` has `mode`, `task_id`, `branch_id`, `stage_id` (P146's migration, not P144's); TUI sessions spawn/resume through `ade.Tracker.Prepare`/`Compose` (`claude --session-id` / `claude --resume`) | P146 A, P147 A | Stop |
 | A3 | `AdeTaskService.Send(SendArgs)` writes bracketed paste + Enter to a live TUI (`Tracker.Send`, `ade/paste.go`) | P143 §4, P147 A | Port `Tracker.Send` into the v2 surface in this phase |
 | A4 | `Prs` returns PR per branch id via `gitsession` `ResolveBranchPr`/`ensureSnapshot` | P143 §4, P144 A | Add lookup here |
 | A5 | TUI activity per `terminalId` reaches the frontend via `agentEvent` (`input`/`working`/`waiting`/`idle`) | P143 §5 "reused unchanged" | Stop: §5.4 busy rule needs it |
-| A6 | Highest Space migration after P148 is `0009`; P150 takes `0010` | preplan §1 | Take next free number |
+| A6 | Highest Space migration after P148 is `0010` (P144 `0008`, P146 `0009` `ade_sessions` rebuild, P148 drops v1 tables); P150 takes the next free number (`0011` expected) | preplan §1, §4 P146 | Take next free number |
 | A7 | Branch panel (P146 B), Review/user-stage block (P147 B) and branch-row context menu exist in `frontend/src/ade/v2/**` | preplan §4 | Put the button where the then-current UI has branch actions |
 | A8 | `adeTaskSessions` push fires on TUI spawn/stop | P143 §5 | Emit it here |
 
@@ -70,11 +71,11 @@ Gaps P150 closes:
 | G2 | Diff tab's left side in `sinceReview` mode is `reviewedAtSha:path`, a commit. Pruned or GC'd after a force-push -> broken left pane, though the snapshot exists | `review.snapshot` method, left model from snapshot (§5.3) |
 | G3 | Reaper deletes sessions idle 14 days (`gitreview.IdleTTL`); `ResolveBranchPr` purges on closed/merged PR (D20). A long task loses its review state | `pinned` flag: task branches exempt until task archive (§4.1) |
 | G4 | Review base resolves from upstream/`origin/HEAD`; a task branch's base is `Branch.base` (stacked branches) | Pass base as override in the window's target (§5.2) |
-| G5 | Only committed tip is reviewed; agent edits left uncommitted in the worktree are invisible | Banner from `Branch.dirty` (§5.2); scope question Q3 |
+| G5 | Only committed tip is reviewed; agent edits left uncommitted in the worktree are invisible | Banner from `Branch.dirty` only (§5.2); worktree state is never reviewed (decided) |
 | G6 | No review window; windows are all persisted workbenches restored on relaunch | Ephemeral review window kind (§5.1) |
 | G7 | No per-task review agent; no questions panel | §5.4 |
 | G8 | `ghclient` is GET-only REST; no PR node id; no viewed-state read or write | GraphQL via `gh api graphql` (§6) |
-| G9 | Rename loses review (record keyed by path) | Not fixed; Q5 |
+| G9 | Rename loses review (record keyed by path) | Carry over when content is unchanged (§5.6) |
 
 ## 4. Data model
 
@@ -89,7 +90,7 @@ Gaps P150 closes:
   state needs no new key. Reviewed state never moves into the Space DB: one store, the Git module
   and the review window see the same marks.
 
-### 4.2 Space DB, migration `0010_p150_review.sql` (number per A6)
+### 4.2 Space DB, migration `0011_p150_review.sql` (number per A6)
 
 - `ade_sessions.purpose TEXT NOT NULL DEFAULT ''` (`''` | `'review'`); unique partial index
   `ON ade_sessions(task_id) WHERE purpose = 'review'` -> exactly one review agent per task, enforced
@@ -97,14 +98,18 @@ Gaps P150 closes:
 - `ade_review_windows(window_key TEXT PRIMARY KEY REFERENCES windows(key) ON DELETE CASCADE,
   task_id TEXT NOT NULL, branch_id TEXT NOT NULL, created_at INTEGER NOT NULL)`, unique on
   `branch_id` (one review window per branch).
-- No GitHub sync table: GitHub's own `viewerViewedState` is read before each push (§6), so nothing
-  app-side can drift.
+- `ade_gh_synced(branch_id TEXT NOT NULL REFERENCES ade_task_branches(id) ON DELETE CASCADE,
+  path TEXT NOT NULL, pr_number INTEGER NOT NULL, marked_at INTEGER NOT NULL, PRIMARY KEY (branch_id,
+  path))`: paths this app marked viewed on GitHub. Only these are ever unmarked (§6.3), so the user's
+  own GitHub viewed state is never touched. GitHub's `viewerViewedState` is still read before each
+  push to avoid redundant writes.
 
 ### 4.3 Lifecycle hooks
 
 - `OpenReviewWindow`: `SetPinned(gitRepoId, branch, true)`.
 - Task archive (P147 A `ArchiveTask`): unpin + `Purge(force)` every branch, close its review
-  windows, stop the review agent (already stops all TUI sessions).
+  windows, stop the review agent (already stops all TUI sessions), delete its `ade_gh_synced` rows
+  (no GitHub call on archive).
 - Branch removed from task: unpin that branch.
 
 ## 5. Architecture
@@ -119,7 +124,8 @@ Gaps P150 closes:
 - Window context: frontend reads `windowKey` (`packages/workbench/src/util/window.ts`), calls
   `ReviewWindowTarget({windowKey})`. Non-null -> review root; null -> normal workbench. No URL
   change, so `shell.Options` stays untouched and the target survives a webview reload.
-- Ephemeral: Space `WindowsRepo.List` excludes rows in `ade_review_windows` (startup restore and
+- Ephemeral, never restored on relaunch (decided; no restoration work in this phase): Space
+  `WindowsRepo.List` excludes rows in `ade_review_windows` (startup restore and
   `ReopenWindows` never revive one). Boot deletes leftover review rows (crash case) before windows
   open.
 - Shared seam (`internal/shell`): `WindowOpenerDeps.Ephemeral func(key string) bool` (nil in Studio).
@@ -152,7 +158,8 @@ handle:
 - **Right: AI questions panel** (§5.4).
 - **Header strip**: task colour square, task title (2-line clamp, SPEC2 §5.2), repo nickname,
   branch, base marker; `Sync to GitHub` button (§6); uncommitted banner when `Branch.dirty` is
-  non-empty: `3 uncommitted changes in the worktree are not in this review` (G5; behaviour per Q3).
+  non-empty: `3 uncommitted changes in the worktree are not in this review` (G5; banner only, worktree
+  state is never added to the diff).
 - **Review code button** (main window, A7): branch panel header actions, branch-row right-click
   menu, and one per branch in the Review stage block. Calls `OpenReviewWindow`. Disabled with
   tooltip for a not-created branch.
@@ -183,11 +190,12 @@ verifies it against real Claude Code. No other injection path is needed or inven
   `branch_id = ''`. Created on first launch, resumed (`claude --resume <claudeSessionId>`) on every
   later launch. Same Claude conversation for the whole task.
 - **Hosting**: a TUI PTY belongs to the window that opened it (`CloseWindow` kills it on close).
-  The review window that launches the agent hosts its terminal in the questions panel. Closing that
-  window stops the session; next launch resumes it. If the agent already runs in another window
-  (another branch's review window, or the main window's Sessions tab), this window shows
-  `Review agent is open in another window` + **Focus** (`FocusSession`), and the compose box still
-  sends through `Send`. One process, never two.
+  One agent terminal per task, shared by all of that task's review windows: the window that
+  launches the agent hosts it in the questions panel. Closing that window stops the session; next
+  launch resumes it. If the agent already runs in another window (another branch's review window, or
+  the main window's Sessions tab), this window shows `Review agent is open in another window` +
+  **Focus** (`FocusSession`), and the compose box still sends through `Send`. One process, never
+  two.
 - **Launch** (`LaunchReviewAgent{taskId, windowKey}` -> `Launch`): new or resume via
   `Tracker.Prepare`. cwd = first created branch's worktree in task order (D12 rule); every other
   branch's worktree (or the repo's main checkout when no worktree) via `--add-dir`, recomputed on
@@ -212,7 +220,23 @@ verifies it against real Claude Code. No other injection path is needed or inven
   (a permission prompt or question waiting): a paste would land in that prompt. `working`: allowed
   only if V2 shows Claude Code queues pasted input during a turn; otherwise disabled too. Not running
   -> button reads `Start review agent` (launch, then send).
-- Interaction with SPEC2 Review stage `▶ Review` (user stage, `session: true`): see Q1.
+- **`▶ Review` is the same agent.** The SPEC2 Review user stage button (`▶ Review`, stage with
+  `session: true`, identified as the user stage with id `review`; implementer confirms the rule
+  against P147's stage-session code) launches or resumes this per-task review agent instead of a
+  separate stage session, and so does `Review code`. Resumed every time, including when the user
+  returns days later to re-review (`claude --resume <claudeSessionId>`). Hosting follows the rule
+  above (the `▶ Review` click hosts it in the main window's session view).
+
+### 5.6 Rename carry-over (G9)
+
+A renamed file whose content is unchanged keeps its review. In `gitreview` `RangeFiles` (and the
+sync plan's record lookup), a changed file reported as renamed `old -> new` with no record at `new`,
+a record at `old`, and current blob oid == that record's `blob_oid` resolves to the old record's state
+under `new` (`changedSinceReview` false). The next mark at `new` writes a record there. A rename with
+edits does not carry (today's behaviour: reviewed state is by content, so it shows as never reviewed).
+Resolved server-side, so no wire change. Implementer verifies `RangeFiles` runs rename detection
+(`-M`) and exposes the old path internally; adds it if not. One case added to the existing
+`RangeFiles` test, no new test file.
 
 ### 5.5 IPC summary (contract extension, serial commit 1)
 
@@ -228,7 +252,7 @@ fixtures + git-ipc contract together.
 | `ReviewAgent` | `TaskArgs` | `ReviewAgentState {session: Session \| null; hostWindowKey: string}` |
 | `LaunchReviewAgent` | `LaunchReviewAgentArgs {taskId; windowKey}` | `Launch` (E_INVALID if running) |
 | `GitHubSyncPlan` | `BranchArgs` | `GhSyncPlan` |
-| `GitHubSyncApply` | `BranchArgs` | `GhSyncResult` |
+| `GitHubSyncApply` | `GhSyncApplyArgs {branchId; unmarkOnly}` | `GhSyncResult` |
 
 Reused unchanged: `Send`, `FocusSession`, `Prs`, `Board`. Types:
 
@@ -237,11 +261,11 @@ interface ReviewWindowTarget { taskId: string; branchId: string; codeRepoId: str
   branch: string; base: string; worktree: string }
 type GhSyncStatus = 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'ghMissing' | 'unauthenticated'
   | 'unavailable' /* rate limit, network, GitHub error */ | 'headNotFetched';
-interface GhSyncFile { path: string; action: 'mark' | 'alreadyViewed' | 'skip';
+interface GhSyncFile { path: string; action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
   reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr' }
 interface GhSyncPlan { status: GhSyncStatus; message: string; pr: PR | null; headSha: string;
   localTip: string; files: GhSyncFile[] }
-interface GhSyncResult { status: GhSyncStatus; message: string; marked: string[];
+interface GhSyncResult { status: GhSyncStatus; message: string; marked: string[]; unmarked: string[];
   failed: { path: string; error: string }[] }
 ```
 
@@ -256,12 +280,14 @@ No new push channel: `adeTaskSessions` and `adeTaskBoard` cover invalidation.
 
 - Installed `gh 2.89.0`; `gh api graphql` sends POST with `-f`/`-F` variables (`gh api --help`).
 - GitHub GraphQL docs (Pulls reference): `markFileAsViewed(input: {pullRequestId: ID!, path:
-  String!, clientMutationId})` returns `pullRequest`; `PullRequestChangedFile.viewerViewedState:
+  String!, clientMutationId})` returns `pullRequest`; `unmarkFileAsViewed` takes the same input
+  shape (documented next to it, not verified live here); `PullRequestChangedFile.viewerViewedState:
   FileViewedState!` = `VIEWED | UNVIEWED | DISMISSED` (`DISMISSED` = new changes since viewed);
   `PullRequest.files(first, after)`.
 - **Not verified live**: this sandbox's `GH_TOKEN` is invalid (`gh auth status` fails). V3 (§10)
-  runs `gh api graphql -f query='{__type(name:"MarkFileAsViewedInput"){inputFields{name}}}'` and
-  one real mutation on a scratch PR before the code is called done. No assumption ships unverified;
+  runs `gh api graphql -f query='{__type(name:"MarkFileAsViewedInput"){inputFields{name}}}'` (and the
+  same for `UnmarkFileAsViewedInput`) and one real mark and one real unmark on a scratch PR before the
+  code is called done. No assumption ships unverified;
   a mismatch stops the phase and goes to the user.
 
 ### 6.2 `ghclient` additions
@@ -274,15 +300,18 @@ No new push channel: `adeTaskSessions` and `adeTaskBoard` cover invalidation.
   string}}, Status)`: one query `repository(owner,name){pullRequest(number){id headRefOid state
   files(first:100, after:$c){nodes{path viewerViewedState} pageInfo{hasNextPage endCursor}}}}`,
   paged to the end (GitHub caps PR files at 3000; stop there).
-- `MarkFilesViewed(ctx, repo, prNodeID, paths []string) (failed map[string]string, Status)`: one
-  mutation per chunk of 50 using aliases (`m0: markFileAsViewed(input:{pullRequestId:$pr,
-  path:$p0}){clientMutationId}` …); per-alias errors map to `failed`.
+- `SetFilesViewed(ctx, repo, prNodeID, paths []string, viewed bool) (failed map[string]string,
+  Status)`: one mutation per chunk of 50 using aliases (`m0: markFileAsViewed(input:{pullRequestId:$pr,
+  path:$p0}){clientMutationId}` …, `unmarkFileAsViewed` when `viewed` is false); per-alias errors
+  map to `failed`.
 - Rate-limit breaker: reuse `gitsession` `armBreaker`/`breakerStatus`.
 
 ### 6.3 Plan rule (`gitsession`, one function, unit-tested)
 
-For each path in the PR's file list, first match:
+For each path in the PR's file list, first match (records resolved with §5.6's rename carry-over):
 
+0. path in `ade_gh_synced` for this branch and the review is not full (`none` or `partial`) ->
+   `unmark` (GitHub already `UNVIEWED`: drop the row silently, no listing)
 1. no review record or `kind none` -> `skip notReviewed`
 2. `partial` -> `skip partial` (GitHub has no partial-file review)
 3. `changedSinceReview` (local tip blob != reviewed `blob_oid`) -> `skip changedSinceReview`
@@ -290,15 +319,21 @@ For each path in the PR's file list, first match:
 5. `viewerViewedState == VIEWED` -> `alreadyViewed`
 6. else (`UNVIEWED` or `DISMISSED`) -> `mark`
 
-Reviewed files absent from the PR list -> `skip notInPr` (listed so the user sees why).
+Reviewed files absent from the PR list -> `skip notInPr` (listed so the user sees why); their
+`ade_gh_synced` rows are dropped.
 Rule 4 makes the sync content-based too: a force-pushed PR head still syncs every file whose bytes
 match what the user reviewed. PR head blob oids come from `blobOIDs(headSha, paths)` (batched
 `cat-file --batch-check`); `headSha` missing locally -> status `headNotFetched`, message `PR head
 <sha7> is not fetched. Refresh the repo first.`, no partial result.
 
-`GitHubSyncApply` recomputes the plan server-side (never trusts a client plan), marks `mark` rows,
-returns `marked`/`failed`. One-way: nothing read from GitHub changes app review state;
-`viewerViewedState` only avoids redundant writes.
+`GitHubSyncApply` recomputes the plan server-side (never trusts a client plan), marks `mark` rows and
+unmarks `unmark` rows (`unmarkOnly` skips the marks), records each success in `ade_gh_synced` (insert
+on mark, delete on unmark), returns `marked`/`unmarked`/`failed`. Un-review trigger: the review window
+calls `GitHubSyncApply{unmarkOnly: true}` after the user un-reviews a file when a PR is open and sync
+is available; a failure leaves the row for the next call (button or later un-review). Implementer
+verifies git-ui exposes a mark-changed hook for the host and adds an optional host action if not. Only
+fully reviewed files are ever marked; only paths in `ade_gh_synced` are ever unmarked. One-way:
+nothing read from GitHub changes app review state; `viewerViewedState` only avoids redundant writes.
 
 ### 6.4 Error cases
 
@@ -312,14 +347,15 @@ returns `marked`/`failed`. One-way: nothing read from GitHub changes app review 
 | Rate limited / network / GitHub error | `unavailable` | Message from `Status.Reason`; breaker respected |
 | PR head not local | `headNotFetched` | Message + `Refresh repo` action (P144 `Refresh`) |
 | Force-pushed head, local tip differs | `ok` | Rule 4 decides per file; header shows `PR head a1b2c3d ≠ local e4f5a6b` |
-| Some mutations fail | `ok` | `Synced 7 files · 2 failed` + per-file errors |
+| Some mutations fail | `ok` | `Synced 7 files · 2 failed` + per-file errors; failed unmarks retry next call |
 | Nothing to mark | `ok` | `Nothing to sync` with skip reasons expandable |
 
 Viewed state on GitHub is per authenticated `gh` user; dialog states which account (`Discovery`
 already parses it).
 
-Sync UI: button `Sync to GitHub · N` (N = `mark` count from `GitHubSyncPlan`), click opens a small
-shadcn Popover listing mark/skip rows, `Mark N files viewed on PR #n` confirms.
+Sync UI: button `Sync to GitHub · N` (N = `mark` + `unmark` count from `GitHubSyncPlan`), click opens
+a small shadcn Popover listing mark/unmark/skip rows, `Mark N files viewed on PR #n` confirms (label
+adds `, unmark M` when any).
 
 ## 7. Streams verdict: one sequential implementer
 
@@ -354,21 +390,21 @@ Per commit also: `go build ./...`, `go vet` on touched packages, `gofmt -l`.
    changed fixtures, decode-test table, git-ipc `review.snapshot` (TS contract + validate + Go
    `gitrpc` wire/contract types). `go test ./apps/kira-space/internal/bridge/...`.
 2. `feat(kira-space): pin task review sessions` — `gitreview` migration `0003`, `SetPinned`,
-   sweep/Purge skip, `review.snapshot` handler.
+   sweep/Purge skip, `review.snapshot` handler, rename carry-over (§5.6).
 3. `feat(shell): ephemeral windows` — `WindowOpenerDeps.Ephemeral`, close/last-window counting.
-4. `feat(kira-space): review windows` — migration `0010`, `ade_review_windows`, `WindowsRepo.List`
+4. `feat(kira-space): review windows` — migration `0011`, `ade_review_windows`, `ade_gh_synced`, `WindowsRepo.List`
    filter, boot purge, `OpenReviewWindow`, `ReviewWindowTarget`, archive/branch hooks, `index.ts`.
 5. `feat(kira-space): per-task review agent` — `ade_sessions.purpose`, `PrepareArgs.AddDirs`,
    `ReviewAgent`, `LaunchReviewAgent`.
-6. `feat(kira-space): GitHub viewed sync` — `ghclient.graphql`/`PullFiles`/`MarkFilesViewed`, plan
-   rule, `GitHubSyncPlan`/`Apply`. `go test ./apps/kira-space/internal/{ghclient,gitsession,bridge}/...`.
+6. `feat(kira-space): GitHub viewed sync` — `ghclient.graphql`/`PullFiles`/`SetFilesViewed`, plan
+   rule (mark and unmark), `GitHubSyncPlan`/`Apply`. `go test ./apps/kira-space/internal/{ghclient,gitsession,bridge}/...`.
 7. `feat(git-ui): needs-review filter and review base override` — `ReviewFilesPane`, mount target.
 8. `feat(kira-space): content-based review diff left side` — `RepoDiffView.vue` snapshot model.
 9. `feat(kira-space): review window` — App root switch, three-pane layout, header, Pinia store,
    queries, uncommitted banner.
 10. `feat(kira-space): review agent panel` — terminal mount, compose, busy rule, `Ask review agent`
     diff action, focus-elsewhere state.
-11. `feat(kira-space): GitHub sync UI` — button, popover, error states.
+11. `feat(kira-space): GitHub sync UI` — button, popover, error states, un-review trigger.
 12. `feat(kira-space): Review code button` — branch panel, branch-row menu, Review stage block.
 13. `test(kira-space): review window UI specs` — mock runtime (`tests/ui/support/{ipcChannels,
     mockRuntime}.ts` FQNs), §9 specs.
@@ -380,8 +416,9 @@ Expensive suites once near the end (§10), not per commit.
 ## 9. Tests (CLAUDE.md bar)
 
 Earn a test:
-- Go `TestGhSyncPlanRule`: table over §6.3's six interacting rules + `notInPr` + `headNotFetched`.
-- Go `TestMarkFilesViewed_ArgvGolden` and `TestPullFiles_Pagination`: fake `ghclient.Runner`, same
+- Go `TestGhSyncPlanRule`: table over §6.3's seven interacting rules (incl. `unmark`) + `notInPr` +
+  `headNotFetched`.
+- Go `TestSetFilesViewed_ArgvGolden` (mark and unmark) and `TestPullFiles_Pagination`: fake `ghclient.Runner`, same
   precedent as `TestOpenPulls_ArgvGoldenAndEarlyStop` (argv shape and cursor paging are easy to get
   wrong; GraphQL `errors[]` in a 200 body).
 - Go: sweep skips pinned, Purge skips pinned unless forced — one test, extends `store_test.go`
@@ -406,8 +443,9 @@ Verifications (each recorded with the one decisive line in the result section):
 - V1 `codegraph_explore` re-verification of §2 A1-A8, drift listed.
 - V2 Real Claude Code: `Send` into a running review agent (idle, and mid-turn `working`) submits
   the question; decides §5.4 `working` rule and whether paste-end/Enter needs a delay.
-- V3 Real `gh`: introspection of `MarkFileAsViewedInput`, then `GitHubSyncApply` on a scratch PR
-  marks a file, and GitHub shows it viewed. Needs a valid `gh` login; if the environment has none,
+- V3 Real `gh`: introspection of `MarkFileAsViewedInput` and `UnmarkFileAsViewedInput`, then
+  `GitHubSyncApply` on a scratch PR marks a file (GitHub shows it viewed) and, after un-review,
+  unmarks it (GitHub shows it unviewed). Needs a valid `gh` login; if the environment has none,
   stop and ask the user for one. Never skip.
 
 **One real e2e** (live `bun run dev:space`, real git, real `claude`, real `gh`; steps and outcome
@@ -420,12 +458,13 @@ in the result section):
 5. Ask a question with a selection reference -> appears in the review agent TUI and is answered;
    close and reopen the window -> same conversation resumed (same `claudeSessionId`).
 6. `Sync to GitHub` -> the unchanged reviewed file marked viewed on the PR; the changed one listed
-   `changedSinceReview`.
+   `changedSinceReview`. Un-review the marked file -> it shows unviewed on the PR. Rename a reviewed
+   file without edits, relaunch the window -> still reviewed.
 7. Close the main window while the review window is open; relaunch -> main workbench restored with
    its tabs, review window not restored.
 
 Ask-vs-delivered check (orchestrator): every §1 item maps to a commit and a V/e2e step; grep for
-real callers of `MarkFilesViewed`, `review.snapshot`, `LaunchReviewAgent`, `OpenReviewWindow`.
+real callers of `SetFilesViewed`, `review.snapshot`, `LaunchReviewAgent`, `OpenReviewWindow`.
 
 ## 11. Libraries
 
@@ -438,23 +477,15 @@ owns the token; the app never reads it), which a direct HTTP client would break.
 Query (all bridge reads, `GitHubSyncApply` as a mutation), existing workbench terminal module
 (xterm). Every Vue file `<script setup lang="ts">`.
 
-## 12. Open questions for the user
+## 12. User decisions (resolved)
 
-- Q1. `▶ Review` (SPEC2 Review user stage, `session: true`) vs the per-task review agent: should
-  `▶ Review` resume the same review agent (one Claude conversation for the review stage and the
-  questions panel), or stay a separate stage session? Plan default: **separate**, review agent
-  only from the review window, until you say otherwise.
-- Q2. Several review windows of one task open at once: the agent's terminal lives in the first one;
-  others forward questions and offer Focus. OK, or one review window per task with a branch switcher?
-- Q3. Uncommitted worktree changes (an agent stopped mid-step): banner only (plan default), or
-  include the worktree state in the review diff? Including it means reviewing content that is not
-  in any commit and may never reach the PR.
-- Q4. Review window persistence: plan makes review windows ephemeral (never restored on relaunch).
-  OK?
-- Q5. Renamed file whose content is unchanged: carry the review over (match by blob oid) or show it
-  as never reviewed (today's behaviour, plan default)?
-- Q6. GitHub sync scope: plan only marks viewed (never unmarks). Should un-reviewing a file in the
-  app also call `unmarkFileAsViewed`? That stays one-way (app -> GitHub) but writes more.
-- Q7. Agent cwd: first branch's worktree + `--add-dir` for the rest. A task whose branches span
-  repos the agent cannot all reach (no worktree, main checkout busy) still gets read access to main
-  checkouts. OK?
+- Q1. `▶ Review` and the Review code window use the same per-task review agent (one interactive TUI
+  session per task), resumed every time, including when the user returns later to re-review (§5.4).
+- Q2. One shared agent terminal per task across that task's review windows (§5.4 Hosting).
+- Q3. Uncommitted worktree changes: banner only (§5.2).
+- Q4. Review windows are short-lived, not restored on relaunch (§5.1). No restoration work.
+- Q5. A renamed file with unchanged content keeps its review (§5.6).
+- Q6. Un-reviewing a file also unmarks it on GitHub (`unmarkFileAsViewed`), only for files this app
+  marked; still one-way app -> GitHub, only fully reviewed files are marked (§6.3).
+- Q7. Agent cwd is the first created branch's worktree, other worktrees (or main checkouts) via
+  `--add-dir`, as planned (§5.4).

@@ -21,7 +21,7 @@ Kira Space `ade` today (P129 Parts 1-7, P135-P140) is per-repo branch planning.
 | Area | Today | SPEC2 effect |
 |---|---|---|
 | Agent runtime | `internal/ade/tracker.go` (`Tracker.Prepare/Compose/Reconcile/HandleEvent/Send`), `command.go` (`claude --session-id`, `claude --resume`), interactive PTY only via `terminal.Registry`; hook activity via `internal/agenthooks` (`Manager.ComposeLaunch`) | **Extend.** TUI launch kept for user stages, Start, Take over. New: headless `claude -p --output-format stream-json` runner (no PTY), per-run session ids, `claude -p --resume` for send-back, TUI `--resume` of a headless id |
-| Sessions store | `storage/repos/adesessions.go`, table `ade_sessions` (0004), keyed by `code_repo_id` + `branch`/`new_work_id` | **Extend.** Add `mode` (`tui`/`headless`), `task_id`, `step_id`, `branch_id`, `resumes`. Existing v1 rows stay unread |
+| Sessions store | `storage/repos/adesessions.go`, table `ade_sessions` (0004), keyed by `code_repo_id` + `branch`/`new_work_id` | **Extend.** Add `mode` (`tui`/`headless`), `task_id`, `step_id`, `branch_id`, `resumes`. Existing v1 rows stay unread. Done in P146's migration (first writer), not P144's |
 | Queue / git facts | `internal/ade/queue.go` (`Queue.snapshotLocked`, `Refresh`, `ForcePush`, `Archive`, `ArchiveRisk`, `reconcileNewWork`), `facts.go` (`pairFacts` via `git merge-tree --write-tree`, `atRisk`), LRU caches (`hashicorp/golang-lru`) | **Reuse per repo**, re-keyed from per-repo items to task branches. New facts: integration merged/stale, deployments, base marker inputs, rebase-conflict check (D1). v1-only parts (new-work rebind heuristics, per-repo plan, dependencies, work types) go |
 | Queue store | `storage/repos/adequeue.go`, tables `ade_branches`, `ade_new_work`, `ade_plan`, `ade_colors` (0005), `ade_dependencies`/`ade_blockers` (0006), `work_type` (0007) | **Replace.** New task model (§12). No data migration: v1 tables dropped, app starts empty (D5) |
 | Bridge | `internal/bridge/ade.go` (`AdeService`, ~1500 lines, 19+ bound methods), TS `frontend/src/bridge/index.ts` + `ade/wire.ts`; bindings generated, not tracked | **Replace** with a new task-based surface; v1 methods removed last (P148) |
@@ -34,17 +34,17 @@ Kira Space `ade` today (P129 Parts 1-7, P135-P140) is per-repo branch planning.
 
 Design §3.1 / SPEC2 §6, §6.2 "native Go git": previously declined app-wide (`docs/ARCHITECTURE.md`
 ~line 2240: go-git v5 `Merge` is fast-forward only; `git merge-tree --write-tree` used, no worktree
-touched). **D1 satisfies SPEC2 this way:** `git` CLI through `gitclient` for every operation
-(`--is-ancestor`, `git cherry`/`patch-id --stable`, fetch, push, worktree, rebase); go-git
-(`github.com/go-git/go-git/v5`, Apache-2.0, actively maintained v5 line, v5.19.2 in the module cache,
-not yet in `go.mod`) only for the plain merge-conflict check. After every refresh, every visible
-branch is checked for conflicts if rebased onto the latest base; results feed the existing conflict
-tags. go-git v5 has no three-way merge, so that check is built on its object plumbing (merge-base,
-tree walk, per-path three-way compare); the P144 plan verifies it against `merge-tree` results
-(§6 open item O1).
+touched). **D1 keeps that decision: git CLI only (merge-tree).** `git` through `gitclient` for every
+operation (`--is-ancestor`, `git cherry`/`patch-id --stable`, fetch, push, worktree, rebase, and the
+rebase-conflict check via `git merge-tree --write-tree`, reusing `gitsession.RepoEntry.MergeTreeConflicts`
+and `porcelain.ParseMergeTreeOutput`). No go-git dependency. merge-tree never touches worktree, index,
+HEAD or refs, so it is safe next to running agents; it needs git >= 2.38, already enforced by
+`gitclient.Discovery` and surfaced per branch when it fails. After every refresh, visible branches
+are checked for conflicts if rebased onto the latest base; results feed the existing conflict tags.
 
-**Migration need:** one Space migration (`0008`) adds task tables, extends `ade_sessions`, adds repo
-config tables. No v1 row migration (D5). A later migration (P148) drops v1 tables once nothing
+**Migration need:** one Space migration (`0008`) adds task tables and repo
+config tables. No v1 row migration (D5). P146's migration (`0009`) extends `ade_sessions` (table
+rebuild with widened CHECK, v1 `List` filter). A later migration (P148) drops v1 tables once nothing
 reads them; v1 UI is gone from P145, so v1 rows are unreachable from then.
 
 ## 2. Phase list and waves
@@ -112,17 +112,17 @@ XL stream into `Part 1`/`Part 2` of the same `P` (agent split rule), still two s
 **Stream A — task store, workflow reader, snapshot, CRUD.**
 - Migration `0008` (no v1 data migration, D5): `ade_tasks`, `ade_task_branches`, `ade_runs`, `ade_task_plan` (day/order/
   queuedAfter/unpushed), `ade_backlog`, `ade_task_colors`, repo config (`ade_repo_config`:
-  nickname, integration branches, prepare timeout; `ade_repo_envs`; `ade_folders`), `ade_worktree_setup`,
-  `ade_sessions` new columns. Models + `storage/repos/adetask*.go`. Repo config reads/writes the shared
+  nickname, integration branches, prepare timeout; `ade_repo_envs`; `ade_folders`), `ade_worktree_setup`
+  (`ade_sessions` columns: P146). Models + `storage/repos/adetask*.go`. Repo config reads/writes the shared
   `code_repos` list (D15), no parallel repo table.
 - Workflow reader: `internal/adeflow` parses/validates YAML (`go.yaml.in/yaml/v3`, promoted to
-  direct; MIT/Apache-2.0; plus go-git v5 for D1), line-numbered errors, `manual`/`automated` aliases, `back:<step>` (must name an earlier step of the same stage; script stages take none; stage and step
-  ids are separate namespaces, D13), `allowed_tools` (D6) and `only <repo>` validation, durations.
+  direct; MIT/Apache-2.0), line-numbered errors, `manual`/`automated` aliases, `back:<step>` (must name an earlier step of the same stage; script stages take none; stage and step
+  ids are separate namespaces, D13), `allowed_tools` (D6) and `only <repo>` (syntax at load, repo name validated at run time in P146), durations.
   Workflows dir: `workflows/` under the app home folder; nothing seeded or embedded (D2). Missing or
   empty dir is a valid empty list. Read-only this wave.
 - Board snapshot: tasks + branches with per-repo git facts by reusing `Queue`'s fact code
   (ahead/behind, files, commits, dirty, pairs, merged, worktree) keyed by task branch; after every
-  refresh, a go-git rebase-conflict check of every visible branch against the latest base (D1); base marker
+  refresh, a `git merge-tree` rebase-conflict check of visible branches against the latest base, cached by (base sha, branch tip sha), with checking/failed states (D1); base marker
   inputs (base branch, base owner/task). Refresh per repo + Refresh all (repos used by tasks only).
 - Bound methods: task CRUD (add new task with repos, rename, Jira key/url and GitHub link stored and displayed only, no sync (D9), estimate
   (extend-only, D16), notes, color), add existing branch (new task or attach; review item), plan set (day/order, drag
@@ -209,7 +209,12 @@ merged/stale/patch-id rules interact). Wave end: both suites + live `bun run dev
 
 ### P146 wave 3: run engine ‖ panel + facts UI
 
-**Stream A.** Worktree creation for task branches (new branch from base, `~/wt/<repo>/<last
+**Stream A.** Migration `0009` (moved here from P144): `ade_sessions` rebuild (SQLite cannot alter a
+CHECK) adding `mode` (`tui`/`headless`), `task_id`, `branch_id`, `stage_id`, `step_id`, `run_id`,
+`resumes`, `code_repo_id` nullable, CHECK widened for task-level sessions; copy v1 rows, recreate
+`ade_sessions_repo`, index on `task_id`; v1 `AdeSessionsRepo.List`/`ListByRepo`/`StopAllRunning` gain
+`WHERE task_id = ''`. Step machine validates `runs_on: only <repo>` against the task's managed repos
+at run time (P144 checks syntax only at load). Worktree creation for task branches (new branch from base, `~/wt/<repo>/<last
 segment>` per §9, reuse `gitsession` worktree add), prepare script run with per-repo timeout,
 states `preparing`/`ready`/`failed` + full log persisted, Retry setup, gate (no step/Start/Take
 over until ready). Headless runner: spawn `claude -p --output-format stream-json --session-id
@@ -319,7 +324,7 @@ end: both + `bun run lint:dead`.
 Full `go test ./...`, `test:unit`, `test:ui:space`, `test:visual:space`, `lint:all`. Live Kira Space
 run compared to `ade-v2/mockup.html` screen by screen (plan, backlog, needs, all sessions,
 workflows, repos, panel modes, dialogs). Re-audit SPEC2 §13 drops and design §9 decisions.
-`docs/ARCHITECTURE.md` ade section rewritten; "Known open items" updated. **SPEC2:** §1 (outcome
+`docs/ARCHITECTURE.md` ade section rewritten; "Known open items" updated. go-git stays declined there; the rebase-conflict check uses `git merge-tree` (git >= 2.38). **SPEC2:** §1 (outcome
 check), §13 (audit). Size M.
 
 ## 5. Coverage matrix (SPEC2 § -> phase)
@@ -387,7 +392,7 @@ Former open questions Q1-Q16 answered. Each wave plan restates the decisions it 
 
 | # | Decision |
 |---|---|
-| D1 | Git: `git` CLI for all ops. go-git (`github.com/go-git/go-git/v5`, Apache-2.0, maintained) only for the plain merge-conflict check. After every refresh, check every visible branch for conflicts if rebased onto the latest base; surface as the existing conflict tags. SPEC2 "native Go git" satisfied this way. |
+| D1 | Git: `git` CLI for all ops, no go-git (`git merge-tree --write-tree`, git >= 2.38, for the plain merge-conflict check). After every refresh, check every visible branch for conflicts if rebased onto the latest base; surface as the existing conflict tags. SPEC2 "native Go git" satisfied by the git CLI only. |
 | D2 | Workflow YAMLs live in a `workflows/` subfolder of the app home folder. No seeded defaults. Zip YAMLs (`design/ade-v2/workflows`) are optional samples, not shipped. Workflows page has an empty state (`Import YAML` / `+ New`). |
 | D3 | Take over of a running headless run: confirm dialog saying the run must be stopped first. Read-only live log of headless runs reachable without taking over (Sessions tab, step rows, Needs you); logs persisted per run. |
 | D4 | Top-5 "my work" filter (P136) becomes top-10 as SPEC2 §4: first 10 items, `Load all` button, `Show only the first 10 again`. |
@@ -406,10 +411,7 @@ Former open questions Q1-Q16 answered. Each wave plan restates the decisions it 
 
 **Still open (not answered by the user; the owning phase's plan proposes, user confirms):**
 
-- O1. go-git has no three-way merge. The P144 plan verifies the plumbing-based conflict check agrees
-  with `git merge-tree --write-tree` on a fixture set. If it cannot, ask the user before falling
-  back to `merge-tree` for that check.
-- O2. Backlog storage (old Q17): app SQLite shared across windows, not browser storage? Plan assumes SQLite.
+- O2. Resolved: backlog in app SQLite, shared across windows.
 - O3. Parked tasks / review items (old Q18): where is `parked` toggled; can a `review` task hold more than one branch?
 - O4. `{jira}` script variable (old Q19): key only, or `KEY URL`? Plan assumes key only (D9: no sync).
 - O5. Default for the `--setting-sources` app setting: decided in the P146 plan (D6).
@@ -422,6 +424,6 @@ ownership overlap, explicit no-ordering confirmation). The user asked for two-st
 explicitly. Each wave plan re-verifies its ownership table against the current tree; if a split
 fails that check, that wave runs as one sequential implementer.
 
-SPEC2 "native Go git" (§6, §6.2) is met by D1: `git` CLI for all operations, go-git only for the
-rebase-conflict check. This reverses the app-wide go-git decline for that one use; `docs/ARCHITECTURE.md`
-records it in P149.
+SPEC2 "native Go git" (§6, §6.2) is met by D1: `git` CLI only (merge-tree). The app-wide go-git
+decline stays; P149's `docs/ARCHITECTURE.md` note says go-git stays declined and the rebase-conflict
+check uses `git merge-tree`.

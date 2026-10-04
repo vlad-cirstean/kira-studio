@@ -3,10 +3,16 @@
 Two streams, one `P`. Stream A (Go) and Stream B (frontend pure logic) in separate worktrees off one
 base. Implements preplan §4 P144 and the P143 contract's P144 rows. Nothing from P145+.
 
-Inputs: `plans/P143-ade-v2-preplan.md` (§3 rules, §4 P144, §6 D1-D16, O1-O5),
+Inputs: `plans/P143-ade-v2-preplan.md` (§3 rules, §4 P144, §6 D1-D16, O2-O5),
 `plans/P143-wire-contract.md` (frozen: `internal/bridge/adewire/{wire,channels}.go`,
 `frontend/src/ade/v2/wire.ts`, `tests/fixtures/ade-v2/*.json`), `design/ade-v2/SPEC2.md`,
-`design/ade-v2/mockup.html`, `SPEC.md` P144 row. Base: the commit landing this plan on `v2.0`.
+`design/ade-v2/mockup.html`, `SPEC.md` P144 row. Base `B0`: the commit landing §2.1 step 0 on `v2.0`.
+
+**Status: approved by user, ready to implement.** User decisions recorded in this plan: D1 without
+go-git (`git merge-tree` only, §3.4), `only <repo>` syntax-checked at load and validated at run time
+(§3.3), `ade_sessions` change moves to P146 (§3.1), rebase conflict shows `✕ conflict` + Rebase while
+`base conflict` stays for a conflict on the base itself (§4.1), promoted backlog item gets no workflow
+(§3.5), backlog in SQLite (§3.2).
 
 ## 0. Findings from the current tree
 
@@ -18,8 +24,8 @@ Inputs: `plans/P143-ade-v2-preplan.md` (§3 rules, §4 P144, §6 D1-D16, O1-O5),
   `DefaultRemote`, `AheadBehind`, `RangeChanges`, `RangeCommits`, `MergeTreeConflicts`,
   `WorktreeStatus`, `ResolveBranchPr`, `PushPreflight`, `RunRemote`, `ConfigValue`).
 - `ade_sessions` (0004) has `code_repo_id NOT NULL` FK and `CHECK ((branch = '') <> (new_work_id = ''))`.
-  A v2 task-level session has neither, so adding columns alone is not enough: the table must be
-  rebuilt with a widened CHECK. `AdeSessionsRepo.List()` is unfiltered and feeds v1 `Sessions()`.
+  A v2 task-level session needs a table rebuild with a widened CHECK. Nothing writes v2 sessions
+  before P146, so that rebuild is P146's migration, not P144's.
 - Prepare script and worktree base path are existing per-repo leaves in `git_repo_settings`
   (`GitRepoSettings.WorktreePrepareScript`, keyed by `code_repos.repo_id`), not ade config.
 - `repos.ErrEstimateShrink` + `checkEstExtends` (`storage/repos/adequeue.go:427`) is v1's
@@ -33,15 +39,18 @@ Inputs: `plans/P143-ade-v2-preplan.md` (§3 rules, §4 P144, §6 D1-D16, O1-O5),
 - knip: `apps/kira-space/frontend` entry is `index.html` + `src/ade/v2/wire.ts`. New
   `src/ade/v2/board/*.ts` files have no `index.html` path until P145, so pre-push `knip` fails on
   them unless listed as entries (same mechanism as P143 W15).
-- go-git `v5.19.2` (Apache-2.0) and `go.yaml.in/yaml/v3 v3.0.5` (MIT + Apache-2.0) sit in the
-  module cache; yaml is `// indirect` in `go.mod`, go-git absent. go-git v5 has
-  `Commit.MergeBase`, `Commit.IsAncestor`, `object.DiffTreeWithOptions` (rename detection) and
-  `utils/diff` (line diff via `sergi/go-diff`, MIT, already its own dependency). No three-way
-  content merge.
+- `go.yaml.in/yaml/v3 v3.0.5` (MIT + Apache-2.0) sits in the module cache; it is `// indirect` in
+  `go.mod`. No other new dependency.
+- Rebase-conflict check reuses existing code (found via `codegraph_explore`):
+  `gitsession.RepoEntry.MergeTreeConflicts(ctx, a, b)` (`gitsession/queuefacts.go:143`: merge base,
+  `porcelain.MergeTreeArgs`, `runAllowingExit` 0/1, `porcelain.ParseMergeTreeOutput`; no merge base
+  returns clean). `gitclient.RequiredVersion = "2.38.0"` and `Discovery.Status`
+  (`gitclient/discovery.go`, kinds `ok|notFound|tooOld|unusable`, cached 30s) already gate the app
+  on git >= 2.38.
 
 ## 1. Decisions restated (preplan §6) and plan decisions
 
-Implemented here: D1 (go-git conflict check), D2 (workflows dir, no seeds), D4 (first-10 cap, B),
+Implemented here: D1 (`git merge-tree` rebase-conflict check, no go-git), D2 (workflows dir, no seeds), D4 (first-10 cap, B),
 D5 (v2 tables start empty, no v1 data migration), D6 (`allowed_tools` schema + validation), D9
 (Jira/GitHub stored, no sync), D10 (derived status, B), D13 (`back:` rules, namespaces), D15 (repos =
 `code_repos`), D16 (no dependency/work type; estimate extend-only).
@@ -55,9 +64,10 @@ D5 (v2 tables start empty, no v1 data migration), D6 (`allowed_tools` schema + v
 | E5 | Last valid workflow persisted in `ade_workflow_last_valid` (JSON) | SPEC2 §5.1.1 "last valid version stays in use" must survive restart, else a file broken at boot drops every task's workflow |
 | E6 | `Task.currentStage` stored as JSON on `ade_tasks.current_stage_json`, set when the task enters a stage | W13 snapshot; tasks keep rendering if the file later breaks |
 | E7 | Task color is a column (`ade_tasks.color`), assigned by `colorSlot` at create, never reassigned | One row per task; v1's separate `ade_colors` existed only for its composite item key |
-| E8 | `conflictsIfRebased` computed in the snapshot for every visible branch, cached by `(baseTip, tip)` LRU; `Refresh` warms it for its repos before emitting `adeTaskBoard` | "After every refresh, every visible branch" (D1) holds by construction; repeat snapshots cost a cache hit |
-| E9 | Pair conflicts keep `git merge-tree` (`pairFacts` unchanged) | D1 limits go-git to the rebase-conflict check |
-| E10 | No dedicated Go tests for store CRUD; tests only for adeflow validation, the conflict check, and snapshot assembly (§3.6) | CLAUDE.md test bar |
+| E8 | `conflictsIfRebased` computed by `git merge-tree --write-tree` (existing `MergeTreeConflicts`) for visible branches after a refresh, cached by `(baseTip, tip)`, bounded concurrency; `Board()` never blocks on it (§3.4) | D1 without go-git: git is the single merge engine; merge-tree never touches worktree, index, HEAD or refs, so it is safe beside running agents |
+| E9 | Pair conflicts and rebase conflicts share one git path (`MergeTreeConflicts`); `pairFacts` unchanged | One engine, no equivalence question |
+| E10 | No dedicated Go tests for store CRUD; tests only for adeflow validation, the check's cache/failure/version states, and snapshot assembly (§3.6) | CLAUDE.md test bar |
+| E11 | Branch wire gains `conflictCheck` (`checking|done|failed`) and `conflictCheckReason`, landed in serial step 0 (§2.1) before the streams | `string[]` alone cannot say "not computed yet" or "failed"; the UI must never read either as "no conflict" |
 
 ## 2. Streams verdict and ownership
 
@@ -65,28 +75,35 @@ D5 (v2 tables start empty, no v1 data migration), D6 (`allowed_tools` schema + v
 
 - B reads only P143 files (`ade/v2/wire.ts`, fixtures) and `state/settingsDomain.ts` types; A adds no
   file B reads.
-- A never touches `frontend/src/ade/**` except the A-owned `ade/v2/wire.ts` (not edited in P144);
-  B never touches Go, `bridge/index.ts`, `go.mod`.
-- No wire change is planned. A stream needing one stops (preplan §3 rule 1).
+- A never touches `frontend/src/ade/**` except the A-owned `ade/v2/wire.ts` (edited only in step 0,
+  before the split); B never touches Go, `bridge/index.ts`, `go.mod`.
+- The only wire change is step 0 (§2.1, E11). A stream needing another stops (preplan §3 rule 1).
 
 | Path | A | B | Closing step |
 |---|---|---|---|
 | `apps/kira-space/internal/**` (incl. `storage/migrations/0008_*.sql`, `embed.go`) | ✓ | | |
-| `apps/kira-space/main.go`, `go.mod`, `go.sum` | ✓ | | |
+| `apps/kira-space/main.go`, `go.mod` (yaml `// indirect` removed; no go-git), `go.sum` only if `go mod tidy` changes it | ✓ | | |
 | `apps/kira-space/frontend/src/bridge/index.ts` | ✓ | | |
 | `apps/kira-space/frontend/src/ade/v2/board/**` | | ✓ | |
 | `apps/kira-space/frontend/src/ade/useQueue.ts` (calendar import only) | | ✓ | |
 | `apps/kira-space/tests/unit/ade-v2-*.spec.ts`, `tests/unit/support/mockupV2Oracle.ts`, `tests/unit/support/adeV2Fixtures.ts` | | ✓ | |
 | `knip.json` | | ✓ | |
-| `docs/v2.0/SPEC.md` (P144 result + row), this plan's result section, `docs/ARCHITECTURE.md` go-git note | | | ✓ |
+| `docs/v2.0/SPEC.md` (P144 result + row), this plan's result section, `docs/ARCHITECTURE.md` merge-tree note | | | ✓ |
 
 Not touched by either: `packages/shared/protocol/events.ts` (P143 landed all channels),
 `tests/ui/**` (mock FQNs land in P145 B with first consumer), `package.json`/`bun.lock` (no new JS
-dependency), `ade/v2/wire.ts`, fixtures.
+dependency), `ade/v2/wire.ts` and fixtures (step 0 only).
 
 ### 2.1 Worktrees and landing
 
-Run from `/home/user/kira-studio`, base `B0` = this plan's commit on `v2.0`:
+**Step 0 (serial, one subagent, before the worktrees; preplan §3 rule 1 contract amendment, E11).**
+`Branch` gains `conflictCheck: 'checking' | 'done' | 'failed'` and `conflictCheckReason: string`
+(`''` unless `failed`). One commit `feat(kira-space): ade v2 conflict-check state on branch wire`
+touching `internal/bridge/adewire/wire.go`, `frontend/src/ade/v2/wire.ts`,
+`tests/fixtures/ade-v2/board.json` (every branch `done`/`''`, one `checking`, one `failed` with a
+reason), the Go decode test, and `plans/P143-wire-contract.md`. `B0` = that commit's `v2.0` tip.
+
+Run from `/home/user/kira-studio`, base `B0`:
 
 ```sh
 git worktree add -b v2.0-p144-a /home/user/kira-studio-p144-a B0
@@ -194,21 +211,9 @@ CREATE TABLE ade_workflow_last_valid (
 );
 ```
 
-`ade_sessions` rebuild (SQLite cannot alter a CHECK): create `ade_sessions_new` with v1 columns plus
-`mode TEXT NOT NULL DEFAULT 'tui' CHECK (mode IN ('tui','headless'))`, `task_id`, `branch_id`,
-`stage_id`, `step_id`, `run_id`, `resumes` (all `TEXT NOT NULL DEFAULT ''`); `code_repo_id`
-nullable (FK kept); CHECK becomes
-`(task_id = '' AND code_repo_id IS NOT NULL AND (branch = '') <> (new_work_id = '')) OR (task_id <> '' AND branch = '' AND new_work_id = '')`.
-`INSERT INTO ade_sessions_new (v1 cols) SELECT v1 cols FROM ade_sessions` (keeps v1 rows working for
-the still-live v1 UI; not a v2 data migration), drop old, rename, recreate `ade_sessions_repo`, add
-index on `task_id`. `sqlitex.Migrate` runs each migration in one transaction with
-`_foreign_keys=1` (DSN). No table references `ade_sessions`, so drop + rename is safe under enforced
-FKs; the copied rows satisfy the `code_repos` FK already.
-
-v1 `AdeSessionsRepo.List`/`ListByRepo`/`StopAllRunning` gain `WHERE task_id = ''` so v1 never sees
-v2 rows; `scanAdeSessionRow` scans the new columns into `model.AdeSession` (new fields `Mode`,
-`TaskID`, `BranchID`, `StageID`, `StepID`, `RunID`, `Resumes`; `CodeRepoID` read via
-`sql.NullString`). Writers of v2 rows arrive in P146. See U2.
+`ade_sessions` is not touched in P144. Its rebuild (task-level columns, widened CHECK, v1 `List`
+filter) moves to P146's migration, where the first v2 session writer lands; recorded in preplan §4 P146.
+`sqlitex.Migrate` runs each migration in one transaction with `_foreign_keys=1` (DSN).
 
 ### 3.2 Models and repos
 
@@ -259,7 +264,10 @@ v2 rows; `scanAdeSessionRow` scans the new columns into `model.AdeSession` (new 
   - script: `command` required, `runs_on` required, `on_failure` without `back:` (D13), `timeout`
     required; `steps`/`session`/`prompt` refused.
   - `timeout`: `time.ParseDuration`, > 0, ≤ 24h; stored as written (W5).
-  - `only <repo>`: non-empty after `only `; matched against managed repos — see U1.
+  - `only <repo>`: syntax only at load (non-empty after `only `); no repo lookup, so a file stays
+    portable between machines with different repo names. Validated against the task's managed repos
+    at run time (P146 step machine, preplan §4 P146); B's `progress.ts` treats an unmatched `only`
+    as no targets.
   - `allowed_tools`: each entry `^[A-Za-z_][A-Za-z0-9_-]*(\(.+\))?$` or `mcp__<server>__<tool>`
     form, no newline, no duplicates; empty list = none added.
 - `Reader{Dir, Store}`: `List(usedBy func(id) int) adewire.WorkflowsResult` reads every file; valid
@@ -271,67 +279,59 @@ v2 rows; `scanAdeSessionRow` scans the new columns into `model.AdeSession` (new 
   (`docs/v2.0/design/ade-v2/workflows/*.yaml`, read by relative path) parse valid. Earns the bar:
   parser with several interacting rules.
 
-### 3.4 Rebase-conflict check (D1, O1) `internal/ade/rebasecheck.go`
+### 3.4 Rebase-conflict check (D1) `internal/ade/rebasecheck.go`
 
-`conflictsIfRebased(repo *git.Repository, baseTip, tip string) ([]string, error)`, plain merge
-check of `tip` into `baseTip`, built on go-git v5 plumbing:
+git CLI only, no go-git. `conflictsIfRebased(baseTip, tip)` calls the existing
+`gitsession.RepoEntry.MergeTreeConflicts(ctx, baseTip, tip)` (§0): merge base, then
+`git merge-tree --write-tree --messages --name-only -z --merge-base=<base> <baseTip> <tip>`, exit 0/1
+parsed by `porcelain.ParseMergeTreeOutput`. No new git code. merge-tree never touches worktree, index,
+HEAD or refs (it only writes unreachable objects to the object DB), so it is safe next to running
+agents. Needs git >= 2.38.
 
-1. Commits via `repo.CommitObject`. `tip` ancestor of `baseTip`, or `baseTip` ancestor of `tip` →
-   `[]`. `MergeBase` empty (unrelated) → `[]` (matches v1 `MergeTreeConflicts`).
-2. More than one merge base (criss-cross): git merges the bases into a virtual base; this check
-   does not. It uses the first base `MergeBase` returns. The differential test has a criss-cross
-   case; a mismatch there escalates under O1.
-3. `object.DiffTreeWithOptions(ctx, base, ours/theirs, &DiffTreeOptions{DetectRenames: true})` for
-   both sides (git's default rename detection, 50% score).
-4. Per path, classify: changed one side only → clean; both sides same resulting (mode, blob) →
-   clean; modify/delete, add/add with different blobs, file/directory, rename/rename to different
-   paths, rename vs delete, mode-only disagreement → conflict; both modified text → content check;
-   either side binary (NUL in first 8000 bytes, git's heuristic) and blobs differ → conflict.
-5. Content check: line diffs base→ours and base→theirs (`utils/diff.Do`, line mode), collect each
-   side's changed base-line ranges, conflict when a range from one side overlaps or is adjacent to
-   (touches) one from the other side (git xdiff merge treats touching hunks as a conflict).
-   Insertions at the same base position on both sides with different text conflict.
-6. Paths reported repo-relative, sorted, both-sides' names for renames.
-
-Wiring: `TaskBoard` keeps one `*git.Repository` per repo opened with
-`git.PlainOpenWithOptions(root, &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true})`
-over `filesystem.NewStorage(..., cache.NewObjectLRU(8 * cache.MiByte))` (bounded memory per repo),
-reopened on error; results in a per-repo `lru.Cache[mergeTreeKey, []string]` (512, existing
-`hashicorp/golang-lru`). Visible branch = live task, created (`name <> ''`), resolved tip, not
-merged, any kind. Latest base: base `''`/main → `MainRef` tip; base names another live planner
-branch in the repo → that branch's tip; else `refs/remotes/<defaultRemote>/<base>` if present, else
-local `refs/heads/<base>`, else `[]` with `slog.Warn`. Error from go-git (missing object in a
-partial clone, SHA-256 repo) → see U3.
-
-**Verification against `git merge-tree --write-tree` (O1).** `rebasecheck_test.go`, differential:
-
-- Builder makes temp repos with the `git` CLI (`git -c user.name=t -c user.email=t@t`), one case
-  each: disjoint files; same file, distant hunks; overlapping hunks; adjacent-line hunks; identical
-  change both sides; insert at same spot; modify/delete; add/add same and different; binary both
-  changed; mode change vs content change; rename + modify other side; rename/rename; file vs
-  directory; criss-cross merge base; unrelated histories; ancestor either way.
-- Seeded random cases (fixed seed, 300 iterations): one 40-line text file, each side applies 1-4
-  random line edits (replace/insert/delete).
-- Oracle per case: `git merge-tree --write-tree --name-only --no-messages <baseTip> <tip>` (git's
-  own base selection), conflicted paths = output lines after the tree id, exit 1 = conflicts.
-  Assert set equality with `conflictsIfRebased`. Skip with a clear message if `git` < 2.38.
-- Opt-in real-history run: `ADE_REBASECHECK_REPO=<path>` compares every local branch tip against
-  `MainRef` tip in that repo; `t.Skip` when unset. Run once at A's end against
-  `/home/user/kira-studio` and paste the one-line count into the result.
-
-Gate: zero mismatches on the fixed and random sets. A mismatch the implementer cannot fix in the
-check (criss-cross is the expected candidate) → **stop, record the failing cases in this plan's
-result section, orchestrator asks the user** before any fallback to `merge-tree` for this check.
-Never fall back silently.
+- **Scope.** Visible branch = branch of a live (not archived) task, created (`name <> ''`), resolved
+  tip, not merged, any kind: the Plan's set. The first-10 cap is display-only in B and unknown to the
+  backend, so capped-out live branches are checked too. Archived, history and merged branches never
+  are. Runs after a refresh for the refreshed repos' visible branches, and lazily from `Board()` for
+  any visible branch with no cached result.
+- **Latest base.** base `''`/main -> `MainRef` tip; base names another live planner branch in the repo
+  -> that branch's tip; else `refs/remotes/<defaultRemote>/<base>` if present, else local
+  `refs/heads/<base>`; none resolves -> `failed`, reason `base <name> not found`.
+- **Cache.** Per-repo `lru.Cache[rebaseKey{baseTip, tip}, []string]` (512, existing
+  `hashicorp/golang-lru`). Keys are shas, so a moved base or tip invalidates itself. Only successful
+  results are cached; failures are retried on the next refresh.
+- **Concurrency.** One board-wide semaphore (4) shared by all repos and all `Refresh` calls; in-flight
+  checks deduped by key.
+- **States per branch** (wire, step 0): `done` (`conflictsIfRebased` = paths, `[]` = clean),
+  `checking` (cache miss, check queued or running), `failed` (`conflictCheckReason` set,
+  `conflictsIfRebased` `[]`). `Board()` never blocks on git: hit -> `done`; miss -> `checking` and
+  queue the check; each completion emits `adeTaskBoard` through `OnBoard` (v1 debounce). `Refresh`
+  awaits its repos' checks after the fetch, so its emit is settled.
+- **Git version.** `TaskBoardDeps` gains `GitStatus func(ctx) gitclient.GitStatus` (the app's
+  `Discovery.Status`, cached 30s). Every check calls it first. `Kind == "tooOld"` -> `failed`, reason
+  `git <detected> is older than <required>; merge-tree --write-tree needs <required>`; other non-`ok`
+  kinds -> `failed` with `GitStatus.Reason` (or `git not found`). No merge-tree spawn in either case.
+  The app-level git-blocked panel already stops a < 2.38 git at startup; this guards the case where
+  git changes under a running app and keeps the failure visible per branch.
+- **Failure.** merge-tree spawn error, exit > 1, parse error, missing object -> `failed` with the
+  error text (first stderr line). Never mapped to `[]`/`done`.
+- **UI** (B, §4.1 `actions.ts`): `checking…`; `✕ conflict` + Rebase with tooltip
+  `conflicts with <base> if rebased: <paths>`; `conflict check failed` with the reason in the tooltip.
+  `✓ clean` shows only for `done` with no paths.
+- **Log.** Every check: `slog.Info("ade rebase check", repo, branch, base, baseTip7, tip7,
+  result=clean|conflicts(n)|failed, cached, ms)`; failures `slog.Warn` with the reason.
+- **Test** (`board_test.go`, earns the bar: cache/invalidation/failure rules interact): second call
+  with the same `(baseTip, tip)` spawns nothing; moving the tip re-checks; `GitStatus` stub `tooOld` ->
+  `failed` with the version reason and no spawn; failure not cached; a clean and a conflicting pair on
+  real temp repos give `[]` and the conflicted paths.
 
 ### 3.5 `TaskBoard` (`internal/ade/board.go`, `board_facts.go`, `board_writes.go`)
 
 `TaskBoardDeps`: `Tasks *repos.AdeTaskRepo`, `Backlog *repos.AdeBacklogRepo`, `RepoConfig
 *repos.AdeRepoConfigRepo`, `CodeRepos *repos.CodeReposRepo`, `GitRepoSettings` getter, `Registry`,
-`GitPath`, `Askpass`, `Workflows *adeflow.Reader`, `OnBoard`, `OnBacklog`, `OnCredential`,
+`GitPath`, `GitStatus` (§3.4), `Askpass`, `Workflows *adeflow.Reader`, `OnBoard`, `OnBacklog`, `OnCredential`,
 `AutofetchMinutes`, `HomeDir`, `Now`. Own Conn `ade-board` (debounced `repo.changed` → `OnBoard`,
 v1's 250ms), per-repo mutex for writes and remote ops, per-repo caches (`rangeFacts` LRU, merge-tree
-LRU, rebase-check LRU).
+LRU, rebase-check LRU keyed `(baseTip, tip)`).
 
 `Board(ctx) (adewire.Board, error)`:
 
@@ -344,7 +344,7 @@ LRU, rebase-check LRU).
   '' when that base branch is mine); ahead/behind/files/commits via `rangeFacts(baseTip, tip)`;
   upstream ahead/behind; `dirty` from linked worktree; `mergedIntoMain` = v1 rule (tip ancestor of
   main and `had_commits`, or stored `merged_at`); write-back via `MarkBranchFacts`;
-  `conflictsIfRebased` (§3.4); `setup` from `ade_worktree_setup` (null if none); `integration` and
+  `conflictsIfRebased` + `conflictCheck` + `conflictCheckReason` (§3.4, cache read only); `setup` from `ade_worktree_setup` (null if none); `integration` and
   `deployments` `[]` (no targets/envs until P145 config writes).
 - `pairs`: per repo, `pairFacts` over that repo's created branches (ids = branch ids; kind mapping
   task `mine`/`review`/`parked`), merge-tree LRU as v1.
@@ -363,7 +363,7 @@ Other P144 methods (P143 §4 rows marked P144):
 - `Refresh(codeRepoIds)`: `[]` = every repo used by live tasks. Per repo (sequential per repo mutex,
   repos in parallel, limit 4): v1 fetch path (`RunRemote` fetch prune), `refsChanged` over task
   branches + main (v1 `countRefsChanged` logic over branch names), PR-merge check marks `merged_at`,
-  then compute `conflictsIfRebased` for that repo's visible branches (warms E8 cache), `mergedInto`
+  then run the rebase-conflict checks for that repo's visible branches and wait for them (§3.4), `mergedInto`
   `[]` (P145), per-repo `error`. Emit `adeTaskBoard` once at the end.
 - `ForcePush(branchId)`: v1 per-branch body (remote from upstream, `PushPreflight`, `RunRemote
   forcePush` with lease), no protected confirm (contract has none: preflight's refusal returns as
@@ -384,7 +384,7 @@ Other P144 methods (P143 §4 rows marked P144):
 - `SetQueuedAfter(branchId, afterBranchId)`: same repo, not self, no cycle; `''` clears.
 - Backlog: `Backlog`, `AddBacklogItem` (top), `UpdateBacklogItem`, `MoveBacklogItem`,
   `DeleteBacklogItem`, `PromoteBacklogItem` (task: title = text, Jira, GitHub, notes, no repos,
-  workflow per U5, Later). Backlog writes emit `adeTaskBacklog`; promote emits both.
+  no workflow, the user picks one on the task later, Later). Backlog writes emit `adeTaskBacklog`; promote emits both.
 - `Workflows`: `adeflow.Reader.List` with `usedBy` = live tasks per workflow id.
 - `Repos`: `ReposResult` from `AdeRepoConfigRepo.List` + `prepareScript` from
   `GitRepoSettings.WorktreePrepareScript`, `usedByTasks`, `name` = `code_repos.name`.
@@ -415,12 +415,11 @@ is not a contract change, P143 §3), using v1's size/format helpers (`validateAd
 Each commit: pre-commit hook (`bun run lint`, `bun run typecheck`) passes normally, plus `gofmt -l`
 empty, `go build ./...`, `go vet ./apps/kira-space/...`. Never `--no-verify` to finish.
 
-1. `feat(kira-space): ade v2 task store migration and repos` — 0008, models, three repos, v1
-   sessions filter. Extra: `go test ./apps/kira-space/internal/storage/... ./apps/kira-space/internal/ade/...`.
+1. `feat(kira-space): ade v2 task store migration and repos` — 0008, models, three repos. Extra: `go test ./apps/kira-space/internal/storage/... ./apps/kira-space/internal/ade/...`.
 2. `feat(kira-space): ade v2 workflow YAML reader` — `internal/adeflow`, yaml promoted to direct,
    test.
 3. `refactor(kira-space): share rangeFacts between queue engines` — E3.
-4. `feat(kira-space): go-git rebase-conflict check` — go-git direct, `rebasecheck.go` + test.
+4. `feat(kira-space): merge-tree rebase-conflict check` — `rebasecheck.go` (cache, semaphore, version gate, log).
 5. `feat(kira-space): ade v2 task board snapshot and refresh` — `board.go`, `board_facts.go`,
    `board_test.go`.
 6. `feat(kira-space): ade v2 task, plan and backlog writes` — `board_writes.go`.
@@ -431,9 +430,9 @@ empty, `go build ./...`, `go vet ./apps/kira-space/...`. Never `--no-verify` to 
 `go test ./apps/kira-space/...`, `go test -race ./apps/kira-space/internal/ade/...`,
 `bun run lint:go`, `bun run lint:dead`, `go mod tidy` diff empty. Migration up on a copy of a real
 v1 `kira.db` (the dev home's DB if present, else one made by running the pre-P144 build): app starts,
-v1 sessions still listed, v2 tables empty. Opt-in real-history rebase-check run (§3.4). License
-check of every module `go.sum` gained (read each `LICENSE` in the module cache; every one must be
-OSI-approved, no non-commercial/enterprise terms); list them in the result.
+v1 sessions still listed, v2 tables empty. `git diff B0 -- go.sum` lists any module gained; each
+must be OSI-approved (read its `LICENSE` in the module cache), expected none. Manual check of the
+three UI states on a real repo: a clean branch, a conflicting branch, and `GitStatus` forced `tooOld`.
 
 ## 4. Stream B: pure board logic (`frontend/src/ade/v2/board/`)
 
@@ -473,10 +472,14 @@ only `../wire` (v2) and `state/settingsDomain.ts` types, never v1 `ade/wire.ts` 
   branch tag/action first-match (`not created` · `⚙ preparing <elapsed>` · `✕ setup failed` +
   See error · `✓ merged` · `not merging` · review `✕ conflict`/`review` · `✕ conflict` + Queue after
   · `↑ not pushed` + Force push · `↓N main` + Rebase · `↻ <branch>` + Rebase (never for a base that
-  is someone else's branch) · `⏳ <owner>` · `base behind`/`base conflict` · `✓ clean`; plus
-  `▶ Start` flag when the branch never had a session). `CI failing` omitted (D9: no CI badge).
-  `conflictsIfRebased` non-empty feeds the `✕ conflict` slot with action Rebase and tooltip
-  `conflicts with <base> if rebased: <paths>` (D1 "existing conflict tags"); see U4.
+  is someone else's branch) · `⏳ <owner>` · `base behind`/`base conflict` · `checking…` ·
+  `conflict check failed` · `✓ clean`; plus `▶ Start` flag when the branch never had a session).
+  `CI failing` omitted (D9: no CI badge). `conflictCheck === 'done'` with non-empty
+  `conflictsIfRebased` feeds the `✕ conflict` slot with action Rebase and tooltip
+  `conflicts with <base> if rebased: <paths>`. `base conflict` stays for a conflict on the base
+  branch itself. `checking` -> `checking…` (no action); `failed` -> `conflict check failed`,
+  tooltip = `conflictCheckReason`; neither ever renders `✓ clean`. The mockup has no such states, so
+  parity fixtures use `done` only.
 - `baseMarker.ts`: `⑂` (base in same task), `⑂ <base without first path segment>` grey (other
   task), blue (someone else's), tooltip `starts from <base> (<owner>'s branch), not main`, not
   created → `no branch yet · from <base>`; nothing when base is main (mockup 1818).
@@ -543,13 +546,13 @@ proven by v1 parity; a date lib would not remove the custom weekend/day-off logi
 ## 5. Wave end and closing step
 
 On the landed tip: `go test ./apps/kira-space/...`, `bun run test:unit`, `bun run lint:all`,
-`go build ./...`, `bun run test:ui:space` (v1 UI must be unaffected by the 0008 migration and the
-sessions filter). Failures fixed in follow-up commits on `v2.0`.
+`go build ./...`, `bun run test:ui:space` (v1 UI must be unaffected by the 0008 migration).
+Failures fixed in follow-up commits on `v2.0`.
 
-Closing subagent (serial, after landing): `## Result` in this plan (commits, counts, O1 verdict with
-the differential numbers, license list, deviations), `## P144 result` in `docs/v2.0/SPEC.md` and the
-row status, and a short `docs/ARCHITECTURE.md` note under the ade queue paragraph: go-git now used
-for the rebase-conflict check only (D1), merge-tree stays for pairs. Full ade section rewrite stays
+Closing subagent (serial, after landing): `## Result` in this plan (commits, counts, manual
+conflict-state check, license list, deviations), `## P144 result` in `docs/v2.0/SPEC.md` and the
+row status, and a short `docs/ARCHITECTURE.md` note under the ade queue paragraph: rebase-conflict
+check uses `git merge-tree` (git >= 2.38); go-git stays declined. Full ade section rewrite stays
 P149.
 
 ## 6. Acceptance (checked once at phase end)
@@ -560,32 +563,25 @@ P149.
 - Migration 0008 applies on a real v1 DB copy; v2 tables empty; v1 sessions still readable.
 - Workflows dir under `KiraSpaceHome()/workflows`, not created by reads, no seeded file in the repo
   or binary (`grep -r "standard.yaml" apps/kira-space` finds no embed).
-- Rebase-conflict differential test: 0 mismatches; real-history run count recorded.
+- Rebase-conflict check: `grep -rn 'go-git' go.mod apps/kira-space` empty; a real caller of
+  `MergeTreeConflicts` from `rebasecheck.go`; board shows `checking`, `done`, `failed` per §3.4; every
+  check logged; `checking…`/`✕ conflict`/`conflict check failed` handled in `actions.ts`.
 - B: every §4.1 file exists and is imported by at least one spec or by another board file; knip
   clean; v1 parity specs green.
 - `git diff B0 -- apps/kira-space/frontend/src/ade/v2/wire.ts apps/kira-space/tests/fixtures/ade-v2 packages/shared` empty (contract untouched).
 
-## 7. User decisions needed (ask before the affected commit; do not invent)
+## 7. User decisions (resolved)
 
-- **U1. `only <repo>` in workflow YAML.** Plan default: valid only if it matches a managed repo's
-  nickname or name, else a validation error (keeps the last valid version). Alternative: syntax
-  only, unknown repo targets nothing at run time (more portable when sharing YAML with colleagues
-  whose nicknames differ). Affects A commit 2.
-- **U2. `ade_sessions` extension timing.** The P144 row includes it; nothing writes v2 sessions until
-  P146. Plan default: do it now (table rebuild + v1 filter). Alternative: move it to P146's
-  migration, where its first writer lands. Affects A commit 1.
-- **U3. go-git cannot read a repo** (partial clone missing objects, SHA-256 object format). Plan
-  default: that repo's `conflictsIfRebased` stays `[]` and a warning is logged. Alternative: fall
-  back to `git merge-tree` for that repo only (O1 says a merge-tree fallback needs your OK).
-- **U4. Rebase-conflict tag.** Plan default: `conflictsIfRebased` shows as `✕ conflict` + Rebase
-  (tooltip names base and paths), in the existing `✕ conflict` slot. Alternative: show it as
-  `base conflict`. Affects B commit 4.
-- **U5. Promoted backlog item's workflow.** SPEC2 §11.1 says "creates a task in Spec", but D2 ships
-  no default workflow. Plan default: workflow `''` (none) until the user picks one (P147
-  `SetTaskWorkflow`). Alternative: an app setting for a default workflow id (new setting, P145+).
-- Still-open preplan items: **O2** (backlog in SQLite) is assumed here; confirm before A commit 1.
-  **O1** resolved by §3.4's gate. **O3**, **O4**, **O5** need nothing from P144 (wire stays
-  permissive for O3).
+- `only <repo>` in workflow YAML: syntax-checked at load, validated against managed repos at run time
+  (§3.3).
+- `ade_sessions` extension: moves to P146's migration (§3.1).
+- go-git: dropped; `git merge-tree` only (§3.4). Needs git >= 2.38, detected through
+  `Discovery.Status` and surfaced per branch.
+- Rebase-conflict tag: `✕ conflict` + Rebase; `base conflict` stays for a conflict on the base itself
+  (§4.1).
+- Promoted backlog item: no workflow; the user picks one on the task (P147 `SetTaskWorkflow`).
+- Backlog storage: SQLite (preplan O2 confirmed).
+- Preplan O3, O4, O5 need nothing from P144 (wire stays permissive for O3).
 
 ## 8. Room for the later "Review code" phase (not planned here)
 
@@ -593,5 +589,5 @@ No columns added for it (no unused scaffolding). P144 choices that keep room: br
 synthetic and stable across rename/rebase, so a later `ade_branch_reviews (branch_id, session_id,
 reviewed_at_sha, …)` table and per-file viewed state keyed `(branch_id, path, blob_sha)` attach
 without touching 0008; branch rows are archived, never deleted, so review history survives task
-archive; `ade_sessions` gets `branch_id` and `mode`, so a persistent per-branch review agent can be
+archive; `ade_sessions` gets `branch_id` and `mode` in P146, so a persistent per-branch review agent can be
 a session row (widening the `mode` CHECK then needs one more table rebuild, a known cost).
