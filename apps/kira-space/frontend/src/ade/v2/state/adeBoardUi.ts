@@ -1,13 +1,19 @@
 import { useLocalStorage } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import type { OpenSessionEvent } from '../wire';
 
 // Board view state: which page is open and what the panel shows. The three Plan toggles persist
 // per window profile; selection and the last refresh summaries are in memory only.
 export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
-  const view = ref<'plan' | 'backlog' | 'workflows' | 'repos'>('plan');
+  const view = ref<'plan' | 'backlog' | 'needs' | 'workflows' | 'repos'>('plan');
   const selectedTaskId = ref<string | null>(null);
   const selectedBranchId = ref<string | null>(null);
+  /** Active tab of the task panel and of the branch panel; Sessions is reachable from anywhere. */
+  const taskTab = ref('task');
+  const branchTab = ref('details');
+  /** Session selected in the Sessions tab (`null` = first listed). */
+  const sessionId = ref<string | null>(null);
   /** Workflows page: selected file name (`null` = first listed) and editor mode. */
   const workflowFile = ref<string | null>(null);
   const workflowMode = ref<'form' | 'yaml'>('form');
@@ -46,6 +52,16 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     select(taskId);
   }
 
+  /** Selects the task or branch of a session and opens its Sessions tab on it. */
+  function openSession(e: OpenSessionEvent): void {
+    view.value = 'plan';
+    if (e.branchId) selectBranch(e.taskId, e.branchId);
+    else select(e.taskId);
+    if (e.branchId) branchTab.value = 'sessions';
+    else taskTab.value = 'sessions';
+    sessionId.value = e.sessionId;
+  }
+
   /** Opens the Workflows page on `fileName`. */
   function openWorkflow(fileName: string | null): void {
     workflowFile.value = fileName;
@@ -67,6 +83,9 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     view,
     selectedTaskId,
     selectedBranchId,
+    taskTab,
+    branchTab,
+    sessionId,
     workflowFile,
     workflowMode,
     repoId,
@@ -83,6 +102,7 @@ export const useAdeBoardUiStore = defineStore('adeBoardUi', () => {
     select,
     selectBranch,
     openTask,
+    openSession,
     openWorkflow,
     openAttach,
     toggleRepo,

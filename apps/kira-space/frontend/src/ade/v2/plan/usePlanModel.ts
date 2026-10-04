@@ -2,6 +2,8 @@ import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
 import { useSettingsStore } from '../../../state/settings';
+import { useAgentSessionsStore } from '../../state/agentSessions';
+import { withTuiActivity } from '../activity';
 import { type BranchTag, branchTag, type TaskAction, taskCell } from '../board/actions';
 import { type BaseMarker, baseMarker } from '../board/baseMarker';
 import { isDraft } from '../board/branchGraph';
@@ -26,9 +28,9 @@ import {
 } from '../board/timeline';
 import { localIso, localIsoOfMs } from '../localDay';
 import { taskColor } from '../palette';
-import { useBoard, usePrs, useRepos, useWorkflows } from '../queries';
+import { useBoard, usePrs, useRepos, useSessions, useWorkflows } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import type { Board, Branch, Task, Workflow } from '../wire';
+import type { Board, Branch, Session, Task, Workflow } from '../wire';
 
 export interface BranchRowModel {
   id: string;
@@ -86,6 +88,7 @@ interface Ctx {
   view: TimelineView;
   cal: Calendar;
   progress: ReadonlyMap<string, TaskProgress>;
+  sessions: readonly Session[];
   workflows: ReadonlyMap<string, Workflow>;
   needs: NeedsYou;
   ripple: Ripple | null;
@@ -126,7 +129,7 @@ function buildRow(c: Ctx, task: Task, bid: string, depth: number): BranchRowMode
       plan: c.board.plan,
       after: c.view.after,
       nowMs: c.nowMs,
-      hadSession: false,
+      hadSession: c.sessions.some((x) => x.branchId === bid),
       mainName: main,
     }),
     prog: prog ? { segs: prog.segments, label: prog.label, tone: prog.tone, tip: prog.tip } : null,
@@ -157,8 +160,9 @@ function buildCard(c: Ctx, id: string): CardModel | null {
   if (!entry || !task) return null;
   const progress = c.progress.get(id) as TaskProgress;
   const branches = task.branchIds.flatMap((bid) => graph.byBranch.get(bid) ?? []);
-  const status = deriveStatus({ task, progress, branches, hasSessions: false });
-  const cell = taskCell({ task, progress, status, branches, sessions: [] });
+  const sessions = c.sessions.filter((x) => x.taskId === id);
+  const status = deriveStatus({ task, progress, branches, hasSessions: sessions.length > 0 });
+  const cell = taskCell({ task, progress, status, branches, sessions });
   const workflow = c.workflows.get(task.workflowId) ?? null;
   const hidden = task.kind !== 'task';
   const first = branches[0];
@@ -203,6 +207,8 @@ function buildCard(c: Ctx, id: string): CardModel | null {
 function buildPlanModel() {
   const board = useBoard();
   const prs = usePrs();
+  const sessionsQuery = useSessions();
+  const agentStore = useAgentSessionsStore();
   const workflows = useWorkflows();
   const repos = useRepos();
   const settingsStore = useSettingsStore();
@@ -233,6 +239,10 @@ function buildPlanModel() {
     { immediate: true },
   );
   const today = computed(() => localIso(now.value));
+  /** Sessions with the TUI activity the server does not report, merged in from the agent hooks. */
+  const sessions = computed(() =>
+    withTuiActivity(sessionsQuery.data.value?.sessions ?? [], agentStore.activity),
+  );
 
   function repoLabel(codeRepoId: string): string {
     const cfg = repos.data.value?.repos.find((r) => r.codeRepoId === codeRepoId);
@@ -283,8 +293,15 @@ function buildPlanModel() {
       view,
       cal: buildCalendar(today.value, planSettings.value),
       progress,
+      sessions: sessions.value,
       workflows: wf,
-      needs: buildNeedsYou({ board: b, sessions: [], progress, repoNick: repoLabel, nowMs }),
+      needs: buildNeedsYou({
+        board: b,
+        sessions: sessions.value,
+        progress,
+        repoNick: repoLabel,
+        nowMs,
+      }),
       ripple: selectedId ? rippleOf(view, { kind: 'task', id: selectedId }) : null,
       selectedId,
       mainName: new Map(b.repos.map((r) => [r.codeRepoId, r.mainName])),
@@ -299,10 +316,10 @@ function buildPlanModel() {
     }
     // The panel opens tasks the Plan hides (first-10 cap, repo filter), so it builds them on demand.
     const cardFor = (id: string): CardModel | null => cards.get(id) ?? buildCard(ctx, id);
-    return { board: b, view, cards, cardFor, ripple: ctx.ripple, cal: ctx.cal };
+    return { board: b, view, cards, cardFor, ripple: ctx.ripple, cal: ctx.cal, needs: ctx.needs };
   });
 
-  return { model, today, now, repoLabel, settings: planSettings, boardQuery: board };
+  return { model, sessions, today, now, repoLabel, settings: planSettings, boardQuery: board };
 }
 
 /** Everything the Plan and the panel render, derived from the four cached queries and the view

@@ -101,6 +101,17 @@ export function adeV2Control(extra: readonly ControlSnapshot[] = []): ControlSna
     { channel: IPC.adeTaskStageDone, response: adeFixture('task') },
     { channel: IPC.adeTaskRetrySetup },
     { channel: IPC.adeTaskReadLog, response: adeFixture('log-page') },
+    { channel: IPC.adeTaskSessions, response: adeFixture('sessions') },
+    { channel: IPC.adeTaskStopRun },
+    { channel: IPC.adeTaskTakeOver, response: adeFixture('launch') },
+    { channel: IPC.adeTaskLaunchStage, response: adeFixture('launch') },
+    { channel: IPC.adeTaskStartBranch, response: adeFixture('launch') },
+    { channel: IPC.adeTaskSend },
+    { channel: IPC.adeTaskFocusSession, response: true },
+    { channel: IPC.adeTaskArchiveRisk, response: adeFixture('archive-risk') },
+    { channel: IPC.adeTaskArchiveTask },
+    { channel: IPC.adeTaskRecordMerge },
+    { channel: IPC.adeTaskSetQueuedAfter },
   ];
   const overridden = new Set(extra.map((s) => s.channel));
   return [...defaults.filter((s) => !overridden.has(s.channel)), ...extra];
@@ -136,4 +147,40 @@ export async function emitLog(
   chunks: { seq: number; at: number; stream: string; text: string }[],
 ): Promise<void> {
   await emitWailsEvent(page, IPC.adeTaskLogChanged, { kind, id, chunks });
+}
+
+/** Pushes an `ade:task:sessions` event; the renderer refetches the (static) sessions snapshot. */
+export async function emitSessions(page: Page): Promise<void> {
+  await emitWailsEvent(page, IPC.adeTaskSessionsChanged, null);
+}
+
+/** Pushes an `ade:task:open-session` event (the backend asking the window to show a session). */
+export async function emitOpenSession(
+  page: Page,
+  event: { taskId: string; branchId: string; sessionId: string },
+): Promise<void> {
+  await emitWailsEvent(page, IPC.adeTaskOpenSession, event);
+}
+
+/** Pushes one Claude Code hook event for a terminal (`UserPromptSubmit`, `Stop`, `SessionEnd`, ...). */
+export async function emitAgentEvent(page: Page, terminalId: string, event: string): Promise<void> {
+  await emitWailsEvent(page, IPC.agentEvent, {
+    terminalId,
+    event,
+    sessionId: '',
+    cwd: '',
+    toolName: '',
+    toolUseId: '',
+    notificationType: '',
+    message: '',
+    source: '',
+    reason: '',
+  });
+}
+
+/** Pushes the live agent-session list (one entry per Claude Code terminal). */
+export async function emitAgentSessions(page: Page, terminalIds: readonly string[]): Promise<void> {
+  await emitWailsEvent(page, IPC.agentSessions, {
+    sessions: terminalIds.map((terminalId) => ({ terminalId, cwd: '' })),
+  });
 }

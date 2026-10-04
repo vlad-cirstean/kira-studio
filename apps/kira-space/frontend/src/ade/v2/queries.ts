@@ -13,20 +13,27 @@ import type {
   Board,
   BranchArgs,
   CreateTaskArgs,
+  FocusSessionArgs,
   FolderArgs,
   ImportWorkflowArgs,
+  LaunchStageArgs,
   LogKind,
   MoveBacklogItemArgs,
   NewWorkflowArgs,
   PathArgs,
+  RecordMergeArgs,
   RefreshArgs,
   RunArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
+  SendArgs,
   SetPlanArgs,
+  SetQueuedAfterArgs,
   SetTaskWorkflowArgs,
+  StartBranchArgs,
   StartRunArgs,
   StepArgs,
+  TakeOverArgs,
   Task,
   TaskArgs,
   UpdateBacklogItemArgs,
@@ -47,6 +54,7 @@ export const workflowYamlKey = ['adetask', 'workflowYaml'] as const;
 export const logKey = (kind: LogKind, id: string) => ['adetask', 'log', kind, id] as const;
 export const backlogKey = ['adetask', 'backlog'] as const;
 export const reposKey = ['adetask', 'repos'] as const;
+export const sessionsKey = ['adetask', 'sessions'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
 
 export function useBoard() {
@@ -89,6 +97,14 @@ export function useCandidates(enabled: () => boolean) {
     staleTime: 0,
     enabled: enabled(),
   }));
+}
+
+export function useSessions() {
+  return useQuery({
+    queryKey: sessionsKey,
+    queryFn: () => control.adeTaskSessions(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 }
 
 export function useBacklog() {
@@ -331,4 +347,46 @@ export function useStageDone() {
 
 export function useRetrySetup() {
   return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRetrySetup(args) });
+}
+
+export function useTakeOver() {
+  return useMutation({ mutationFn: (args: TakeOverArgs) => control.adeTaskTakeOver(args) });
+}
+
+export function useLaunchStage() {
+  return useMutation({ mutationFn: (args: LaunchStageArgs) => control.adeTaskLaunchStage(args) });
+}
+
+export function useStartBranch() {
+  return useMutation({ mutationFn: (args: StartBranchArgs) => control.adeTaskStartBranch(args) });
+}
+
+export function useSend() {
+  return useMutation({ mutationFn: (args: SendArgs) => control.adeTaskSend(args) });
+}
+
+export function useStopRun() {
+  return useMutation({ mutationFn: (args: RunArgs) => control.adeTaskStopRun(args) });
+}
+
+export function useRecordMerge() {
+  return useMutation({ mutationFn: (args: RecordMergeArgs) => control.adeTaskRecordMerge(args) });
+}
+
+export function useSetQueuedAfter() {
+  return useMutation({
+    mutationFn: (args: SetQueuedAfterArgs) => control.adeTaskSetQueuedAfter(args),
+  });
+}
+
+export function useArchiveRisk() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveRisk(args) });
+}
+
+export function useArchiveTask() {
+  return useMutation({ mutationFn: (args: TaskArgs) => control.adeTaskArchiveTask(args) });
+}
+
+export function useFocusSession() {
+  return useMutation({ mutationFn: (args: FocusSessionArgs) => control.adeTaskFocusSession(args) });
 }

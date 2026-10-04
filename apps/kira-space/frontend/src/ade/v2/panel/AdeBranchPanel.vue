@@ -6,19 +6,23 @@ import AdeChip from '../AdeChip.vue';
 import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
-import type { CardModel, PlanModel } from '../plan/usePlanModel';
+import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
 import { usePrs, useRepos, useRetrySetup } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
-import { solidStyle, TONE } from '../tones';
+import { useAdeDialogsStore } from '../state/adeDialogs';
+import { actionStyle, solidStyle, TONE } from '../tones';
 import type { Deployment, Integration } from '../wire';
 import AdeChangesTab from './AdeChangesTab.vue';
 import AdePanelFrame from './AdePanelFrame.vue';
 import AdeWorktreeSetup from './AdeWorktreeSetup.vue';
+import { type HeaderAction, headerActions } from './headerActions';
 
 // Branch mode: header (back link, git status, name, facts, Force push), Details and Changes tabs.
 const props = defineProps<{ card: CardModel; row: CardModel['rows'][number]; model: PlanModel }>();
 
 const ui = useAdeBoardUiStore();
+const dialogs = useAdeDialogsStore();
+const { sessions } = usePlanModel();
 const prs = usePrs();
 const repos = useRepos();
 const tab = ref('details');
@@ -51,6 +55,29 @@ async function onRetrySetup(): Promise<void> {
     setupError.value = err instanceof Error ? err.message : String(err);
   }
 }
+const actions = computed(() =>
+  headerActions({
+    branch: branch.value,
+    graph: graph.value,
+    after: props.model.view.after,
+    hadSession: sessions.value.some((x) => x.branchId === branch.value.id),
+  }),
+);
+const rebasing = (a: HeaderAction): boolean =>
+  (a.kind === 'rebaseMain' && dialogs.pending.has(`rebase:${a.rootId}`)) ||
+  (a.kind === 'rebaseOnto' && dialogs.pending.has(`rebase:${branch.value.id}`));
+function run(a: HeaderAction): void {
+  const id = branch.value.id;
+  if (a.kind === 'rebaseMain') dialogs.rebaseOnto(a.rootId, 'main', 'Rebase onto main');
+  else if (a.kind === 'rebaseOnto') {
+    dialogs.rebaseOnto(id, a.ontoId, `Rebase onto ${graph.value.byBranch.get(a.ontoId)?.name ?? ''}`);
+  } else if (a.kind === 'queueAfter') {
+    dialogs.rebaseOnto(graph.value.rootOf(id), a.withId, `Queue after ${graph.value.byBranch.get(a.withId)?.name ?? ''}`);
+  } else if (a.kind === 'remerge') dialogs.merge(id, a.target);
+  else if (a.kind === 'start') dialogs.start(id);
+}
+const actionTone = (a: HeaderAction): Record<string, string> =>
+  a.tone === 'claude' ? actionStyle('claude') : solidStyle(a.tone);
 const canForcePush = computed(() => props.row.tag.actions.some((a) => a.kind === 'forcePush'));
 const shared = computed(() => {
   const a = props.model.view.after.get(branch.value.id);
@@ -165,7 +192,7 @@ function deployNote(d: Deployment): string {
       </div>
       <div class="truncate font-data text-kira-sm text-muted-foreground" data-testid="ade-panel-facts">{{ facts }}</div>
       <p v-if="setupError" class="m-0 text-kira-sm text-error" data-testid="ade-panel-setup-error">{{ setupError }}</p>
-      <div v-if="canForcePush || setupFailed" class="flex flex-wrap gap-1.5 pt-[3px]">
+      <div v-if="canForcePush || setupFailed || actions.length" class="flex flex-wrap gap-1.5 pt-[3px]">
         <button
           v-if="setupFailed"
           type="button"
@@ -187,6 +214,18 @@ function deployNote(d: Deployment): string {
             Force push
           </button>
         </AdeTip>
+        <button
+          v-for="a in actions"
+          :key="a.kind + a.label"
+          type="button"
+          class="h-[26px] cursor-pointer rounded-kira-sm border-0 px-2.5 text-kira-md font-semibold disabled:cursor-default disabled:opacity-60"
+          :style="actionTone(a)"
+          :disabled="a.kind === 'created' || rebasing(a)"
+          :data-testid="`ade-panel-action-${a.kind}`"
+          @click="run(a)"
+        >
+          {{ rebasing(a) ? 'Rebasing…' : a.label }}
+        </button>
       </div>
     </template>
 

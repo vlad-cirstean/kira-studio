@@ -1,0 +1,43 @@
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
+import { defineStore } from 'pinia';
+import { reactive, watch } from 'vue';
+import { useTerminalsStore } from '../../../state/terminals';
+import { useSessions } from '../queries';
+
+// Reaps the terminals this window opened for ade sessions. Nothing else closes them, so a stopped
+// session would keep its terminal entry, drain queue and xterm instance for the window's life.
+export const useAdeTerminalsStore = defineStore('adeTerminals', () => {
+  const terminalsStore = useTerminalsStore();
+  const sessions = useSessions();
+  const tracked = reactive(new Set<string>());
+
+  /** Every terminal id this window opens for an ade session. */
+  function track(terminalId: string): void {
+    tracked.add(terminalId);
+  }
+
+  // A stopped session reports `terminalId: ''`, so "no running session holds this id" is the reap
+  // signal; a terminal still starting a moment before its first sessions refetch is left alone.
+  watch(
+    () => ({
+      running: new Set(
+        (sessions.data.value?.sessions ?? [])
+          .filter((s) => s.state === 'running')
+          .map((s) => s.terminalId),
+      ),
+      ids: [...tracked],
+    }),
+    ({ running, ids }) => {
+      for (const id of ids) {
+        if (running.has(id)) continue;
+        const local = terminalsStore.terminalSession(id);
+        if (local && local.status !== 'exited' && local.status !== 'failed') continue;
+        terminalsStore.closeTerminalSession(id);
+        cleanupTabRuntime(id);
+        tracked.delete(id);
+      }
+    },
+  );
+
+  return { track };
+});

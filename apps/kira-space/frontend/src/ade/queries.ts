@@ -2,15 +2,18 @@ import type { QueryClient } from '@tanstack/vue-query';
 import { control } from '../bridge/control';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
+import { adeTurns } from './v2/dialog/turnWatch';
 import {
   backlogKey,
   boardKey,
   logKey,
   prsKey,
   reposKey,
+  sessionsKey,
   workflowsKey,
   workflowYamlKey,
 } from './v2/queries';
+import { useAdeBoardUiStore } from './v2/state/adeBoardUi';
 import type { Board, LogPage, RunsChangedEvent } from './v2/wire';
 
 /** Merges pushed runs into the cached board by id (unknown ones append to their task); the board
@@ -37,7 +40,8 @@ function appendChunks(page: LogPage, chunks: LogPage['chunks']): LogPage {
 }
 
 /** Called once from `main.ts`, app lifetime, no teardown. Every board push re-reads the board and
- *  PR facts; a backlog push re-reads the backlog; a repos push re-reads the repo settings and the
+ *  PR facts; a sessions push re-reads the sessions; an open-session push selects that session; an
+ *  agent hook event feeds the dialog turn watchers; a backlog push re-reads the backlog; a repos push re-reads the repo settings and the
  *  shared code repo list; a workflows push re-reads the list and any open YAML; a runs push merges
  *  into the cached board; a log push appends to the cached log; a credential prompt joins the
  *  shared queue and is answered through the v2 broker. */
@@ -57,6 +61,13 @@ export function installAdeSignals(queryClient: QueryClient): void {
     void queryClient.invalidateQueries({ queryKey: workflowsKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: workflowYamlKey });
   });
+  control.onAdeTaskSessions(() => {
+    void queryClient.invalidateQueries({ queryKey: sessionsKey, exact: true });
+  });
+  control.onAdeTaskOpenSession((event) => {
+    useAdeBoardUiStore().openSession(event);
+  });
+  control.onAgentEvent((event) => adeTurns.onEvent(event));
   control.onAdeTaskRuns((event) => {
     queryClient.setQueryData<Board>(boardKey, (board) => (board ? mergeRuns(board, event) : board));
   });

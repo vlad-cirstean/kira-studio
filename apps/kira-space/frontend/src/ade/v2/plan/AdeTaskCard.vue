@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
+import type { BranchAction } from '../board/actions';
 import AdeTaskActionButton from '../run/AdeTaskActionButton.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
+import { useAdeDialogsStore } from '../state/adeDialogs';
 import { TONE, TONE_INK } from '../tones';
 import AdeActionCell from './AdeActionCell.vue';
 import AdeAttention from './AdeAttention.vue';
@@ -13,9 +15,15 @@ const props = defineProps<{ card: CardModel }>();
 const emit = defineEmits<{ select: []; forcePush: [row: BranchRowModel] }>();
 
 const ui = useAdeBoardUiStore();
-function seeError(row: BranchRowModel): void {
-  ui.selectBranch(row.branch.taskId, row.id);
-  ui.focusSetup = true;
+const dialogs = useAdeDialogsStore();
+
+function act(row: BranchRowModel, a: BranchAction): void {
+  if (a.kind === 'forcePush') emit('forcePush', row);
+  else if (a.kind === 'seeError') {
+    ui.selectBranch(row.branch.taskId, row.id);
+    ui.focusSetup = true;
+  } else if (a.kind === 'start') dialogs.start(row.id);
+  else dialogs.rebase(row.id, a);
 }
 
 const p = computed(() => props.card.progress);
@@ -68,10 +76,9 @@ const headStyle = computed(() => ({
         v-for="row in card.rows"
         :key="row.id"
         :tag="row.tag"
-        :force-push="row.tag.actions.find((a) => a.kind === 'forcePush')"
-        :see-error="row.tag.actions.find((a) => a.kind === 'seeError')"
-        @force-push="emit('forcePush', row)"
-        @see-error="seeError(row)"
+        :actions="row.tag.actions"
+        :rebasing="dialogs.pending.has(`rebase:${row.id}`)"
+        @act="(a) => act(row, a)"
       />
     </div>
     <div

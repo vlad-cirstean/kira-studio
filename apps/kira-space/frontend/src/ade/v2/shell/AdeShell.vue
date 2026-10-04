@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger } from '@theme/components/ui/tabs';
 import { computed } from 'vue';
 import AdeAddPopover from '../AdeAddPopover.vue';
 import AdeBacklogPage from '../backlog/AdeBacklogPage.vue';
+import AdeClaudeDialog from '../dialog/AdeClaudeDialog.vue';
 import AdePanel from '../panel/AdePanel.vue';
 import AdePlanView from '../plan/AdePlanView.vue';
 import { useBacklog } from '../queries';
@@ -78,5 +79,6 @@ const count = computed(() => backlog.data.value?.items.length ?? 0);
       <AdePanel v-if="ui.selectedTaskId" />
     </div>
     <AdeRunDialog />
+    <AdeClaudeDialog />
   </Tabs>
 </template>
