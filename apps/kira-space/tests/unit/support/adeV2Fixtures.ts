@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Branch, Plan, Run, Stage, Task } from '../../../frontend/src/ade/v2/wire';
 
 // Builders for the pure-logic specs: every field defaulted, a spec overrides only what it asserts on.
@@ -93,4 +95,11 @@ export function mkStage(over: Partial<Stage> & Pick<Stage, 'id'>): Stage {
     timeout: '',
     ...over,
   };
+}
+
+/** Loads `tests/fixtures/ade-v2/<name>.json` typed as its wire shape. JSON imports widen string
+ *  unions, so the cast lives here; the Go decode test already guards the shape. */
+export function loadFixture<T>(name: string): T {
+  const file = path.join(import.meta.dir, '../../fixtures/ade-v2', `${name}.json`);
+  return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
 }
