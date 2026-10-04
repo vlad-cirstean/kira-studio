@@ -16,7 +16,7 @@ import (
 func TestRun_ExitCodeAndStdout(t *testing.T) {
 	dir := t.TempDir()
 	res, err := gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{
-		Shell: "/bin/sh", Script: "echo hello; exit 7", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+		Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Script: "echo hello; exit 7", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -37,7 +37,7 @@ func TestRun_ExitCodeAndStdout(t *testing.T) {
 func TestRun_RunsInSpecifiedDir(t *testing.T) {
 	dir := t.TempDir()
 	res, err := gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{
-		Shell: "/bin/sh", Script: "pwd", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+		Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Script: "pwd", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -59,7 +59,7 @@ func TestRun_RunsInSpecifiedDir(t *testing.T) {
 func TestRun_EnvIsExactlySpecEnv(t *testing.T) {
 	dir := t.TempDir()
 	res, err := gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{
-		Shell: "/bin/sh", Dir: dir,
+		Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Dir: dir,
 		Script: `echo "MARKER=[$KIRA_TEST_MARKER]"`,
 		Env:    []string{"PATH=/usr/bin:/bin", "KIRA_TEST_MARKER=present"},
 	})
@@ -82,7 +82,7 @@ func TestRun_StdinClosed(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		_, _ = gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{
-			Shell: "/bin/sh", Script: "read line; echo \"got:[$line]\"", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+			Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Script: "read line; echo \"got:[$line]\"", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 		})
 		close(done)
 	}()
@@ -101,7 +101,7 @@ func TestRun_CancelKillsProcess(t *testing.T) {
 	resultCh := make(chan gitprepare.Result, 1)
 	go func() {
 		res, _ := gitprepare.NewOSRunner().Run(ctx, gitprepare.Spec{
-			Shell: "/bin/sh", Script: "sleep 60", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+			Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Script: "sleep 60", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 		})
 		resultCh <- res
 	}()
@@ -126,7 +126,7 @@ func TestRun_OnBatchDeliveredDuringRun(t *testing.T) {
 	defer cancel()
 	go func() {
 		_, _ = gitprepare.NewOSRunner().Run(ctx, gitprepare.Spec{
-			Shell: "/bin/sh", Script: "echo one; sleep 5; echo two", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+			Timeout: gitprepare.DefaultPrepareTimeout, Shell: "/bin/sh", Script: "echo one; sleep 5; echo two", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 			OnBatch: func(b []gitprepare.Line) { batchCh <- b },
 		})
 	}()
@@ -143,5 +143,20 @@ func TestRun_OnBatchDeliveredDuringRun(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no batch delivered within 5s of the first echo — output is not streaming live")
+	}
+}
+
+func TestOSRunner_perSpecTimeout(t *testing.T) {
+	res, err := gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{
+		Timeout: 300 * time.Millisecond, Shell: "/bin/sh", Script: "sleep 60", Dir: t.TempDir(), Env: []string{"PATH=/usr/bin:/bin"},
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !res.TimedOut {
+		t.Fatalf("expected TimedOut, got %+v", res)
+	}
+	if _, err := gitprepare.NewOSRunner().Run(context.Background(), gitprepare.Spec{Shell: "/bin/sh", Script: "true", Dir: t.TempDir()}); err == nil {
+		t.Fatal("zero Timeout accepted")
 	}
 }

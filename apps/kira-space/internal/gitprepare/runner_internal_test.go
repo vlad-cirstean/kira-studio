@@ -63,7 +63,8 @@ func TestRun_CancellationSendsExactlyOneImmediateSIGKILL_EscalationTimerNeverFir
 	done := make(chan struct{})
 	go func() {
 		_, _ = NewOSRunner().Run(ctx, Spec{
-			Shell: "/bin/sh", Script: "sleep 30", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+			Timeout: DefaultPrepareTimeout,
+			Shell:   "/bin/sh", Script: "sleep 30", Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 		})
 		close(done)
 	}()
@@ -115,7 +116,7 @@ func TestRun_DescendantIgnoringSIGTERMIsKilledPromptlyAfterCancel(t *testing.T) 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		_, _ = NewOSRunner().Run(ctx, Spec{Shell: "/bin/sh", Script: script, Dir: dir, Env: []string{"PATH=/usr/bin:/bin"}})
+		_, _ = NewOSRunner().Run(ctx, Spec{Timeout: DefaultPrepareTimeout, Shell: "/bin/sh", Script: script, Dir: dir, Env: []string{"PATH=/usr/bin:/bin"}})
 		close(done)
 	}()
 
@@ -173,7 +174,8 @@ func TestRun_BackgroundChildHoldingPipesReturnsIncompleteResult(t *testing.T) {
 	// but is disowned from the subshell — the outer `sh` exits 0 immediately, while the sleep
 	// keeps the pipe's write end open well past gracefulStopDelay.
 	res, err := NewOSRunner().Run(context.Background(), Spec{
-		Shell: "/bin/sh", LoginShell: false, Script: "echo hello; (sleep 5 &); exit 0",
+		Timeout: DefaultPrepareTimeout,
+		Shell:   "/bin/sh", LoginShell: false, Script: "echo hello; (sleep 5 &); exit 0",
 		Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
 	})
 	if err != nil {

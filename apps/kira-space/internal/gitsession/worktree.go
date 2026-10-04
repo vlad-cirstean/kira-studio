@@ -5,15 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitprepare"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -506,6 +509,7 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	if runner == nil {
 		runner = gitprepare.NewOSRunner()
 	}
+	timeout, timeoutText := prepareTimeout(settings.WorktreePrepareTimeout)
 
 	onBatch := func(lines []gitprepare.Line) {
 		if conn == nil {
@@ -515,7 +519,7 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	}
 
 	res, err := runner.Run(opCtx, gitprepare.Spec{
-		Shell: shell, LoginShell: loginShell, Script: script, Dir: target.Path, Env: env, OnBatch: onBatch,
+		Shell: shell, LoginShell: loginShell, Script: script, Dir: target.Path, Env: env, Timeout: timeout, OnBatch: onBatch,
 	})
 	if err != nil {
 		return WorktreePrepareResult{}, err
@@ -530,9 +534,20 @@ func (e *RepoEntry) RunPrepare(ctx context.Context, conn *Conn, path, scriptSha2
 	case res.Cancelled:
 		result.Error = &OpError{Kind: "Cancelled", Message: "the prepare script was cancelled"}
 	case res.TimedOut:
-		result.Error = &OpError{Kind: "Unknown", Message: fmt.Sprintf("the prepare script did not finish within %s and was stopped", gitprepare.PrepareTimeout)}
+		result.Error = &OpError{Kind: "Unknown", Message: fmt.Sprintf("the prepare script did not finish within %s and was stopped", timeoutText)}
 	case res.ExitCode != 0:
 		result.Error = &OpError{Kind: "Unknown", Message: fmt.Sprintf("the prepare script exited with status %d", res.ExitCode)}
 	}
 	return result, nil
+}
+
+// prepareTimeout parses the per-repo worktreePrepareTimeout leaf. A stored value that no longer
+// validates falls back to the default and is logged, never blocks the run.
+func prepareTimeout(stored string) (time.Duration, string) {
+	d, err := model.ParsePrepareTimeout(stored)
+	if err == nil {
+		return d, stored
+	}
+	slog.Warn("worktree prepare: invalid timeout, using default", "scope", "git", "value", stored, "err", err)
+	return gitprepare.DefaultPrepareTimeout, model.DefaultPrepareTimeout
 }

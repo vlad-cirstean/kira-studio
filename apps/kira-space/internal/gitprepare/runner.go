@@ -10,10 +10,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/procgroup"
 )
 
-// PrepareTimeout is D12's own hard timeout — unconditional, no setting anywhere raises it. A
-// runaway script (an interactive prompt it silently hangs on, an infinite build loop) is killed
-// rather than left to run indefinitely.
-const PrepareTimeout = 15 * time.Minute
+// DefaultPrepareTimeout is the hard timeout a repo gets until it sets worktreePrepareTimeout
+// (P145 F2; supersedes G25 D12's fixed cap). A runaway script (an interactive prompt it silently
+// hangs on, an infinite build loop) is killed at the deadline rather than left to run indefinitely.
+const DefaultPrepareTimeout = 15 * time.Minute
 
 // gracefulStopDelay is SIGTERM's own grace window before escalating to SIGKILL — mirrors
 // ghclient/runner.go's own constant of the same name and purpose exactly (this package's own
@@ -34,6 +34,8 @@ type Spec struct {
 	Script     string
 	Dir        string
 	Env        []string
+	// Timeout is the hard deadline for the whole run; required (> 0).
+	Timeout time.Duration
 	// OnBatch, when non-nil, is called with every throttled, capped batch of sanitized output
 	// lines as they arrive (D12) — never called again after Run returns. May be called from a
 	// goroutine other than Run's own caller; callers that touch shared state from it must
@@ -75,12 +77,15 @@ var killGroup = procgroup.Kill
 // D12: stdin is never set on the *exec.Cmd, which os/exec documents as reading from the null
 // device — so the child never inherits this process's own stdin and is never attached to a pty;
 // Setsid puts it in its own session so a group signal reaches whatever it forks, not just the
-// shell itself; a PrepareTimeout deadline is layered onto ctx (which is ALSO ctx's own
+// shell itself; a spec.Timeout deadline is layered onto ctx (which is ALSO ctx's own
 // cancellation — either one triggers the same SIGTERM-then-SIGKILL sequence cmd.Cancel/WaitDelay
 // implement, mirroring ghclient/runner.go's own precedent exactly). Output is sanitized, capped and
 // streamed through outputCollector as it arrives — never buffered raw and processed only at exit.
 func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
-	runCtx, cancel := context.WithTimeout(ctx, PrepareTimeout)
+	if spec.Timeout <= 0 {
+		return Result{}, errors.New("gitprepare: Spec.Timeout must be positive")
+	}
+	runCtx, cancel := context.WithTimeout(ctx, spec.Timeout)
 	defer cancel()
 
 	argv := BuildArgv(spec.Shell, spec.LoginShell, spec.Script)
