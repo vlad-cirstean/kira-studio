@@ -5,24 +5,19 @@ import { Label } from '@theme/components/ui/label';
 import { Switch } from '@theme/components/ui/switch';
 import LogLevelField from '@workbench/settings/fields/LogLevelField.vue';
 import { computed, useId } from 'vue';
-import { useSettingsStore } from '../../state/settings';
-import { defaultSettings } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Advanced'"` branch — trimmed to the one leaf this app still owns,
 // advanced.gitLogLevel (kira-space's own diagnostic log verbosity).
-defineProps<SettingsPaneProps>();
+const props = defineProps<SettingsPaneProps>();
 
-// ade.headlessSettingSources is not in the dialog draft (SettingsDialog.vue builds it from three
-// sections), so this switch writes immediately instead of on Save.
-const settings = useSettingsStore();
-const ignoreRepoSettings = computed(() => settings.ade.headlessSettingSources === 'user');
-const defaultIgnore = defaultSettings.ade.headlessSettingSources === 'user';
+// `user` = background agents ignore the repo's own .claude settings.
+const ignoreRepoSettings = computed(() => props.draft.ade.headlessSettingSources === 'user');
 const switchId = useId();
 
 function setSources(ignore: boolean): void {
-  void settings.patchSettings({ ade: { headlessSettingSources: ignore ? 'user' : 'all' } });
+  props.draft.ade.headlessSettingSources = ignore ? 'user' : 'all';
 }
 </script>
 
@@ -45,9 +40,9 @@ function setSources(ignore: boolean): void {
           icon="discard"
           label="Reset to default"
           data-testid="settings-reset-ade-headlessSettingSources"
-          :disabled-trigger="ignoreRepoSettings === defaultIgnore"
-          :disabled="ignoreRepoSettings === defaultIgnore"
-          @click="setSources(defaultIgnore)"
+          :disabled-trigger="isAtDefault('ade', 'headlessSettingSources')"
+          :disabled="isAtDefault('ade', 'headlessSettingSources')"
+          @click="resetLeaf('ade', 'headlessSettingSources')"
         />
       </div>
       <Switch

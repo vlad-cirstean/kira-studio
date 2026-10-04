@@ -243,13 +243,25 @@ test('dragging the handle persists the panel width', async ({ relaunch }) => {
     .toBe(true);
 });
 
-test('the Advanced switch writes ade.headlessSettingSources', async ({ relaunch }) => {
+test('the Advanced switch saves ade.headlessSettingSources with the dialog', async ({
+  relaunch,
+}) => {
   const { window: page, control } = await openPlan(relaunch);
   await emitWailsEvent(page, IPC.openSettings, undefined);
   await page.locator('[data-testid="settings-section-Advanced"]').click();
   const sw = page.locator('[data-testid="settings-ade-headless-sources"]');
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
+  expect(
+    control
+      .log()
+      .some(
+        (e) =>
+          e.channel === IPC.settingsSet &&
+          JSON.stringify(e.args).includes('headlessSettingSources'),
+      ),
+  ).toBe(false);
+  await page.locator('[data-testid="settings-save"]').click();
   await expect
     .poll(() =>
       control

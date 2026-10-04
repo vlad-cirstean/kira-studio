@@ -41,11 +41,13 @@ async function save(patch: SettingsPatch): Promise<void> {
       appearance: defaultSettings.appearance,
       advanced: defaultSettings.advanced,
       git: defaultSettings.git,
+      ade: { headlessSettingSources: defaultSettings.ade.headlessSettingSources },
     }"
     :current="{
       appearance: settingsStore.appearance,
       advanced: settingsStore.advanced,
       git: settingsStore.git,
+      ade: { headlessSettingSources: settingsStore.ade.headlessSettingSources },
     }"
     :save="save"
     @close="emit('close')"
