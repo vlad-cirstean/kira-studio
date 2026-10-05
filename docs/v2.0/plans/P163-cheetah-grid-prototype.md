@@ -358,165 +358,84 @@ each on `.grid-scrollable` or the SlickGrid viewport, `MARK-<band>` titles, `MAR
    per page.
 6. Optional: Web Inspector Timelines, one flick each, frame p95.
 
-The plan's `## Result` gets a "Mac" subsection with the user's numbers; until then the verdict is
-conditional (§12).
+The plan's `## Result
 
-## 9. Ordered commits (one sequential implementer)
+Implemented at `4d08c7be` (commits e0577fcc to 4d08c7be, plus `77ea5a93` knip fix). Container
+numbers ran while another agent ran WebKit clip tests on the same machine: ranges are noisy, rank
+engines only.
 
-No parallel streams: the page, hook, helper and probes share `data.ts`, the host and the hook; order
-matters. Conventional Commits, each with the session trailer.
+### Commits
 
-1. `chore(deps): add cheetah-grid, vue-cheetah-grid, cheetah-grid-playwright for P163 prototype`.
-   Root `package.json` devDependencies (exact), `bun.lock`. Run knip.
-2. `refactor(perf): share the wide grid template`. New `tests/perf/support/wideTable.ts`;
-   `grid-scroll.spec.ts` imports it, logs `PERF viewport`, gains `TRACE=1`.
-3. `feat(proto): Cheetah grid page, read-only render with Studio cell semantics`.
-   `frontend/vite.proto.config.ts`, `frontend/tsconfig.proto.json`, `proto/grid/{cheetah.html,
-   main.ts,App.vue,CheetahProto.vue,data.ts,cellColumn.ts,theme.ts,theme-alt.css}`, root scripts
-   `proto:dev:grid`, `proto:build:grid`, `proto:build:grid:hooks`, `proto:preview:grid`,
-   `typecheck:proto:studio` (added to `typecheck`), `.gitignore` `dist-proto/`, knip entry/project.
-4. `feat(proto): SlickGrid baseline page (stock and Kira variants)`. `proto/grid/{slick.html,
-   slickMain.ts,SlickProto.vue}`, `proto/grid/empty.html`.
-5. `feat(proto): selection, keyboard, context menus, clipboard, columns, hover`.
-   `proto/grid/selection.ts`, `menus.ts`, `clipboard.ts`, host wiring; `tests/unit/
-   proto-grid-selection.spec.ts` (§10 tests).
-6. `feat(proto): edit with veto, insert row, pending and search layers, find, FK/PK nav preview`.
-   `proto/grid/{edit.ts,pending.ts,search.ts,NavPreview.vue,tooltipProxy.ts}`.
-7. `feat(proto): header sort cycle, numbered multi-sort badge, key badges, tooltips`.
-   `proto/grid/header.ts`.
-8. `test(proto): debug hook, grid helper, sample and parity specs`.
-   `proto/grid/debugHook.ts`, `apps/kira-studio/playwright.proto.config.ts`,
-   `tests/proto/{fixtures.ts,support/grid.ts,null-vs-empty,row-selection-copy,edit-veto,header-sort,
-   nav-button,parity}.spec.ts`, `tsconfig.tests.json` include `tests/proto/**/*.ts` and the proto
-   config, root script `test:proto:studio`, `build:proto:test`.
-9. `test(perf): prototype grid flick and late-data probes`. `tests/perf/proto-grid-scroll.spec.ts`,
-   `proto/grid/trace.ts` (hook-gated), root script `perf:probe:proto`, HUD in `App.vue` (hook-gated).
-10. `docs(proto): macOS footprint harness and run guide`. `proto/grid/mac/{wkhost.swift,driver.js}`,
-    `docs/DEV_ENVIRONMENT.md` subsection "Grid prototype (P163)" (commands from §2/§8.3).
-11. `docs(v2.0): P163 result`. This plan's `## Result`: numbers, parity table, line-change table,
-    go/no-go. `SPEC.md` P163 row status.
+e0577fcc deps; 73499f6d shared wide template; 48765efb Cheetah page; 9641d9eb SlickGrid baselines;
+3e403d6a selection, menus, clipboard; 3c72d75c edit, insert, layers, find, nav; d0f41e37 sort and
+header; efdd9d09 hook, helper, specs; e74b84a8 perf probes; 77ea5a93 knip; 4d08c7be Mac harness.
 
-Fast checks per commit (`bun run lint`, `bun run typecheck` via the hook). Expensive runs (proto
-specs x3, perf probes headless x3 and headed x3, app reference probe) once after commit 9, fixes as
-follow-up commits, then commit 11.
+### Gates
 
-## 10. Tests and verification
+| Gate | Result | Status |
+|---|---|---|
+| G1 headless WPE, 15 flicks x3 runs | Cheetah 44-62 fps (mean 57), p95 18-38 ms, 0-1 frames over 50 ms. Slick stock 36-43 fps, kira 36-40. App 23-35 (mean 33), p95 59-111. | Fail on "every flick" (worst 44 fps, p95 38). Mean is +24 fps over app. Noisy. |
+| G1 headed WebKitGTK | Cheetah 51-60 fps (mean 59), p95 19-27. App 56-59, p95 21-25. Slick kira 58-60. | Borderline: worst flick misses 58 fps and 24 ms |
+| G2 late data, 40/100/200 px per frame | Cheetah lagPx 0, blankRows 0 on all 60 frames x3 bands x6 runs. Slick uncoveredPx 0. | Pass, but vacuous: programmatic scroll cannot lag. Trackpad run decides. |
+| G3 Mac footprint | Not run. Harness: `proto/grid/mac/`. | Pending user |
+| G4 parity | 0 impossible except live-input insert rows (equivalent works); 0 items at L | Pass |
+| G5 tests | 5 sample specs + parity pass 3/3 in WebKit; unit spec 7 pass. Asserting lines changed: 78 of 88 (89 %). | Fail on changed-line bound |
 
-Unit tests: only `tests/unit/proto-grid-selection.spec.ts`, and only if `selection.ts` is a custom
-model (expected): shift/ctrl/drag interplay across rows, ranges and columns is a decision structure
-worth guarding. Nothing else gets a unit test (theme bridge, draw, hook, helper are thin).
+Other facts: `proto:build:grid` release build holds no `__kiraGridProto`, `cheetahGrid` hook,
+trace or HUD. App `dist` holds no cheetah code (one word-list false positive, "cheetah" the animal in
+`en-*.js`). Bundle: Cheetah page chunk 121 KB gzip vs Slick page 50 KB. Wrapper: events, selection,
+invalidate and `dataSource` all go through `rawGrid` (about 25 distinct members); only column and
+theme props bind through `vue-cheetah-grid`. Its undefined `mousedown_cell` return did not break
+native selection; our own `false` returns do (they also cancel column resize, so a header press on a
+border returns `true`).
 
-Orchestrator verification:
+### Parity (verified by `tests/proto/parity.spec.ts` unless noted)
 
-```sh
-bun run lint && bun run typecheck && bun run lint:dead
-bun run build:studio && ! grep -rlE "cheetah|__kiraGridProto" apps/kira-studio/frontend/dist
-bun run proto:build:grid && ! grep -lE "__kiraGridProto|window\.cheetahGrid" apps/kira-studio/frontend/dist-proto/assets/*.js
-bun run test:proto:studio                      # 3 times; 0 failures
-bun test apps/kira-studio/tests/unit/proto-grid-selection.spec.ts   # if present
-bun run perf:probe:proto                       # headless WPE
-PERF_HEADED=1 xvfb-run -a bun run perf:probe:proto
-NCOLS=20 TRACE=1 bunx playwright test --config=apps/kira-studio/playwright.perf.config.ts grid-scroll
-grep -c "codegraph_explore" <implementer log>  # discovery calls happened (CLAUDE.md)
-```
-
-Also confirm: real imports of `cheetah-grid-playwright` in `tests/proto/support/grid.ts`; real
-imports of `clipboardFormats`, `maskPreview`, `createTabularPageBuilder`, `ContextMenu.vue`,
-`AttributeTooltip.vue` from `proto/` (grep), so "reuse" is not scaffolding.
-
-## 11. Parity checklist (filled in the Result as native / custom S-M-L / impossible, verified)
-
-Expected verdicts below; the Result replaces each with the verified one and the `parity.spec.ts`
-step that proves it.
-
-| Feature | Expected |
+| Feature | Verdict |
 |---|---|
-| NULL vs empty distinct | custom S |
-| Truncated marker | custom S |
-| Type colours, numeric right-align | custom S (draw) |
-| Masked marker | custom S |
-| Staged, search, current-match layers (zebra optional) | custom S |
-| Frozen gutter, row numbers, pending rail | native freeze, custom S |
-| Theme from `--kira-*`, live re-theme | custom M |
-| Cell and range selection | native |
-| Row selection: shift, ctrl disjoint, gutter drag; column select | custom M |
-| Keyboard nav | native |
-| Inline edit with veto | native editor, custom S veto |
-| Insert row | live-input behaviour impossible; equivalent custom M |
-| FK/PK nav button + preview anchored to cell | custom M |
-| Context menus (cell, row, range, header) | custom S |
-| Copy TSV, paste | native hooks, custom S routing |
-| Column resize (header-aware floor) | native |
-| Column hide/reorder (data level) | custom S |
-| Sort cycle + numbered multi-sort badge | custom M |
-| PK/FK header badge, header tooltip | custom M |
-| Find + go-to-match, hide non-matching | custom S |
-| Truncation tooltip | custom S |
-| Hover row | custom S |
-| Playwright drive (library + hook) | native library + custom S hook |
+| NULL vs empty, masked, truncated, type colour, right-align | custom S |
+| Staged, search match and current layers, hover row | custom S |
+| Frozen gutter, row numbers by position, row rail (dirty, deleted, inserted) | native freeze, custom S |
+| Live re-theme from `--kira-*` | custom M (repaint verified, no reload) |
+| Cell and range selection, keyboard nav | native |
+| Row select (shift, ctrl disjoint, gutter drag), column select, select all | custom M |
+| Inline edit with veto (read-only, deleted, generated, truncated, masked) | native editor, custom S veto and Escape restore |
+| Insert row | live inputs per cell impossible; equivalent custom M (one editor, staged per keystroke) |
+| FK/PK glyph and preview popover | custom M (preview anchored to the cell, collision-shifted at edge) |
+| Context menus (cell, range, row, header, column) | custom S |
+| Copy TSV, multi-cell paste | native hooks, custom S routing (`parseDelimited`) |
+| Column resize | native, header border needs `mousedown_cell` pass-through |
+| Column hide and show-all | custom S |
+| Sort cycle, numbered multi-sort badge, PK/FK header badge | custom M |
+| Header and truncation tooltips | custom S (pointermove replay at a proxy element for `AttributeTooltip`) |
+| Find, go to match, hide non-matching | custom S |
+| Playwright drive | native library plus custom S hook |
 
-Expected to fail or degrade (stated up front): live-input insert rows (one editor at a time);
-cheetah's native selection cannot express disjoint rows (own layer needed); multi-sort needs a
-custom header; header/tooltip DOM attributes have no canvas equivalent (proxy element);
-`cheetah-grid-playwright` WebKit support is unverified upstream; canvas text on DPR 1 in the
-container will not look like Mac DPR 2; IME composition in the cheetah editor is untested here.
+Known gaps: Delete key on a range clears cells to empty (native range delete), not row delete;
+`paste` menu item cannot read the clipboard in Playwright (key paste verified); IME in the editor
+untested; header resize floor asserted at 40 px only; DPR and fonts differ from Mac.
 
-## 12. Go/no-go (agreed before measuring)
+### Verdict
 
-All numbers at NCOLS=20, 10 000 rows, same viewport, row height 28.
+Conditional, not GO. Parity (G4) holds with one accepted impossible item. Frame cost (G1) favours
+Cheetah over the app and the Slick baselines in the container, but not to the 55 fps and 25 ms bar on
+every flick, and the run was contended; rerun on a quiet machine before deciding. G2 and G3 need
+the Mac (trackpad lag, footprint). G5 fails as defined: the mechanical call-shape change (canvas cells
+are not Locators, assertions move to `state()`) touches 89 % of asserting lines. Per section 12 that
+alone is GO with a test-surface follow-up (migration phase 6).
 
-- **G1 frame cost.** Headless WPE: Cheetah avg ≥ 55 fps and p95 ≤ 25 ms on every ladder flick,
-  ≤ 5 frames over 50 ms per flick, and ≥ 15 fps above the then-current app (`NCOLS=20 grid-scroll`
-  at the same commit, P162 fixes included if landed). Headed WebKitGTK: no worse than the app (≥ 58
-  fps, p95 ≤ 24 ms).
-- **G2 late data.** `blankRows` = 0 on every frame of the 40/100/200 px/frame ladder in WPE;
-  `lagPx` p95 ≤ 28 (one row). Mac trackpad: `lagPx` p95 ≤ 28 and no blank edge perceived.
-- **G3 Mac footprint.** At 100 px/frame sustained, Cheetah's footprint delta ≤ 60 % of
-  `slick.html?variant=kira`'s, and ≤ empty-scroller delta + 150 MB.
-- **G4 parity.** 0 "impossible" except insert-row live inputs (accepted if the equivalent works and
-  the user agrees); ≤ 2 items at L.
-- **G5 tests.** Five sample specs pass 3/3 runs in WebKit; asserting-body lines changed ≤ 30 % in
-  total.
-- **Informational, not gating:** bundle delta (cheetah-grid ~85 KB gzip vs SlickGrid ~42 KB), and
-  how many knobs needed `rawGrid` (wrapper value).
+### Deviations
 
-Decision: GO only if G1-G4 pass. G5 failing alone means GO with a test-surface follow-up sized in
-the phase list. Without the user's Mac run, the verdict is "conditional GO/NO-GO pending G3 and the
-Mac half of G2".
+- Hooks build writes `dist-proto-hooks`, release `dist-proto` (probe serves both).
+- Trace is `window.__kiraProtoTrace`, shared by both pages, not on `__kiraGridProto`; HUD hook-gated.
+- Added hook `gridCol`. Toolbar (find, add row) shows only for `fixture=features`.
+- Probe viewport copied from the app probe: 1104x729. Slick scroller reports 1048x700 inside it.
+- `knip` `lint:dead` fails on pre-existing unused exports (`packages/shared/protocol/page.ts`, git-ui
+  row menu, repo schemas); not touched, outside scope. No proto finding remains.
+- `codegraph_explore` calls in this implementer run: 2.
 
-**If GO, estimated migration phase list (L-XL, about 7 phases, P-numbered at the end of the
-table):** (1) Cheetah host for the data grid: theme bridge, cell column, markers, gutter, read-only,
-behind no flag (one engine, `support/grid.ts` note "no turning back"); (2) selection model, keyboard,
-context menus, clipboard; (3) edit, vetoes, insert rows, pending layers, FK/PK nav and preview; (4)
-header furniture: sort badges, PK/FK, select zone, tooltips, resize persistence; (5) console grid on
-the same layer; (6) debug hook + `support/grid.ts` over `cheetah-grid-playwright`, port about 25
-specs, delete `slick-grid.spec.ts`/`scroll-trace.spec.ts` and SlickGrid-only scroll machinery; (7)
-accessibility decision (overlay or accepted regression, user's call) and Studio's `slickgrid` usage
-removed (`packages/git-ui` keeps it). Rewrite size from P162: about 4 000 engine-coupled lines.
+### What the user runs on the Mac
 
-## 13. Environment caveats and risks
-
-- Linux sandbox has no GPU. WPE rasters canvas on the CPU; `fillText` cost is real CPU cost here,
-  likely GPU-assisted on Mac. DOM paint in WPE is also software. Container numbers rank engines;
-  Mac numbers decide.
-- Container DPR is 1; Mac Retina is 2 (4x canvas backing store, about 23 MB per buffer at 1600x900
-  CSS px). Footprint only means anything on the Mac.
-- Fonts differ (container fallback monospace vs Mac `--kira-font-data` stack): widths, ellipsis
-  points and screenshots differ; never compare screenshots across machines.
-- Playwright WebKit cannot read the clipboard; use the existing clipboard spy.
-- `cheetah-grid-playwright` is 0.1.0, experimental, one release. Risk of API churn; pin exact.
-- `window.cheetahGrid` must be the grid's own module instance: `resolve.dedupe` plus one installed
-  copy; verify `getInstanceByElement` finds the grid in the first spec.
-- `vue-cheetah-grid` lags core (2.1.0, 2025-08) and is Options API internally; acceptable as a
-  dependency, decision recorded.
-- Cheetah's canvas sits outside the native scroller: on macOS the compositor moves only the sizer,
-  so content can visibly lag the trackpad; `lagPx` measures exactly this. Native momentum is kept
-  (no wheel hijack), the P22 requirement.
-- Accessibility overlay out of scope: the go/no-go does not cover screen readers; the migration
-  list keeps it as its own phase.
-- P162 may land SlickGrid fixes during this phase; always measure the app baseline at the same
-  commit as the prototype run and record that commit.
-
-## Result
-
-Pending implementation.
+`docs/DEV_ENVIRONMENT.md` "Grid prototype (P163)": wkhost footprint for the four pages (G3), and a
+trackpad flick with the HUD on `cheetah.html?fixture=features` and `slick.html?variant=kira` (G2).
+`wkhost.swift` is not compiled in the sandbox. Open both pages in two windows on the same data.

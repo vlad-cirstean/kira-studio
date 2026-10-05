@@ -633,6 +633,7 @@ Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped b
 - `bun run proto:dev:grid` serves them. `proto:build:grid` writes `dist-proto` (no debug hooks).
   `proto:build:grid:hooks` writes `dist-proto-hooks` (`window.__kiraGridProto`, `window.cheetahGrid`,
   trace HUD).
+- Both grid pages build the same data: `createProtoData` over the shared `wideTable` template, 10 000 rows x 20 columns, no randomness. Open `cheetah.html` and `slick.html?variant=kira` in two windows to compare by hand; pass the same `fixture`, `w`, `h` and `rowHeight` to both.
 - `bun run test:proto:studio` builds the hooks build and runs `tests/proto/` in Playwright WebKit.
 - `bun run perf:probe:proto` builds both and runs `tests/perf/proto-grid-scroll.spec.ts`. Frame cost
   uses the release build, late data the hooks build. `GRID=cheetah,slick-stock,slick-kira` narrows.
