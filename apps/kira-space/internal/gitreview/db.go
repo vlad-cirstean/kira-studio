@@ -29,7 +29,7 @@ func (s *Store) ensureOpen() error {
 		return nil
 	}
 
-	if err := config.EnsureLayout(); err != nil {
+	if err := config.EnsureLayoutAt(filepath.Dir(s.path)); err != nil {
 		return fmt.Errorf("gitreview: ensure layout: %w", err)
 	}
 
