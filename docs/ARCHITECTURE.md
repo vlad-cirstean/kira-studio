@@ -1875,6 +1875,16 @@ unconditional fetch happens on every mount regardless of pane or live response �
 (`api/state/apiQueries.ts`, cached and invalidated rather than fetched once per mount) — which is
 what lets a restored tab say "N past responses" before the user ever opens the pane.
 
+**Large response bodies (P160).** `useResponseBody` formats a received body once: format detection and
+pretty text come from one parse, in a Web Worker (`prettyBody.worker.ts`) for bodies over 64 K chars,
+inline below that. Pretty text is retained only while Pretty view is selected; Raw drops it, switching
+back re-requests it. In Pretty view `MonacoHost` is not mounted until the result arrives; a muted
+"Formatting response…" line shows only after 200 ms. `MonacoHost`'s pending `<pre>` shows at most
+16 384 chars: a full-doc `<pre>` forced a layout of the whole wrapped text inside `editor.create`'s
+size measure, which was the profiled hot spot (12 MB: nothing painted, RSS ~2.7 GB). The model is
+created empty, then filled with `setValue`; read-only external writes use `setValue` too (no undo
+copy). Default `api.maxResponseMb` is 5; stored explicit values keep, no migration.
+
 **Comparing two entries reaches for Monaco's diff editor for the one thing it's actually built for
 — the body — and a plain keyed comparison for headers, not the same algorithm twice (P8; moved
 onto Monaco in P60a, `6bc45255`, which deleted `@codemirror/merge` from the dependency tree).**
@@ -4247,8 +4257,9 @@ was ported from — drift in either fails on the same bytes. `internal/mask/pari
 `tests/unit/mask-parity.spec.ts` do the same for masking, both reading 66 shared fixture pairs under
 `tests/fixtures/mask/`.
 
-**Parallelism.** `apps/kira-studio/playwright.config.ts` runs five projects (v1.4 P27 added
-`ui-timing`, v1.4 P6 added `visual`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real` and `visual`,
+**Parallelism.** `apps/kira-studio/playwright.config.ts` runs six projects (v1.4 P27 added
+`ui-timing`, v1.4 P6 added `visual`, v2.0 P160 added the opt-in `perf`, in no suite script, serial,
+`tests/perf/`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real`, `visual` and `perf`,
 every one but `ui-timing` `fullyParallel`. Kira Space has its own two-project
 `apps/kira-space/playwright.config.ts` (`ui`, `visual`) and the extension has its own
 `apps/kira-space-vscode/playwright.config.ts` (`webview-layout`, `webview-interaction`) — neither
