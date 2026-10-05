@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
 import { startServer, type UiServer } from '@workbench/testing/ui/server';
 
-const DIST_DIR = resolve(__dirname, '../../frontend/dist-proto');
+const DIST_DIR = resolve(__dirname, '../../frontend/dist-proto-hooks');
 
 export type ProtoPage = 'cheetah' | 'slick';
 

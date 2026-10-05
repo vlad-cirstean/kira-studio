@@ -44,6 +44,7 @@ import { cycleSort, setSort } from './sort';
 import { createState, HEADER_ROWS, pageRowOf, recordOf } from './state';
 import TooltipProxy from './TooltipProxy.vue';
 import { buildTheme, readPalette } from './theme';
+import { cheetahSource, createTrace } from './trace';
 
 const NAV_HIT = 24;
 const TRUNCATION_TIP = 'Value truncated at 64 KB';
@@ -531,7 +532,10 @@ onMounted(async () => {
   };
   raw.allowRangePaste = false;
   bindGrid(raw);
-  if (__KIRA_DEBUG_HOOKS__) installDebugHook({ grid: raw, state, navOf: navFor });
+  if (__KIRA_DEBUG_HOOKS__) {
+    installDebugHook({ grid: raw, state, navOf: navFor });
+    window.__kiraProtoTrace = createTrace(cheetahSource(raw));
+  }
 });
 </script>
 
