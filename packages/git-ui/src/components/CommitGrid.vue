@@ -1353,6 +1353,12 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   width: 100%;
 }
 
+/* P162: one stacking context and paint boundary for every row (each row is a stacking context
+   via its translateY transform), so no row can be promoted to its own compositing layer. */
+.kv-commit-grid .grid-canvas {
+  contain: layout paint;
+}
+
 .kv-commit-grid .slick-row.ui-widget-content {
   position: absolute;
   border: 0;
