@@ -175,7 +175,7 @@ historical prose.
   project `perf`, in no suite script). Builds the production bundle (`build:studio` overwrites
   `frontend/dist`; `test:ui:studio` rebuilds its own test bundle). `KIRA_PERF_RUNS` (default 3) runs
   per case, `KIRA_PERF_CASES=json,text-1line` narrows. 12 cases: 4 body shapes x 2.4/5/12 MB. Gate:
-  run only at `load1 <= 1.0` (`/proc/loadavg`); each run line prints `load1`, discard noisy ones.
+  run only at `load1 <= 1.0` (`/proc/loadavg`); each run line prints `load1` (includes the probe's own browser, ~1.0 extra, so a reading up to ~2 during a run is normal; check the gate before starting).
   Output is `key=value` per run plus a median `summary` per case. RSS is Linux-only and sums every
   browser process under the test worker.
 - **The FSEvents watcher is `darwin && cgo`** (`apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go`), so

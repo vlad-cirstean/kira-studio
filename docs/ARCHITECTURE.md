@@ -1882,8 +1882,9 @@ back re-requests it. In Pretty view `MonacoHost` is not mounted until the result
 "Formatting response…" line shows only after 200 ms. `MonacoHost`'s pending `<pre>` shows at most
 16 384 chars: a full-doc `<pre>` forced a layout of the whole wrapped text inside `editor.create`'s
 size measure, which was the profiled hot spot (12 MB: nothing painted, RSS ~2.7 GB). The model is
-created empty, then filled with `setValue`; read-only external writes use `setValue` too (no undo
-copy). Default `api.maxResponseMb` is 5; stored explicit values keep, no migration.
+created empty, then filled: `setValue`, or for read-only docs over 256 KiB line-aligned 256 KiB
+`applyEdits` chunks a frame apart (one `setValue` of an 8 MB pretty body blocked 1.1 s); read-only
+external writes keep no undo copy. Default `api.maxResponseMb` is 5; stored explicit values keep, no migration.
 
 **Comparing two entries reaches for Monaco's diff editor for the one thing it's actually built for
 — the body — and a plain keyed comparison for headers, not the same algorithm twice (P8; moved

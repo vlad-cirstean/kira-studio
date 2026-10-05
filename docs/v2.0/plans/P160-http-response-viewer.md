@@ -104,177 +104,55 @@ Wiring:
   the 12 MB `data-kira-editor-text` attribute is test-only cost users never pay. Check first that
   the shell boots under the mocks on a production build (`relaunch` reaches `status-bar`, a send
   shows a status chip). If it does not, use `build:test:studio`, and say so in the script comment,
-  DEV_ENVIRONMENT and `## Result`. Either way before and after use the same build kind.
-- `tsconfig.tests.json` `include`: add `"tests/perf/**/*.ts"`.
-- Specs import `test`/`expect` from `../ui/fixtures`, `IPC` from `../ui/support/ipcChannels`,
-  `httpResponse`/`openHttpModeAndNewRequest` from `../ui/support/apiMode`. No new mock machinery.
+  DEV_ENVIRONMENT and `## Result
 
-Cases (bodies generated in the spec, deterministic; 1 MB = 1_048_576 bytes, the app's own MB):
-- `json`: compact array of objects (`{"id":n,"name":"user-n","email":"user-n@example.com",
-  "active":true,"score":12.5,"tags":["a","b"]}`), `Content-Type: application/json`.
-- `text-80col`: 79 chars + `\n` per line, `text/plain`.
-- `text-short-lines`: ~8 chars + `\n` per line (`line 123\n`-style), `text/plain`.
-- `text-1line`: one line, words and spaces, no `\n`, `text/plain`.
-- Sizes: 2.4, 5 (new default ceiling) and 12 MB each. 12 cases. The mock bypasses the Go cap, so
-  12 MB still measures the viewer.
+Commits (`6dce6fd6..`):
+  0ba95c4b test: update settings Api visual baseline for 5 MB default
+  18a5cff5 perf(editor): chunked fill for large read-only docs
+  97a6a8bd docs: P160 architecture and dev environment notes
+  9520dd86 fix(editor): MonacoHost preview via v-text for lint
+  3022d60b feat(api): default max response size 5 MB
+  1ec1f7b3 perf(http): format response body once, off the main thread
+  c6922518 perf(editor): MonacoHost capped preview, empty create then fill
+  7d35e10c test(perf): http response viewer probe
 
-Per run (fresh `relaunch` per run, `KIRA_PERF_RUNS` runs per case, default 3, median reported):
-1. `relaunch({ control: [{ channel: IPC.httpSend, response: httpResponse({ … body, bodyBytes,
-   headers }) }] })`, `openHttpModeAndNewRequest`, fill `http-url`. Wait for any `.monaco-editor`
-   on the page if the request view mounts one (warm Monaco chunk); record `warm: true|false`.
-2. Record `/proc/loadavg` 1-min value (`load1`) and baseline RSS.
-3. In page: start heartbeat (`setTimeout(0)` chain logging `performance.now()`), install a
-   `MutationObserver` on `[data-testid="http-response-pane"]`, then `t0 = performance.now()` and
-   click `[data-testid="http-send"]` from inside `page.evaluate` (no actionability waits in the
-   timed window).
-4. `firstTextMs`: first moment any body text is in the body area (pending `<pre>` or a
-   `.view-line`). `shownMs`: first `.response-body .monaco-host .view-lines .view-line` with
-   non-empty text, plus one `requestAnimationFrame` (first paint opportunity). Timeout 120 s ->
-   record `timeout`.
-5. Keep the heartbeat 1 s past `shown`. `longestBlockMs` = largest heartbeat gap in
-   `[t0, shown+1s]`; `tbtMs` = sum of `(gap - 50)` over gaps > 50 ms.
-6. RSS (Linux): Node-side sampler every 100 ms sums `VmRSS` from `/proc/<pid>/status` over every
-   descendant of the test worker process (`process.pid`; walk `/proc/*/stat` ppid), covering the
-   WebKit UI, web and network processes. `rssPeakDeltaMb` = peak during the window minus baseline;
-   also `rssPeakMb`. Non-Linux: `n/a`.
-7. Print one line per run, `key=value` (DEV_ENVIRONMENT's Go perf-probe convention): `case=json
-   size=12 run=1 load1=0.42 warm=true firstTextMs=… shownMs=… longestBlockMs=… tbtMs=…
-   rssPeakDeltaMb=… rssPeakMb=…`, then a median summary per case.
+Build: production (`build:studio`); the shell boots under the mocks, no `build:test` fallback. Probe
+3 runs per case, median. Before = probe commit `7d35e10c` in a temp worktree (removed), after =
+phase tip, run back to back. Gate readings (`/proc/loadavg` 1-min) at start of the window: 0.86
+(before), 0.97 (after). Per-run `load1` 0.7..1.7 before, 1.0..1.9 after; the probe's own browser
+adds ~1.0, the other chain was idle during the window. An earlier pass (before the chunked fill,
+load 0.9..2.2) is superseded.
 
-Asserts nothing (DEV_ENVIRONMENT "perf probes are opt-in and assert nothing").
+Before -> after medians:
 
-## 4. Measuring protocol (quiet machine)
+| case (MB) | firstTextMs | shownMs | longestBlockMs | tbtMs | rssPeakDeltaMb |
+|---|---|---|---|---|---|
+| json 2.4 | 547 -> 475 | 2703 -> 973 | 2489 -> 316 | 2586 -> 899 | 418 -> 292 |
+| json 5 | 1183 -> 786 | 4296 -> 1326 | 3871 -> 410 | 4128 -> 910 | 811 -> 393 |
+| json 12 | 2215 -> 1810 | 9005 -> 2396 | 8152 -> 325 | 9001 -> 1011 | 1736 -> 617 |
+| text-80col 2.4 | 128 -> 135 | 1517 -> 591 | 1369 -> 303 | 1342 -> 335 | 130 -> 132 |
+| text-80col 5 | 298 -> 289 | 2339 -> 752 | 2054 -> 276 | 2097 -> 370 | 163 -> 158 |
+| text-80col 12 | 535 -> 571 | 5511 -> 1068 | 4974 -> 309 | 5201 -> 478 | 310 -> 183 |
+| text-short-lines 2.4 | 152 -> 155 | 2261 -> 660 | 2092 -> 294 | 2243 -> 750 | 351 -> 223 |
+| text-short-lines 5 | 291 -> 332 | 3870 -> 812 | 3552 -> 278 | 3951 -> 876 | 587 -> 216 |
+| text-short-lines 12 | 618 -> 624 | 8630 -> 1130 | 7987 -> 299 | 8139 -> 964 | 861 -> 272 |
+| text-1line 2.4 | 120 -> 140 | 1988 -> 597 | 1826 -> 232 | 1802 -> 358 | 174 -> 107 |
+| text-1line 5 | 199 -> 254 | 3501 -> 693 | 3262 -> 267 | 3235 -> 469 | 283 -> 130 |
+| text-1line 12 | 488 -> 527 | 8365 -> 985 | 7826 -> 309 | 7874 -> 586 | 316 -> 145 |
 
-Another chain (`/home/user/kira-studio-c2`) runs CPU-heavy loops on this 4-core box; never touch
-it. Before **each** probe invocation:
-- Read `/proc/loadavg`. Proceed only when `load1 <= 1.0`. Otherwise wait with a Monitor until-loop
-  (`until awk '{exit !($1<=1.0)}' /proc/loadavg; do sleep 30; done`), not foreground `sleep`.
-- The probe also logs `load1` per run; a run whose `load1 > 1.0` is discarded and re-run.
-- Record the gate reading and the per-run `load1` range in `## Result`.
+Step 6 verdict: first after-pass 5 MB json longest block 1447 ms, text-short-lines 1065 ms (> 500).
+`performance.mark`-style timing showed `model.setValue` of the 8.2 M-char pretty body took 1131 ms
+(editor create 143 ms). Built the chunked fill: read-only docs over 256 KiB append line-aligned
+256 KiB chunks via `applyEdits`, a frame apart, generation token cancels, `repaintRanges`/lint/
+debug hook deferred to the end. Final: every 5 MB case longest block <= 410 ms. `text-1line` needed
+no `wordWrap` override.
 
-Before/after must be comparable, so measure them back to back in one quiet window:
-- "before" = the probe commit (step 1) in a temporary worktree
-  (`git worktree add /home/user/kira-studio-p160-before <probe-sha>`, then
-  `sh scripts/prepare-worktree.sh` there), "after" = the phase tip in this checkout.
-- Run before, then after, same `KIRA_PERF_RUNS`. Remove the temporary worktree afterwards
-  (`git worktree remove`).
-- If a quiet window comes right after step 1, also take a first "before" pass then (early signal);
-  the back-to-back pass is the one recorded as authoritative.
-- WebKit for Playwright: `bunx playwright install webkit` plus the system libs (DEV_ENVIRONMENT).
+Deviation: bodies up to 64 K chars format inline on the main thread (`SYNC_BODY_CHARS`), not in the
+worker, to avoid a pending flash and keep existing specs synchronous. Larger bodies go to the worker.
 
-## 5. Steps and commits
-
-1. **`test(perf): http response viewer probe`** — §3 files, project, script, tsconfig include, and
-   the DEV_ENVIRONMENT bullet (§7). Run it once on 2.4 MB json to prove it works (any load; this is
-   a smoke run, not a measurement). Commit.
-2. **`perf(editor): MonacoHost capped preview, empty create then fill`** — `editor/MonacoHost.vue`:
-   - `previewDoc` computed: `doc.length > PENDING_PREVIEW_CHARS ? doc.slice(0, PENDING_PREVIEW_CHARS)
-     : doc`; the `<pre>` renders `previewDoc`.
-   - `onMounted`: after `loadMonaco()`, large-doc frame yield (§2), `createModel('', lang)`,
-     `editor.create(…)`, `model.setValue(props.doc)` with `applyingExternal = true` around it (no
-     `update:doc` echo), record `lastAppliedDoc`/`lastAppliedVersionId`, then `pending = false`,
-     then the existing wiring. Register `onDidChangeContent` after the fill so the fill does not run
-     `repaintRanges`/`scheduleLint` twice; call them once explicitly as today.
-   - `applyExternalDoc`: guard and write split per §2; update `lastApplied*` after every write.
-   - Constants are named, top of script, one-line comment each (why the number).
-   - Verify every `readOnly` mount site still behaves (CodeGraph callers of `MonacoHost`; those
-     with `keepSelectionOnExternalSync`). Fast checks per commit. Commit.
-3. **`perf(http): format response body once, off the main thread`** — new
-   `views/httprequest/prettyBody.worker.ts` (message `{id, body, wantText}` -> `{id, format:
-   'json'|'xml'|null, text?}`; logic moved verbatim from `prettyFormat`, incl. the `<…>` bracket
-   gate), `views/httprequest/prettyBody.ts` (lazy singleton worker, id -> resolver map; worker
-   `error` rejects all pending and drops the singleton so the next call recreates it, same shape as
-   `loadMonaco`'s reject-then-retry), `views/httprequest/useResponseBody.ts` composable:
-   - inputs: `response`, `responseView`; outputs: `format` (`undefined` while pending), `bodyText`,
-     `formatting` (delayed flag for the caption).
-   - watch `response` (immediate): base64 -> nothing; else request with `wantText = view ===
-     'pretty'`. Sequence id per pane; a result for a superseded id is dropped.
-   - watch `responseView`: to raw -> drop pretty text; to pretty with a known non-null format and no
-     text -> request text.
-   - rejection -> same computation synchronously on the main thread.
-   - `ResponsePane.vue`: replace `prettyFormat`/`bodyText` with the composable; toggle `v-if` uses
-     `format`; `MonacoHost` `v-if` adds "not pending in pretty view"; caption element uses Tailwind
-     utilities (`text-kira-sm text-muted-foreground p-1.5`, the binary note's own classes); update
-     the P21 comment block to the new shape (short). `findTargets` keeps reading `bodyText`.
-   - Typing: if the frontend tsconfig lacks the `WebWorker` lib, type the worker's `self` locally
-     (`self as unknown as DedicatedWorkerGlobalScope` needs the lib; otherwise a minimal local
-     interface for `postMessage`/`addEventListener`). No `// @ts-ignore`.
-   Commit.
-4. **`feat(api): default max response size 5 MB`** — the five values in §1 Settings; update the
-   `model/settings.go:83-84` comment (P90's "50 MB" -> P160 5 MB) and the `options.go` coupling stays
-   true. Repo-wide grep `maxResponseMb.*50|MaxResponseMb: *50|50 \* 1024 \* 1024` over `apps/` and
-   `packages/` returns nothing. Commit.
-5. **Full verification** (once): `bun run typecheck`, `bun run lint:all`, `bun run test:unit`,
-   `go test ./apps/kira-studio/...`, `bun run test:ui:studio` (all HTTP specs exercise the async
-   pretty path: `http-request`, `http-history`, `http-request-body`, `http-raw`,
-   `api-ui-consistency`, `collections`, `settings-apply-on-save`). Fix failures in follow-up
-   commits, root-caused; a spec that read the pretty body synchronously gets an auto-retrying
-   assertion, never a sleep.
-6. **Measure** (§4) before and after. Rule: if any **5 MB** case after the fix has median
-   `longestBlockMs > 500`, find which part blocks (WebKit timeline or `performance.mark` around
-   `setValue` vs. render) and fix in this phase:
-   - `setValue`/view-model line breaks dominate -> chunked fill for read-only hosts over
-     `LARGE_DOC_CHARS`: append line-aligned ~256 KiB chunks via `model.applyEdits` at the model end,
-     yielding a frame between chunks, `applyingExternal` held across the whole fill, `repaintRanges`/
-     `scheduleLint`/`updateDebugHook` deferred to the end, a fill generation token cancels on a new
-     doc or unmount.
-   - wrapping of a single huge line dominates (`text-1line`) -> discuss with the user before
-     overriding their `wordWrap` setting; record it, do not silently change it.
-   Otherwise record "no further work: 5 MB longest block N ms" in `## Result`.
-7. **Docs and close-out** (§7), SPEC row -> **Done.**, `## Result` filled. Commit
-   `docs(v2.0): P160 result`.
-
-## 6. Tests
-
-- No new unit test. The worker protocol is one request/response; stale-result handling is one id
-  compare; the default is a constant. Nothing meets the complex-logic bar.
-- No new UI spec. Existing HTTP specs cover pretty/raw/history behaviour through the new async
-  path; `settings-apply-on-save.spec.ts` covers the leaf patch shape (unchanged).
-- Go: no test change (`client_test.go` passes explicit `MaxResponseMb`).
-- The probe is not a test: opt-in, asserts nothing, never in `ui`/`ui-timing`.
-
-## 7. Docs
-
-- `docs/ARCHITECTURE.md`, UI architecture, next to the P8 ResponsePane paragraph (`:1853`): one
-  paragraph — response body formatted once per receive in a worker, pretty text retained only in
-  pretty view, viewer not mounted until formatted. Next to the Monaco stack row/`MonacoHost`
-  facts: pending preview capped at 16 384 chars (full-doc `<pre>` forced a layout of the whole text
-  inside `editor.create`'s size measure), model created empty then filled, read-only external
-  writes use `setValue` (no undo copy). Api settings default `maxResponseMb` 5 (stored explicit
-  values kept, no migration).
-- `docs/ARCHITECTURE.md` Testing (`:4251` project list): add `perf` (opt-in, serial, not in any
-  suite script) and `tests/perf/` in the suite overview line.
-- `docs/DEV_ENVIRONMENT.md`, next to "The perf probes are opt-in and assert nothing" (`:168`): how
-  to run (`bun run perf:http:studio`, `KIRA_PERF_RUNS`), which build, the `load1 <= 1.0` gate,
-  RSS is Linux-only and sums all browser processes, output format. Note that `build:studio`
-  overwrites `frontend/dist`; `test:ui:studio` rebuilds the test bundle itself.
-- `docs/v2.0/SPEC.md` P160 row: status **Done.** with a one-line summary, original ask kept
-  ("Original ask: …", P158 precedent); drop the "commit it with or before this phase" note.
-- No `docs/PERF.md` section: no stated budget; this plan's `## Result` is the record.
-
-## 8. Streams
-
-One sequential implementer. Steps 2 and 3 both decide what `ResponsePane` mounts and when; step 3's
-"don't mount while pending" depends on step 2's fill semantics; step 6 depends on all. No
-independent split exists.
-
-## 9. End checks (orchestrator)
-
-- `git log` shows steps 1-4 (+ fixes) and the docs commit, all hooks green, no `--no-verify`.
-- `tests/perf/http-response.spec.ts` and `tests/perf/perfProbe.ts` committed; `perf` project
-  present; `bun run test:ui:studio` does not run it (`--list` check).
-- `grep -n "{{ doc }}" frontend/src/editor/MonacoHost.vue` empty; `createModel('',` present;
-  `setValue` used for read-only writes.
-- `ResponsePane.vue` has no `beautifyJson`/`beautifyXml` import; worker file imports them.
-- Default grep (step 4) clean; `DefaultSettings().Api.MaxResponseMb == 5` and
-  `normalize` default `5 * 1024 * 1024`.
-- `## Result` holds before/after medians for all 12 cases (at least json, text-80col,
-  text-short-lines, text-1line at 2.4 and 12 MB, the row's acceptance), load readings, build kind,
-  and the step 6 verdict.
-- No edit under `/home/user/kira-studio-c2`; temporary before-worktree removed.
-
-## Result
-
-(Implementer fills: commits; build kind; per case before -> after medians of `firstTextMs`,
-`shownMs`, `longestBlockMs`, `tbtMs`, `rssPeakDeltaMb`; load1 gate and ranges; step 6 verdict;
-verification summary.)
+Verification: `go build/vet/test ./apps/kira-studio/...` clean; `lint:all` 0; `test:unit` 1764 pass;
+`test:ui:studio` 303 pass, 1 fail (`budgets.spec.ts` interaction budgets, grid scroll p50/max, 13 vs 12
+and 51 vs 50 ms). It fails the same way on the pre-phase tree (54 vs 50), touches no code this phase
+changed, and only misses under this shared box's load. `perf.spec.ts` flaked once at 80-83 vs 80
+under load, passes alone (3/3). `test:visual:studio`: settings Api baseline re-captured (14 px, the
+"50" -> "5" digit), 14 pass.
