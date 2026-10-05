@@ -34,15 +34,24 @@ export interface RelaunchOptions extends UiFixturesOptions {
  * entirely, mocked per-spec by `installGitStreamMock` (support/gitStreamMock.ts) by default, or via
  * this fixture's own `gitStream` option when boot itself opens the transport.
  */
+const installMocks = async (page: Page, options?: RelaunchOptions): Promise<KiraAppExtra> => {
+  const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
+  if (options?.gitStream) {
+    await installGitStreamMockOnInit(page, options.gitStream);
+  }
+  return { control };
+};
+
 export const test = createUiFixtures<KiraAppExtra, RelaunchOptions>({
   distDir: DIST_DIR,
-  installMocks: async (page, options) => {
-    const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
-    if (options?.gitStream) {
-      await installGitStreamMockOnInit(page, options.gitStream);
-    }
-    return { control };
-  },
+  installMocks,
+});
+
+/** A review window has no status bar: it is ready once its own root renders. */
+export const reviewTest = createUiFixtures<KiraAppExtra, RelaunchOptions>({
+  distDir: DIST_DIR,
+  installMocks,
+  readySelector: '[data-testid="ade-review-window"]',
 });
 
 export { expect } from '@playwright/test';
