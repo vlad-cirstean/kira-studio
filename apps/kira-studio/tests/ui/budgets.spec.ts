@@ -436,8 +436,12 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // P139: the work mark sat in the host scroll listener, before SlickGrid's scrollRenderThrottling
   // deferred the far-jump render, so 'work' included the throttle wait (p50 12-17ms, flaky). The
   // mark now fires at KiraSlickGrid.render() entry: measured p50 6-8ms, quiet and under load.
-  expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(12);
-  expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(50);
+  // P161: re-measured on this container with no other browser running: p50 9-14ms and max up to
+  // 68ms, identical at 058623df (P139's own commit) and HEAD, with no grid render code changed in
+  // between. The host runs the same render ~1.4x slower than P139's, so the bounds follow the
+  // host (docs/PERF.md §2.1). Still tight enough to catch a render-per-step regression.
+  expect(percentile(scrollDeltas, 50)).toBeLessThanOrEqual(16);
+  expect(Math.max(...scrollDeltas)).toBeLessThanOrEqual(80);
 
   // --- 1a. sustained-velocity coverage ladder (P22 iter2 D7), on big_rows (narrow, >200,000px
   // scrollable — plenty of room for every rung below). Unlike measureScrollResponses above (one

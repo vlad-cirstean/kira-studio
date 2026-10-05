@@ -136,6 +136,15 @@ keeps a looser `max ≤ 50 ms` sanity bound instead of gating on p95; the p95 nu
 not gated. Re-check this against a real macOS display before relying on p95 anywhere in this
 environment's history.
 
+**P161 re-measurement, `ui-timing` scroll response.** On this container with no other browser
+running (`ps` shows no WPE web process, `load1 <= 1.0` at start), the `interaction budgets` case
+failed 4 of 5 runs against p50 <= 12 / max <= 50: p50 9-14 ms, max 51-68 ms. The same case at
+`058623df` (P139's own commit) failed 3 of 3 (p50 9-11, max 51-68); `git log 058623df..HEAD`
+touches no grid render code. Sharing the machine with another session's browsers pushed p50 to 18
+ms and max to 43 ms. The code did not regress; this host runs the render about 1.4x slower than
+the one P139 measured (p50 6-8 ms). The bounds became p50 <= 16 ms and max <= 80 ms. The 8 ms
+product budget is unchanged and stays unverified here.
+
 **macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
 macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
 where the Xvfb container above hit it on only about half — motivated
