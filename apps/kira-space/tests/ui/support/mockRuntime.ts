@@ -135,6 +135,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskReviewAgent: 'AdeTaskService.ReviewAgent',
   adeTaskLaunchReviewAgent: 'AdeTaskService.LaunchReviewAgent',
+  adeTaskGitHubSyncPlan: 'AdeTaskService.GitHubSyncPlan',
+  adeTaskGitHubSyncApply: 'AdeTaskService.GitHubSyncApply',
   adeTaskArchiveRisk: 'AdeTaskService.ArchiveRisk',
   adeTaskArchiveTask: 'AdeTaskService.ArchiveTask',
   adeTaskRecordMerge: 'AdeTaskService.RecordMerge',

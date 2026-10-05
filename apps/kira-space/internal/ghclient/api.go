@@ -30,6 +30,11 @@ func (c *Client) Hosts(ctx context.Context) []string {
 	return c.discovery.Hosts(ctx)
 }
 
+// Account is the `gh` login Discovery parsed for host ("" when unauthenticated or unknown).
+func (c *Client) Account(ctx context.Context, host string) string {
+	return c.discovery.Status(ctx, host).Account
+}
+
 // commonArgv builds D4's own common prefix: `gh api --hostname <host> --method GET -H "Accept:
 // application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" <path>` — one place so every
 // one of the three calls in pr.go, and this file's own argv-golden test, share byte-for-byte the

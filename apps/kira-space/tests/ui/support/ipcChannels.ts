@@ -139,6 +139,8 @@ export const IPC = {
   adeTaskLaunchReviewAgent: 'kira:adetask:launchReviewAgent',
   adeTaskOpenReviewWindow: 'kira:adetask:openReviewWindow',
   adeTaskReviewWindowTarget: 'kira:adetask:reviewWindowTarget',
+  adeTaskGitHubSyncPlan: 'kira:adetask:gitHubSyncPlan',
+  adeTaskGitHubSyncApply: 'kira:adetask:gitHubSyncApply',
   adeTaskArchiveRisk: 'kira:adetask:archiveRisk',
   adeTaskArchiveTask: 'kira:adetask:archiveTask',
   adeTaskRecordMerge: 'kira:adetask:recordMerge',

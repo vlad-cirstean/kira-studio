@@ -124,6 +124,10 @@ type TaskBoard struct {
 	stepMsgs  map[string]string      // task|stage|step -> the Run dialog's edited message
 	agent     *adeagent.Server
 	wg        sync.WaitGroup // background setups and runs; Close waits
+
+	ghMu      sync.Mutex             // guards ghLocks, ghPending
+	ghLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
+	ghPending map[string]bool        // branch id -> an unmark worker is queued
 }
 
 // NewTaskBoard builds the engine; Close releases it.
@@ -137,6 +141,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, runOpts: map[string]runOpts{}, tuiRuns: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
 		taskMus: map[string]*sync.Mutex{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
+		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
 	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)
 	b.conn = gitsession.NewConn(boardConnID, "ade-board", boardConnLabel, b.handleEmit)

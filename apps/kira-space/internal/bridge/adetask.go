@@ -786,3 +786,21 @@ func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.Tas
 	l, err := s.Engine.LaunchReviewAgent(ctx, args.TaskID)
 	return l, adeTaskError(err)
 }
+
+// GitHubSyncPlan reports what syncing the branch's reviewed files to its PR would do.
+func (s *AdeTaskService) GitHubSyncPlan(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncPlan, error) {
+	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
+		return adewire.GhSyncPlan{}, err
+	}
+	p, err := s.Engine.GitHubSyncPlan(ctx, args.BranchID)
+	return p, adeTaskError(err)
+}
+
+// GitHubSyncApply marks and unmarks the branch's files on its PR as planned.
+func (s *AdeTaskService) GitHubSyncApply(ctx context.Context, args adewire.BranchArgs) (adewire.GhSyncResult, error) {
+	if err := validateAdeTaskID(args.BranchID, "branchId"); err != nil {
+		return adewire.GhSyncResult{}, err
+	}
+	r, err := s.Engine.GitHubSyncApply(ctx, args.BranchID)
+	return r, adeTaskError(err)
+}

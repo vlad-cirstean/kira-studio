@@ -484,6 +484,7 @@ func wireAdeTask(
 	if err := board.Recover(); err != nil {
 		slog.Warn("ade: recover task board", "scope", "ade", "err", err)
 	}
+	board.WatchReviews()
 	board.Start()
 	return board
 }

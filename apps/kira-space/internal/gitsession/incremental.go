@@ -506,27 +506,34 @@ func (e *RepoEntry) rangeFileDiffBody(ctx context.Context, mergeBase, tip, path 
 // (blob-oid) check, so a per-file "has this changed since you reviewed it" answer costs one pipe
 // round trip, never a diff, for every file that has a record (F6).
 func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeFilesResult, error) {
+	res, _, err := e.rangeFilesRecords(ctx, base, branch)
+	return res, err
+}
+
+// rangeFilesRecords is RangeFiles plus the record each reviewed file resolved to (rename carry-over
+// included), keyed by its current path.
+func (e *RepoEntry) rangeFilesRecords(ctx context.Context, base, branch string) (RangeFilesResult, map[string]gitreview.FileRecord, error) {
 	tip, err := e.branchTip(ctx, branch)
 	if err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 	mb, ok, err := e.mergeBase(ctx, base, branch)
 	if err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 	if !ok {
-		return RangeFilesResult{}, ErrUnrelatedHistories
+		return RangeFilesResult{}, nil, ErrUnrelatedHistories
 	}
 
 	numstat, nameStatus, err := e.fileChanges(ctx, porcelain.NumstatArgs(&mb, tip), porcelain.NameStatusArgs(&mb, tip))
 	if err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 	changes := porcelain.CombineFileChanges(numstat, nameStatus)
 
 	records, err := e.review.Records(ctx, e.Summary.RepoID, branch)
 	if err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 
 	// G30 round-1 performance review, finding #5: one batched CheckMany round trip for every
@@ -540,18 +547,22 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 	}
 	oids, err := e.blobOIDs(ctx, tip, needsOID)
 	if err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 	oidByPath := make(map[string]string, len(needsOID))
 	for i, p := range needsOID {
 		oidByPath[p] = oids[i]
 	}
 
+	resolved := make(map[string]gitreview.FileRecord, len(needsOID))
 	entries := make([]ReviewFileEntry, 0, len(changes))
 	for _, ch := range changes {
 		rec, hasRecord := records[ch.Path]
 		if src := renameSource(records, ch); !hasRecord && src != "" && oidByPath[ch.Path] == records[src].BlobOID {
 			rec, hasRecord = records[src], true
+		}
+		if hasRecord {
+			resolved[ch.Path] = rec
 		}
 		var status ReviewFileStatus
 		if !hasRecord {
@@ -564,10 +575,10 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 	}
 
 	if err := e.review.Touch(ctx, e.Summary.RepoID, branch); err != nil {
-		return RangeFilesResult{}, err
+		return RangeFilesResult{}, nil, err
 	}
 
-	return RangeFilesResult{BranchTip: tip, MergeBase: mb, Files: entries}, nil
+	return RangeFilesResult{BranchTip: tip, MergeBase: mb, Files: entries}, resolved, nil
 }
 
 // renameSource returns the old path whose record a renamed change with no record of its own may
