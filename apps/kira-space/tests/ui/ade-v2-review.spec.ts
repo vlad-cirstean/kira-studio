@@ -51,6 +51,7 @@ const GIT = {
     },
     'review.files': REVIEW_FILES,
     'review.session.load': null,
+    'repo.open': null,
   },
 };
 
