@@ -179,3 +179,38 @@ runs per variant minimum, paired with a base run in the same batch: about 5-35 m
 - `margin-trim` exists on macOS 14+, so the `--tw-*` fallback does not apply there.
 - Memory: any layer-count drop from fix 1 may also lower the scroll-memory plateau
   (`docs/v1.1/WEBVIEW-SCROLL-MEMORY.md`); measure with its Appendix A harness.
+
+## Round 2
+
+Investigation only, no product code changed. Base: `3d1093ff` (v2.0). Grid code (`SlickGridHost.vue`,
+`views/shared/slick/*`, `views/grid/slick/*`) is byte-identical to round 1's `87a65ea9`.
+
+### R2.1 Method
+
+- Same probe as round 1 (`bisect.spec.ts`, scratch copy, `NCOLS=20`-shaped wide page, 10 000 rows,
+  5-flick `FLICK_LADDER`), rebuilt from current HEAD under the scratchpad. Headless WPE, 4 vCPU.
+- CSS variants baked into a copy of the built `dist` CSS (no runtime CSSOM edits). JS variants via
+  `window.__bisect` flags in the scratch build.
+- Quiet machine: no sibling agents. Each run waits until load1 < 1.0, records load1, then runs.
+  load1 stays at 0.9-1.0 between runs because the previous run is the only load (4 cores, so <25 %).
+  No run hit the 1.5 discard limit.
+- Runs interleaved (base, v1, v2, ..., base, v1, ...), 3 rounds, so drift hits every variant equally.
+- Row value: fps avg / mean p95 ms / total frames over 50 ms over the 5 flicks.
+
+### R2.2 Step 1: round-1 winners, re-verified
+
+| Variant | fps (3 runs) | p95 ms | >50 ms | load1 |
+|---|---|---|---|---|
+| base | 30.0 / 30.4 / 29.8 | 71.2 / 67.8 / 68.8 | 752 / 695 / 712 | 0.96-0.98 |
+| `.grid-canvas{isolation:isolate}` | 44.3 / 46.4 / 45.2 | 34.8 / 35.6 / 34.8 | 19 / 17 / 16 | 0.92-0.98 |
+| `.grid-canvas{contain:layout paint}` | 50.8 / 48.0 / 47.2 | 29.8 / 32.4 / 32.0 | 4 / 9 / 6 | 0.92-0.95 |
+| no cell borders | 35.1 / 34.4 / 34.2 | 54.8 / 58.0 / 57.4 | 252 / 317 / 317 | 0.93-0.96 |
+| no hover rule | 30.5 / 29.9 / 29.1 | 68.0 / 68.6 / 77.0 | 705 / 737 / 777 | 0.92-0.98 |
+| isolate + no hover + no borders | 49.3 / 50.3 / 51.0 | 32.2 / 30.8 / 30.6 | 11 / 10 / 5 | 0.94-0.97 |
+
+Confirmed, with far less spread than round 1:
+
+- Canvas isolation: +15 fps (+50 %), p95 halves, frames over 50 ms drop 97 %.
+- `contain: layout paint` on the canvas: +18.6 fps, best single change, frames over 50 ms -99 %.
+- No borders alone: +4.5 fps. On top of isolation (combo vs isolate): +5 fps.
+- Hover rule: 0. Keep it.
