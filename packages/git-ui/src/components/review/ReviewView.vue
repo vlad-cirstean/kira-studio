@@ -127,10 +127,14 @@ function reportAsyncError(err: unknown, prefix: string): void {
   liveAnnouncement.value = `${prefix} — ${err instanceof Error ? err.message : String(err)}`;
 }
 
-async function applyTarget(nextRepoId: string, branch: string): Promise<number> {
+async function applyTarget(
+  nextRepoId: string,
+  branch: string,
+  open?: { readonly base?: string; readonly pane?: ReviewPane },
+): Promise<number> {
   const token = ++targetSequence;
   repoId.value = nextRepoId;
-  await review.value?.setTarget(nextRepoId, branch);
+  await review.value?.setTarget(nextRepoId, branch, open);
   return token;
 }
 
@@ -198,9 +202,7 @@ async function bootstrap(): Promise<void> {
 
   if (props.target) {
     const { repoId: targetRepo, branch, base, pane } = props.target;
-    const token = await applyTarget(targetRepo, branch);
-    if (base && token === targetSequence) await review.value?.setBase(base);
-    if (pane && token === targetSequence) review.value?.setPane(pane);
+    await applyTarget(targetRepo, branch, { base, pane });
     return;
   }
   const list = await bridge.request('repo.list', {});

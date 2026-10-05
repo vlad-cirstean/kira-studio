@@ -150,7 +150,11 @@ export class ReviewSessionState {
    *  requests `review.resolveBase` with no override. The entry point for all three of §6.8's
    *  "how the view learns which branch to review" arms (D40): a cold bootstrap target, a
    *  `review.target` push, and the palette's own branch picker once it has one to hand over. */
-  async setTarget(repoId: string, branch: string): Promise<void> {
+  async setTarget(
+    repoId: string,
+    branch: string,
+    open?: { readonly base?: string; readonly pane?: ReviewPane },
+  ): Promise<void> {
     this.#sessionGeneration++;
     this.#abortAll();
     this.#clearExpansions();
@@ -163,9 +167,9 @@ export class ReviewSessionState {
     this.resolveError.value = undefined;
     this.staleReview.value = false;
     this.#pendingResolution = undefined;
-    this.pane.value = 'commits';
+    this.pane.value = open?.pane ?? 'commits';
     this.phase.value = 'resolving';
-    await this.#resolve(repoId, branch, undefined);
+    await this.#resolve(repoId, branch, open?.base);
   }
 
   /** G19 D5 (item 5): the header's swap button — re-targets the session through the two RPCs it
