@@ -341,3 +341,69 @@ Fast checks per commit: the pre-commit hook (`bun run lint` + `bun run typecheck
 - Canvas grid migration (dropped), P163 prototype code under `proto/grid/`.
 - R2.10 open questions (stock-versus-app per-row layer difference, residual ~35 MB RSS).
 - The Mac A/B itself (user-run, section 4).
+
+## Result
+
+Commits (branch `v2.0`, base `77871697`): `d2ceb523` perf(studio) D1, `26847d76` perf(git-ui) D4.
+Commit 0 skipped: `bun run lint:dead` exits 0. It prints only "Duplicate exports" notes (same-value
+aliases such as `BASE_LEAD_PX`/`OVERSCAN_PX`, deliberate) and knip config hints, no unused export.
+Green after each commit. No `codegraph_explore` call (named fixes, no deletion).
+
+### Probe (headless WPE, `NCOLS=20`, `load1` gate <= 1.0, no GPU)
+
+Mean over the 5-flick ladder per run. Console grid first, data grid second.
+
+| Grid | Runs | load1 | fps base | fps after | mean p95 base | mean p95 after | frames >50 ms base | after | RSS rise (sum of 5) base | after |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Console | 3 | 0.79-0.95 | 42.6 / 40.4 / 42.0 | 61.8 / 61.6 / 61.4 | 42.6 / 48.0 / 45.2 ms | 17.8 / 17.8 / 18.6 ms | 24 / 81 / 42 | 0 / 1 / 0 | 186 / 203 / 200 MB | 148 / 142 / 146 MB |
+| Data | 3 | 0.79-0.95 | 33.8 / 34.2 / 34.2 | 52.8 / 51.8 / 52.4 | 63.6 / 63.4 / 63.4 ms | 28.2 / 29.0 / 28.2 ms | 619 / 575 / 609 | 1 / 1 / 0 | 233 / 221 / 223 MB | 113 / 109 / 113 MB |
+
+Data grid: +18 fps, p95 -35 ms, frames over 50 ms -99.8 %, scroll RSS rise about -50 %. Matches
+R2.2 (30 to 47-51 fps). Spread across runs under 1 fps. Console grid gains the same way (the plan
+set no console expectation). `TRACE=1` run after the fix: `uncoveredPx` max 0, gap frames 0 over
+all 5 flicks (data grid). That one run had `load1` 2.05, not gated; it checks coverage, not speed.
+Built CSS carries both rules: `.slick-grid-host .grid-canvas{contain:layout paint}` in Studio dist,
+`.kv-commit-grid .grid-canvas{contain:layout paint}` in the Space and VS Code webview bundles.
+Git graph: no perf measurement (user decision).
+
+### Visual (sandbox against sandbox)
+
+Base (plan commit): 13 passed, 1 failed: `console.spec.ts` console.png, 36 px diff vs the CI
+baseline (font drift, section 2.2). After D1: 14 passed, same spec included. No actual images
+remain to `cmp` (passing tests write none). The base failure did not reproduce; treat as sandbox
+flake, not a code change. Diff `d2ceb523` touches only the new rule.
+
+### Suites
+
+| Suite | Result |
+|---|---|
+| Studio ui: slick-grid, scroll-trace, cell-editor, data-view, console, tooltips | 32 passed |
+| `tests/visual` (`test:visual:studio`) after | 14 passed |
+| Space ui: repo-workspace, repo-graph-lifecycle | 23 passed |
+| `test:webview` | 60 passed |
+| `test:unit` | 1771 pass, 0 fail |
+| `lint:dead` | exit 0 |
+
+Running bare `playwright` hits a global binary (version mismatch, "test() not expected"); use
+`node_modules/.bin/playwright`. Header `will-change: transform` (one hit) and cell borders
+untouched: the diff is 13 added lines.
+
+### Deviations
+
+None to scope. Probe filter `grid-scroll` also matches `proto-grid-scroll.spec.ts` (3 more
+minutes per run); runs used the regex `tests/perf/(console-)?grid-scroll`.
+
+### Mac handover
+
+Paste the section 4 `kiraAB` helper first, then toggle on the shipped build:
+
+| Snippet | Turns off |
+|---|---|
+| `kiraAB('ab-canvas-off', '.slick-grid-host .grid-canvas{contain:none !important}')` | D1 (Studio data or console grid) |
+| `kiraAB('ab-graph-canvas-off', '.kv-commit-grid .grid-canvas{contain:none !important}')` | D4 (Space git graph; VS Code webview via Open Webview Developer Tools) |
+| `kiraAB('ab-hdr-wc', '.slick-grid-host .slick-header-columns{will-change:auto !important}')` | Header `will-change`, information only, not shipped |
+| `kiraAB('ab-no-borders', '.slick-grid-host .slick-cell{border-right:none !important;border-bottom:none !important}')` | Cell borders, information only, not shipped |
+
+Per toggle, run section 4 protocol: Layers tab count, Activity Monitor footprint over 10 s of
+scroll, `__kiraScrollTrace` `gapFrames`/`uncoveredMax`/`frameP95` over one hard flick. Report
+layer count, plateau, gap frames, p95. Graph: check seams, HEAD ring, badges, hover, menu.
