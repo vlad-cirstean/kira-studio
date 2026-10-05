@@ -7,22 +7,30 @@ import {
   rowsToTsv,
 } from '../../src/views/shared/clipboardFormats';
 import { type CellText, cellAt, columnName, copyText, rowSnapshot } from './clipboard';
+import { vetoReason } from './pending';
 import { selectedCols, selectedRows } from './selection';
-import type { ProtoState } from './state';
+import { type ProtoState, pageRowOf } from './state';
 
 /** Callbacks the menus need from the host; everything else reads `state`. */
 export interface MenuActions {
   state: ProtoState;
   hideColumn(displayCol: number): void;
   showAllColumns(): void;
+  edit(record: number, displayCol: number): void;
+  setNull(record: number, displayCol: number): void;
+  paste(record: number, displayCol: number): Promise<void>;
+  deleteRows(records: readonly number[]): void;
+  insertRow(): void;
 }
 
 function copyItem(id: string, label: string, text: () => string): MenuItem {
   return { type: 'item', id, label, icon: 'copy', run: () => copyText(text()) };
 }
 
-export function cellMenu({ state }: MenuActions, row: number, col: number): MenuItem[] {
+export function cellMenu(actions: MenuActions, row: number, col: number): MenuItem[] {
+  const { state } = actions;
   const name = columnName(state, col);
+  const vetoed = vetoReason(state, pageRowOf(state, row), state.order[col] as number) !== null;
   const cell = (): CellText => cellAt(state, row, col);
   const text = (): string => (cell().isNull ? '' : cell().text);
   return [
@@ -31,6 +39,39 @@ export function cellMenu({ state }: MenuActions, row: number, col: number): Menu
     copyItem('copy-as-json', 'Copy as JSON', () =>
       JSON.stringify(cell().isNull ? null : cell().text),
     ),
+    {
+      type: 'item',
+      id: 'paste',
+      label: 'Paste',
+      icon: 'clippy',
+      disabled: vetoed,
+      run: () => actions.paste(row, col),
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      id: 'edit',
+      label: 'Edit',
+      icon: 'edit',
+      disabled: vetoed,
+      run: () => actions.edit(row, col),
+    },
+    {
+      type: 'item',
+      id: 'set-null',
+      label: 'Set NULL',
+      disabled: vetoed,
+      run: () => actions.setNull(row, col),
+    },
+    { type: 'item', id: 'insert-row', label: 'Insert row', run: () => actions.insertRow() },
+    {
+      type: 'item',
+      id: 'delete-row',
+      label: 'Delete row',
+      icon: 'trash',
+      danger: true,
+      run: () => actions.deleteRows([row]),
+    },
   ];
 }
 
@@ -55,7 +96,8 @@ export function rangeMenu({ state }: MenuActions): MenuItem[] {
   ];
 }
 
-export function rowMenu({ state }: MenuActions, rows: readonly number[]): MenuItem[] {
+export function rowMenu(actions: MenuActions, rows: readonly number[]): MenuItem[] {
+  const { state } = actions;
   let cached: RowSnapshot[] | null = null;
   const snapshots = (): RowSnapshot[] => {
     cached ??= rows.map((r) => rowSnapshot(state, r));
@@ -87,6 +129,15 @@ export function rowMenu({ state }: MenuActions, rows: readonly number[]): MenuIt
           run: () => copyText(rowsToJson(snapshots())),
         },
       ],
+    },
+    { type: 'separator' },
+    {
+      type: 'item',
+      id: 'delete-row',
+      label: rows.length > 1 ? 'Delete rows' : 'Delete row',
+      icon: 'trash',
+      danger: true,
+      run: () => actions.deleteRows(rows),
     },
   ];
 }

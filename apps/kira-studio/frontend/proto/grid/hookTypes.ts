@@ -1,14 +1,7 @@
 // Shape of `window.__kiraGridProto`, shared by the debug hook and the Playwright helper
 // (apps/kira-studio/tests/proto/support/grid.ts). Pure types: no DOM, Vue or cheetah imports.
 
-export interface ViewportRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface HookSelection {
+interface HookSelection {
   kind: 'cell' | 'range' | 'row' | 'column' | 'all' | null;
   /** Page rows, ascending. */
   rows: number[];

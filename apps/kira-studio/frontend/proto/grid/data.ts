@@ -25,6 +25,8 @@ export interface ProtoParams {
   width: number | null;
   height: number | null;
   zebra: boolean;
+  /** `?readonly=1`: every edit is vetoed, as for a table without a primary key. */
+  readOnly: boolean;
 }
 
 export function readParams(search: string): ProtoParams {
@@ -39,6 +41,7 @@ export function readParams(search: string): ProtoParams {
     width: num('w'),
     height: num('h'),
     zebra: q.get('zebra') === '1',
+    readOnly: q.get('readonly') === '1',
   };
 }
 
@@ -87,6 +90,10 @@ function findMatches(rows: (string | null)[][], columns: ColumnDescriptor[]): nu
 
 export function createProtoData(fixture: Fixture): ProtoData {
   const columns = wideColumns(NCOLS);
+  if (fixture === 'features') {
+    const generated = columns.find((c) => c.name === 'updated_at');
+    if (generated) generated.generated = true;
+  }
   const rows = wideRows(NCOLS, ROWS);
   const features = fixture === 'features';
   if (features) featureRows(rows, columns);

@@ -1,9 +1,9 @@
 import { categoryForTypeClass } from '../../src/theme/icons';
 import { alignmentFor } from '../../src/views/shared/page/columns';
 import { type CellContext, ColumnBase, type DrawCellInfo, type Rect } from './cheetahTypes';
-import type { ProtoCellView } from './data';
+import { railOf } from './pending';
 import { EDGE_BOTTOM, EDGE_LEFT, EDGE_RIGHT, EDGE_TOP, edgesOf, rowSelected } from './selection';
-import { HEADER_ROWS, type ProtoState } from './state';
+import { HEADER_ROWS, type ProtoState, type ProtoView, pageRowOf } from './state';
 import type { Palette } from './theme';
 
 // Draw geometry, in CSS px. NAV_RESERVE is the left strip a FK/PK glyph owns (C11 T9 asserts the
@@ -63,12 +63,16 @@ export class CellColumn extends ColumnBase {
   ): void {
     const state = this.state;
     const p = state.palette;
-    const view = value as ProtoCellView;
+    const view = value as ProtoView;
+    const pageRow = pageRowOf(state, context.row - HEADER_ROWS);
     info.drawCellBase();
+    if (view.staged) fillTint(context, p.warn);
+    const deleted = state.deleted.size > 0 && state.deleted.has(pageRow);
 
     let text = view.text;
     let font = p.font;
     let color = categoryColor(p, this.colorKind);
+    if (deleted) color = p.fgSubtle;
     if (view.isNull) {
       text = 'NULL';
       font = p.fontItalic;
@@ -100,11 +104,27 @@ export class CellColumn extends ColumnBase {
         ctx.fillText(ELLIPSIS, x + ctx.measureText(text).width + 4, midY);
       }
     }
+    if (deleted && !view.isNull) {
+      const width = ctx.measureText(text).width;
+      const x = this.right ? rect.right - PAD_X - width : rect.left + PAD_X + navPad;
+      ctx.fillStyle = p.fgSubtle;
+      ctx.fillRect(x, midY, width, 1);
+    }
     if (navPad > 0) drawNavGlyph(ctx, rect.left + 6, midY, this.nav as NavKind, p.fgMuted);
     const edges = edgesOf(state.selection.sel, context.row - HEADER_ROWS, context.col - 1);
     if (edges !== 0) drawEdges(ctx, rect, edges, p.focus);
     ctx.restore();
   }
+}
+
+function fillTint(context: CellContext, color: string): void {
+  const rect = context.getRect();
+  const ctx = context.getContext();
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = color;
+  ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+  ctx.restore();
 }
 
 function drawEdges(ctx: CanvasRenderingContext2D, rect: Rect, edges: number, color: string): void {
@@ -188,7 +208,17 @@ export class GutterColumn extends ColumnBase {
     ctx.fillStyle = p.fgSubtle;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(value), rect.right - PAD_X, rect.top + rect.height / 2);
+    const pageRow = pageRowOf(this.state, context.row - HEADER_ROWS);
+    const rail = railOf(this.state, pageRow);
+    ctx.fillText(
+      rail === 'inserted' ? '+' : String(value),
+      rect.right - PAD_X,
+      rect.top + rect.height / 2,
+    );
+    if (rail) {
+      ctx.fillStyle = rail === 'inserted' ? p.ok : rail === 'deleted' ? p.error : p.warn;
+      ctx.fillRect(rect.left, rect.top, 3, rect.height);
+    }
     ctx.restore();
   }
 }
