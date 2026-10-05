@@ -3647,11 +3647,11 @@ and `docs/v2.0/plans/`.
   `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `adeagent` `finish_step` server, the
   `Tracker`, log sink, session store). It calls `Recover()` then `Start()`, and installs
   `board.OnTUIStopped` as the tracker's stopped handler.
-- `bridge.AdeTaskService` binds 47 methods (`grep -c '^func (s \*AdeTaskService)'`; 47 `adeTask*` entries
+- `bridge.AdeTaskService` binds 53 methods (`grep -c '^func (s \*AdeTaskService)'`; 53 `adeTask*` entries
   in `frontend/src/bridge/index.ts`). Push channels (`bridge/adewire/channels.go`): `kira:adetask:` +
   `board`, `backlog`, `workflows`, `repos`, `runs`, `log`, `sessions`, `credential` (focused window)
   and `open-session` (`EmitTo` one window).
-- `bridge/adewire` is the frozen wire contract; `tests/fixtures/ade-v2/` holds 23 fixtures decoded by
+- `bridge/adewire` is the frozen wire contract; `tests/fixtures/ade-v2/` holds 28 fixtures decoded by
   `adewire/wire_test.go` and the mock runtime. `layeringtest.RunAllowing` admits `adewire`.
 
 ### Storage
@@ -3660,6 +3660,7 @@ and `docs/v2.0/plans/`.
   `ade_repo_integration`, `ade_repo_envs`, `ade_folders`, `ade_worktree_setup`, `ade_workflow_last_valid`.
   `0009`: `ade_branch_marks`, `ade_env_state`. `0010`: `ade_logs`, `ade_log_chunks`, `ade_sessions` rebuilt.
   `0011`: drops the six v1 tables and rebuilds `ade_sessions` v2-only.
+  `0012`: `ade_sessions.purpose`, `ade_review_windows`, `ade_gh_synced`.
 - Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
   writes batched every 250 ms.
 - Per-repo prepare timeout is the `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
@@ -3756,6 +3757,29 @@ and `docs/v2.0/plans/`.
   (no dialog). Notes use TipTap (`notes/`). The fix menu uses the shared context-menu primitive (R20).
 - Colours: `ade/v2/tones.ts` and `palette.ts` are dark-only; `scripts/check-ade-colours.sh` (in
   `bun run lint`) fails any other colour literal under `ade/`.
+
+### Review code (P150)
+
+- Per-branch **Review code** button opens an ephemeral Wails window (`?window=<key>`, `OpenReviewWindow`;
+  second call returns `false`). `main.ts` decides `ReviewWindowTarget` at boot. Rows live in
+  `ade_review_windows`; never restored on relaunch, purged at boot (`purgeReviewWindows`). `closeDecision`
+  keeps main from closing while a review window is open.
+- Three panes: git-ui `view: 'review'` files (`reviewFilter: 'needsReview'`, `onReviewMarked`), diff tabs,
+  review agent panel. The files pane calls `ensureRepoOpen` first: the git socket needs `repo.open` on its
+  connection.
+- Since-review: the `review_session` is pinned (`SetPinned`, gitreview `0003`) so rebases cannot drop the
+  reviewed blobs. The diff's left side is the stored snapshot (`review.snapshot`), not a git ref. A renamed
+  unchanged file keeps its review.
+- Review agent: one interactive TUI session per task, row `purpose = 'review'` (unique per task), stage id
+  `review`, cwd the first created branch's worktree, other branches via `--add-dir`. Stopped row resumes
+  with `--resume` and the same `claudeSessionId`. Recorded cwd gone: old row loses `purpose`, a new one
+  launches. `TakeOver` of the row goes through `launchReviewAgent`. Questions paste bracketed through
+  `Tracker.Send`; Send is disabled while the agent waits on input.
+- GitHub sync, one way, `gh` only: `GitHubSyncPlan` decides per file (`ghSyncDecision`), `Apply` marks with
+  one aliased `markFileAsViewed` mutation (`gh api graphql`). `ade_gh_synced` records files this app
+  marked. Un-reviewing one fires `unmarkFileAsViewed` server side through the unmark observer
+  (`SetObserver`), for ledger files only. Partial reviews never sync.
+- Monaco objects stay in `shallowRef` (`useDiffEditor`): a deep `ref` hangs the page.
 
 ### Tests
 
@@ -4245,7 +4269,9 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
 - **Settings leaf `ade.allAgentsFilter` is dead (P149).** Nothing writes or reads it in v2; the All sessions toggle keeps a local `running`/`stopped` ref (R19). Removing it changes the settings model, bindings and schema: SPEC row P155. Delete once removed.
 - **Held fix runs lose their resume spec across restart (P147).** `runOpts` live in memory; a held `back:<step>` run relaunches as a plain fresh attempt after `Recover()`. Closing it needs a run-row column (migration): SPEC row P156. Delete once the spec persists on the run row.
-- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build.
+- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
+- **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
+- **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's

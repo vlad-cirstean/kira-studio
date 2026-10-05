@@ -346,6 +346,12 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
   that `hooks.json` with the same env.
 - **The server-tag build drops terminal output**: `EmitTo(windowKey)` needs a native window
   (`internal/shell/wails.go`), so a TUI tab stays blank. Sessions, hooks and the DB still work.
+- **A fake `gh` or `claude` needs a `HOME` override** (P150). PTY login shells reorder `PATH`, so a prefix
+  set in the server's env is lost. Point `HOME` at a dir whose `.bash_profile` prepends the fake bin dir,
+  then confirm with `/proc/<pid>/cmdline`. Discovery uses `exec.LookPath` for `gh`.
+- **Review smoke seeding** (P150): `code_repos.repo_id` is the repo path; copy sample workflows into
+  `<home>/workflows`; task rows need `current_stage_json`. To patch git discovery without touching source,
+  build with a `-overlay` JSON replacing the discovery file.
 - **In harness scripts never `pkill -f` or `pgrep -f` a pattern that appears in your own command line**
   (e.g. `claude --session-id`): it kills the calling shell. Anchor it (`pgrep -f '^claude --session-id'`).
 

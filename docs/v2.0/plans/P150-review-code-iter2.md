@@ -494,4 +494,43 @@ result unless a desktop build is available.
 
 ## Result
 
-(Implementer fills this in.)
+Commits on `v2.0` after the plan `8728967c`: `78ae1e85` contract, `3ade5a29` pin and snapshot reads,
+`81212f81` ephemeral windows, `617f52b6` review windows, `7e58761a` review agent, `fcef1cc3` GitHub sync,
+`c3efaedc` git-ui review base/filter/mark hook, `002ffed3` since-review diff, `bc99bb7c` window shell,
+`6af00b2f` agent panel, `93733ba5` sync UI, `f0b70709` contract-42 chunk fixture, `56464452` Review code
+button, `680fdcbc` git-ui `setTarget(open)`, `53870ffa` UI specs, `d297331d` smoke fixes, `4d1d5429`
+gocognit/prealloc refactors, `7e19759d`, `487dd031` UI spec fixes, `d3b196ad` knip. No `--no-verify`.
+
+**Drift and deviations:**
+- Commit 2 (`3ade5a29`) shipped with a bridge test red; fixed in commit 4 (`617f52b6`).
+- git-ui `ReviewTarget` gained `pane?`; `setTarget(repoId, branch, {base, pane})` and `open` so the window
+  resolves once (`680fdcbc`).
+- A single-line reference renders `L<n>`, not `L<n>-<n>`.
+- Step 4 listed 2 files after the rewrite, not 1 (the amended file and the one never reviewed).
+- Sync reason for a rewritten, reviewed file is `differsFromPrHead`, not `changedSinceReview`.
+- `useDiffEditor` (shared) now holds Monaco objects in `shallowRef`: a deep `ref` hung the page.
+- The sessions fixture review session `rv01` is stopped, so two UI specs count it (`487dd031`).
+
+**Bugs the smoke found (`d297331d`):** `repository not open` (git socket needs `repo.open`; files pane now
+calls `ensureRepoOpen`); page freeze (Monaco in a deep `ref`); tab strip filled the centre column.
+
+**§9.3 outcome:** 1 built and seeded; 2 fake `gh`/`claude` ran only with a `HOME` override (login shell
+reorders `PATH`), `/proc/<pid>/cmdline` showed the fake; 3 `OpenReviewWindow` true then false, rows and pin
+present; 4 three panes, 3 files listed, after rewrite 2 listed, left side equals stored snapshot; 5 fake
+`claude` log shows bracketed paste then `\r`, `--add-dir`, `--resume` same row and `claudeSessionId`,
+`LaunchStage` on `review` reuses the row; 6 plan lists `mark`, skip, `notReviewed`; apply logs one aliased
+`markFileAsViewed` and writes the ledger; un-review logs `unmarkFileAsViewed` and drops the row; rename keeps
+review; 7 no record kept of a restart check: `purgeReviewWindows` runs at boot (`main.go`), unobserved live.
+Native close/hide wiring unobserved (server build); `closeDecision` test covers the rule.
+
+**V2/V3:** both unobserved (no Claude login; no authenticated `gh`). Known open items added.
+
+**Suites (final tip):** `go build`, `go vet`, `bun run lint:go` 0 issues, `go test ./...` pass,
+`lint:all` pass, `test:unit` 1765 pass, `test:ui:space` 158 pass before two spec count fixes (3 failed,
+fixed, rerun green), `test:webview` 60 pass, `test:visual:space` 4 pass, `test:visual:studio` 14 pass.
+
+**Test files touched (for P154):** `tests/ui/ade-v2-review.spec.ts` (new), `ade-v2-sessions.spec.ts`,
+`ade-v2-needs.spec.ts`, `tests/ui/fixtures.ts`, `tests/ui/support/{ipcChannels,mockRuntime}.ts`,
+`tests/unit/ade-v2-dialog.spec.ts`, `tests/fixtures/ade-v2/*`.
+
+**`codegraph_explore`:** 7 calls in this implementer's transcript.
