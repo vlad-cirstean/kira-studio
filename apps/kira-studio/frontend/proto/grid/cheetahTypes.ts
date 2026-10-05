@@ -51,3 +51,26 @@ export interface CheetahDataSource {
 
 export const ColumnBase: new () => CellDrawer = columns.type.Column;
 export const DataSource: new (source: RecordSource<unknown>) => CheetahDataSource = data.DataSource;
+
+export interface CellAddress {
+  col: number;
+  row: number;
+}
+
+export interface InlineEditorGrid {
+  doGetCellValue(col: number, row: number, callback: (value: unknown) => void): boolean;
+}
+
+export interface InlineEditorOptions {
+  readOnly?: (record: unknown) => boolean;
+  classList?: string[];
+}
+
+export interface InlineEditorShape {
+  onInputCellInternal(grid: InlineEditorGrid, cell: CellAddress, value: string): void;
+  onOpenCellInternal(grid: InlineEditorGrid, cell: CellAddress): void;
+  clone(): InlineEditorShape;
+}
+
+export const InlineInputEditorBase: new (options?: InlineEditorOptions) => InlineEditorShape =
+  columns.action.InlineInputEditor;
