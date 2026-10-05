@@ -43,6 +43,9 @@ type WindowOpenerDeps struct {
 	Terminal   *terminal.Registry
 	Repo       WindowRepo
 	Cfg        Config
+	// Ephemeral reports windows that are never restored on relaunch and never count as the last
+	// window (P150 review windows). nil = none.
+	Ephemeral func(key string) bool
 }
 
 // OpenWindow opens one workbench from an already-persisted record and registers it — the one path
@@ -71,12 +74,20 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 	}
 	win := d.App.Window.NewWithOptions(Options(Harden(), rec, primaryWorkArea, d.Cfg))
 	detach := Attach(win, d.WindowDeps, rec.Key)
-	d.Windows.Add(rec.Key, win, detach)
+	ephemeral := d.Ephemeral != nil && d.Ephemeral(rec.Key)
+	if ephemeral {
+		d.Windows.AddEphemeral(rec.Key, win, detach)
+	} else {
+		d.Windows.Add(rec.Key, win, detach)
+	}
 	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
 	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is
 	// still counted (RemoveAndCount, below, is what removes it, and only once a real Close()
 	// actually goes through), so `== 1` means "I am the only one left".
-	AttachCloseFlush(win, rec.Key, d.CloseFlush, func() bool { return d.Windows.Count() == 1 })
+	AttachCloseFlush(win, rec.Key, d.CloseFlush, func() bool {
+		hide, _ := closeDecision(ephemeral, d.Windows.OthersReal(rec.Key))
+		return hide
+	})
 	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
 		// A window that closes mid-quit-handshake without ever acking through the flush channel is
 		// removed from the pending set here rather than being waited out for the full timeout
@@ -86,7 +97,7 @@ func OpenWindow(d WindowOpenerDeps, rec WindowRecord) {
 		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when
 		// the renderer never gets to ack.
 		d.Terminal.CloseWindow(rec.Key)
-		if d.Windows.RemoveAndCount(rec.Key) > 0 {
+		if d.Windows.RowDecision(rec.Key) {
 			if err := d.Repo.Delete(rec.Key); err != nil {
 				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
 			}

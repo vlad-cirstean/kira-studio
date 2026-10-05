@@ -8,8 +8,9 @@ import (
 
 // windowEntry is one open window's live handle plus its shell.Attach cleanup.
 type windowEntry struct {
-	win    *application.WebviewWindow
-	detach func()
+	win       *application.WebviewWindow
+	detach    func()
+	ephemeral bool
 }
 
 // WindowRegistry tracks every currently open window by its key (P8 C2). Window creation runs on
@@ -33,6 +34,39 @@ func (r *WindowRegistry) Add(key string, win *application.WebviewWindow, detach 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.entries[key] = windowEntry{win: win, detach: detach}
+}
+
+// AddEphemeral registers a window that is never restored on relaunch (P150 review windows): it
+// does not count toward Count and RemoveAndCount, so it never keeps the last real window open and
+// is never the one that hides instead of closing.
+func (r *WindowRegistry) AddEphemeral(key string, win *application.WebviewWindow, detach func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries[key] = windowEntry{win: win, detach: detach, ephemeral: true}
+}
+
+// Close asks key's window to close through its normal WindowClosing hooks. false for an unknown key.
+func (r *WindowRegistry) Close(key string) bool {
+	r.mu.Lock()
+	e, ok := r.entries[key]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+	e.win.Close()
+	return true
+}
+
+// SetTitle retitles key's window. false for an unknown key.
+func (r *WindowRegistry) SetTitle(key, title string) bool {
+	r.mu.Lock()
+	e, ok := r.entries[key]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+	e.win.SetTitle(title)
+	return true
 }
 
 // DetachAll runs every registered window's detach exactly once. This is beforeFlush's whole job:
@@ -62,7 +96,37 @@ func (r *WindowRegistry) DetachAll() {
 func (r *WindowRegistry) Count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return len(r.entries)
+	return r.realLocked()
+}
+
+func (r *WindowRegistry) realLocked() int {
+	n := 0
+	for _, e := range r.entries {
+		if !e.ephemeral {
+			n++
+		}
+	}
+	return n
+}
+
+// OthersReal reports how many non-ephemeral windows besides key are registered.
+func (r *WindowRegistry) OthersReal(key string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := r.realLocked()
+	if e, ok := r.entries[key]; ok && !e.ephemeral {
+		n--
+	}
+	return n
+}
+
+// closeDecision: an ephemeral window always closes for real and drops its row. A real window hides
+// instead of closing, keeping its row, only when no other real window remains (D14).
+func closeDecision(isEphemeral bool, otherRealWindows int) (hide, deleteRow bool) {
+	if isEphemeral {
+		return false, true
+	}
+	return otherRealWindows == 0, otherRealWindows > 0
 }
 
 // Focus brings key's own window to the front — AdeTaskService.FocusSession's own cross-window Open
@@ -113,15 +177,31 @@ func (r *WindowRegistry) Keys() []string {
 // from the result: only the close that empties the registry keeps that window's `windows` row
 // (so a later Dock click restores the same workbench); every other close deletes its row.
 func (r *WindowRegistry) RemoveAndCount(key string) (remaining int) {
+	_, remaining, _ = r.removeAndCount(key)
+	return remaining
+}
+
+func (r *WindowRegistry) removeAndCount(key string) (wasEphemeral bool, remaining int, found bool) {
 	r.mu.Lock()
 	e, ok := r.entries[key]
 	if ok {
 		delete(r.entries, key)
 	}
-	remaining = len(r.entries)
+	remaining = r.realLocked()
 	r.mu.Unlock()
 	if ok {
 		e.detach()
 	}
-	return remaining
+	return e.ephemeral, remaining, ok
+}
+
+// RowDecision unregisters key and reports whether its windows row should be deleted
+// (closeDecision's deleteRow). An unknown key reports false, like RemoveAndCount's no-op.
+func (r *WindowRegistry) RowDecision(key string) bool {
+	eph, remaining, found := r.removeAndCount(key)
+	if !found {
+		return false
+	}
+	_, del := closeDecision(eph, remaining)
+	return del
 }
