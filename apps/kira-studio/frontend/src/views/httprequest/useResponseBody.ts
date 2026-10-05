@@ -1,11 +1,10 @@
 import type { HttpResponseView } from '@shared/domain/http';
 import { useTimeoutFn } from '@vueuse/core';
 import { computed, type Ref, ref, shallowRef, watch } from 'vue';
-import { formatBodyInWorker } from './prettyBody';
-import { formatBody, type PrettyFormat, type PrettyResult } from './prettyBodyCore';
+import { INLINE_CHARS, parseInline } from '../../workers/parse/client';
+import type { PrettyFormat, PrettyResult } from '../../workers/parse/protocol';
+import { useParseWorker } from '../../workers/parse/useParseWorker';
 
-// Bodies up to this size format inline: a worker round trip would only add a pending flash.
-const SYNC_BODY_CHARS = 65_536;
 // Show the "Formatting…" caption only for waits long enough to notice.
 const CAPTION_DELAY_MS = 200;
 
@@ -23,6 +22,7 @@ export function useResponseBody(response: Ref<BodySource | null>, view: Ref<Http
   const format = ref<PrettyFormat | null | undefined>(undefined);
   const text = shallowRef<string | null>(null);
   const slow = ref(false);
+  const parse = useParseWorker();
   let seq = 0;
 
   const { start: startCaptionTimer, stop: stopCaptionTimer } = useTimeoutFn(
@@ -44,15 +44,21 @@ export function useResponseBody(response: Ref<BodySource | null>, view: Ref<Http
     const id = ++seq;
     slow.value = false;
     stopCaptionTimer();
-    if (body.length <= SYNC_BODY_CHARS) {
-      apply(formatBody(body, wantText));
+    const input = { body, wantText };
+    if (body.length <= INLINE_CHARS) {
+      apply(parseInline('body.format', input));
       return;
     }
     startCaptionTimer();
-    void formatBodyInWorker(body, wantText)
-      .catch(() => (id === seq ? formatBody(body, wantText) : null))
+    parse
+      .runLatest('body', 'body.format', input)
       .then((r) => {
-        if (r && id === seq) apply(r);
+        if (id === seq) apply(r);
+      })
+      .catch((e) => {
+        if (id === seq && !(e instanceof DOMException && e.name === 'AbortError')) {
+          apply({ format: null });
+        }
       });
   }
 

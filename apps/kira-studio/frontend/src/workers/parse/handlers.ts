@@ -1,17 +1,5 @@
 import { beautifyJson, beautifyXml } from '../../beautify';
-
-export type PrettyFormat = 'json' | 'xml';
-
-export interface PrettyRequest {
-  id: number;
-  body: string;
-  wantText: boolean;
-}
-
-export interface PrettyResult {
-  format: PrettyFormat | null;
-  text?: string;
-}
+import type { JobInput, JobKind, JobOutput, PrettyResult } from './protocol';
 
 /** One parse per body: detects the format and, when asked, returns the pretty text from that same parse. */
 export function formatBody(body: string, wantText: boolean): PrettyResult {
@@ -25,3 +13,17 @@ export function formatBody(body: string, wantText: boolean): PrettyResult {
   if (!xml.ok) return { format: null };
   return wantText ? { format: 'xml', text: xml.text } : { format: 'xml' };
 }
+
+type Handler<K extends JobKind> = (input: JobInput<K>) => JobOutput<K> | Promise<JobOutput<K>>;
+
+/** Shared by the worker and the client's inline paths, so both run the same code. */
+export const handlers = {
+  'body.format': ({ body, wantText }) => formatBody(body, wantText),
+  'json.beautify': ({ text, mode }) => beautifyJson(text, mode),
+  'xml.beautify': ({ text, mode }) => beautifyXml(text, mode),
+} satisfies { [K in JobKind]: Handler<K> };
+
+/** Kinds whose handler is synchronous, so `parseInline` can run them in the caller's tick. */
+export type SyncKind = {
+  [K in JobKind]: ReturnType<(typeof handlers)[K]> extends Promise<unknown> ? never : K;
+}[JobKind];
