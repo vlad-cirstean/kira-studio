@@ -1,8 +1,9 @@
 import { categoryForTypeClass } from '../../src/theme/icons';
 import { alignmentFor } from '../../src/views/shared/page/columns';
-import { type CellContext, ColumnBase, type DrawCellInfo } from './cheetahTypes';
+import { type CellContext, ColumnBase, type DrawCellInfo, type Rect } from './cheetahTypes';
 import type { ProtoCellView } from './data';
-import type { ProtoState } from './state';
+import { EDGE_BOTTOM, EDGE_LEFT, EDGE_RIGHT, EDGE_TOP, edgesOf, rowSelected } from './selection';
+import { HEADER_ROWS, type ProtoState } from './state';
 import type { Palette } from './theme';
 
 // Draw geometry, in CSS px. NAV_RESERVE is the left strip a FK/PK glyph owns (C11 T9 asserts the
@@ -100,8 +101,33 @@ export class CellColumn extends ColumnBase {
       }
     }
     if (navPad > 0) drawNavGlyph(ctx, rect.left + 6, midY, this.nav as NavKind, p.fgMuted);
+    const edges = edgesOf(state.selection.sel, context.row - HEADER_ROWS, context.col - 1);
+    if (edges !== 0) drawEdges(ctx, rect, edges, p.focus);
     ctx.restore();
   }
+}
+
+function drawEdges(ctx: CanvasRenderingContext2D, rect: Rect, edges: number, color: string): void {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (edges & EDGE_TOP) {
+    ctx.moveTo(rect.left, rect.top + 0.5);
+    ctx.lineTo(rect.right, rect.top + 0.5);
+  }
+  if (edges & EDGE_BOTTOM) {
+    ctx.moveTo(rect.left, rect.bottom - 0.5);
+    ctx.lineTo(rect.right, rect.bottom - 0.5);
+  }
+  if (edges & EDGE_LEFT) {
+    ctx.moveTo(rect.left + 0.5, rect.top);
+    ctx.lineTo(rect.left + 0.5, rect.bottom);
+  }
+  if (edges & EDGE_RIGHT) {
+    ctx.moveTo(rect.right - 1.5, rect.top);
+    ctx.lineTo(rect.right - 1.5, rect.bottom);
+  }
+  ctx.stroke();
 }
 
 function drawNavGlyph(
@@ -149,7 +175,8 @@ export class GutterColumn extends ColumnBase {
     info: DrawCellInfo,
   ): void {
     const p = this.state.palette;
-    info.drawCellBg({ bgColor: p.bgChrome });
+    const selected = rowSelected(this.state.selection.sel, context.row - HEADER_ROWS);
+    info.drawCellBg({ bgColor: selected ? p.select : p.bgChrome });
     info.drawCellBorder();
     const rect = context.getRect();
     const ctx = context.getContext();

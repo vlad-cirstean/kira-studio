@@ -4,7 +4,7 @@ import { columns, data } from 'cheetah-grid';
 // `data_d_exports` without declaring them, so `columns`, `headers` and `data` resolve to `any`.
 // These are the minimal shapes this prototype relies on, checked at runtime by the specs.
 
-interface Rect {
+export interface Rect {
   left: number;
   top: number;
   right: number;
