@@ -339,6 +339,15 @@ temp `KIRA_SPACE_HOME`, `WAILS_SERVER_HOST=127.0.0.1`.
 - **`claude -p` blocks a standalone `sleep N` and backgrounds it**, so the run ends `ended without
   finish_step`. A live-run step that must stay running prompts `until [ -f <flag> ]; do sleep 2; done`.
   Kill leftover `claude` TUI processes after a run.
+- **An interactive `claude` cannot sign in here** (P149, 2.1.289): a fresh TUI stops at the theme picker,
+  then the login menu. `claude -p` works. To exercise the Stop hook path, read the launched process's
+  `/proc/<pid>/environ` (`KIRA_AGENT_HOOK_TOKEN`, `KIRA_TERMINAL_ID`) and argv (`--settings <hooks.json>`),
+  then pipe `{"hook_event_name":"Stop","session_id":"<id>","cwd":"<cwd>"}` into the `hook` shim next to
+  that `hooks.json` with the same env.
+- **The server-tag build drops terminal output**: `EmitTo(windowKey)` needs a native window
+  (`internal/shell/wails.go`), so a TUI tab stays blank. Sessions, hooks and the DB still work.
+- **In harness scripts never `pkill -f` or `pgrep -f` a pattern that appears in your own command line**
+  (e.g. `claude --session-id`): it kills the calling shell. Anchor it (`pgrep -f '^claude --session-id'`).
 
 ## Playwright UI tier — `webkit` needs fetching explicitly
 
