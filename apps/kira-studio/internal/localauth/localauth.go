@@ -71,8 +71,25 @@ type Authorizer struct {
 	evaluate  EvaluateFunc
 	available AvailableFunc
 
+	// evalMu serialises prompts: a second reveal arriving while one prompt is up waits, then
+	// reuses its grant instead of stacking another OS sheet.
+	evalMu sync.Mutex
+
 	mu       sync.Mutex
 	deadline time.Time // zero value = no live grant
+}
+
+// graceLive reports whether a grant is still inside GraceWindow. It requires both the monotonic
+// and the wall clock to agree: Go's monotonic clock can stop while the machine sleeps (macOS), so
+// monotonic alone would let a grant outlive its window across a lid-close.
+func (a *Authorizer) graceLive() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.deadline.IsZero() {
+		return false
+	}
+	now := a.now()
+	return now.Before(a.deadline) && now.Round(0).Before(a.deadline.Round(0))
 }
 
 // New constructs an Authorizer and logs its availability once, the same "probe once, log once at
@@ -104,10 +121,7 @@ func boolString(b bool) string {
 // — on a machine where LocalAuthentication actually works, this argument cannot influence the
 // result, so a renderer cannot skip a real prompt by simply lying about having already shown one.
 func (a *Authorizer) Authorize(reason string, confirmed bool) (Outcome, error) {
-	a.mu.Lock()
-	live := !a.deadline.IsZero() && a.now().Before(a.deadline)
-	a.mu.Unlock()
-	if live {
+	if a.graceLive() {
 		return Granted, nil
 	}
 
@@ -119,6 +133,12 @@ func (a *Authorizer) Authorize(reason string, confirmed bool) (Outcome, error) {
 			return Granted, nil
 		}
 		return Unavailable, nil
+	}
+
+	a.evalMu.Lock()
+	defer a.evalMu.Unlock()
+	if a.graceLive() {
+		return Granted, nil // a prompt that finished while this call waited
 	}
 
 	outcome, err := a.evaluate(reason)

@@ -2,6 +2,8 @@ package localauth_test
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,5 +155,30 @@ func mustAuthorize(t *testing.T, a *localauth.Authorizer, confirmed bool, want l
 	}
 	if out != want {
 		t.Fatalf("Authorize(confirmed=%t) = %v, want %v", confirmed, out, want)
+	}
+}
+
+// TestConcurrentAuthorizePromptsOnce is P168 Part 2 F5: reveals racing outside the grace window
+// share one OS prompt.
+func TestConcurrentAuthorizePromptsOnce(t *testing.T) {
+	var calls atomic.Int32
+	evaluate := func(string) (localauth.Outcome, error) {
+		calls.Add(1)
+		time.Sleep(50 * time.Millisecond)
+		return localauth.Granted, nil
+	}
+	a := localauth.New(func() time.Time { return time.Unix(0, 0) }, evaluate, alwaysAvailable)
+
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mustAuthorize(t, a, false, localauth.Granted)
+		}()
+	}
+	wg.Wait()
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("evaluate called %d times, want 1", got)
 	}
 }
