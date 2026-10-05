@@ -36,9 +36,31 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-// checkEstExtends guards an estimate patch: once set, it may only grow, same unit (h or d).
+// MaxEstHours and MaxEstDays bound an estimate: a longer one makes the Plan span thousands of days.
+const (
+	MaxEstHours = 480
+	MaxEstDays  = 60
+)
+
+// EstOverCap reports an estimate above the bound.
+func EstOverCap(est string) bool {
+	if est == "" {
+		return false
+	}
+	n, err := strconv.ParseFloat(est[:len(est)-1], 64)
+	if err != nil {
+		return false
+	}
+	if est[len(est)-1] == 'h' {
+		return n > MaxEstHours
+	}
+	return n > MaxEstDays
+}
+
+// checkEstExtends guards an estimate patch: once set, it may only grow, same unit (h or d). An
+// estimate stored above the cap may be replaced by any valid one, so a typo is recoverable.
 func checkEstExtends(old, next string) error {
-	if old == "" {
+	if old == "" || EstOverCap(old) {
 		return nil
 	}
 	if next == "" || next[len(next)-1] != old[len(old)-1] {

@@ -31,7 +31,11 @@ watch(parsed, (next) => {
   extendBy.value = '';
 });
 
-const locked = computed(() => props.est !== '');
+const MAX_EST = { h: 480, d: 60 };
+// An estimate stored above the cap unlocks so a typo can be replaced.
+const locked = computed(
+  () => props.est !== '' && !(Number.parseFloat(parsed.value.num) > MAX_EST[parsed.value.unit]),
+);
 
 function commit(): void {
   const numStr = String(num.value).trim();

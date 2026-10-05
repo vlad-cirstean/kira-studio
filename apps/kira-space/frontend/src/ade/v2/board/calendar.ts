@@ -28,6 +28,9 @@ const DAY_MS = 86_400_000;
 // §0.7: estimates from settings, not constants
 // -------------------------------------------------------------------------------------------------
 
+/** Cap on a task's span; an older stored estimate can exceed the bound the API now enforces. */
+export const MAX_SPAN_DAYS = 60;
+
 export function parseEst(
   raw: string,
   workdayHours: number,
@@ -42,14 +45,20 @@ export function parseEst(
   const unit = m[2];
   if (unit === 'm') return { hours: n / 60, days: 1 };
   if (unit === 'h') {
-    return { hours: n, days: Math.max(1, Math.ceil(n / workdayHours - 1e-9)) };
+    return {
+      hours: n,
+      days: Math.min(MAX_SPAN_DAYS, Math.max(1, Math.ceil(n / workdayHours - 1e-9))),
+    };
   }
   if (unit === 'd') {
-    const days = Math.max(1, Math.ceil(n));
-    return { hours: days === 1 ? workdayHours : days * workdayHours * spanDayShare, days };
+    const days = Math.min(MAX_SPAN_DAYS, Math.max(1, Math.ceil(n)));
+    return {
+      hours: days === 1 ? workdayHours : days * workdayHours * spanDayShare,
+      days,
+    };
   }
   // 'w'
-  const days = Math.max(1, Math.ceil(n * 5));
+  const days = Math.min(MAX_SPAN_DAYS, Math.max(1, Math.ceil(n * 5)));
   return { hours: days * workdayHours * spanDayShare, days };
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
@@ -79,6 +80,9 @@ func validateAdeEst(est string) error {
 	}
 	if !adeEstRe.MatchString(est) {
 		return ipcerr.New("E_INVALID", "est is invalid")
+	}
+	if repos.EstOverCap(est) {
+		return ipcerr.New("E_INVALID", "est is too long: at most 480h or 60d")
 	}
 	return nil
 }
