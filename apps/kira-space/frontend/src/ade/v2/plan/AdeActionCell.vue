@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
+import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
-import type { BranchAction, Tone } from '../board/actions';
+import { type BranchAction, type Tone, tagLabel } from '../board/actions';
 import { actionStyle, solidStyle, tagStyle } from '../tones';
+import { usePlanModel } from './usePlanModel';
 
 // One cell of the left action column: the derived tag and, for a branch, its action buttons.
-defineProps<{
-  tag: { label: string; tone: Tone; tip: string };
+const props = defineProps<{
+  tag: { label: string; tone: Tone; tip: string; since?: number };
   tall?: boolean;
   actions?: readonly BranchAction[];
   /** The branch is being rebased: its Rebase button reads `Rebasing…` and is disabled. */
   rebasing?: boolean;
 }>();
+const { liveNow } = usePlanModel();
+const label = computed(() => tagLabel(props.tag, liveNow.value.getTime()));
 const emit = defineEmits<{ act: [action: BranchAction] }>();
 
 const STYLE: Record<BranchAction['kind'], () => Record<string, string>> = {
@@ -41,7 +45,7 @@ const TESTID: Record<BranchAction['kind'], string> = {
         class="box-border max-w-30 shrink truncate rounded-kira-sm px-[7px] py-0.5 text-kira-sm font-semibold"
         :style="tagStyle(tag.tone)"
         data-testid="ade-tag"
-        >{{ tag.label }}</span
+        >{{ label }}</span
       >
     </AdeTip>
     <AdeTip v-for="a in actions" :key="a.kind" :text="a.tip">

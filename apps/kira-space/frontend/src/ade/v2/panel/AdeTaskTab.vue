@@ -6,11 +6,11 @@ import { Switch } from '@theme/components/ui/switch';
 import { computed, ref, watch } from 'vue';
 import AdeChip from '../AdeChip.vue';
 import AdeTip from '../AdeTip.vue';
-import { STATUS_TONE } from '../board/actions';
+import { STATUS_TONE, tagLabel } from '../board/actions';
 import { integrationChips } from '../board/labels';
 import { statusWhy, taskPatch } from '../board/panelFacts';
 import { repoColor } from '../palette';
-import type { CardModel } from '../plan/usePlanModel';
+import { type CardModel, usePlanModel } from '../plan/usePlanModel';
 import { useAddTaskRepo, useRepos, useUpdateTask } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { TONE } from '../tones';
@@ -22,6 +22,7 @@ import { useLinkFields } from './useLinkFields';
 
 // Task tab: the editable fields, then the branches. Status is read-only (D10).
 const props = defineProps<{ card: CardModel }>();
+const { liveNow } = usePlanModel();
 
 const ui = useAdeBoardUiStore();
 const update = useUpdateTask();
@@ -211,7 +212,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
         :data-branch-id="row.id"
         @click="ui.selectBranch(task.id, row.id)"
       >
-        <AdeChip :label="row.tag.label" :tone="row.tag.tone" wide />
+        <AdeChip :label="tagLabel(row.tag, liveNow.getTime())" :tone="row.tag.tone" wide />
         <span
           class="shrink-0 rounded-kira-xs px-[5px] py-px font-data text-kira-sm font-semibold"
           :style="{ background: `${repoColor(row.branch.codeRepoId)}1f`, color: repoColor(row.branch.codeRepoId) }"

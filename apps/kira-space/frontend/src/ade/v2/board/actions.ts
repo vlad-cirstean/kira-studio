@@ -197,6 +197,12 @@ export interface BranchTag {
   tone: Tone;
   tip: string;
   actions: BranchAction[];
+  /** Start of a running setup; the label's elapsed time re-reads the clock (`tagLabel`). */
+  since?: number;
+}
+
+export function tagLabel(tag: { label: string; since?: number }, nowMs: number): string {
+  return tag.since === undefined ? tag.label : `⚙ preparing ${formatElapsed(nowMs - tag.since)}`;
 }
 
 export interface BranchTagInput {
@@ -254,13 +260,15 @@ const notCreated: Rule = (i) =>
 
 const preparing: Rule = (i) => {
   const s = i.branch.setup;
-  return s?.state === 'running'
-    ? tag(
-        `⚙ preparing ${formatElapsed(i.nowMs - s.startedAt)}`,
-        'blue',
-        'running the prepare-worktree script',
-      )
-    : null;
+  if (s?.state !== 'running') return null;
+  return {
+    ...tag(
+      `⚙ preparing ${formatElapsed(i.nowMs - s.startedAt)}`,
+      'blue',
+      'running the prepare-worktree script',
+    ),
+    since: s.startedAt,
+  };
 };
 
 const setupFailed: Rule = (i) =>

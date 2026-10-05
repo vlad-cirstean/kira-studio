@@ -72,7 +72,7 @@ export interface CardModel {
   /** Panel Workflow block: one per stage; empty for a review or parked task. */
   blocks: StageBlock[];
   status: DerivedStatus;
-  tag: { label: string; tone: BranchTag['tone']; tip: string } | null;
+  tag: { label: string; tone: BranchTag['tone']; tip: string; since?: number } | null;
   /** Task stage action; which kinds render is `useTaskAction`'s call. */
   action: TaskAction | null;
   /** `3d → Mon 28 · PAY-102 · api · web-app`. */
@@ -223,17 +223,20 @@ function buildPlanModel() {
   const codeReposStore = useCodeReposStore();
   const ui = useAdeBoardUiStore();
 
+  // The model reads the minute clock; `liveNow` also ticks per second while a setup runs, for the
+  // `⚙ preparing 3m 40s` label alone, so a running setup never rebuilds the whole model.
   const now = ref(new Date());
+  const liveNow = ref(now.value);
   useIntervalFn(() => {
     now.value = new Date();
+    liveNow.value = now.value;
   }, 60_000);
-  // `⚙ preparing 3m 40s` needs seconds: tick every second only while a setup runs.
   const setupRunning = computed(
     () => board.data.value?.branches.some((b) => b.setup?.state === 'running') ?? false,
   );
   const secondTick = useIntervalFn(
     () => {
-      now.value = new Date();
+      liveNow.value = new Date();
     },
     1000,
     { immediate: false },
@@ -336,7 +339,16 @@ function buildPlanModel() {
     };
   });
 
-  return { model, sessions, today, now, repoLabel, settings: planSettings, boardQuery: board };
+  return {
+    model,
+    sessions,
+    today,
+    now,
+    liveNow,
+    repoLabel,
+    settings: planSettings,
+    boardQuery: board,
+  };
 }
 
 /** Everything the Plan and the panel render, derived from the four cached queries and the view
