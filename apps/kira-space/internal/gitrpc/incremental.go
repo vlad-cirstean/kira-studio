@@ -123,3 +123,31 @@ func (r *Router) handleReviewMark(ctx context.Context, c *gitsession.Conn, param
 		},
 	)
 }
+
+func (r *Router) handleReviewSnapshot(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	return handleRepoCall(ctx, c, "review.snapshot", params,
+		func(p ReviewSnapshotParams) (string, error) {
+			if err := requireNonEmpty("review.snapshot", "repoId", p.RepoID, "path", p.Path); err != nil {
+				return "", err
+			}
+			if err := validRefArg("branch", p.Branch); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p ReviewSnapshotParams) (ReviewSnapshotResult, error) {
+			res, err := entry.ReviewSnapshot(ctx, p.Branch, p.Path)
+			if err != nil {
+				return ReviewSnapshotResult{}, mapDetailError(err)
+			}
+			raw, merr := json.Marshal(res)
+			if merr != nil {
+				return ReviewSnapshotResult{}, ipcerr.Internal(merr.Error())
+			}
+			if len(raw) > MaxResultBytes {
+				return ReviewSnapshotResult{Kind: "tooLarge", ReviewedAtSHA: res.ReviewedAtSHA}, nil
+			}
+			return res, nil
+		},
+	)
+}

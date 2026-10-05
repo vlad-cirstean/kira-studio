@@ -473,13 +473,9 @@ type ReviewSnapshotParams struct {
 	Path   string `json:"path"`
 }
 
-// ReviewSnapshotResult is review.snapshot's own result: Kind is "none" | "text" | "binary" |
-// "tooLarge" | "absent"; Text is set only for "text".
-type ReviewSnapshotResult struct {
-	Kind          string  `json:"kind"`
-	Text          *string `json:"text"`
-	ReviewedAtSha *string `json:"reviewedAtSha"`
-}
+// ReviewSnapshotResult is review.snapshot's own result: gitsession's wire-shaped type (Kind is
+// "none" | "text" | "binary" | "tooLarge" | "absent"; Text is set only for "text").
+type ReviewSnapshotResult = gitsession.ReviewSnapshotResult
 
 // ---------------------------------------------------------------------------------------
 // G13 — inline AI review comments (D1, D11). review.comment.list's own result is gitsession's own

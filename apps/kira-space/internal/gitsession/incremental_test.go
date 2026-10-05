@@ -511,3 +511,50 @@ func waitForRefsChangedInc(t *testing.T, entry *RepoEntry) {
 	}
 	t.Fatal("timed out waiting for the watcher's own refsChanged signal to invalidate refs")
 }
+
+// A renamed file with identical content keeps its review under the new path; an edited rename does not (P150 Q5).
+func TestRangeFiles_RenamedUnchangedKeepsReview(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	dir := t.TempDir()
+	runInc(t, dir, "init", "-q", "-b", "main")
+	writeIncFile(t, dir, "keep.txt", "one\ntwo\nthree\nfour\nfive\n")
+	writeIncFile(t, dir, "edit.txt", "alpha\nbeta\ngamma\ndelta\nepsilon\n")
+	runInc(t, dir, "add", ".")
+	commitInc(t, dir, "base")
+	runInc(t, dir, "checkout", "-q", "-b", "feature")
+	writeIncFile(t, dir, "other.txt", "x\n")
+	runInc(t, dir, "add", ".")
+	commitInc(t, dir, "other")
+
+	entry, _ := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+	for _, p := range []string{"keep.txt", "edit.txt"} {
+		if _, err := entry.MarkFile(ctx, "feature", p, true, nil); err != nil {
+			t.Fatalf("MarkFile %s: %v", p, err)
+		}
+	}
+	runInc(t, dir, "mv", "keep.txt", "kept.txt")
+	runInc(t, dir, "mv", "edit.txt", "edited.txt")
+	writeIncFile(t, dir, "edited.txt", "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta\n")
+	runInc(t, dir, "add", ".")
+	commitInc(t, dir, "renames")
+	waitForRefsChangedInc(t, entry)
+
+	res, err := entry.RangeFiles(ctx, "main", "feature")
+	if err != nil {
+		t.Fatalf("RangeFiles: %v", err)
+	}
+	got := map[string]ReviewFileStatus{}
+	for _, f := range res.Files {
+		got[f.Change.Path] = f.Review
+	}
+	if k := got["kept.txt"]; k.Kind != "full" || k.ChangedSinceReview {
+		t.Errorf("kept.txt = %+v, want full and unchanged", k)
+	}
+	if e := got["edited.txt"]; e.Kind != "none" {
+		t.Errorf("edited.txt = %+v, want none (content differs)", e)
+	}
+}

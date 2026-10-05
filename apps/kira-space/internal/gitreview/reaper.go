@@ -21,7 +21,7 @@ const sweepPeriod = time.Hour
 // the connection it just opened, without re-entering the store's own locking.
 func sweepDB(db *sql.DB, now time.Time) (removed int, err error) {
 	cutoff := now.Add(-IdleTTL).UnixMilli()
-	res, err := db.Exec(`DELETE FROM review_session WHERE last_used_at < ?`, cutoff)
+	res, err := db.Exec(`DELETE FROM review_session WHERE last_used_at < ? AND pinned = 0`, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("gitreview: sweep: %w", err)
 	}
@@ -47,15 +47,15 @@ func (s *Store) sweep(now time.Time) (int, error) {
 	return sweepDB(db, now)
 }
 
-// Purge is G16's own seam (D20): removes every row for (repoID, branch) immediately, regardless of
-// idle time — the eager purge on PR closed/merged, once G16 exists to call it. The sweep calls this
+// Purge is G16's own seam (D20): removes every unpinned row for (repoID, branch) immediately, regardless of
+// idle time (a pinned session survives; SetPinned(false) first) — the eager purge on PR closed/merged, once G16 exists to call it. The sweep calls this
 // same statement in bulk; G16 calls it per (repoID, branch) from its own PR-closed handler.
 func (s *Store) Purge(ctx context.Context, repoID, branch string) error {
 	db, err := s.conn()
 	if err != nil {
 		return err
 	}
-	res, err := db.ExecContext(ctx, `DELETE FROM review_session WHERE repo_id = ? AND branch = ?`, repoID, branch)
+	res, err := db.ExecContext(ctx, `DELETE FROM review_session WHERE repo_id = ? AND branch = ? AND pinned = 0`, repoID, branch)
 	if err != nil {
 		return fmt.Errorf("gitreview: purge: %w", err)
 	}

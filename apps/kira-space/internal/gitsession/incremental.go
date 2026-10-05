@@ -534,7 +534,7 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 	// per such file in the loop below.
 	var needsOID []string
 	for _, ch := range changes {
-		if _, hasRecord := records[ch.Path]; hasRecord {
+		if _, hasRecord := records[ch.Path]; hasRecord || renameSource(records, ch) != "" {
 			needsOID = append(needsOID, ch.Path)
 		}
 	}
@@ -550,6 +550,9 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 	entries := make([]ReviewFileEntry, 0, len(changes))
 	for _, ch := range changes {
 		rec, hasRecord := records[ch.Path]
+		if src := renameSource(records, ch); !hasRecord && src != "" && oidByPath[ch.Path] == records[src].BlobOID {
+			rec, hasRecord = records[src], true
+		}
 		var status ReviewFileStatus
 		if !hasRecord {
 			status = ReviewFileStatus{Kind: "none", ChangedSinceReview: false}
@@ -565,6 +568,49 @@ func (e *RepoEntry) RangeFiles(ctx context.Context, base, branch string) (RangeF
 	}
 
 	return RangeFilesResult{BranchTip: tip, MergeBase: mb, Files: entries}, nil
+}
+
+// renameSource returns the old path whose record a renamed change with no record of its own may
+// inherit (P150 Q5), or "". The caller still requires the current blob oid to equal that record's;
+// "copied" never carries.
+func renameSource(records map[string]gitreview.FileRecord, ch porcelain.FileChange) string {
+	if ch.Kind != porcelain.FileRenamed || ch.OriginalPath == nil {
+		return ""
+	}
+	if _, has := records[ch.Path]; has {
+		return ""
+	}
+	if _, has := records[*ch.OriginalPath]; !has {
+		return ""
+	}
+	return *ch.OriginalPath
+}
+
+// ReviewSnapshotResult is review.snapshot's own payload: the stored text a file had when last
+// reviewed. Kind is "none" (no record) or the record's content kind.
+type ReviewSnapshotResult struct {
+	Kind          string  `json:"kind"`
+	Text          *string `json:"text"`
+	ReviewedAtSHA *string `json:"reviewedAtSha"`
+}
+
+// ReviewSnapshot reads path's stored snapshot straight from review.db, no git object read, so it
+// survives a rewritten branch whose old tip is unreachable.
+func (e *RepoEntry) ReviewSnapshot(ctx context.Context, branch, path string) (ReviewSnapshotResult, error) {
+	rec, content, found, err := e.review.Record(ctx, e.Summary.RepoID, branch, path)
+	if err != nil {
+		return ReviewSnapshotResult{}, err
+	}
+	if !found {
+		return ReviewSnapshotResult{Kind: "none"}, nil
+	}
+	sha := rec.ReviewedAtSHA
+	out := ReviewSnapshotResult{Kind: string(rec.ContentKind), ReviewedAtSHA: &sha}
+	if rec.ContentKind == gitreview.ContentText {
+		text := string(content)
+		out.Text = &text
+	}
+	return out, nil
 }
 
 // ReviewFileDiff is review.fileDiff's own orchestration (D13): the delta selection runs in BOTH

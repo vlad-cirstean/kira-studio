@@ -349,3 +349,35 @@ func TestKeyedMutexSerializesSameKeyOnly(t *testing.T) {
 		t.Fatal("a lock on a different key blocked behind an unrelated key's holder")
 	}
 }
+
+func TestPinnedSessionSurvivesSweepAndPurge(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	rec := FileRecord{Path: "a.go", State: "full", ReviewedAtSHA: "abc", ReviewedAt: time.Now(), ContentKind: ContentBinary}
+	for _, b := range []string{"pinned", "plain"} {
+		if err := s.Put(ctx, "r", b, rec, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SetPinned(ctx, "r", "pinned", true); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.sweep(time.Now().Add(IdleTTL + time.Hour)); err != nil || n != 1 {
+		t.Fatalf("sweep removed %d, err %v; want 1 (plain only)", n, err)
+	}
+	if err := s.Purge(ctx, "r", "pinned"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Records(ctx, "r", "pinned"); len(got) != 1 {
+		t.Fatalf("pinned session lost its records: %d", len(got))
+	}
+	if err := s.SetPinned(ctx, "r", "pinned", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Purge(ctx, "r", "pinned"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Records(ctx, "r", "pinned"); len(got) != 0 {
+		t.Fatalf("unpinned purge kept %d records", len(got))
+	}
+}

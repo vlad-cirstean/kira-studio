@@ -259,6 +259,9 @@ var requestHandlers = map[string]requestHandler{
 	"review.fileDiff": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewFileDiff(ctx, c, params)
 	},
+	"review.snapshot": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewSnapshot(ctx, c, params)
+	},
 	"review.mark": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
 		return r.handleReviewMark(ctx, c, params)
 	},

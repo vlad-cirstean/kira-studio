@@ -23,6 +23,58 @@ type Store struct {
 	reapDone chan struct{}
 
 	locks *keyedMutex
+
+	obsMu    sync.RWMutex
+	observer func(ReviewChange)
+}
+
+// ReviewChange describes one committed mark change. State is "full", "partial" or "deleted".
+type ReviewChange struct {
+	RepoID, Branch, Path, State string
+}
+
+// SetObserver registers fn to run after each committed Put or Delete, outside the transaction.
+// Set once before serving; nil clears it.
+func (s *Store) SetObserver(fn func(ReviewChange)) {
+	s.obsMu.Lock()
+	s.observer = fn
+	s.obsMu.Unlock()
+}
+
+func (s *Store) notify(c ReviewChange) {
+	s.obsMu.RLock()
+	fn := s.observer
+	s.obsMu.RUnlock()
+	if fn != nil {
+		fn(c)
+	}
+}
+
+// SetPinned pins or unpins (repoID, branch): a pinned session survives the idle sweep and Purge.
+// Pinning creates the session row so the pin outlives the first mark.
+func (s *Store) SetPinned(ctx context.Context, repoID, branch string, pinned bool) error {
+	db, err := s.conn()
+	if err != nil {
+		return err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("gitreview: begin SetPinned: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := upsertSession(ctx, tx, repoID, branch, time.Now().UnixMilli()); err != nil {
+		return err
+	}
+	v := 0
+	if pinned {
+		v = 1
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE review_session SET pinned = ? WHERE repo_id = ? AND branch = ?`, v, repoID, branch,
+	); err != nil {
+		return fmt.Errorf("gitreview: set pinned: %w", err)
+	}
+	return tx.Commit()
 }
 
 // NewStore constructs a Store over path. Nothing is opened yet.
@@ -316,7 +368,11 @@ func (s *Store) Put(ctx context.Context, repoID, branch string, rec FileRecord, 
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.notify(ReviewChange{RepoID: repoID, Branch: branch, Path: rec.Path, State: rec.State})
+	return nil
 }
 
 // Delete removes one path's record (and its ranges, by cascade). The session row is left alone —
@@ -335,6 +391,7 @@ func (s *Store) Delete(ctx context.Context, repoID, branch, path string) error {
 	); err != nil {
 		return fmt.Errorf("gitreview: delete review_file: %w", err)
 	}
+	s.notify(ReviewChange{RepoID: repoID, Branch: branch, Path: path, State: "deleted"})
 	return nil
 }
 
