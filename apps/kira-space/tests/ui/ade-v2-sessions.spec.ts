@@ -35,7 +35,7 @@ test('the task strip lists interactive sessions first, then the most recent runs
   expect(badges).toEqual(['TUI', 'claude -p', 'claude -p', 'claude -p']);
   await expect(page.locator(t('ade-session-tab-tk01'))).toContainText('(resumed)');
   await expect(page.locator(t('ade-session-tab-tk01'))).toHaveAttribute('data-selected', 'true');
-  await expect(page.locator(t('ade-stopped-row'))).toHaveCount(1);
+  await expect(page.locator(t('ade-stopped-row'))).toHaveCount(2);
 });
 
 test('a branch scope shows only that branch', async ({ relaunch }) => {
@@ -105,7 +105,7 @@ test('Take over of a stuck run skips the confirm', async ({ relaunch }) => {
 test('a stopped session takes over from the list', async ({ relaunch }) => {
   const { window: page, control } = await openPlan(relaunch);
   await openSessions(page, 'T_bill');
-  await page.locator(t('ade-stopped-takeover')).click();
+  await page.locator(t('ade-stopped-takeover')).last().click();
   await expect.poll(() => calls(control, IPC.adeTaskTakeOver)).toHaveLength(1);
   expect(calls(control, IPC.adeTaskTakeOver)[0]?.args).toMatchObject({ sessionId: 'sp11' });
 });

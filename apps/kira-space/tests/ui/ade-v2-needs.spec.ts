@@ -121,7 +121,7 @@ test('All sessions groups by task and filters running or stopped', async ({ rela
   await expect(page.locator(t('ade-all-session'))).toHaveCount(13);
   expect(await page.locator(t('ade-all-group')).count()).toBeGreaterThan(5);
   await page.locator(t('ade-all-stopped')).click();
-  await expect(page.locator(t('ade-all-session'))).toHaveCount(6);
+  await expect(page.locator(t('ade-all-session'))).toHaveCount(7);
   await page.locator(t('ade-all-running')).click();
   await expect(page.locator(t('ade-all-session'))).toHaveCount(13);
   await page.locator(t('ade-needs-all')).click();
