@@ -214,3 +214,42 @@ Confirmed, with far less spread than round 1:
 - `contain: layout paint` on the canvas: +18.6 fps, best single change, frames over 50 ms -99 %.
 - No borders alone: +4.5 fps. On top of isolation (combo vs isolate): +5 fps.
 - Hover rule: 0. Keep it.
+
+### R2.3 Step 2a: the trigger is the header strip's `will-change`
+
+DOM survey of the running app (computed styles, every element): the only compositing triggers near
+the grid are `.slick-header-columns-left`/`-right` with `will-change: transform`
+(`slickTheme.css`, P22 header-flicker fix). Their boxes are 28 px tall, directly above the
+viewport, and very wide (left strip x -727..329, right strip x -671..3816; SlickGrid's -1000 px
+header offset). Everything else (sidebar tree rows with `transform`, `position: fixed` 0x0 tooltip
+anchors, `opacity` toolbar buttons) sits outside the grid's box.
+
+| Variant | fps (3 runs) | p95 ms | >50 ms | load1 |
+|---|---|---|---|---|
+| base | 30.8 / 30.7 / 30.1 | 66.2 / 67.0 / 68.8 | 673 / 641 / 685 | 0.95-0.99 |
+| **`.slick-header-columns{will-change:auto}`** | 50.8 / 46.6 / 50.0 | 29.8 / 34.0 / 30.4 | 4 / 9 / 4 | 0.95-0.99 |
+| `.slick-viewport{isolation:isolate}` | 30.7 / 29.8 / 30.0 | 68.6 / 69.4 / 71.4 | 707 / 712 / 744 | 0.94-0.99 |
+| `.slick-pane{isolation:isolate}` | 30.7 / 29.9 / 30.7 | 67.6 / 68.6 / 66.6 | 662 / 724 / 622 | 0.93-0.96 |
+| `.slick-grid-host{isolation:isolate}` | 30.7 / 29.9 / 30.4 | 65.4 / 67.8 / 67.2 | 620 / 700 / 697 | 0.91-0.94 |
+| rows `content-visibility:auto` | 36.2 / 35.6 / 35.5 | 52.8 / 54.2 / 55.0 | 144 / 174 / 186 | 0.93-0.97 |
+| cells `display:block` (no flex) | 31.1 / 30.5 / 30.9 | 64.0 / 67.2 / 67.2 | 684 / 673 / 700 | 0.98-0.99 |
+
+Dropping the header strip's `will-change` alone recovers the whole canvas-isolation gain (+19 fps,
+frames over 50 ms -99 %). This names the mechanism round 1 inferred:
+
+- The header strip is a composited layer. Rows are stacking contexts (`contain: layout`) painted in
+  an ancestor's z-order, after the strip. The runway rows above the viewport (up to 560 px plus
+  velocity lead) overlap the strip's box in WebKit's overlap test, since the viewport is not a
+  stacking context and its clip does not scope them. Each overlapping row gets its own composited
+  layer; every mount/unmount rebuilds layer state. That is the fixed ~30 ms per mutating frame.
+- `isolation`/`contain: paint` on `.grid-canvas` puts every row in one stacking context (one layer
+  at most), which is why it fixes the same thing from the other side.
+- Isolating the viewport, pane or host does not: those boxes start at or above the strip, so they
+  are themselves the overlapping layer and the rows inside still paint per-row. Inferred, not
+  observed (no layer-tree API in this WebKit).
+- It also explains why round 1's stock page never paid the penalty with the same CSS: stock's
+  default range keeps ~3 rows above the viewport instead of 560 px of runway, so far fewer rows
+  overlap the strip. Not separately measured.
+
+`content-visibility:auto` on rows: +5.5 fps, not competitive with the two layer fixes and it
+skips painting the runway (late-data risk), so not pursued. Cell `display:flex` costs nothing.
