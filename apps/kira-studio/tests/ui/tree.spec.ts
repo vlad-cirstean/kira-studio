@@ -715,8 +715,15 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(filterObjectRow(SEQUENCE_PATH)).toHaveAttribute('data-state', 'off');
   // P104 §6.2: the disabled-row reason moved off data-kira-tip onto the real Tooltip system
   // (FiltersDialog.vue's `Tooltip :disabled="!row.disabledReason"`) -- hover to read it instead.
-  await filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label').hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).not.toHaveCount(0);
+  // Expanding the schema re-lays the row out after the pointer lands; a tooltip opens on pointerenter,
+  // so leave and re-enter on the settled layout.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label').hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).not.toHaveCount(0, {
+      timeout: 1500,
+    });
+  }).toPass();
   await expect(page.locator('[data-slot="tooltip-content"]')).not.toHaveText('');
   await page.mouse.move(0, 0);
   const previewBefore = await page.locator('[data-testid="filters-preview"]').innerText();
