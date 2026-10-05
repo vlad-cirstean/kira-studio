@@ -60,8 +60,10 @@
       // src/lib/utils.ts and src/components/ui/** both moved out to packages/theme (P103's
       // byte-identical tier, folded into P100 Part 2) — that workspace's own block below now
       // carries the equivalent ignore.
-      "entry": ["index.html"],
-      "project": ["src/**/*.{ts,vue}"]
+      // P163: the dev-only grid prototype's own page scripts (the proto/grid/*.html Vite entries of
+      // vite.proto.config.ts, which knip does not follow), never in the app build.
+      "entry": ["index.html", "proto/grid/main.ts"],
+      "project": ["src/**/*.{ts,vue}", "proto/**/*.{ts,vue}"]
     },
     "apps/kira-space/frontend": {
       // Mirrors apps/kira-studio/frontend's own block above.

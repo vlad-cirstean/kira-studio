@@ -181,3 +181,6 @@ apps/kira-studio/bin/
 
 # CodeGraph local index (machine-local, rebuilt by scripts/codegraph-setup.sh)
 .codegraph/
+
+# P163 prototype build (apps/kira-studio/frontend/vite.proto.config.ts), never shipped.
+dist-proto/

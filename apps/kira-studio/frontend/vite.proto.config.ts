@@ -1,0 +1,31 @@
+import { fileURLToPath } from 'node:url';
+import { defineConfig, mergeConfig } from 'vite';
+import { defineAppViteConfig } from '../../../packages/workbench/src/viteAppConfig.ts';
+
+// P163 dev-only prototype build (docs/v2.0/plans/P163-cheetah-grid-prototype.md §2). Same aliases,
+// plugins and debug-hook define as the app, different entries and outDir. The shipped build
+// (`vite build`, index.html only) never reaches `proto/`, and Go embeds only `dist`.
+const app = defineAppViteConfig({
+  app: 'kira-studio',
+  port: 9246,
+  configUrl: import.meta.url,
+});
+
+const page = (name: string): string =>
+  fileURLToPath(new URL(`./proto/grid/${name}.html`, import.meta.url));
+
+export default defineConfig(async (env) => {
+  const base = await (typeof app === 'function' ? app(env) : app);
+  return mergeConfig(base, {
+    // One Vue and one cheetah-grid module instance: cheetah-grid-playwright reads the same
+    // `window.cheetahGrid` the wrapper builds its grid from.
+    resolve: { dedupe: ['vue', 'cheetah-grid'] },
+    preview: { host: '127.0.0.1', port: 9246, strictPort: true },
+    build: {
+      outDir: 'dist-proto',
+      rolldownOptions: {
+        input: { cheetah: page('cheetah') },
+      },
+    },
+  });
+});
