@@ -9,7 +9,7 @@ export interface PrettyResult {
   text?: string;
 }
 
-export interface ParseJobs {
+interface ParseJobs {
   'body.format': { input: { body: string; wantText: boolean }; output: PrettyResult };
   'json.beautify': { input: { text: string; mode: BeautifyMode }; output: BeautifyResult };
   'console.format': { input: { kind: ConnectionKind; text: string }; output: FormatResult };

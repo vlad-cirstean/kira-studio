@@ -3,7 +3,7 @@ import { formatConsoleText } from '../../views/console/format';
 import type { JobInput, JobKind, JobOutput, PrettyResult } from './protocol';
 
 /** One parse per body: detects the format and, when asked, returns the pretty text from that same parse. */
-export function formatBody(body: string, wantText: boolean): PrettyResult {
+function formatBody(body: string, wantText: boolean): PrettyResult {
   const json = beautifyJson(body, 'indented');
   if (json.ok) return wantText ? { format: 'json', text: json.text } : { format: 'json' };
   // The `<…>` bracket check mirrors celleditor/detect.ts's own detectXml gate: an XML parse alone
