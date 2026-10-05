@@ -12,6 +12,16 @@ Keychain, Colima for containers. A Linux sandbox/container session is the constr
 restriction in this file assumes Linux unless its own section says otherwise. Check once, before
 assuming a constraint below applies to the current session.
 
+## The user cannot run anything in the sandbox
+
+No shell, commands, kill, manual cleanup, tests or scripts in this container. An agent runs it, or
+hands it off to the user's own machine/VM. Never ask the user to run a command in the sandbox.
+
+An agent cancels every background wait/monitor it starts when done. Never leave poll loops,
+`tail -f` or long `sleep` timers behind. Never poll with `pgrep -f "<pattern>"` when the pattern
+appears in the loop's own command line: it matches itself, loop never ends. Use `pgrep -x`, a
+pidfile, or a flag file.
+
 ## Git push: `.github/workflows/` changes can't be pushed from a Linux sandbox
 
 On a Linux sandbox session, the git push credential is an OAuth App token without the `workflow`
