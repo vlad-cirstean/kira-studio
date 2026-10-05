@@ -11,7 +11,7 @@ import {
   type MonacoModule,
   overflowWidgetsContainer,
 } from '@workbench/editor/monaco';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
@@ -68,7 +68,18 @@ const settingsStore = useSettingsStore();
 
 const rootRef = ref<HTMLElement | null>(null);
 // §3.3: renders the raw doc as text while loadMonaco()'s import is in flight — never an empty box.
+// The pending <pre> sits inside `rootRef`, which `editor.create` measures synchronously: a
+// full-doc <pre> forced a layout of megabytes of wrapped text there. Cap it.
+const PENDING_PREVIEW_CHARS = 16_384;
+// Above this, yield one painted frame before Monaco work so the capped preview shows first.
+const LARGE_DOC_CHARS = 262_144;
+
 const pending = ref(true);
+const previewDoc = computed(() =>
+  props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
+);
+let lastAppliedDoc: string | null = null;
+let lastAppliedVersionId = -1;
 
 // §3.2: never a ref/shallowRef/reactive — same no-reactivity rule as CodeMirrorHost.vue's own
 // `view` (D4), restated here for the same reason: Vue must not proxy Monaco's internals on every
@@ -408,14 +419,24 @@ onMounted(async () => {
   const resolved = await loadMonaco();
   // Unmounted while the import was in flight — dispose nothing, mount nothing.
   if (!rootRef.value) return;
+  if (props.doc.length > LARGE_DOC_CHARS) {
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    if (!rootRef.value) return;
+  }
   mod = resolved;
 
-  model = mod.editor.createModel(props.doc, monacoLanguageIdFor(props.language));
+  // Empty first, filled after `create`: the doc never enters the editor's construction path.
+  model = mod.editor.createModel('', monacoLanguageIdFor(props.language));
   editor = mod.editor.create(rootRef.value, {
     ...applyBaseOptions(),
     model,
     theme: KIRA_EDITOR_THEME,
   });
+  applyingExternal = true;
+  model.setValue(props.doc);
+  applyingExternal = false;
+  lastAppliedDoc = props.doc;
+  lastAppliedVersionId = model.getVersionId();
   decorations = editor.createDecorationsCollection();
   // Only now — Monaco's own DOM already exists inside `rootRef`, so the pending <pre>'s v-if
   // removal (Vue's own, batched) never has a window where neither one nor both are showing real
@@ -499,18 +520,28 @@ defineExpose({
 // (P89 §5). `setDoc` is that same write, reachable imperatively.
 function applyExternalDoc(doc: string): void {
   if (!editor || !model) return;
-  // Guards the editable round trip — same as `CodeMirrorHost.vue:329`.
-  if (doc === model.getValue()) return;
+  // Guards the editable round trip — same as `CodeMirrorHost.vue:329`. While the model is
+  // untouched since the last write, compare against the remembered string (no `getValue()` copy).
+  const unchanged =
+    model.getVersionId() === lastAppliedVersionId ? lastAppliedDoc : model.getValue();
+  if (doc === unchanged) return;
   const currentPosition = editor.getPosition();
   const priorOffset = currentPosition ? model.getOffsetAt(currentPosition) : 0;
-  // §4.7: the hard undo boundary around every external write — both `pushStackElement()` calls
-  // are mandatory (one alone leaves the write mergeable on one side); `model.setValue()` is never
-  // used here, since it discards the whole undo stack instead of isolating just this edit.
+  // §4.7: the hard undo boundary around every editable external write — both `pushStackElement()`
+  // calls are mandatory (one alone leaves the write mergeable on one side); `setValue` would
+  // discard the whole undo stack, so it is used only on read-only hosts.
   applyingExternal = true;
-  model.pushStackElement();
-  model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
-  model.pushStackElement();
+  if (props.readOnly) {
+    // Nothing to undo on a read-only host; `setValue` keeps no copy of the previous doc.
+    model.setValue(doc);
+  } else {
+    model.pushStackElement();
+    model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
+    model.pushStackElement();
+  }
   applyingExternal = false;
+  lastAppliedDoc = doc;
+  lastAppliedVersionId = model.getVersionId();
   if (props.keepSelectionOnExternalSync) {
     const clamped = Math.min(priorOffset, doc.length);
     const position = model.getPositionAt(clamped);
@@ -632,7 +663,7 @@ watch(
       v-if="pending"
       class="m-0 font-data text-kira-md text-fg bg-bg overflow-auto"
       :class="singleLine ? 'p-0 whitespace-pre' : 'py-2 px-0 whitespace-pre-wrap'"
-      >{{ doc }}</pre
+      >{{ previewDoc }}</pre
     >
   </div>
 </template>
