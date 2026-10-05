@@ -579,3 +579,18 @@ suites). Tooling lives in `scripts/mutation/` and `tools/mutation/` (own `packag
 - **Risks**: gremlins and `@hughescr/stryker-bun-runner` are single-maintainer, slow-moving tools.
   Fallbacks if either breaks: `avito-tech/go-mutesting` (about 5x slower, no coverage split),
   Stryker's `command` runner with `coverageAnalysis: 'off'` (10-30x slower).
+
+## Perf probes — `tests/perf/` (scroll lag, RSS)
+
+Report-only probes: print `PERF ...` lines, assert nothing. Run `bun run perf:probe:studio` or
+`bun run perf:probe:space`; narrow with a file filter, e.g.
+`bunx playwright test --config=apps/kira-studio/playwright.perf.config.ts documents`.
+Helper: `packages/workbench/src/testing/ui/perfProbe.ts` (RSS sampler, rAF frame stats, momentum
+flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LADDER`.
+
+- Engine is Playwright WebKit. Linux runs the WPE port: software rendering, no GPU process.
+- fps = 1000 / frame ms. Compare views to each other, not to 16 ms.
+- RSS comes from `ps`. On macOS it omits CoreAnimation/IOSurface graphics memory, the dominant
+  scroll cost there. Read real footprint with `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
+- Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
+  response), `NTABLES` (tree), `GRAPH_N` (git graph).

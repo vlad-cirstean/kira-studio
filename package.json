@@ -46,6 +46,8 @@
     "typecheck:git": "tsgo --noEmit -p packages/git-ipc/tsconfig.json && tsgo --noEmit -p packages/git-core/tsconfig.json && tsgo --noEmit -p apps/kira-space-vscode/tsconfig.json && vue-tsc --noEmit -p packages/git-ui/tsconfig.json && vue-tsc --noEmit -p packages/kira-ui/tsconfig.json",
     "test:ui:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=ui --project=ui-timing",
     "test:ui:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=ui",
+    "perf:probe:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.perf.config.ts",
+    "perf:probe:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.perf.config.ts",
     "test:visual:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual",
     "test:visual:update:studio": "bun run build:test:studio && playwright test --config=apps/kira-studio/playwright.config.ts --project=visual --update-snapshots",
     "test:visual:space": "bun run build:test:space && playwright test --config=apps/kira-space/playwright.config.ts --project=visual",
