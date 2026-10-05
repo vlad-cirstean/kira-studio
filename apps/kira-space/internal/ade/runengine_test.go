@@ -22,6 +22,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
 // The fake claude is this test binary re-executed: with KIRA_FAKE_CLAUDE=1 and "-p" first, TestMain
@@ -38,7 +39,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv(fakeEnv) == "1" && len(os.Args) > 1 && os.Args[1] == "-p" {
 		os.Exit(runFakeClaude(os.Args[1:]))
 	}
-	os.Exit(m.Run())
+	os.Exit(testx.RunWithTempHomes(m))
 }
 
 func runFakeClaude(args []string) int {

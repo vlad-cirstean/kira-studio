@@ -1,7 +1,6 @@
 package gitsock
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,24 +8,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
+	"github.com/kirathecat/kira-studio/internal/testx"
 )
 
-// TestMain points KIRA_SPACE_HOME at a per-process temp dir so no default-path lookup (kira.db,
-// review.db) can reach the real ~/.kira-space. The SIGKILL helper child inherits it.
-func TestMain(m *testing.M) {
-	home, err := os.MkdirTemp("", "gitsock-home-")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "gitsock TestMain:", err)
-		os.Exit(1)
-	}
-	if err := os.Setenv("KIRA_SPACE_HOME", home); err != nil {
-		fmt.Fprintln(os.Stderr, "gitsock TestMain:", err)
-		os.Exit(1)
-	}
-	code := m.Run()
-	_ = os.RemoveAll(home)
-	os.Exit(code)
-}
+// Temp app homes for the binary; the SIGKILL helper child inherits them.
+func TestMain(m *testing.M) { os.Exit(testx.RunWithTempHomes(m)) }
 
 // isolatedRegistry is gitsession.NewRegistry with Review moved under kiraHome, never the default
 // $KIRA_SPACE_HOME/review.db. Registry.Close closes it.
