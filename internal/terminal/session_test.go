@@ -184,68 +184,48 @@ func TestSessionResizeAppliesWinsize(t *testing.T) {
 	waitFor(t, 5*time.Second, func() bool { return strings.Contains(col.text(), "30 100") })
 }
 
+// TestSessionCloseKillsProcessGroup pins forwarding shells: bash and zsh hang up their jobs on
+// SIGHUP. dash never forwards, so it is covered by the survivors test instead.
 func TestSessionCloseKillsProcessGroup(t *testing.T) {
-	dir := t.TempDir()
-	_, sess, col := openTestSession(t, "close-kills-group", dir, 80, 24)
+	for _, shell := range []string{"bash", "zsh"} {
+		t.Run(shell, func(t *testing.T) {
+			sess, col := openShellSession(t, shell, "close-kills-group-"+shell)
+			childPID := startJob(t, sess, col, "sleep 300 &")
+			shellPID := sess.cmd.Process.Pid
 
-	if err := sess.Write([]byte("sleep 300 &\necho started-$!\n")); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	var childPID int
-	waitFor(t, 5*time.Second, func() bool {
-		text := col.text()
-		// LastIndex, not Index: the pty echoes the typed command itself first ("echo
-		// started-$!"), which also contains the literal substring "started-" — the real
-		// answer is the occurrence after that.
-		idx := strings.LastIndex(text, "started-")
-		if idx < 0 {
-			return false
-		}
-		rest := text[idx+len("started-"):]
-		end := strings.IndexAny(rest, "\r\n")
-		if end < 0 {
-			return false
-		}
-		pid, err := strconv.Atoi(strings.TrimSpace(rest[:end]))
-		if err != nil || pid == 0 {
-			return false
-		}
-		childPID = pid
-		return true
-	})
+			// Different groups prove job control is on; a shell change that drops it would silently
+			// make this a single-group test.
+			shellPG, errS := syscall.Getpgid(shellPID)
+			childPG, errC := syscall.Getpgid(childPID)
+			if errS != nil || errC != nil || shellPG == childPG {
+				t.Fatalf("child must run in its own process group: shell pgid=%d (%v), child pgid=%d (%v)",
+					shellPG, errS, childPG, errC)
+			}
+			shellBefore, childBefore := procStatus(shellPID), procStatus(childPID)
 
-	// Close right after the fork can land SIGHUP in the child's pre-exec window, where the shell's
-	// own handler swallows it; wait until the child is really `sleep`.
-	waitFor(t, 5*time.Second, func() bool {
-		comm, _, _ := procInfo(childPID)
-		return comm == "sleep"
-	})
+			start := time.Now()
+			sess.Close()
+			closeTook := time.Since(start)
 
-	shellPID := sess.cmd.Process.Pid
-	// Different groups prove job control is on; a shell change that drops it would silently make
-	// this a single-group test.
-	shellPG, errS := syscall.Getpgid(shellPID)
-	childPG, errC := syscall.Getpgid(childPID)
-	if errS != nil || errC != nil || shellPG == childPG {
-		t.Fatalf("child must run in its own process group: shell pgid=%d (%v), child pgid=%d (%v)",
-			shellPG, errS, childPG, errC)
-	}
-	sess.Close()
-
-	select {
-	case <-sess.done:
-	default:
-		t.Fatal("Close returned before the session exited; the SIGKILL/ptmx fallback must not be needed")
-	}
-	// kill(pid, 0) succeeds on a zombie; reaping an orphan is its reaper's job, not Close's.
-	deadline := time.Now().Add(closeGracePeriod + 2*time.Second)
-	for processAlive(shellPID) || processAlive(childPID) {
-		if time.Now().After(deadline) {
-			_, _, shellLine := procInfo(shellPID)
-			_, _, childLine := procInfo(childPID)
-			t.Fatalf("processes alive after Close:\n shell: %s\n child: %s", shellLine, childLine)
-		}
-		time.Sleep(10 * time.Millisecond)
+			select {
+			case <-sess.done:
+			default:
+				t.Fatal("Close returned before the session exited; the SIGKILL/ptmx fallback must not be needed")
+			}
+			// kill(pid, 0) succeeds on a zombie; reaping an orphan is its reaper's job, not Close's.
+			deadline := time.Now().Add(closeGracePeriod + 2*time.Second)
+			for processAlive(shellPID) || processAlive(childPID) {
+				if time.Now().After(deadline) {
+					text := col.text()
+					if len(text) > 300 {
+						text = text[len(text)-300:]
+					}
+					t.Fatalf("processes alive after Close (took %s):\n shell before:\n%s\n child before:\n%s\n child after:\n%s\n output tail: %q",
+						closeTook, shellBefore, childBefore, procStatus(childPID), text)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		})
 	}
 }
 

@@ -19,3 +19,6 @@ func procInfo(pid int) (comm, state, line string) {
 	}
 	return filepath.Base(strings.Join(f[1:], " ")), f[0][:1], line
 }
+
+// procStatus has no /proc to read here.
+func procStatus(int) string { return "" }
