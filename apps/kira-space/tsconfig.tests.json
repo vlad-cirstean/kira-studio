@@ -31,6 +31,8 @@
     "../../packages/workbench/src/**/*.ts",
     "../../packages/workbench/env.d.ts",
     "playwright.config.ts",
+    "playwright.perf.config.ts",
+    "tests/perf/**/*.ts",
     "tests/ui/**/*.ts"
   ],
   // P103 Part 1: testing/unit/* imports `bun:test` (this project's own `types` is `["node"]`,
