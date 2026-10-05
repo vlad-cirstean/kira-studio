@@ -89,110 +89,30 @@ Large data pushed into UI/editor (chunker candidates):
 | Library: Comlink | Declined. Apache-2.0 and maintained, but it cannot meet the cancellation requirement: no abort for a call, and terminating the worker under a Comlink proxy leaves pending calls unsettled, so the client would keep its own pending map, queue and inline fallback anyway. What Comlink would replace is ~30 lines of id correlation, under the "non-trivial infrastructure" bar. |
 | Library: VueUse `useWebWorkerFn` / `useWebWorker` | Declined. `useWebWorkerFn` builds the worker from the function's source text: handlers cannot import `beautify.ts`, `ejson.ts` or `sql-formatter` as bundled modules, and it spawns one worker per function. `useWebWorker` is scope-bound (terminates on unmount) with one `data` ref, no request/response correlation; the requirement is one app-wide worker shared across components. VueUse is used for scope cleanup (`tryOnScopeDispose`). |
 | Chunker | `editor/chunkedText.ts`: `textChunks(text, { chunkChars, lineAligned })` generator (cut after the next `\n` within one more chunk, never inside a surrogate pair or between `\r` and `\n`) and `pumpChunks(chunks, apply, { signal, pace })`, `pace` default one `requestAnimationFrame`. `MonacoHost.fillModel` moves onto it unchanged in behaviour (generation counter becomes an `AbortController`). Other users only where step 2 finds a large push. VueUse `useRafFn` declined for pacing: it is a start/stop loop, the pump needs one awaitable frame per chunk and an abort signal; a rAF promise is one line. |
-| Editable hosts | Not chunked: a chunked editable write splits the §4.7 undo boundary into many entries. If step 2 shows an editable Beautify/Format push over 50 ms, record it in `## Result` and ask the user; do not build. |
-| Async callers | Migrating a sync caller (Beautify buttons, copy-all, Format) to `run` makes it async. Each guards staleness: drop the result if the buffer or selection changed since the job started (compare input string identity / tab id). Buttons show the existing pending affordance pattern only if the wait exceeds 200 ms (P160's `useTimeoutFn` caption rule); no new UI otherwise. |
-| Move threshold | A caller migrates only when the step 2 probe at its realistic worst input shows a main-thread block (`longestBlockMs`) over 50 ms attributable to the call (before-after delta vs an idle baseline). Otherwise it is listed "no change" with its numbers. Cheapest fix first: memoization or dropping a duplicate pass beats a worker move (row 10). |
-| P160 fold-in | `views/httprequest/prettyBody.ts`, `prettyBody.worker.ts` deleted; `prettyBodyCore.ts` `formatBody` becomes the `body.format` handler (moved into `workers/parse/handlers.ts` or imported by it; keep one definition); `useResponseBody.ts` uses `useParseWorker` (`runLatest`) and `parseInline`. P21 retention rule and 200 ms caption unchanged. |
-| Split | Single sequential implementer. Worker infra and chunker touch disjoint files, but every caller migration depends on step 3, and all probe windows share one quiet machine; a split buys nothing (CLAUDE.md independence rule not met). |
-| Unit tests | Two, both meet the CLAUDE.md bar: `tests/unit/parse-worker-client.spec.ts` (queue ordering, abort queued vs running, terminate-and-respawn, fallback after worker error; worker faked) and `tests/unit/chunked-text.spec.ts` (line alignment, no-newline doc, surrogate pair and `\r\n` boundaries, concatenation equals input). No test per handler: handlers are the existing pure functions, already covered. |
-| Out of scope | Go-side formatting (user decision). Grid render (P162). Documents scroll (P161). Search behaviour, Beautify output, copy formats: byte-identical to today. |
+| Editable hosts | Not chunked: a chunked editable write splits the §4.7 undo boundary into many entries. If step 2 shows an editable Beautify/Format push over 50 ms, record it in `## Result
 
-## 3. Steps
+Numbers, tables and gate readings: `docs/PERF.md`, "P163 large-input parse callers". Summary:
 
-### Step 0: precondition
+Commits (on `v2.0-p163`, rebased on `v2.0` at `58de2d8b`): shared chunker + `MonacoHost` fill;
+shared parse worker with HTTP fold-in; parse-callers probe; console Format; HTTP request Beautify;
+gRPC Beautify; probe fixes (in-page seeding, worker lifecycle case); unexport internals; probe for
+documents field names, Copy all and pure callers; `perf(documents)` field-names memoization;
+`perf(console)` Copy all on the worker; docs.
 
-1. Confirm P161's result commit is on `v2.0`; branch from the chapter tip after it (and after P162
-   if landed). Re-read section 0 overlap files.
-2. CodeGraph (`codegraph_explore`, mandatory for this discovery) on `beautifyJson beautifyXml
-   beautifyShellText tryParseShellText parseDocument fieldNamesOnPage formatDialect toPlainJson
-   detectFormat validateFormat useEditBuffer MonacoHost fillModel`: re-confirm section 1 callers on
-   the new tree; add any new caller to the inventory table before measuring.
+Inventory verdicts (move threshold: block > 50 ms):
+- Migrated: 13 console Format (1 848 -> 187 ms at 236 KB), 3 request Beautify, 4 gRPC Beautify
+  (5 MB JSON ~1 420 -> ~1 020 ms, remainder is the editable Monaco write, not chunkable), 12
+  console Copy all (411 -> 83 ms, 10 000 docs), 1 HTTP body (P160, folded in).
+- Memoize only: 10 field names (one pass 6-23 ms, worker declined).
+- No change, numbers in PERF.md: 2, 6, 7, 8, 9, 11, 14, 15, 16. Row 5 has no frontend parse; 17 small
+  by construction.
 
-### Step 1: probe
-
-Files:
-- `apps/kira-studio/tests/perf/perfProbe.ts`: extract the heartbeat block meter from
-  `http-response.spec.ts` (setTimeout-0 gap list, `longestBlockMs`, `tbtMs` over a window) into
-  shared in-page helpers (`installBlockMeter` / `readBlockMeter`, injected via `page.evaluate`);
-  add `actionLine`/`actionSummaryLine` (`case`, `size`, `run`, `load1`, `actionMs` click to result
-  visible, `longestBlockMs`, `tbtMs`, `rssPeakDeltaMb`). `http-response.spec.ts` uses the shared
-  meter; its output format unchanged. Keep P161's frame helpers intact.
-- New `apps/kira-studio/tests/perf/parse-callers.spec.ts`: one case per inventory row marked
-  "Probe" (3, 4, 5, 6, 7, 10, 12, 13, 14, and 15 if a fixture exists), mocks via
-  `tests/ui/fixtures.ts` `relaunch({control})` and the existing support helpers (`apiMode.ts`,
-  `mongoFixture.ts`, grid/console fixtures). Sizes: realistic worst per row (section 1), plus one
-  mid size. `KIRA_PERF_CASES`, `KIRA_PERF_RUNS` (default 3) as in P160. Asserts nothing.
-- Root `package.json`: `"perf:parse:studio": "bun run build:studio && playwright test
-  --config=apps/kira-studio/playwright.config.ts --project=perf parse-callers"`.
-
-### Step 2: before numbers and verdicts
-
-Quiet gate (section 5). Full `parse-callers` probe, 3 runs per case, plus `perf:http:studio`
-`json` and `text-80col` at 5 and 12 MB (baseline for steps 3-4). Fill the inventory table in
-`## Result` with measured `longestBlockMs`/`actionMs` per row and the verdict (migrate / no change)
-per the move threshold. Commit `docs(v2.0): P163 inventory` (Result only) before any code moves.
-
-### Step 3: shared parse worker
-
-Build `workers/parse/` per section 2. Fold P160's files in (section 2 "P160 fold-in"). Measure
-once: worker cold start, respawn, 12 MB string `postMessage` each way; record in `## Result`.
-`perf:http:studio` json/text-80col 5 and 12 MB before -> after: no regression beyond run noise
-(medians within 10 %). Unit test `parse-worker-client.spec.ts`.
-
-### Step 4: shared chunker
-
-`editor/chunkedText.ts`; `MonacoHost.fillModel` on it, same constants (`LARGE_DOC_CHARS`,
-`FILL_CHUNK_CHARS`), same deferral of `repaintRanges`/lint/debug hook to the end. Same http probe
-check as step 3. Unit test `chunked-text.spec.ts`. Adopt at any other site step 2 flagged (e.g.
-`ResponseDiffDialog.vue`'s diff models) in its own commit with its own before/after.
-
-### Step 5: migrate callers
-
-One commit per caller marked "migrate" in step 2, highest measured cost first. Each commit:
-the caller moves to `useParseWorker` (`run`/`runLatest`, `parseInline` under `INLINE_CHARS`),
-adds only the handler kind it needs, keeps output byte-identical, guards staleness; then its probe
-case before (step 2 number, or a fresh back-to-back run if load drifted) -> after, recorded in
-`## Result`. Row 10's memoization fix, if chosen, is its own `perf(documents): …` commit.
-Rules: Tailwind classes, shadcn-vue primitives, `<script setup lang="ts">`, no scoped styles,
-comments only for a non-obvious why.
-
-### Step 6: verify
-
-- After numbers: full `parse-callers` and `http-response` probes, back to back with a before run
-  from a temp worktree at the step 1 probe commit (removed after), same gate.
-- `bun run lint:all`, typecheck, `test:unit`, `test:ui:studio` (incl. `ui-timing`),
-  `test:visual:studio` (re-capture only a baseline this phase changed on purpose, with the pixel
-  reason). A failure gets fixed per CLAUDE.md, pre-existing or not.
-- Docs: `docs/ARCHITECTURE.md` (rule: a parse/format of potentially large input goes through
-  `workers/parse`; large read-only editor pushes go through `chunkedText`; inline threshold),
-  `docs/PERF.md` (inventory table, before -> after), `docs/DEV_ENVIRONMENT.md` (probe script).
-
-## 4. Commits (expected; one per logical group)
-
-1. `test(perf): parse callers probe` (step 1).
-2. `docs(v2.0): P163 inventory` (step 2, Result only).
-3. `refactor(frontend): shared parse worker; HTTP body formatting on it` (step 3).
-4. `refactor(editor): shared chunked text pump; MonacoHost fill on it` (step 4).
-5. `perf(<area>): <caller> parse off the main thread` one per migrated caller (step 5), plus
-   any chunker adoption (step 4) or memoization fix as its own commit.
-6. `docs: P163 architecture, perf and dev environment notes`.
-7. `docs(v2.0): P163 result` (Result filled, SPEC row status Done with headline numbers).
-
-## 5. Measurement rules
-
-- Gate: start a window only at `load1 <= 1.0` (`/proc/loadavg`). The probe's own browser adds
-  ~1.0, so a per-run reading up to ~2 is normal; above that, discard the run and wait. Record the
-  gate reading and per-run range in `## Result`.
-- Same machine, production build (`build:studio`), before/after back to back.
-- Median of 3 runs per case; one warm-up action discarded per run.
-- No other heavy process started by this session during a window (no parallel UI suite, no
-  build). Another session's load counts too: wait it out.
-- A number not reproducible at the gate is not evidence; say so rather than report it.
-- The section 1 `bun` numbers order candidates only; never quote them as before/after.
-
-## Result
-
-Filled by the implementer: commits; inventory table with measured numbers and verdict per row
-(migrated or "no change, numbers"); worker cold start, respawn and transfer costs; per-migrated-
-caller before -> after (`actionMs`, `longestBlockMs`, `tbtMs`, `rssPeakDeltaMb`); http probe
-no-regression table; gate readings; deviations; verification.
+Deviations:
+- Row 5 and the row 6 diff editor fill were not driven through the UI (function-level numbers only).
+- Editable Beautify 5 MB keeps a ~1 s Monaco write: per section 2 not built; user decision needed
+  to pursue (a chunked write would split undo).
+- Idle-worker termination not added: parked worker holds no input, respawn ~10 ms.
+- Host `load1` swung 1-8 with nothing of ours running; the <= 1.0 gate could not be held through a
+  run. Large deltas only are claimed; the HTTP no-regression was rerun back to back.
+- Copy all uses `ClipboardItem` with a pending blob (`copyOrReportErrorLazy`) so the write starts in
+  the user gesture; `installClipboardSpy` also stubs `clipboard.write`.
