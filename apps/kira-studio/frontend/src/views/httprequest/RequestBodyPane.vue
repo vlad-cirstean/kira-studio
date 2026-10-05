@@ -23,6 +23,8 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
+import { INLINE_CHARS } from '../../workers/parse/client';
+import { useParseWorker } from '../../workers/parse/useParseWorker';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
@@ -125,11 +127,19 @@ const beautifyFormat = computed<'json' | 'xml' | null>(() => {
   return canBeautify(lang) ? lang : null;
 });
 
+const parse = useParseWorker();
 const beautifyError = ref<string | null>(null);
-function onBeautifyBody(): void {
+async function onBeautifyBody(): Promise<void> {
   const fmt = beautifyFormat.value;
   if (!fmt) return;
-  const result = beautifyFor(fmt, props.tab.state.code, 'indented');
+  const source = props.tab.state.code;
+  const result =
+    source.length <= INLINE_CHARS
+      ? beautifyFor(fmt, source, 'indented')
+      : await parse.run(`${fmt}.beautify`, { text: source, mode: 'indented' }).catch(() => null);
+  if (!result) return; // the view unmounted mid-run
+  // The buffer moved on while the worker ran: the result describes older text.
+  if (props.tab.state.code !== source) return;
   if (result.ok) {
     patchHttpRequestTabState(props.tab.id, { code: result.text });
     beautifyError.value = null;
