@@ -215,7 +215,7 @@ func (b *TaskBoard) deploymentRow(ctx context.Context, sc *boardCtx, sb model.Ad
 	case back:
 		d.Status, d.Note = "stale", fmt.Sprintf("%s moved back to %s", env, short)
 	case c.state == containSome:
-		d.Status, d.Note = "stale", fmt.Sprintf("%s runs %s: %s of this branch are missing", env, short, plural(c.missing, "commit", "commits"))
+		d.Status, d.Note = "stale", missingNote(env, short, c.missing)
 	case hasMark:
 		d.Status = "stale"
 		since, err := sc.entry.CountRange(ctx, mark.MergedTip, tip)
@@ -224,7 +224,7 @@ func (b *TaskBoard) deploymentRow(ctx context.Context, sc *boardCtx, sb model.Ad
 		}
 		if since > 0 {
 			d.MissingCommits = since
-			d.Note = fmt.Sprintf("%s runs %s: %s of this branch are missing", env, short, plural(since, "commit", "commits"))
+			d.Note = missingNote(env, short, since)
 		} else {
 			d.Note = fmt.Sprintf("%s runs %s, which no longer contains this branch", env, short)
 		}
@@ -253,4 +253,13 @@ func shortSha(sha string) string {
 		return sha[:7]
 	}
 	return sha
+}
+
+// missingNote is the stale-deploy note; the verb agrees with the count (mockup: "is missing" for one).
+func missingNote(env, short string, n int) string {
+	verb := "are"
+	if n == 1 {
+		verb = "is"
+	}
+	return fmt.Sprintf("%s runs %s: %s of this branch %s missing", env, short, plural(n, "commit", "commits"), verb)
 }
