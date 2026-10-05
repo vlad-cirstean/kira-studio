@@ -171,6 +171,13 @@ historical prose.
   numbers and a real Mac's aren't comparable, so a hard bound would be flaky in exactly the way
   it's meant to guard against. Record numbers in the commit message and, when they
   answer a stated budget, in `docs/PERF.md`.
+- **`bun run perf:http:studio` probes the HTTP response viewer** (P160, `tests/perf/`, Playwright
+  project `perf`, in no suite script). Builds the production bundle (`build:studio` overwrites
+  `frontend/dist`; `test:ui:studio` rebuilds its own test bundle). `KIRA_PERF_RUNS` (default 3) runs
+  per case, `KIRA_PERF_CASES=json,text-1line` narrows. 12 cases: 4 body shapes x 2.4/5/12 MB. Gate:
+  run only at `load1 <= 1.0` (`/proc/loadavg`); each run line prints `load1`, discard noisy ones.
+  Output is `key=value` per run plus a median `summary` per case. RSS is Linux-only and sums every
+  browser process under the test worker.
 - **The FSEvents watcher is `darwin && cgo`** (`apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go`), so
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.

@@ -123,5 +123,15 @@ export default defineConfig({
       fullyParallel: true,
       workers: 2,
     },
+    // P160: opt-in HTTP response viewer probe (`bun run perf:http:studio`); asserts nothing, in no
+    // suite script. Serial, one browser: the numbers are the product.
+    {
+      name: 'perf',
+      testDir: './tests/perf',
+      use: { browserName: 'webkit' },
+      fullyParallel: false,
+      workers: 1,
+      timeout: 600_000,
+    },
   ],
 });
