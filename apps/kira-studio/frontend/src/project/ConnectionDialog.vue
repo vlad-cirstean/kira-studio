@@ -614,13 +614,7 @@ const preconnectText = computed({
       <DialogHeader v-if="step === 'engine'">
         <span class="size-4 flex items-center justify-center shrink-0 text-muted-foreground"><CodiconIcon name="database" :size="13" /></span>
         <DialogTitle>{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
-        <span class="flex min-w-0 ml-auto">
-          <span v-if="!isEdit" class="steps">
-            <span class="step on"><span class="n">1</span>Engine</span>
-            <span class="text-subtle">›</span>
-            <span class="step"><span class="n">2</span>Details</span>
-          </span>
-        </span>
+        <span class="flex min-w-0 ml-auto" />
         <Button v-if="isEdit" variant="toolbar" size="kira" @click="step = 'details'">
           <CodiconIcon name="chevron-left" :size="13" />
           Back
@@ -685,7 +679,7 @@ const preconnectText = computed({
               <label
                 class="relative flex flex-col items-start gap-1 py-3 px-2 border rounded-kira bg-bg cursor-pointer text-left text-inherit not-data-[off]:hover:bg-hover not-data-[off]:hover:border-border-strong focus-within:border-focus data-[off]:opacity-40 data-[off]:cursor-default"
                 :class="draft.kind === kind ? 'border-focus' : 'border-border'"
-                :data-off="!SUPPORTED_KINDS.has(kind)"
+                :data-off="SUPPORTED_KINDS.has(kind) ? undefined : ''"
               >
                 <input
                   type="radio"
