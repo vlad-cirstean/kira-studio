@@ -180,6 +180,56 @@ Ranked by severity, then impact.
   (`sqlitex.ReindexSortOrder`) with unlisted rows appended. Scope the variables `UPDATE` with
   `AND <column> = ?`.
 
+## Coverage pass findings
+
+These come from the second pass over the areas the first pass skimmed or did not reach. Numbering
+continues from F10.
+
+### F11 (medium): FK child columns lack indexes, so deleting a collection or folder is quadratic
+
+`apps/kira-studio/internal/storage/migrations/0006_p4_collections.sql:23`, `:42`;
+`0008_p8_response_history.sql:10`, `:42-44`; `0009_p11_grpc.sql:21`, `:48-50`;
+`0001_init.sql:71`.
+
+- What: SQLite needs an index on the child column to resolve `ON DELETE CASCADE`/`SET NULL` without
+  a full table scan per deleted parent row. Three FK child columns have none:
+  - `api_items.parent_id`. The only index, `api_items_tree`, leads with `collection_id`, so it
+    cannot serve `parent_id = ?`.
+  - `api_response_history.item_id` and `grpc_call_history.item_id`. Their indexes are on the
+    generated `scope_key`, not `item_id`.
+  - `op_log.connection_id` (`SET NULL`) also has none. It costs one scan of up to 20,000 rows per
+    connection delete, so it is minor.
+- Scenario (measured in scratch: real migrations 0001-0029 applied, modernc v1.58.0, same
+  `_foreign_keys=1` DSN):
+  - 2,000 items plus 2,000 history rows: deleting the collection takes 730 ms; with the three
+    indexes, 29 ms.
+  - 5,000 items plus 5,000 history rows: 4.3 s; with the indexes, 39 ms.
+
+  The app DB runs with `SetMaxOpenConns(1)`, so every other query in the app (tab saves,
+  settings, op log) waits behind that delete. Deleting a large folder (`CollectionsRepo.Delete`
+  on an item) has the same cost, scoped to its subtree.
+- Fix: add a new migration with `CREATE INDEX api_items_parent ON api_items(parent_id)`,
+  `api_response_history_item ON api_response_history(item_id)`,
+  `grpc_call_history_item ON grpc_call_history(item_id)`, and optionally
+  `op_log_connection ON op_log(connection_id)`.
+
+### F12 (low): saved-query name and sort-text limits count bytes, not the UTF-16 units zod counts
+
+`apps/kira-studio/internal/storage/model/queries.go:24`, `:71-73`, `:125-133`;
+`apps/kira-studio/internal/storage/repos/saved_queries.go:122`, `:183`.
+
+- What: this is F7's unit mismatch at two more boundaries.
+  - `ValidSavedQueryName` checks `len(trimmed) > 120` in bytes, while
+    `packages/shared/domain/queries.ts:42` uses `.max(120)` (UTF-16 units).
+  - `SortSpec.UnmarshalJSON` caps `text` at 4096 bytes, while `queries.ts:21` uses `.max(4096)`.
+
+  Separately, `insert` and `Update` store the untrimmed name while validating the trimmed one.
+- Scenario: a filter saved as a 45-character Japanese name (135 bytes) passes the renderer and fails
+  in Go with "saved query name exceeds 120 characters". A text sort of 2,000 CJK characters (6,000
+  bytes) fails to decode at the bridge, so the whole request is rejected.
+- Fix: count the same unit zod counts, and store the trimmed name. Apply the same fix as F7, so all
+  three sites share one helper.
+
 ## Coverage
 
 - Reviewed in full: `secrets/*` (cipher, scope, status, all keyring files); `localauth/*`;
@@ -188,13 +238,54 @@ Ranked by severity, then impact.
   `storage/db.go`; `migrations/embed.go` plus `0018`, `0023`, `0025`-`0029`;
   `repos/{secrets,connections,variables,maskkeys,settings,history,tabs,maintenance}.go`;
   `model/settings.go`; `main.go` `openCore`/`wireAdapters` and teardown order.
-- Skimmed: `repos/{ops,response_history,grpc_history,collections}.go` (caps, sweeps, create/save
-  paths); `migrations/0001`-`0017` (FK graph via `REFERENCES` grep only); frontend
-  `VariableSetView.vue`, `api/state/variables.ts`, `state/tabs.ts` (reachability only).
-- Not reached: `repos/{customscripts,filter_history,filters,layout,maskrules,metadata_cache,
-  saved_queries,schema,windows,repos}.go` beyond grep hits; `model/*` other than `settings.go`,
-  `connection.go` usage, `variables.go`; `datagrip/{keychain_darwin,keychain_other,errors}.go`;
-  `migrate_*_test.go`.
-- Runtime claims checked in scratch replicas: F1 (copied package, real `/bin/sh`), F8 (copied
-  function), and `PRAGMA incremental_vacuum` via `Exec` on modernc v1.58.0 (frees the full
-  freelist; not a finding).
+- Reviewed in full in the coverage pass:
+  - Repos: `repos.go` (prepared statements, `Close`); `customscripts`, `filter_history`, `filters`,
+    `layout`, `maskrules`, `metadata_cache`, `saved_queries`, `schema` and `windows` (the last
+    delegates to `appstorage.WindowRepo`, Part 8); `ops`, `response_history`, `grpc_history` and
+    `collections`, read end to end.
+  - `model/*`: every file.
+  - `datagrip/{keychain_darwin,keychain_other,errors}.go`.
+  - Migrations: `0001`-`0017` read end to end; all four `migrate_*_test.go` files.
+  - Callees: `sqlitex.Migrate`/`LoadMigrations`/`NextSortOrder` and
+    `appstorage.UpdateLeaves`/`UpsertLeafList`/`ReplaceKeyed`.
+- Areas checked and clean, apart from F11-F12:
+  - Migrations:
+    - `names` and the files match one to one: 29 listed, 29 present, versions dense 1-29.
+    - Each step applies in its own transaction with its version bump, so a crash cannot
+      half-apply one.
+    - `0002`'s rebuild-and-swap keeps every tab.
+    - `0010`'s renames keep FKs pointing at the right tables (covered by
+      `migrate_rename_test.go`).
+    - `0015`'s purge of oversized rows and `0026`'s table drops are deliberate. Nothing still reads
+      a dropped table, and no FK references one.
+    - `0028`'s key rename cannot collide, since Studio had no `advanced.logLevel` row before P120.
+  - Index coverage for hot reads is adequate: tabs by window, history by `scope_key`, the byte
+    sums, variables by owner, filter history, saved queries, metadata cache and `op_log.started_at`.
+  - Repo behaviour:
+    - Metadata-cache merge and eviction are correct.
+    - The filter-history rune-boundary cap is correct.
+    - Mask-rule upsert has a case-insensitive conflict target, and the copy runs in one
+      transaction.
+    - Saved-query strict decode is correct.
+    - Tab save keeps tabs moved between windows.
+    - Custom-script validation is correct.
+  - Latent notes, not findings:
+    - Studio's Go `Layout` drops the shared schema's `widthUserSet`. Only Space reads it, so Studio
+      sees no effect.
+    - `keychain_other.go`'s refusal message advises switching DataGrip to KeePass, which
+      `lookupPassword` also refuses. `applyOne` surfaces only the refusal code, never that
+      message, so no user sees it.
+    - The gRPC 64 KiB per-message cap is applied before JSON escaping. `elide` handles a snapshot
+      over half the budget, and only a payload averaging more than 5x escape expansion could
+      exceed the full 32 MiB budget.
+- Frontend files were read only to decide reachability: `VariableSetView.vue`,
+  `api/state/variables.ts`, `state/tabs.ts`, `packages/shared/domain/{layout,queries,
+  connection}.ts`.
+- Not reached: none in the Part 2 file set. Adapter use of `model` types and the `appstorage`
+  internals are out of scope (plan §8, Parts 3-4 and 8).
+- Runtime claims checked in scratch replicas:
+  - F1: copied package, real `/bin/sh`.
+  - F8: copied function.
+  - F11: real migrations, timed cascade delete with and without the indexes.
+  - `PRAGMA incremental_vacuum` via `Exec` on modernc v1.58.0: frees the full freelist, so not a
+    finding.
