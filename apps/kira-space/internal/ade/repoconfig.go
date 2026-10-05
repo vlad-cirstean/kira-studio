@@ -72,7 +72,7 @@ func (b *TaskBoard) UpdateRepo(ctx context.Context, args adewire.UpdateRepoArgs)
 		return adewire.Repo{}, err
 	}
 	if patch.Environments != nil {
-		go b.refreshEnvScripts(args.CodeRepoID)
+		b.goTracked(func() { b.refreshEnvScripts(args.CodeRepoID) })
 	}
 	b.notifyRepos()
 	b.notifyBoard()

@@ -149,6 +149,15 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 	return b
 }
 
+// goTracked runs fn in the background; Close waits for it.
+func (b *TaskBoard) goTracked(fn func()) {
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		fn()
+	}()
+}
+
 // Close stops pending work and releases the Conn.
 func (b *TaskBoard) Close() {
 	b.cancel()

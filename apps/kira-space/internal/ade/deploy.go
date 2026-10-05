@@ -85,6 +85,9 @@ func (b *TaskBoard) RunEnvScripts(ctx context.Context, codeRepoID string) error 
 		} else {
 			st.Sha = sha
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err := b.deps.Facts.SetEnvState(st); err != nil {
 			return err
 		}
