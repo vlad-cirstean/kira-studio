@@ -432,6 +432,44 @@ Commit 1-4 land before any fix from that step. A step with no finding still comm
 
 ## Result
 
-(Filled by the implementer: commits, counts, suites before/after, audit verdict counts, mockup
-verdict per screen, unobserved items, accepted deviations, new rows, `codegraph_explore` call
-count.)
+Commits on `v2.0` from `5a70b19f` (plan): `59c06dbd` baseline suites, `74733a6c` settings Advanced
+baseline refresh, `2387223f` stale-chip hover retry (reviewed: real pointer race, not a masked defect),
+`5dfed9a9` retry review, `351be864` stale-deploy grammar fix, `3562808c` samples, mockup, unobserved
+items, `121a6179` ARCHITECTURE rewrite and Known open items, `e8bfa24c` DEV_ENVIRONMENT facts,
+`c84e9317` Studio tree spec hover race, plus the SPEC rows and this result. No `--no-verify`.
+
+**Suites (final tip):** `go build`, `go vet`, `go test ./...`, `go test -race` (ade, adeagent, adeflow,
+gitsession), `typecheck`, `lint:all` pass; `test:unit` 1764 pass; `test:ui:space` 154 pass;
+`test:visual:space` 4 pass; `test:webview` 60 pass; `test:visual:studio` 14 pass; `test:ui:studio` 298 pass
+and 3 failures under load average 12-19: two passed on rerun, `tree.spec.ts:158` was a real hover race
+(fixed, `c84e9317`). Dependency files unchanged.
+
+**Audit:** `plans/P149-audit.md`: 107 rows `ok` (16 of them accepted or superseded), 1 `gap -> P155`. SPEC2 §1-§13, design §9 and the preplan matrix: every row has evidence;
+gaps: F1 `ade.allAgentsFilter` dead leaf (row P155), F2 stale-deploy grammar (fixed `351be864`), F3 held fix
+runs lose their resume spec (row P156). No silently dropped requirement.
+
+**Samples:** `standard`, `bugfix`, `chore` import, validate, show the indentation error and keep the last
+valid file, and a copied file appears without reload.
+
+**Mockup:** 11 screens compared live (1440x900, measured sizes). One defect (F2); the rest match or are
+accepted differences below.
+
+**Unobserved items:** (1) TUI first run: theme picker then login menu, no Claude account in the sandbox, so
+trust prompt and initial message unobserved. (2) `▶ Start` observed end to end. (3) Hook-driven merge record
+observed through the real hook shim (`recorded = 1`), not through `claude`'s own Stop; send-then-archive
+observed up to the turn end. (4) No todo tool in `claude -p` 2.1.289 (confirmed again).
+
+**Accepted deviations (for the user):** go-git declined (D1, `merge-tree`); `Stop` button on the headless bar
+(R15); fix menu on the shared context-menu primitive (R20); Needs you ordered by SPEC2 §11 rank, not tone;
+All sessions `Running`/`Stopped` (R19); Import YAML as a path field (R24); extend-only estimate; Status
+read-only (D10); Jira row key only (R4); no `CI failing` rung (D9); real xterm in the TUI pane, Take over
+confirm (D3), app fonts; `On merge` ripple line in the Plan header; Workflow `once` step in the first branch
+(D12); `quotePOSIX` leaves safe words unquoted; wire: owner `""` for own commits, syntax errors carry `line`
+without a `✕` prefix, `lastCommitAt` in ms. Full list: plan section 6.4.
+
+**Open questions for the user:** todo progress needs a CLI that offers a todo tool in `-p` mode (keep or drop
+the requirement); the sandbox cannot authenticate an interactive `claude`, so check Spec/Start/merge turns once
+on a real desktop build.
+
+**Carry-forward:** P155 (dead settings leaf), P156 (resume spec column), P153, P154.
+

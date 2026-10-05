@@ -78,12 +78,14 @@ streams rule. B in each wave consumes only bridge methods landed in earlier wave
 | **P146 ADE v2 wave 3: worktree setup and headless run engine (A) ‖ panel, Backlog, merged/deployed UI (B)** | **Done** (see P146 result). A: migration `0010` (`ade_sessions` rebuild, moved from P144; `0009` is P145's), worktree creation, prepare script with per-repo timeout, setup states/log/gate, headless `claude -p --output-format stream-json` runner (`allowed_tools` via `--allowedTools`, `--setting-sources` app setting, no concurrency cap, per-run persisted live log; D3, D6, D8), todo progress, `finish_step` MCP server (`modelcontextprotocol/go-sdk`), step machine (scope, gates, retry, timeouts; `once` in first branch worktree, D12), script stages. B: panel task mode (Task, Notes) and branch mode (Details incl. Merged into, Deployed to as display only; Changes), branch row merged/deployed line, Backlog page, headless setting-sources switch. Right-click fix menu, merge dialog and Merge / Re-merge buttons moved to P148 B (M1, same shape as U1 (a)). | Needs P145. B consumes P144-P145 methods only. |
 | **P147 ADE v2 wave 4: send-back, Take over, interactive stages, task archive (A) ‖ Workflows, Repos, run UI (B)** | **Done** (see P147 result). Plan `plans/P147-ade-v2-wave4-interactive-archive-run-ui.md`. A: send back via `claude -p --resume` (3 rounds), Take over via `claude --resume` in a TUI, interactive user-stage launch with prompt, single-branch Start, archive per task, restart recovery (`running` becomes `stuck`, no auto-resume, D7). B: Workflows page (Form/YAML, empty state with Import YAML / + New, D2), Repos page, live stage progress, panel Workflow block with per-repo step lines, Run dialog, Approve/Retry/Done/Finish, Release block, worktree setup UI. | Needs P146. B consumes P144-P146 methods only. |
 | **P148 ADE v2 wave 5: v1 backend removal (A) ‖ Sessions, Take over, Needs you, task archive UI (B)** | **Done** (see P148 result). Plan `plans/P148-ade-v2-wave5-v1-removal-sessions-dialogs.md`. A: delete v1-only `AdeService` methods, queue code, v1 `ade/wire.ts`; migration dropping v1 tables, no data migration (D5). B: merge dialog (`Also push develop` off, develop worktree template, `RecordMerge` on finish, D14), right-click fix menu (shadcn `context-menu`), Merge / Re-merge buttons and the `Right-click to re-merge.` tooltip text (M1, moved from P146 B), headless setting-sources switch bound to the settings dialog draft and Save (P146 B writes it immediately; needs `SettingsDialog.vue` and `settings/types.ts`), Rebase / Queue after Claude dialogs (U1 (a); restore from `git show 13e99974:apps/kira-space/frontend/src/ade/{AdeClaudeDialog.vue,dialogCompose.ts,dialogFlow.ts,launch.ts,turnWatch.ts}`), Sessions tab (TUI and headless read-only log, reachable without taking over), Take over everywhere (confirm dialog when run is live, D3; calls `TakeOver{stopIfRunning:true}`, R13; a taken-over stuck or failed run can be finished from the TUI, R14), `▶ <Stage>` dialog (`LaunchStage`, R15) and `▶ Start` (`StartBranch`, R16); merge, rebase and queue dialogs launch through `StartBranch`, or `Send` to a running session (R16, R17); task Archive dialog (`ArchiveRisk` then `ArchiveTask`, no discard flag, R18), Needs you page with All sessions and badge, History per task. | Needs P147. v1 frontend callers left in P145, so A's removals touch nothing B uses. |
-| **P149 ADE v2 closing: full suites, live mockup comparison, architecture docs** | **Proposed, pending user approval.** Serial. All Go and UI suites, live Kira Space run compared to `ade-v2/mockup.html` screen by screen, SPEC2 §13 and design §9 re-audit, `docs/ARCHITECTURE.md` ade section and Known open items. | Last: needs every wave landed. |
+| **P149 ADE v2 closing: full suites, live mockup comparison, architecture docs** | **Done** (see P149 result). Plan `plans/P149-ade-v2-closing-audit.md`, audit record `plans/P149-audit.md`. All Go and UI suites, live Kira Space run compared to `ade-v2/mockup.html` screen by screen, SPEC2 §13 and design §9 re-audit, `docs/ARCHITECTURE.md` ADE section and Known open items. | Last: needs every wave landed. |
 | **P150 Review code: per-branch review window, per-task review agent, GitHub viewed sync** | **Approved by user (Q1-Q7 resolved), pending re-verification against the then-current tree.** Added by user request at the end; no other phase renumbered. Plan `plans/P150-review-code.md`. Per-branch Review code button opens dedicated review window reusing the Git module review module. Content-based since-review diff: stored snapshot survives rebases, pinned against cleanup. AI questions panel forwards to one interactive TUI Claude Code review session per task (`Tracker.Send` path). One-way GitHub sync marks fully reviewed files viewed via `gh api graphql` `markFileAsViewed` and unmarks files the user un-reviews (`unmarkFileAsViewed`, only those the app marked). `▶ Review` uses the same review agent; renamed unchanged files keep their review; review windows are not restored on relaunch. | Runs after P149. Re-verify plan against then-current tree first. |
 | **P151 Introduce mutation testing (report-only)** | **Implemented.** Tooling under `scripts/mutation/` and `tools/mutation/`, manual-dispatch pending workflow, baseline sample for Go and TS. No production edits, no new or fixed tests, no CI or hook gating. Go baseline numbers invalid (gremlins `--test-cpu` bug, fixed); Go rerun pending on another VM. TS baseline valid. Plan `plans/P151-mutation-testing.md`, baseline `plans/P151-mutation-baseline.md`. | Added at end by user request; no other phase renumbered. |
 | **P152 Fix intermittent gitsock integration test failure** | **Done.** Three root causes fixed: catfile ctx watcher closed a healthy process after a post-success cancel (RC1, `gitclient/catfile`); gitsock tests shared the real `~/.kira-space` (RC2); test client assumed `repo.changed` order and read without deadlines (RC3). Plan `plans/P152-gitsock-flake.md`, results there. Open: 23 test files in gitrpc/gitsession/ade/bridge still open the real `review.db`. Found by P144's closing run: a different gitsock integration test fails each run (e.g. `ClearRemovesOnlyComments`, `CommentsAreOrderedByFileThenLine`) with `E_INTERNAL: read |0: file already closed`. Likely pipe-close race in gitclient streaming. Passes alone; worse under CPU load. No diff to gitclient/gitsession/gitrpc/gitsock since `8dd60e10`, so predates P144. Different subsystem, so its own phase. Root-cause and fix; no skipping or retrying tests. Details in P144 plan `## Result`. | Added at end; no other phase renumbered. |
 | **P153 Fix `internal/terminal` TestSessionCloseKillsProcessGroup failure** | **Proposed.** Seen failing in plain `go test` during P151 (cause not recorded); did not reproduce in a later retest. Reproduce first (shell and pty environment), then root-cause. Different subsystem, so its own phase. | Added at end; no other phase renumbered. |
 | **P154 Isolate tests from the real `review.db`** | **Proposed.** 23 test files in `gitrpc`, `gitsession`, `ade` and `bridge` still open the real `review.db` under the default app home (found by P146; `gitsock` shares the same `KIRA_HOME` vs `KIRA_SPACE_HOME` mix-up, see P152). Point each at a temp home, one shared helper, then add a guard that fails a test touching the real home. Different subsystem, so its own phase. | Added at end, after P153; no other phase renumbered. |
+| **P155 Remove the dead `ade.allAgentsFilter` settings leaf** | **Proposed.** Found by P149: nothing writes or reads the leaf in v2 (`AdeAllSessions.vue` keeps a local `running`/`stopped` ref, R19). Delete the leaf from `storage/model/settings.go`, `repos/settings.go`, the settings schema in `settingsDomain.ts`, the regenerated bindings and the two unit-spec fixtures, with a migration-free reader that ignores a stored value. Wire change, so not a P149 fix (R1). | Added at end by P149; no other phase renumbered. |
+| **P156 Persist held fix runs' resume spec across restart** | **Proposed.** Found by P147, carried by P149: a held `back:<step>` run keeps `runOpts` in memory only, so after `Recover()` it relaunches as a plain fresh attempt. Add a run-row column for the spec (migration `0012` or later, check P150 first) and read it on relaunch. Needs a migration, so not a P149 fix (R1). Deletes the matching `ARCHITECTURE.md` Known open item. | Added at end by P149; no other phase renumbered. |
 
 ## Layout
 
@@ -3828,3 +3830,49 @@ to new session, Merge into develop, task Archive, settings Save/Cancel. Details 
 - Interactive `claude --resume` TUI first-run screen and a real `Stop` hook ending a turn unobserved in the sandbox.
 - Todo progress unobservable in `claude -p` 2.1.289 (open for the user).
 - P149: ade `ARCHITECTURE.md` rewrite, full suites, SPEC2 section 13 re-audit with v1 gone.
+
+## P149 result
+
+Plan `plans/P149-ade-v2-closing-audit.md`; audit record `plans/P149-audit.md`.
+
+Commits on `v2.0` from `5a70b19f` (plan): `59c06dbd` baseline suites, `74733a6c` settings Advanced
+baseline refresh, `2387223f` stale-chip hover retry (reviewed: real pointer race, not a masked defect),
+`5dfed9a9` retry review, `351be864` stale-deploy grammar fix, `3562808c` samples, mockup, unobserved
+items, `121a6179` ARCHITECTURE rewrite and Known open items, `e8bfa24c` DEV_ENVIRONMENT facts,
+`c84e9317` Studio tree spec hover race, plus the SPEC rows and this result. No `--no-verify`.
+
+**Suites (final tip):** `go build`, `go vet`, `go test ./...`, `go test -race` (ade, adeagent, adeflow,
+gitsession), `typecheck`, `lint:all` pass; `test:unit` 1764 pass; `test:ui:space` 154 pass;
+`test:visual:space` 4 pass; `test:webview` 60 pass; `test:visual:studio` 14 pass; `test:ui:studio` 298 pass
+and 3 failures under load average 12-19: two passed on rerun, `tree.spec.ts:158` was a real hover race
+(fixed, `c84e9317`). Dependency files unchanged.
+
+**Audit:** `plans/P149-audit.md`: 107 rows `ok` (16 of them accepted or superseded), 1 `gap -> P155`. SPEC2 §1-§13, design §9 and the preplan matrix: every row has evidence;
+gaps: F1 `ade.allAgentsFilter` dead leaf (row P155), F2 stale-deploy grammar (fixed `351be864`), F3 held fix
+runs lose their resume spec (row P156). No silently dropped requirement.
+
+**Samples:** `standard`, `bugfix`, `chore` import, validate, show the indentation error and keep the last
+valid file, and a copied file appears without reload.
+
+**Mockup:** 11 screens compared live (1440x900, measured sizes). One defect (F2); the rest match or are
+accepted differences below.
+
+**Unobserved items:** (1) TUI first run: theme picker then login menu, no Claude account in the sandbox, so
+trust prompt and initial message unobserved. (2) `▶ Start` observed end to end. (3) Hook-driven merge record
+observed through the real hook shim (`recorded = 1`), not through `claude`'s own Stop; send-then-archive
+observed up to the turn end. (4) No todo tool in `claude -p` 2.1.289 (confirmed again).
+
+**Accepted deviations (for the user):** go-git declined (D1, `merge-tree`); `Stop` button on the headless bar
+(R15); fix menu on the shared context-menu primitive (R20); Needs you ordered by SPEC2 §11 rank, not tone;
+All sessions `Running`/`Stopped` (R19); Import YAML as a path field (R24); extend-only estimate; Status
+read-only (D10); Jira row key only (R4); no `CI failing` rung (D9); real xterm in the TUI pane, Take over
+confirm (D3), app fonts; `On merge` ripple line in the Plan header; Workflow `once` step in the first branch
+(D12); `quotePOSIX` leaves safe words unquoted; wire: owner `""` for own commits, syntax errors carry `line`
+without a `✕` prefix, `lastCommitAt` in ms. Full list: plan section 6.4.
+
+**Open questions for the user:** todo progress needs a CLI that offers a todo tool in `-p` mode (keep or drop
+the requirement); the sandbox cannot authenticate an interactive `claude`, so check Spec/Start/merge turns once
+on a real desktop build.
+
+**Carry-forward:** P155 (dead settings leaf), P156 (resume spec column), P153, P154.
+

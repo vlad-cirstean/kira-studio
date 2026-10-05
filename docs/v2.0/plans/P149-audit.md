@@ -72,6 +72,23 @@ into, because `claude` itself waits at its own first screen.
 | 3b | Archive with dirty worktree | Task panel `Archive` with `dirty.txt` uncommitted: dialog `Archive: work would be lost`, risk line `web-app: 1 uncommitted, 2 unmerged commits. Tell Claude what to do with it, or delete the worktrees anyway.`, button `Send to Claude, then archive`; Send closes the dialog, opens a TUI session on the branch, task stays unarchived (`archived_at` null) until the turn ends | observed up to the turn end; archive after the turn not observed (needs authenticated TUI). Stays in the open items |
 | 4 | Todo progress in `-p` | `claude -p --output-format stream-json --verbose` (2.1.289), prompt asking for a todo list: `init` tools hold no todo tool (`TodoWrite`/`TaskCreate`/`TaskUpdate` absent); the model searched with `ToolSearch`, found none and said so | observed: no todo tool; Known open item stays, question for the user repeated in `## Result` |
 
+## Final suites (step 9, tip after the fixes)
+
+| Suite | Result | Decisive line |
+|---|---|---|
+| `go build ./...`, `go vet ./apps/kira-space/...` | pass | rc 0 |
+| `go test ./...` | pass | rc 0 (74 packages `ok`; `internal/terminal` passed this run, owned by P153) |
+| `go test -race` ade, adeagent, adeflow, gitsession | pass | rc 0 |
+| `bun run typecheck`, `bun run lint:all` | pass | rc 0 |
+| `bun run test:unit` | pass | `1764 pass` |
+| `bun run test:ui:space` | pass | `154 passed (4.8m)` (baseline had 1 flaky fail, fixed in `2387223f`) |
+| `bun run test:visual:space` | pass | `4 passed` |
+| `bun run test:ui:studio` | 298 pass, 3 fail, then fixed | load average 12-19 from parallel streams. `console-format.spec.ts:253` and `mode-switch.spec.ts:76` pass on rerun (`14 passed`, no change). `tree.spec.ts:158` failed 2 of 3 alone: `[data-slot="tooltip-content"]` never appeared. The step expands a schema, which re-lays the row out after the pointer lands; a tooltip opens on `pointerenter`, so `hover()` on the settled row fires no new enter. Re-entering inside `toPass` (move away, hover, 1.5s check) has the same shape as `2387223f`: 4 of 4 green after (`c84e9317`). Product code untouched |
+| `bun run test:webview` | pass | `60 passed` |
+| `bun run test:visual:studio` | pass | `14 passed` |
+| `go.mod`, `go.sum`, `package.json`, `bun.lock` vs `cee4112c` | unchanged | empty diff |
+| `grep -rn AdeService` code / `ARCHITECTURE.md` | 0 / 0 | plan's `grep -nE` list returns only the history sentence |
+
 ## Progress` list at the end.
 
 **Silently dropped requirements:** none found (every SPEC2 item below has evidence).
@@ -135,7 +152,7 @@ other 5 are the accepted forms listed in "Literal text".
 
 | Item | Owner | Evidence | Verdict |
 |---|---|---|---|
-| One task, branches in two repos, planned and run as one unit | P149 | `L` S1/S2 (§Mockup) | see §Mockup |
+| One task, branches in two repos, planned and run as one unit | P149 | `L` S1/S2 (§Mockup): `Usage-based billing` card holds api and web-app branches, one panel | ok |
 | Task, Workflow, Stage, Run, Branch, Step, Session, Integration, Prepare, Environment, Review item, Parked present | P143/P144 A | `adewire` types; migrations 0008 (tasks, task_branches, task_plan, runs, backlog, repo_config, repo_integration, repo_envs, folders, worktree_setup, workflow_last_valid), 0009 (branch_marks, env_state), 0010 (sessions, logs, log_chunks); `UN`/`GO` exercises each | ok |
 | Base marker: `⑂`, `⑂ <base>`, blue for someone else's | P145 B | `board/baseMarker.ts`; `UN board-parity` "base marker label and tone equal the mockup"; `UI plan` base markers | ok |
 | Base tooltip `starts from X (li's branch), not main` | P144 B | `baseMarker.ts:19,33` (curly apostrophe, same as mockup line 1818) | ok (accepted: mockup text) |
@@ -185,7 +202,7 @@ other 5 are the accepted forms listed in "Literal text".
 | Per-repo run lines | P146 A/P147 B | `UI run` "a pushed runs event updates the step line" | ok |
 | Send back template, `· fix N`, 3-round cap | P147 A | `GO TestRunEngine_sendBack`, `TestSendBackTarget`, `TestChainRerun`; `UI run` send-back | ok |
 | Script stages: variables, Output, red lines, Retry | P146 A/P147 B | `GO TestRunEngine_scriptStage`; `UI run` | ok |
-| Default Release = script (samples) | P144 A | samples parse (`TestParse_designSamples`); live import in §Samples | see §Samples |
+| Default Release = script (samples) | P144 A | samples parse (`TestParse_designSamples`); live import in §Samples | ok |
 
 ### §5.1 / §5.1.1 / §5.1.2 workflows page, YAML, finish_step
 
@@ -203,7 +220,7 @@ other 5 are the accepted forms listed in "Literal text".
 
 | Item | Owner | Evidence | Verdict |
 |---|---|---|---|
-| Cards / panel header title 2-line clamp + tooltip; branch names one line + tooltip; branch panel header wraps; lists one line; stage label ~150px | P145-P148 B | `UI plan` clamped title; measured in §Mockup S1/S4 with a long title and branch name | see §Mockup |
+| Cards / panel header title 2-line clamp + tooltip; branch names one line + tooltip; branch panel header wraps; lists one line; stage label ~150px | P145-P148 B | `UI plan` clamped title; measured in §Mockup S1/S4 with a long title and branch name (title clamps to 2 lines, 31px; the long branch name stays one line) | ok |
 
 ### §6 integration, §6.1 setup, §6.2 deployments, §6.3 repos
 
@@ -288,3 +305,6 @@ Needs you P148 B (`UI needs`). No matrix row is unlanded.
 - [x] Step 3: sample workflows in the app
 - [x] Step 4: 11-screen mockup comparison
 - [x] Step 5: unobserved items
+- [x] Step 6: fixes (F2 `351be864`; F1 and F3 are rows P155 and P156)
+- [x] Step 7: docs (ARCHITECTURE rewrite, Known open items, SPEC rows, DEV_ENVIRONMENT)
+- [x] Step 9: final suites
