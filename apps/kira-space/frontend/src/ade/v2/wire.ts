@@ -394,7 +394,7 @@ export interface ReviewAgentLaunch {
   resumed: boolean;
   note: string /* '' or why a fresh one started */;
 }
-export type GhSyncStatus =
+type GhSyncStatus =
   | 'ok'
   | 'noPr'
   | 'prClosed'
@@ -403,7 +403,7 @@ export type GhSyncStatus =
   | 'unauthenticated'
   | 'unavailable'
   | 'headNotFetched';
-export interface GhSyncFile {
+interface GhSyncFile {
   path: string;
   action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
   reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr';
@@ -417,7 +417,7 @@ export interface GhSyncPlan {
   localTip: string;
   files: GhSyncFile[];
 }
-export interface GhSyncFailure {
+interface GhSyncFailure {
   path: string;
   error: string;
 }
