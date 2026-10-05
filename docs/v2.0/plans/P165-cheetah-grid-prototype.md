@@ -1,6 +1,6 @@
-# P163 plan: Cheetah Grid prototype for the SQL data grid
+# P165 plan: Cheetah Grid prototype for the SQL data grid
 
-Plan only. Base: `83a9932b` (v2.0). SPEC row: P163. Inputs: `P162-canvas-grid-investigation.md`
+Plan only. Base: `83a9932b` (v2.0). SPEC row: P165. Inputs: `P162-canvas-grid-investigation.md`
 §2-§5, `docs/PERF.md` §2.1a, `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` §6 and Appendix A, perf probe suite
 (`tests/perf/`, `perfProbe.ts`).
 
@@ -436,6 +436,6 @@ alone is GO with a test-surface follow-up (migration phase 6).
 
 ### What the user runs on the Mac
 
-`docs/DEV_ENVIRONMENT.md` "Grid prototype (P163)": wkhost footprint for the four pages (G3), and a
+`docs/DEV_ENVIRONMENT.md` "Grid prototype (P165)": wkhost footprint for the four pages (G3), and a
 trackpad flick with the HUD on `cheetah.html?fixture=features` and `slick.html?variant=kira` (G2).
 `wkhost.swift` is not compiled in the sandbox. Open both pages in two windows on the same data.

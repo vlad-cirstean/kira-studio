@@ -383,7 +383,7 @@ Protocol, per hypothesis (H0 = nothing on, then H1, H2, H3, H4, then H2+H4):
    `slick-row` layers; H1/H2/H3 show one canvas layer.
 3. Activity Monitor -> Memory, the app's web content process ("... Web Content"): note value at
    rest, then hold a sustained two-finger scroll for 10 s and note the plateau. Or the committed
-   footprint harness (`apps/kira-studio/frontend/proto/grid/mac/`, P163 §8.3) on
+   footprint harness (`apps/kira-studio/frontend/proto/grid/mac/`, P165 §8.3) on
    `slick.html?variant=kira`, which imports the same `slickTheme.css`: prepend one line to the
    driver, e.g. `(echo "document.head.append(Object.assign(document.createElement('style'),{textContent:'.slick-grid-host .grid-canvas{contain:layout paint}'}));"; cat driver.js) > /tmp/driver-h2.js`,
    and compare `FOOTPRINT` peaks against the unmodified driver.

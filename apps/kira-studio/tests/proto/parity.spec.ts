@@ -13,7 +13,7 @@ import {
 } from './support/grid';
 
 // One step per prototype parity item (plan §11): the "verified by trying it" evidence behind each
-// verdict in the P163 Result. A step that throws is a feature the prototype does not reproduce.
+// verdict in the P165 Result. A step that throws is a feature the prototype does not reproduce.
 
 const colWidth = (page: Page, col: number) =>
   page.evaluate(

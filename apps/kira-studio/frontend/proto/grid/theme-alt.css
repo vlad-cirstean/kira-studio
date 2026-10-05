@@ -1,4 +1,4 @@
-/* P163 prototype only: a light variant of the ~15 grid-relevant tokens, to prove live re-theming.
+/* P165 prototype only: a light variant of the ~15 grid-relevant tokens, to prove live re-theming.
    Not a design proposal; the app ships one palette. */
 [data-proto-theme="alt"] {
   --kira-bg: #ffffff;

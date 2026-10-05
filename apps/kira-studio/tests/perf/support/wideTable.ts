@@ -1,6 +1,6 @@
 import type { ColumnDescriptor, TypeClass } from '@shared/protocol/page';
 
-// Shared by tests/perf/grid-scroll.spec.ts and the P163 grid prototype, so both render identical data.
+// Shared by tests/perf/grid-scroll.spec.ts and the P165 grid prototype, so both render identical data.
 
 export const ROWS = 10_000;
 

@@ -2,7 +2,7 @@
 
 Ships round 2 of [P162-grid-gap-bisect.md](P162-grid-gap-bisect.md) (R2.6 causes, R2.7 fix list).
 Context: [P162-canvas-grid-investigation.md](P162-canvas-grid-investigation.md). Canvas migration
-dropped by user decision (P163: no gain, worse memory on the user's Mac). SlickGrid stays.
+dropped by user decision (P165: no gain, worse memory on the user's Mac). SlickGrid stays.
 
 Base: the commit that lands this plan. Single sequential implementer. A sibling session also
 commits on `v2.0`: stage only the files named here, never `git add -A`, do not push.
@@ -235,7 +235,7 @@ result well short of that means the rule is not applied: check the built CSS (se
 
 ## 3. Pre-existing failures
 
-- `bun run lint:dead` (knip): P163 Result noted pre-existing unused exports
+- `bun run lint:dead` (knip): P165 Result noted pre-existing unused exports
   (`packages/shared/protocol/page.ts`, git-ui row menu, repo schemas). Run it at the start. Fix
   every finding per CLAUDE.md: confirm zero callers with `codegraph_explore` before deleting an
   export, then remove the export or the dead code. Commit as its own group (commit 0). If a finding
@@ -338,7 +338,7 @@ Fast checks per commit: the pre-commit hook (`bun run lint` + `bun run typecheck
 - Overscan/runway changes, JS runway or `onGridRendered` changes, `content-visibility` (user
   decisions).
 - Git graph perf measurement (user decision).
-- Canvas grid migration (dropped), P163 prototype code under `proto/grid/`.
+- Canvas grid migration (dropped), P165 prototype code under `proto/grid/`.
 - R2.10 open questions (stock-versus-app per-row layer difference, residual ~35 MB RSS).
 - The Mac A/B itself (user-run, section 4).
 

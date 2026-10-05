@@ -10,7 +10,7 @@ import {
 import { startServer, type UiServer } from '@workbench/testing/ui/server';
 import type { TraceResult } from '../../frontend/proto/grid/trace';
 
-// P163: frame cost and late data of the prototype grids, same data and viewport as the app's own
+// P165: frame cost and late data of the prototype grids, same data and viewport as the app's own
 // `NCOLS=20 grid-scroll` probe. `bun run perf:probe:proto`; PERF_HEADED=1 for headed WebKitGTK;
 // GRID=cheetah,slick-stock,slick-kira narrows the variants. Frame cost runs on the release build
 // (`dist-proto`, no hooks); late data on the hooks build (`dist-proto-hooks`) because its readback

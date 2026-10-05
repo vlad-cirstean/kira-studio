@@ -622,7 +622,7 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
   response), `NTABLES` (tree), `GRAPH_N` (git graph).
 
-## Grid prototype (P163) — `proto/grid/`
+## Grid prototype (P165) — `proto/grid/`
 
 Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped bundle; Go embeds only
 `frontend/dist`. Plan and verdict: `docs/v2.0/plans/P163-cheetah-grid-prototype.md`.
