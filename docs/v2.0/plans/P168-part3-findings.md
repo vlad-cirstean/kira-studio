@@ -311,3 +311,36 @@ Leads checked, no finding:
 - Connect promptness (plan §5.1, Part 2 `abortInFlight`): postgres/mysqlfamily dial with ctx and
   `connectTimeout` 10 s; clickhouse probe is `RunWithAbortRace` on ctx; sqlite is F9; reconnect
   teardown is F6.
+
+### Block 6: `SA/testsupport` (reviewed)
+
+All 24 files. No finding. Pinned images (`images.go` consumers: postgres 17-alpine, mysql 8.4,
+mariadb 11.4, clickhouse 26.3, mongo 8.3, redis 8.10, cp-kafka 8.0.7, localstack 4) match
+`scripts/test-matrix.sh`; `KIRA_COMPAT_IMAGE_<KIND>` override honoured by `ImageFor`.
+`ClearAwsEnv` restores via `LookupEnv`; `fixture[T]` memoizes start errors and terminates from
+`TestMain` (B15). A container whose post-`Run` setup fails (`Host`, `MappedPort`, seed) is not
+terminated by the fixture; Ryuk reaps it at binary exit in the default config, so not a finding.
+
+### Block 7: scripts (reviewed; data files skimmed)
+
+`db-compat.sh`, `test-matrix.sh`, `demo-dbs/seed.sh`, `docker-compose.yml`, the shell seeds
+(`kafka`, `sqs`, `s3`) and `sqlite/seed.ts` read in full. No finding: every published port binds
+`127.0.0.1`; demo passwords are documented demo-only; all seeds run `set -euo pipefail` (or the
+client's abort-on-error default); `--only` filters fail with exit 2 on no match; a failing row sets
+exit 1. Per-engine `init`/`seed` SQL/JS/Lua data files skimmed for quoting only: static data, no
+user input, nothing executes them but the demo stack.
+
+### Block 8: conformance and unit tests (reviewed)
+
+Core unit tests (`abort, classify, connset, errors, sqlmutate, sqltext`) and every engine's
+`*_test.go`, `authmatrix_test.go`, `*_internal_test.go`, `connset_wiring_test.go`,
+`query_bench_test.go` read for what they guard. Per-capability coverage intact; no true
+duplicates. Gaps tied to findings (each fix above names the scenario to add): read-only escape
+spellings (F1, F2), `ANALYSE`/`WITH … INTO`/MySQL comment classification (F3), binary-key keyset
+(F4), cancel-then-reuse on the catalog path (F5). Real-container suites for postgres, mysqlfamily
+and clickhouse pass at HEAD; they do not exercise any finding's scenario.
+
+### Not reached
+
+Nothing. Every file in plan §2's 138-file set was read or, for the demo seed data files, skimmed
+with the reason above.
