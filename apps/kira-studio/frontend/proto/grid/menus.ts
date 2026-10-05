@@ -9,6 +9,7 @@ import {
 import { type CellText, cellAt, columnName, copyText, rowSnapshot } from './clipboard';
 import { vetoReason } from './pending';
 import { selectedCols, selectedRows } from './selection';
+import type { SortDir } from './sort';
 import { type ProtoState, pageRowOf } from './state';
 
 /** Callbacks the menus need from the host; everything else reads `state`. */
@@ -21,6 +22,7 @@ export interface MenuActions {
   paste(record: number, displayCol: number): Promise<void>;
   deleteRows(records: readonly number[]): void;
   insertRow(): void;
+  sort(displayCol: number, dir: SortDir | null): void;
 }
 
 function copyItem(id: string, label: string, text: () => string): MenuItem {
@@ -158,6 +160,26 @@ export function headerMenu(actions: MenuActions, displayCol: number): MenuItem[]
   const { state } = actions;
   const name = columnName(state, displayCol);
   return [
+    {
+      type: 'item',
+      id: 'sort-asc',
+      label: 'Sort ascending',
+      run: () => actions.sort(displayCol, 'asc'),
+    },
+    {
+      type: 'item',
+      id: 'sort-desc',
+      label: 'Sort descending',
+      run: () => actions.sort(displayCol, 'desc'),
+    },
+    {
+      type: 'item',
+      id: 'clear-sort',
+      label: 'Clear sort',
+      disabled: state.sorts.length === 0,
+      run: () => actions.sort(displayCol, null),
+    },
+    { type: 'separator' },
     {
       type: 'item',
       id: 'hide-column',

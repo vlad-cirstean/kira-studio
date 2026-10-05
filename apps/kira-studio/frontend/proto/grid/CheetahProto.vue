@@ -21,6 +21,7 @@ import { copySelection, selectionText } from './clipboard';
 import { createProtoData, GUTTER_FIELD, readParams } from './data';
 import { installDebugHook } from './debugHook';
 import { createEditor, EDITOR_CLASS } from './edit';
+import { HeaderColumn, SORT_ZONE } from './header';
 import { cellMenu, columnMenu, headerMenu, type MenuActions, rangeMenu, rowMenu } from './menus';
 import NavPreview, { type NavTarget } from './NavPreview.vue';
 import { addInsertRow, deleteRows, stageValue, vetoReason } from './pending';
@@ -39,6 +40,7 @@ import {
   selectedRows,
   selectRows,
 } from './selection';
+import { cycleSort, setSort } from './sort';
 import { createState, HEADER_ROWS, pageRowOf, recordOf } from './state';
 import TooltipProxy from './TooltipProxy.vue';
 import { buildTheme, readPalette } from './theme';
@@ -89,7 +91,7 @@ function makeSource() {
   return markRaw(
     new DataSource({
       length: state.rowCount(),
-      get: (index) => new Record(pageRowOf(state, index)),
+      get: (index) => new Record(pageRowOf(state, index), index),
     }),
   );
 }
@@ -108,6 +110,9 @@ const order = ref([...state.order]);
 const gutterType = markRaw(new GutterColumn(state));
 const columnTypes = data.columns.map((_, index) =>
   markRaw(new CellColumn(state, index, navFor(index))),
+);
+const headerTypes = data.columns.map((_, index) =>
+  markRaw(new HeaderColumn(state, index, navFor(index))),
 );
 const editors = data.columns.map((_, index) => markRaw(createEditor(state, index)));
 
@@ -248,6 +253,11 @@ const actions: MenuActions = {
     order.value = [...state.order];
     setSelection(EMPTY);
   },
+  sort(displayCol, dir) {
+    const pageCol = state.order[displayCol] as number;
+    setSort(state, pageCol, dir, false);
+    applyOrder();
+  },
   edit: openEditor,
   setNull(record, displayCol) {
     stageValue(state, pageRowOf(state, record), state.order[displayCol] as number, null);
@@ -328,11 +338,33 @@ function openMenu(ev: MouseEvent, record: number, displayCol: number, header: bo
   }
 }
 
+function inSortZone(grid: ListGrid<unknown>, col: number, row: number, event: MouseEvent): boolean {
+  const origin = grid.getElement().getBoundingClientRect();
+  const cell = grid.getCellRelativeRect(col, row);
+  return event.clientX - origin.left - cell.left >= cell.width - SORT_ZONE;
+}
+
+function setHoverHeader(grid: ListGrid<unknown>, pageCol: number, col: number): void {
+  if (state.hoverHeader === pageCol) return;
+  const previous = state.hoverHeader;
+  state.hoverHeader = pageCol;
+  if (previous >= 0) {
+    const at = state.order.indexOf(previous);
+    if (at >= 0) grid.invalidateCell(at + 1, 0);
+  }
+  if (col > 0) grid.invalidateCell(col, 0);
+}
+
 function bindGrid(grid: ListGrid<unknown>): void {
   grid.listen('mousedown_cell', (e) => {
     if (e.event.button !== 0) return false;
     const record = e.row - HEADER_ROWS;
     if (e.row < HEADER_ROWS) {
+      if (e.col > 0 && inSortZone(grid, e.col, e.row, e.event)) {
+        cycleSort(state, state.order[e.col - 1] as number, e.event.shiftKey);
+        applyOrder();
+        return false;
+      }
       setSelection(e.col === 0 ? selectAll() : selectColumns(state.selection, e.col - 1, mods(e.event)));
       grid.focus();
       return false;
@@ -347,7 +379,11 @@ function bindGrid(grid: ListGrid<unknown>): void {
   });
   grid.listen('mouseenter_cell', (e) => {
     showTip(grid, e.col, e.row);
-    if (e.row < HEADER_ROWS) return;
+    if (e.row < HEADER_ROWS) {
+      setHoverHeader(grid, e.col > 0 ? (state.order[e.col - 1] as number) : -1, e.col);
+      return;
+    }
+    setHoverHeader(grid, -1, 0);
     const record = e.row - HEADER_ROWS;
     if (gutterDragFrom !== null && e.col === 0) {
       setSelection(dragRows(state.selection, gutterDragFrom, record));
@@ -361,7 +397,10 @@ function bindGrid(grid: ListGrid<unknown>): void {
     const prevRecord = previous < 0 ? -1 : recordOf(state, previous);
     if (prevRecord >= 0) grid.invalidateGridRect(0, prevRecord + HEADER_ROWS, last, prevRecord + HEADER_ROWS);
   });
-  grid.listen('mouseleave_cell', () => tip.value?.hide());
+  grid.listen('mouseleave_cell', (e) => {
+    tip.value?.hide();
+    if (e.row < HEADER_ROWS) setHoverHeader(grid, -1, 0);
+  });
   grid.listen('click_cell', (e) => {
     if (e.row < HEADER_ROWS || e.col === 0) return;
     const pageCol = state.order[e.col - 1] as number;
@@ -545,6 +584,7 @@ onMounted(async () => {
           :width="widths[index]"
           :min-width="minWidth(index)"
           :column-type="columnTypes[index]"
+          :header-type="headerTypes[index]"
           :action="editors[index]"
           :header-style="headerStyle()"
         >
