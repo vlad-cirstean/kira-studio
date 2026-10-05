@@ -84,7 +84,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 			message := rec.Message
 			requestMessageTruncated := false
 			if len(message) > maxHistoryBodyBytes {
-				message = message[:maxHistoryBodyBytes]
+				message = capUTF8(message, maxHistoryBodyBytes)
 				requestMessageTruncated = true
 			}
 
@@ -94,7 +94,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 					break
 				}
 				if len(m.JSON) > maxGrpcMessageBytes {
-					m.JSON = m.JSON[:maxGrpcMessageBytes]
+					m.JSON = capUTF8(m.JSON, maxGrpcMessageBytes)
 					m.Truncated = true
 				}
 				messages = append(messages, m)

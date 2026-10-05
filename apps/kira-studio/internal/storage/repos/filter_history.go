@@ -63,6 +63,15 @@ func truncateUTF8ToBoundary(b []byte, maxBytes int) []byte {
 	return cut
 }
 
+// capUTF8 is truncateUTF8ToBoundary for a string: s unchanged when it fits, otherwise cut at a rune
+// boundary.
+func capUTF8(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	return string(truncateUTF8ToBoundary([]byte(s), maxBytes))
+}
+
 // capOrderByJSON is order_by_json's own cap (F9, P108 Part 3): unlike where_text, this value is
 // encoded JSON, and truncating it at any offset — even a valid UTF-8 rune boundary — still leaves
 // invalid JSON behind. List's own decode guard already drops a row whose order_by_json fails to

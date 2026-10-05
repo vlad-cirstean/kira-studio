@@ -103,12 +103,12 @@ func (r *OpsRepo) ReconcileInterrupted() (n int64, err error) {
 // The returned bool is D1(c)'s command_truncated flag.
 func (r *OpsRepo) Finish(opID string, patch *model.OpFinish) (commandTruncated bool, err error) {
 	if patch.Command != nil && len(*patch.Command) > maxOpCommandBytes {
-		truncated := (*patch.Command)[:maxOpCommandBytes]
+		truncated := capUTF8(*patch.Command, maxOpCommandBytes)
 		patch.Command = &truncated
 		commandTruncated = true
 	}
 	if patch.Error != nil && len(*patch.Error) > maxOpErrorBytes {
-		truncated := (*patch.Error)[:maxOpErrorBytes]
+		truncated := capUTF8(*patch.Error, maxOpErrorBytes)
 		patch.Error = &truncated
 	}
 	storedBytes := 0

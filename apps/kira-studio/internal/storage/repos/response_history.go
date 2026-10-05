@@ -78,7 +78,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 			bodyStorageTruncated := false
 			if bodyStored {
 				if len(resp.Body) > maxHistoryBodyBytes {
-					resp.Body = resp.Body[:maxHistoryBodyBytes]
+					resp.Body = capUTF8(resp.Body, maxHistoryBodyBytes)
 					bodyStorageTruncated = true
 				}
 			} else {
@@ -138,12 +138,12 @@ func capBody(b httpclient.Body) (httpclient.Body, bool) {
 	switch b.Mode {
 	case "raw":
 		if len(b.Raw) > maxHistoryBodyBytes {
-			b.Raw = b.Raw[:maxHistoryBodyBytes]
+			b.Raw = capUTF8(b.Raw, maxHistoryBodyBytes)
 			return b, true
 		}
 	case "code":
 		if len(b.Code) > maxHistoryBodyBytes {
-			b.Code = b.Code[:maxHistoryBodyBytes]
+			b.Code = capUTF8(b.Code, maxHistoryBodyBytes)
 			return b, true
 		}
 	}
