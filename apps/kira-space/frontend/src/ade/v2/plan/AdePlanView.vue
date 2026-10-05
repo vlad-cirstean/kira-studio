@@ -234,7 +234,8 @@ const inHistory = computed(() => {
 async function extendHorizon(iso: string): Promise<void> {
   const ade = settingsStore.ade;
   if (!ade.extraDays.includes(iso)) {
-    await settingsStore.patchSettings({ ade: { extraDays: [...ade.extraDays, iso] } });
+    const kept = ade.extraDays.filter((d) => d >= today.value);
+    await settingsStore.patchSettings({ ade: { extraDays: [...kept, iso] } });
   }
   await nextTick();
   scrollToDay(isoToOffset(today.value, iso));

@@ -382,7 +382,10 @@ function collectDayKeys(
     if (!shown.has(e.taskId)) continue;
     for (const d of e.days) if (d !== LATER) keys.add(d);
   }
-  for (const iso of [...settings.extraDays, ...settings.offDays]) keys.add(isoToOffset(today, iso));
+  for (const iso of [...settings.extraDays, ...settings.offDays]) {
+    const k = isoToOffset(today, iso);
+    if (k >= 0) keys.add(k);
+  }
   const dayKeys = [...keys].sort((a, b) => a - b);
   if (!hiddenCount || seq.some((e) => shown.has(e.taskId) && e.day === LATER)) dayKeys.push(LATER);
   return dayKeys;

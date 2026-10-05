@@ -40,7 +40,7 @@ export function dayMenuFor(
   }
   return {
     label: 'Mark as day off',
-    patch: { offDays: [...settings.offDays, iso] },
+    patch: { offDays: [...settings.offDays.filter((d) => d >= today), iso] },
     confirm: startCount > 0,
   };
 }
