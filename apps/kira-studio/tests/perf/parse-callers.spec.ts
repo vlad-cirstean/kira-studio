@@ -375,7 +375,7 @@ if (want('console-copy-all')) {
               },
             ];
             const { window } = await relaunch({ control: MONGO_CONTROL, stream });
-            await installClipboardSpy(window);
+            await installClipboardSpy(window, { lazy: true });
             await connectMongo(window);
             await openConsoleFromMenu(window, WIDGETS_PATH);
             const view = window.locator('[data-testid="console-view"]');

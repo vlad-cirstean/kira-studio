@@ -1043,7 +1043,7 @@ test('Query console — a Mongo document result copies as JSON, one row or all d
   ];
 
   const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
-  await installClipboardSpy(page);
+  await installClipboardSpy(page, { lazy: true });
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-mongodb"]');
   await page.fill('[data-testid="connection-name"]', 'Console Doc Copy');
