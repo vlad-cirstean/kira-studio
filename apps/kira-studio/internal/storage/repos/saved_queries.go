@@ -114,6 +114,7 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 	if err := model.ValidSavedQueryName(name); err != nil {
 		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: %w", err)
 	}
+	name = strings.TrimSpace(name)
 	newID := uuid.NewString()
 	now := kiratime.NowISO()
 	if _, err := r.DB.Exec(
@@ -180,7 +181,7 @@ func (r *SavedQueriesRepo) Update(queryID string, patch model.SavedQueryPatch) (
 		if err := model.ValidSavedQueryName(*patch.Name); err != nil {
 			return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: %w", err)
 		}
-		if _, err := r.DB.Exec(`UPDATE saved_queries SET name = ? WHERE id = ?`, *patch.Name, queryID); err != nil {
+		if _, err := r.DB.Exec(`UPDATE saved_queries SET name = ? WHERE id = ?`, strings.TrimSpace(*patch.Name), queryID); err != nil {
 			return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: update name %s: %w", queryID, err)
 		}
 	}

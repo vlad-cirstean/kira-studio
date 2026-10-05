@@ -3,13 +3,12 @@ package connections
 import (
 	"math"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// maxNameLength is connectionInputSchema's own name cap — the single source Validate and
+// maxNameLength (UTF-16 units, as zod counts) is connectionInputSchema's own name cap — the single source Validate and
 // Service.Duplicate's generated "<name> copy" both read, so the two can never drift apart (review
 // finding: Duplicate used to append " copy" with no cap at all, which Validate would then have
 // rejected outright for any name already close to the limit).
@@ -54,7 +53,7 @@ func (in Input) Validate() error {
 // validateIdentity checks name/kind/color/mode — the connection's own identity fields.
 func (in Input) validateIdentity() error {
 	name := strings.TrimSpace(in.Name)
-	if name == "" || len(name) > maxNameLength {
+	if name == "" || model.UTF16Len(name) > maxNameLength {
 		return ipcerr.BadRequest("name must be 1-120 characters")
 	}
 	if !model.ValidConnectionKind(in.Kind) {
@@ -149,24 +148,16 @@ func (in Input) validateMode() error {
 const copySuffix = " copy"
 
 // duplicateName is Service.Duplicate's name generator: name + copySuffix, capped at
-// maxNameLength — the base name is truncated (never the suffix, so the result always reads as a
+// maxNameLength UTF-16 units — the base name is truncated (never the suffix, so the result always reads as a
 // copy) at a rune boundary so it is never invalid UTF-8. Review finding: Duplicate used to append
 // copySuffix with no cap at all, which Validate would then reject outright for any name already
 // within copySuffix's own length of the limit — Duplicate itself never calls Validate (an
 // already-stored name is by definition valid input; a rejection here would be a duplicate that
 // silently never happens), so the cap has to be applied at generation time instead.
 func duplicateName(name string) string {
-	full := name + copySuffix
-	if len(full) <= maxNameLength {
-		return full
+	if model.UTF16Len(name)+len(copySuffix) <= maxNameLength {
+		return name + copySuffix
 	}
-	maxBase := maxNameLength - len(copySuffix)
-	if maxBase < 0 {
-		maxBase = 0
-	}
-	cut := maxBase
-	for cut > 0 && !utf8.RuneStart(name[cut]) {
-		cut--
-	}
-	return name[:cut] + copySuffix
+	base, _ := model.TruncateUTF16(name, maxNameLength-len(copySuffix))
+	return base + copySuffix
 }

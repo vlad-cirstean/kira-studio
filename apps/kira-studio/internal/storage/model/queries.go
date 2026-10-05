@@ -18,7 +18,7 @@ type SortTerm struct {
 type SortSpec struct {
 	Kind  string     // "structured" | "text"
 	Terms []SortTerm // structured only
-	Text  string     // text only, <= 4096 (queries.ts's own cap)
+	Text  string     // text only, <= 4096 UTF-16 units (queries.ts's own cap)
 }
 
 const maxSortSpecText = 4096
@@ -68,7 +68,7 @@ func (s *SortSpec) UnmarshalJSON(data []byte) error {
 		if err := json.Unmarshal(probe.Text, &text); err != nil {
 			return fmt.Errorf("model: SortSpec: invalid text: %w", err)
 		}
-		if len(text) > maxSortSpecText {
+		if UTF16Len(text) > maxSortSpecText {
 			return fmt.Errorf("model: SortSpec: text exceeds %d characters", maxSortSpecText)
 		}
 		s.Kind, s.Terms, s.Text = "text", nil, text
@@ -124,10 +124,10 @@ type FilterHistoryEntry struct {
 // ValidSavedQueryName mirrors queries.ts's savedQueryBase name field: trimmed, 1..120 chars.
 func ValidSavedQueryName(name string) error {
 	trimmed := strings.TrimSpace(name)
-	if len(trimmed) < 1 {
+	if trimmed == "" {
 		return fmt.Errorf("model: saved query name must not be empty")
 	}
-	if len(trimmed) > 120 {
+	if UTF16Len(trimmed) > 120 {
 		return fmt.Errorf("model: saved query name exceeds 120 characters")
 	}
 	return nil

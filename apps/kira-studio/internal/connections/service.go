@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -305,6 +306,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 
 	fields := in.ConnectionFields
 	fields.URI = uri
+	fields.Name = strings.TrimSpace(fields.Name)
 	id := uuid.NewString()
 	created, err := s.deps.Conns.InsertWithSecret(id, fields, kiratime.NowISO(), storedSecret)
 	if err != nil {
@@ -373,6 +375,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 
 	fields := in.ConnectionFields
 	fields.URI = uri
+	fields.Name = strings.TrimSpace(fields.Name)
 	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, kiratime.NowISO(), hasSecret, storedSecret)
 	if err != nil {
 		return model.ConnectionSummary{}, ipcerr.Wrap(err)

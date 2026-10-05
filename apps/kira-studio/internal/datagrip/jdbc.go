@@ -5,7 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // defaultPort mirrors packages/shared/domain/connection.ts's DEFAULT_PORT — kept as its own copy
@@ -378,16 +379,9 @@ var kindAccent = map[string]string{
 }
 
 // truncateName is D7's 120-character name cap, applied before the connection is ever built —
-// connections.Input.Validate *rejects* a name over 120 bytes rather than truncating it, so the
+// connections.Input.Validate *rejects* a name over 120 UTF-16 units rather than truncating it, so the
 // importer must already have shortened it, and separately report the truncation as a warning.
 // Cuts on a rune boundary so the result is never invalid UTF-8.
 func truncateName(name string) (out string, truncated bool) {
-	if len(name) <= 120 {
-		return name, false
-	}
-	cut := 120
-	for cut > 0 && !utf8.RuneStart(name[cut]) {
-		cut--
-	}
-	return name[:cut], true
+	return model.TruncateUTF16(name, 120)
 }
