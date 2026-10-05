@@ -742,6 +742,7 @@ func (s *AdeTaskService) OpenReviewWindow(ctx context.Context, args adewire.Bran
 		return false, adeTaskError(err)
 	}
 	if res.Existing {
+		s.FocusWindow(res.Key)
 		return false, nil
 	}
 	s.OpenWindow(shell.WindowRecord{Key: res.Key, Order: res.Order})
