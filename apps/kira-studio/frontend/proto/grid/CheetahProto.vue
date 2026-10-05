@@ -338,10 +338,18 @@ function openMenu(ev: MouseEvent, record: number, displayCol: number, header: bo
   }
 }
 
-function inSortZone(grid: ListGrid<unknown>, col: number, row: number, event: MouseEvent): boolean {
+type HeaderZone = 'resize' | 'sort' | 'body';
+
+// Cheetah starts a column resize only when `mousedown_cell` is not cancelled, so a press on a
+// header border has to fall through to it. The library's own hit width is 5 px.
+const RESIZE_EDGE = 5;
+
+function headerZone(grid: ListGrid<unknown>, col: number, row: number, event: MouseEvent): HeaderZone {
   const origin = grid.getElement().getBoundingClientRect();
   const cell = grid.getCellRelativeRect(col, row);
-  return event.clientX - origin.left - cell.left >= cell.width - SORT_ZONE;
+  const x = event.clientX - origin.left - cell.left;
+  if (x >= cell.width - RESIZE_EDGE || x <= RESIZE_EDGE) return 'resize';
+  return x >= cell.width - SORT_ZONE && col > 0 ? 'sort' : 'body';
 }
 
 function setHoverHeader(grid: ListGrid<unknown>, pageCol: number, col: number): void {
@@ -360,13 +368,16 @@ function bindGrid(grid: ListGrid<unknown>): void {
     if (e.event.button !== 0) return false;
     const record = e.row - HEADER_ROWS;
     if (e.row < HEADER_ROWS) {
-      if (e.col > 0 && inSortZone(grid, e.col, e.row, e.event)) {
+      const zone = headerZone(grid, e.col, e.row, e.event);
+      if (zone === 'resize') return true;
+      if (zone === 'sort') {
         cycleSort(state, state.order[e.col - 1] as number, e.event.shiftKey);
         applyOrder();
         return false;
       }
       setSelection(e.col === 0 ? selectAll() : selectColumns(state.selection, e.col - 1, mods(e.event)));
-      grid.focus();
+      // The browser's own mousedown default parks focus on the body after this handler returns.
+      requestAnimationFrame(() => grid.focus());
       return false;
     }
     if (e.col === 0) {
@@ -520,7 +531,7 @@ onMounted(async () => {
   };
   raw.allowRangePaste = false;
   bindGrid(raw);
-  if (__KIRA_DEBUG_HOOKS__) installDebugHook({ grid: raw, state });
+  if (__KIRA_DEBUG_HOOKS__) installDebugHook({ grid: raw, state, navOf: navFor });
 });
 </script>
 

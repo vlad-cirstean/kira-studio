@@ -30,6 +30,8 @@
     "proto:dev:grid": "cd apps/kira-studio/frontend && vite --config vite.proto.config.ts",
     "proto:build:grid": "cd apps/kira-studio/frontend && vite build --config vite.proto.config.ts",
     "proto:build:grid:hooks": "cd apps/kira-studio/frontend && KIRA_DEBUG_HOOKS=1 vite build --config vite.proto.config.ts",
+    "build:proto:test": "bun run proto:build:grid:hooks",
+    "test:proto:studio": "bun run build:proto:test && playwright test --config=apps/kira-studio/playwright.proto.config.ts",
     "proto:preview:grid": "cd apps/kira-studio/frontend && vite preview --config vite.proto.config.ts",
     "build:test:space": "cd apps/kira-space/frontend && bun run build:test",
     "build:vscode": "bun run scripts/build-vscode.ts",
