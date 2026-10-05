@@ -54,7 +54,12 @@ type repoCaches struct {
 	contain   *lru.Cache[containKey, containment]
 	patchIDs  *lru.Cache[string, map[string]struct{}] // target tip -> patch ids of its recent commits
 	commits   *lru.Cache[string, string]              // printed sha -> full commit id (found shas only)
+	ancestor  *lru.Cache[tipPair, bool]               // (older, newer) -> older is an ancestor of newer
+	since     *lru.Cache[tipPair, int]                // (older, newer) -> commits in older..newer
 }
+
+// tipPair keys a git fact on two immutable commit ids.
+type tipPair struct{ from, to string }
 
 func newRepoCaches() *repoCaches {
 	b, _ := lru.New[branchFactsKey, branchFactsValue](branchFactsCacheCap)
@@ -62,7 +67,9 @@ func newRepoCaches() *repoCaches {
 	c, _ := lru.New[containKey, containment](branchFactsCacheCap)
 	p, _ := lru.New[string, map[string]struct{}](patchIDCacheCap)
 	r, _ := lru.New[string, string](patchIDCacheCap)
-	return &repoCaches{branch: b, mergeTree: m, contain: c, patchIDs: p, commits: r}
+	a, _ := lru.New[tipPair, bool](branchFactsCacheCap)
+	n, _ := lru.New[tipPair, int](branchFactsCacheCap)
+	return &repoCaches{branch: b, mergeTree: m, contain: c, patchIDs: p, commits: r, ancestor: a, since: n}
 }
 
 // resolveQueuedRef is §0.14's own identity rule: refs/heads/<b> when present, else

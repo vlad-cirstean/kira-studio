@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/adewire"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
@@ -90,6 +91,32 @@ func containsOwn(ctx context.Context, entry *gitsession.RepoEntry, caches *repoC
 	return res, nil
 }
 
+func isAncestorCached(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, older, newer string) (bool, error) {
+	key := tipPair{older, newer}
+	if v, ok := caches.ancestor.Get(key); ok {
+		return v, nil
+	}
+	v, err := entry.IsAncestor(ctx, older, newer)
+	if err != nil {
+		return false, err
+	}
+	caches.ancestor.Add(key, v)
+	return v, nil
+}
+
+func countRangeCached(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, from, to string) (int, error) {
+	key := tipPair{from, to}
+	if v, ok := caches.since.Get(key); ok {
+		return v, nil
+	}
+	v, err := entry.CountRange(ctx, from, to)
+	if err != nil {
+		return 0, err
+	}
+	caches.since.Add(key, v)
+	return v, nil
+}
+
 func squashMerged(ctx context.Context, entry *gitsession.RepoEntry, caches *repoCaches, baseTip, tip, targetTip string) (bool, error) {
 	id, err := entry.DiffPatchID(ctx, baseTip, tip)
 	if err != nil || id == "" {
@@ -166,11 +193,11 @@ func (b *TaskBoard) integrationRow(ctx context.Context, sc *boardCtx, sb model.A
 		return row, nil
 	}
 	if hasMark && mark.MergedTip != tip {
-		descends, err := sc.entry.IsAncestor(ctx, mark.MergedTip, tip)
+		descends, err := isAncestorCached(ctx, sc.entry, sc.caches, mark.MergedTip, tip)
 		if err != nil {
 			return row, err
 		}
-		inTarget, err := sc.entry.IsAncestor(ctx, tip, targetTip)
+		inTarget, err := isAncestorCached(ctx, sc.entry, sc.caches, tip, targetTip)
 		if err != nil {
 			return row, err
 		}
@@ -193,7 +220,7 @@ func (b *TaskBoard) integrationRow(ctx context.Context, sc *boardCtx, sb model.A
 		}
 	case hasMark:
 		row.Status = "stale"
-		since, err := sc.entry.CountRange(ctx, mark.MergedTip, tip)
+		since, err := countRangeCached(ctx, sc.entry, sc.caches, mark.MergedTip, tip)
 		if err != nil {
 			return row, err
 		}
@@ -267,6 +294,13 @@ func (b *TaskBoard) RecordMerge(ctx context.Context, branchID, target string) er
 	if b.deps.Facts == nil {
 		return invalid("facts store is not available")
 	}
+	held, err := tipInTarget(ctx, entry, inv, remote, row.Tip, target)
+	if err != nil {
+		return err
+	}
+	if !held {
+		return invalid("%s is not in %s yet; nothing recorded", sb.Name, target)
+	}
 	err = b.deps.Facts.UpsertMark(model.AdeBranchMark{
 		BranchID: sb.ID, Kind: "target", Name: target, MergedTip: row.Tip, Recorded: true, UpdatedAt: b.deps.Now().UnixMilli(),
 	})
@@ -275,6 +309,23 @@ func (b *TaskBoard) RecordMerge(ctx context.Context, branchID, target string) er
 	}
 	b.notifyBoard()
 	return nil
+}
+
+// tipInTarget reports whether tip is reachable from the local or the default remote's target branch.
+func tipInTarget(ctx context.Context, entry *gitsession.RepoEntry, inv []porcelain.InventoryRef, remote, tip, target string) (bool, error) {
+	for _, r := range inv {
+		if r.Short != target || (r.Remote != "" && r.Remote != remote) {
+			continue
+		}
+		in, err := entry.IsAncestor(ctx, tip, r.Tip)
+		if err != nil {
+			return false, err
+		}
+		if in {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // marksOfRepo reads the stored marks of one repo's live branches, keyed branch id + target name.

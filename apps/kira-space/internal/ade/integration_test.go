@@ -170,17 +170,21 @@ func TestIntegration_recordMerge(t *testing.T) {
 	if err := f.board.RecordMerge(ctx, "b-rec", "staging"); err == nil {
 		t.Fatal("unconfigured target accepted")
 	}
+	if err := f.board.RecordMerge(ctx, "b-rec", "develop"); err == nil {
+		t.Fatal("merge recorded while the target lacks the tip")
+	}
+	f.onDevelop("merge -q --ff-only rec")
 	if err := f.board.RecordMerge(ctx, "b-rec", "develop"); err != nil {
 		t.Fatalf("RecordMerge: %v", err)
 	}
 	got := f.integration("rec")
-	if got.Status != "stale" || !got.Recorded || got.Note != "no longer in develop" {
-		t.Fatalf("recorded without git evidence: %+v", got)
-	}
-	f.onDevelop("merge -q --ff-only rec")
-	got = f.integration("rec")
 	if got.Status != "merged" || !got.Recorded {
 		t.Fatalf("recorded then merged: %+v", got)
+	}
+	f.onDevelop("reset -q --hard main")
+	got = f.integration("rec")
+	if got.Status != "stale" || !got.Recorded || got.Note != "no longer in develop" {
+		t.Fatalf("recorded merge dropped from target: %+v", got)
 	}
 }
 
