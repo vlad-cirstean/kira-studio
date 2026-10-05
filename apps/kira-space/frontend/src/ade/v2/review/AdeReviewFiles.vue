@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../../repo/git/gitUiModule';
 import { gitTransportFor } from '../../../repo/git/transport';
+import { ensureRepoOpen } from '../../../state/repoOpenHold';
 import type { ReviewWindowTarget } from '../wire';
 
 // The review window's left pane: git-ui's review view on this window's branch and base, listing
@@ -18,10 +19,13 @@ let handle: MountHandle | null = null;
 onMounted(async () => {
   if (!container.value) return;
   try {
+    // The review view only asks about a repo this connection already holds.
+    const transport = gitTransportFor(props.target.codeRepoId);
+    await ensureRepoOpen(transport, props.target.gitRepoId);
     const { mount, NullViewStateStore } = await loadGitUi();
     if (!container.value) return;
     handle = mount(container.value, {
-      transport: gitTransportFor(props.target.codeRepoId),
+      transport,
       viewState: new NullViewStateStore(),
       host: 'kira',
       view: 'review',

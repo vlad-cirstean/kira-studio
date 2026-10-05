@@ -11,7 +11,7 @@
 // still owns; registering either once per expanded multi-diff section would mean the last section
 // mounted wins, silently shadowing the others'.
 import type { DiffSide } from '@shared/domain/repo';
-import { type Ref, ref } from 'vue';
+import { type Ref, ref, shallowRef } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
@@ -183,7 +183,7 @@ export function useDiffEditor(
 ): DiffEditorHandle {
   const state = ref<DiffEditorState>('loading');
   const errorMessage = ref('');
-  const editor = ref<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
+  const editor = shallowRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null);
   let goToFileImpl: (() => void) | null = null;
 
   async function mount(): Promise<void> {
