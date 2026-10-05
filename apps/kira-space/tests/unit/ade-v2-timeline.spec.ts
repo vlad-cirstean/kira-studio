@@ -12,7 +12,6 @@ import { mkBranch, mkPlan, mkTask } from './support/adeV2Fixtures';
 const TODAY = '2026-09-22';
 const SETTINGS = {
   panelWidth: 0,
-  allAgentsFilter: 'active' as const,
   horizonDays: 14,
   historyDays: 14,
   extraDays: [] as string[],

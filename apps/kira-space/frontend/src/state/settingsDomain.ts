@@ -95,7 +95,6 @@ const adeSettingsSchema = /*#__PURE__*/ z.object({
       message: 'expected 0 or 340..4000',
     })
     .default(0),
-  allAgentsFilter: z.enum(['active', 'older']).default('active'),
   horizonDays: z
     .number()
     .int()
@@ -137,7 +136,6 @@ const settingsSchema = /*#__PURE__*/ z.object({
   }),
   ade: adeSettingsSchema.default({
     panelWidth: 0,
-    allAgentsFilter: 'active',
     horizonDays: 14,
     historyDays: 14,
     extraDays: [],
@@ -179,7 +177,6 @@ export const defaultSettings: Settings = {
   },
   ade: {
     panelWidth: 0,
-    allAgentsFilter: 'active',
     horizonDays: 14,
     historyDays: 14,
     extraDays: [],
