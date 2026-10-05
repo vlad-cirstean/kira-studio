@@ -158,7 +158,10 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // P111: 40 -> 41, one new PullPreflight field (rebaseMerges) and one new remote.run param
 // (rebaseMerges) -- the pull executor stops re-deriving --rebase-merges from config and takes it
 // from the preflight the client already ran. No new request, no new event, no SQL migration.
-export const CONTRACT_VERSION = 41;
+// P150: 41 -> 42, one new request (review.snapshot) -- the stored text a file had when it was last
+// reviewed, so a review window's since-review left side survives a rewritten branch. No new
+// event, no SQL migration beyond review.db's own pinned column.
+export const CONTRACT_VERSION = 42;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -238,6 +241,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.files': true,
   'review.fileDiff': true,
   'review.mark': true,
+  'review.snapshot': true,
   'review.comment.add': true,
   'review.comment.list': true,
   'review.comment.remove': true,

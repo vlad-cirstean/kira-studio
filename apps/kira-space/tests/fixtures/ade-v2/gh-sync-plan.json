@@ -1,0 +1,55 @@
+{
+  "status": "ok",
+  "message": "",
+  "account": "kira-scratch",
+  "pr": {
+    "number": 42,
+    "title": "Billing dashboard",
+    "state": "open",
+    "url": "https://github.com/acme/web-app/pull/42"
+  },
+  "headSha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+  "localTip": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+  "files": [
+    {
+      "path": "src/a.ts",
+      "action": "mark",
+      "reason": ""
+    },
+    {
+      "path": "src/b.ts",
+      "action": "unmark",
+      "reason": ""
+    },
+    {
+      "path": "src/c.ts",
+      "action": "alreadyViewed",
+      "reason": ""
+    },
+    {
+      "path": "src/d.ts",
+      "action": "skip",
+      "reason": "notReviewed"
+    },
+    {
+      "path": "src/e.ts",
+      "action": "skip",
+      "reason": "partial"
+    },
+    {
+      "path": "src/f.ts",
+      "action": "skip",
+      "reason": "changedSinceReview"
+    },
+    {
+      "path": "src/g.ts",
+      "action": "skip",
+      "reason": "differsFromPrHead"
+    },
+    {
+      "path": "src/h.ts",
+      "action": "skip",
+      "reason": "notInPr"
+    }
+  ]
+}

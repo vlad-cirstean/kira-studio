@@ -162,7 +162,10 @@ package gitrpc
 // P111: 40 -> 41, one new PullPreflight field (rebaseMerges) and one new remote.run param
 // (rebaseMerges) -- the pull executor stops re-deriving --rebase-merges from config and takes it
 // from the preflight the client already ran. No new request, no new event, no SQL migration.
-const ContractVersion = 41
+// P150: 41 -> 42, one new request (review.snapshot) -- the stored text a file had when it was last
+// reviewed, so a review window's since-review left side survives a rewritten branch. No new
+// event, no SQL migration beyond review.db's own pinned column.
+const ContractVersion = 42
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

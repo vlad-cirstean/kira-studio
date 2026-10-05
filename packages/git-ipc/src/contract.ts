@@ -1659,6 +1659,19 @@ export type Contract = {
       };
       result: { readonly review: ReviewFileStatus };
     };
+    /**
+     * P150: the stored text of `path` as it was when last reviewed, read from review.db's own
+     * compressed snapshot (no git object read, so it survives a rewritten or unreachable tip).
+     * `absent` = no record or no stored snapshot; `reviewedAtSha` is the tip at that review.
+     */
+    'review.snapshot': {
+      params: { repoId: string; branch: string; path: string };
+      result: {
+        readonly kind: 'none' | 'text' | 'binary' | 'tooLarge' | 'absent';
+        readonly text: string | null;
+        readonly reviewedAtSha: string | null;
+      };
+    };
     /** G13 D11/D15: anchors a new comment to `at` — the revision the caller says it was reading,
      *  required with no default (a default of "the tip" is exactly the silent mis-anchor D8
      *  exists to prevent). Returns the whole comment, id included, so the caller can render its

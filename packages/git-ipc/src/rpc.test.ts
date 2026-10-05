@@ -139,6 +139,7 @@ function stubHandlers(
       'review.files': notImplemented,
       'review.fileDiff': notImplemented,
       'review.mark': notImplemented,
+      'review.snapshot': notImplemented,
       'review.comment.add': notImplemented,
       'review.comment.list': notImplemented,
       'review.comment.remove': notImplemented,

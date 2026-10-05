@@ -1,0 +1,22 @@
+{
+  "session": {
+    "id": "rv01",
+    "claudeSessionId": "claude-rv01",
+    "mode": "tui",
+    "state": "running",
+    "activity": "idle",
+    "terminalId": "term-rv01",
+    "taskId": "T_bill",
+    "branchId": "",
+    "stageId": "",
+    "stepId": "",
+    "runId": "",
+    "resumes": "",
+    "purpose": "review",
+    "cwd": "~/wt/web-app/billing-dashboard",
+    "cwdMissing": false,
+    "startedAt": 1790060500000,
+    "lastActiveAt": 1790067700000
+  },
+  "hostWindowKey": "main"
+}

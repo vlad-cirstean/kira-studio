@@ -356,6 +356,7 @@ export interface Session {
   stepId: string;
   runId: string /* headless */;
   resumes: string /* headless claude id */;
+  purpose: '' | 'review';
   cwd: string;
   cwdMissing: boolean;
   startedAt: number;
@@ -369,6 +370,63 @@ export interface Launch {
   sessionId: string;
   command: string;
   cwd: string;
+}
+
+// ---- review (P150)
+export interface WindowKeyArgs {
+  windowKey: string;
+}
+export interface ReviewWindowTarget {
+  taskId: string;
+  branchId: string;
+  codeRepoId: string;
+  gitRepoId: string;
+  branch: string;
+  base: string;
+  worktree: string;
+}
+export interface ReviewAgentState {
+  session: Session | null;
+  hostWindowKey: string /* '' = not running */;
+}
+export interface ReviewAgentLaunch {
+  launch: Launch;
+  resumed: boolean;
+  note: string /* '' or why a fresh one started */;
+}
+export type GhSyncStatus =
+  | 'ok'
+  | 'noPr'
+  | 'prClosed'
+  | 'disabled'
+  | 'ghMissing'
+  | 'unauthenticated'
+  | 'unavailable'
+  | 'headNotFetched';
+export interface GhSyncFile {
+  path: string;
+  action: 'mark' | 'unmark' | 'alreadyViewed' | 'skip';
+  reason: '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr';
+}
+export interface GhSyncPlan {
+  status: GhSyncStatus;
+  message: string;
+  account: string;
+  pr: PR | null;
+  headSha: string;
+  localTip: string;
+  files: GhSyncFile[];
+}
+export interface GhSyncFailure {
+  path: string;
+  error: string;
+}
+export interface GhSyncResult {
+  status: GhSyncStatus;
+  message: string;
+  marked: string[];
+  unmarked: string[];
+  failed: GhSyncFailure[];
 }
 
 // ---- push payloads

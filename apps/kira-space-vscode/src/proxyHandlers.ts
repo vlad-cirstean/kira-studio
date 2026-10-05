@@ -493,6 +493,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // and last of those was closed above (review.open).
     'review.files': forward('review.files'),
     'review.fileDiff': forward('review.fileDiff'),
+    'review.snapshot': forward('review.snapshot'),
     // G15 D7: a webview-side mark (the sidebar's whole-file toggle) also refreshes every editor
     // decoration tracked for the same (repoId, branch, path) — the exact shape review.comment.add/
     // remove/clear already have below.

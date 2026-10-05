@@ -466,6 +466,21 @@ type ReviewMarkResult struct {
 	Review gitsession.ReviewFileStatus `json:"review"`
 }
 
+// ReviewSnapshotParams is review.snapshot's own request (P150).
+type ReviewSnapshotParams struct {
+	RepoID string `json:"repoId"`
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+}
+
+// ReviewSnapshotResult is review.snapshot's own result: Kind is "none" | "text" | "binary" |
+// "tooLarge" | "absent"; Text is set only for "text".
+type ReviewSnapshotResult struct {
+	Kind          string  `json:"kind"`
+	Text          *string `json:"text"`
+	ReviewedAtSha *string `json:"reviewedAtSha"`
+}
+
 // ---------------------------------------------------------------------------------------
 // G13 — inline AI review comments (D1, D11). review.comment.list's own result is gitsession's own
 // wire-shaped type (gitsession.CommentListResult) — D5's own precedent applied again. Every method

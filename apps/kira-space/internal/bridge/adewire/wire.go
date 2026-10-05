@@ -393,6 +393,7 @@ type Session struct {
 	StepID          string `json:"stepId"`
 	RunID           string `json:"runId"`
 	Resumes         string `json:"resumes"`
+	Purpose         string `json:"purpose"` // '' | 'review'
 	Cwd             string `json:"cwd"`
 	CwdMissing      bool   `json:"cwdMissing"`
 	StartedAt       int64  `json:"startedAt"`
@@ -590,6 +591,67 @@ type RunArgs struct {
 
 type TaskArgs struct {
 	TaskID string `json:"taskId"`
+}
+
+type WindowKeyArgs struct {
+	WindowKey string `json:"windowKey"`
+}
+
+// ReviewWindowTarget is what a review window reviews (P150).
+type ReviewWindowTarget struct {
+	TaskID     string `json:"taskId"`
+	BranchID   string `json:"branchId"`
+	CodeRepoID string `json:"codeRepoId"`
+	GitRepoID  string `json:"gitRepoId"`
+	Branch     string `json:"branch"`
+	Base       string `json:"base"`
+	Worktree   string `json:"worktree"`
+}
+
+// ReviewAgentState is the task's review agent row; HostWindowKey is ” unless it runs.
+type ReviewAgentState struct {
+	Session       *Session `json:"session"`
+	HostWindowKey string   `json:"hostWindowKey"`
+}
+
+// ReviewAgentLaunch carries Note when a fresh conversation replaced a resume.
+type ReviewAgentLaunch struct {
+	Launch  Launch `json:"launch"`
+	Resumed bool   `json:"resumed"`
+	Note    string `json:"note"`
+}
+
+// GhSyncStatus: 'ok' | 'noPr' | 'prClosed' | 'disabled' | 'ghMissing' | 'unauthenticated' |
+// 'unavailable' | 'headNotFetched'.
+type GhSyncStatus string
+
+type GhSyncFile struct {
+	Path   string `json:"path"`
+	Action string `json:"action"` // 'mark' | 'unmark' | 'alreadyViewed' | 'skip'
+	Reason string `json:"reason"` // '' | 'notReviewed' | 'partial' | 'changedSinceReview' | 'differsFromPrHead' | 'notInPr'
+}
+
+type GhSyncPlan struct {
+	Status   GhSyncStatus `json:"status"`
+	Message  string       `json:"message"`
+	Account  string       `json:"account"`
+	Pr       *PR          `json:"pr"`
+	HeadSha  string       `json:"headSha"`
+	LocalTip string       `json:"localTip"`
+	Files    []GhSyncFile `json:"files"`
+}
+
+type GhSyncFailure struct {
+	Path  string `json:"path"`
+	Error string `json:"error"`
+}
+
+type GhSyncResult struct {
+	Status   GhSyncStatus    `json:"status"`
+	Message  string          `json:"message"`
+	Marked   []string        `json:"marked"`
+	Unmarked []string        `json:"unmarked"`
+	Failed   []GhSyncFailure `json:"failed"`
 }
 
 type ReadLogArgs struct {
