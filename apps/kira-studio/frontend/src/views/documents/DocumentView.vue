@@ -487,11 +487,23 @@ const rowHeights = computed<number[]>(() => {
 // own `rowHeights` prop did (a document row's collapsed head vs. expanded body).
 const scrollEl = ref<HTMLElement | null>(null);
 
+// Overscan in px, not rows (P161): 8 rows is 1 280 px of off-screen markup for 160 px expanded
+// documents, and a fast flick re-renders all of it each frame. Collapsed lists keep the 8-row cap.
+const OVERSCAN_PX = 320;
+const overscanRows = computed(() => {
+  const heights = rowHeights.value;
+  if (heights.length === 0) return 8;
+  let sum = 0;
+  for (const h of heights) sum += h;
+  return Math.min(8, Math.max(2, Math.ceil(OVERSCAN_PX / (sum / heights.length))));
+});
+
 const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => rows.value.length,
   rowHeight: () => 26,
   rowHeights: () => rowHeights.value,
   scrollElement: scrollEl,
+  overscan: () => overscanRows.value,
 });
 
 // One tooltip for every row's Edit/Delete (RowActionButton.vue): anchored to a fixed, invisible span

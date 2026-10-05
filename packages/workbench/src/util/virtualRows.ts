@@ -29,7 +29,8 @@ export interface UseVirtualRowsOptions {
    *  Falls back to the uniform `rowHeight` when absent or when an index has none. */
   rowHeights?: () => readonly number[] | undefined;
   scrollElement: Ref<HTMLElement | null>;
-  overscan?: number;
+  /** Rows rendered beyond the viewport on each side; a getter lets a caller size it from row heights. Default 8. */
+  overscan?: number | (() => number);
 }
 
 export function useVirtualRows(opts: UseVirtualRowsOptions) {
@@ -39,7 +40,9 @@ export function useVirtualRows(opts: UseVirtualRowsOptions) {
     },
     getScrollElement: () => opts.scrollElement.value,
     estimateSize: (index: number) => opts.rowHeights?.()?.[index] ?? opts.rowHeight(),
-    overscan: opts.overscan ?? 8,
+    get overscan() {
+      return typeof opts.overscan === 'function' ? opts.overscan() : (opts.overscan ?? 8);
+    },
   });
 
   // `estimateSize` isn't one of virtual-core's own memo deps (only `count` and the handful listed
