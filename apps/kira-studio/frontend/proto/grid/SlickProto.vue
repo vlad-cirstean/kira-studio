@@ -7,7 +7,7 @@ import {
   SlickHybridSelectionModel,
 } from 'slickgrid';
 import 'slickgrid/dist/styles/css/slick.grid.css';
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { categoryForTypeClass } from '../../src/theme/icons';
 import {
   alignmentFor,
@@ -22,6 +22,7 @@ import '../../src/views/shared/slick/slickTheme.css';
 import { createProtoData, GUTTER_FIELD, readParams } from './data';
 import { createState } from './state';
 import { readPalette } from './theme';
+import { createTrace, slickSource } from './trace';
 
 // biome-ignore lint/suspicious/noExplicitAny: same escape hatch SlickGridHost.vue uses.
 type KiraColumn = Column<any>;
@@ -33,6 +34,7 @@ const data = createProtoData(params.fixture);
 const state = createState(data, params, readPalette(params.rowHeight ?? undefined));
 const rowHeight = state.palette.rowHeight;
 
+const Hud = __KIRA_DEBUG_HOOKS__ ? defineAsyncComponent(() => import('./Hud.vue')) : null;
 const mountRef = ref<HTMLElement | null>(null);
 let grid: SlickGrid<RowHandle, KiraColumn> | null = null;
 
@@ -152,6 +154,7 @@ onMounted(() => {
   }
   grid.init();
   grid.render();
+  if (__KIRA_DEBUG_HOOKS__) window.__kiraProtoTrace = createTrace(slickSource(el, rowHeight));
 });
 
 onBeforeUnmount(() => grid?.destroy());
@@ -167,5 +170,6 @@ onBeforeUnmount(() => grid?.destroy());
     }"
   >
     <div ref="mountRef" class="slick-grid-mount"></div>
+    <component :is="Hud" v-if="Hud" />
   </div>
 </template>

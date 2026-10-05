@@ -22,7 +22,8 @@ export default defineConfig(async (env) => {
     resolve: { dedupe: ['vue', 'cheetah-grid'] },
     preview: { host: '127.0.0.1', port: 9246, strictPort: true },
     build: {
-      outDir: 'dist-proto',
+      // Hooks builds land beside the release build so a probe can serve both.
+      outDir: process.env.KIRA_PROTO_OUT ?? 'dist-proto',
       rolldownOptions: {
         input: { cheetah: page('cheetah'), slick: page('slick'), empty: page('empty') },
       },

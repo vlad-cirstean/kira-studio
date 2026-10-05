@@ -185,3 +185,4 @@ apps/kira-studio/bin/
 
 # P163 prototype build (apps/kira-studio/frontend/vite.proto.config.ts), never shipped.
 dist-proto/
+dist-proto-hooks/
