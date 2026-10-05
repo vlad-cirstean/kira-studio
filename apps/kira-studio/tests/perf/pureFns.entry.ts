@@ -106,6 +106,16 @@ export function runAll(reps: number): Record<string, number> {
   r('9.parseDocument x60 400B', () => {
     for (let i = 0; i < 60; i++) parseDocument(d400);
   });
+  // 10: one fieldNamesOnPage pass (JSON.parse + Object.keys per body), page of 10 000 x 400 B / 2 000 x 8 KB
+  const fieldPass = (bodies: string[]) => () => {
+    const names = new Set<string>();
+    for (const b of bodies) for (const k of Object.keys(JSON.parse(b))) names.add(k);
+    return names;
+  };
+  const small = Array.from({ length: 10_000 }, () => docOf(150));
+  const big = Array.from({ length: 2000 }, () => docOf(8192));
+  r('10.fieldNames pass 10000x400B', fieldPass(small), 3);
+  r('10.fieldNames pass 2000x8KB', fieldPass(big), 3);
   // 11: row menu, one 64 KiB body
   r('11.toPlainJson 64KB', () => toPlainJson(d64));
   r('11.toRelaxedText 64KB', () => toRelaxedText(d64));
