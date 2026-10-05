@@ -1,14 +1,14 @@
 // Shape of `window.__kiraGridProto`, shared by the debug hook and the Playwright helper
 // (apps/kira-studio/tests/proto/support/grid.ts). Pure types: no DOM, Vue or cheetah imports.
 
-export interface ViewportRect {
+interface ViewportRect {
   x: number;
   y: number;
   width: number;
   height: number;
 }
 
-export interface HookSelection {
+interface HookSelection {
   kind: 'cell' | 'range' | 'row' | 'column' | 'all' | null;
   /** Page rows, ascending. */
   rows: number[];
@@ -18,7 +18,7 @@ export interface HookSelection {
   active: { row: number; column: string } | null;
 }
 
-export interface HookCellState {
+interface HookCellState {
   text: string;
   isNull: boolean;
   truncated: boolean;
@@ -32,7 +32,7 @@ export interface HookCellState {
   navRect: ViewportRect | null;
 }
 
-export interface HookEditor {
+interface HookEditor {
   open: boolean;
   pageRow: number | null;
   column: string | null;
@@ -41,14 +41,14 @@ export interface HookEditor {
   vetoReason: string | null;
 }
 
-export interface HookHeader {
+interface HookHeader {
   sort: 'asc' | 'desc' | null;
   /** 1-based position among the sort terms. */
   sortOrder: number | null;
   key: 'PK' | 'FK' | null;
 }
 
-export interface HookRow {
+interface HookRow {
   inserted: boolean;
   deleted: boolean;
   dirty: boolean;

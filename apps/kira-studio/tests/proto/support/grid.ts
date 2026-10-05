@@ -1,12 +1,13 @@
 import type { Locator, Page } from '@playwright/test';
 import { type CellRect, gridLocator } from 'cheetah-grid-playwright';
-import type {
-  HookCellState,
-  HookEditor,
-  HookHeader,
-  HookRow,
-  HookSelection,
-} from '../../../frontend/proto/grid/hookTypes';
+import '../../../frontend/proto/grid/hookTypes';
+
+type Hook = NonNullable<Window['__kiraGridProto']>;
+type HookCellState = ReturnType<Hook['cellState']>;
+type HookEditor = ReturnType<Hook['editor']>;
+type HookHeader = ReturnType<Hook['header']>;
+type HookRow = ReturnType<Hook['rowState']>;
+type HookSelection = ReturnType<Hook['selection']>;
 
 // The prototype counterpart of tests/ui/support/grid.ts: same addressing (page row, column name),
 // but a cell is a canvas region, so it resolves through cheetah-grid-playwright's own locator plus

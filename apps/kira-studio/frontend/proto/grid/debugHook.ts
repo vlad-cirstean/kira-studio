@@ -2,7 +2,10 @@ import cheetahGrid, { type ListGrid } from 'cheetah-grid';
 import { categoryForTypeClass } from '../../src/theme/icons';
 import { alignmentFor } from '../../src/views/shared/page/columns';
 import { EDITOR_CLASS } from './edit';
-import type { HookCellState, KiraGridProtoHook } from './hookTypes';
+import type { KiraGridProtoHook } from './hookTypes';
+
+type HookCellState = ReturnType<KiraGridProtoHook['cellState']>;
+
 import { railOf } from './pending';
 import { markOf } from './search';
 import { selectedCols, selectedRows } from './selection';
