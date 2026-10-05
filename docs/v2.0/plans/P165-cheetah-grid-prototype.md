@@ -424,6 +424,17 @@ the Mac (trackpad lag, footprint). G5 fails as defined: the mechanical call-shap
 are not Locators, assertions move to `state()`) touches 89 % of asserting lines. Per section 12 that
 alone is GO with a test-surface follow-up (migration phase 6).
 
+### Final verdict: NO-GO (user decision, Mac run)
+
+The user compared `cheetah.html` and `slick.html` on a real Mac. No visible smoothness difference.
+Memory was worse on Cheetah: a larger spike that also returned to baseline more slowly. This is a
+user-reported observation, not a footprint number; G3 (`wkhost`) was never run, and `wkhost.swift`
+was never compiled. It matches the expected cost of canvas backing buffers (about 23 MB each at
+1600x900 CSS px, DPR 2) on top of the native scroller's tile memory. The container's headless WPE
+frame-rate gap did not carry over: headed WebKitGTK already ran the app at 56-59 fps against Cheetah's
+51-60. SlickGrid stays; the canvas migration is dropped. P162 ships the layer fix instead. The
+prototype code under `proto/grid/` stays as a comparison tool.
+
 ### Deviations
 
 - Hooks build writes `dist-proto-hooks`, release `dist-proto` (probe serves both).
