@@ -1239,8 +1239,8 @@ instead, with no left panel, no tab strip, and no "+" of its own — the shared
 `WorkbenchShellBase`'s own `tabStripVisible` prop (default `true`) gates the tab strip out for it.
 Kira Studio's own `MODES` stays pinned to `ModeRegistry<StudioMode, PanelModeDef>` (its shell still
 reads `.panel`/`.start` unconditionally, no full-layout module exists there yet); Kira Space's `ade`
-(P128's own placeholder, now the app's first full-layout module — see "Kira Space's `ade` module"
-below) is what the union exists for. `packages/workbench/src/components/ModeSwitcher.vue` (generic
+(P128's own placeholder, now the app's first full-layout module — see "ADE: Kira Space task
+planner (v2.0)" below) is what the union exists for. `packages/workbench/src/components/ModeSwitcher.vue` (generic
 over `M`) is the title-bar switcher itself, byte-identical markup to Kira Studio's pre-P128 inline
 one; Kira Space's own `TitleBar.vue` renders it for the first time.
 
@@ -2187,127 +2187,6 @@ arm `waiting` even when its own command is really a background watcher script, s
 never decoded (P86's own privacy rule, restated in Known open items below) — only `Monitor`/
 `ScheduleWakeup` by name can.
 
-**Kira Space's own agent runtime — spawning and tracking the Claude Code sessions its "agent merge
-queue" UI opens — is `apps/kira-space/internal/ade` (P129 Part 1; the UI itself landed in Parts
-3-7).**
-`ade.Tracker` is one instance, shared by `internal/terminal.BoundService.ComposeAgent` (the launch
-hook below), `terminal.Registry.OnChange` (`Reconcile`), `agenthooks.Manager`'s own `OnEvent`
-(`HandleEvent`), and `AdeService` (`bridge/ade.go`, bound as `PrepareLaunch`/`Send`/`Sessions`/
-`AgentSessions`). `PrepareLaunch` validates the request, mints a terminal id and records a pending
-launch intent; the renderer then opens that terminal through the ordinary, unchanged
-`TerminalService.Open` path, whose `ComposeAgent` seam (`internal/terminal/bound.go`, nil for Kira
-Studio) consumes the intent, inserts or revives the session's `ade_sessions` row as `running`, and
-appends the agent-hooks env and the initial prompt (a bracketed paste followed by a bare `\r`,
-`internal/ade/paste.go`) to the launch command — one spawn path, no second way in. A `time.AfterFunc`
-grace window (30s in production) covers the race between `Compose` returning and the PTY actually
-registering with `Registry`: `Reconcile` reads the live agent set itself on every call (both a spawn
-and an exit fire `Registry.OnChange`) and only stops a record whose terminal is gone *and* whose
-grace window has elapsed, so an exit notification that outraces its own spawn's notification can
-never wrongly stop a fresh record. `ade_sessions` (migration `0004`) persists across restarts;
-`Recover()` unconditionally marks every row a previous process life left `running` as `stopped`,
-called once at boot before any window exists — a fresh `Registry` never has that life's PTYs live.
-**Sessions are window-scoped, like every other terminal PTY (P103 Part 3's own choice, not revisited
-here):** closing the window that hosts a running Claude Code session kills its PTY same as any other
-terminal, and the record reads `stopped` — resumable (`claude --resume`, always in the session's own
-recorded cwd, never wherever the resuming call happens to run) but not literally still running
-behind the closed window. Changing PTY lifetime scope to survive a window close is out of this
-phase's own scope. **P129 Part 7 §0.12: a resume's recorded cwd can itself be gone** (an old
-worktree removed outside the app) — `Tracker.Prepare` `os.Stat`s it first and `os.MkdirAll`s it back
-if missing, so `claude --resume` still finds its transcript at the same project-key path (and the
-folder-trust entry keyed by that path needs no new prompt); a path that exists but is not a
-directory returns `ErrResumeCwdNotDir` (`E_INVALID`). The dialog itself forces `new worktree` for
-that case (`AdeAllAgentsView`'s `forceNew`), so the message tells Claude to create one — the app
-itself never runs `git worktree add`. `AdePrepareLaunchResult.Cwd` is the effective cwd either way
-(the recreated recorded one on resume, `args.Cwd` otherwise), and `deliver` opens the terminal there
-rather than at the renderer's own guess, so the PTY and the record always agree. The wire session
-carries `cwdMissing` (one `os.Stat` per stopped record per `Sessions()` call, never cached), which
-`AdeAllAgentsRow`'s own Start reads to force that same `new worktree` choice for a stopped session
-whose worktree is already gone, same as an archived one. **Unverified:** a real `claude` CLI's own
-cross-directory resume behaviour was never confirmed against the fallback above (the planning pass's
-own probe was stopped by this sandbox's permission classifier) — the live check only ever runs
-against Part 1's fake `claude` on `PATH`.
-
-**The "agent merge queue"'s own git facts and persistence — `apps/kira-space/internal/ade/queue.go`
-and `facts.go` (P129 Part 2; UI landed in Parts 3-7) — is a second, separate service from
-`ade.Tracker` above, sharing only the package and the `ade_sessions` table.** `ade_branches`/`ade_new_work`/
-`ade_plan`/`ade_colors` (migration `0005`) hold a queued item's own meta; every fact the board shows
-(ahead/behind, files, commits, dirty state, merged, conflicts) is recomputed on every `Snapshot`,
-never cached to disk. The facts pipeline runs in order: `BranchInventory` resolves each item to a
-local or remote-tracking ref (`exists: false` for neither); `inferParents` walks
-`kirastackparent`/deepest-ancestor/`start_from` (falling back to `main` for whichever branch closes
-a cycle) to assign each branch's `base`; per-branch ranges (`ahead`/`behind`/files/commits against
-that base) run under an `errgroup` (limit 4), cached by `(parentTip, tip)` since a tip pair is
-immutable; `pairFacts` then calls `git merge-tree --write-tree` for every `mine`-vs-`mine`/`review`
-pair whose own-file sets intersect, cached by tip pair. Design §3.1 named go-git for this in-memory
-three-way merge; declined because go-git v5's `Merge` is fast-forward-only (no three-way tree
-merge, so it cannot answer "does A conflict with B") — `git merge-tree --write-tree` (git ≥ 2.38)
-does exactly that, writing no worktree or index, reusing the same `porcelain` merge-tree builder/
-parser the git module already carries. A branch counts `merged` when its tip is reachable from
-`mainRef` and it once had `ahead > 0` (`had_commits`), or when `ResolveBranchPr`'s raw state reads
-`merged` (the ancestor check alone misses a squash or rebase merge, whose tip never becomes an
-ancestor); `merged_at` is set once and never cleared, so a history row's day never moves. New work
-with no branch yet is rebound automatically only when exactly one unqueued, unarchived local branch
-sits in a linked worktree whose reflog creation time is at or after the new work's first session
-start (minus a 5s slack); more than one candidate leaves it unbound and serves `branchCandidates`
-for `BindNewWork` to resolve explicitly. Every held repo lives on one shared `gitsession.Conn`
-(id `ade`), separate from the git module's own per-window streaming `Conn`s but wired to the same
-`Askpass` broker: its `credential.request` emits `kira:ade:credential` to the focused window,
-answered by `AdeService.ProvideCredential`, the same pattern `gitrpc`'s own remote-op handler
-already uses for the git module's user-driven pushes/fetches. Its
-`repo.changed` debounces 250ms per repo before `kira:ade:repo` fires (a plain write signals
-immediately, no debounce). `Refresh` fetches the default remote, then re-derives facts through the
-same `Snapshot` path used everywhere else (so the two never drift) before cross-checking
-`ResolveBranchPr` for a "mine" branch git itself hasn't detected as merged yet. `ForcePush` runs
-`--force-with-lease --force-if-includes` per branch, so a real remote move past the local tracking
-ref is rejected by git itself even though the lease's own preflight reads a local, possibly-stale
-tracking ref. `Archive` runs `WorktreeRemovePreflight`, refusing a blocked worktree outright and a
-dirty one unless the caller opts to discard, before removing any linked worktree and moving the
-item to history.
-
-P144 adds `rebaseChecker` (`ade/rebasecheck.go`) for the v2 task board: predicts whether a branch conflicts if rebased onto its base by calling `gitsession.RepoEntry.MergeTreeConflicts`, i.e. `git merge-tree --write-tree` (git >= 2.38; older git reports `failed`, no spawn). Results cache by base and tip sha. go-git stays declined, same reason as above.
-
-**P135 adds a third node kind to the queue, `dependency` — an external blocker with no git identity
-at all.** `ade_dependencies`/`ade_blockers` (migration `0006`) hold it: `AddDependency`/
-`UpdateDependency`/`ResolveDependency`/`SetBlocker` (`queue.go`) touch only those two tables and
-`notifyChanged`, never `openRepo` or any git-session call — the facts pipeline above (`facts.go`)
-never sees one, and it carries no branch, no ahead/behind, no PR. `SetBlocker`'s own `ade_blockers`
-link is many-to-one, client-repo-scoped (`ErrNotBlockable` when the target isn't a live `mine`/
-`parked` branch or new work — never a `review` item, an archived one, or another dependency);
-`Rebind`/`Archive` each own their own link cleanup (a rebound new work keeps its links, an archived
-item loses them). The frontend's own scheduling rule (`useQueue.ts`'s `applyDependencyDays`) never
-sits a dependency later than the earliest day any item it blocks needs it resolved by: its own day
-is `min(its own expectedBy, the earliest blocked item's day)`, and it reads `late` when its own
-`expectedBy` has passed or falls after that earliest need. It renders as a dotted-border, globe-icon
-box with no drag attributes (`data-ade-box`/`data-ade-row-movable` both absent, `data-ade-dependency`
-present instead) — a drop aimed at it falls through to the day band underneath, same as any other
-non-drop-target; a blocked item's own cell shows a chip (`blockedChipFor`) summing its own blockers,
-red once any is late. The estimate field is extend-only once set the same phase: the client hides the
-h/d toggle and number input behind a read-only total plus a separate "Extend by" delta once
-`estimate.num` is non-empty, and the server mirrors that in `checkEstExtends` (`adequeue.go`) —
-`UpdateNewWork`/`SetBranchMeta` run it inside their own transaction whenever the patch touches `est`,
-rejecting a shrink or a unit change with `ErrEstimateShrink`; a retried write at the same value is a
-no-op, and `Rebind`'s own internal copy of `est` from new work to its branch stays unguarded. A Jira
-key/title line under a row's own title (`AdeStackRow.vue`) grows that row, and its own action-column
-cell, from `h-10` to `h-14` — `ade/rowHeight.ts`'s `rowHeightClass` is the one place both read, so
-they never drift apart.
-
-**P136 adds `work_type` beside `kind` and caps the main timeline to five stacks of "my work".**
-`work_type` (`work`/`investigate`/`review`/`test`, migration `0007`, backfilled `review` where
-`kind = 'review'`) is the user-facing choice; `kind` stays the structural field (merge order,
-read-only banner). Invariant: `work`/`investigate` pair with `kind` `mine` or `parked`;
-`review`/`test` pair with `kind` `review`. New work takes only `work`/`investigate`.
-`Queue.SetWorkType` is its own write path, separate from `SetBranchMeta`, deriving `kind` in one
-transaction. It refuses `review`/`test` while the item has blocker links (`ErrWorkTypeBlocked`), and
-`review`/`test` on new work (`ErrWorkTypeInvalid`); both surface as `E_INVALID`. The details panel's
-Kind select (`AdeWorkTypeField.vue`) reads the stored value back and reverts when a write is
-refused. The cap is UI-level only: `useQueue` still computes every band, hour and status over all
-items; `myWorkCap.ts` filters presentation. It ranks non-parked, non-dependency stacks by (all members
-merged last, earliest segment day ascending with overdue first and Later last, first index in
-`view.segments`), keeps five, then adds every dependency blocking a kept member. `hiddenCount` is
-`stacks.length - visibleRoots.size`, so hidden parked stacks and unlinked dependencies count. The
-expand state (`showAllWork`) is a runtime ref in `AdeRepoView.vue`, reset by a repo-tab switch and
-never persisted. An explicit selection of a hidden item expands the list once per id.
-
 **The renderer talks to Go over two planes.** The **control plane** is the Wails-generated
 TypeScript bindings under `apps/kira-studio/frontend/bindings/…/internal/bridge/` (git-ignored, regenerated by
 `wails3 task common:generate:bindings`, which `scripts/setup.sh` calls), which `apps/kira-studio/frontend/src/bridge/control.ts` calls as plain
@@ -2463,10 +2342,10 @@ the only bound service the headless git module had, since everything else it did
 socket rather than the bindings; that whole surface, and the service itself, moved to Kira Space
 along with the rest of the module (see Git module, above) — Kira Studio's `main.go` binds no
 git-related service of any kind any more, confirmed by the grep above and the phase-closing audit's
-own service-list check, below. Kira Space's own `main.go` binds a separate **14**
+own service-list check, below. Kira Space's own `main.go` binds a separate **15**
 (`grep -c application.NewService apps/kira-space/main.go`; this count already included P116/P119's
 own additions — `KeepAwakeService`, `WindowsService`, `UpdateService` — before P128 touched it, and
-P129 Part 1's own `AdeService` since) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
+P129 Part 1's own ADE service (now `AdeTaskService`) since) for its own module. **`TerminalService` and `WindowsService` are each a per-app embedding of one shared
 Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 `internal/windowsvc.Service` (`Ensure`/`SetMode`/`OpenNew`) and `internal/terminal.BoundService`
 (`Open`/`Write`/`Resize`/`Close`/`DefaultCwd`) each live once at repo root; both apps'
@@ -2680,8 +2559,8 @@ than living behind a `'git'` `AppMode` inside a bigger shell; **P128 gave it a m
 own instead (§2.6-§2.8 below), not Kira Studio's `studio`/`api`/`terminal` vocabulary reused, but
 its own: `git` (this section, unchanged — still the whole of what P100-P127 built, just no longer
 the *only* thing mounted), `terminal` (the same shared Terminal module Kira Studio's own copy uses,
-§2.4 below), and `ade` (P128 placeholder, now the app's own agent-merge-queue surface — "Kira
-Space's `ade` module" below). `state/workspace.ts`'s `visibleWorkspace()` is the one function that
+§2.4 below), and `ade` (P128 placeholder, now the app's own task-planner surface — "ADE: Kira
+Space task planner (v2.0)" below). `state/workspace.ts`'s `visibleWorkspace()` is the one function that
 reads across both the mode store and the (git-only, unchanged) workspace store: the active repo (or
 no repo) while `git` is active, the active module's own id otherwise — `host.ts`'s `activeWorkspace`
 and `state/tabs.ts`'s tab-stepping actions read it instead of the workspace store directly, so a
@@ -2709,208 +2588,6 @@ frontend is still a separately-installed VS Code extension (`apps/kira-space-vsc
 `apps/kira-studio-vscode` at P100 Part 3) connecting as an external client, dialing the same Unix
 socket the native window's own in-process stream also reaches (see "Git graph in the native
 workspace (C10)" below).
-
-**Kira Space's `ade` module (P129 Part 3) is the first `layout: 'full'` module (see the `ModeDef`
-union paragraph above) — a full-area view, no left panel, no tab strip, replacing P128's own
-placeholder.** `apps/kira-space/frontend/src/ade/`: `AdeView.vue` (the module's `FullModeDef.view`
-— repo tabs plus the active repo's own view, or an empty state when no repository is imported yet)
-mounts `AdeRepoTabs.vue` (renders the shared `TabStrip` through `useAdeTabStripHost.ts`, one tab per imported repository, no
-close; drag-reorder persists `code_repos.sort_order` through `CodeWorkspaceService.ReorderRepos`
-(full-list rewrite, unknown ids skipped, unlisted rows appended), the same order the Git panel's repo
-list reads, and new imports land last; a needs-input badge summing every
-`attention`-phase session in that repo — every running session's own repo, not only a queued item's,
-`ade/activity.ts`'s own `needsInputByRepo`) and `AdeRepoView.vue` (that repo's sticky
-`AdeProjectHeader.vue` + `AdeMainLine.vue`; the timeline itself is Part 5's). `ade/useQueue.ts` is a
-pure port of the design mockup's own `renderVals()` — no Vue import, no reactivity, no clock read
-(`today` is an input) — cross-checked by `tests/unit/ade-queue-parity.spec.ts` running the mockup
-itself as an oracle via `node:vm`; the caller wraps it in `computed()`. `ade/queries.ts` wires 6 of
-`AdeService`'s 19 bound methods (`AgentSessions`, `Sessions`, `RepoSnapshot`, `RepoPrs`, `Refresh`,
-`ProvideCredential` — the rest land with their first consumer in later parts) through TanStack Vue
-Query: every query key is `['ade', ...]`-prefixed and `staleTime: Infinity` — freshness is entirely
-push-driven (`installAdeSignals`, called once from `main.ts`, no teardown: the window is the
-lifetime), never poll- or remount-driven, so a missing invalidation surfaces as a bug rather than
-hiding behind churn. Three pushes drive it: `kira:ade:sessions` invalidates the sessions list;
-`kira:ade:repo` invalidates one repo's snapshot/PRs; a session's own `Stop` (`kira:agent:event`)
-invalidates its repo's snapshot too (the linked-worktree dirty state an agent's edits leave behind).
-A `kira:ade:credential` prompt's `repoId` maps to a `codeRepoId` through `useCodeReposStore` (every
-window hydrates it at boot), not the snapshot cache — the focused window may never have loaded that
-repo's snapshot — and answers through the same `gitCredential.ts` store/`GitCredentialDialog.vue`
-the Git module's own askpass prompts already use, an unmapped `repoId` still enqueuing with no repo
-label rather than being dropped. `AgentSessionsControl`'s three members
-(`terminalAgentSessions`/`onAgentSessions`/`onAgentEvent`) satisfy P127's shared
-`createAgentSessionsStore` structurally, no adapter layer — Kira Space's own agent-activity store
-instance lives at `ade/state/agentSessions.ts`. `ade/state/adeUi.ts` (one Pinia store, one concern)
-owns the module's own runtime-only UI state: the active repo tab and a per-repo refresh note that
-persists until the next `Refresh`. `RepoSnapshot.main.name`/`.ref` hold short forms (`main`,
-`origin/main`), not full refnames, and `RepoSnapshot.remote` names the default remote — a Part 4
-fix, since `AdeMainLine` renders `main` verbatim.
-
-`ade` chrome colours are `--kira-*` tokens (P138): Tailwind utilities in templates, `var(--kira-*)`
-in style objects. Literals stay only for data that encodes queue state: tones (`TONE` in
-`ade/tones.ts`, with `TONE_INK` and one-site alpha tints), the dependency kind colour and the
-20-slot work `PALETTE` in `ade/useQueue.ts`. `scripts/check-ade-colours.sh` (in `bun run lint`)
-fails on any other colour literal under `ade/`, comments included, and on an allowlist entry with
-no hit left. Design §7's Claude accent is the theme's `--primary`. The gate cannot see a kept value
-used as chrome; review covers that.
-
-**Kira Space's `ade` dialog (P129 Part 4) adds the Claude Code send/launch/archive flow on top of
-Part 3's read-only view.** Part 6's detail panel now wires the last opener: `resumeSpec`'s caller is
-the Agents tab's own Stopped list (its per-row Resume button), and the activity-icon click Part 5
-left as selection-only now calls `adeUi.openSession`, which selects the item, switches to the
-Agents tab, and picks that session's own terminal tab in one store call. **P129 Part 7 §0.2/§0.11
-fixed a resume that had shipped broken and unexercised since this part:** `sendStart`'s `resume`
-branch now looks the record up in `ctx.sessions` and delivers `{ resume: session.id, branch:
-session.branch, newWorkId: session.newWorkId, cwd: session.cwd }` — the delivery target is the
-`ade_sessions` record, never the Claude session id `Tracker.Prepare` could never resolve — and
-`startResumeLines` reads that same session (`Resume session <8-char id>.`, its own branch, and the
-recorded cwd on the Worktree line, `create a new worktree for it` only when the dialog's own
-`askWt && wt === 'new'`), falling back to `branchNameOf`/`wtOf` only once the record itself is gone
-from a stale dialog. Rebase all (Part 4), Queue
-after and Move (a stack box's own action, `AdeStackBlock`), Start new/existing work (the action
-column's `▶ Start`), and the archive-at-risk dialog's trigger (the action column's Archive) already
-reached `dialogFlow.ts` from a real caller since Part 5. `ade/dialogCompose.ts` is a pure,
-byte-exact port of the design mockup's own `sendDialog()`/message templates (no Vue import, no
-`Date.now()`/`new Date()`), taking real queue/session data as parameters where the mockup read
-globals — cross-checked by `tests/unit/ade-dialog-parity.spec.ts` running the mockup itself as an
-oracle via `node:vm`, and by `ade-dialog-rules.spec.ts` for the busy-check/override/multi-root
-rules the mockup doesn't cover standalone. `ade/dialogFlow.ts` is the thin, still-pure orchestration
-layer above it (still no Vue import) that a store adapts into real calls: `sendDialog()` resolves
-each target to either `Send` (an already-running session) or `PrepareLaunch` +
-`openTerminalSession` (`ade/launch.ts`, a fresh one, reattaching if `PrepareLaunch` names an
-existing terminal), then arms a turn watch per target before the delivery call that can fail —
-`ade/turnWatch.ts`'s singleton `adeTurns` watcher resolves a target's `.done` on that terminal's
-`Stop`, gated by `requireSubmit`: `false` for a fresh launch (its first `Stop` completes the turn),
-`true` for `Send` to a running session (a `Stop` before *this* prompt's own `UserPromptSubmit`
-belongs to the turn already running and is ignored, never resolving `.done`) — a delivery that fails
-before arming, or whose watch never resolves, is cancelled rather than left to leak. A rewrite that
-touches more than one root's own stack (§0.13's multi-root split) sends one message per root rather
-than one shared message, the rule `ade-dialog-rules.spec.ts` pins. The archive-at-risk half
-(`requestArchive`/`justDeleteArchive`) fetches `ArchiveRisk` first: nothing at risk archives
-directly, a blocked worktree (`WorktreeRemoveBlocker`) surfaces as an `actionError`, "Just delete"
-discards and archives immediately, and "Send to Claude, then archive" sends a prompt and archives
-only on that session's own `Stop` — re-fetching `ArchiveRisk` first, reopening the dialog with the
-target's own choice preserved if still at risk. `ade/state/adeActions.ts` (one Pinia store, one
-concern, alongside `adeUi.ts`'s dialog-open state) owns in-flight delivery bookkeeping — which
-target is mid-send, which item has a pending "send then archive" — and the per-repo `actionError`
-`AdeRepoView.vue` renders as a dismissible Alert; it does not expose which item has a pending
-archive to the UI, since no queue row marks it this phase (see Known open items).
-
-**Kira Space's `ade` timeline (P129 Part 5) is the calendar/drag-and-drop surface `AdeMainLine`
-mounts below the queue read Part 3 already renders — `useQueue`'s own view facts (`bands`,
-`segments`, `cells`, `spans`, `parentOf`, `effDay`) drive every row this phase adds, still with no
-Vue import or clock read of their own.** `ade/timelineOps.ts` is the one module that both writes a
-plan (`movePlanArgs`) and decides whether a drop applies directly, opens Part 4's Move dialog, or
-refuses (`dropVerdict`) — no other file constructs a `SetPlan` `order`/`days` payload, so the drop
-rules (a parked branch applies directly; my own work always confirms; a day earlier than a
-non-review parent's own effective day refuses) live in exactly one place. `mutations.ts`'s
-`SetPlan` mutation is optimistic (`onMutate` cancels the in-flight snapshot query and writes the
-new plan locally; `onError` rolls back; Go's own `kira:ade:repo` push refetches), so a drag/menu action
-reflects immediately rather than waiting on the round trip. The DnD model is `vue-draggable-plus`
-(SortableJS) in `forceFallback` mode — a synthetic drag image driven by native mouse events rather
-than the HTML5 drag API SortableJS otherwise prefers, chosen because Playwright can drive
-`forceFallback` with a plain `mouse.move`/`down`/`up` sequence while HTML5 DnD has no such hook.
-`useTimelineDrag.ts` binds `useDraggable` with no `v-model` list — every sortable is a pass-through
-that leaves the DOM order alone and reports `onEnd` (the bound-id-list path is
-`util/useSortableReorder.ts`: `TabStrip.vue` and Studio's `ColumnsMenu`/`EnvironmentsView`/
-`VariableSetView`, each committing one move per drop); the actual drop target comes from
-`AdeTimeline.vue`'s own hit-test (`useElementByPoint`/`useMouse` from VueUse, `closest`ing
-`[data-ade-box]` then `[data-ade-band]`), never from Sortable's own index, since a fallback clone
-can land the pointer over stale DOM. A review row carries no `data-ade-row-movable`, so grabbing it
-bubbles to its box's own block-level sortable and drags the whole segment. History's open/closed
-state and how far it reaches back (`historyOpen`/`historyReach`) live as local refs on
-`AdeRepoView`, keyed by `activeRepoId` — switching repo tabs remounts and re-closes history, same
-as the design mockup; selection stays in `adeUi.ts`, since it must outlive that remount. The
-timeline writes four settings fields (`horizonDays`, `extraDays`, `offDays`, `workWeekendDays`) via
-`patchSettings`, which applies the resolved `SettingsService.Set` response back verbatim rather than
-merging optimistically client-side; `historyReach` stays runtime-only, never persisted.
-`AdeService.ForcePush` (P129 Part 4's own hand-off) gets its first renderer caller here: a
-protected-branch result opens `AdeConfirmDialog` with the failing result's own branch name as both
-the confirm token and the retry's `confirmProtected` value, not the original request's item id — a
-retry that still fails surfaces as an `actionError` instead of re-opening the confirm. A merged
-branch's archive lands on `useQueue`'s local-day band (`localDayOf`, not UTC) it was fixed to use
-earlier this same phase, so an archive in the evening in most zones doesn't appear to land on
-tomorrow.
-
-**Kira Space's `ade` detail panel (P129 Part 6) is a flex-row split on `AdeRepoView`'s own right
-edge — `QueueView.panel` (a pure `useQueue` fact, `null` when nothing is selected) drives it, still
-with no Vue import.** `AdePanelResizeHandle.vue` is hand-rolled on VueUse's `useDraggable`/
-`useDebounceFn` rather than shadcn/reka `ResizablePanelGroup`: a second nested
-`ResizablePanelGroup` inside `WorkbenchShell`'s own outer one is an unproven topology (P132 Part 1
-§0.1 found outer-vertical nesting hangs the render process there), and reka's own `sizeUnit="px"`
-re-runs layout on every container resize tick, the same feedback shape that hung SlickGrid. The
-handle only reports a candidate width (`resize` while dragging or on each arrow-key press, `commit`
-to persist); `AdeRepoView.vue` owns the clamp (`PANEL_MIN = 340`, max is the root's own width minus
-that) and the settings write. `settings.ade.panelWidth === 0` means "half the root's own live
-width" (`useElementSize`), not a literal zero-width panel — the only stored value that means
-anything other than itself. Meta writes route through `useItemMeta.ts`: `SetBranchMeta` for a real
-branch, `UpdateNewWork` for a draft, both validated client-side (Jira/PR paste parsing, the estimate
-regex, new-work's "name or key" guard) before either mutation fires; a review item only ever reaches
-`setNotes` (the component hides every other input for it, mockup `mineOnly`) — `useItemMeta` stays
-ignorant of that restriction rather than re-enforcing it. `startFrom: ''` means main, matching Part
-5's own `movePlanArgs` convention rather than a new one. Links open through `RepoWebURL` (`queue.go`,
-already resolved server-side into `RepoSnapshot.webUrl`) and an OS-opened `<a>` (`LinkService.
-OpenExternal`), never TipTap's own click handler. Notes use TipTap v3 with `@tiptap/markdown`, not
-the more obvious `tiptap-markdown`: the latter parses Markdown to HTML through `markdown-it` then
-`window.DOMParser()`, which needs a DOM `bun test` (this repo's only unit runner) doesn't have,
-where `@tiptap/markdown` parses through `marked` into ProseMirror JSON with no DOM, headless
-(`MarkdownManager({extensions}).parse/serialize`) — the only way the SPEC's own round-trip
-acceptance check runs in a unit test at all. One `notesExtensions()` factory
-(`ade/notesExtensions.ts`) is shared by the editor and that spec so the two can't drift. Only a
-user's own edit ever writes notes back (the refetch rule): a snapshot refetch while the editor is
-focused is dropped rather than resetting its content mid-typing, since nothing besides this editor
-ever changes `notes` server-side. The Agents tab (`AdeAgentsTab.vue`) mounts `TerminalHostView` only
-for a session whose terminal this window itself opened (`terminalsStore.terminalSession(id)`
-truthy) — a session running in another window shows a plain cross-window notice instead, never a
-second PTY for the same id. **P129 Part 7 §0.9 adds cross-window Open** (the All agents view's own
-row action, and any later caller): the notice still stays exactly as it was for a session the user
-reaches without going through Open (the Agents tab's own terminal-tab picker, most directly) —
-Open itself now tries to bring the owning window forward first, so the notice is a fallback, not a
-dead end. `AdeAgentsTab` is also the first `ade/` caller to mount an xterm at all,
-so `ade/state/adeTerminals.ts` (one Pinia store, one concern) reaps this window's own stopped ade
-terminals — nothing else in `ade/` ever called `closeTerminalSession`/`cleanupTabRuntime`, so a
-stopped session's `byTabId` entry, drain queue and xterm instance would otherwise outlive the
-session for the app's life. `adeUi.agentTabByItem` falls back to the first running session when an
-item has no pick yet (mockup parity — starting a new session does not itself pick its tab); the
-activity-icon hand-off (`adeUi.openSession`) is the one caller that does pick it, alongside
-selecting the item and switching to the Agents tab.
-
-**Kira Space's `ade` pinned "All agents" tab (P129 Part 7, the last P129 part) is a cross-repo view
-over the same per-repo data every repo tab already fetches — no new Go endpoint.** `adeUi.allAgents`
-(runtime only, default `false`) is a plain boolean, not a sentinel id inside `activeRepoId`:
-`AdeRepoView` is keyed and fed by that field and its own records watch resets any id it doesn't
-recognise, so a sentinel would need a guard there a flag doesn't. `showAllAgents()` sets only the
-flag; `activeRepoId` is left exactly as `showRepo` last set it (the mockup's own `lastRepo`) — read
-again the moment `showRepo` is next called, never exposed anywhere while the pinned tab shows
-(`useAdeTabStripHost.ts` reports the pinned tab's own sentinel as active regardless of it, and
-`AdeRepoView` itself is unmounted). `activity.ts`'s `activitySummary`/`actRank` are the tab's own
-count and the row sort's own urgency ranking, kept out of any tab markup. The pinned `All agents`
-tab is the shared `TabStrip`'s pinned slot: kind `ade-all-agents`, labelled (`pinnedTitle`), count
-in `#tab-leading`. `allAgents.ts` (no Vue import, no clock read) is the pure per-session row join: a
-session already attached to a `useQueue` item (`QueueItem.sessionIds`, a Part 7 addition) is live;
-else a `snapshot.history` entry matching the session's own branch or `newWorkId` is archived
-(`stopped · archived`, forced to `new worktree` on Start); else it is an orphan (its branch was
-removed outside the app), title falling back to the branch name. Rows sort within a repo by
-`actRank`, ties by `lastActiveAt` descending — the mockup ties by fixture order, which has no
-real-data equivalent. The view drives one `useQueries` (snapshot + PRs, same keys/options
-`adeSnapshotOptions`/`adePrsOptions` factor out for `AdeRepoView`'s own composables, so the cache is
-shared) and one `useQueue()` per repo that has at least one session — a repo never opened this
-session has nothing for the join to show and its own group is empty regardless, so it pays nothing.
-The Active/Older filter is `settingsStore.ade.allAgentsFilter` (Part 2's own settings leaf),
-written through the same `patchSettings` path `ade.panelWidth` uses. Open, same window
-(`terminalsStore.terminalSession(row.terminalId)` truthy): `showRepo` then `openSession`, or
-`showRepo` alone for an orphan. Open, cross-window (§0.9 above): `AdeService.FocusSession` looks
-the record up, confirms it is `running`, resolves its terminal's own window key
-(`terminal.Registry.WindowOf`) and brings that window forward (`shell.WindowRegistry.Focus` —
-`Show`/`UnMinimise`/`Focus` on the `*application.WebviewWindow`, each already `InvokeSync`-wrapped
-internally so calling them off the main goroutine is safe), then `EmitTo`s
-`kira:ade:open-session` at it; a `false` result (the owning window closed, or the session stopped,
-between render and click) falls back to the same local path, which then shows the ordinary
-cross-window notice until the next sessions refresh. Start from Older (row action `start`, a stopped
-session): opens the Claude dialog with `askWt: true` and `noSame` forced whenever the row is
-archived or its `cwdMissing` — design §2.4's "restarting an archived session only offers `new
-worktree`" and §0.12's cwd-recreation fallback share the one `noSame` flag. `AdeAllAgentsView`
-mounts one `AdeClaudeDialog` for whichever repo Start was last clicked on, since `AdeRepoView` (and
-its own dialog mount) is unmounted while this view shows.
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -3155,65 +2832,6 @@ word-splittable value, never re-parsed as a command. The package imports nothing
 standard library and knows nothing about repositories, sessions or approval; `gitsession` owns
 every policy decision and this package owns only the mechanism, letting the whole
 feature be tested without ever spawning a real shell.
-
-**ADE v2 facts (P145).**
-
-- Prepare timeout: per-repo `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
-  shared by git-ui worktree add and ADE. `Spec.Timeout` is required (> 0). G25 D12 ("no setting
-  raises it") is superseded.
-- Integration and deploy facts: one evaluator over `git cherry` plus `patch-id` (`gitclient` only, no
-  go-git), cached per repo by shas. Migration `0009` stores branch marks (`ade_branch_marks`) and
-  environment state (`ade_env_state`) for "was merged", "rebased since", "moved back".
-  `RecordMerge` is the only writer of `recorded = 1`.
-- Deploy scripts run through `gitprepare` plumbing in the repo root, 60s fixed timeout; failure
-  reports `unknown`.
-- The workflows folder under the app home is watched (`fsnotify`); a broken edit keeps the last
-  valid version. No workflow is seeded.
-- Full ADE rewrite of this document stays P149.
-
-**ADE v2 run engine (P146).**
-
-- Headless run: `$SHELL -l -c 'exec claude -p --output-format stream-json --verbose --session-id <uuid>
-  --mcp-config <file> --setting-sources <src> [--allowedTools …]'`, cwd the worktree, prompt on stdin,
-  `Setsid` + `procgroup.GracefulCancel`. No `--permission-mode`, no `--strict-mcp-config`;
-  `--allowedTools` is the step list plus `mcp__kira-ade__finish_step`.
-- `--setting-sources` (verified on CLI 2.1.289): in a fresh worktree repo allow rules are ignored
-  anyway; repo deny rules apply only with `project`. App setting `ade.headlessSettingSources` is
-  `all` (default, `user,project,local`) or `user`.
-- `finish_step` MCP server (`internal/adeagent`): one loopback listener, bearer token per run
-  (`tokenauth`), config file `<home>/ade/runs/<runId>.mcp.json` mode `0600`, deleted at process exit.
-  Token never on argv. Last call wins, applied at exit.
-- Run and setup logs live in SQLite (`ade_logs`, `ade_log_chunks`): tail 2 MiB per log, chunks of at
-  most 8 KiB, `truncated` set when head chunks drop. Writes batch every 250 ms.
-- `ade_sessions` (migration `0010`) holds v1 TUI rows (`task_id = ''`) and v2 rows (`mode`
-  `tui`/`headless`, `task_id`, `run_id`, `resumes`). v1 repo methods filter `task_id = ''`.
-- Todo progress `[n, m]` parses `TodoWrite` and `TaskCreate`/`TaskUpdate`. CLI 2.1.289 in `-p` mode
-  offers neither tool, so `todo` stays null live (see Known open items).
-
-**ADE v2 send-back, Take over and archive (P147).**
-
-- Send-back: a `back:<step>` failure queues a fix run of the target step with `claude -p --resume
-  <session id>`, so the Claude session id stays the same across rounds. `loops` is the round epoch;
-  3 rounds, then the run fails. Fix runs of a step on another repo or `once` branch get a note, not a run.
-- Per-run stop (`StopRun`, task archive, Take over) records its cause on the run.
-- Restart recovery: `Recover()` runs before `Start()`; `running` runs become `stuck` with note
-  `interrupted by restart`. Nothing auto-resumes (D7). A held fix run loses its resume options and
-  relaunches as a plain fresh attempt.
-- TUI launches (`claude --session-id` / `--resume`) put the user message after ` -- `, so it cannot
-  parse as a flag. A taken-over run can still report `finish_step` from the TUI (R14).
-- Archive stops the task's runs and prepare scripts, closes its terminals, then archives; no discard flag.
-- Adding an existing branch that is not checked out creates its worktree and runs setup.
-
-**ADE v2 v1 removal and dialogs (P148).**
-
-- v1 is gone: `AdeService`, the queue, `ade_branches`/`ade_new_work`/`ade_plan`/`ade_colors`/`ade_dependencies`/
-  `ade_blockers` and the v1 `ade_sessions` rows (migration `0011`, no data migration). `ade_sessions` is
-  v2-only. Agent-session hydration is `TerminalService.AgentSessions`.
-- Claude dialogs (rebase, queue after, merge, stage, start, archive) share one flow in
-  `ade/v2/dialog/flow.ts` and the `adeDialogs` store: pick a target (new session via `StartBranch`, or `Send`
-  to a running session), a turn watch follows the agent, and a finished merge calls `RecordMerge`.
-- Take over calls `TakeOver{stopIfRunning:true}` after a confirm when the run is live. `Stop` on the headless
-  status bar calls `StopRun`.
 
 **GitHub authentication is delegated entirely to `gh`, and this app holds no GitHub credential of
 any kind.** No OAuth flow, no token prompt, no direct call to GitHub's OAuth endpoints, no
@@ -4007,6 +3625,148 @@ every `Set`, reappearing at its zod default on the very next read. `inlineBlame`
 alongside `wordWrap`/`rowColoring`, the only Go change this phase makes and the only reason it makes
 one.
 
+## ADE: Kira Space task planner (v2.0)
+
+Kira Space's `ade` module plans tasks across repositories and runs Claude Code on them. It is a
+rewrite of the P129 agent merge queue (design: `docs/v2.0/design/ade-v2/SPEC2.md`). v1 data is not
+migrated (D5); history of the removal is migration `0011`. Phase detail: `docs/v2.0/SPEC.md` P143-P149
+and `docs/v2.0/plans/`.
+
+### Model and scope
+
+- A task owns branches across repos. A branch is `mine` (created here, has a name), `review` (another
+  author's) or a placeholder with no branch yet. A task follows a workflow of stages, kind `user`,
+  `agent` or `script`; each stage holds steps (agent stages: `claude -p` per step; script stages: a
+  shell command). A step runs `once` (first mine branch in task order), `each repo` or `only <repo>`. One run per step and branch.
+- Task status is derived from the workflow and runs, never typed (D10): the Status field is read-only.
+- Backlog items are not on the plan until promoted.
+
+### Process wiring
+
+- `main.go` `wireAdeTask` builds `ade.TaskBoard` from `TaskBoardDeps` (repos, own `gitsession.Conn`
+  `ade-board`, `adeflow.Reader` over `<home>/workflows`, the `adeagent` `finish_step` server, the
+  `Tracker`, log sink, session store). It calls `Recover()` then `Start()`, and installs
+  `board.OnTUIStopped` as the tracker's stopped handler.
+- `bridge.AdeTaskService` binds 47 methods (`grep -c '^func (s \*AdeTaskService)'`; 47 `adeTask*` entries
+  in `frontend/src/bridge/index.ts`). Push channels (`bridge/adewire/channels.go`): `kira:adetask:` +
+  `board`, `backlog`, `workflows`, `repos`, `runs`, `log`, `sessions`, `credential` (focused window)
+  and `open-session` (`EmitTo` one window).
+- `bridge/adewire` is the frozen wire contract; `tests/fixtures/ade-v2/` holds 23 fixtures decoded by
+  `adewire/wire_test.go` and the mock runtime. `layeringtest.RunAllowing` admits `adewire`.
+
+### Storage
+
+- `0008`: `ade_tasks`, `ade_task_branches`, `ade_task_plan`, `ade_runs`, `ade_backlog`, `ade_repo_config`,
+  `ade_repo_integration`, `ade_repo_envs`, `ade_folders`, `ade_worktree_setup`, `ade_workflow_last_valid`.
+  `0009`: `ade_branch_marks`, `ade_env_state`. `0010`: `ade_logs`, `ade_log_chunks`, `ade_sessions` rebuilt.
+  `0011`: drops the six v1 tables and rebuilds `ade_sessions` v2-only.
+- Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
+  writes batched every 250 ms.
+- Per-repo prepare timeout is the `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
+  shared with git-ui worktree add; `Spec.Timeout` must be > 0.
+
+### Git facts
+
+- Board facts per repo run on `ade-board`: branch inventory, ahead/behind against the base, files,
+  commits, dirty state, caches keyed by tip pairs. Refresh fetches the default remote, then derives
+  again through the same path; autofetch interval is a setting.
+- Conflict pairs and the rebase-conflict check use `git merge-tree --write-tree` (git >= 2.38, enforced
+  by `gitclient.Discovery`; older git reports `failed`). It touches no worktree, index, HEAD or ref, so
+  it is safe beside running agents. Pairs are computed only for a mine branch against a mine or review one, neither parked nor merged, neither an ancestor of the other, with intersecting changed-file sets.
+  **go-git declined (D1; SPEC2 §6/§6.2 and design §3.1 asked for it):** v5 `Merge` is fast-forward only
+  and cannot answer "does A conflict with B". `go.mod` has no go-git.
+- Integration (`merged`/`stale`/`not merged`) and deploy (`deployed`/`stale`/`not deployed`) facts use
+  `git merge-base --is-ancestor`, `git cherry` and `patch-id --stable` (`gitclient` only). Marks in
+  `ade_branch_marks` and `ade_env_state` remember "was merged", "rebased since", "environment moved back".
+  `RecordMerge` is the only writer of `recorded = 1`; a mark keeps the branch tip at that moment.
+- Deploy scripts run through `gitprepare` plumbing in the repo root, 60s fixed timeout, at startup,
+  on env change and on each repo refresh; failure reports `unknown`. The stale note counts commits
+  (`1 commit ... is missing`, `N commits ... are missing`).
+- `ForcePush` runs `--force-with-lease --force-if-includes`. Credential prompts route through the git
+  module's askpass broker as `kira:adetask:credential`, answered by `ProvideCredential`.
+- `Archive` is `ArchiveRisk` (dirty and unmerged work per worktree) then `ArchiveTask`: it stops the
+  task's runs and prepare scripts, closes its terminals, removes worktrees, moves the task to history.
+  No discard flag in the engine; "Delete anyway" is the dialog's own choice.
+
+### Workflows
+
+- YAML files in `<home>/workflows`, parsed by `adeflow.Reader`. No workflow is seeded (D2). The folder is
+  watched (`fsnotify`); a broken edit keeps the last valid version and reports `line` plus a message.
+  The writer keeps key order and comments. Aliases `manual`/`automated` map to `user`/`agent`.
+  Step `allowed_tools` feeds the headless `--allowedTools` list.
+- Sample workflows (`docs/v2.0/design/ade-v2/workflows/`) import and validate in the app.
+
+### Run engine
+
+- Headless run: `$SHELL -l -c 'exec claude -p --output-format stream-json --verbose --session-id <uuid>
+  --mcp-config <file> --setting-sources <src> [--allowedTools ...]'`, cwd the worktree, prompt on stdin,
+  `Setsid` + `procgroup.GracefulCancel`. No `--permission-mode`, no `--strict-mcp-config`.
+  App setting `ade.headlessSettingSources` is `all` (default, `user,project,local`) or `user`.
+- `finish_step` MCP server (`internal/adeagent`): one loopback listener, bearer token per run
+  (`tokenauth`), config `<home>/ade/runs/<runId>.mcp.json` mode `0600` deleted at process exit, token
+  never on argv, last call wins and applies at exit. `suffix.go` holds the text appended to the message.
+  A run that ends without it fails with `ended without finish_step`; timeout is `failed`; script
+  stages fail by exit code.
+- Step machine (`steps.go`, `runs.go`): a step starts `auto` or waits for `approval`; `on_failure` is
+  `stop`, `retry 1|2` or `back:<step>`. Send-back queues a fix run of the target step with
+  `claude -p --resume <session id>` (same Claude session), `loops` is the round epoch, 3 rounds then
+  the run fails. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
+- Todo progress `[n, m]` parses `TodoWrite` and `TaskCreate`/`TaskUpdate`; CLI 2.1.289 in `-p` mode
+  offers neither, so `todo` stays null (Known open items).
+- Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
+  with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
+  are removed. Nothing auto-resumes.
+
+### Interactive sessions
+
+- `ade.Tracker` is one instance shared by `terminal.BoundService.ComposeAgent` (`Compose`),
+  `terminal.Registry.OnChange` (`Reconcile`), `agenthooks.Manager` `OnEvent` (`HandleEvent`) and the
+  board (`Send`, `Get`). `Prepare` records a pending launch intent (TTL 2 min); the renderer opens the
+  terminal through the ordinary `TerminalService.Open`; `ComposeAgent` consumes the intent, inserts the
+  `ade_sessions` row as `running` and appends hooks env, `--settings` and the initial prompt.
+  Reconcile stops a record only when its terminal is gone and a 30s grace window has passed.
+- `LaunchStage`, `StartBranch`, `TakeOver` build the launch. The user message follows ` -- ` in argv so
+  it cannot parse as a flag. A resume runs in the recorded cwd; a missing cwd is an `ErrInvalidInput`
+  (no recreation). `StartBranch` refuses a second session on a branch (`a session is already open on ...`).
+  A taken-over run can still call `finish_step` from the TUI (R14). Take over confirms when the run is
+  live and passes `stopIfRunning`.
+- Sessions are window-scoped like every PTY: closing the window stops the record (resumable).
+  `FocusSession` raises the window that holds a session (`kira:adetask:open-session`).
+- The agent-hooks `Stop` event ends a dialog turn; the renderer's `turnWatch` then calls `RecordMerge`
+  (merge dialog) or `ArchiveTask` (send-then-archive). That pending state lives in the renderer.
+
+### Worktree setup
+
+- A worktree is created by a run creating branches, Start, Take over in a new worktree or Add existing
+  branch. The repo's prepare script then runs with its timeout; states `preparing`, `ready`, `failed`
+  (full output stored). Until `ready`, pipeline steps for that branch wait (`waiting for worktree setup`)
+  and Start/Take over are not offered. `Retry setup` reruns it.
+
+### Frontend
+
+- `frontend/src/ade/AdeView.vue`, `queries.ts`, `state/`, and `ade/v2/`: `backlog board dialog needs
+  notes panel plan repos run sessions shell state workflows`. Pure logic lives in `ade/v2/board/`
+  (status, actions, needs-you rank, timeline, drop plan, fix menu); components are `<script setup>`.
+- Pinia stores, one concern each: `adeBoardUi` (selection, tabs), `adeDialogs` (dialog flow and pending
+  keys such as `merge:<branch>:<target>`), `adeTakeOver`, `adeTerminals`. Server state goes through
+  TanStack Query (`queries.ts`) invalidated by the push channels above.
+- Dialogs share `dialog/flow.ts` (target pick: new session via `StartBranch`, or `Send` to a running
+  session), `compose.ts` (message templates), `deliver.ts` and `turnWatch.ts`.
+- Plan drag and drop (`plan/usePlanDrag.ts`, `board/dropPlan.ts`) writes the day and position directly
+  (no dialog). Notes use TipTap (`notes/`). The fix menu uses the shared context-menu primitive (R20).
+- Colours: `ade/v2/tones.ts` and `palette.ts` are dark-only; `scripts/check-ade-colours.sh` (in
+  `bun run lint`) fails any other colour literal under `ade/`.
+
+### Tests
+
+- Go: `internal/ade` (board, integration, deploy, run engine, steps, tracker), `adeflow`, `adeagent`,
+  `bridge/adewire`; `go test -race` on those plus `gitsession`.
+- `tests/unit/ade-v2-*` (board parity with the mockup's logic, dialog, drop plan, progress, timeline) and
+  `ade-notes-markdown`; 13 `tests/ui/ade-v2-*.spec.ts` on the mock runtime; no ADE visual spec.
+- Live smoke (server build, real `claude -p`) covers runs, send-back, restart recovery, Spec/Start/Take
+  over sessions, merge, rebase and archive dialogs. The sandbox cannot authenticate an interactive
+  `claude`, so a real TUI turn ending (Stop from `claude` itself) is unobserved (Known open items).
+
 ## Database MCP server (v1.7)
 
 ### The server (M1)
@@ -4483,15 +4243,16 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
-- **Held fix runs lose their resume spec across restart (P147).** `runOpts` live in memory; a held `back:<step>` run relaunches as a plain fresh attempt after `Recover()`. Delete once the spec persists on the run row.
-- **Interactive `claude --resume` TUI is unobservable in the dev sandbox (P147).** No display; argv shape is covered by tests only. Delete once checked on a real desktop build.
+- **Settings leaf `ade.allAgentsFilter` is dead (P149).** Nothing writes or reads it in v2; the All sessions toggle keeps a local `running`/`stopped` ref (R19). Removing it changes the settings model, bindings and schema: SPEC row P155. Delete once removed.
+- **Held fix runs lose their resume spec across restart (P147).** `runOpts` live in memory; a held `back:<step>` run relaunches as a plain fresh attempt after `Recover()`. Closing it needs a run-row column (migration): SPEC row P156. Delete once the spec persists on the run row.
+- **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build.
 - **Tab switch remounts above the 50 ms product budget in the WebKit sandbox (P139 Part 2)**. Every
   switch remounts `DataView` and SlickGrid, no tab caching. The sandbox measures p95 159-194 ms and
   gates at 300 ms (`budgets.spec.ts`); ~47 ms of it is Vue component work, and Tailwind v4's
   `@property` fallback, live only on WebKit builds without `margin-trim`, doubles every restyle.
   Real WKWebView is unmeasured. Delete once the Mac check in `docs/PERF.md` §3 settles it.
 
-- **A backgrounded `Bash` tool call cannot arm the `waiting` activity phase (P129 Part 1 §4.8)**.
+- **A backgrounded `Bash` tool call cannot arm the `waiting` activity phase (agent-hooks rule, §4.8)**.
   `reduceAgentActivity`'s `wakeArmed` flag — the signal that turns a session's `Stop` into `waiting
   on monitor` instead of plain `idle` — is set only when a `PreToolUse`'s own `toolName` is `Monitor`
   or `ScheduleWakeup`; a `Bash` call backgrounding an equivalent watcher script is indistinguishable
@@ -4499,31 +4260,29 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   deliberately: decoding it would mean parsing arbitrary tool arguments for a UI nicety). Closing
   this for real would mean either decoding `tool_input` for `Bash` specifically (breaking the
   privacy rule for one tool) or Claude Code itself distinguishing a "waiting" background run from an
-  ordinary one at the hook level — neither is this phase's call to make.
+  ordinary one at the hook level.
 
 - **The ADE board's conflict pairs drop a rename/delete conflict whose two paths differ and
-  neither lies in the pair's own shared-file set (P129 Part 2 §0.7)**. `pairFacts` intersects
+  neither lies in the pair's own shared-file set (`ade/facts.go`)**. `pairFacts` intersects
   `git merge-tree --write-tree`'s conflicted paths against `shared` (each branch's own changed-path
   set) before reporting `conflicts`; a rename or delete on one side names a path the other side
   never touched, so the intersection is empty and the conflict is silently dropped from the pair's
   `conflicts` list even though `merge-tree` itself saw it. Closing this needs surfacing merge-tree's
   own conflicted paths outside the `shared` filter as a different signal (a follow-up phase's own
-  call, since it changes the wire shape `pairs` promises — P129 closed at Part 7, so no later P129
-  part remains to make it).
+  call, since it changes the wire shape `pairs` promises).
 
 - **A linked worktree's own dirty state is read only on board load, an explicit `Refresh` and
-  `ArchiveRisk` — never watched (P129 Part 3 §0.11/§0.22, kept in P148).** A worktree a *person* or
-  an agent dirties between two board loads (or right before `Archive`'s own `ArchiveRisk`
-  call and the confirmed `Archive` call that follows it) can still go stale for that window — no file
+  `ArchiveRisk` — never watched (P148).** A worktree a *person* or
+  an agent dirties between two board loads (or between `ArchiveRisk`
+  and the confirmed `ArchiveTask` that follows it) can still go stale for that window — no file
   watcher covers a linked worktree's own working tree the way `gitsession`'s existing repo watcher
   covers `.git` itself.
 
-- **A pending "Send to Claude, then archive" lives in the renderer, not persisted (P129 Part 4
-  §0.15/§0.16, P148)**. The v2 `adeDialogs` store's in-flight bookkeeping (`archive:<task>`) is a plain reactive `Map`, gone on
+- **A pending "Send to Claude, then archive" lives in the renderer, not persisted (P148)**. The v2 `adeDialogs` store's in-flight bookkeeping (`archive:<task>`) is a plain reactive `Map`, gone on
   reload or window close; a reload or close between the Send and the agent's own `Stop` drops the
   pending archive with no record it was ever requested, and the branch stays unarchived with no
   further prompt. Closing this needs the pending archive itself surviving a reload (a persisted
-  queue field or a Go-side flag `RepoSnapshot` already reports back), a later phase's call.
+  Go-side flag on the task), a later phase's call.
 
 - **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
   discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
@@ -4728,9 +4487,9 @@ Performance:
   staging one under `docs/pending-changes/` for a session that can; that staging step is real,
   separate work this phase's own icon/docs/audit scope does not cover.
 
-- **No light theme; `ade`'s kept tone and work-palette values are dark-only (P138)**. Kira Space has
+- **No light theme; `ade`'s kept tone and palette values are dark-only (P138)**. Kira Space has
   one dark `:root`; design §7 has no light palette. Kept tone text measures 1.6-2.4:1 on white
   (amber 1.79, red 2.40, green 1.78, blue 2.02, purple 2.11, grey 2.03) and work palette slots
-  1.86-3.76:1. All `ade` chrome resolves through `--kira-*`, so a light `:root` flips it with no
+  1.86-3.76:1 (`ade/v2/tones.ts`, `palette.ts`). All `ade` chrome resolves through `--kira-*`, so a light `:root` flips it with no
   `ade` edit. Closing this needs light tone variants plus a light `:root` in `packages/theme`,
   which changes kept values.
