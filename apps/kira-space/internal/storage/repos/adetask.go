@@ -54,7 +54,7 @@ func checkEstExtends(old, next string) error {
 
 const adeTaskColumns = `id, kind, title, owner, jira_key, jira_url, github_url, workflow_id, stage_id, current_stage_json, est, notes, color, created_at, archived_at`
 const adeTaskBranchColumns = `id, task_id, code_repo_id, name, kind, base, queued_after, position, had_commits, added_at, merged_at, archived_at`
-const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, todo_done, todo_total, loops, note, summary, session_id, exit_code, started_at, finished_at, launch_note, launch_resume_id, launch_prompt, launch_extra`
+const adeRunColumns = `id, task_id, stage_id, step_id, branch_id, attempt, state, loops, note, summary, session_id, exit_code, started_at, finished_at, launch_note, launch_resume_id, launch_prompt, launch_extra`
 
 // AdeTaskRepo reads and writes the v2 task store: tasks, branches, plan, runs, worktree setup and
 // last-valid workflows.
@@ -689,13 +689,12 @@ func (r *AdeTaskRepo) SetSnapshot(taskID, stageJSON string) error {
 
 func scanAdeRun(row rowScanner) (model.AdeRun, error) {
 	var run model.AdeRun
-	var done, total, exit, started, finished sql.NullInt64
+	var exit, started, finished sql.NullInt64
 	if err := row.Scan(&run.ID, &run.TaskID, &run.StageID, &run.StepID, &run.BranchID, &run.Attempt, &run.State,
-		&done, &total, &run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished,
+		&run.Loops, &run.Note, &run.Summary, &run.SessionID, &exit, &started, &finished,
 		&run.Launch.Note, &run.Launch.ResumeID, &run.Launch.Prompt, &run.Launch.Extra); err != nil {
 		return model.AdeRun{}, err
 	}
-	run.TodoDone, run.TodoTotal = nullIntPtr(done), nullIntPtr(total)
 	run.ExitCode = nullIntPtr(exit)
 	run.StartedAt, run.FinishedAt = nullInt64Ptr(started), nullInt64Ptr(finished)
 	return run, nil
@@ -706,8 +705,8 @@ func (r *AdeTaskRepo) InsertRun(run model.AdeRun) error {
 	if run.ID == "" || run.TaskID == "" || run.Attempt < 1 {
 		return fmt.Errorf("repos: insert ade run: id, taskId and attempt >= 1 are required")
 	}
-	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		run.ID, run.TaskID, run.StageID, run.StepID, run.BranchID, run.Attempt, run.State, run.TodoDone, run.TodoTotal,
+	if _, err := r.DB.Exec(`INSERT INTO ade_runs (`+adeRunColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		run.ID, run.TaskID, run.StageID, run.StepID, run.BranchID, run.Attempt, run.State,
 		run.Loops, run.Note, run.Summary, run.SessionID, run.ExitCode, run.StartedAt, run.FinishedAt,
 		run.Launch.Note, run.Launch.ResumeID, run.Launch.Prompt, run.Launch.Extra); err != nil {
 		return fmt.Errorf("repos: insert ade run %s: %w", run.ID, err)
@@ -732,10 +731,6 @@ func (r *AdeTaskRepo) UpdateRun(id string, p model.AdeRunPatch) (model.AdeRun, e
 	if p.State != nil {
 		cur.State = *p.State
 	}
-	if p.Todo != nil {
-		done, total := p.Todo[0], p.Todo[1]
-		cur.TodoDone, cur.TodoTotal = &done, &total
-	}
 	if p.Note != nil {
 		cur.Note = *p.Note
 	}
@@ -757,10 +752,10 @@ func (r *AdeTaskRepo) UpdateRun(id string, p model.AdeRunPatch) (model.AdeRun, e
 	if p.Launch != nil {
 		cur.Launch = *p.Launch
 	}
-	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, todo_done = ?, todo_total = ?, note = ?, summary = ?, session_id = ?,
+	if _, err := tx.Exec(`UPDATE ade_runs SET state = ?, note = ?, summary = ?, session_id = ?,
 		exit_code = ?, started_at = ?, finished_at = ?, launch_note = ?, launch_resume_id = ?, launch_prompt = ?,
 		launch_extra = ? WHERE id = ?`,
-		cur.State, cur.TodoDone, cur.TodoTotal, cur.Note, cur.Summary, cur.SessionID, cur.ExitCode, cur.StartedAt,
+		cur.State, cur.Note, cur.Summary, cur.SessionID, cur.ExitCode, cur.StartedAt,
 		cur.FinishedAt, cur.Launch.Note, cur.Launch.ResumeID, cur.Launch.Prompt, cur.Launch.Extra, id); err != nil {
 		return model.AdeRun{}, fmt.Errorf("repos: update ade run %s: %w", id, err)
 	}

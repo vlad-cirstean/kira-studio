@@ -98,7 +98,7 @@ type AdeTaskPlanRow struct {
 	Position int
 }
 
-// AdeRun is one row of ade_runs. Todo is nil unless the agent reported progress.
+// AdeRun is one row of ade_runs.
 type AdeRun struct {
 	ID         string
 	TaskID     string
@@ -107,8 +107,6 @@ type AdeRun struct {
 	BranchID   string
 	Attempt    int
 	State      string
-	TodoDone   *int
-	TodoTotal  *int
 	Loops      int
 	Note       string
 	Summary    string
@@ -144,7 +142,6 @@ const (
 // AdeRunPatch holds only the run leaves the caller changes; nil = unchanged.
 type AdeRunPatch struct {
 	State      *string
-	Todo       *[2]int
 	Note       *string
 	Summary    *string
 	SessionID  *string
