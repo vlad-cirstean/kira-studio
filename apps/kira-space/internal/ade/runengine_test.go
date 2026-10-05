@@ -72,12 +72,9 @@ func runFakeClaude(args []string) int {
 		raw, _ := json.Marshal(v)
 		fmt.Println(string(raw))
 	}
-	todo := func(a, b string) {
+	tool := func() {
 		emit(map[string]any{"type": "assistant", "message": map[string]any{"content": []any{map[string]any{
-			"type": "tool_use", "id": "t-" + a + b, "name": "TodoWrite",
-			"input": map[string]any{"todos": []any{
-				map[string]any{"content": "one", "status": a}, map[string]any{"content": "two", "status": b},
-			}},
+			"type": "tool_use", "id": "t-bash", "name": "Bash", "input": map[string]any{"command": "git status"},
 		}}}})
 	}
 	emit(map[string]any{"type": "system", "subtype": "init", "session_id": "fake"})
@@ -92,9 +89,7 @@ func runFakeClaude(args []string) int {
 	}
 	switch action {
 	case "done":
-		todo("in_progress", "pending")
-		todo("completed", "in_progress")
-		todo("completed", "completed")
+		tool()
 		return finish("done")
 	case "needs_input", "failed":
 		return finish(action)
@@ -389,8 +384,8 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 	}
 	for _, repo := range []string{"api", "web"} {
 		r := e.waitRun(id, "one/"+repo, model.AdeRunDone)
-		if r.TodoDone == nil || *r.TodoDone != 2 || *r.TodoTotal != 2 || r.Summary != "summary-done" {
-			t.Fatalf("%s run = %+v; want todo 2/2 and the finish summary", repo, r)
+		if r.Summary != "summary-done" {
+			t.Fatalf("%s run = %+v; want the finish summary", repo, r)
 		}
 	}
 	if _, queued := e.runs(id)["two/api"]; queued {
@@ -424,7 +419,7 @@ func TestRunEngine_eachRepoAutoAdvanceApprovalAndStageDone(t *testing.T) {
 		}
 	}
 	runLog := e.logText("run", e.runs(id)["one/api"].ID)
-	if !strings.Contains(runLog, "▸ TodoWrite") || !strings.Contains(runLog, "result: success") {
+	if !strings.Contains(runLog, "▸ Bash git status") || !strings.Contains(runLog, "result: success") {
 		t.Fatalf("run log = %q", runLog)
 	}
 	setupLog := e.logText("setup", branchOf(t, e, id, "api"))

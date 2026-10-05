@@ -50,11 +50,10 @@ type Exit struct {
 	Cancelled bool
 }
 
-// Handler receives the parsed output. Both callbacks may run on any goroutine, never concurrently
-// with themselves.
+// Handler receives the parsed output. Its callback may run on any goroutine, never concurrently
+// with itself.
 type Handler struct {
 	OnLine func(Line)
-	OnTodo func(Todo)
 }
 
 // quotePOSIX single-quotes s as one shell word.
@@ -105,7 +104,6 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	stopEscalate := procgroup.GracefulCancel(cmd, gracefulStopDelay, killGroup)
 
 	var mu sync.Mutex
-	parser := NewParser()
 	emit := func(l Line) {
 		if h.OnLine != nil {
 			h.OnLine(l)
@@ -114,12 +112,8 @@ func Run(ctx context.Context, spec Spec, h Handler) (Exit, error) {
 	cmd.Stdout = newLineWriter(func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
-		lines, todo := parser.Feed(line)
-		for _, l := range lines {
+		for _, l := range parseLine(line) {
 			emit(l)
-		}
-		if todo != nil && h.OnTodo != nil {
-			h.OnTodo(*todo)
 		}
 	})
 	cmd.Stderr = newLineWriter(func(line string) {

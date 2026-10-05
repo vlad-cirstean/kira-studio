@@ -3,7 +3,6 @@ package adeagent
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 )
 
@@ -20,24 +19,6 @@ type Line struct {
 	Text   string
 }
 
-// Todo is the agent's todo progress.
-type Todo struct{ Done, Total int }
-
-// Parser turns `claude -p --output-format stream-json` lines into log lines and todo progress. It
-// follows both todo tools: TodoWrite (older CLIs, the full list per call) and TaskCreate/TaskUpdate
-// (CLI 2.1.x, one task per call, ids learned from the tool result).
-type Parser struct {
-	toolName map[string]string // tool_use id -> tool name, for TaskCreate results
-	tasks    map[string]bool   // task id -> completed (deleted ids are removed)
-	last     Todo
-	hasLast  bool
-}
-
-// NewParser returns a Parser with empty todo state.
-func NewParser() *Parser {
-	return &Parser{toolName: map[string]string{}, tasks: map[string]bool{}}
-}
-
 type streamMsg struct {
 	Type    string `json:"type"`
 	Subtype string `json:"subtype"`
@@ -51,46 +32,44 @@ type streamMsg struct {
 }
 
 type contentBlock struct {
-	Type      string          `json:"type"`
-	Text      string          `json:"text"`
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Input     json.RawMessage `json:"input"`
-	ToolUseID string          `json:"tool_use_id"`
-	IsError   bool            `json:"is_error"`
-	Content   json.RawMessage `json:"content"`
+	Type    string          `json:"type"`
+	Text    string          `json:"text"`
+	Name    string          `json:"name"`
+	Input   json.RawMessage `json:"input"`
+	IsError bool            `json:"is_error"`
+	Content json.RawMessage `json:"content"`
 }
 
-var taskCreated = regexp.MustCompile(`Task #(\d+)`)
-
-// Feed parses one stdout line. todo is non-nil only when the progress changed.
-func (p *Parser) Feed(raw string) (lines []Line, todo *Todo) {
+// parseLine turns one `claude -p --output-format stream-json` line into log lines.
+func parseLine(raw string) []Line {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, nil
+		return nil
 	}
 	var msg streamMsg
 	if err := json.Unmarshal([]byte(raw), &msg); err != nil || msg.Type == "" {
-		return []Line{{StreamStdout, raw}}, nil
+		return []Line{{StreamStdout, raw}}
 	}
 	switch msg.Type {
 	case "system":
-		lines = p.system(msg)
+		return system(msg)
 	case "assistant", "user":
 		var blocks []contentBlock
 		if json.Unmarshal(msg.Message.Content, &blocks) != nil {
-			return nil, nil // a plain-string user message carries nothing to show
+			return nil // a plain-string user message carries nothing to show
 		}
+		var lines []Line
 		for _, b := range blocks {
-			lines = append(lines, p.block(b)...)
+			lines = append(lines, block(b)...)
 		}
+		return lines
 	case "result":
-		lines = []Line{{StreamEvent, fmt.Sprintf("result: %s · %d turns", msg.Subtype, msg.NumTurns)}}
+		return []Line{{StreamEvent, fmt.Sprintf("result: %s · %d turns", msg.Subtype, msg.NumTurns)}}
 	}
-	return lines, p.progress()
+	return nil
 }
 
-func (p *Parser) system(msg streamMsg) []Line {
+func system(msg streamMsg) []Line {
 	switch msg.Subtype {
 	case "init":
 		return []Line{{StreamEvent, "session " + msg.SessionID}}
@@ -104,74 +83,19 @@ func (p *Parser) system(msg streamMsg) []Line {
 	return nil
 }
 
-func (p *Parser) block(b contentBlock) []Line {
+func block(b contentBlock) []Line {
 	switch b.Type {
 	case "text":
 		return splitLines(StreamStdout, b.Text)
 	case "tool_use":
-		p.toolName[b.ID] = b.Name
-		p.trackTodoCall(b)
 		return []Line{{StreamStdout, "▸ " + b.Name + shortInput(b.Name, b.Input)}}
 	case "tool_result":
-		text := resultText(b.Content)
-		if p.toolName[b.ToolUseID] == "TaskCreate" {
-			if m := taskCreated.FindStringSubmatch(text); m != nil {
-				p.tasks[m[1]] = false
-			}
-		}
 		if b.IsError {
-			first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+			first, _, _ := strings.Cut(strings.TrimSpace(resultText(b.Content)), "\n")
 			return []Line{{StreamStderr, "✕ " + first}}
 		}
 	}
 	return nil
-}
-
-func (p *Parser) trackTodoCall(b contentBlock) {
-	switch b.Name {
-	case "TodoWrite":
-		var in struct {
-			Todos []struct {
-				Status string `json:"status"`
-			} `json:"todos"`
-		}
-		if json.Unmarshal(b.Input, &in) != nil {
-			return
-		}
-		p.tasks = map[string]bool{}
-		for i, t := range in.Todos {
-			p.tasks[fmt.Sprint(i)] = t.Status == "completed"
-		}
-	case "TaskUpdate":
-		var in struct {
-			TaskID string `json:"taskId"`
-			Status string `json:"status"`
-		}
-		if json.Unmarshal(b.Input, &in) != nil {
-			return
-		}
-		switch in.Status {
-		case "completed":
-			p.tasks[in.TaskID] = true
-		case "deleted":
-			delete(p.tasks, in.TaskID)
-		}
-	}
-}
-
-// progress reports the todo counts when they differ from the last report.
-func (p *Parser) progress() *Todo {
-	cur := Todo{Total: len(p.tasks)}
-	for _, done := range p.tasks {
-		if done {
-			cur.Done++
-		}
-	}
-	if cur.Total == 0 || (p.hasLast && cur == p.last) {
-		return nil
-	}
-	p.last, p.hasLast = cur, true
-	return &cur
 }
 
 func splitLines(stream, text string) []Line {

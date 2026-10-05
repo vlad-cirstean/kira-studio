@@ -491,7 +491,6 @@ func (b *TaskBoard) superviseAgent(ctx context.Context, run model.AdeRun, def st
 		SettingSources: b.settingSources(), AllowedTools: allowedTools(def.AllowedTools), Timeout: timeout, Env: cwdEnv,
 	}, adeagent.Handler{
 		OnLine: func(l adeagent.Line) { sink.add(l.Stream, l.Text) },
-		OnTodo: func(t adeagent.Todo) { b.setTodo(run.ID, t) },
 	})
 	sink.flush()
 	release()
@@ -515,15 +514,6 @@ func (b *TaskBoard) sessionClaudeID(sessionID string) string {
 		return b.newID()
 	}
 	return rec.ClaudeSessionID
-}
-
-func (b *TaskBoard) setTodo(runID string, t adeagent.Todo) {
-	run, err := b.deps.Tasks.UpdateRun(runID, model.AdeRunPatch{Todo: &[2]int{t.Done, t.Total}})
-	if err != nil {
-		slog.Warn("ade: record todo", "scope", "ade", "run", runID, "err", err)
-		return
-	}
-	b.emitRuns(run)
 }
 
 func (b *TaskBoard) agentOutcome(runID string, exit adeagent.Exit, runErr error, timeout string) outcome {
