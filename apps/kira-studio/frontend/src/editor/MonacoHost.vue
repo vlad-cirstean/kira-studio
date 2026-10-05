@@ -73,11 +73,16 @@ const rootRef = ref<HTMLElement | null>(null);
 const PENDING_PREVIEW_CHARS = 16_384;
 // Above this, yield one painted frame before Monaco work so the capped preview shows first.
 const LARGE_DOC_CHARS = 262_144;
+// Read-only docs over LARGE_DOC_CHARS fill in chunks of this size, a frame apart: one `setValue` of
+// a multi-MB doc blocked the main thread for over a second (measured, P160).
+const FILL_CHUNK_CHARS = 262_144;
 
 const pending = ref(true);
 const previewDoc = computed(() =>
   props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
 );
+let fillGeneration = 0;
+let filling = false;
 let lastAppliedDoc: string | null = null;
 let lastAppliedVersionId = -1;
 
@@ -415,6 +420,63 @@ function applyBaseOptions(): ConstructionOptions {
   };
 }
 
+function finishFill(m: TextModel, doc: string): void {
+  filling = false;
+  lastAppliedDoc = doc;
+  lastAppliedVersionId = m.getVersionId();
+  repaintRanges();
+  if (mod) scheduleLint(mod);
+  updateDebugHook();
+}
+
+// Replaces the model's content with `doc`. Read-only large docs stream in line-aligned chunks (no
+// undo entries: `applyEdits`), yielding a frame between them; a newer fill or unmount cancels.
+async function fillModel(doc: string, onFirstContent?: () => void): Promise<void> {
+  const target = model;
+  if (!target) return;
+  const gen = ++fillGeneration;
+  filling = true;
+  applyingExternal = true;
+  lastAppliedVersionId = -1;
+  try {
+    if (!props.readOnly || doc.length <= LARGE_DOC_CHARS) {
+      target.setValue(doc);
+      onFirstContent?.();
+      finishFill(target, doc);
+      return;
+    }
+    target.setValue('');
+    let pos = 0;
+    while (pos < doc.length) {
+      let end = Math.min(pos + FILL_CHUNK_CHARS, doc.length);
+      const nl = doc.indexOf('\n', end);
+      if (nl !== -1 && nl - end < FILL_CHUNK_CHARS) end = nl + 1;
+      const line = target.getLineCount();
+      const col = target.getLineMaxColumn(line);
+      target.applyEdits([
+        {
+          range: { startLineNumber: line, startColumn: col, endLineNumber: line, endColumn: col },
+          text: doc.slice(pos, end),
+        },
+      ]);
+      pos = end;
+      if (onFirstContent) {
+        onFirstContent();
+        onFirstContent = undefined;
+      }
+      if (pos >= doc.length) break;
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      if (gen !== fillGeneration || model !== target) return;
+    }
+    finishFill(target, doc);
+  } finally {
+    if (gen === fillGeneration) {
+      filling = false;
+      applyingExternal = false;
+    }
+  }
+}
+
 onMounted(async () => {
   const resolved = await loadMonaco();
   // Unmounted while the import was in flight — dispose nothing, mount nothing.
@@ -432,28 +494,20 @@ onMounted(async () => {
     model,
     theme: KIRA_EDITOR_THEME,
   });
-  applyingExternal = true;
-  model.setValue(props.doc);
-  applyingExternal = false;
-  lastAppliedDoc = props.doc;
-  lastAppliedVersionId = model.getVersionId();
   decorations = editor.createDecorationsCollection();
-  // Only now — Monaco's own DOM already exists inside `rootRef`, so the pending <pre>'s v-if
-  // removal (Vue's own, batched) never has a window where neither one nor both are showing real
-  // content.
-  pending.value = false;
-
   wrapDisposable = attachWrapOnType(editor, model);
   registerProviders(mod, monacoLanguageIdFor(props.language));
-  repaintRanges();
-  scheduleLint(mod);
-  updateDebugHook();
-
   model.onDidChangeContent(() => {
+    if (filling) return;
     if (!applyingExternal) emit('update:doc', model?.getValue() ?? '');
     repaintRanges();
     if (mod) scheduleLint(mod);
     updateDebugHook();
+  });
+  // The pending <pre> is removed once Monaco's own DOM holds the first content (Vue batches the
+  // v-if), so there is never a window with neither showing real content.
+  void fillModel(props.doc, () => {
+    pending.value = false;
   });
   editor.onDidChangeCursorPosition((e) => {
     if (!model) return;
@@ -462,6 +516,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  fillGeneration++;
   clearTimeout(lintTimer);
   decorations?.clear();
   decorations = null;
@@ -527,21 +582,23 @@ function applyExternalDoc(doc: string): void {
   if (doc === unchanged) return;
   const currentPosition = editor.getPosition();
   const priorOffset = currentPosition ? model.getOffsetAt(currentPosition) : 0;
-  // §4.7: the hard undo boundary around every editable external write — both `pushStackElement()`
-  // calls are mandatory (one alone leaves the write mergeable on one side); `setValue` would
-  // discard the whole undo stack, so it is used only on read-only hosts.
-  applyingExternal = true;
   if (props.readOnly) {
-    // Nothing to undo on a read-only host; `setValue` keeps no copy of the previous doc.
-    model.setValue(doc);
+    // Nothing to undo on a read-only host: `setValue`/chunked `applyEdits` keep no copy of the
+    // previous doc. Large docs stream in; the position reset below applies to the first chunk.
+    void fillModel(doc);
   } else {
+    // §4.7: the hard undo boundary around every editable external write — both
+    // `pushStackElement()` calls are mandatory (one alone leaves the write mergeable on one side);
+    // `setValue` would discard the whole undo stack.
+    fillGeneration++;
+    applyingExternal = true;
     model.pushStackElement();
     model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
     model.pushStackElement();
+    applyingExternal = false;
+    lastAppliedDoc = doc;
+    lastAppliedVersionId = model.getVersionId();
   }
-  applyingExternal = false;
-  lastAppliedDoc = doc;
-  lastAppliedVersionId = model.getVersionId();
   if (props.keepSelectionOnExternalSync) {
     const clamped = Math.min(priorOffset, doc.length);
     const position = model.getPositionAt(clamped);
