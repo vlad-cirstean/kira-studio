@@ -256,18 +256,18 @@ const spaceControl = {
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>
     unwrap(AdeTaskService.ArchiveTask(args)),
-  onAdeTaskBoard: (cb: () => void): (() => void) => on('kira:adetask:board', cb),
-  onAdeTaskBacklog: (cb: () => void): (() => void) => on('kira:adetask:backlog', cb),
-  onAdeTaskWorkflows: (cb: () => void): (() => void) => on('kira:adetask:workflows', cb),
-  onAdeTaskRepos: (cb: () => void): (() => void) => on('kira:adetask:repos', cb),
+  onAdeTaskBoard: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBoard, cb),
+  onAdeTaskBacklog: (cb: () => void): (() => void) => on(CHANNEL.adeTaskBacklog, cb),
+  onAdeTaskWorkflows: (cb: () => void): (() => void) => on(CHANNEL.adeTaskWorkflows, cb),
+  onAdeTaskRepos: (cb: () => void): (() => void) => on(CHANNEL.adeTaskRepos, cb),
   onAdeTaskRuns: (cb: (event: V2.RunsChangedEvent) => void): (() => void) =>
-    on('kira:adetask:runs', cb),
-  onAdeTaskLog: (cb: (event: V2.LogEvent) => void): (() => void) => on('kira:adetask:log', cb),
-  onAdeTaskSessions: (cb: () => void): (() => void) => on('kira:adetask:sessions', cb),
+    on(CHANNEL.adeTaskRuns, cb),
+  onAdeTaskLog: (cb: (event: V2.LogEvent) => void): (() => void) => on(CHANNEL.adeTaskLog, cb),
+  onAdeTaskSessions: (cb: () => void): (() => void) => on(CHANNEL.adeTaskSessions, cb),
   onAdeTaskCredential: (cb: (request: V2.CredentialRequest) => void): (() => void) =>
-    on('kira:adetask:credential', cb),
+    on(CHANNEL.adeTaskCredential, cb),
   onAdeTaskOpenSession: (cb: (event: V2.OpenSessionEvent) => void): (() => void) =>
-    on('kira:adetask:open-session', cb),
+    on(CHANNEL.adeTaskOpenSession, cb),
 };
 
 // P103 Part 2 (§5.6): the shared methods (createCoreControl.ts, P116 H5/P119 grew that set) plus
