@@ -1,15 +1,6 @@
 import type { Page } from '@playwright/test';
-import { DATA_OP } from '@shared/protocol/data-ops';
-import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from '../ui/fixtures';
-import { IPC } from '../ui/support/ipcChannels';
-import {
-  DB_PATH,
-  mongoConnectionSummary,
-  WIDGETS_PATH,
-  widgetsFixture,
-} from '../ui/support/mongoFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from '../ui/support/tree';
+import { CONTROL, FIXTURE, makeDocs, openWidgets, readSnapshot } from './documentsFixture';
 import {
   type Frame,
   type FrameMetrics,
@@ -33,89 +24,6 @@ const LADDER_START_DY = Number(ENV.KIRA_PERF_LADDER_DY ?? 1600);
 const LADDER_DECAY = Number(ENV.KIRA_PERF_LADDER_DECAY ?? 0.92);
 const SETTLE_MS = 500;
 const LIST = '[data-testid="document-list"] [data-testid="virtual-list"]';
-
-const CONNECTION_ID = 'conn-doc-perf';
-const SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo Perf', 'red');
-const FIXTURE = widgetsFixture(CONNECTION_ID);
-
-const CONTROL: ControlSnapshot[] = [
-  { channel: IPC.connectionsList, response: [] },
-  {
-    channel: IPC.connectionsCreate,
-    args: {
-      name: 'Mongo Perf',
-      kind: 'mongodb',
-      color: 'red',
-      mode: 'fields',
-      readOnly: false,
-      host: '127.0.0.1',
-      port: 27017,
-      database: 'kira_test',
-      username: 'kira',
-      password: null,
-      uri: null,
-      options: {},
-      preconnect: null,
-      preconnectSidecar: false,
-      autoExplain: false,
-      throttlePerSec: 0,
-    },
-    response: SUMMARY,
-  },
-  ...FIXTURE.control,
-];
-
-const hex = (n: number): string => n.toString(16).padStart(24, '0');
-
-/** Same 7-field shape as `WIDGETS_BODIES[0]` (expanded height 160 px), unique `_id`, varied values. */
-function makeDocs(n: number): { ids: string[]; bodies: string[] } {
-  const ids: string[] = [];
-  const bodies: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const id = `{"$oid":"${hex(i)}"}`;
-    ids.push(id);
-    bodies.push(
-      `{"_id":${id},"name":"widget-${i}","price":{"$numberDouble":"${(i % 997) + 0.5}"},"active":${i % 2 === 0},"createdAt":{"$date":{"$numberLong":"${1704067200000 + i * 86400000}"}},"tags":["${i % 3 === 0 ? 'red' : 'blue'}","small"],"meta":{"weight":{"$numberInt":"${i}"},"note":${i % 5 === 0 ? 'null' : `"note-${i}"`}}}`,
-    );
-  }
-  return { ids, bodies };
-}
-
-function readSnapshot(
-  pageSize: number,
-  docs: { ids: string[]; bodies: string[] },
-  hasMore: boolean,
-): PortSnapshot {
-  return {
-    op: DATA_OP.read,
-    payload: {
-      connectionId: CONNECTION_ID,
-      path: WIDGETS_PATH,
-      projection: null,
-      filter: null,
-      sort: null,
-      pageSize,
-      cursor: { mode: 'offset', offset: 0 },
-    },
-    response: {
-      kind: 'read',
-      page: {
-        kind: 'document',
-        ids: docs.ids.slice(0, pageSize),
-        bodies: docs.bodies.slice(0, pageSize),
-        position: {
-          offset: 0,
-          pageSize,
-          hasMore,
-          nextToken: null,
-          prevToken: null,
-          strategy: 'keyset',
-        },
-      },
-      source: 'server',
-    },
-  };
-}
 
 async function installRecorder(page: Page): Promise<void> {
   await page.evaluate((sel) => {
@@ -202,28 +110,7 @@ test('documents scroll', async ({ relaunch }) => {
     ],
   });
 
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-mongodb"]');
-  await page.fill('[data-testid="connection-name"]', 'Mongo Perf');
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '27017');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'kira');
-  await page.click('[data-testid="color-red"]');
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-  const connRow = connectionRow(page);
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, DB_PATH);
-  await (await findRow(page, WIDGETS_PATH)).dblclick();
-  await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
-    timeout: 15_000,
-  });
+  await openWidgets(page);
   await page.click('[data-testid="document-page-size-10000"]');
   const list = page.locator(LIST);
   await expect

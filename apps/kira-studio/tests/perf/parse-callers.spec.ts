@@ -1,17 +1,31 @@
+import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
-import type { ControlSnapshot } from '../ipc/support/types';
+import { DATA_OP } from '@shared/protocol/data-ops';
+import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from '../ui/fixtures';
 import { grpcTab } from '../ui/support/apiMode';
+import { installClipboardSpy } from '../ui/support/clipboard';
 import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from '../ui/support/connect';
 import { IPC } from '../ui/support/ipcChannels';
+import { WIDGETS_PATH } from '../ui/support/mongoFixture';
 import {
   ORDER_ITEMS_PATH,
   orderItemsFixture,
   postgresConnectionSummary,
 } from '../ui/support/postgresFixture';
 import { type ActionMetrics, actionLine, actionSummaryLine, measureAction } from './blockMeter';
+import {
+  CONNECTION_ID,
+  connectMongo,
+  CONTROL as MONGO_CONTROL,
+  FIXTURE as MONGO_FIXTURE,
+  makeDocs,
+  openWidgets,
+  readSnapshot,
+} from './documentsFixture';
 import { load1 } from './perfProbe';
 
 // P163: opt-in probe of every large-input parse caller (`bun run perf:parse:studio`), asserts
@@ -279,6 +293,140 @@ if (want('console-format')) {
       );
     });
   }
+}
+
+// Row 10: Documents page of 10 000 documents loads; fieldNamesOnPage runs from four computeds.
+if (want('doc-fieldnames')) {
+  for (const [rows, pad] of [
+    [10_000, 0],
+    [2000, 8192],
+  ] as const) {
+    test(`doc-fieldnames ${rows}x${pad}B`, async ({ relaunch }) => {
+      test.setTimeout(600_000);
+      const docs = makeDocs(rows, pad);
+      await measure(
+        'doc-fieldnames',
+        `${rows}x${400 + pad}B`,
+        async () => {
+          const { window } = await relaunch({
+            control: MONGO_CONTROL,
+            stream: [
+              readSnapshot(100, docs, true),
+              readSnapshot(10000, docs, false),
+              ...MONGO_FIXTURE.port.slice(1),
+            ],
+          });
+          await openWidgets(window);
+          return window;
+        },
+        '[data-testid="document-page-size-10000"]',
+        `() => {
+          const l = document.querySelector('[data-testid="document-list"] [data-testid="virtual-list"]');
+          return !!l && l.scrollHeight >= ${rows * 100};
+        }`,
+      );
+    });
+  }
+}
+
+// Row 12: console Mongo result, "Copy all" over every displayed document.
+if (want('console-copy-all')) {
+  for (const [rows, pad] of [
+    [10_000, 0],
+    [2000, 8192],
+  ] as const) {
+    for (const [fmt, item] of [
+      ['json', 'copy-all-as-json'],
+      ['shell', 'copy-all-shell'],
+    ] as const) {
+      test(`console-copy-all-${fmt} ${rows}x${pad}B`, async ({ relaunch }) => {
+        test.setTimeout(600_000);
+        const docs = makeDocs(rows, pad);
+        await measure(
+          `console-copy-all-${fmt}`,
+          `${rows}x${400 + pad}B`,
+          async () => {
+            const stream: PortSnapshot[] = [
+              {
+                op: DATA_OP.execute,
+                payload: {
+                  connectionId: CONNECTION_ID,
+                  path: WIDGETS_PATH,
+                  statements: ['db.widgets.find()'],
+                },
+                response: {
+                  kind: 'execute',
+                  pages: [
+                    {
+                      kind: 'document',
+                      ids: docs.ids,
+                      bodies: docs.bodies,
+                      position: {
+                        offset: 0,
+                        pageSize: rows,
+                        hasMore: false,
+                        nextToken: null,
+                        prevToken: null,
+                        strategy: 'offset',
+                      },
+                    },
+                  ],
+                },
+              },
+            ];
+            const { window } = await relaunch({ control: MONGO_CONTROL, stream });
+            await installClipboardSpy(window);
+            await connectMongo(window);
+            await openConsoleFromMenu(window, WIDGETS_PATH);
+            const view = window.locator('[data-testid="console-view"]');
+            await expect(view).toBeVisible();
+            await pasteInto(view, window, () => 'db.widgets.find()', 0);
+            await window.click('[data-testid="console-run-statement"]');
+            const first = view.locator('[data-testid="console-result-doc-row"]').first();
+            await expect(first).toBeVisible({ timeout: 60_000 });
+            await first.click({ button: 'right' });
+            await window.locator('[data-testid="menu-item-copy-all-submenu"]').hover();
+            await expect(window.locator('[data-testid="context-submenu"]')).toBeVisible();
+            return window;
+          },
+          `[data-testid="menu-item-${item}"]`,
+          `() => ((window).__clipboard || []).length > 0`,
+        );
+      });
+    }
+  }
+}
+
+// Pure caller functions timed in-page (WebKit), median over 5 runs; rows with no UI path worth
+// driving: find, compare, cell editor, byte label, row menu, lint scan, EXPLAIN parse, grid copy.
+if (want('pure-fns')) {
+  test('pure-fns', async ({ relaunch }) => {
+    test.setTimeout(600_000);
+    const out = resolve(tmpdir(), `kira-pure-${process.pid}.js`);
+    execFileSync(
+      'bun',
+      [
+        'build',
+        resolve(__dirname, 'pureFns.entry.ts'),
+        '--outfile',
+        out,
+        '--target=browser',
+        '--format=iife',
+      ],
+      { stdio: 'inherit' },
+    );
+    for (let run = 1; run <= RUNS; run++) {
+      const { window: page } = await relaunch({ control: [] });
+      await page.waitForTimeout(500);
+      const load = load1();
+      await page.addScriptTag({ path: out });
+      const res = await page.evaluate(() =>
+        (window as unknown as { __pure: (n: number) => Record<string, number> }).__pure(5),
+      );
+      console.log(`case=pure-fns run=${run} load1=${load} ${JSON.stringify(res)}`);
+      await page.close();
+    }
+  });
 }
 
 // Worker lifecycle costs: cold start, respawn after terminate, and structured-clone cost of a
