@@ -355,6 +355,10 @@ export function useRetrySetup() {
   return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskRetrySetup(args) });
 }
 
+export function useOpenReviewWindow() {
+  return useMutation({ mutationFn: (args: BranchArgs) => control.adeTaskOpenReviewWindow(args) });
+}
+
 export function useTakeOver() {
   return useMutation({ mutationFn: (args: TakeOverArgs) => control.adeTaskTakeOver(args) });
 }

@@ -11,6 +11,7 @@ export type HeaderAction =
   | { kind: 'queueAfter'; label: string; tone: Tone; withId: string }
   | { kind: 'remerge'; label: string; tone: Tone; target: string }
   | { kind: 'start'; label: string; tone: 'claude' }
+  | { kind: 'review'; label: string; tone: 'grey' }
   | { kind: 'created'; label: string; tone: 'grey' };
 
 export interface HeaderInput {
@@ -26,7 +27,8 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
   if (b.name === '') {
     return [{ kind: 'created', label: 'Created when the pipeline runs', tone: 'grey' }];
   }
-  if (b.kind !== 'mine' || b.mergedIntoMain) return [];
+  const review: HeaderAction = { kind: 'review', label: 'Review code', tone: 'grey' };
+  if (b.kind !== 'mine' || b.mergedIntoMain) return [review];
   const out: HeaderAction[] = [];
   const rootId = i.graph.rootOf(b.id);
   const root = i.graph.byBranch.get(rootId);
@@ -65,5 +67,6 @@ export function headerActions(i: HeaderInput): HeaderAction[] {
   }
   const setupOk = b.setup === null || b.setup.state === 'ready';
   if (!i.hadSession && setupOk) out.push({ kind: 'start', label: '▶ Start agent', tone: 'claude' });
+  out.push(review);
   return out;
 }

@@ -9,7 +9,7 @@ import { integrationChips } from '../board/labels';
 import type { StepRun } from '../board/progress';
 import type { StageBlock } from '../board/stageBlocks';
 import type { CardModel } from '../plan/usePlanModel';
-import { useApprove, useRetryRun } from '../queries';
+import { useApprove, useOpenReviewWindow, useRetryRun } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeTakeOverStore } from '../state/adeTakeOver';
 import { actionStyle, solidStyle, TONE, tagStyle } from '../tones';
@@ -22,6 +22,7 @@ const ui = useAdeBoardUiStore();
 const takeOver = useAdeTakeOverStore();
 const approve = useApprove();
 const retry = useRetryRun();
+const openReview = useOpenReviewWindow();
 
 const error = ref('');
 const openLog = ref<string | null>(null);
@@ -84,6 +85,14 @@ const released = computed(() =>
     ? props.card.rows.filter((r) => r.branch.kind === 'mine' && !r.draft)
     : [],
 );
+const reviewRows = computed(() =>
+  props.block.stage.id === 'review' ? props.card.rows.filter((r) => r.branch.kind === 'mine') : [],
+);
+const onReview = (branchId: string): void =>
+  openReview.mutate(
+    { branchId },
+    { onError: (err) => (error.value = err instanceof Error ? err.message : String(err)) },
+  );
 const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? TONE.amber[1] : 'var(--kira-fg-muted)');
 </script>
 
@@ -217,6 +226,28 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
       <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
       <span class="min-w-0 truncate font-data text-kira-md">{{ row.name }}</span>
     </button>
+    <div
+      v-for="row in reviewRows"
+      :key="`review-${row.id}`"
+      class="flex h-7 items-center gap-2 rounded-kira-sm bg-bg px-1.5"
+      data-testid="ade-review-row"
+      :data-branch-id="row.id"
+    >
+      <AdeRepoTag :code-repo-id="row.branch.codeRepoId" :label="row.repo" />
+      <span class="min-w-0 flex-1 truncate font-data text-kira-md">{{ row.name }}</span>
+      <AdeTip :text="row.branch.name === '' ? 'Create the branch first' : 'Open the review window'">
+        <Button
+          variant="dialog"
+          size="xs"
+          class="h-[18px] shrink-0 rounded-kira-xs px-[7px] text-kira-sm"
+          :disabled="row.branch.name === ''"
+          data-testid="ade-review-code"
+          @click="onReview(row.id)"
+        >
+          Review code
+        </Button>
+      </AdeTip>
+    </div>
     <p v-if="error" class="m-0 text-kira-sm text-error" data-testid="ade-stage-block-error">{{ error }}</p>
   </div>
 </template>

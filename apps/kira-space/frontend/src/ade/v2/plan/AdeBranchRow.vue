@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import AdeTip from '../AdeTip.vue';
 import { fixItems } from '../board/fixMenu';
 import { repoColor } from '../palette';
-import { useRepos } from '../queries';
+import { useOpenReviewWindow, useRepos } from '../queries';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
 import { TONE } from '../tones';
@@ -18,6 +18,7 @@ const dialogs = useAdeDialogsStore();
 const contextMenu = useContextMenuStore();
 const { model } = usePlanModel();
 const repos = useRepos();
+const openReview = useOpenReviewWindow();
 const hasChips = computed(() => props.row.chips.merged.length + props.row.chips.deployed.length > 0);
 const selected = computed(() => ui.selectedBranchId === props.row.id);
 
@@ -38,13 +39,22 @@ function onMenu(ev: MouseEvent): void {
         unpushed: m.board.plan.unpushed,
       })
     : null;
-  if (!items) return;
+  const created = props.row.branch.name !== '';
   ev.preventDefault();
   ev.stopPropagation();
   const id = props.row.id;
   contextMenu.openContextMenu(ev, [
     { type: 'label', label: `${props.row.repo} · ${props.row.name}` },
-    ...(items.length === 0
+    {
+      type: 'item' as const,
+      id: 'ade-review-code',
+      label: created ? 'Review code' : 'Review code (create the branch first)',
+      disabled: !created,
+      run: () => openReview.mutate({ branchId: id }),
+    },
+    ...(!items
+      ? []
+      : items.length === 0
       ? [{ type: 'item' as const, id: 'ade-fix-none', label: 'Nothing to fix', disabled: true, run: () => {} }]
       : items.map((it) => ({
           type: 'item' as const,

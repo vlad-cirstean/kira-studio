@@ -7,7 +7,7 @@ import AdeForcePushDialog from '../AdeForcePushDialog.vue';
 import AdeTip from '../AdeTip.vue';
 import type { Tone } from '../board/actions';
 import { type CardModel, type PlanModel, usePlanModel } from '../plan/usePlanModel';
-import { usePrs, useRepos, useRetrySetup } from '../queries';
+import { useOpenReviewWindow, usePrs, useRepos, useRetrySetup } from '../queries';
 import AdeSessionsTab from '../sessions/AdeSessionsTab.vue';
 import { useAdeBoardUiStore } from '../state/adeBoardUi';
 import { useAdeDialogsStore } from '../state/adeDialogs';
@@ -30,6 +30,7 @@ const sessionCount = computed(
 const prs = usePrs();
 const repos = useRepos();
 const retrySetup = useRetrySetup();
+const openReview = useOpenReviewWindow();
 const setupError = ref('');
 const forcePush = ref(false);
 const { copy, copied } = useClipboard({ copiedDuring: 1500 });
@@ -78,6 +79,13 @@ function run(a: HeaderAction): void {
     dialogs.rebaseOnto(graph.value.rootOf(id), a.withId, `Queue after ${graph.value.byBranch.get(a.withId)?.name ?? ''}`);
   } else if (a.kind === 'remerge') dialogs.merge(id, a.target);
   else if (a.kind === 'start') dialogs.start(id);
+  else if (a.kind === 'review') {
+    setupError.value = '';
+    openReview.mutate(
+      { branchId: id },
+      { onError: (err) => (setupError.value = err instanceof Error ? err.message : String(err)) },
+    );
+  }
 }
 const actionTone = (a: HeaderAction): Record<string, string> =>
   a.tone === 'claude' ? actionStyle('claude') : solidStyle(a.tone);
