@@ -12,7 +12,6 @@ export const IPC = {
   settingsSet: 'kira:settings:set',
   layoutGetAll: 'kira:layout:getAll',
   layoutSet: 'kira:layout:set',
-  engineStatus: 'kira:engine:status',
   port: 'kira:port',
   engineState: 'kira:engine:state',
   openSettings: 'kira:open-settings',

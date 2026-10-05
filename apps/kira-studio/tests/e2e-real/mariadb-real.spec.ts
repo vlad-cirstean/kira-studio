@@ -22,7 +22,7 @@ import { installPassthrough } from './support/passthrough';
 // — once Kafka went native in P58e M9.3, the last of the ten kinds to do so — every connection
 // surviving the child's own SIGKILL entirely (checkpoint C2, P58e E21). P58f's own M10 deletes that
 // child (`internal/enginehost/`) outright, which retires the property: there is no child left to
-// kill, and `EngineService.Status()` now just reports this process (P58f D11). What is still worth
+// kill. What is still worth
 // proving, and covered nowhere else, is that two different Go-native kinds — MariaDB and Kafka —
 // coexist in one session and both keep serving real reads across a `page.reload()`.
 

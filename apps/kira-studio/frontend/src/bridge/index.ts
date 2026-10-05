@@ -3,7 +3,6 @@ import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as DataGripService from '@bindings/datagripservice.js';
 import * as DbMcpService from '@bindings/dbmcpservice.js';
-import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
@@ -64,7 +63,6 @@ import { apiControl } from './apiControl';
 // existing `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
 const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
-  engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
   onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),
   onNewRequest: (cb: () => void): (() => void) => on(CHANNEL.newRequest, cb),
   onImportPostman: (cb: () => void): (() => void) => on(CHANNEL.importPostman, cb),

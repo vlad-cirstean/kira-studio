@@ -22,9 +22,6 @@ const KEYCHAIN_AVAILABLE: SecretStorageStatus = {
  * `windowsEnsure` (P8) runs sequentially *before* this `Promise.all`, not inside it — always a
  * no-op void call here (`mockRuntime.ts`'s own `WILDCARD_DEFAULTS`, not listed in this array,
  * the same way `tabsSave`/`filtersList` aren't).
- *
- * `engineStatus` is deliberately absent — nothing in the renderer ever calls it, so it has
- * no `CHANNEL_TO_FQN` entry and needs none here.
  */
 export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.layoutGetAll, response: defaultLayout },

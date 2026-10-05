@@ -2331,12 +2331,12 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **27** bound services under `apps/kira-studio/internal/bridge/`
+options, registering **26** bound services under `apps/kira-studio/internal/bridge/`
 (`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
-`LifecycleService`); ten Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
-`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` —
+`LifecycleService`); nine Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
+`OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` —
 P18: the per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL language
 service described below — `CustomScriptsService`, P85's launchable-scripts feature); seven the Api
 module's (`HttpService` — P2: `Send`, the outbound HTTP path, see the op-log paragraph below and
@@ -2366,10 +2366,7 @@ Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 app's bindings — never the shared package's name — with no binding-name shim needed. Kira Space's
 own `WindowsService` gained `Ensure`/`SetMode` this way (P128 §2.2) — it bound only `OpenNew`
 before.
-`EngineService.Status()` has
-zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
-rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
-no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
+Behind the
 services: `apps/kira-studio/internal/storage/` (repos plus forward-only SQL migrations),
 `apps/kira-studio/internal/tree/service.go` (the children/describe/definition cache-aside),
 `apps/kira-studio/internal/preconnect/` (the pre-connect script supervisor, a real

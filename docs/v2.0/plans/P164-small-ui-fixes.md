@@ -31,3 +31,5 @@ screenshot before/after.
 
 **Visual baselines re-captured (studio):** workbench-shell, data-grid, console, schema-dialog (status bar
 change), connection-dialog (breadcrumbs). Space baselines unchanged.
+
+**Follow-up.** Dead `EngineService`/`engineStatus` removed (Go service, registration, bridge call, test mocks, ARCHITECTURE mention).
