@@ -1,4 +1,4 @@
-import { columns, data } from 'cheetah-grid';
+import { columns, data, headers } from 'cheetah-grid';
 
 // cheetah-grid 2.2.0's `main.d.mts` references `columns_d_exports`, `headers_d_exports` and
 // `data_d_exports` without declaring them, so `columns`, `headers` and `data` resolve to `any`.
@@ -50,6 +50,7 @@ export interface CheetahDataSource {
 }
 
 export const ColumnBase: new () => CellDrawer = columns.type.Column;
+export const HeaderBase: new () => CellDrawer = headers.type.BaseHeader;
 export const DataSource: new (source: RecordSource<unknown>) => CheetahDataSource = data.DataSource;
 
 export interface CellAddress {

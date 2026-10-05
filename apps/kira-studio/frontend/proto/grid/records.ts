@@ -6,11 +6,21 @@ import type { ProtoState } from './state';
  *  costs one object and a cell is decoded only when drawn. */
 export interface RowRecord {
   readonly row: number;
+  /** Display position, which the gutter numbers. */
+  readonly position: number;
 }
 
-export function createRecordClass(state: ProtoState): new (row: number) => RowRecord {
+export function createRecordClass(
+  state: ProtoState,
+): new (
+  row: number,
+  position: number,
+) => RowRecord {
   class Record implements RowRecord {
-    constructor(readonly row: number) {}
+    constructor(
+      readonly row: number,
+      readonly position: number,
+    ) {}
   }
   const proto = Record.prototype;
   state.data.columns.forEach((column, index) => {
@@ -26,7 +36,7 @@ export function createRecordClass(state: ProtoState): new (row: number) => RowRe
   });
   Object.defineProperty(proto, GUTTER_FIELD, {
     get(this: Record) {
-      return String(state.rowNumberBase + this.row + 1);
+      return String(state.rowNumberBase + this.position + 1);
     },
   });
   return Record;
