@@ -57,6 +57,7 @@ async function mount(): Promise<void> {
     left,
     right,
     review: review !== null,
+    reviewBranch: review?.branch,
   });
   await diffEditor.mount();
   state.value = diffEditor.state.value;

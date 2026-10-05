@@ -59,6 +59,7 @@ async function loadDiffSides(
   path: string,
   left: string | null,
   right: string | null,
+  reviewBranch: string | undefined,
 ): Promise<DiffSidesLoaded | { error: string }> {
   if (left === null) {
     try {
@@ -77,11 +78,20 @@ async function loadDiffSides(
   // as soon as they settle rather than left to leak for the rest of the mount.
   const transport = gitTransportFor(repoId);
   try {
-    const [leftResult, rightResult] = await Promise.all([
+    const [leftResult, rightResult, snapshot] = await Promise.all([
       transport.request('file.read', { repoId: gitRepoId, rev: left, path }),
       transport.request('file.read', { repoId: gitRepoId, rev: right, path }),
+      reviewBranch === undefined
+        ? null
+        : transport.request('review.snapshot', { repoId: gitRepoId, branch: reviewBranch, path }),
     ]);
-    return { diff: { head: toDiffSide(leftResult), worktree: toDiffSide(rightResult) }, gitRepoId };
+    // A since-review left side is the bytes the reviewer saw, which survive a rewritten branch
+    // that made the reviewed commit unreachable.
+    const head =
+      snapshot?.kind === 'text' && snapshot.text !== null && snapshot.reviewedAtSha === left
+        ? toDiffSide({ kind: 'found', content: snapshot.text, bytes: snapshot.text.length })
+        : toDiffSide(leftResult);
+    return { diff: { head, worktree: toDiffSide(rightResult) }, gitRepoId };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   } finally {
@@ -143,6 +153,9 @@ export interface DiffEditorParams {
   /** Only toggles hideUnchangedRegions/glyphMargin (§7.3 gotchas 1/2) — the review object itself,
    *  and attaching its comment-thread layer, stay the caller's own concern. */
   review: boolean;
+  /** The reviewed branch of a review diff; the left side then comes from `review.snapshot` when
+   *  it stored this revision's text. */
+  reviewBranch?: string;
 }
 
 export interface DiffEditorHandle {
@@ -175,8 +188,8 @@ export function useDiffEditor(
 
   async function mount(): Promise<void> {
     const settingsStore = useSettingsStore();
-    const { editorKey, repoId, path, left, right, review } = params;
-    const loaded = await loadDiffSides(repoId, path, left, right);
+    const { editorKey, repoId, path, left, right, review, reviewBranch } = params;
+    const loaded = await loadDiffSides(repoId, path, left, right, reviewBranch);
     if ('error' in loaded) {
       state.value = 'error';
       errorMessage.value = loaded.error;
