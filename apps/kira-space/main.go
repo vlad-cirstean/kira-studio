@@ -154,16 +154,7 @@ func main() {
 	// windows holds every open window; created here so Archive can close a task's review windows.
 	windows := shell.NewWindowRegistry()
 	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
-		func(taskID string) {
-			keys, err := repositories.AdeReview.KeysByTask(taskID)
-			if err != nil {
-				slog.Warn("ade: list review windows", "scope", "ade", "task", taskID, "err", err)
-				return
-			}
-			for _, k := range keys {
-				windows.Close(k)
-			}
-		})
+		closeTaskReviewWindows(repositories, windows))
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -318,13 +309,7 @@ func main() {
 		Cfg:       shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 		Ephemeral: func(key string) bool { ok, _ := repositories.AdeReview.IsReviewKey(key); return ok },
 	}
-	// Review windows are native windows this service opens, closes and retitles.
-	adeTaskSvc.OpenWindow = func(rec shell.WindowRecord) {
-		rec.Bounds = shell.CascadeFrom(app.Window.Current())
-		shell.OpenWindow(winDeps, rec)
-	}
-	adeTaskSvc.CloseWindow = windows.Close
-	adeTaskSvc.SetWindowTitle = func(key, title string) { windows.SetTitle(key, title) }
+	wireReviewWindows(adeTaskSvc, winDeps, windows, app)
 	openNew := func() { shell.OpenNewWindow(winDeps) }
 	// windowsSvc.OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action
 	// the ⇧⌘N menu command below ties to.
@@ -339,10 +324,7 @@ func main() {
 		OnEmit: events.Signal, Quit: quitter.RequestQuit, NewWindow: openNew,
 	}))
 
-	// Review windows are never restored: drop the leftovers before the startup List.
-	if err := repositories.AdeReview.PurgeAll(); err != nil {
-		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
-	}
+	purgeReviewWindows(repositories)
 	records, err := repositories.Windows.List()
 	if err != nil {
 		reporter.Fatal(startupfail.StepWindowList, err)
@@ -430,6 +412,37 @@ func wireTracker(
 	}
 	tracker.SetHooks(hooks.ComposeLaunch)
 	return tracker, hooks
+}
+
+// closeTaskReviewWindows returns the hook that closes every review window of an archived task.
+func closeTaskReviewWindows(repositories *repos.Repos, windows *shell.WindowRegistry) func(taskID string) {
+	return func(taskID string) {
+		keys, err := repositories.AdeReview.KeysByTask(taskID)
+		if err != nil {
+			slog.Warn("ade: list review windows", "scope", "ade", "task", taskID, "err", err)
+			return
+		}
+		for _, k := range keys {
+			windows.Close(k)
+		}
+	}
+}
+
+// purgeReviewWindows drops review windows a previous run left behind: they are never restored.
+func purgeReviewWindows(repositories *repos.Repos) {
+	if err := repositories.AdeReview.PurgeAll(); err != nil {
+		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
+	}
+}
+
+// wireReviewWindows points the task service at the shell window registry for review windows.
+func wireReviewWindows(svc *bridge.AdeTaskService, winDeps shell.WindowOpenerDeps, windows *shell.WindowRegistry, app *application.App) {
+	svc.OpenWindow = func(rec shell.WindowRecord) {
+		rec.Bounds = shell.CascadeFrom(app.Window.Current())
+		shell.OpenWindow(winDeps, rec)
+	}
+	svc.CloseWindow = windows.Close
+	svc.SetWindowTitle = func(key, title string) { windows.SetTitle(key, title) }
 }
 
 // wireAdeTask builds the v2 task board engine (P144): its own Conn, the

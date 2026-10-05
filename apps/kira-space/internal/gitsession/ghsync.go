@@ -8,6 +8,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/catfile"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitreview"
 )
 
 // ghsync.go: the one-way app -> GitHub "viewed" sync plan (P150). The rules live in ghSyncDecision.
@@ -162,19 +163,29 @@ func (e *RepoEntry) GhSyncPlan(ctx context.Context, branch, base string, pr int,
 
 	out := GhSyncPlanResult{
 		Status: "ok", Account: account, HeadSha: files.HeadSha, LocalTip: rng.BranchTip, PrNodeID: files.NodeID,
-		Files: []GhSyncFile{},
 	}
-	inPr := make(map[string]bool, len(files.Files))
+	out.Files, out.DropSynced = ghSyncFiles(files.Files, local, records, prOID, synced)
+	return out, nil
+}
+
+// ghSyncFiles decides every path: the PR's files first, then local or earlier-synced paths the PR
+// no longer lists.
+func ghSyncFiles(
+	prFiles []ghclient.PullFile, local map[string]ReviewFileStatus, records map[string]gitreview.FileRecord,
+	prOID map[string]string, synced map[string]bool,
+) (files []GhSyncFile, drop []string) {
+	files = []GhSyncFile{}
 	add := func(path string, facts ghSyncFacts) {
-		action, reason, drop := ghSyncDecision(facts)
-		if drop {
-			out.DropSynced = append(out.DropSynced, path)
+		action, reason, dropIt := ghSyncDecision(facts)
+		if dropIt {
+			drop = append(drop, path)
 		}
 		if action != "" {
-			out.Files = append(out.Files, GhSyncFile{Path: path, Action: action, Reason: reason})
+			files = append(files, GhSyncFile{Path: path, Action: action, Reason: reason})
 		}
 	}
-	for _, f := range files.Files {
+	inPr := make(map[string]bool, len(prFiles))
+	for _, f := range prFiles {
 		inPr[f.Path] = true
 		st, has := local[f.Path]
 		kind := "none"
@@ -205,7 +216,7 @@ func (e *RepoEntry) GhSyncPlan(ctx context.Context, branch, base string, pr int,
 		}
 		add(p, ghSyncFacts{Synced: synced[p], Kind: kind})
 	}
-	return out, nil
+	return files, drop
 }
 
 // SetPrFilesViewed marks (viewed) or unmarks paths on the PR, honouring the rate-limit breaker.

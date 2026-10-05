@@ -103,25 +103,9 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if err != nil {
 		return adewire.Launch{}, err
 	}
-	rec, err := b.deps.Sessions.Get(args.SessionID)
+	rec, err := b.takeOverSession(args)
 	if err != nil {
 		return adewire.Launch{}, err
-	}
-	if rec == nil || rec.TaskID == "" {
-		return adewire.Launch{}, invalid("session %s is not a task session", args.SessionID)
-	}
-	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
-		return adewire.Launch{}, invalid("the session is already open")
-	}
-	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID }); err != nil {
-		return adewire.Launch{}, err
-	} else if open != nil {
-		return adewire.Launch{}, invalid("the conversation is already open")
-	}
-	if rec.Mode == model.AdeSessionModeHeadless {
-		if err := b.stopForTakeOver(rec, args.StopIfRunning); err != nil {
-			return adewire.Launch{}, err
-		}
 	}
 
 	mu := b.taskMu(rec.TaskID)
@@ -135,22 +119,9 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, "", nil)
 		return l, err
 	}
-	gatePath := ""
-	if rec.BranchID != "" {
-		sb, ok := tc.branch(rec.BranchID)
-		if !ok {
-			return adewire.Launch{}, invalid("the session's branch is no longer on the task")
-		}
-		if gatePath, err = b.launchGate(ctx, tc, sb); err != nil {
-			return adewire.Launch{}, err
-		}
-	}
-	cwd := rec.Cwd
-	if info, err := os.Stat(cwd); err != nil || !info.IsDir() {
-		if gatePath == "" {
-			return adewire.Launch{}, invalid("%s no longer exists", cwd)
-		}
-		cwd = gatePath
+	cwd, err := b.takeOverCwd(ctx, tc, rec)
+	if err != nil {
+		return adewire.Launch{}, err
 	}
 
 	pa := PrepareArgs{TaskID: rec.TaskID, BranchID: rec.BranchID, StageID: rec.StageID, StepID: rec.StepID, Cwd: cwd}
@@ -177,6 +148,55 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 		b.bindTUIRun(runID, res.RecordID, release)
 	}
 	return launchOf(res), nil
+}
+
+// takeOverSession loads the row and rejects one that is not takeable; a running headless run is
+// stopped when args allow.
+func (b *TaskBoard) takeOverSession(args adewire.TakeOverArgs) (*model.AdeSession, error) {
+	rec, err := b.deps.Sessions.Get(args.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	if rec == nil || rec.TaskID == "" {
+		return nil, invalid("session %s is not a task session", args.SessionID)
+	}
+	if rec.Mode == model.AdeSessionModeTUI && rec.State == model.AdeSessionStateRunning {
+		return nil, invalid("the session is already open")
+	}
+	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.ClaudeSessionID == rec.ClaudeSessionID }); err != nil {
+		return nil, err
+	} else if open != nil {
+		return nil, invalid("the conversation is already open")
+	}
+	if rec.Mode == model.AdeSessionModeHeadless {
+		if err := b.stopForTakeOver(rec, args.StopIfRunning); err != nil {
+			return nil, err
+		}
+	}
+	return rec, nil
+}
+
+// takeOverCwd gates the session's branch and returns its cwd, falling back to the gate path when
+// the recorded directory is gone.
+func (b *TaskBoard) takeOverCwd(ctx context.Context, tc *taskCtx, rec *model.AdeSession) (string, error) {
+	gatePath := ""
+	if rec.BranchID != "" {
+		sb, ok := tc.branch(rec.BranchID)
+		if !ok {
+			return "", invalid("the session's branch is no longer on the task")
+		}
+		var err error
+		if gatePath, err = b.launchGate(ctx, tc, sb); err != nil {
+			return "", err
+		}
+	}
+	if info, err := os.Stat(rec.Cwd); err != nil || !info.IsDir() {
+		if gatePath == "" {
+			return "", invalid("%s no longer exists", rec.Cwd)
+		}
+		return gatePath, nil
+	}
+	return rec.Cwd, nil
 }
 
 // stopForTakeOver stops the headless run behind the row when it still runs (D3).

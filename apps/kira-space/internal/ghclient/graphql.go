@@ -186,7 +186,8 @@ func (c *Client) SetFilesViewed(ctx context.Context, repo Repo, prNodeID string,
 	ok := Status{Kind: KindOK, Host: repo.Host}
 	for start := 0; start < len(paths); start += viewedChunkSize {
 		chunk := paths[start:min(start+viewedChunkSize, len(paths))]
-		vars := []GraphQLVar{{Name: "pr", Str: prNodeID}}
+		vars := make([]GraphQLVar, 0, 1+len(chunk))
+		vars = append(vars, GraphQLVar{Name: "pr", Str: prNodeID})
 		for i, p := range chunk {
 			vars = append(vars, GraphQLVar{Name: "p" + strconv.Itoa(i), Str: p})
 		}
