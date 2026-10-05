@@ -39,6 +39,7 @@ type fakeBackend struct {
 	testN         atomic.Int64
 	disconnectN   atomic.Int64
 	release       chan struct{}
+	unwind        chan struct{}
 	throttleCalls []throttleCall
 }
 
@@ -47,15 +48,31 @@ type throttleCall struct {
 	perSec       float64
 }
 
-func newFakeBackend() *fakeBackend { return &fakeBackend{release: make(chan struct{})} }
+func newFakeBackend() *fakeBackend {
+	return &fakeBackend{release: make(chan struct{}), unwind: make(chan struct{})}
+}
 
 func (b *fakeBackend) Connect(ctx context.Context, cfg model.ResolvedConnectionConfig) (connections.ConnectResult, error) {
 	b.mu.Lock()
 	b.lastConfig = cfg
 	b.mu.Unlock()
-	b.connectN.Add(1)
-	if cfg.Name == "slow-conn" {
-		<-b.release
+	n := b.connectN.Add(1)
+	switch cfg.Name {
+	case "slow-conn":
+		select {
+		case <-b.release:
+		case <-ctx.Done():
+			return connections.ConnectResult{}, ctx.Err()
+		}
+	case "blind-conn":
+		<-b.release // ignores ctx
+	case "stubborn-conn":
+		// First attempt honours ctx only after unwind is closed: a driver slow to notice a cancel.
+		if n == 1 {
+			<-ctx.Done()
+			<-b.unwind
+			return connections.ConnectResult{}, ctx.Err()
+		}
 	}
 	return connections.ConnectResult{ServerVersion: "1.0", Caps: map[string]any{}}, nil
 }
@@ -627,6 +644,89 @@ func TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry(t *t
 	}
 }
 
+// TestConnectAfterDisconnectStartsFreshAttempt is P168 Part 2 F4: a Connect arriving while a
+// cancelled attempt is still unwinding must not join it and return its stale "disconnected"; and
+// Disconnect must not return before that attempt finished.
+func TestConnectAfterDisconnectStartsFreshAttempt(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("stubborn-conn"))
+
+	firstDone := make(chan struct{})
+	go func() {
+		_, _ = h.svc.Connect(created.ID)
+		close(firstDone)
+	}()
+	time.Sleep(200 * time.Millisecond)
+
+	disconnectDone := make(chan struct{})
+	go func() {
+		_, _ = h.svc.Disconnect(created.ID)
+		close(disconnectDone)
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	secondDone := make(chan model.ConnectionState, 1)
+	go func() {
+		state, _ := h.svc.Connect(created.ID)
+		secondDone <- state
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	select {
+	case <-disconnectDone:
+		t.Fatal("Disconnect returned while the cancelled attempt was still unwinding")
+	default:
+	}
+
+	close(h.backend.unwind)
+	<-firstDone
+	<-disconnectDone
+	if state := <-secondDone; state.Status != "connected" {
+		t.Fatalf("second Connect status = %q, want connected (a fresh attempt)", state.Status)
+	}
+	if got := h.backend.connectCount(); got != 2 {
+		t.Fatalf("Backend.Connect calls = %d, want 2", got)
+	}
+}
+
+// TestUpdateWhileConnectingReconnectsOnTheNewConfig is P168 Part 2 F3: an attempt that resolved
+// its config before an edit must not finish on the old ReadOnly/destination.
+func TestUpdateWhileConnectingReconnectsOnTheNewConfig(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+
+	connectDone := make(chan struct{})
+	go func() {
+		_, _ = h.svc.Connect(created.ID)
+		close(connectDone)
+	}()
+	time.Sleep(200 * time.Millisecond)
+
+	draft := fieldsInput("slow-conn")
+	draft.ReadOnly = true
+	updateDone := make(chan error, 1)
+	go func() {
+		_, err := h.svc.Update(created.ID, draft)
+		updateDone <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	h.backend.releaseSlow()
+
+	if err := <-updateDone; err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	<-connectDone
+	if got := h.backend.connectCount(); got != 2 {
+		t.Errorf("Backend.Connect calls = %d, want 2 (aborted attempt plus reconnect)", got)
+	}
+	if !h.backend.lastConnectConfig().ReadOnly {
+		t.Error("reconnect did not carry ReadOnly=true")
+	}
+	if got := h.svc.StateOf(created.ID).Status; got != "connected" {
+		t.Errorf("status = %q, want connected", got)
+	}
+}
+
 // TestConnectRefusesAfterShutdown is F13 (P108 Part 7): once Shutdown has run, every later Connect
 // must refuse outright rather than starting a new attempt behind a supervisor that has already been
 // told to stop everything.
@@ -649,7 +749,7 @@ func TestConnectRefusesAfterShutdown(t *testing.T) {
 // StopAll that ran first could miss an attempt that only gets tracked moments later, orphaning it.
 func TestShutdownWaitsOutInFlightConnectBeforeStoppingPreconnect(t *testing.T) {
 	h := newHarness(t)
-	created := mustCreate(t, h.svc, fieldsInput("slow-conn"))
+	created := mustCreate(t, h.svc, fieldsInput("blind-conn"))
 
 	connectDone := make(chan struct{})
 	go func() {
