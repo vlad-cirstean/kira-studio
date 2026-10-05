@@ -16,7 +16,7 @@ import { useBlameStatusStore } from '../state/blameStatus';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 
 // P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
-// §5.2) beside the shared caret-status slot. Now a thin composition over the shared bar chrome
+// §5.2) on the left. Now a thin composition over the shared bar chrome
 // (packages/workbench/src/components/StatusBar.vue). P116 G7 adds the app-metrics item back —
 // AppMetricsItem.vue, shared with Kira Studio's own copy of this file. P119 adds the update item,
 // same shared component (UpdateAvailableItem.vue) and the same in-app dialog Kira Studio's own
@@ -41,7 +41,7 @@ function onRevealBlameCommit(): void {
 <template>
   <StatusBarBase>
     <template #left-extra>
-      <!-- P76 §5.2: a sibling fact, not the caret-status slot — that readout stays unwired. -->
+      <!-- P76 §5.2: left-side item. -->
       <Tooltip v-if="blame">
         <TooltipTrigger as-child>
           <TooltipDisabledTrigger>

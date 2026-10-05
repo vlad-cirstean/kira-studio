@@ -29,7 +29,6 @@ import { useTabsStore } from './state/tabs';
 import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import { createWorkbenchHost } from './workbench/host';
-import { useEngineStore } from './workbench/state/engine';
 import TitleBar from './workbench/TitleBar.vue';
 import { createTerminalModule } from './workbench/terminalModule';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
@@ -42,7 +41,6 @@ provide(workbenchHostKey, createWorkbenchHost());
 // TerminalNewTab.vue/TerminalTabView.vue (all shared with Kira Space) to inject.
 provide(terminalModuleKey, createTerminalModule());
 
-const engineStore = useEngineStore();
 const appUpdateStore = useAppUpdateStore();
 const paletteStore = usePaletteStore();
 const modeStore = useModeStore();
@@ -62,7 +60,6 @@ function closeActiveTab(): void {
 }
 
 onMounted(() => {
-  void engineStore.initEngineState();
   unsubscribe = [
     control.onOpenSettings(() => {
       settingsStore.settingsOpen = true;

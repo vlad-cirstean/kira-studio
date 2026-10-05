@@ -106,10 +106,6 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   // P56's own named symptom ("engine connecting" forever) turning `ok` is the single clearest
   // signal the whole stack — bridge/port.ts's Stream, the Go stream, the vendored Node
   // engine — is really wired, not stubbed (P57-e2e-revisit.md §3.3).
-  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
-    timeout: 15_000,
-  });
-
   // A handled bound-call error is a real HTTP 422 under Wails (CLAUDE.md P57 finding) — nothing in
   // this scenario should trigger one, so the console should carry nothing at all, not even that.
   expect(consoleErrors).toEqual([]);

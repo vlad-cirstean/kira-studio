@@ -697,10 +697,6 @@ test('the chrome type scale renders --kira-t-sm/md/lg on their assigned roles (P
 
   await page.click('[data-testid="settings-dialog-close"]');
   await expect(settingsDialog).toHaveCount(0);
-
-  // The status bar's engine-status item -- secondary text, sm. Already sm before this phase.
-  const statusSize = await computedFontSize(page.locator('[data-testid="engine-status"]'));
-  expect(statusSize).toBeCloseTo(sm, 1);
 });
 
 // P123 §6.3 Test 2: data stays customizable -- chrome moving onto a fixed four-value scale must

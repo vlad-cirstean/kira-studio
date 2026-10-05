@@ -189,9 +189,4 @@ test('font-roles — chrome renders in the interface font, and it differs from t
   await expect(dialogTitle).toBeVisible();
   expect(await dialogTitle.evaluate(readFont)).toBe(uiFont);
   await page.click('[data-testid="settings-dialog-close"]');
-
-  // The status bar (engine-status — unconditional, unlike the metrics/cache segments).
-  const engineStatus = page.locator('[data-testid="engine-status"]');
-  await expect(engineStatus).toBeVisible();
-  expect(await engineStatus.evaluate(readFont)).toBe(uiFont);
 });

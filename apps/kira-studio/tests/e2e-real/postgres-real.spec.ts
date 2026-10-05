@@ -106,10 +106,6 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   );
   await expect(firstIdCell).toHaveText('1');
 
-  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
-    timeout: 15_000,
-  });
-
   expect(consoleErrors).toEqual([]);
 });
 

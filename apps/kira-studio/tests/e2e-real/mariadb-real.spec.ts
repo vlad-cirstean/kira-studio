@@ -132,12 +132,6 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await page.click('[data-testid="pager-prev"]');
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
 
-  // Step 10: the status bar's own engine indicator reads 'ok' throughout a wholly-native session
-  // too — it reports this process itself now (P58f D11), not a child that no longer exists.
-  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
-    timeout: 15_000,
-  });
-
   expect(consoleErrors).toEqual([]);
 });
 
