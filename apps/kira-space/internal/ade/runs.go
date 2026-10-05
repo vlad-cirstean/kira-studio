@@ -198,7 +198,7 @@ func (b *TaskBoard) emitRuns(runs ...model.AdeRun) {
 		}
 		b.deps.OnRuns(ev)
 	}
-	b.notifyBoard()
+	b.scheduleBoard()
 }
 
 func (b *TaskBoard) notifySessions() {

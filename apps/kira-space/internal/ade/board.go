@@ -297,7 +297,7 @@ func (b *TaskBoard) load() (boardData, error) {
 	if d.plan, err = b.deps.Tasks.PlanRows(); err != nil {
 		return d, err
 	}
-	if d.runs, err = b.deps.Tasks.RunsByTask(); err != nil {
+	if d.runs, err = b.deps.Tasks.RunsByLiveTask(); err != nil {
 		return d, err
 	}
 	if d.setups, err = b.deps.Tasks.SetupByBranch(); err != nil {

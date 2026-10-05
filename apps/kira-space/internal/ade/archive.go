@@ -169,12 +169,12 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 
 // stopTaskWork cancels the task's running processes and prepare scripts and waits for them to end.
 func (b *TaskBoard) stopTaskWork(tc *taskCtx) error {
-	runs, err := b.deps.Tasks.RunsByTask()
+	runs, err := b.deps.Tasks.RunsOfTask(tc.task.ID)
 	if err != nil {
 		return err
 	}
 	var waits []<-chan struct{}
-	for _, r := range runs[tc.task.ID] {
+	for _, r := range runs {
 		if r.State == model.AdeRunRunning {
 			if done := b.cancelLive(b.live, r.ID, errArchived); done != nil {
 				waits = append(waits, done)

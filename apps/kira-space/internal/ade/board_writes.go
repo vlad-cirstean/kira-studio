@@ -40,11 +40,11 @@ func (b *TaskBoard) wireTask(t model.AdeTask) (adewire.Task, error) {
 			ids = append(ids, br.ID)
 		}
 	}
-	runs, err := b.deps.Tasks.RunsByTask()
+	runs, err := b.deps.Tasks.RunsOfTask(t.ID)
 	if err != nil {
 		return adewire.Task{}, err
 	}
-	return toWireTask(t, ids, runs[t.ID]), nil
+	return toWireTask(t, ids, runs), nil
 }
 
 // stageSnapshot is the JSON of a workflow's first stage, the task's currentStage on creation.

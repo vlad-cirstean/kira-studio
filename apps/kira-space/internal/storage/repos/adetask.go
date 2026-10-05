@@ -525,9 +525,19 @@ func (r *AdeTaskRepo) MarkBranchFacts(hadCommits []string, merged map[string]int
 	return nil
 }
 
-// RunsByTask returns every run grouped by task id, oldest first.
-func (r *AdeTaskRepo) RunsByTask() (map[string][]model.AdeRun, error) {
-	rows, err := r.DB.Query(`SELECT ` + adeRunColumns + ` FROM ade_runs ORDER BY COALESCE(started_at, 0), id`)
+// RunsByLiveTask returns the runs of live (unarchived) tasks grouped by task id, oldest first.
+func (r *AdeTaskRepo) RunsByLiveTask() (map[string][]model.AdeRun, error) {
+	return r.queryRunsByTask(` WHERE task_id IN (SELECT id FROM ade_tasks WHERE archived_at IS NULL)`)
+}
+
+// RunsOfTask returns one task's runs, oldest first.
+func (r *AdeTaskRepo) RunsOfTask(taskID string) ([]model.AdeRun, error) {
+	by, err := r.queryRunsByTask(` WHERE task_id = ?`, taskID)
+	return by[taskID], err
+}
+
+func (r *AdeTaskRepo) queryRunsByTask(where string, args ...any) (map[string][]model.AdeRun, error) {
+	rows, err := r.DB.Query(`SELECT `+adeRunColumns+` FROM ade_runs`+where+` ORDER BY COALESCE(started_at, 0), id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repos: query ade runs: %w", err)
 	}

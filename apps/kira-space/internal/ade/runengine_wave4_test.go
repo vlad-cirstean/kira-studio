@@ -17,11 +17,11 @@ import (
 
 func (e *engine) allRuns(taskID string) []model.AdeRun {
 	e.t.Helper()
-	all, err := e.repos.AdeTasks.RunsByTask()
+	runs, err := e.repos.AdeTasks.RunsOfTask(taskID)
 	if err != nil {
 		e.t.Fatal(err)
 	}
-	return all[taskID]
+	return runs
 }
 
 // run finds one attempt of a step by its attempt number.
