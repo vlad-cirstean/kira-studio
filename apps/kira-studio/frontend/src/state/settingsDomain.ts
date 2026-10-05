@@ -104,7 +104,7 @@ const apiSettingsSchema = /*#__PURE__*/ z.object({
     .int()
     .min(MAX_RESPONSE_MB_RANGE.min)
     .max(MAX_RESPONSE_MB_RANGE.max)
-    .default(50),
+    .default(5),
   sslVerify: z.boolean().default(true),
   followRedirects: z.boolean().default(true),
   maxRedirects: z
@@ -150,7 +150,7 @@ const settingsSchema = /*#__PURE__*/ z.object({
   api: apiSettingsSchema.default({
     httpVersion: '2',
     requestTimeoutMs: 0,
-    maxResponseMb: 50,
+    maxResponseMb: 5,
     sslVerify: true,
     followRedirects: true,
     maxRedirects: 10,
@@ -196,7 +196,7 @@ export const defaultSettings: Settings = {
   api: {
     httpVersion: '2',
     requestTimeoutMs: 0,
-    maxResponseMb: 50,
+    maxResponseMb: 5,
     sslVerify: true,
     followRedirects: true,
     maxRedirects: 10,

@@ -81,11 +81,12 @@ func DefaultSettings() Settings {
 			LogLevel:           "info",
 		},
 		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
-		// 30s -> none, max response 10 MiB -> 50 MB, max redirects unchanged at 10.
+		// 30s -> none, max response 10 MiB -> 50 MB (P160: -> 5 MB, large bodies freeze the viewer),
+		// max redirects unchanged at 10.
 		Api: ApiSettings{
 			HTTPVersion:      "2",
 			RequestTimeoutMs: 0,
-			MaxResponseMb:    50,
+			MaxResponseMb:    5,
 			SSLVerify:        true,
 			FollowRedirects:  true,
 			MaxRedirects:     10,

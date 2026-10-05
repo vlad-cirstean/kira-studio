@@ -62,7 +62,7 @@ func (o Options) normalize() resolved {
 	r := resolved{
 		http1:            false,
 		timeout:          30 * time.Second,
-		maxResponseBytes: 50 * 1024 * 1024,
+		maxResponseBytes: 5 * 1024 * 1024,
 		sslVerify:        true,
 		followRedirects:  true,
 		maxRedirects:     10,
