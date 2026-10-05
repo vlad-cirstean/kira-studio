@@ -238,6 +238,12 @@ const spaceControl = {
   adeTaskSend: (args: V2.SendArgs): Promise<void> => unwrap(AdeTaskService.Send(args)),
   adeTaskFocusSession: (args: V2.FocusSessionArgs): Promise<boolean> =>
     unwrap(AdeTaskService.FocusSession(args)),
+  adeTaskOpenReviewWindow: (args: V2.BranchArgs): Promise<boolean> =>
+    unwrap(AdeTaskService.OpenReviewWindow(args)),
+  adeTaskReviewWindowTarget: (args: V2.WindowKeyArgs): Promise<V2.ReviewWindowTarget | null> =>
+    unwrap(AdeTaskService.ReviewWindowTarget(args)).then((r) =>
+      trust<V2.ReviewWindowTarget | null>(r),
+    ),
   adeTaskArchiveRisk: (args: V2.TaskArgs): Promise<V2.ArchiveRisk> =>
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>

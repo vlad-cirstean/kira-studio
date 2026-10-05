@@ -153,6 +153,7 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 	if err := b.closeTaskTerminals(taskID); err != nil {
 		return err
 	}
+	b.teardownReview(ctx, tc)
 	for _, lb := range linked {
 		if err := b.removeWorktree(ctx, lb); err != nil {
 			return err

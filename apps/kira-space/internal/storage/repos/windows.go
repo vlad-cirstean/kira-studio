@@ -6,6 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // WindowsRepo reads and writes the `windows` table (P8 D1/D4) — one row per workbench that is
@@ -33,10 +34,36 @@ func (r *WindowsRepo) SetMode(key string, mode string) error {
 	return r.shared().SetMode(key, mode, model.WindowModes)
 }
 
-// List returns every window record in `order`. Not a hot boot path (read once at startup, per
+// List returns every restorable window record in `order` (review windows are ephemeral and excluded). Not a hot boot path (read once at startup, per
 // window record), so this has no prepared statement.
 func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
-	return r.shared().List()
+	all, err := r.shared().List()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := r.DB.Query(`SELECT window_key FROM ade_review_windows`)
+	review, err := sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (string, bool, error) {
+		var k string
+		err := rows.Scan(&k)
+		return k, true, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repos: list review window keys: %w", err)
+	}
+	if len(review) == 0 {
+		return all, nil
+	}
+	skip := make(map[string]bool, len(review))
+	for _, k := range review {
+		skip[k] = true
+	}
+	out := all[:0:0]
+	for _, w := range all {
+		if !skip[w.Key] {
+			out = append(out, w)
+		}
+	}
+	return out, nil
 }
 
 // Exists reports whether key names a live `windows` row.

@@ -109,7 +109,7 @@ var allowedMethods = map[string]struct{}{
 	// stream admits (P67e) and are no longer restricted. GraphPageSize/GraphScope/StashShowInGraph/
 	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed, as before.
 	"repoSettings.get": {}, "repoSettings.set": {},
-	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {},
+	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {}, "review.snapshot": {},
 	"review.comment.add": {}, "review.comment.list": {}, "review.comment.remove": {},
 	"review.comment.clear": {}, "review.comment.export": {}, // review.db only — see above.
 	// P67e: every preflight — a read whose only purpose is to stage a write for a subsequent

@@ -151,7 +151,19 @@ func main() {
 	terminalSvc := &bridge.TerminalService{BoundService: &terminal.BoundService{
 		Emit: emitter, Registry: terminalRegistry, ComposeAgent: adeTracker.Compose,
 	}}
-	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry))
+	// windows holds every open window; created here so Archive can close a task's review windows.
+	windows := shell.NewWindowRegistry()
+	adeTaskBoard := wireAdeTask(repositories, events, git, adeTracker, adeCloseTerminal(terminalRegistry),
+		func(taskID string) {
+			keys, err := repositories.AdeReview.KeysByTask(taskID)
+			if err != nil {
+				slog.Warn("ade: list review windows", "scope", "ade", "task", taskID, "err", err)
+				return
+			}
+			for _, k := range keys {
+				windows.Close(k)
+			}
+		})
 	adeTaskSvc := &bridge.AdeTaskService{Engine: adeTaskBoard, Registry: terminalRegistry, Emit: emitter}
 	// Registry.OnChange fires after every agent session registers or is removed (spawn and exit) —
 	// Reconcile picks up both, and AgentSessionsChanged refreshes the P127 store's own live count
@@ -183,7 +195,6 @@ func main() {
 	// windows/closeFlush are P100 Part 2's own addition — Part 1 had no per-window flush to
 	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
 	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
-	windows := shell.NewWindowRegistry()
 	// FocusSession needs windows, which doesn't exist yet when adeTaskSvc is constructed above (the
 	// same two-step windowsSvc.OpenNewWindow uses).
 	adeTaskSvc.FocusWindow = windows.Focus
@@ -304,8 +315,16 @@ func main() {
 		WindowDeps: shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt},
 		Windows:    windows, CloseFlush: closeFlush, Quitter: quitter,
 		Terminal: terminalSvc.Registry, Repo: repositories.Windows,
-		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
+		Cfg:       shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
+		Ephemeral: func(key string) bool { ok, _ := repositories.AdeReview.IsReviewKey(key); return ok },
 	}
+	// Review windows are native windows this service opens, closes and retitles.
+	adeTaskSvc.OpenWindow = func(rec shell.WindowRecord) {
+		rec.Bounds = shell.CascadeFrom(app.Window.Current())
+		shell.OpenWindow(winDeps, rec)
+	}
+	adeTaskSvc.CloseWindow = windows.Close
+	adeTaskSvc.SetWindowTitle = func(key, title string) { windows.SetTitle(key, title) }
 	openNew := func() { shell.OpenNewWindow(winDeps) }
 	// windowsSvc.OpenNewWindow is the title bar's "New window" button (P116 G6) — the same action
 	// the ⇧⌘N menu command below ties to.
@@ -320,6 +339,10 @@ func main() {
 		OnEmit: events.Signal, Quit: quitter.RequestQuit, NewWindow: openNew,
 	}))
 
+	// Review windows are never restored: drop the leftovers before the startup List.
+	if err := repositories.AdeReview.PurgeAll(); err != nil {
+		slog.Warn("ade: purge review windows", "scope", "ade", "err", err)
+	}
 	records, err := repositories.Windows.List()
 	if err != nil {
 		reporter.Fatal(startupfail.StepWindowList, err)
@@ -414,6 +437,7 @@ func wireTracker(
 // It recovers rows a restart left running, then starts the board.
 func wireAdeTask(
 	repositories *repos.Repos, events *bridge.Events, git gitWired, tracker *ade.Tracker, closeTerminal func(string) error,
+	closeReviewWindows func(taskID string),
 ) *ade.TaskBoard {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -439,10 +463,12 @@ func wireAdeTask(
 		Sessions:        repositories.AdeSessions,
 		Tracker:         tracker,
 		CloseTerminal:   closeTerminal,
-		OnRuns:          func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
-		OnLog:           func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
-		OnSessions:      func() { bridge.AdeTaskSessionsChanged(events) },
-		AgentDir:        filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
+		Windows:         repositories.Windows, ReviewWindows: repositories.AdeReview, GhSynced: repositories.AdeGhSynced,
+		CloseReviewWindows: closeReviewWindows,
+		OnRuns:             func(ev adewire.RunsChangedEvent) { bridge.AdeTaskRunsChanged(events, ev) },
+		OnLog:              func(ev adewire.LogEvent) { bridge.AdeTaskLogAppended(events, ev) },
+		OnSessions:         func() { bridge.AdeTaskSessionsChanged(events) },
+		AgentDir:           filepath.Join(config.KiraSpaceHome(), "ade", "runs"),
 		HeadlessSettingSources: func() string {
 			settings, err := repositories.Settings.GetAll()
 			if err != nil {

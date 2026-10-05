@@ -131,6 +131,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   adeTaskStartBranch: 'AdeTaskService.StartBranch',
   adeTaskSend: 'AdeTaskService.Send',
   adeTaskFocusSession: 'AdeTaskService.FocusSession',
+  adeTaskOpenReviewWindow: 'AdeTaskService.OpenReviewWindow',
+  adeTaskReviewWindowTarget: 'AdeTaskService.ReviewWindowTarget',
   adeTaskArchiveRisk: 'AdeTaskService.ArchiveRisk',
   adeTaskArchiveTask: 'AdeTaskService.ArchiveTask',
   adeTaskRecordMerge: 'AdeTaskService.RecordMerge',

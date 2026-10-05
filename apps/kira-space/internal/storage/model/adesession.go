@@ -34,7 +34,12 @@ type AdeSession struct {
 	StepID          string `json:"stepId"`
 	RunID           string `json:"runId"`
 	Resumes         string `json:"resumes"`
+	// Purpose is "" for a stage or branch session, "review" for the task's one review agent.
+	Purpose string `json:"purpose"`
 }
+
+// AdeSessionPurposeReview marks the task's review agent row (ade_sessions.purpose).
+const AdeSessionPurposeReview = "review"
 
 // Validate asserts the identity/shape fields no SQL constraint covers by itself (the CHECKs on
 // state and mode still guard the DB directly; this catches the same mistakes earlier, with a

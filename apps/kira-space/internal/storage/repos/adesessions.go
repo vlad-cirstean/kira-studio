@@ -9,7 +9,7 @@ import (
 )
 
 const adeSessionsSelectColumns = `id, claude_session_id, cwd, state, terminal_id, started_at, last_active_at,
-	mode, task_id, branch_id, stage_id, step_id, run_id, resumes`
+	mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose`
 
 // AdeSessionsRepo reads and writes `ade_sessions` — the history of every task Claude Code session
 // (interactive or headless) the app has spawned or resumed.
@@ -23,7 +23,7 @@ func scanAdeSessionRow(row rowScanner) (model.AdeSession, error) {
 	if err := row.Scan(
 		&rec.ID, &rec.ClaudeSessionID, &rec.Cwd,
 		&rec.State, &terminalID, &rec.StartedAt, &rec.LastActiveAt,
-		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StageID, &rec.StepID, &rec.RunID, &rec.Resumes,
+		&rec.Mode, &rec.TaskID, &rec.BranchID, &rec.StageID, &rec.StepID, &rec.RunID, &rec.Resumes, &rec.Purpose,
 	); err != nil {
 		return model.AdeSession{}, err
 	}
@@ -66,10 +66,10 @@ func (r *AdeSessionsRepo) InsertHeadless(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
 		return fmt.Errorf("repos: insert headless ade session %s: %w", rec.ID, err)
@@ -86,15 +86,40 @@ func (r *AdeSessionsRepo) InsertTUI(rec model.AdeSession) error {
 		return fmt.Errorf("repos: %w", err)
 	}
 	if _, err := r.DB.Exec(
-		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes,
+		`INSERT INTO ade_sessions (id, mode, task_id, branch_id, stage_id, step_id, run_id, resumes, purpose,
 			claude_session_id, cwd, state, terminal_id, started_at, last_active_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rec.ID, rec.Mode, rec.TaskID, rec.BranchID, rec.StageID, rec.StepID, rec.RunID, rec.Resumes, rec.Purpose,
 		rec.ClaudeSessionID, rec.Cwd, rec.State, nullableString(rec.TerminalID), rec.StartedAt, rec.LastActiveAt,
 	); err != nil {
 		return fmt.Errorf("repos: insert tui ade session %s: %w", rec.ID, err)
 	}
 	return nil
+}
+
+// ClearPurpose turns a review agent row into a plain stopped session (its cwd is gone, a fresh
+// review agent replaces it).
+func (r *AdeSessionsRepo) ClearPurpose(id string) error {
+	res, err := r.DB.Exec(`UPDATE ade_sessions SET purpose = '' WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("repos: clear ade session purpose %s: %w", id, err)
+	}
+	return sqlitex.RequireOneRow(res, "ade session "+id)
+}
+
+// ReviewAgent returns the task's review agent row, (nil, nil) when it has none.
+func (r *AdeSessionsRepo) ReviewAgent(taskID string) (*model.AdeSession, error) {
+	rec, err := sqlitex.QueryOne(r.DB, func(row *sql.Row) (*model.AdeSession, error) {
+		s, err := scanAdeSessionRow(row)
+		if err != nil {
+			return nil, err
+		}
+		return &s, nil
+	}, `SELECT `+adeSessionsSelectColumns+` FROM ade_sessions WHERE task_id = ? AND purpose = 'review'`, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("repos: get review agent of task %s: %w", taskID, err)
+	}
+	return rec, nil
 }
 
 // MarkRunning sets state='running' and terminal_id — Tracker.Compose's own resume path (a

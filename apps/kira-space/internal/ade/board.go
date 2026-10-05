@@ -69,6 +69,12 @@ type TaskBoardDeps struct {
 	Tracker *Tracker
 	// CloseTerminal closes a running terminal by id (Archive).
 	CloseTerminal func(terminalID string) error
+	// Windows and ReviewWindows back review windows; CloseReviewWindows closes a task's native
+	// review windows (Archive).
+	Windows            *repos.WindowsRepo
+	ReviewWindows      *repos.AdeReviewWindowsRepo
+	GhSynced           *repos.AdeGhSyncedRepo
+	CloseReviewWindows func(taskID string)
 	// HeadlessSettingSources returns the ade.headlessSettingSources setting, read fresh per run.
 	HeadlessSettingSources func() string
 	// SetRepoSettings writes git_repo_settings leaves through the path git-ui's repoSettings.set

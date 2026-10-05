@@ -135,6 +135,8 @@ export const IPC = {
   adeTaskStartBranch: 'kira:adetask:startBranch',
   adeTaskSend: 'kira:adetask:send',
   adeTaskFocusSession: 'kira:adetask:focusSession',
+  adeTaskOpenReviewWindow: 'kira:adetask:openReviewWindow',
+  adeTaskReviewWindowTarget: 'kira:adetask:reviewWindowTarget',
   adeTaskArchiveRisk: 'kira:adetask:archiveRisk',
   adeTaskArchiveTask: 'kira:adetask:archiveTask',
   adeTaskRecordMerge: 'kira:adetask:recordMerge',

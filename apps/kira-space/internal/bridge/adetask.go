@@ -12,6 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
@@ -35,6 +36,10 @@ type AdeTaskService struct {
 	Registry    *terminal.Registry
 	Emit        appcore.Emitter
 	FocusWindow func(key string) bool
+	// OpenWindow, CloseWindow and SetWindowTitle serve review windows; func fields like FocusWindow.
+	OpenWindow     func(rec shell.WindowRecord)
+	CloseWindow    func(key string) bool
+	SetWindowTitle func(key, title string)
 }
 
 // AdeTaskOpenSession is FocusSession's emit half: addressed to the one window just brought forward.
@@ -722,4 +727,35 @@ func (s *AdeTaskService) ArchiveTask(ctx context.Context, args adewire.TaskArgs)
 		return err
 	}
 	return adeTaskError(s.Engine.ArchiveTask(ctx, args.TaskID))
+}
+
+// OpenReviewWindow opens the branch's review window, or focuses it when already open. true = opened.
+func (s *AdeTaskService) OpenReviewWindow(ctx context.Context, args adewire.BranchArgs) (bool, error) {
+	if err := validateAdeItemID(args.BranchID, "branchId"); err != nil {
+		return false, err
+	}
+	if s.OpenWindow == nil || s.FocusWindow == nil {
+		return false, adeTaskInvalid("review windows are not available")
+	}
+	res, err := s.Engine.OpenReviewWindow(ctx, args.BranchID)
+	if err != nil {
+		return false, adeTaskError(err)
+	}
+	if res.Existing {
+		return false, nil
+	}
+	s.OpenWindow(shell.WindowRecord{Key: res.Key, Order: res.Order})
+	if s.SetWindowTitle != nil {
+		s.SetWindowTitle(res.Key, res.Title)
+	}
+	return true, nil
+}
+
+// ReviewWindowTarget returns what the window with this key reviews, null when it is no review window.
+func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.WindowKeyArgs) (*adewire.ReviewWindowTarget, error) {
+	if err := validateAdeItemID(args.WindowKey, "windowKey"); err != nil {
+		return nil, err
+	}
+	t, err := s.Engine.ReviewWindowTarget(ctx, args.WindowKey)
+	return t, adeTaskError(err)
 }
