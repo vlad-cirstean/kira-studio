@@ -107,6 +107,12 @@ func newSession(p OpenParams) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	ptmx, err = pollablePtmx(ptmx)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, err
+	}
 
 	return &Session{
 		id:     p.ID,
@@ -182,7 +188,7 @@ func (s *Session) Write(b []byte) error {
 	return err
 }
 
-// Resize applies cols/rows to the real winsize via pty.Setsize — a no-op once closed, for the same
+// Resize applies cols/rows to the real winsize (TIOCSWINSZ) — a no-op once closed, for the same
 // reason Write is.
 func (s *Session) Resize(cols, rows uint16) error {
 	s.mu.Lock()
@@ -191,7 +197,7 @@ func (s *Session) Resize(cols, rows uint16) error {
 	if closed {
 		return nil
 	}
-	return pty.Setsize(s.ptmx, &pty.Winsize{Rows: rows, Cols: cols})
+	return setWinsize(s.ptmx, &pty.Winsize{Rows: rows, Cols: cols})
 }
 
 // Close is idempotent and ordered (§4 rule 2): mark closed under the mutex → SIGHUP the whole
@@ -230,11 +236,12 @@ func (s *Session) Close() {
 	}
 
 	// Still not done: a job-control shell's child can live in its own process group (missed by
-	// Kill(-pid, …)), or the pty's slave side can otherwise survive both signals. Closing ptmx
-	// hangs up the slave and reliably unblocks a pending Read on Linux; it is not guaranteed to
-	// on darwin (this repo's shipping platform), so the wait below is bounded regardless — a
-	// logged, permanent leak of this one goroutine/process beats every caller of Close (app-quit
-	// teardown, a single window's own close) hanging forever on it.
+	// Kill(-pid, …)), or the pty's slave side can otherwise survive both signals. On Linux the
+	// master is non-blocking and netpoller-registered (pollablePtmx), so Close interrupts the
+	// pending Read. Elsewhere (darwin) the fd stays blocking, Close does not interrupt a blocked
+	// read(2), and the wait below is the bound: a logged, permanent leak of this one
+	// goroutine/process beats every caller of Close (app-quit teardown, a single window's own
+	// close) hanging forever on it.
 	_ = s.ptmx.Close()
 
 	select {
