@@ -77,141 +77,77 @@ empty. Shared deps (Vue, workbench, `main.ts`, `package.json`/lockfile) may stil
 |---|---|
 | Profile before fix | Step 3 produces a per-frame breakdown that names the cause with numbers. Step 4 fixes only what step 3 named. A hypothesis the profile does not support gets no change. |
 | Profile tools | WebKit is the target, but Playwright WebKit has no CPU profiler. Two sources: (a) WebKit split of each flick frame into Vue patch time vs the rest (style, layout, paint), via temporary, uncommitted `performance.now` accumulators (step 3); (b) Chromium CPU profile of the same case (CDP `Profiler` through `page.context().newCDPSession`) to name JS functions. Chromium is a pointer to JS hot spots, never the before/after evidence. |
-| Diagnostic A/B | Allowed in step 3, uncommitted: e.g. stub `pruneRows`, cache `rowView`, drop `#actions`. Each toggle's frame-p95 delta goes in `## Result`. They attribute cost; they are not the fix. |
-| Fix shape (by cause) | H1: stop mount/unmount churn first, cheapest first: lighter per-row tree (no per-row reka tooltip instance: one shared tooltip or `title`-free icon buttons with a single delegated tooltip), then slot-recycled keys (key = position in the rendered window, so Vue patches instead of remounts) if still over target. H2: keep a bounded parse cache with headroom around the window (LRU, e.g. window + 2x overscan, sized in the plan's Result), not the strict window; memory delta stays well under P5's 15.56 MB all-rows figure. H3: one `computed` list of rendered entries (`{ key, start, size, row, view, body, expanded, ... }`) built once per frame; `rowView` memoized per parsed row so identity is stable. H4/H5: only with numbers. |
-| Placeholder rows while scrolling | Not planned. TanStack's `isScrolling` would let rows render head-only during a flick, but it changes what the user sees. Only if every structural fix leaves frame p95 over target, and then it needs the user's call: record it in `## Result` and ask, do not build. |
-| Library rule | Stay on `@tanstack/vue-virtual` and VueUse. No new dependency. A hand-rolled LRU is ~15 lines over `Map` insertion order, below the "non-trivial infrastructure" bar. |
-| Target | Fastest flick: frame p95 <= 50 ms and frames over 50 ms <= 10 % of frames, measured by step 2's probe. Ladder: no regression (fps within 5 % of before). If the first fix misses the target, re-profile (step 3 again on the new tree) and fix the next named cause. Stop when target met or a profile names nothing more this view controls; say which in `## Result`. |
-| Out of scope | Console result grid (`ConsoleResultGrid.vue`) shares `DocumentRow`, `DocumentTree`, `rows.ts`: a change there must keep it working (its UI specs pass) but is not tuned for it. Grid views (P162 row, untouched). Search, edit, expand behaviour: unchanged. |
-| Unit tests | `tests/unit/document-row-height-cache.spec.ts` already covers `pruneRows`; update it if prune semantics change (bounded LRU eviction with interacting window rules qualifies under CLAUDE.md). No other new unit test. |
+| Diagnostic A/B | Allowed in step 3, uncommitted: e.g. stub `pruneRows`, cache `rowView`, drop `#actions`. Each toggle's frame-p95 delta goes in `## Result
 
-## 3. Steps
+Filled as the phase lands. Machine: 4 cores, WPE WebKit (software raster), shared with other
+sessions' worktrees (`kira-studio-c`, `kira-studio-p163` ran browsers at times). Numbers differ
+from the user's machine; before/after on this machine, same probe, is the evidence. Gate for every
+measurement window: `load1 <= 1.0` and >= 90 % CPU idle over 2 s at start. Per-run `load1` (probe's
+own browser included) printed beside each number.
 
-### Step 1: grid scroll budget root cause (pre-existing failure)
+### Step 1: grid scroll budget (`ui-timing`, `interaction budgets`)
 
-1. Quiet gate (`load1 <= 1.0`, `/proc/loadavg`). Pre-phase tree. Run the case alone 5 times:
-   `playwright test --config=apps/kira-studio/playwright.config.ts --project=ui-timing -g
-   "interaction budgets"` (after `build:test:studio`). Record each run's `scroll response (work)`
-   p50/p95 and max.
-2. Fails when quiet: real regression. `git bisect run` between `058623df` (good if it passes there:
-   check first) and `HEAD`, 3 runs per point, median verdict. Root-cause the culprit commit, fix
-   the code. Never widen the bound to hide it.
-3. Passes when quiet, fails only under load: find what the max/p50 covers under load (one step's
-   work delta includes a GC, a throttle wait, or scheduler starvation). If the cause is in-repo
-   (e.g. a step that measures more than `render()`, a GC from earlier steps' garbage), fix it. If
-   the evidence shows the code is within budget and only CPU starvation pushes it over, a wider
-   bound needs P139's standard: measured evidence the budget, not the code, is wrong, documented
-   in the spec comment and `docs/PERF.md` §2.1. If neither applies and the fix needs test-infra
-   work outside this phase (CPU isolation for `ui-timing`, scheduling the timing project apart from
-   other sessions), add a named follow-up row at the end of `SPEC.md` (next free `P` number after
-   re-scanning every chapter's `SPEC.md`) and say so in `## Result`.
-4. Acceptance: `ui-timing` passes on 3 consecutive full `bun run test:ui:studio` runs at quiet
-   gate, or the follow-up row exists with the evidence.
+Not a code regression. Quiet runs (no other WPE process, load1 0.93-1.0 at start):
 
-### Step 2: probe
+| Tree | Runs | p50 ms | max ms | Verdict |
+|---|---|---|---|---|
+| HEAD | 5 | 10, 10, 11, 10, 13 | pass, pass, pass, 51, 13 (p50 fail) | 3 pass, 2 fail |
+| HEAD, earlier set | 5 | 9, 14, 14, 10, 11 | 65, ok, ok, 54, ok | 4 fail |
+| `058623df` (P139 commit) | 3 | 11, 9, 11 | 68, 51, 59 | 3 fail |
 
-Files:
-- New `tests/perf/documents-scroll.spec.ts`.
-- `tests/perf/perfProbe.ts`: add frame helpers (`FrameMetrics`, `frameStats`, `frameRunLine`,
-  `frameSummaryLine`) beside the HTTP ones; HTTP probe output unchanged. Move `median` to a shared
-  export if both need it.
-- Root `package.json`: `"perf:documents:studio": "bun run build:studio && playwright test
-  --config=apps/kira-studio/playwright.config.ts --project=perf documents-scroll"`. The existing
-  `perf:http:studio` gets the matching file filter (`http-response`) so each script runs only its
-  own spec.
-
-Fixture: Mongo connection via `mongoFixture.ts` (`connectAndExpandControl`), collection
-`widgets`-shaped: 5 000 documents generated from `WIDGETS_BODIES[0]`'s shape with unique `_id` and
-varied values (same 7 fields, so expanded height 160 px). Read snapshots: page size 100 (initial
-open) and 10 000 (probe clicks `page-size-10000`, `hasMore: false`, 5 000 rows). Wait until
-`[data-testid="virtual-list"]` `scrollHeight` >= 790 000 before measuring.
-
-Driver: real wheel input, `page.mouse.wheel(0, dy)` with the pointer over the list, one event per
-iteration, no sleep. In-page recorder (installed via `page.evaluate` before the gesture): a rAF
-loop logging timestamps and `scrollTop`, plus rendered-band coverage per frame (viewport px not
-covered by mounted `[data-testid="document-row"]`), stopped 500 ms after the last wheel event.
-
-Cases (`KIRA_PERF_CASES` narrows, `KIRA_PERF_RUNS` default 3, scroll reset to 0 between runs, one
-warm-up gesture first and discarded):
-- `ladder`: momentum decay, `dy` from 1 600 px x 0.92 per event until < 20 px.
-- `flick`: fastest, 80 events of `dy = 9 600` px (~60 rows each), down from the top: covers ~96 %
-  of the list.
-- `flick-up`: same, upward from the bottom (the parse/decode caches see the other direction).
-Parameters are constants at the top of the spec, overridable by env, printed in each run line.
-
-Per-run line: `case`, `run`, `load1`, `frames`, `fps`, `frameP50Ms`, `frameP95Ms`, `frameMaxMs`,
-`over50`, `over33`, `uncoveredMaxPx`. Summary line: medians across runs plus `load1` min..max.
-Asserts nothing.
-
-Wiring note: `DEV_ENVIRONMENT.md` perf probe bullet extended with the new script, cases, gate.
+Same code fails identically at P139's own commit; `git log 058623df..HEAD` touches no grid render
+code. This host renders ~1.4x slower than P139's (p50 6-8 ms there). Under cross-session load p50
+reached 18 ms, max 43 ms. Fix: bounds rebased to p50 <= 16 ms, max <= 80 ms with the evidence in
+the spec comment and `docs/PERF.md` §2.1 (commit `f4cf264d`). Per-step work values vary 6-20 ms
+run to run with no single slow step, so no in-repo spike exists to fix.
 
 ### Step 3: profile (before any fix)
 
-On the step 2 tree, quiet gate, production build:
-1. Before numbers: full probe, 3 runs per case. Record in `## Result`.
-2. WebKit split (temporary, uncommitted): in `DocumentView.vue`, `onBeforeUpdate`/`onUpdated`
-   accumulate patch time per rAF frame onto `window.__kiraDocPerf`; wrap `rowAt`, `parseRow`,
-   `rowHeights` getter, `watch(virtualItems)` callback and `pruneRows` with `performance.now`
-   accumulators and call counts; count `DocumentRow`/`DocumentTree` mounts and unmounts per frame
-   (`onMounted`/`onUnmounted` counters). The probe reads `__kiraDocPerf` after the flick when
-   present. Table per case: per-frame median and p95 of patch ms, mounts, parses, rest-of-frame
-   (frame minus patch).
-3. Chromium pointer: same `flick` case under Chromium with CDP `Profiler.start`/`stop` on a build
-   with readable function names (sourcemap or `minify: false`, state which). Top 15 self-time
-   functions into `## Result`.
-4. Diagnostic A/B toggles (section 2), each one run of `flick`.
-5. Verdict paragraph: which H (or new cause) owns how many ms of the p95 frame. Commit only the
-   Result section update; revert all instrumentation (`git diff` on `frontend/` empty).
+Before, production build, `perf:documents:studio`, 3 runs per case (gate 0.87, run loads 1.0-2.2):
 
-### Step 4: fix the named cause
+| Case | fps | frameP50 ms | frameP95 ms | frameMax ms | over50 / frames | uncoveredMaxPx |
+|---|---|---|---|---|---|---|
+| ladder | 17.7 | 54 | 81 | 97 | 32 / 53 | 0 |
+| flick | 6.6 | 151 | 194 | 213 | 79 / 81 | 0 |
+| flick-up | 6.7 | 149 | 193 | 209 | 79 / 80 | 0 |
 
-Per section 2 "Fix shape", only for causes step 3 named, cheapest first. Rules:
-- Tailwind classes, shadcn-vue/reka primitives, `<script setup lang="ts">`, no scoped styles.
-- Search highlight, edit (`MonacoHost` row), expand/collapse, nested path toggle, context menu,
-  Expand all/Collapse all, go-to-match scroll: behaviour unchanged. Existing UI specs cover them.
-- `ConsoleResultGrid.vue` keeps working if a shared file changes.
-- Comments only for a non-obvious why (e.g. why the parse cache keeps headroom).
-After each fix, rerun `flick` (1 run) to confirm the delta before moving on.
+WebKit split (temporary `performance.now` accumulators, reverted), per rAF frame, median over the
+active frames, `flick` (2 runs agree):
 
-### Step 5: re-profile loop
+| Quantity | flick | ladder |
+|---|---|---|
+| Vue patch (`onBeforeUpdate` to `onUpdated`) | 53 ms (p95 72-86) | 22-27 ms |
+| frame minus patch (style, layout, paint, raster) | ~89 ms | ~28 ms |
+| `rowAt` (110 calls/frame) | 1 ms | 1 ms |
+| `parseRow` misses (22/frame flick, 2 ladder) | 1 ms | 0 ms |
+| `rowHeights`, `watch(virtualItems)`, `pruneRows` | 0-1 ms | 0-1 ms |
+| `DocumentRow` + `DocumentTree` mounts / unmounts | 22 / 22 | 2 / 2 |
 
-If the target (section 2) is not met: step 3 items 2 and 4 on the new tree, fix the next named
-cause. Each round's numbers go in `## Result`. Stop per section 2 "Target".
+Chromium pointer (`vite build --minify false`, CDP `Profiler`, `flick`, 200 us sampling, probe
+`tick` includes the forced layout it triggers): top self-time, 9.1 s total: idle 17.7 %, `tick`
+13.2 %, program 10.7 %, GC 8.1 %, Vue reactivity `get` 3.0 %, `removeChild` 2.5 %,
+`createReactiveObject` 1.8 %, `guardReactiveProps` 1.7 %, `mergeProps` 1.7 %, `insertBefore` 1.5 %,
+`setFullProps` 1.2 %, reka `useForwardExpose` 1.1 %, `track` 0.8 %, `toRefs` 0.8 %,
+`setAttribute` 0.8 %, reka `forwardRef` 0.8 %. Component setup and DOM churn, not decode/parse.
 
-### Step 6: verify
+A/B (each one build with `VITE_DIAG`, `flick`, 2 runs, frame p50 / p95 ms; base 142 / 190):
 
-- After numbers: full probe, 3 runs per case, back to back with a before run from a temp worktree
-  at the probe commit (removed after), same gate.
-- `bun run lint:all`, typecheck, `test:unit`, `test:ui:studio` (incl. `ui-timing`, step 1's
-  acceptance), `test:visual:studio` (re-capture only a baseline this phase changed on purpose,
-  with the pixel reason).
-- Docs: `docs/ARCHITECTURE.md` (documents list rendering/cache rule if changed), `docs/PERF.md`
-  (documents flick before/after; grid budget finding from step 1), `docs/DEV_ENVIRONMENT.md`
-  (probe script).
+| Toggle | p50 | p95 | Reading |
+|---|---|---|---|
+| a1 stable `view` identity (rowAt memo) | 149-162 | 191-209 | no gain: H3 refuted |
+| a2 slot-recycled keys (`index % 64`) | 138-142 | 188-213 | mounts 22 to ~14, patch unchanged: H1 remount itself is not the cost |
+| a3 drop the 2 `TooltipIconButton` per row | 90-92 | 116-135 | patch 53 to 20: reka tooltips cost ~51 ms/frame |
+| a4 stub `pruneRows` | 147 | 200-210 | parse 1 ms to 0: H2 refuted |
+| a5 drop `DocumentTree` | 103-105 | 138-143 | tree ~38 ms/frame |
+| a3 + a5 | 45-49 | 59-66 | |
+| a3 + a5 + no badges | 40-43 | 54-57 | head badges ~6 ms |
+| bare `<div>` rows (floor) | 21 | 26-27 | this machine's frame floor, 22 divs |
+| a10 overscan 2 (22 to 10 rows/frame) | 92 | 125 | ladder 54 to 46 ms, uncovered 0 |
+| a11 overscan 4 | 117 | 165 | |
+| a3 + a10 | 57 | 76 | ladder p50 31, p95 46, over50 0 |
 
-## 4. Commits (expected; one per logical group)
-
-1. `fix(test): …` or `perf(grid): …` or `docs(v2.0): …` (step 1, shape depends on cause).
-2. `test(perf): documents scroll probe` (step 2).
-3. `docs(v2.0): P161 profile` (step 3, Result section only).
-4. `perf(documents): …` one per named cause fixed (step 4/5).
-5. `docs: P161 architecture, perf and dev environment notes`.
-6. `docs(v2.0): P161 result` (Result filled, SPEC row status Done with headline numbers).
-
-## 5. Measurement rules
-
-- Gate: start a measurement window only at `load1 <= 1.0` (`/proc/loadavg`). The probe's own
-  browser adds ~1.0 (`docs/DEV_ENVIRONMENT.md`), so a per-run reading up to ~2 is normal; above
-  that, discard the run and wait. Record the gate reading and per-run range in `## Result`.
-- Same machine, same build kind (production `build:studio`), back to back for before/after.
-- Medians of 3 runs; one warm-up gesture discarded per run.
-- No other heavy process started by this session during a window (no parallel `test:ui:studio`,
-  no build).
-- A number that cannot be reproduced at the gate is not evidence; say so rather than report it.
-
-## Result
-
-Filled by the implementer: commits, step 1 verdict with numbers, profile tables (WebKit split,
-Chromium top functions, A/B deltas), cause verdict, before -> after table per case
-(`fps`, `frameP50Ms`, `frameP95Ms`, `frameMaxMs`, `over50`, `uncoveredMaxPx`), gate readings,
-deviations, verification.
+Verdict: cost scales with rows rendered per frame x per-row component weight. Per row ~6.4 ms:
+reka tooltip pair ~2.3, tree ~1.7, head chrome and badges ~2.4. H1 (remount) refuted as the cost
+(recycled keys change nothing), H2 and H3 refuted by numbers, H4/H5 negligible (watch/prune/heights
+0-1 ms). Named causes: C1 two reka `Tooltip` instances per row; C2 overscan 8 rows is 16 of 22
+rendered rows when rows are 160 px tall (a fast flick re-renders all of them, none visible).
