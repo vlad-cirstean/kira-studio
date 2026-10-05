@@ -116,6 +116,19 @@ type AdeRun struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
+	Launch     AdeRunLaunch
+}
+
+// AdeRunLaunch is a held run's launch spec: what the run needs once its worktree gate opens. Non-empty
+// only on a never-launched row; launch clears it.
+type AdeRunLaunch struct {
+	// Note stays on the run while it runs.
+	Note string
+	// ResumeID, when set, continues that Claude session with Prompt as the message.
+	ResumeID string
+	Prompt   string
+	// Extra is added after a fresh run's composed prompt.
+	Extra string
 }
 
 // AdeRunState* mirror ade_runs.state's CHECK.
@@ -138,6 +151,7 @@ type AdeRunPatch struct {
 	ExitCode   *int
 	StartedAt  *int64
 	FinishedAt *int64
+	Launch     *AdeRunLaunch
 }
 
 // AdeWorktreeSetup is one row of ade_worktree_setup.
