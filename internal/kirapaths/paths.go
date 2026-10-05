@@ -20,6 +20,7 @@ func Home(envVar, dirName string) string {
 	if home := os.Getenv(envVar); home != "" {
 		return home
 	}
+	requireTestHome(envVar)
 	dir, err := os.UserHomeDir()
 	if err != nil {
 		dir = "."

@@ -7,3 +7,5 @@ package kirapaths
 // app.Env.Info().Debug. Giving IsDev() this as its first, unconditional check means the two
 // dev-build signals can no longer disagree in a shipped build (P29 F4).
 const isProductionBuild = true
+
+func requireTestHome(string) {}
