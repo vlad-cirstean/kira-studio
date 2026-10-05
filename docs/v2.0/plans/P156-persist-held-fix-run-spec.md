@@ -221,4 +221,11 @@ contract (`adewire`, 53 methods) untouched. Plan [P156](plans/P156-persist-held-
 
 ## Result
 
-_Pending implementation._
+Commits: `ad2b0feb` storage, `7479fe9a` engine plus test, docs commit after.
+
+- Done as planned. `runOpts.Launch` (`model.AdeRunLaunch`) rides the run row; `TaskBoard.runOpts`, `setRunOpts`, `takeRunOpts` gone. `launch` clears the spec in the same `UpdateRun` that sets `running`. `RetryRun` copies it when `StartedAt == nil`.
+- Test: `TestRunEngine_recoverHeldFixRun` (runengine_wave4_test.go). Differs from plan step 2: impl attempt 1 launched for real under the fake (scenario `sleep`) and stopped, so the worktree and Claude id exist; `RetrySetup` needs a real worktree. Final fix-run note not asserted: finish replaces it.
+- Wire bindings regenerated: no diff. `adewire` untouched.
+- Migration spot check: via scratch Go program on a temp home. Old tree `49e35c5f` opens at version 13 with no `launch_*` columns; new tree reaches 14 with four columns default `''`. Not a server-tag boot.
+- Real-claude smoke: ran the named fallback, not the server-tag boot. Scratch uncommitted copy of the test with `ClaudeBin` set to real `claude`, fake env unset. Real impl attempt 1 created a Claude session; seeded held fix run with that id; `Recover()` kept it pending with spec; `RetrySetup` launched it. Observed: fix run `Launch` empty after launch, run replied from the resumed context (asked which tests failed, so the session was resumed with the fix prompt), same transcript file `<id>.jsonl` holds the prompt. Not observed: `/proc/<pid>/cmdline` argv and `ade_sessions.resumes` (the fake-claude test asserts `--resume` and resumes instead).
+- End checks: go build, vet, test, `-race` on ade and storage, lint:all, typecheck, test:unit (1765 pass), test:ui:space (161 pass) all green. Leftover `runOpts[`/`setRunOpts`/`takeRunOpts` grep: no hits. Every `ade_runs` column list uses `adeRunColumns`.
