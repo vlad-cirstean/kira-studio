@@ -58,7 +58,6 @@ type AdeSettings struct {
 	// PanelWidth is the queue side panel's own width in px; 0 means "half the window" (Part 3's own
 	// layout default) rather than a literal zero-width panel.
 	PanelWidth      int      `json:"panelWidth"`
-	AllAgentsFilter string   `json:"allAgentsFilter"`
 	HorizonDays     int      `json:"horizonDays"`
 	HistoryDays     int      `json:"historyDays"`
 	ExtraDays       []string `json:"extraDays"`
@@ -93,7 +92,6 @@ func DefaultGitSettings() GitSettings {
 func DefaultAdeSettings() AdeSettings {
 	return AdeSettings{
 		PanelWidth:      0,
-		AllAgentsFilter: "active",
 		HorizonDays:     14,
 		HistoryDays:     14,
 		ExtraDays:       []string{},
@@ -151,7 +149,6 @@ type GitPatch struct {
 // AdePatch mirrors AdeSettings' own `.partial()` shape (§7).
 type AdePatch struct {
 	PanelWidth      *int      `json:"panelWidth,omitempty"`
-	AllAgentsFilter *string   `json:"allAgentsFilter,omitempty"`
 	HorizonDays     *int      `json:"horizonDays,omitempty"`
 	HistoryDays     *int      `json:"historyDays,omitempty"`
 	ExtraDays       *[]string `json:"extraDays,omitempty"`
@@ -225,11 +222,6 @@ func ValidAdePanelWidth(v int) bool {
 	return v == 0 || (v >= 340 && v <= 4000)
 }
 
-// ValidAdeAllAgentsFilter mirrors adeSettingsSchema.allAgentsFilter's enum.
-func ValidAdeAllAgentsFilter(v string) bool {
-	return v == "active" || v == "older"
-}
-
 // ValidAdeHeadlessSettingSources mirrors adeSettingsSchema.headlessSettingSources' enum.
 func ValidAdeHeadlessSettingSources(v string) bool {
 	return v == "user" || v == "all"
@@ -269,9 +261,6 @@ func validateAdeSection(a *AdePatch) error {
 	}
 	if a.PanelWidth != nil && !ValidAdePanelWidth(*a.PanelWidth) {
 		return fmt.Errorf("model: ade.panelWidth: invalid value %d", *a.PanelWidth)
-	}
-	if a.AllAgentsFilter != nil && !ValidAdeAllAgentsFilter(*a.AllAgentsFilter) {
-		return fmt.Errorf("model: ade.allAgentsFilter: invalid value %q", *a.AllAgentsFilter)
 	}
 	if a.HorizonDays != nil && !ValidAdeHorizonDays(*a.HorizonDays) {
 		return fmt.Errorf("model: ade.horizonDays: out of range value %d", *a.HorizonDays)

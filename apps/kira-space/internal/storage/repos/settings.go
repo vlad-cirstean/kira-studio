@@ -76,7 +76,6 @@ func readGit(stored map[string]json.RawMessage) model.GitSettings {
 func readAde(stored map[string]json.RawMessage) model.AdeSettings {
 	result := model.DefaultAdeSettings()
 	appsettings.LeafValid(stored, "ade.panelWidth", &result.PanelWidth, model.ValidAdePanelWidth)
-	appsettings.LeafValid(stored, "ade.allAgentsFilter", &result.AllAgentsFilter, model.ValidAdeAllAgentsFilter)
 	appsettings.LeafValid(stored, "ade.horizonDays", &result.HorizonDays, model.ValidAdeHorizonDays)
 	appsettings.LeafValid(stored, "ade.historyDays", &result.HistoryDays, model.ValidAdeHistoryDays)
 	appsettings.LeafValid(stored, "ade.extraDays", &result.ExtraDays, model.ValidAdeDateList)
@@ -94,9 +93,6 @@ func upsertAde(tx *sql.Tx, a *model.AdePatch) error {
 		return nil
 	}
 	if err := appsettings.UpsertOptional(tx, "ade.panelWidth", a.PanelWidth); err != nil {
-		return err
-	}
-	if err := appsettings.UpsertOptional(tx, "ade.allAgentsFilter", a.AllAgentsFilter); err != nil {
 		return err
 	}
 	if err := appsettings.UpsertOptional(tx, "ade.horizonDays", a.HorizonDays); err != nil {
