@@ -133,6 +133,21 @@ func TestSave_edits(t *testing.T) {
 		}
 	})
 
+	t.Run("interactive user stage with no prompt writes no prompt key", func(t *testing.T) {
+		wf := load(t, r, "standard.yaml")
+		for i := range wf.Stages {
+			if wf.Stages[i].ID == "spec" {
+				wf.Stages[i] = adewire.Stage{ID: "spec", Name: "Spec", Kind: "user", Status: "To do", Session: true, Steps: []adewire.PipelineStep{}}
+			}
+		}
+		out := saveOK(t, r, "standard.yaml", wf)
+		_, seg, _ := strings.Cut(out, "id: spec")
+		seg, _, _ = strings.Cut(seg, "- id:")
+		if !strings.Contains(seg, "session: true") || strings.Contains(seg, "prompt:") {
+			t.Fatalf("spec stage:\n%s", seg)
+		}
+	})
+
 	t.Run("kind change drops foreign keys", func(t *testing.T) {
 		wf := load(t, r, "standard.yaml")
 		for i := range wf.Stages {

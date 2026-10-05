@@ -158,7 +158,6 @@ func main() {
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
 			application.NewService(&bridge.MaskRulesService{Deps: deps}),
 			application.NewService(&bridge.TreeService{Deps: deps}),
-			application.NewService(&bridge.EngineService{Deps: deps}),
 			application.NewService(&bridge.OpsService{Deps: deps, Canceller: router}),
 			application.NewService(&bridge.FiltersService{Deps: deps}),
 			application.NewService(&bridge.FilesService{Dialogs: dialogs}),

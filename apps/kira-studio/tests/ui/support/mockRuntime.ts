@@ -44,7 +44,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   settingsSet: 'SettingsService.Set',
   layoutGetAll: 'LayoutService.GetAll',
   layoutSet: 'LayoutService.Set',
-  engineStatus: 'EngineService.Status',
   appFlushed: 'LifecycleService.Flushed',
   filesChooseSave: 'FilesService.ChooseSave',
   filesChooseOpen: 'FilesService.ChooseOpen',

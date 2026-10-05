@@ -220,7 +220,7 @@ func (v *validator) stage(sn *yaml.Node, num int) adewire.Stage {
 			return st
 		}
 		if st.Session {
-			st.Prompt = v.str(m, prefix, "prompt", true)
+			st.Prompt = v.str(m, prefix, "prompt", false)
 		} else {
 			refuse("prompt")
 		}

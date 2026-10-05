@@ -345,3 +345,15 @@ test('typing in the engine search filters the tile grid without moving the dialo
   await expect(page.locator('[data-testid="connection-kind"] input[type="radio"]')).toHaveCount(10);
   expect(await dialogBox(page)).toEqual(reference);
 });
+
+test('engine step: tiles are not greyed out and show no step breadcrumbs', async ({ relaunch }) => {
+  const { window: page } = await relaunch({
+    control: [{ channel: IPC.connectionsList, response: [] }],
+  });
+  await page.click('[data-testid="add-connection"]');
+  const tile = page.locator('[data-testid="connection-kind-postgres"]').locator('..');
+  await expect(tile).toBeVisible();
+  await expect(tile).not.toHaveAttribute('data-off', /.*/);
+  expect(await tile.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+  await expect(page.locator('[data-testid="connection-dialog"]')).not.toContainText('Details');
+});

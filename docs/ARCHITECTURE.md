@@ -2331,12 +2331,12 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registering **27** bound services under `apps/kira-studio/internal/bridge/`
+options, registering **26** bound services under `apps/kira-studio/internal/bridge/`
 (`grep -c application.NewService apps/kira-studio/main.go`), grouped by module: six shell/app-wide
 (`AppService`, `SettingsService`, `LayoutService`, `TabsService`, `WindowsService` — P8: a page's
 own boot-time window registration, see Process model's multi-window subsection below —
-`LifecycleService`); ten Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
-`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` —
+`LifecycleService`); nine Studio/database (`ConnectionsService`, `MaskRulesService`, `TreeService`,
+`OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` —
 P18: the per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL language
 service described below — `CustomScriptsService`, P85's launchable-scripts feature); seven the Api
 module's (`HttpService` — P2: `Send`, the outbound HTTP path, see the op-log paragraph below and
@@ -2366,10 +2366,7 @@ Go type now, not two hand-kept-identical implementations (P128 §2.1/§2.2):**
 app's bindings — never the shared package's name — with no binding-name shim needed. Kira Space's
 own `WindowsService` gained `Ensure`/`SetMode` this way (P128 §2.2) — it bound only `OpenNew`
 before.
-`EngineService.Status()` has
-zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
-rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
-no user-visible gain; it now reports unconditionally, since the engine is this process. Behind the
+Behind the
 services: `apps/kira-studio/internal/storage/` (repos plus forward-only SQL migrations),
 `apps/kira-studio/internal/tree/service.go` (the children/describe/definition cache-aside),
 `apps/kira-studio/internal/preconnect/` (the pre-connect script supervisor, a real
@@ -2489,9 +2486,8 @@ array views, landing at +0.01–1.7% over raw buffer bytes with no transient hea
 (`docs/PERF.md` §2.7).
 
 **Update check and in-app install (P66, P119), shared by both apps.** The status bar's right-hand
-group can show one more item, `[data-testid="update-available"]`, first in that group so the three
-existing readouts (`app-metrics`, `cache-size`, `engine-status`) keep their positions.
-`StatusBar.vue`'s left readout is unaffected — LAW 14 governs it, not this feature. Clicking the
+group can show one more item, `[data-testid="update-available"]`, first in that group so the
+existing readouts (`app-metrics`, `cache-size`) keep their positions. Clicking the
 item, or a new version becoming available while the app is open, opens a modal dialog
 (`UpdateDialog.vue`) with an **Update** button — P119 replaced Kira Studio's own click-opens-the-
 release-page behavior with this dialog, the deliberate behavior change P119's own plan names.
@@ -3571,13 +3567,9 @@ The annotation renders as injected text at the end of the cursor's line in
 answer are the same document by construction (the diff tabs compare historical revisions
 `blame.line` structurally can't answer for). The status bar was the extension's own surface for
 this, and `apps/kira-space/frontend/src/workbench/StatusBar.vue` (wrapping the shared
-`packages/workbench/src/components/StatusBar.vue`)'s own LAW 14 reserves its left readout for
-"where is the caret,"
-never a fact about the line under it — P62 declined the status bar for that reason, porting it
-literally would have meant breaking LAW 14 or wiring a per-view caret readout first. P76 shipped it
-anyway, a third way this paragraph didn't anticipate: a **sibling** left-side item, not the caret
-readout — `StatusBar.vue`'s own comment says so in place ("a sibling fact, not the caret-status slot
-above — that readout stays unwired"). Whole-file gutter blame (a GitLens-style column beside every
+`packages/workbench/src/components/StatusBar.vue`) carries no caret readout (P164 removed the
+unwired "no selection" item). P62 declined the status bar for blame; P76 shipped it anyway as a
+left-side item. Whole-file gutter blame (a GitLens-style column beside every
 line) is still deliberately not built: `blame.line` is one spawn per line, so a real implementation
 needs a new multi-hunk porcelain parser, a new `blame.file` method, and a real `ContractVersion`
 bump.

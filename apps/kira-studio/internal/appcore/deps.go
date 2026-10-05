@@ -34,7 +34,7 @@ type Emitter = appevent.Emitter
 // yet (P55 §6.1, §7) so they are wired directly in main.go, not carried here.
 type Deps struct {
 	DB        *sql.DB
-	StartedAt int64 // unix millis, for engineStatus/appInfo-style diagnostics later
+	StartedAt int64 // unix millis, for appInfo-style diagnostics later
 
 	Repos       *repos.Repos
 	Connections *connections.Service

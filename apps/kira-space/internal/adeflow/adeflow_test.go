@@ -51,7 +51,7 @@ func TestParse_rules(t *testing.T) {
 		{"missing name", "id: w\nstages:\n  - id: u\n", 0, "name is required"},
 		{"bad id", "id: W!\nname: W\nstages: []\n", 1, "id must be lowercase"},
 		{"dup stage id", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n  - id: u\n    name: U\n    kind: user\n    status: To do\n", 8, "stage 2: id \"u\" is already used"},
-		{"user session needs prompt", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    session: true\n", 0, "stage 1: prompt is required"},
+		{"user session prompt optional", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    session: true\n", 0, ""},
 		{"user prompt without session", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    prompt: x\n", 0, "prompt is not allowed on user stages"},
 		{"user refuses steps", head + "  - id: u\n    name: U\n    kind: user\n    status: To do\n    timeout: 1h\n", 0, "timeout is not allowed on user stages"},
 		{"agent empty steps", head + agent + "      []\n", 0, "steps must be a non-empty list"},

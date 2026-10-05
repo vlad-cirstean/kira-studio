@@ -22,7 +22,7 @@ import { installPassthrough } from './support/passthrough';
 // — once Kafka went native in P58e M9.3, the last of the ten kinds to do so — every connection
 // surviving the child's own SIGKILL entirely (checkpoint C2, P58e E21). P58f's own M10 deletes that
 // child (`internal/enginehost/`) outright, which retires the property: there is no child left to
-// kill, and `EngineService.Status()` now just reports this process (P58f D11). What is still worth
+// kill. What is still worth
 // proving, and covered nowhere else, is that two different Go-native kinds — MariaDB and Kafka —
 // coexist in one session and both keep serving real reads across a `page.reload()`.
 
@@ -131,12 +131,6 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('101');
   await page.click('[data-testid="pager-prev"]');
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
-
-  // Step 10: the status bar's own engine indicator reads 'ok' throughout a wholly-native session
-  // too — it reports this process itself now (P58f D11), not a child that no longer exists.
-  await expect(page.locator('[data-testid="engine-status"]')).toHaveAttribute('data-status', 'ok', {
-    timeout: 15_000,
-  });
 
   expect(consoleErrors).toEqual([]);
 });

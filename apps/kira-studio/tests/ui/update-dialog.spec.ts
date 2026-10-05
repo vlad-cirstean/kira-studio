@@ -13,7 +13,6 @@ test('no update available: no status-bar item, no dialog', async ({ kira }) => {
   await expect(window.locator('[data-testid="update-available"]')).toHaveCount(0);
   await expect(window.locator('[data-testid="update-dialog"]')).toHaveCount(0);
   await expect(window.locator('[data-testid="status-bar"]')).toBeVisible();
-  await expect(window.locator('[data-testid="engine-status"]')).toBeVisible();
 });
 
 test('update available: dialog auto-opens, Later closes it, the item reopens it', async ({
