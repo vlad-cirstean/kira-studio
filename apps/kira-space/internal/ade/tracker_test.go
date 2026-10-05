@@ -358,14 +358,15 @@ func TestTracker_ConcurrentComposeReconcileHandleEvent(t *testing.T) {
 
 func TestTracker_ResumeAfterAbandonedLaunchAndDoubleComposeGuard(t *testing.T) {
 	tr, _, live, clock := newTestTracker(t)
-	first := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: "/repo"})
+	repo := t.TempDir()
+	first := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: repo})
 	sessions, _ := listSessions(tr)
 	recordID := sessions[0].ID
 	live.remove(first.TerminalID)
 	clock.advance(50 * time.Millisecond)
 	tr.Reconcile()
 
-	args := PrepareArgs{TaskID: "t1", Cwd: "/repo", Resume: recordID}
+	args := PrepareArgs{TaskID: "t1", Cwd: repo, Resume: recordID}
 	abandoned, err := tr.Prepare(args) // never composed: Open failed before ComposeAgent
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
