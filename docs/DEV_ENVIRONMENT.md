@@ -183,6 +183,15 @@ historical prose.
   run only at `load1 <= 1.0` (`/proc/loadavg`); each run line prints `load1` (includes the probe's own browser, ~1.0 extra, so a reading up to ~2 during a run is normal; check the gate before starting).
   Output is `key=value` per run plus a median `summary` per case. RSS is Linux-only and sums every
   browser process under the test worker.
+- **`bun run perf:parse:studio` probes every large-input parse caller** (P163,
+  `tests/perf/parse-callers.spec.ts`, same `perf` project and gate). Cases: `req-body-json`,
+  `req-body-xml`, `grpc-json` (0.5/5 MB, `KIRA_PERF_SIZES_MB`), `console-format` (64/236/1024 KB),
+  `doc-fieldnames`, `console-copy-all-json|shell`, `pure-fns` (pure callers timed in-page via a
+  `bun build` bundle served at `/__pure.js`; WebKit timers are 1 ms), `worker-costs`.
+  `KIRA_PERF_CASES`, `KIRA_PERF_RUNS` as above. Editors are seeded in-page by a synthetic paste:
+  the Playwright WebKit transport breaks on any message over 512 KB. A before run needs a second
+  worktree at the older commit with the probe files copied over. This sandbox's `load1` swings 1-8
+  with nothing of ours running (host steal): read the per-run `load1`, rerun a case that matters.
 - **`bun run perf:documents:studio` probes the Documents list scroll** (P161, `tests/perf/documents-scroll.spec.ts`,
   same `perf` project). 5 000 Mongo documents, ~160 px expanded rows, real wheel input. Cases `ladder`
   (momentum), `flick` (80 x 9 600 px), `flick-up`; `KIRA_PERF_CASES`, `KIRA_PERF_RUNS` as above. Prints

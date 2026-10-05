@@ -163,6 +163,67 @@ off screen at 160 px). Fixes: one shared tooltip, overscan sized in px (320).
 Target (flick p95 <= 50 ms, <= 10 % of frames over) not met: remaining cost is mounting a full new
 window of rows per frame (bare divs floor 21 ms). No uncovered viewport in any run.
 
+**P163 large-input parse callers (WebKit sandbox, `perf:parse:studio`).** Medians of 3 runs, one discarded
+warm-up. Before: tree at `260ee0a1` (worker and chunker present, callers not moved), probe files
+from the final probe commit. After: P163 head. Per-run `load1` (includes the probe's browser) 1.4-3.2
+before, 1.7-8.3 after: this host's load swings with nothing of ours running, so only large deltas
+count. `longestBlockMs` = longest main-thread gap click to result + 1 s.
+
+| Caller | Size | Before block ms | After block ms | After actionMs (before) |
+|---|---|---|---|---|
+| Console Format | 64 KB | 631 | 84 | 990 (686) |
+| Console Format | 236 KB | 1 848 | 187 | 2 775 (1 863) |
+| Console Format | 1 MB | 6 913 | 683 | 8 928 (6 957) |
+| Request Beautify JSON | 0.5 MB | 184 | 134 | 187 (187) |
+| Request Beautify JSON | 5 MB | 1 420 | 1 021 | 1 301 (1 422) |
+| Request Beautify XML | 0.5 MB | 343 | 224 | 295 (343) |
+| Request Beautify XML | 5 MB | 1 787 | 1 596 | 2 105 (1 787) |
+| gRPC Beautify JSON | 0.5 MB | 153 | 145 | 196 (155) |
+| gRPC Beautify JSON | 5 MB | 1 176 | 1 057 | 1 356 (1 178) |
+| Console Copy all, JSON | 10 000 x 0.4 KB | 198 | 85 | 288 (167) |
+| Console Copy all, shell | 10 000 x 0.4 KB | 411 | 83 | 558 (365) |
+| Console Copy all, JSON | 2 000 x 8.6 KB | 158 | 98 | 471 (125) |
+| Console Copy all, shell | 2 000 x 8.6 KB | 264 | 102 | 508 (231) |
+
+The Beautify rows keep a ~1 s block at 5 MB: the parse is off-thread, the remaining block is
+Monaco applying the 5 MB result as one editable `pushEditOperations` (undo boundary). Chunking it
+would split undo into many entries, so it stays; the worker removed the parse and format share
+(~25 % at 5 MB JSON). Residual 83-100 ms on Copy all is the click and menu close, not the encode.
+
+Documents field names (10 000 x 0.4 KB page load): `fieldNamesOnPage` ran in four computeds plus
+the projection menu, now memoized per page object. One pass costs 6-8 ms (10 000 x 0.4 KB) and
+13-23 ms (2 000 x 8 KB) in WebKit, so a worker is not warranted. The load block is 340-460 ms before
+and after (435 before; 366, 461, 339 after, loads 1.4-2.0): the memoization saves about three passes
+(~20 ms), inside run noise; the rest is page decode and row rendering, outside P163.
+
+No change (function timed in-page in WebKit, median of 5 x 3 runs, 1 ms timer):
+
+| Row | Input | ms |
+|---|---|---|
+| Response find `findRanges` | 5 MB / 12 MB | 1 / 35-51 |
+| Response compare `detectAndBeautify` x2 | 256 KB JSON / XML | 7-12 / 11-16 |
+| Cell editor `detectFormat`, `validateFormat`, `beautifyFor` | 64 KB | <= 7 |
+| `byteLabel` `TextEncoder` | 64 KB | < 1 |
+| Documents `parseDocument` | 64 KB; 60 x 0.4 KB | < 1; <= 1 |
+| Row menu `toPlainJson`/`toRelaxedText`/`toShellText`/pretty | 64 KB | < 1 |
+| Mongo lint `tryParseShellText` | 64 KB / 1 MB | 1-2 / 10-20 |
+| `beautifyShellText` | 1 MB | 25-44 |
+| EXPLAIN `JSON.parse` | 1 MB | 4-7 |
+| Grid Copy as JSON `rowsToJson` | 10 000 x 20 | 19-33 |
+
+gRPC response messages have no frontend parse (Go `protojson`); the fill is `MonacoHost`'s
+chunked path, already covered by the P160 http probe. The diff editor fill (<= 256 KiB per side)
+was not driven through the UI; the compare functions above are 7-16 ms.
+
+Worker costs (3 runs): cold start 7-14 ms, warm round trip 0-1 ms, respawn 5-12 ms, `postMessage`
+of a 12 MB string 15-18 ms, 200 000-object JSON beautify round trip 360-415 ms. Transfer stays
+structured clone (under the 50 ms bar).
+
+HTTP response viewer no-regression (`perf:http:studio`, json and text-80col, before `b14bb1ed`,
+after P163 head, 3 runs each): medians within run noise. json 5 MB firstText/shown 633/968 before,
+719/1 057 after on the first pass (loads 2.7 vs 1.1); two back-to-back reruns: 624/941 vs 615/930
+and 580/903 vs 613/916 ms. json 12 MB shown 1 754 vs 1 732, text-80col 12 MB shown 765 vs 807.
+
 **macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
 macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
 where the Xvfb container above hit it on only about half — motivated

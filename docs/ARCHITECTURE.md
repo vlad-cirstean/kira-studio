@@ -1883,8 +1883,26 @@ back re-requests it. In Pretty view `MonacoHost` is not mounted until the result
 16 384 chars: a full-doc `<pre>` forced a layout of the whole wrapped text inside `editor.create`'s
 size measure, which was the profiled hot spot (12 MB: nothing painted, RSS ~2.7 GB). The model is
 created empty, then filled: `setValue`, or for read-only docs over 256 KiB line-aligned 256 KiB
-`applyEdits` chunks a frame apart (one `setValue` of an 8 MB pretty body blocked 1.1 s); read-only
+`applyEdits` chunks a frame apart (`editor/chunkedText.ts`) (one `setValue` of an 8 MB pretty body blocked 1.1 s); read-only
 external writes keep no undo copy. Default `api.maxResponseMb` is 5; stored explicit values keep, no migration.
+
+**Large-input parsing (P163).** A parse or format of input that can exceed 64 K chars (`INLINE_CHARS`,
+`workers/parse/client.ts`) goes through `workers/parse/`: one lazy app-wide module worker, one job in
+flight, FIFO queue, `AbortSignal` cancellation (running job with waiters: terminate and respawn). A
+worker failure never fails a job: queued and in-flight jobs run inline through the same
+`handlers.ts`. Callers use `useParseWorker().run`/`runLatest`, and `parseInline` at or under the
+threshold so small inputs apply in the same tick. Kinds: `body.format`, `json.beautify`,
+`xml.beautify`, `console.format`, `ejson.copyAll`; add a kind only for a caller that moves. A
+migrated caller drops its result when the buffer changed since the job started. Large read-only
+editor pushes go through `editor/chunkedText.ts` (`textChunks`, `pumpChunks`); an editable
+Beautify/Format write stays one `pushEditOperations` (one undo entry), so its Monaco write is the
+remaining block (5 MB JSON: ~1 s). The worker is never terminated while idle: a parked worker holds
+no input (strings are not retained) and a respawn costs ~10 ms, so an idle timer buys nothing
+measurable. Not moved, measured under 50 ms in WebKit (`docs/PERF.md`): response find, response
+compare, cell editor detect/validate/beautify at 64 KiB, row menu copies, Mongo lint scan, EXPLAIN
+parse, grid Copy as JSON, Documents row parse and field names. Console "Copy all" writes through a
+`ClipboardItem` holding the pending text (`copyOrReportErrorLazy`), so the write starts inside the
+user gesture.
 
 **Comparing two entries reaches for Monaco's diff editor for the one thing it's actually built for
 — the body — and a plain keyed comparison for headers, not the same algorithm twice (P8; moved
