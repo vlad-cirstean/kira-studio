@@ -119,13 +119,14 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, "", nil)
 		return l, err
 	}
-	cwd, err := b.takeOverCwd(ctx, tc, rec)
+	cwd, moved, err := b.takeOverCwd(ctx, tc, rec)
 	if err != nil {
 		return adewire.Launch{}, err
 	}
 
 	pa := PrepareArgs{TaskID: rec.TaskID, BranchID: rec.BranchID, StageID: rec.StageID, StepID: rec.StepID, Cwd: cwd}
-	if rec.Mode == model.AdeSessionModeTUI {
+	// Resume pins the recorded cwd, so a TUI record whose directory moved resumes by conversation id.
+	if rec.Mode == model.AdeSessionModeTUI && !moved {
 		pa.Resume = rec.ID
 	} else {
 		pa.Resumes = rec.ClaudeSessionID
@@ -177,26 +178,25 @@ func (b *TaskBoard) takeOverSession(args adewire.TakeOverArgs) (*model.AdeSessio
 }
 
 // takeOverCwd gates the session's branch and returns its cwd, falling back to the gate path when
-// the recorded directory is gone.
-func (b *TaskBoard) takeOverCwd(ctx context.Context, tc *taskCtx, rec *model.AdeSession) (string, error) {
+// the recorded directory is gone (moved).
+func (b *TaskBoard) takeOverCwd(ctx context.Context, tc *taskCtx, rec *model.AdeSession) (cwd string, moved bool, err error) {
 	gatePath := ""
 	if rec.BranchID != "" {
 		sb, ok := tc.branch(rec.BranchID)
 		if !ok {
-			return "", invalid("the session's branch is no longer on the task")
+			return "", false, invalid("the session's branch is no longer on the task")
 		}
-		var err error
 		if gatePath, err = b.launchGate(ctx, tc, sb); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
-	if info, err := os.Stat(rec.Cwd); err != nil || !info.IsDir() {
+	if info, statErr := os.Stat(rec.Cwd); statErr != nil || !info.IsDir() {
 		if gatePath == "" {
-			return "", invalid("%s no longer exists", rec.Cwd)
+			return "", false, invalid("%s no longer exists", rec.Cwd)
 		}
-		return gatePath, nil
+		return gatePath, true, nil
 	}
-	return rec.Cwd, nil
+	return rec.Cwd, false, nil
 }
 
 // stopForTakeOver stops the headless run behind the row when it still runs (D3).
