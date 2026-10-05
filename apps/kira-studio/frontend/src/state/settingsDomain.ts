@@ -80,7 +80,7 @@ const advancedSettingsSchema = /*#__PURE__*/ z.object({
 // constants (options.go states the coupling back at this file: its normalize() defaults must
 // equal this section's own defaults, field for field, since neither package may import the
 // other). Three deliberate default changes from pre-P90 httpclient behaviour: timeout 30s -> none,
-// max response 10 MiB -> 50 MB, max redirects unchanged at 10. HTTP_VERSIONS/httpVersionSchema
+// max response 10 MiB -> 50 MB (P160: -> 5 MB), max redirects unchanged at 10. HTTP_VERSIONS/httpVersionSchema
 // come from @shared/domain/settings (re-exported above) — domain/http.ts's own dependency, not
 // this section's.
 
