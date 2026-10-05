@@ -118,12 +118,11 @@ test('a pushed runs event updates the step line', async ({ relaunch }) => {
   const ev = adeFixture<{ runs: Record<string, unknown>[] }>('event-runs');
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_bill');
-  const line = stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '4/10' });
-  await expect(line).toHaveCount(1);
-  await emitRuns(page, [{ ...ev.runs[0], todo: [7, 10] }]);
-  await expect(
-    stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '7/10' }),
-  ).toHaveCount(1);
+  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('running');
+  await emitRuns(page, [{ ...ev.runs[0], state: 'done' }]);
+  await expect(line.locator(t('ade-run-glyph'))).toHaveText('✓');
+  await expect(line.locator(t('ade-run-status'))).toHaveText('done');
 });
 
 test('Approve sends the gated step', async ({ relaunch }) => {
@@ -199,7 +198,7 @@ test('a send-back shows on the step line with its loop and note', async ({ relau
   const { window: page } = await openPlan(relaunch);
   await open(page, 'T_push');
   const impl = stage(page, 'impl');
-  await expect(impl.locator(t('ade-run-todo')).filter({ hasText: 'sent back' })).toHaveCount(1);
+  await expect(impl.locator(t('ade-run-status')).filter({ hasText: 'sent back' })).toHaveCount(1);
   await expect(
     impl.locator(t('ade-run-note')).filter({ hasText: '2 failing tests' }),
   ).not.toHaveCount(0);
@@ -209,7 +208,7 @@ test('Log opens the run log and appends pushed chunks', async ({ relaunch }) => 
   const page0 = await openPlan(relaunch);
   const page = page0.window;
   await open(page, 'T_bill');
-  const line = stage(page, 'impl').locator(t('ade-run-line')).filter({ hasText: '4/10' });
+  const line = stage(page, 'impl').locator('[data-testid="ade-run-line"][data-branch-id="b_bill"]');
   await line.locator(t('ade-run-log-toggle')).click();
   const log = page.locator(t('ade-run-log'));
   await expect(log).toBeVisible();

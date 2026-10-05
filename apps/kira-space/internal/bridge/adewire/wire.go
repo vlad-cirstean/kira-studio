@@ -223,7 +223,6 @@ type Run struct {
 	BranchID   string   `json:"branchId"`
 	Attempt    int      `json:"attempt"`
 	State      RunState `json:"state"`
-	Todo       *[2]int  `json:"todo"`
 	Loops      int      `json:"loops"`
 	Note       string   `json:"note"`
 	Summary    string   `json:"summary"`

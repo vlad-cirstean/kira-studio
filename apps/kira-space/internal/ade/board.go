@@ -470,9 +470,6 @@ func toWireRun(r model.AdeRun) adewire.Run {
 		State: r.State, Loops: r.Loops, Note: r.Note, Summary: r.Summary, SessionID: r.SessionID,
 		ExitCode: r.ExitCode, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
 	}
-	if r.TodoDone != nil && r.TodoTotal != nil {
-		run.Todo = &[2]int{*r.TodoDone, *r.TodoTotal}
-	}
 	return run
 }
 

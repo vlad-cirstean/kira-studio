@@ -179,7 +179,7 @@ export type RunState = 'pending' | 'running' | 'stuck' | 'failed' | 'back' | 'do
 export interface Run {
   id: string; taskId: string; stageId: string; stepId: string /* script stage: stage id */;
   branchId: string /* once: first branch, D12 */; attempt: number; state: RunState;
-  todo: [number, number] | null; loops: number /* send-back round */;
+  loops: number /* send-back round */;
   note: string; summary: string /* finish_step summary */; sessionId: string /* '' for script */;
   exitCode: number | null; startedAt: number | null; finishedAt: number | null;
 }
@@ -396,7 +396,7 @@ Transcribed from `mockup.html` (lines 1084-1230) and SPEC2 examples. Ids keep th
 | `log-page.json` | `LogPage` | `b_searchui` setup log (stderr line for the 404) |
 | `sessions.json` | `SessionsResult` | every `S(...)` in branch + spec sessions; `9ab0` TUI running `input`; one TUI with `resumes` |
 | `launch.json` | `Launch` | `TUI … (resumed)` of `9d10` |
-| `event-runs.json` | `RunsChangedEvent` | `b_bill` impl todo `[4, 10]` |
+| `event-runs.json` | `RunsChangedEvent` | `b_bill` impl running |
 | `event-log.json` | `LogEvent` | 2 `event` chunks of a headless run |
 | `event-credential.json` | `CredentialRequest` | one masked prompt |
 | `event-open-session.json` | `OpenSessionEvent` | `T_auth` / `b_auth` / `9ab0` |
@@ -492,3 +492,5 @@ Schema equivalent `tsc` would infer).
   `checking` and one `failed` with a reason.
 - P146 Step 0 (R1): `StartRunArgs.branchNames` `''` means derived from the task title (comment only).
   Settings leaf `ade.headlessSettingSources` (`'user' | 'all'`, default `all`) added.
+- P158 Step 0 (rule 1, user decision): `Run.todo` removed. Fixtures `board.json`, `event-runs.json` drop
+  the key. Methods unchanged (53).

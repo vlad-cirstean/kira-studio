@@ -22,14 +22,13 @@ import { type MockupComponent, runMockupV2 } from './support/mockupV2Oracle';
 
 // Parity: the board logic over the P143 fixtures equals the mockup's own `renderVals()` for status,
 // stage label and percent, task action, branch tag and actions, base marker, day bands and the
-// Needs-you list. The fixtures describe the mockup's default data, with three input normalizations
+// Needs-you list. The fixtures describe the mockup's default data, with four input normalizations
 // the mockup derives itself and the wire carries as backend facts:
 //   1. a running headless run whose session waits for input is `stuck` (the mockup reads the session);
 //   2. `pairs` are recomputed from each branch's file list, and a pair conflicts when one side is a
 //      review item (the mockup's file-overlap rule; the backend uses git merge-tree);
 //   3. `now` is 3m 40s after the `preparing` worktree setup started;
-//   4. the fixture's b_bill implement run reads 4/10, the mockup's 3/10 (a later update in the fixture);
-//   5. the fixture's `tk01` session (a take-over the mockup only creates on click) is dropped.
+//   4. the fixture's `tk01` session (a take-over the mockup only creates on click) is dropped.
 // Deliberate divergences (asserted in DIVERGENCE, never skipped): CI failing is dropped (D9).
 
 const NOW = 1790067000000 + 220_000;
@@ -61,11 +60,7 @@ let progress: Map<string, TaskProgress>;
 
 function normalizeBoard(raw: Board, sess: SessionsResult): Board {
   const runs = (t: Board['tasks'][number]) =>
-    t.runs.map((r0) => {
-      const r =
-        r0.branchId === 'b_bill' && r0.stepId === 'impl' && r0.todo
-          ? { ...r0, todo: [3, 10] as [number, number] }
-          : r0;
+    t.runs.map((r) => {
       const stuck = sess.sessions.some(
         (s) =>
           s.mode === 'headless' &&

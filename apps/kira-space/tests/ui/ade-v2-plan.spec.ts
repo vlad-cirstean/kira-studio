@@ -41,7 +41,7 @@ test('a card shows its stage, progress, span and clamped title', async ({ relaun
   const { window: page } = await openPlan(relaunch);
   const search = card(page, 'T_search');
   await expect(search.locator('[data-testid="ade-stage-label"]')).toHaveText('Implement 3/5');
-  await expect(search).toContainText('67%');
+  await expect(search).toContainText('60%');
   await expect(search.locator('[data-testid="ade-card-meta"]')).toHaveText(
     '3d → Mon 28 · SRCH-41 · web-app',
   );
@@ -186,7 +186,7 @@ test('the Plan scrolls inside the window instead of growing it', async ({ relaun
 test('a branch row shows its own progress under the name', async ({ relaunch }) => {
   const { window: page } = await openPlan(relaunch);
   const row = page.locator('[data-testid="ade-branch-row"][data-branch-id="b_meter"]');
-  await expect(row.locator('[data-testid="ade-branch-prog"]')).toHaveText('Implement 6/9');
+  await expect(row.locator('[data-testid="ade-branch-prog"]')).toHaveText('Implement');
   await expect(
     page.locator(
       '[data-testid="ade-branch-row"][data-branch-id="b_cart"] [data-testid="ade-branch-prog"]',

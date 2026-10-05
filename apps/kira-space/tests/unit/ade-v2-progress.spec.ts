@@ -67,27 +67,21 @@ const run = (stepId: string, branchId: string, over: Partial<Run> = {}): Run =>
   mkRun({ taskId: 'T', stageId: 'impl', stepId, branchId, ...over });
 
 describe('step targets and percent', () => {
-  test('averages done runs as 1 and running runs by todo, over steps and repos', () => {
+  test('averages done runs as 1 and others as 0, over steps and repos', () => {
     const p = buildTaskProgress(
       input([
         run('plan', 'b_api', { state: 'done' }),
         run('code', 'b_api', { state: 'done' }),
-        run('code', 'b_web', { state: 'running', todo: [3, 10] }),
+        run('code', 'b_web', { state: 'running' }),
       ]),
     );
-    // plan (once -> b_api): 1, code: (1 + 0.3) / 2, pr: no runs started -> 0
-    expect(p.steps.map((s) => s.frac)).toEqual([1, 0.65, 0]);
-    expect(p.percent).toBe(55);
+    // plan (once -> b_api): 1, code: (1 + 0) / 2, pr: no runs started -> 0
+    expect(p.steps.map((s) => s.frac)).toEqual([1, 0.5, 0]);
+    expect(p.percent).toBe(50);
     expect(p.label).toBe('Implement 1/3');
     expect(p.barTip).toBe(
-      '1. plan: api ✓\n2. code: api ✓, web-app 3/10\n3. pr: api pending, web-app pending',
+      '1. plan: api ✓\n2. code: api ✓, web-app running\n3. pr: api pending, web-app pending',
     );
-  });
-
-  test('a running run with null todo counts zero, never NaN', () => {
-    const p = buildTaskProgress(input([run('plan', 'b_api', { state: 'running', todo: null })]));
-    expect(p.steps[0]?.frac).toBe(0);
-    expect(p.percent).toBe(0);
   });
 
   test('once targets the first mine branch; only <repo> matches the nickname; unmatched only has none', () => {
@@ -118,7 +112,7 @@ describe('latest attempt and worst-of', () => {
     const p = buildTaskProgress(
       input([
         run('code', 'b_api', { attempt: 1, state: 'failed' }),
-        run('code', 'b_api', { attempt: 2, state: 'running', todo: [1, 2] }),
+        run('code', 'b_api', { attempt: 2, state: 'running' }),
         run('code', 'b_web', { attempt: 1, state: 'done' }),
       ]),
     );
@@ -218,13 +212,13 @@ describe('branch progress line', () => {
   const lineOf = (runs: Run[], branchId = 'b_web') =>
     branchProgress(buildTaskProgress(input(runs)), branchId);
 
-  test('names the first unfinished step with todo, fix round and state suffix', () => {
+  test('names the first unfinished step with fix round and state suffix', () => {
     expect(
       lineOf([
         run('plan', 'b_api', { state: 'done' }),
-        run('code', 'b_web', { state: 'running', todo: [3, 5], loops: 1 }),
+        run('code', 'b_web', { state: 'running', loops: 1 }),
       ])?.label,
-    ).toBe('code 3/5 · fix 1');
+    ).toBe('code · fix 1');
     expect(lineOf([run('code', 'b_web', { state: 'stuck' })])?.label).toBe('code · stuck');
     expect(lineOf([run('code', 'b_web', { state: 'back' })])?.label).toBe('code ↩ sent back');
     expect(lineOf([])?.label).toBe('code · waiting');

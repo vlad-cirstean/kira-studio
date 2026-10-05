@@ -8,7 +8,6 @@ export type StepState = 'pending' | 'running' | 'stuck' | 'failed' | 'done';
 export interface StepRun {
   branchId: string;
   state: RunState;
-  todo: [number, number] | null;
   loops: number;
   note: string;
   runId: string;
@@ -29,7 +28,7 @@ export interface StepProgress {
   runs: StepRun[];
   /** Pending, gated on approval, and the previous step is done. */
   approval: boolean;
-  /** 0..1: done runs count 1, running runs their todo fraction, averaged over targets. */
+  /** 0..1: share of target runs done. */
   frac: number;
 }
 
@@ -95,8 +94,7 @@ function aggregate(states: readonly RunState[]): StepState {
 }
 
 function runFraction(r: StepRun): number {
-  if (r.state === 'done') return 1;
-  return r.todo && r.todo[1] > 0 ? r.todo[0] / r.todo[1] : 0;
+  return r.state === 'done' ? 1 : 0;
 }
 
 interface StepDef {
@@ -140,7 +138,6 @@ function latestRun(task: Task, stageId: string, stepId: string, branchId: string
   return {
     branchId,
     state: best.state,
-    todo: best.todo,
     loops: best.loops,
     note: best.note,
     runId: best.id,
@@ -158,7 +155,6 @@ export function buildSteps(i: ProgressInput, stage: Stage): StepProgress[] {
         latestRun(i.task, stage.id, def.id, branchId) ?? {
           branchId,
           state: 'pending',
-          todo: null,
           loops: 0,
           note: '',
           runId: '',
@@ -233,7 +229,7 @@ export function buildTaskProgress(i: ProgressInput): TaskProgress {
         (s) =>
           `${s.n}. ${s.name}: ${s.runs
             .map((r) => {
-              const mid = r.state === 'done' ? '✓' : r.todo ? `${r.todo[0]}/${r.todo[1]}` : r.state;
+              const mid = r.state === 'done' ? '✓' : r.state;
               return `${nick(r.branchId)} ${mid}`;
             })
             .join(', ')}`,
@@ -249,7 +245,7 @@ export type BranchSegState = 'done' | 'running' | 'bad' | 'pending';
 
 export interface BranchProgress {
   segments: BranchSegState[];
-  /** `Implement 3/10`, `Implement · stuck`, `Tests ↩ sent back`, `Implement ✓`. */
+  /** `Implement`, `Implement · stuck`, `Tests ↩ sent back`, `Implement ✓`. */
   label: string;
   tone: 'amber' | 'red' | 'green' | 'grey';
   tip: string;
@@ -285,7 +281,6 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
     >;
     label =
       pos.step.name +
-      (pos.run.todo ? ` ${pos.run.todo[0]}/${pos.run.todo[1]}` : '') +
       (pos.run.loops ? ` · fix ${pos.run.loops}` : '') +
       (suffix[pos.run.state] ?? '');
     if (pos.run.state === 'stuck' || pos.run.state === 'failed') tone = 'red';
@@ -293,8 +288,7 @@ export function branchProgress(p: TaskProgress, branchId: string): BranchProgres
   }
   const tip = own
     .map(
-      ({ step, run }) =>
-        `${step.n}. ${step.name}: ${run.state}${run.todo ? ` ${run.todo[0]}/${run.todo[1]}` : ''}${run.note ? ` (${run.note})` : ''}`,
+      ({ step, run }) => `${step.n}. ${step.name}: ${run.state}${run.note ? ` (${run.note})` : ''}`,
     )
     .join('\n');
   return { segments, label, tone, tip };

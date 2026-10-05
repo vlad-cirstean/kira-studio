@@ -163,10 +163,7 @@ const chipTone = (t: 'muted' | 'stale' | 'unknown'): string => (t === 'stale' ? 
             :code-repo-id="card.rows.find((r) => r.id === rl.run.branchId)?.branch.codeRepoId ?? ''"
             :label="card.rows.find((r) => r.id === rl.run.branchId)?.repo ?? ''"
           />
-          <span class="inline-block h-1 w-10 shrink-0 overflow-hidden rounded-[2px] bg-border-strong">
-            <span class="block h-full" :style="{ width: `${rl.pct}%`, background: TONE[rl.tone][1] }" />
-          </span>
-          <span class="w-16 shrink-0 whitespace-nowrap font-data text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-todo">{{ rl.todo }}</span>
+          <span class="w-16 shrink-0 whitespace-nowrap font-data text-kira-sm" :style="{ color: TONE[rl.tone][1] }" data-testid="ade-run-status">{{ rl.status }}</span>
           <Button
             v-if="rl.hasLog"
             variant="dialog"

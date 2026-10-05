@@ -15,9 +15,7 @@ interface RunLine {
   run: StepRun;
   glyph: string;
   tone: Tone;
-  /** 0..100 */
-  pct: number;
-  todo: string;
+  status: string;
   /** The run's own note, else `fix round n of 3` for a fix run. */
   note: string;
   /** Log (agent) / Output (script) opens the run's log: shown once the run started. */
@@ -86,19 +84,7 @@ function runLine(r: StepRun): RunLine {
     run: r,
     glyph: g.glyph,
     tone: g.tone,
-    pct:
-      r.state === 'done'
-        ? 100
-        : r.todo && r.todo[1] > 0
-          ? Math.round((100 * r.todo[0]) / r.todo[1])
-          : 0,
-    todo: r.todo
-      ? `${r.todo[0]}/${r.todo[1]}`
-      : r.state === 'done'
-        ? 'done'
-        : r.state === 'back'
-          ? 'sent back'
-          : r.state,
+    status: r.state === 'done' ? 'done' : r.state === 'back' ? 'sent back' : r.state,
     note: r.note || (r.loops ? `fix round ${r.loops} of 3` : ''),
     hasLog: started,
     canRetry: started && (r.state === 'failed' || r.state === 'stuck'),
@@ -111,7 +97,7 @@ function showRuns(s: StepProgress, script: boolean): boolean {
     started &&
     (s.runs.length > 1 ||
       script ||
-      s.runs.some((r) => r.state !== s.state || r.todo || r.note || r.loops > 0))
+      s.runs.some((r) => r.state !== s.state || r.note || r.loops > 0))
   );
 }
 

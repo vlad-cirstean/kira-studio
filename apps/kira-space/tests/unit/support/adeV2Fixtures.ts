@@ -65,7 +65,6 @@ export function mkRun(
     id: `${over.taskId}:${over.stepId}:${over.branchId}:${over.attempt ?? 1}`,
     attempt: 1,
     state: 'pending',
-    todo: null,
     loops: 0,
     note: '',
     summary: '',

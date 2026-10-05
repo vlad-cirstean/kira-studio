@@ -196,7 +196,6 @@ export interface Run {
   branchId: string /* once: first branch, D12 */;
   attempt: number;
   state: RunState;
-  todo: [number, number] | null;
   loops: number /* send-back round */;
   note: string;
   summary: string /* finish_step summary */;

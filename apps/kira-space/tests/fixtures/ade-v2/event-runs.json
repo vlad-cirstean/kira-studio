@@ -8,7 +8,6 @@
       "branchId": "b_bill",
       "attempt": 1,
       "state": "running",
-      "todo": [4, 10],
       "loops": 0,
       "note": "",
       "summary": "",
