@@ -114,10 +114,11 @@ type TaskBoard struct {
 	rebase      map[string]*rebaseCache
 	boardTimer  *time.Timer
 
-	runMu     sync.Mutex             // guards live, setupLive, taskMus, finishes, stepMsgs
+	runMu     sync.Mutex             // guards live, setupLive, archiving, taskMus, finishes, stepMsgs
 	live      map[string]*liveRun    // run id -> its process
 	tuiRuns   map[string]tuiBinding  // run id -> the TUI that can finish it
 	setupLive map[string]*liveRun    // branch id -> its running prepare script
+	archiving map[string]int         // task id -> archives in progress; blocks launches
 	taskMus   map[string]*sync.Mutex // task id -> serializes that task's run transitions
 	finishes  map[string]finishCall  // run id -> last finish_step call
 	stepMsgs  map[string]string      // task|stage|step -> the Run dialog's edited message
@@ -139,7 +140,7 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 		deps: deps, ctx: ctx, cancel: cancel, folderW: map[string]*folderWatcher{},
 		repoMus: map[string]*sync.Mutex{}, byGitRepoID: map[string]string{}, gitRepoIDOf: map[string]string{},
 		caches: map[string]*repoCaches{}, rebase: map[string]*rebaseCache{}, live: map[string]*liveRun{}, tuiRuns: map[string]tuiBinding{}, setupLive: map[string]*liveRun{},
-		taskMus: map[string]*sync.Mutex{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
+		taskMus: map[string]*sync.Mutex{}, archiving: map[string]int{}, finishes: map[string]finishCall{}, stepMsgs: map[string]string{},
 		ghLocks: map[string]*sync.Mutex{}, ghPending: map[string]bool{},
 	}
 	b.agent = adeagent.NewServer(deps.AgentDir, b.recordFinish)

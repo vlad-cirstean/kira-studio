@@ -121,6 +121,12 @@ func (b *TaskBoard) aheadOfMain(ctx context.Context, lb linkedBranch) (int, erro
 
 // ArchiveTask stops the task's runs, setups and terminals, removes its worktrees and archives it.
 func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
+	// Block new launches first, then wait out any launch already past its check: the task mutex is
+	// held for a launch's whole critical section, so one lock/unlock drains them.
+	defer b.beginArchive(taskID)()
+	barrier := b.taskMu(taskID)
+	barrier.Lock()
+	barrier.Unlock() //nolint:staticcheck // empty critical section drains in-flight launches
 	tc, err := b.loadTaskCtx(taskID)
 	if err != nil {
 		return err
@@ -153,12 +159,12 @@ func (b *TaskBoard) ArchiveTask(ctx context.Context, taskID string) error {
 	if err := b.closeTaskTerminals(taskID); err != nil {
 		return err
 	}
-	b.teardownReview(ctx, tc)
 	for _, lb := range linked {
 		if err := b.removeWorktree(ctx, lb); err != nil {
 			return err
 		}
 	}
+	b.teardownReview(ctx, tc)
 	if err := b.deps.Tasks.ArchiveTask(taskID, b.deps.Now().UnixMilli()); err != nil {
 		return err
 	}

@@ -334,6 +334,9 @@ func (b *TaskBoard) startStep(ctx context.Context, tc *taskCtx, plan []stepView,
 
 // queueRun inserts a run attempt and launches it, or leaves it pending behind the worktree gate.
 func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, idx int, branchID string, attempt int, path string, opts runOpts) (model.AdeRun, error) {
+	if err := b.checkNotArchiving(tc.task.ID); err != nil {
+		return model.AdeRun{}, err
+	}
 	sb, ok := tc.branch(branchID)
 	if !ok {
 		return model.AdeRun{}, invalid("branch %s is not on this task", branchID)
@@ -378,6 +381,9 @@ func (b *TaskBoard) runVarsFor(tc *taskCtx, sb model.AdeTaskBranch, path string)
 
 // launch marks the run running and starts its process in the background.
 func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, idx int, run model.AdeRun, sb model.AdeTaskBranch, path string) (model.AdeRun, error) {
+	if err := b.checkNotArchiving(run.TaskID); err != nil {
+		return run, err
+	}
 	def := plan[idx].Def
 	rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
 	if err != nil {

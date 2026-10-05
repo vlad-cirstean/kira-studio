@@ -84,3 +84,27 @@ func stopOutcome(ctx context.Context) (outcome, bool) {
 	}
 	return outcome{}, false
 }
+
+// beginArchive blocks new launches for the task until the returned func runs.
+func (b *TaskBoard) beginArchive(taskID string) func() {
+	b.runMu.Lock()
+	b.archiving[taskID]++
+	b.runMu.Unlock()
+	return func() {
+		b.runMu.Lock()
+		defer b.runMu.Unlock()
+		if b.archiving[taskID]--; b.archiving[taskID] <= 0 {
+			delete(b.archiving, taskID)
+		}
+	}
+}
+
+// checkNotArchiving rejects a launch for a task whose archive is in progress.
+func (b *TaskBoard) checkNotArchiving(taskID string) error {
+	b.runMu.Lock()
+	defer b.runMu.Unlock()
+	if b.archiving[taskID] > 0 {
+		return invalid("task is being archived")
+	}
+	return nil
+}

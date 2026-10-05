@@ -119,6 +119,9 @@ type worktreeResult struct {
 // not-created branch gets its name, then a newBranch worktree from its base. wanted is the caller's
 // name for a not-created branch ("" = derived from the task title).
 func (b *TaskBoard) ensureWorktree(ctx context.Context, title string, rec model.CodeRepo, sb model.AdeTaskBranch, wanted string) (worktreeResult, error) {
+	if err := b.checkNotArchiving(sb.TaskID); err != nil {
+		return worktreeResult{}, err
+	}
 	mu := b.repoMutex(sb.CodeRepoID)
 	mu.Lock()
 	defer mu.Unlock()
@@ -263,6 +266,9 @@ func (b *TaskBoard) setupReady(sb model.AdeTaskBranch, worktree string, setups m
 // onReady is called (off the caller's goroutine) after a successful script; a repo without one is
 // ready at once and onReady is not called.
 func (b *TaskBoard) startSetup(rec model.CodeRepo, sb model.AdeTaskBranch, name, path string, onReady func(branchID string)) error {
+	if err := b.checkNotArchiving(sb.TaskID); err != nil {
+		return err
+	}
 	settings, err := b.deps.GitRepoSettings(rec.RepoID)
 	if err != nil {
 		return err
