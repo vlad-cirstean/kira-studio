@@ -253,3 +253,142 @@ frames over 50 ms -99 %). This names the mechanism round 1 inferred:
 
 `content-visibility:auto` on rows: +5.5 fps, not competitive with the two layer fixes and it
 skips painting the runway (late-data risk), so not pursued. Cell `display:flex` costs nothing.
+
+### R2.4 Step 2b: borders, combinations, overscan
+
+Same batch (first base run at load1 1.43: a pre-commit typecheck overlapped it; under the 1.5
+limit, kept).
+
+| Variant | fps (3 runs) | p95 ms | >50 ms | load1 |
+|---|---|---|---|---|
+| base | 30.7 / 30.8 / 32.5 | 66.0 / 66.6 / 60.8 | 694 / 629 / 444 | 0.96-1.43 |
+| cells `box-shadow` inset instead of borders | did not finish (240 s timeout, 3 of 3) | - | - | 0.93-0.98 |
+| cells border-right only, row `border-bottom` | 31.0 / 32.9 / 31.8 | 64.8 / 60.2 / 61.8 | 641 / 432 / 520 | 0.93-0.98 |
+| canvas isolate + no borders | 52.3 / 54.4 / 53.6 | 29.0 / 27.4 / 26.8 | 1 / 3 / 4 | 0.93-0.98 |
+| canvas isolate + row `border-bottom` | 44.9 / 51.1 / 53.0 | 34.0 / 30.2 / 28.2 | 11 / 6 / 2 | 0.97-0.98 |
+| canvas isolate + rows `content-visibility:auto` | 46.2 / 50.5 / 50.2 | 38.2 / 32.6 / 33.2 | 27 / 10 / 15 | 0.93-0.98 |
+| header `will-change:auto` + canvas `contain:layout paint` | 48.5 / 53.4 / 50.5 | 33.2 / 28.2 / 30.2 | 12 / 3 / 3 | 0.94-0.99 |
+| **header `will-change:auto` + no borders** | 56.3 / 59.3 / 57.0 | 26.2 / 23.0 / 25.4 | 3 / 0 / 2 | 0.98-0.99 |
+| canvas `contain:layout paint` + no borders | 54.3 / 56.0 / 54.6 | 26.6 / 25.0 / 26.4 | 4 / 0 / 5 | 0.93-0.95 |
+
+Overscan, `TRACE=1` (`__kiraScrollTrace` on, both axes changed together via scratch flags):
+
+| Variant | fps (3 runs) | p95 ms | >50 ms | uncovered frames | renderMs p95 max |
+|---|---|---|---|---|---|
+| base, 560 px | 30.5 / 32.4 / 31.4 | 67.8 / 61.6 / 64.8 | 678 / 452 / 553 | 0 of ~1770 | 3.0 |
+| base, 480 px | 31.8 / 33.3 / 33.3 | 64.0 / 60.2 / 59.2 | 534 / 353 / 408 | 0 | 3.0 |
+| base, 400 px | 35.1 / 37.0 / 35.6 | 54.8 / 50.0 / 53.6 | 213 / 89 / 170 | 0 | 3.0 |
+| canvas `contain`, 560 px | 50.4 / 54.1 / 51.5 | 30.2 / 26.8 / 29.2 | 5 / 1 / 1 | 0 of ~2060 | 4.0 |
+| canvas `contain`, 400 px | 52.6 / 55.1 / 49.9 | 28.0 / 26.0 / 31.0 | 1 / 3 / 9 | 0 | 3.0 |
+
+- Overscan only helps while the layer bug is live (fewer runway rows overlap the header strip:
+  +4.6 fps at 400 px). With the layer fix it gains nothing measurable (+0.5 fps, inside spread).
+  Uncovered px stayed 0 in every run: the synthetic wheel flick never outruns the runway here, so
+  the late-data risk cannot be seen in headless WPE. Verdict: do not cut overscan.
+- Borders: worth ~+5-7 fps on top of either layer fix. Neither replacement measured is cheaper:
+  inset `box-shadow` per cell is far worse (runs never finished), row `border-bottom` gives back
+  only part of the gain on top of isolation and nothing alone.
+- JS per render is not a factor: `renderMs` p95 is 3 ms in every trace run, including everything
+  `onGridRendered` does (`refreshSelEdges`/`refreshStagedLayer` `setCellCssStyles` layers,
+  `placeNavButtonsForRenderedCells` scan, `tagRenderedRows`). Nav buttons: 0 mounted (fixture has no
+  FK/PK meta), not measured. Cell `display:flex`, hover rule: 0.
+
+### R2.5 Step 3: memory (WPE process RSS, interim)
+
+`RSS=1`: all WebKit processes' RSS sampled every 100 ms (`RssSampler`). Rise = flick peak minus
+pre-ladder value. Linux software compositing keeps layer backing stores in process memory, so RSS
+sees them here; on macOS `ps` does not (IOSurface), use footprint.
+
+| Variant | pre -> peak MB (3 runs) | rise MB | fps |
+|---|---|---|---|
+| base | 626->806, 618->817, 625->824 | 180 / 199 / 199 | 31.9 / 32.5 / 31.8 |
+| header `will-change:auto` | 621->704, 620->707, 619->703 | 83 / 87 / 84 | 53.3 / 52.1 / 50.4 |
+| canvas `contain:layout paint` | 617->703, 622->712, 624->717 | 86 / 90 / 93 | 52.3 / 53.4 / 50.8 |
+| both | 622->695, 623->707, 618->713 | 73 / 84 / 95 | 52.1 / 53.1 / 54.0 |
+| canvas isolate + no hover + no borders | 614->700, 613->702, 616->697 | 86 / 89 / 81 | 53.7 / 56.2 / 54.8 |
+| stock, all app factors (frozen, app CSS incl. header `will-change`) | 407->460, 407->449, 401->454 | 53 / 42 / 53 | 59.2 / 57.5 / 59.7 |
+| stock, same, header `will-change:auto` | 405->452, 395->451 | 47 / 56 | 61.5 / 60.6 |
+| stock plain | 381->453, 382->450 | 72 / 68 | 61.0 / 59.8 |
+
+- Either layer fix cuts scroll-time RSS growth from ~193 MB to ~86 MB (-55 %), every run. That is
+  per-row layer backing store, gone. On a Retina Mac each row layer is backed at 2x, so the share of
+  the user's 1 GB+ plateau it explains could be larger; only a Mac footprint run can say (R2.7).
+- Residual versus stock: ~+35 MB rise, ~+215 MB baseline (the whole app versus a bare page; not
+  grid-attributable).
+- No variant returns to baseline within 3 s in WPE ("end" stays near peak), stock included.
+- Stock pays nothing for the same header `will-change`. Why stock rows do not get per-row layers
+  is still open (R2.8).
+
+### R2.6 Ranked causes (round 2)
+
+1. **Header strip `will-change: transform` + rows painted outside a canvas stacking context.**
+   Either side fixes it: header `will-change:auto` +19 fps, canvas `contain:layout paint` +18.6,
+   canvas `isolation:isolate` +15. Frames over 50 ms -97..-99 %. Scroll RSS growth -55 %.
+2. **Per-cell borders.** +4.5 fps alone, +5-7 fps on top of cause 1. Best measured app variant:
+   header `will-change:auto` + no borders, 56.3-59.3 fps, p95 23-26 ms: at stock level (57-61).
+3. Overscan 560 -> 400: +4.6 fps only while cause 1 is live; 0 after. Not a fix.
+
+No gain: viewport/pane/host isolation, hover rule, cell flex, per-render JS.
+
+### R2.7 Fix list
+
+1. `apps/kira-studio/frontend/src/views/shared/slick/slickTheme.css`, `.slick-grid-host
+   .grid-canvas`: add `contain: layout paint`. Shared with the console grid. Fixes cause 1 from
+   the row side, keeps the header's horizontal-scroll layer. Risk: low-medium. `contain: paint`
+   clips to the canvas box; the canvas is the full scroll height and width, so nothing inside it
+   is clipped in practice. Inline editor stays inside its row already. Check: drag-select
+   autoscroll, `FkPreviewPopover` (portal), the range decorator, `tests/visual` data-view, and
+   `slick-grid.spec.ts`/`scroll-trace.spec.ts`. `isolation: isolate` is the lower-risk fallback
+   (no clip; measured 3-6 fps less).
+2. Same file, `.slick-grid-host .slick-header-columns { will-change: transform }`: drop it, or keep
+   it only with fix 1. Alone it gives the same gain, but it was added for horizontal-scroll header
+   repaint (P22 §14.2, 91 % fewer header paints in Chromium). Not re-measured here. Risk: medium,
+   regresses horizontal header flicker unless re-measured. Prefer fix 1, then A/B dropping this on
+   the Mac.
+3. Same file, `.slick-grid-host .slick-cell` borders: +5-7 fps on top of fix 1, but no cheaper
+   equivalent found (inset `box-shadow` much worse, row `border-bottom` partial). Needs a design
+   call (e.g. column separators only in the header, horizontal rules only). Risk: visual.
+4. No overscan change. No JS change in `onGridRendered`/`placeNavButtonsForRenderedCells`/
+   `setCellCssStyles` layers.
+
+### R2.8 Mac A/B: Web Inspector snippets
+
+Run in the real app's Web Inspector console (dev build: View -> Open DevTools; `bun run
+dev:studio` also exposes `__kiraScrollTrace`). Each line toggles one hypothesis: first call
+inserts the stylesheet, second call removes it. Paste the helper once:
+
+```js
+window.kiraAB = (id, css) => { const o = document.getElementById(id); if (o) { o.remove(); return `${id} OFF`; } const s = document.createElement('style'); s.id = id; s.textContent = css; document.head.append(s); return `${id} ON`; };
+```
+
+```js
+kiraAB('ab-hdr-wc', '.slick-grid-host .slick-header-columns{will-change:auto !important}');   // H1 header strip layer off
+kiraAB('ab-canvas-contain', '.slick-grid-host .grid-canvas{contain:layout paint}');          // H2 canvas contain (fix 1)
+kiraAB('ab-canvas-iso', '.slick-grid-host .grid-canvas{isolation:isolate}');                 // H3 canvas stacking context
+kiraAB('ab-no-borders', '.slick-grid-host .slick-cell{border-right:none !important;border-bottom:none !important}'); // H4 borders off
+```
+
+Late-cell trace around each toggle (dev build only):
+
+```js
+__kiraScrollTrace.start();   // then one hard two-finger flick, wait for momentum to stop
+(r => ({ uncoveredP95: r.summary.uncoveredPx.p95, uncoveredMax: r.summary.uncoveredPx.max, gapFrames: r.frames.filter(f => f.pxPerFrame > 0 && f.uncoveredPx > 0).length, frameP95: r.summary.frameMs.p95 }))(__kiraScrollTrace.stop())
+```
+
+Protocol, per hypothesis (H0 = nothing on, then H1, H2, H3, H4, then H2+H4):
+
+1. Open a 10 000-row page, 20+ columns, scroll to the top. Toggle the snippet.
+2. Web Inspector -> Layers tab (enable it under the tab bar's "+" if hidden). Scroll a little and
+   note layer count and total layer memory. Expectation if R2.3 holds on macOS: H0 shows dozens of
+   `slick-row` layers; H1/H2/H3 show one canvas layer.
+3. Activity Monitor -> Memory, the app's web content process ("... Web Content"): note value at
+   rest, then hold a sustained two-finger scroll for 10 s and note the plateau. Or the committed
+   footprint harness (`apps/kira-studio/frontend/proto/grid/mac/`, P163 §8.3) on
+   `slick.html?variant=kira`, which imports the same `slickTheme.css`: prepend one line to the
+   driver, e.g. `(echo "document.head.append(Object.assign(document.createElement('style'),{textContent:'.slick-grid-host .grid-canvas{contain:layout paint}'}));"; cat driver.js) > /tmp/driver-h2.js`,
+   and compare `FOOTPRINT` peaks against the unmodified driver.
+4. Run the trace snippet over one hard flick; note `gapFrames`/`uncoveredMax` (late cells) and
+   `frameP95`.
+5. Remove the snippet (same call) before the next one. Reload between hypotheses if numbers drift.
+
+Report per hypothesis: layer count, footprint plateau, gap frames, frame p95.
