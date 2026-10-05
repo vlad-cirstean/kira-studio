@@ -29,7 +29,7 @@ const DAY_MS = 86_400_000;
 // -------------------------------------------------------------------------------------------------
 
 /** Cap on a task's span; an older stored estimate can exceed the bound the API now enforces. */
-export const MAX_SPAN_DAYS = 60;
+const MAX_SPAN_DAYS = 60;
 
 export function parseEst(
   raw: string,
