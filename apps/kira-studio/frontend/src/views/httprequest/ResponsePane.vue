@@ -18,7 +18,6 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { beautifyJson, beautifyXml } from '../../beautify';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
@@ -34,6 +33,7 @@ import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
 import { useHttpRequestViewStore } from './state';
 import TimelinePane from './TimelinePane.vue';
+import { useResponseBody } from './useResponseBody';
 
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const httpRequestViewStore = useHttpRequestViewStore();
@@ -128,31 +128,18 @@ function viewTimeline(): void {
   setResponsePane('timeline');
 }
 
-// P21 round 2 performance finding 7: the previous shape (a round-2-review-finding-8 fix) cached
-// jsonResult/xmlResult as their own computed()s so prettyFormat and bodyText below would share one
-// parse instead of two — but a Vue computed retains whatever its arrow function *returns*, and
-// beautifyJson/beautifyXml's return value is `{ text, ok, reason? }`: the full pretty-printed
-// string, not just the boolean prettyFormat actually needed. Reading jsonResult.value.ok (from
-// prettyFormat, on every render of the toolbar toggle) was therefore enough to keep the *entire*
-// pretty-printed body — ~1.3x the raw body's own size, un-budgeted, on top of the raw body itself
-// — retained for as long as `response` stayed the current one, including while Raw view is
-// selected or a different pane entirely is showing. prettyFormat now only ever returns 'json' |
-// 'xml' | null, so the large `.text` string beautifyJson/beautifyXml also compute is discarded the
-// instant this computed's own function returns; bodyText below re-parses to get `.text` only when
-// pretty view is the one actually being rendered, at the cost of a second parse in that case
-// (bytewise no worse than the parse this file already ran per render before finding 8's own
-// caching existed) in exchange for never retaining the pretty text outside that view.
-const prettyFormat = computed<'json' | 'xml' | null>(() => {
-  const body = response.value?.body;
-  if (body === undefined) return null;
-  if (beautifyJson(body, 'indented').ok) return 'json';
-  // The `<…>` bracket check mirrors celleditor/detect.ts's own detectXml gate: an XML parse alone
-  // accepts plain text with no tags at all (a valid, tag-less node list), so without it every
-  // plain-text response would misreport as XML.
-  const t = body.trim();
-  if (t.length === 0 || t[0] !== '<' || t[t.length - 1] !== '>') return null;
-  return beautifyXml(body, 'indented').ok ? 'xml' : null;
-});
+// Format detection and pretty text come from one worker pass per received body (P21 finding 7
+// still holds: the pretty text is retained only while Pretty view is selected). `format` is
+// `undefined` while pending.
+const {
+  format: prettyFormat,
+  bodyText,
+  pending: bodyPending,
+  formatting: bodyFormatting,
+} = useResponseBody(
+  response,
+  computed(() => props.tab.state.responseView),
+);
 
 const RESPONSE_VIEW_OPTIONS = [
   { value: 'pretty' as const, label: 'Pretty', testid: 'http-response-view-pretty' },
@@ -176,24 +163,8 @@ const redirectCaption = computed(() => {
   return `${n} redirect${n === 1 ? '' : 's'} → ${r.finalUrl}`;
 });
 
-// D12/D13: a view toggle, never an edit — Pretty renders beautifyJson/beautifyXml(raw, 'indented')
-// depending on prettyFormat, Raw renders the bytes exactly as received. Neither ever mutates
-// response.body itself (it is read-only runtime state, D6), so switching back to Raw always shows
-// what the server actually sent.
-//
-// Finding 7 (continued): this re-parses rather than reading a cached jsonResult/xmlResult, and
-// deliberately so — this computed only ever runs (and only ever retains its own return value, the
-// pretty string) while pretty view is the one actually selected, which is exactly the lifetime the
-// pretty text should be retained for.
-const bodyText = computed(() => {
-  const r = response.value;
-  if (!r) return '';
-  if (props.tab.state.responseView === 'pretty') {
-    if (prettyFormat.value === 'json') return beautifyJson(r.body, 'indented').text;
-    if (prettyFormat.value === 'xml') return beautifyXml(r.body, 'indented').text;
-  }
-  return r.body;
-});
+// D12/D13: a view toggle, never an edit — Pretty shows the formatted body, Raw the bytes exactly
+// as received. Neither ever mutates response.body itself (it is read-only runtime state, D6).
 
 // P8 D10: the two storage notices — only meaningful while viewing a stored entry (the live
 // response carries neither flag). Separate from, and additional to, bodyTruncated's own transfer
@@ -490,6 +461,15 @@ onUnmounted(() => {
         >
           {{ response.bodyBytes }} bytes of binary data
         </span>
+        <template v-else-if="bodyPending">
+          <span
+            v-if="bodyFormatting"
+            class="text-kira-sm text-muted-foreground p-1.5"
+            data-testid="http-response-formatting"
+          >
+            Formatting response…
+          </span>
+        </template>
         <MonacoHost
           v-else
           ref="bodyHostRef"
