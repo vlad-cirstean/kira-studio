@@ -124,6 +124,8 @@ type TaskBoard struct {
 	stepMsgs  map[string]string      // task|stage|step -> the Run dialog's edited message
 	agent     *adeagent.Server
 	wg        sync.WaitGroup // background setups and runs; Close waits
+	closeMu   sync.Mutex     // orders goTracked's wg.Add before Close's wg.Wait
+	closed    bool
 
 	ghMu      sync.Mutex             // guards ghLocks, ghPending
 	ghLocks   map[string]*sync.Mutex // branch id -> serializes its GitHub sync
@@ -151,6 +153,11 @@ func NewTaskBoard(deps TaskBoardDeps) *TaskBoard {
 
 // goTracked runs fn in the background; Close waits for it.
 func (b *TaskBoard) goTracked(fn func()) {
+	b.closeMu.Lock()
+	defer b.closeMu.Unlock()
+	if b.closed {
+		return
+	}
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
@@ -161,6 +168,13 @@ func (b *TaskBoard) goTracked(fn func()) {
 // Close stops pending work and releases the Conn.
 func (b *TaskBoard) Close() {
 	b.cancel()
+	b.closeMu.Lock()
+	b.closed = true
+	b.closeMu.Unlock()
+	// Stop the MCP server first: a late finish_step must not start work after wg.Wait returns.
+	if err := b.agent.Close(); err != nil {
+		slog.Warn("ade: close agent server", "scope", "ade", "err", err)
+	}
 	b.mu.Lock()
 	if b.boardTimer != nil {
 		b.boardTimer.Stop()
@@ -171,9 +185,6 @@ func (b *TaskBoard) Close() {
 	b.mu.Unlock()
 	b.stopWatchers()
 	b.wg.Wait()
-	if err := b.agent.Close(); err != nil {
-		slog.Warn("ade: close agent server", "scope", "ade", "err", err)
-	}
 	b.conn.Close()
 }
 

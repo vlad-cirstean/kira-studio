@@ -27,6 +27,9 @@ func (b *TaskBoard) launchGate(ctx context.Context, tc *taskCtx, sb model.AdeTas
 	if sb.Name == "" {
 		return "", invalid("the branch of %s is not created yet", b.repoNick(tc, sb))
 	}
+	if err := b.checkNotArchiving(tc.task.ID); err != nil {
+		return "", err
+	}
 	setups, err := b.deps.Tasks.SetupByBranch()
 	if err != nil {
 		return "", err
@@ -280,6 +283,9 @@ func (b *TaskBoard) tuiBound(runID string) bool {
 
 // applyTUIFinish applies a finish_step call of a taken-over run at call time (R14).
 func (b *TaskBoard) applyTUIFinish(runID, status, summary string) {
+	if b.ctx.Err() != nil {
+		return
+	}
 	run, err := b.deps.Tasks.GetRun(runID)
 	if err != nil {
 		slog.Warn("ade: taken-over finish", "scope", "ade", "run", runID, "err", err)
