@@ -23,7 +23,8 @@ Review of plan `P168-part3-sql-adapters.md`. Report only; nothing fixed. One Son
 
 ## Findings (ranked)
 
-Block 1 (core) findings below. Engine findings follow in the block 2 commit.
+13 findings: high 3 (F1-F3), medium 3 (F4-F6), low 7 (F7-F13). F1-F4 are rooted in the core;
+F5-F13 in the engines. None needs a design decision beyond the fix named.
 
 ### F1 (high) Postgres read-only console escapes the read-only wrap
 
@@ -125,6 +126,140 @@ Fix: decode each keyset value by its column's type class before binding (binary 
 column keyset-ineligible in `ComputeEffectiveOrder` (offset fallback). Add a binary-PK keyset
 scenario to each relational conformance suite.
 
+### F5 (medium) A cancelled catalog query kills the pinned connection for good
+
+`SA/postgres/catalog.go:25-48` (`execFor`), `SA/mysqlfamily/catalog.go:20-44` (`execFor`),
+`SA/postgres/client.go:283-312`, `SA/mysqlfamily/client.go:366-392` (`Acquire`).
+
+Catalog queries (tree, Describe, Definition, SchemaColumns, `getReadTarget` inside Read and
+Mutate, the Connect probe) pass the op's own ctx straight to the driver; only the data/console
+paths use `RunWithAbortRace`. On cancel, pgx v5.11's default `DeadlineContextWatcherHandler` sets a
+socket deadline and `ResultReader.receiveMessage` calls `asyncClose()`; go-sql-driver closes its
+netConn. `ConnSet` never checks liveness, so the dead `*pgx.Conn` / `*sql.Conn` stays the entry for
+that database.
+
+Scenario (confirmed, real adapter): cancel an `execFor` query mid-flight (Stop on a slow tree
+expand or Describe, or the frame session closing). The next `Children` on the same database fails
+with `failed to deallocate cached statement(s): conn closed` (PG 17) or `driver: bad connection`
+(MySQL 8.4, MariaDB 11.4), and keeps failing until the user reconnects.
+
+Fix: route `execFor` through `RunWithAbortRace` + `track()` like `runArrayQuery` (cancel stays
+server-side via `Cancel`), and make `Acquire` drop and re-dial an entry whose connection is closed
+(`conn.IsClosed()` for pgx; `driver.ErrBadConn` / `Conn.PingContext` for mysql). Add a
+cancel-then-reuse scenario to both conformance suites.
+
+### F6 (medium) Per-connection lock ignores ctx: Stop on a queued op and teardown both block unbounded
+
+`SA/postgres/client.go:232-236` (eviction/`CloseAll` `Close`), `SA/postgres/client.go:293,303-310`
+(`Acquire`), `SA/mysqlfamily/client.go:270-275,376,385-390`, `SA/relational/connstate.go:32-51`.
+
+`connEntry.mu` is a `sync.Mutex` held for an op's whole duration, including the release's
+`inFlight.Wait()` for a background query that `RunWithAbortRace` already abandoned. Three waits on
+it take no ctx: `Acquire` (a queued op), LRU eviction `Close` inside another op's `Get`, and
+`CloseAll` inside `Disconnect`.
+
+Scenario: the server becomes unreachable mid-query (VPN drop, laptop sleep). `Disconnect` runs
+`Cancel`, whose side dial fails after `connectTimeout`; `Drain` returns at ctx; `CloseAll` then
+blocks on `e.mu`, held by the op whose detached-ctx query waits on a dead socket until TCP
+keepalive gives up (pgx dialer keepalive 5 min, many minutes total). `Router.Disconnect` and a
+reconnect's `Router.Connect` (teardown is inline at `adapterhost/router.go:156-157`) hang far past
+`disconnectTimeout`; Part 2's `connections.Service.abortInFlight` waits unbounded on that Connect,
+so Disconnect/Remove/Update of the connection hang too. Same lock: pressing Stop on a Read queued
+behind a long query does nothing until that query ends. Not reproduced (needs a partition); traced
+from code.
+
+Fix: replace `connEntry.mu` with a 1-slot channel semaphore acquired via `select` on ctx (Acquire
+returns `CheckCancelled`); in `Close`, wait for the semaphore with a bound, then close the socket
+regardless (`PgConn().Conn().Close()` / `connEntry.db.Close()` are safe to call concurrently and
+unblock the stuck reader).
+
+### F7 (low) Server-side cancel can hit the next op's query on the same connection
+
+`SA/postgres/adapter.go:386-410`, `SA/mysqlfamily/adapter.go:373-397`.
+
+`Cancel` pops the backend pid / thread id, then dials a side connection, then cancels whatever
+that backend runs at that moment. If the targeted query finishes in the dial window (a TLS dial
+over WAN is tens of ms) and its op releases the entry, the next queued op starts on the same
+backend and gets `pg_cancel_backend` / `KILL QUERY` instead. The other op reports `E_CANCELLED`
+for a Stop the user never pressed.
+
+Fix: have the entry's release wait for an in-progress Cancel aimed at it (record "cancel in
+flight" on the entry under the tracker lock; `Acquire`'s release blocks on it), or on Postgres use
+`SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE pid = $1 AND query_start = $2` with the
+start time captured when the query was tracked.
+
+### F8 (low) sqlite `inFlight.Add` has no draining guard
+
+`SA/sqlite/adapter.go:150-160` (Disconnect's waiter), `SA/sqlite/adapter.go:180-217`
+(`runOnConn`).
+
+`runOnConn` calls `a.inFlight.Add(1)` with no lock and no draining check, while `Disconnect`'s
+goroutine may be in `inFlight.Wait()`. This is the exact `sync.WaitGroup` misuse P108 F3 fixed in
+`QueryTracker` (`draining` flag) but sqlite kept its own counter. An op that resolved the adapter
+before `takeLiveAdapterForTeardown` removed it can start after Disconnect began: worst case the
+`WaitGroup` panics ("Add called concurrently with Wait"), otherwise it runs on a DB whose close is
+pending.
+
+Fix: reuse `QueryTracker`'s pattern: a `draining` flag checked and `Add` done under `a.mu`, refuse
+new work with `E_CONNECT` once draining.
+
+### F9 (low) sqlite `Connect` ignores ctx
+
+`SA/sqlite/adapter.go:66-120`.
+
+`Connect(_ context.Context, …)` runs `db.Conn` and three probes on `context.Background()`. Each
+probe can wait the 5 s busy timeout on a locked file, and a file on a hung network mount blocks
+indefinitely. Part 2's `abortInFlight` waits on Connect with no bound, so Disconnect/Remove/Update
+of that connection wait too.
+
+Fix: pass ctx to `db.Conn` and `runRows`; on ctx error run the existing cleanup path.
+
+### F10 (low) Postgres definition emits a stray sequence for identity columns
+
+`SA/postgres/definition.go:175-200` (`fetchSerialSequences`), used by `buildTableStatements`.
+
+The doc comment says `pg_get_serial_sequence` returns NULL for an identity column; it returns the
+identity sequence (confirmed PG 17: `public.ident_id_seq`). The generated DDL then has
+`CREATE SEQUENCE public.ident_id_seq`, the identity column, and `ALTER SEQUENCE … OWNED BY`.
+Replayed, it succeeds but leaves an unused extra sequence (the identity gets `ident_id_seq1`), so
+the "Open definition" text does not reproduce the table.
+
+Fix: add `AND a.attidentity = ''` to the query and correct the comment.
+
+### F11 (low) ClickHouse reads a literal `ᴺᵁᴸᴸ` string as NULL
+
+`SA/clickhouse/query.go:31-43` (`nullSentinel`, `decodeRow`).
+
+`JSONCompactStrings*` renders NULL as `ᴺᵁᴸᴸ`, and a real string with that text renders the same
+(confirmed CH 26.3: rows `(1, NULL)` and `(2, 'ᴺᵁᴸᴸ')` both come back `"ᴺᵁᴸᴸ"`). The grid shows
+NULL for a non-NULL value. Exotic input, but the doc comment's "can't collide" is wrong.
+
+Fix: for Nullable columns select an extra `isNull(col)` flag (read path knows the types), or
+switch to a typed JSON format where NULL is JSON `null`. At minimum, correct the comment.
+
+### F12 (low) ClickHouse console: a leading `#` comment drops the result and buffers it all
+
+`SA/clickhouse/console.go:92-99` (`leadingCommentRE`, `isRowReturning`),
+`SA/clickhouse/query.go:171-188` (`RunCommand`).
+
+ClickHouse accepts `#` comments (confirmed: `# note\nSELECT 42` returns 42). `leadingCommentRE`
+skips only `--` and `/* */`, so `# fetch\nSELECT * FROM big` is routed to `RunCommand`, which
+`io.ReadAll`s the entire result into memory, discards it, and reports `0 row(s) written`. Same for
+a parenthesised `(SELECT …)` or a FROM-first `FROM t SELECT …`.
+
+Fix: add `#[^\n]*\n` to `leadingCommentRE` and `\(`/`FROM` to `rowReturningRE`; in `RunCommand`
+drain the body with `io.Copy(io.Discard, …)` instead of buffering it.
+
+### F13 (low) ClickHouse query params reject tab/newline in identifiers
+
+`SA/clickhouse/query.go:77-79` (`escapeParamValue`).
+
+Param values are parsed as TSV-escaped text; only backslash is escaped. A raw tab or newline stops
+the parse (confirmed CH 26.3: `param_x=a%09b` → `BAD_QUERY_PARAMETER … only 1 of 3 bytes was
+parsed`). A database/table name containing either fails every catalog lookup, Describe and Count.
+
+Fix: also escape `\t`, `\n`, `\r` (as `\\t`, `\\n`, `\\r`) after the backslash pass.
+
 ## Coverage
 
 ### Block 1: core (`SA/*.go`, `SA/relational`) (reviewed)
@@ -139,7 +274,7 @@ Leads checked, no finding:
   always builds a new adapter (`CreateAdapter`) and removes the old one from the live map first,
   so no op registers on a drained tracker.
 - `TrackerFor` no-op release while draining: only an op already holding the old adapter can hit
-  it; its query still runs on a connection `CloseAll` then waits for (see F6 in block 2).
+  it; its query still runs on a connection `CloseAll` then waits for (see F6).
 - `RunSQLMutation`: rollback on every early return incl. failed COMMIT; each engine's rollback
   detaches ctx (`WithoutCancel` + 5 s).
 - `ValidateRequestedTerms` reached by every engine's structured sort (PG/MySQL/SQLite through
@@ -150,3 +285,29 @@ Leads checked, no finding:
   `recover()` covering `Preview`.
 - Missing unit tests for `Guarded`, `ParseSSLMode`, `relational.Disconnect`: bodies are trivial,
   under the `CLAUDE.md` unit-test bar; not a finding.
+
+### Blocks 2-5: engines (reviewed)
+
+- **postgres** (all 10 files): `adapter, caps, catalog, client, console, definition, errors,
+  mutate, query, read`. Findings F1, F5, F6, F7, F10. Checked, no finding: `buildConfig` clears
+  `Fallbacks` on override; `verify-ca` chain check; `statement_timeout=0`; read path runs
+  `AssertNoHiddenStatement` on filter and text sort for read-only; definition quotes every name
+  via `format('%I')`; `mapError` keeps pgx's redacted config error.
+- **mysqlfamily, mysql, mariadb** (all 16 files). Findings F2, F5, F6, F7. Checked, no finding:
+  `MultiStatements=false`, `ClientFoundRows=true`, URI query keys never reach driver `Params`,
+  TLS registry names bounded per mode/host, `KILL QUERY` side connection unprivileged for own
+  thread, definition quotes with backticks, binary cells decoded on mutate.
+- **sqlite** (all 10 files). Findings F8, F9. Lead refuted: `buildDSN` concatenation is safe
+  because `rejectDSNMetacharacters` refuses `?`, `#`, `%` first; modernc v1.58 honours
+  `_query_only`, `_busy_timeout`, `_foreign_keys`, `_txlock`, `mode`. `mode=ro` makes ATTACH
+  inherit read-only. `assertSingleStatement` fails closed. Mutate rollback detached.
+- **clickhouse** (all 10 files). Findings F11, F12, F13. Leads refuted (CH 26.3): `readonly=2`
+  cannot be lowered by `SETTINGS readonly=0` (Code 164); credentials travel only in
+  `X-ClickHouse-User`/`Key` headers, never URL or error text; catalog SQL binds every name as
+  `{x:String}`; `KILL QUERY … SYNC` is bounded by Disconnect's ctx and covers in-flight streams
+  after `CloseIdleConnections`; unbracketed IPv6 host in `OpenClient`'s URL still dials correctly
+  (Go splits on the last colon). TLS modes all verify certificates (stricter than pg/mysql
+  `require`), documented as D12.
+- Connect promptness (plan §5.1, Part 2 `abortInFlight`): postgres/mysqlfamily dial with ctx and
+  `connectTimeout` 10 s; clickhouse probe is `RunWithAbortRace` on ctx; sqlite is F9; reconnect
+  teardown is F6.
