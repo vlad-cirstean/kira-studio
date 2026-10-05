@@ -409,7 +409,8 @@ func (r *ConnectionsRepo) Delete(connID string) error {
 	return nil
 }
 
-// Reorder writes sort_order = index for each id in one transaction, then returns List().
+// Reorder applies ids as the new order in one transaction (rows ids omits follow, in their existing
+// order; an unknown id is an error), keeping sort_order dense, then returns List().
 func (r *ConnectionsRepo) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 	tx, err := r.DB.Begin()
 	if err != nil {
@@ -417,10 +418,12 @@ func (r *ConnectionsRepo) Reorder(ids []string) ([]model.ConnectionSummary, erro
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	for i, connID := range ids {
-		if _, err := tx.Exec(`UPDATE connections SET sort_order = ? WHERE id = ?`, i, connID); err != nil {
-			return nil, fmt.Errorf("repos/connections: reorder %s: %w", connID, err)
-		}
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM connections ORDER BY sort_order, name, id`,
+		`UPDATE connections SET sort_order = ? WHERE id = ?`,
+		ids,
+	); err != nil {
+		return nil, fmt.Errorf("repos/connections: reorder: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("repos/connections: commit reorder: %w", err)

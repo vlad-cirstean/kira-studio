@@ -57,3 +57,35 @@ func TestThrottlePerSecRoundTrips(t *testing.T) {
 		t.Errorf("default ThrottlePerSec = %v, want 0", defaulted.ThrottlePerSec)
 	}
 }
+
+// TestReorderKeepsSortOrderDenseAndRejectsUnknownIDs is P168 Part 2 F10: a list that omits a row
+// (made since the caller read it) must not collide with it, and an unknown id must not write.
+func TestReorderKeepsSortOrderDenseAndRejectsUnknownIDs(t *testing.T) {
+	connRepo := &repos.ConnectionsRepo{DB: newRepos(t).DB}
+	for _, id := range []string{"a", "b", "c"} {
+		if _, err := connRepo.Insert(id, model.ConnectionFields{
+			Name: id, Kind: "postgres", Color: "blue", Mode: "fields", Options: map[string]any{},
+		}, kiratime.NowISO()); err != nil {
+			t.Fatalf("Insert %s: %v", id, err)
+		}
+	}
+
+	if _, err := connRepo.Reorder([]string{"c", "ghost"}); err == nil {
+		t.Fatal("Reorder with an unknown id succeeded, want an error")
+	}
+
+	list, err := connRepo.Reorder([]string{"c"})
+	if err != nil {
+		t.Fatalf("Reorder: %v", err)
+	}
+	var order []string
+	for i, c := range list {
+		order = append(order, c.ID)
+		if c.SortOrder != i {
+			t.Errorf("%s sort_order = %d, want %d (dense)", c.ID, c.SortOrder, i)
+		}
+	}
+	if got := order; len(got) != 3 || got[0] != "c" {
+		t.Errorf("order = %v, want c first and every row kept", got)
+	}
+}

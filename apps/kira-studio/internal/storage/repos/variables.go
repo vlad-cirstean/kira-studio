@@ -280,10 +280,12 @@ func (r *VariablesRepo) ReorderEnvironments(ids []string) error {
 		return fmt.Errorf("repos/variables: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE api_environments SET sort_order = ? WHERE id = ?`, order, id); err != nil {
-			return fmt.Errorf("repos/variables: reorder environment %s: %w", id, err)
-		}
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM api_environments ORDER BY sort_order, created_at, id`,
+		`UPDATE api_environments SET sort_order = ? WHERE id = ?`,
+		ids,
+	); err != nil {
+		return fmt.Errorf("repos/variables: reorder environments: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos/variables: commit: %w", err)
@@ -698,7 +700,8 @@ func reindexVariables(tx *sql.Tx, scope model.VariableScope, ownerID string) err
 // Reorder rewrites one scope's sort_order dense, in the order ids names — ConnectionsService.
 // Reorder's own "here is the new order, in full" shape (D14).
 func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids []string) error {
-	if _, err := scopeColumn(scope); err != nil {
+	column, err := scopeColumn(scope)
+	if err != nil {
 		return err
 	}
 	tx, err := r.db.Begin()
@@ -706,10 +709,12 @@ func (r *VariablesRepo) Reorder(scope model.VariableScope, ownerID string, ids [
 		return fmt.Errorf("repos/variables: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	for order, id := range ids {
-		if _, err := tx.Exec(`UPDATE api_variables SET sort_order = ? WHERE id = ?`, order, id); err != nil {
-			return fmt.Errorf("repos/variables: reorder %s: %w", id, err)
-		}
+	if err := sqlitex.ReorderSortOrder(tx,
+		`SELECT id FROM api_variables WHERE `+column+` = ? ORDER BY sort_order, created_at, id`,
+		`UPDATE api_variables SET sort_order = ? WHERE id = ?`,
+		ids, ownerID,
+	); err != nil {
+		return fmt.Errorf("repos/variables: reorder: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("repos/variables: commit: %w", err)
