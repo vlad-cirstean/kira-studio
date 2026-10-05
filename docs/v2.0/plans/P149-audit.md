@@ -22,7 +22,23 @@ Bindings regenerated first (`wails3 task common:generate:bindings`): no diff.
 | `bun run lint:all` | pass | rc 0 (knip prints 9 configuration hints, no findings) |
 | `bun run test:unit` | pass | `1764 pass, 0 fail, 14799 expect() calls, 180 files` |
 
-(UI, visual, webview and Studio suites are appended below as they finish.)
+| `bun run test:ui:space` | 153 pass, 1 fail | `ade-v2-dialogs.spec.ts:163 Details lists Merge and Re-merge ... expect(getByText('Right-click to re-merge.')).toBeVisible() failed`. Predates P149 (`git diff --stat B0` touches no ade file). Reproduced alone in 1 of 3 runs: a flaky hover (panel opening re-lays the row out under the pointer). Fixed in `fix` commit below (R4). |
+| `bun run test:visual:space` | 3 pass, 1 fail | `settings.spec.ts:9 settings dialog: Advanced pane`, `1227 pixels (ratio 0.01) are different`. Not font drift: the diff image marks only the new `Background agents ignore repo settings` row (P148 B R21 added it; baseline predated it). Only that baseline regenerated, other three untouched (R4). |
+| `bun run test:ui:studio` | 300 pass, 1 fail | `leaks.spec.ts:289 leak sweep ... Test timeout of 120000ms exceeded` (`mouse.move: Page closed`). Passes alone in 34 s, twice. Load timeout while the pre-commit hook ran beside it, Kira Studio subsystem, no defect reproduced: no change, no row (R4). |
+| `bun run test:webview` | pass | `60 passed (26.9s)` |
+| `bun run test:visual:studio` | pass | `14 passed (21.4s)` |
+
+### After the baseline fixes (same tree plus the two test commits)
+
+`ade-v2-dialogs` "Details lists Merge and Re-merge" 6 of 6 runs green alone; `test:visual:space`
+`4 passed`.
+
+Retry review (`2387223f`): accepted as a real spec race, not a masked defect. Clicking the branch row
+opens the panel, which shrinks the plan column; the row (and the `dev ⚠` chip) moves after the
+pointer is already placed. A tooltip opens on `pointerenter`, so a hover issued before the layout
+settles leaves the pointer off the chip and no new enter fires. App behaviour is correct: a real
+user's pointer moves again. `toPass` re-issues the hover on the settled layout. Product code
+unchanged.
 
 ## Audit: SPEC2 coverage (step 2, static)
 
