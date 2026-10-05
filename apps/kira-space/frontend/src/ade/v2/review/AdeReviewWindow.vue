@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { useStorage } from '@vueuse/core';
+import { tryOnScopeDispose, useStorage } from '@vueuse/core';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
+import { queryClient } from '@workbench/state/queryClient';
 import { computed, ref } from 'vue';
+import { onReviewRepaint } from '../../../repo/git/transport';
 import AdePanelResizeHandle from '../panel/AdePanelResizeHandle.vue';
+import { ghSyncPlanPrefix } from '../queries';
 import { useAdeReviewWindowStore } from '../state/adeReviewWindow';
 import AdeReviewAgentPanel from './AdeReviewAgentPanel.vue';
 import AdeReviewFiles from './AdeReviewFiles.vue';
@@ -16,6 +19,16 @@ import { useReviewContext } from './useReviewContext';
 const store = useAdeReviewWindowStore();
 const target = computed(() => store.target);
 const { repoLabel } = useReviewContext(() => store.target as NonNullable<typeof store.target>);
+
+// A mark from the file list or from a diff editor can change what a sync would do.
+function refreshSyncPlan(): void {
+  void queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix });
+}
+tryOnScopeDispose(
+  onReviewRepaint((e) => {
+    if (e.kind === 'mark' && e.repoId === target.value?.gitRepoId) refreshSyncPlan();
+  }),
+);
 
 const LEFT_MIN = 220;
 const LEFT_MAX = 560;
@@ -53,7 +66,7 @@ function commitRight(w: number): void {
         aria-label="Files to review"
         data-testid="ade-review-left"
       >
-        <AdeReviewFiles :target="target" />
+        <AdeReviewFiles :target="target" @marked="refreshSyncPlan" />
       </section>
       <AdePanelResizeHandle
         invert

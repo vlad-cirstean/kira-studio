@@ -15,6 +15,8 @@ import type {
   CreateTaskArgs,
   FocusSessionArgs,
   FolderArgs,
+  GhSyncPlan,
+  GhSyncResult,
   ImportWorkflowArgs,
   LaunchStageArgs,
   LogKind,
@@ -57,6 +59,7 @@ export const backlogKey = ['adetask', 'backlog'] as const;
 export const reposKey = ['adetask', 'repos'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
+export const ghSyncPlanPrefix = ['adetask', 'ghSyncPlan'] as const;
 export const reviewTargetKey = (windowKey: string) =>
   ['adetask', 'reviewTarget', windowKey] as const;
 
@@ -407,5 +410,23 @@ export function useLaunchReviewAgent() {
   return useMutation({
     mutationFn: (args: TaskArgs): Promise<ReviewAgentLaunch> =>
       control.adeTaskLaunchReviewAgent(args),
+  });
+}
+
+/** What a GitHub sync would do for the branch; always re-asked (viewed state changes on GitHub). */
+export function useGhSyncPlan(branchId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: ['adetask', 'ghSyncPlan', branchId] as const,
+    queryFn: (): Promise<GhSyncPlan> =>
+      control.adeTaskGitHubSyncPlan({ branchId: toValue(branchId) }),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useGitHubSyncApply() {
+  return useMutation({
+    mutationFn: (args: BranchArgs): Promise<GhSyncResult> => control.adeTaskGitHubSyncApply(args),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix }),
   });
 }

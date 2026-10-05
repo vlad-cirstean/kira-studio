@@ -6,6 +6,7 @@ import { adeTurns } from './v2/dialog/turnWatch';
 import {
   backlogKey,
   boardKey,
+  ghSyncPlanPrefix,
   logKey,
   prsKey,
   reposKey,
@@ -51,6 +52,7 @@ export function installAdeSignals(queryClient: QueryClient): void {
   control.onAdeTaskBoard(() => {
     void queryClient.invalidateQueries({ queryKey: boardKey, exact: true });
     void queryClient.invalidateQueries({ queryKey: prsKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: ghSyncPlanPrefix });
   });
   control.onAdeTaskBacklog(() => {
     void queryClient.invalidateQueries({ queryKey: backlogKey, exact: true });
