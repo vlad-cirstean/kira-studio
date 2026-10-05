@@ -51,14 +51,14 @@ const xmlOf = (bytes: number): string => {
 const docOf = (bytes: number): string =>
   `{"_id":{"$oid":"000000000000000000000001"},"name":"w","createdAt":{"$date":{"$numberLong":"1704067200000"}},"n":{"$numberInt":"5"},"pad":"${'x'.repeat(bytes)}"}`;
 const shellScriptOf = (bytes: number): string => {
-  const lines: string[] = [];
-  let len = 0;
+  const items: string[] = [];
+  let len = 2;
   for (let n = 0; len < bytes; n++) {
-    const l = `db.widgets.insertOne({ _id: ObjectId("${n.toString(16).padStart(24, '0')}"), name: "w${n}", at: ISODate("2024-01-01T00:00:00Z") })`;
-    lines.push(l);
-    len += l.length + 1;
+    const l = `{ _id: ObjectId("${n.toString(16).padStart(24, '0')}"), name: "w${n}", at: ISODate("2024-01-01T00:00:00Z") }`;
+    items.push(l);
+    len += l.length + 2;
   }
-  return lines.join('\n');
+  return `[${items.join(',\n')}]`;
 };
 
 const KB64 = 64 * 1024;

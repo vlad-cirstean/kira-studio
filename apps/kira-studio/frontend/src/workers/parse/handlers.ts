@@ -1,4 +1,5 @@
 import { beautifyJson, beautifyXml } from '../../beautify';
+import { copyAllDocuments } from '../../views/console/copyAll';
 import { formatConsoleText } from '../../views/console/format';
 import type { JobInput, JobKind, JobOutput, PrettyResult } from './protocol';
 
@@ -21,6 +22,7 @@ type Handler<K extends JobKind> = (input: JobInput<K>) => JobOutput<K> | Promise
 export const handlers = {
   'body.format': ({ body, wantText }) => formatBody(body, wantText),
   'json.beautify': ({ text, mode }) => beautifyJson(text, mode),
+  'ejson.copyAll': ({ format, bodies }) => copyAllDocuments(format, bodies),
   'xml.beautify': ({ text, mode }) => beautifyXml(text, mode),
   'console.format': ({ kind, text }) => formatConsoleText(kind, text),
 } satisfies { [K in JobKind]: Handler<K> };

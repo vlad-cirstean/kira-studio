@@ -32,3 +32,26 @@ export async function copyOrReportError(
     onError(err instanceof Error ? err.message : String(err));
   }
 }
+
+/**
+ * Copies text that is still being produced (an off-thread encode). The clipboard item holds the
+ * pending promise, so the write starts inside the user gesture and WebKit does not reject it
+ * once the text arrives late; falls back to awaiting first where ClipboardItem is missing.
+ */
+export async function copyOrReportErrorLazy(
+  text: Promise<string>,
+  onError: (message: string) => void,
+  onSuccess?: () => void,
+): Promise<void> {
+  try {
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard.write) {
+      await copyText(await text);
+    } else {
+      const blob = text.then((t) => new Blob([t], { type: 'text/plain' }));
+      await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+    }
+    onSuccess?.();
+  } catch (err) {
+    onError(err instanceof Error ? err.message : String(err));
+  }
+}

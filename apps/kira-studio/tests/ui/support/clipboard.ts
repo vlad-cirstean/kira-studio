@@ -6,6 +6,13 @@ import type { Page } from '@playwright/test';
 export async function installClipboardSpy(page: Page): Promise<void> {
   await page.evaluate(() => {
     (window as unknown as { __clipboard: string[] }).__clipboard = [];
+    // Lazy copies (console "Copy all") go through ClipboardItem with a pending blob.
+    navigator.clipboard.write = async (items: ClipboardItem[]) => {
+      for (const item of items) {
+        const blob = await item.getType('text/plain');
+        (window as unknown as { __clipboard: string[] }).__clipboard.push(await blob.text());
+      }
+    };
     navigator.clipboard.writeText = (text: string) => {
       (window as unknown as { __clipboard: string[] }).__clipboard.push(text);
       return Promise.resolve();

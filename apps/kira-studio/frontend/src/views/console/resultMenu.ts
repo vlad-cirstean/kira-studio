@@ -1,6 +1,5 @@
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyOrReportError, copyText } from '@workbench/util/clipboard';
-import { beautifyJson } from '../../beautify';
+import { copyOrReportError, copyOrReportErrorLazy, copyText } from '@workbench/util/clipboard';
 import {
   columnsToTsv,
   disambiguateNames,
@@ -9,12 +8,8 @@ import {
   rowsToJson,
   rowsToTsv,
 } from '../shared/clipboardFormats';
-import {
-  beautifyShellText,
-  toPlainJson,
-  toRelaxedText,
-  toShellText,
-} from '../shared/document/ejson';
+import { toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
+import { type CopyAllFormat, jsonArrayOf, prettyJson } from './copyAll';
 
 // P19 D9/D10: the console result grid's own menu builders, mirroring views/grid/menu.ts's split
 // (builders in a plain module, the host only opens them) -- item ids follow that file's own
@@ -176,28 +171,6 @@ export function tabularColumnMenu(ctx: TabularColumnMenuContext): MenuItem[] {
   ];
 }
 
-// D6: the row's body -- already canonical extended JSON (a Mongo document) or built fresh (a
-// Redis key/value pair) -- re-indented through beautify.ts's JSON scanner, falling back to the
-// raw text if it does not scan (a truncated body, say).
-function prettyJson(text: string): string {
-  const r = beautifyJson(text, 'indented');
-  return r.ok ? r.text : text;
-}
-
-function indented(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => `  ${line}`)
-    .join('\n');
-}
-
-// D6's own "copy all" shape: `[` + every row's (already-pretty) text, comma-joined + `]` -- a
-// plain textual assembly, not a re-parse-and-restringify, so a row whose own text doesn't happen
-// to scan still lands in the array unindented rather than dropping it.
-function jsonArrayOf(items: readonly string[]): string {
-  return `[\n${items.map((item) => indented(item)).join(',\n')}\n]`;
-}
-
 export interface RowJsonMenuContext {
   /** This row's own value, pre-formatted JSON text (a document's raw EJSON body, or a kv pair
    *  already run through JSON.stringify). */
@@ -239,23 +212,11 @@ export interface MongoDocumentRowMenuContext {
   /** This row's own canonical extended-JSON body, unparsed -- toShellText/toRelaxedText each do
    *  their own parse. */
   body: string;
-  /** Every displayed row's own canonical body, in display order -- RowJsonMenuContext.allJson's
-   *  own "what's on screen now, as a thunk" rule, restated here since bodies (not pre-stringified
-   *  JSON) are what the shell/relaxed formats need to encode from. */
-  allBodies: () => readonly string[];
+  /** Every displayed row in one copy format -- RowJsonMenuContext.allJson's own "what's on screen
+   *  now, as a thunk" rule: the host reads the bodies only when invoked, and encodes them off the
+   *  main thread when the page is large. */
+  allText: (format: CopyAllFormat) => Promise<string>;
   onError: (message: string) => void;
-}
-
-// P22b D11 fix: `toShellText` (P27 D12, unwrapped from `beautify.ts`'s own mode concept) always
-// pretty-prints -- its one caller before this was the document editor's own buffer, where an
-// indented literal is exactly what's wanted. "Copy all", one document per line, needs the
-// opposite: `beautifyShellText`'s existing 'compact' mode re-renders shell text without its own
-// newlines, so composing the two here (rather than teaching toShellText a second mode it has
-// exactly one non-editor caller for) gives each document its own single line.
-function compactShellText(body: string): string {
-  const indented = toShellText(body);
-  const compacted = beautifyShellText(indented, 'compact');
-  return compacted.ok ? compacted.text : indented;
 }
 
 // P22b D11: the Mongo document result's own row menu -- two named-format submenus (mirroring
@@ -313,7 +274,7 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
           type: 'item',
           id: 'copy-all-plain-json',
           label: 'Plain JSON',
-          run: () => copyOrReportError(jsonArrayOf(ctx.allBodies().map(toPlainJson)), ctx.onError),
+          run: () => copyOrReportErrorLazy(ctx.allText('plain'), ctx.onError),
         },
         {
           type: 'item',
@@ -323,21 +284,19 @@ export function mongoDocumentRowMenu(ctx: MongoDocumentRowMenuContext): MenuItem
           // not a JSON array, and not each document's own multi-line indented form (which would
           // make "joined by \n" meaningless) -- that's what pasting N mongosh literals back into
           // a shell session actually wants.
-          run: () =>
-            copyOrReportError(ctx.allBodies().map(compactShellText).join('\n'), ctx.onError),
+          run: () => copyOrReportErrorLazy(ctx.allText('shell'), ctx.onError),
         },
         {
           type: 'item',
           id: 'copy-all-as-json',
           label: 'Canonical Extended JSON',
-          run: () => copyOrReportError(jsonArrayOf(ctx.allBodies().map(prettyJson)), ctx.onError),
+          run: () => copyOrReportErrorLazy(ctx.allText('canonical'), ctx.onError),
         },
         {
           type: 'item',
           id: 'copy-all-relaxed-json',
           label: 'Relaxed Extended JSON',
-          run: () =>
-            copyOrReportError(jsonArrayOf(ctx.allBodies().map(toRelaxedText)), ctx.onError),
+          run: () => copyOrReportErrorLazy(ctx.allText('relaxed'), ctx.onError),
         },
       ],
     },

@@ -6,6 +6,8 @@ import { useVirtualRows, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
 import { computed, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
+import { INLINE_CHARS, parseInline } from '../../workers/parse/client';
+import { useParseWorker } from '../../workers/parse/useParseWorker';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/rows';
@@ -13,6 +15,7 @@ import { datasetNumber } from '../shared/eventCoords';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
+import type { CopyAllFormat } from './copyAll';
 import { mongoDocumentRowMenu, rowAsJsonMenu } from './resultMenu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
@@ -20,6 +23,7 @@ import { useConsoleViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
+const parse = useParseWorker();
 const documentRowsStore = useDocumentRowsStore();
 const settingsStore = useSettingsStore();
 const consoleViewStore = useConsoleViewStore();
@@ -300,7 +304,16 @@ function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
   const body = documentRow(props.pageKey, index)?.body ?? '';
   const allBodies = () =>
     documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
-  contextMenuStore.openContextMenu(e, mongoDocumentRowMenu({ body, allBodies, onError: onCopyError }));
+  // Over the inline threshold the encode runs in the shared parse worker: a 10 000-document page
+  // otherwise blocks the main thread for hundreds of ms.
+  const allText = (format: CopyAllFormat): Promise<string> => {
+    const bodies = allBodies();
+    const chars = bodies.reduce((n, b) => n + b.length, 0);
+    return chars <= INLINE_CHARS
+      ? Promise.resolve(parseInline('ejson.copyAll', { format, bodies }))
+      : parse.run('ejson.copyAll', { format, bodies });
+  };
+  contextMenuStore.openContextMenu(e, mongoDocumentRowMenu({ body, allText, onError: onCopyError }));
 }
 
 function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {

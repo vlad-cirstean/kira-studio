@@ -419,7 +419,10 @@ if (want('pure-fns')) {
       const { window: page } = await relaunch({ control: [] });
       await page.waitForTimeout(500);
       const load = load1();
-      await page.addScriptTag({ path: out });
+      await page.route('**/__pure.js', (route) =>
+        route.fulfill({ path: out, contentType: 'text/javascript' }),
+      );
+      await page.addScriptTag({ url: '/__pure.js' });
       const res = await page.evaluate(() =>
         (window as unknown as { __pure: (n: number) => Record<string, number> }).__pure(5),
       );

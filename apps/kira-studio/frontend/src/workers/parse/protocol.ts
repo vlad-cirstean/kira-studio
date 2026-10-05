@@ -1,5 +1,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { BeautifyMode, BeautifyResult } from '../../beautify';
+import type { CopyAllFormat } from '../../views/console/copyAll';
 import type { FormatResult } from '../../views/console/format';
 
 export type PrettyFormat = 'json' | 'xml';
@@ -13,6 +14,7 @@ interface ParseJobs {
   'body.format': { input: { body: string; wantText: boolean }; output: PrettyResult };
   'json.beautify': { input: { text: string; mode: BeautifyMode }; output: BeautifyResult };
   'console.format': { input: { kind: ConnectionKind; text: string }; output: FormatResult };
+  'ejson.copyAll': { input: { format: CopyAllFormat; bodies: readonly string[] }; output: string };
   'xml.beautify': { input: { text: string; mode: BeautifyMode }; output: BeautifyResult };
 }
 
