@@ -663,8 +663,8 @@ watch(
       v-if="pending"
       class="m-0 font-data text-kira-md text-fg bg-bg overflow-auto"
       :class="singleLine ? 'p-0 whitespace-pre' : 'py-2 px-0 whitespace-pre-wrap'"
-      >{{ previewDoc }}</pre
-    >
+      v-text="previewDoc"
+    ></pre>
   </div>
 </template>
 
