@@ -249,39 +249,73 @@ func TestSigtermEscalatesToSigkill(t *testing.T) {
 	}
 }
 
-// TestBackgroundedSetsidChildDoesNotBlockStop is F1 (P108 Part 3): a script that backgrounds a
-// helper via setsid leaves that helper outside cmd's process group while it keeps inheriting the
-// stderr fd — so `-pid` signals from killEntry never reach it, and it only closes stderr's write
-// end when it exits on its own (here, after 2s). Reproduced by the P108 Part 3 reviewer with
-// `setsid sleep 6 & exit 0`: the outer shell exits 0 almost immediately, but the old
-// StderrPipe-then-Wait ordering blocked cmd.Wait() (and so e.exited, and so killEntry's own wait)
-// on that fd's EOF regardless — Stop only returned once the backgrounded sleep finished on its
-// own. killGrace (120ms in this package's test init) exceeds settleWindow (80ms), so the settled
-// entry is deterministically tracked as a sidecar here — this isn't a one-shot-vs-sidecar test,
-// it is a Stop-returns-promptly test.
-func TestBackgroundedSetsidChildDoesNotBlockStop(t *testing.T) {
+// TestBackgroundedSetsidChildDoesNotDelayStart is F1 (P108 Part 3): a helper that left the
+// process group (setsid) while holding the stderr pipe must not delay Start or Stop. The shell
+// exits 0 at once, so Start resolves one-shot, not after a pipe-EOF wait.
+func TestBackgroundedSetsidChildDoesNotDelayStart(t *testing.T) {
 	s := New()
 	var oe exitCollector
 	s.OnExit(oe.handle)
 
+	begin := time.Now()
 	got, err := s.Start(context.Background(), "c1", "setsid sleep 2 & exit 0")
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if got.Kind != KindSidecar {
-		t.Fatalf("Kind = %q, want %q (killGrace > settleWindow in this test config)", got.Kind, KindSidecar)
+	if got.Kind != KindOneShot {
+		t.Fatalf("Kind = %q, want %q", got.Kind, KindOneShot)
 	}
-
-	start := time.Now()
 	s.Stop("c1")
-	elapsed := time.Since(start)
-
-	if elapsed >= 1*time.Second {
-		t.Errorf("Stop took %s, want well under the backgrounded child's own 2s lifetime (bounded by WaitDelay/killGrace instead)", elapsed)
+	if elapsed := time.Since(begin); elapsed >= time.Second {
+		t.Errorf("Start+Stop took %s, want well under the helper's own 2s lifetime", elapsed)
 	}
 	if oe.count() != 0 {
-		t.Fatalf("OnExit fired %d times after a self-inflicted Stop, want 0", oe.count())
+		t.Fatalf("OnExit fired %d times, want 0", oe.count())
 	}
+}
+
+// TestOneShotWithBackgroundChildKeepsRealExitAndIsReaped is P168 Part 2 F1: a script that exits
+// while a background child in its group still holds stderr must be classified by its own exit
+// code (not as a sidecar after the pipe closes), and the child must die on Stop.
+func TestOneShotWithBackgroundChildKeepsRealExitAndIsReaped(t *testing.T) {
+	t.Run("non-zero exit is an error and kills the child", func(t *testing.T) {
+		pidFile := t.TempDir() + "/pid"
+		s := New()
+		_, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 & echo $! > %s; echo boom >&2; exit 3", pidFile))
+		if err == nil || !strings.Contains(err.Error(), "exit 3") || !strings.Contains(err.Error(), "boom") {
+			t.Fatalf("Start error = %v, want exit 3 with stderr tail", err)
+		}
+		waitUntil(t, 5*time.Second, func() bool { return !processAlive(readPID(t, pidFile)) })
+	})
+
+	t.Run("exit zero is one-shot and Stop kills the child", func(t *testing.T) {
+		pidFile := t.TempDir() + "/pid"
+		s := New()
+		got, err := s.Start(context.Background(), "c1", fmt.Sprintf("sleep 30 >/dev/null 2>&1 & echo $! > %s", pidFile))
+		if err != nil || got.Kind != KindOneShot {
+			t.Fatalf("Start = %+v, %v, want one-shot", got, err)
+		}
+		pid := readPID(t, pidFile)
+		if !processAlive(pid) {
+			t.Fatalf("background child %d died before Stop", pid)
+		}
+		s.Stop("c1")
+		waitUntil(t, 5*time.Second, func() bool { return !processAlive(pid) })
+	})
+}
+
+func readPID(t *testing.T, path string) int {
+	t.Helper()
+	var pid int
+	waitUntil(t, 2*time.Second, func() bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		pid, err = strconv.Atoi(strings.TrimSpace(string(data)))
+		return err == nil && pid > 0
+	})
+	return pid
 }
 
 // TestStartAbortsOnContextCancellationDuringSettle is F4 (P108 Part 3): a caller racing Start with
@@ -309,8 +343,9 @@ func TestStartAbortsOnContextCancellationDuringSettle(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Start error = %v, want context.Canceled", err)
 	}
-	if elapsed >= settleWindow {
-		t.Errorf("Start took %s after cancellation, want well under settleWindow (%s)", elapsed, settleWindow)
+	// Start also waits for the killed group to empty (a lingering zombie costs up to 2*killGrace).
+	if elapsed >= time.Second {
+		t.Errorf("Start took %s after cancellation, want far under the script's 30s sleep", elapsed)
 	}
 	// Never tracked — the ctx.Done() branch returns before ever reaching s.entries[connectionID].
 	if entryDead(s, "c1") != nil || s.entries["c1"] != nil {

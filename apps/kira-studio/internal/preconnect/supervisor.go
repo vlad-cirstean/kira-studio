@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -44,6 +45,11 @@ type Exit struct {
 var (
 	settleWindow = 2 * time.Second
 	killGrace    = 2 * time.Second
+	// stderrDrain bounds how long Start waits for buffered stderr after the leader exits; a
+	// group member still holding the pipe would otherwise stall the read forever.
+	stderrDrain = 200 * time.Millisecond
+	// groupPoll is how often a reaped leader's process group is probed for surviving members.
+	groupPoll = 50 * time.Millisecond
 )
 
 // killSignal is syscall.Kill, indirected through a var (postgres/client.go's pgxConnect-as-a-var
@@ -65,6 +71,12 @@ type outcome struct {
 type entry struct {
 	pid    int
 	exited chan struct{} // closed exactly once, after the exit is fully classified
+	// groupGone closes once the leader has exited and no member of its process group remains.
+	// A pgid cannot be recycled while a member lives, so signalling -pid is safe until then.
+	groupGone chan struct{}
+
+	stderrR    *os.File
+	readerDone chan struct{} // closed when the stderr reader has stopped
 
 	tailMu sync.Mutex
 	tail   tailTracker
@@ -75,9 +87,7 @@ type entry struct {
 	dead    *Exit // set if the process exited before Arm consumed it
 }
 
-// stderrWriter feeds cmd.Stderr writes into an entry's tail tracker — see the WaitDelay comment
-// at its one call site (Start) for why a plain io.Writer, not StderrPipe, is what lets Wait()
-// itself be bounded.
+// stderrWriter feeds the stderr pipe's bytes into an entry's tail tracker.
 type stderrWriter struct{ e *entry }
 
 func (w stderrWriter) Write(p []byte) (int, error) {
@@ -140,31 +150,48 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
-	e := &entry{exited: make(chan struct{})}
+	e := &entry{exited: make(chan struct{}), groupGone: make(chan struct{}), readerDone: make(chan struct{})}
+
+	// Own pipe, not an io.Writer on cmd.Stderr: with an *os.File the stdlib spawns no copy
+	// goroutine, so cmd.Wait() returns when the shell itself exits (real exit code, no wait on a
+	// background child that inherited the pipe).
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
+	}
 
 	cmd := exec.Command("/bin/sh", "-c", command)
 	cmd.Dir = dir
 	cmd.Stdout = nil // D8: /dev/null, not a pipe nobody reads — deliberately stricter than the TS original.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = withAugmentedPath(os.Environ())
-	cmd.Stderr = stderrWriter{e: e}
-	// F1 (P108 Part 3): bounds cmd.Wait() itself. cmd.Stderr being a plain io.Writer (not an
-	// *os.File) makes the stdlib spawn its own internal pipe-copy goroutine, and Wait() normally
-	// blocks until that goroutine sees EOF — which never arrives if a descendant left the process
-	// group (setsid, daemon(3)) while keeping the pipe's write end open. WaitDelay makes Wait()
-	// forcibly close that pipe (unblocking the copy goroutine with a read error) once it has been
-	// this long since the process itself was observed to exit, instead of hanging forever.
-	cmd.WaitDelay = killGrace
+	cmd.Stderr = stderrW
 
 	if err := cmd.Start(); err != nil {
+		_ = stderrW.Close()
+		_ = stderrR.Close()
 		slog.Error(fmt.Sprintf("preconnect[%s] failed to spawn: %s", connectionID, err), "scope", "preconnect")
 		return Start{}, fmt.Errorf("Pre-connect script could not start: %s", err)
 	}
+	_ = stderrW.Close()
 	e.pid = cmd.Process.Pid
+
+	e.stderrR = stderrR
+	go func() {
+		defer close(e.readerDone)
+		defer stderrR.Close()
+		_, _ = io.Copy(stderrWriter{e: e}, stderrR)
+	}()
 
 	outcomeCh := make(chan outcome, 1)
 	go func() {
-		outcomeCh <- classifyExit(cmd.Wait())
+		out := classifyExit(cmd.Wait())
+		if syscall.Kill(-e.pid, 0) == syscall.ESRCH {
+			close(e.groupGone)
+		} else {
+			go e.watchGroup()
+		}
+		outcomeCh <- out
 		close(e.exited)
 	}()
 
@@ -189,8 +216,17 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 	case out := <-outcomeCh:
 		if out.signal == "" && out.code != nil && *out.code == 0 {
 			slog.Info(fmt.Sprintf("preconnect[%s] one-shot exited 0", connectionID), "scope", "preconnect")
+			// A background child left in the group (`kubectl port-forward ... & sleep 1`) stays
+			// tracked so Stop/StopAll still reach it.
+			if !e.groupDead() {
+				s.mu.Lock()
+				s.entries[connectionID] = e
+				s.mu.Unlock()
+			}
 			return Start{Kind: KindOneShot}, nil
 		}
+		e.drainStderr()
+		s.killEntry(connectionID, e)
 		return Start{}, fmt.Errorf("Pre-connect script failed %s", exitDetail(out, e.lastStderr()))
 	}
 }
@@ -200,6 +236,7 @@ func (s *Supervisor) Start(ctx context.Context, connectionID, command string) (S
 // uses.
 func (s *Supervisor) awaitExit(connectionID string, e *entry, outcomeCh chan outcome) {
 	out := <-outcomeCh
+	e.drainStderr()
 
 	e.mu.Lock()
 	wasKilling := e.killing
@@ -216,11 +253,8 @@ func (s *Supervisor) awaitExit(connectionID string, e *entry, outcomeCh chan out
 
 	if armed {
 		s.exits.Emit(exit)
-		s.mu.Lock()
-		if s.entries[connectionID] == e {
-			delete(s.entries, connectionID)
-		}
-		s.mu.Unlock()
+		// The leader is gone, so the connection is down; reap any group member it left behind.
+		s.killEntry(connectionID, e)
 		return
 	}
 
@@ -256,6 +290,7 @@ func (s *Supervisor) Arm(connectionID string) {
 	}
 	s.mu.Unlock()
 	s.exits.Emit(*dead)
+	go s.killEntry(connectionID, e)
 }
 
 // Stop kills the process tracked for connectionID, if any. Idempotent; self-inflicted kills
@@ -291,52 +326,37 @@ func (s *Supervisor) StopAll() {
 }
 
 // killEntry sends SIGTERM to the process group, escalates to SIGKILL after killGrace, waits for
-// the real exit (bounded — F1, see below), and removes the entry. Marking killing=true first
-// ensures awaitExit's own exit routing stays silent for this kill.
+// the group to empty (bounded), and removes the entry. Marking killing=true first keeps
+// awaitExit's own exit routing silent for this kill.
 //
-// P21 round 3 finding 6: an entry can reach here already dead — awaitExit deliberately leaves a
-// sidecar that exited on its own (before Arm was ever called) sitting in s.entries for Arm to
-// consume, and Arm may never come (a connect that fails after the script settled, a connection
-// removed before arming). e.pid has already been reaped by cmd.Wait() in that case, and on a busy
-// machine a reaped pid can be recycled as the leader of an *unrelated* process group by the time
-// Stop/StopAll reaches it here — signalling -e.pid unconditionally would SIGTERM/SIGKILL whatever
-// that pid now is, not this sidecar. e.exited is closed exactly once cmd.Wait() returns, so
-// checking it first (and re-checking right before the escalation fires, racing the same reap)
-// skips the whole kill/escalate dance for an entry that is already gone.
+// P21 round 3 finding 6: once the leader is reaped its pid can be recycled as an unrelated group's
+// leader, so signalling -e.pid is only safe while a group member still lives. groupGone closes
+// the moment none does (checked right after the reap, then polled), and a closed groupGone skips
+// every signal. A surviving member of a reaped leader's group (a one-shot script's background
+// child) is still signalled, since its pgid stays reserved.
 //
-// F1 (P108 Part 3): -e.pid (a process-group signal) never reaches a descendant that left the
-// group (setsid, daemon(3)), so SIGKILL is no guarantee the tracked process itself ever dies —
-// waiting on e.exited unconditionally could block Disconnect/Remove/quit forever. Give up
-// killGrace after the SIGKILL escalation fires (Start's own cmd.WaitDelay already bounds the I/O
-// half of Wait(); this bounds the case where the process itself never receives or heeds a signal)
-// and log rather than block further — the entry is still removed from tracking either way.
+// F1 (P108 Part 3): -e.pid never reaches a descendant that left the group (setsid, daemon(3)), so
+// give up killGrace after the SIGKILL escalation fires and log rather than block Disconnect,
+// Remove or quit forever. The entry is removed either way.
 func (s *Supervisor) killEntry(connectionID string, e *entry) {
 	e.mu.Lock()
 	e.killing = true
 	e.mu.Unlock()
 
-	select {
-	case <-e.exited:
-		// Already dead (or dies in the instant before the signal below goes out — an
-		// unavoidable, narrower race a non-atomic check-then-kill can't fully close). ESRCH from
-		// a stale pid is otherwise indistinguishable from "no such process" for an unrelated
-		// pid that never existed, so there is nothing further to signal here.
-	default:
+	if !e.groupDead() {
 		_ = killSignal(-e.pid, syscall.SIGTERM)
 
 		giveUp := make(chan struct{})
 		escalate := time.AfterFunc(killGrace, func() {
-			select {
-			case <-e.exited:
-				return // reaped between the SIGTERM above and this timer firing.
-			default:
+			if e.groupDead() {
+				return // emptied between the SIGTERM above and this timer firing.
 			}
 			_ = killSignal(-e.pid, syscall.SIGKILL)
 			time.AfterFunc(killGrace, func() { close(giveUp) })
 		})
 
 		select {
-		case <-e.exited:
+		case <-e.groupGone:
 		case <-giveUp:
 			slog.Warn(fmt.Sprintf("preconnect[%s] pid %d did not exit within %s of SIGKILL, giving up", connectionID, e.pid, killGrace), "scope", "preconnect")
 		}
@@ -348,6 +368,30 @@ func (s *Supervisor) killEntry(connectionID string, e *entry) {
 		delete(s.entries, connectionID)
 	}
 	s.mu.Unlock()
+}
+
+// drainStderr picks up stderr already buffered once the leader has exited, bounded in case a
+// surviving group member keeps the pipe's write end open.
+func (e *entry) drainStderr() {
+	_ = e.stderrR.SetReadDeadline(time.Now().Add(stderrDrain))
+	<-e.readerDone
+}
+
+func (e *entry) groupDead() bool {
+	select {
+	case <-e.groupGone:
+		return true
+	default:
+		return false
+	}
+}
+
+// watchGroup closes groupGone once the reaped leader's process group has no members left.
+func (e *entry) watchGroup() {
+	for syscall.Kill(-e.pid, 0) != syscall.ESRCH {
+		time.Sleep(groupPoll)
+	}
+	close(e.groupGone)
 }
 
 // classifyExit turns cmd.Wait()'s error into an outcome: nil code+signal means the process is
