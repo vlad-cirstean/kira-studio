@@ -3663,6 +3663,7 @@ and `docs/v2.0/plans/`.
   `0012`: `ade_sessions.purpose`, `ade_review_windows`, `ade_gh_synced`.
   `0013`: deletes the dead `ade.allAgentsFilter` settings row.
   `0014`: `ade_runs.launch_note`, `launch_resume_id`, `launch_prompt`, `launch_extra` (held run's send-back spec, cleared at launch).
+  `0015`: rebuilds `ade_runs` without `todo_done`/`todo_total` (P158).
 - Run and setup logs: tail 2 MiB per log, chunks of at most 8 KiB, `truncated` once head chunks drop,
   writes batched every 250 ms.
 - Per-repo prepare timeout is the `GitRepoSettings` leaf `worktreePrepareTimeout` (default 15m, max 2h),
@@ -3714,8 +3715,6 @@ and `docs/v2.0/plans/`.
   `stop`, `retry 1|2` or `back:<step>`. Send-back queues a fix run of the target step with
   `claude -p --resume <session id>` (same Claude session), `loops` is the round epoch, 3 rounds then
   the run fails. The fix run's resume spec sits on its run row until launch, so a run held behind a setup resumes the same Claude session after restart. A `once` step runs in the first mine branch's worktree (D12). No concurrency cap (D8).
-- Todo progress `[n, m]` parses `TodoWrite` and `TaskCreate`/`TaskUpdate`; CLI 2.1.289 in `-p` mode
-  offers neither, so `todo` stays null (Known open items).
 - Restart recovery (`recover.go`, D7): `Recover()` runs before `Start()`; running runs become `stuck`
   with note `interrupted by restart`, running setups fail, task sessions stop, stale `*.mcp.json` files
   are removed. Pending runs keep their launch spec and launch when their gate opens. Nothing auto-resumes.
@@ -4269,7 +4268,6 @@ Kept only while genuinely open — delete an item the moment it's resolved, neve
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
 - **Terminal `Close` does not reach background jobs outside the shell's process group (P153).** A shell that does not forward SIGHUP (dash, a `disown`ed bash job, zsh `NO_HUP`) leaves its jobs alive after the tab closes. Follow-up P157. Also: darwin keeps a blocking pty master (kqueue pollability unverified), so there `Close` cannot unblock a stuck reader and logs a WARN after 4 s.
-- **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
 - **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.

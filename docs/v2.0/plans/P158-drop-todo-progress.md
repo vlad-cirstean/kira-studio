@@ -300,4 +300,18 @@ Commit `docs: P158 drop todo progress`.
 
 ## Result
 
-_Placeholder: implementer fills commits, deviations, counts (unit, UI), smoke line._
+Commits (v2.0): `f93d4c25` wire contract (step 0), `383b62e0` parser and engine, `a8887feb`
+migration 0015, docs commit (this one).
+
+- Migration `0015` spot check (v14 to v15, scratch SQLite 3.45.1, `foreign_keys=ON`): run row with
+  `todo 1/2` and non-empty `launch_*` survives field for field; `todo_*` gone; `ade_runs_task` and
+  `ade_runs_state` present; `foreign_key_check` empty.
+- Percent of `T_search` is 60 (was 67): matches the parity oracle on the edited mockup.
+- Unit 1764 pass. UI `test:ui:space` 161 pass. Go `go test ./...` green; `-race` green on
+  `ade`, `adeagent`, `storage`. `lint:all`, typecheck, bindings (`Run` has no `todo`) clean.
+- Repo-wide grep: no `OnTodo`, `setTodo`, `TodoDone`, `ade-run-todo` left. `todo_done`/`todo_total`
+  only in `0008`/`0015` comment; `TodoWrite` only in `testdata/taskcreate.jsonl`.
+- Deviation: live smoke ran at engine level, not in a browser against a server build. The fake
+  `claude` run engine test (two repos, real stores) reaches `done` with the finish summary and the
+  `▸ Bash git status` log line; the panel run line (`running` then `done`, glyph `✓`, no mini bar)
+  is asserted by the mock-runtime UI spec. No server-tag browser drive.
