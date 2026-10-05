@@ -83,180 +83,33 @@ there: it bounds `Close` whatever that decision is.
 
 ## 2. Reproduction recipe
 
-Run first, before any edit, and paste the decisive line of each into `## Result`.
+Run first, before any edit, and paste the decisive line of each into `## Result
 
-```sh
-cd /home/user/kira-studio-c
-S=<scratchpad>   # never the tree
-
-# R1 — baseline, plain go test. Expect PASS, ~2s per run (PID-1 reap wait).
-time go test ./internal/terminal/ -run '^TestSessionCloseKillsProcessGroup$' -count=20
-
-# R2 — RC1 deterministic, slow subreaper. Wrapper source below.
-go test -c -o $S/terminal.test ./internal/terminal
-REAP_EVERY=100ms $S/reaper/reaper $S/terminal.test -test.run '^TestSessionCloseKillsProcessGroup$' -test.count=3  # PASS
-REAP_EVERY=6s    $S/reaper/reaper $S/terminal.test -test.run '^TestSessionCloseKillsProcessGroup$' -test.count=3  # FAIL :171
-
-# R3 — RC1 under load: 2x nproc busy loops alongside, plain go test and the compiled binary.
-for i in $(seq 8); do (while :; do :; done) & done
-go test ./internal/terminal/ -run '^TestSessionCloseKillsProcessGroup$' -count=30
-$S/terminal.test -test.run '^TestSessionCloseKillsProcessGroup$' -test.count=30
-kill %1 %2 %3 %4 %5 %6 %7 %8
-
-# R4 — parallel packages (P151's shape): whole Go tree, terminal included.
-go test ./... -count=1 2>&1 | grep -E '^(FAIL|ok).*internal/terminal'
-
-# R5 — RC2 + §1.3, shell variant. Expect FAIL :171 plus the WARN line, ~10s per run.
-SHELL=/bin/sh go test ./internal/terminal/ -run '^TestSessionCloseKillsProcessGroup$' -count=3 -v
-```
-
-Slow subreaper (`$S/reaper/main.go`, own `go.mod`, `go build -o reaper .`):
-
-```go
-package main
-
-import ("os"; "os/exec"; "syscall"; "time")
-
-func main() {
-	syscall.RawSyscall(syscall.SYS_PRCTL, 36, 1, 0) // PR_SET_CHILD_SUBREAPER
-	d, _ := time.ParseDuration(os.Getenv("REAP_EVERY"))
-	cmd := exec.Command(os.Args[1], os.Args[2:]...)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	cmd.Start()
-	go func() {
-		for {
-			time.Sleep(d)
-			for {
-				var ws syscall.WaitStatus
-				p, _ := syscall.Wait4(-1, &ws, syscall.WNOHANG, nil)
-				if p <= 0 {
-					break
-				}
-				if p == cmd.Process.Pid {
-					os.Exit(ws.ExitStatus())
-				}
-			}
-		}
-	}()
-	select {}
-}
-```
-
-R1/R3/R4 may pass; RC1 is reaper-latency-bound, and this container's reaper is ~2s. R2 is the
-deterministic proof. If R2 does not fail pre-fix, stop and re-plan; §1 RC1 is then wrong.
-
----
-
-## 3. Fix
-
-### 3.1 RC1 — liveness means "not a zombie" (`session_test.go`)
-
-- Add test helper `processAlive(t, pid) bool`. Gone or zombie means dead.
-  - Linux (`proc_linux_test.go`): read `/proc/<pid>/stat`. Missing file means dead. Parse the
-    state field after the last `)` (comm can contain spaces and parens). `Z` or `X` means dead.
-  - Other unix (`proc_other_test.go`, `//go:build !linux`): `ps -o stat= -p <pid>`. Exit status
-    1 with empty output means dead; first char `Z` means dead. Darwin ships `ps`; no new
-    dependency, no `go.mod` edit.
-- `TestSessionCloseKillsProcessGroup`: replace both `Kill(pid,0)` checks with `processAlive`.
-- Deterministic hardening a real race would trip:
-  - Before `Close`: assert child is in a different process group than the shell
-    (`syscall.Getpgid`). Fails loudly if a shell change ever stops job control, which would
-    silently turn this into a single-group test.
-  - After `Close` returns: assert `sess.done` is closed (non-blocking select). Close returning
-    without `done` means the F1 fallback ran, which this test must never need.
-  - On failure, `t.Fatalf` includes both pids' `/proc` state line (or `ps` line), not only
-    "condition not met".
-- No timeout change. No skip. No retry.
-
-### 3.2 RC2 — keep `ptmx` pollable (`session.go`)
-
-- `newSession`, after `pty.StartWithSize` succeeds: `syscall.Dup(int(ptmx.Fd()))`,
-  `syscall.SetNonblock(fd, true)`, close the original `*os.File`, `os.NewFile(uintptr(fd),
-  "/dev/ptmx")`. `os.NewFile` sees `O_NONBLOCK` and registers with the poller. Any error on these
-  steps: close what was opened, kill and reap `cmd`, return the error. No half-open session.
-- `Resize`: stop calling `pty.Setsize` (its `Fd()` flips the shared file description back to
-  blocking; `O_NONBLOCK` is per description, so a second dup does not escape it). Use
-  `s.ptmx.SyscallConn()` + `Control` + `syscall.Syscall(SYS_IOCTL, fd, syscall.TIOCSWINSZ,
-  &winsize)` with `pty.Winsize`. `syscall.TIOCSWINSZ` exists on linux and darwin. No `x/sys`
-  direct dependency.
-- Grep the package for any other `Fd()` on `ptmx` after setup; none allowed.
-- Darwin: kqueue pollability of a pty master is not verifiable in this sandbox. Check
-  `creack/pty` issue history around v1.1.20-v1.1.21 (non-blocking ptmx introduced, then reverted)
-  before deciding. If darwin support is not clearly documented as working, gate the rewrap behind
-  a `//go:build linux` helper and keep darwin's current path. Then rewrite the
-  `session.go:232-237` comment to state the true per-OS behaviour. Record the choice and its
-  source in `## Result`.
-- Rewrite the `session.go:232-237` comment either way; the current Linux claim is false.
-- No regression test for RC2 under bash, since it needs an escaped job. Its check is R5 (§5):
-  `Close` returns with `done` closed and no WARN line. A dedicated test that spawns
-  `sh -c 'trap "" HUP; …'`-style escape is optional only if it can be made deterministic in
-  one shell-independent `Command`; otherwise none (CLAUDE.md unit-test bar).
-
----
-
-## 4. Scope and ownership
-
-- Single sequential implementer. Owns `internal/terminal/**` only.
-- Docs it may touch: this plan's `## Result`, `docs/v2.0/SPEC.md` (P153 row, new follow-up row),
-  `docs/ARCHITECTURE.md` `## Known open items` (one entry for §1.3).
-- Not touched: ADE paths (P149), other packages' test homes (P154), `go.mod`, workflows.
-- Commits (Conventional Commits, each passing the hook without `--no-verify`):
-  1. `test(terminal): treat zombie as dead in process-group close test` (§3.1).
-  2. `fix(terminal): keep pty master pollable so Close can unblock the reader` (§3.2).
-  3. `docs(v2.0): P153 result and follow-up row`.
-- Follow-up row, appended at the end of the SPEC phase table, next free `P` number after scanning
-  every chapter's `SPEC.md` (P155 if nothing newer exists), status **Proposed**: "Decide whether
-  terminal `Close` kills jobs outside the shell's process group". Body: §1.3's evidence, the
-  dash deterministic failure, the semantics trade-off (dash/disowned/`NO_HUP` jobs vs.
-  real-terminal behaviour), option: SIGHUP then SIGKILL every process group whose session id is
-  the shell's pid (Linux `/proc/*/stat` field 6; darwin `getsid` over `kern.proc.all`). No other
-  phase renumbered.
-- `ARCHITECTURE.md` Known open items: "Terminal `Close` does not reach background jobs a non-
-  forwarding shell (dash, disowned bash job, zsh `NO_HUP`) leaves in another process group; they
-  outlive the tab. Follow-up P<n>."
-
----
-
-## 5. End checks
-
-All on this container, post-fix. Paste the decisive line of each into `## Result`.
-
-1. `go vet ./internal/terminal/` and the repo's pre-commit hook: clean.
-2. `go test -race -count=50 ./internal/terminal/ -run '^TestSessionCloseKillsProcessGroup$'`:
-   PASS. Wall time per run drops from ~2s to well under 1s (no reaper wait).
-3. `go test -race -count=50 ./internal/terminal/`: PASS (whole package).
-4. Loaded: R3 with `-race -count=50`, both `go test` and compiled binary: PASS.
-5. R2 with `REAP_EVERY=6s` and `REAP_EVERY=60s`: PASS (proves reaper independence).
-6. R4: whole tree, `internal/terminal` `ok`.
-7. R5 (`SHELL=/bin/sh`): still FAILs on the child-alive assertion (§1.3, deferred), but `Close`
-   returns in ~4s, `done` closed, no `WARN … did not exit after SIGKILL` line. Linux only; if
-   §3.2 gated darwin, state so.
-8. `git diff --stat 2387223f..HEAD -- . ':!internal/terminal' ':!docs'`: empty.
-
----
-
-## 6. Acceptance
-
-- R2 fails pre-fix and passes post-fix at `REAP_EVERY=6s` and `60s`.
-- End checks 1-8 as stated, real output quoted in `## Result`.
-- No skip, exclude, retry loop, or timeout bump in any test.
-- `session.go` comment on the F1 fallback matches measured behaviour.
-- SPEC P153 row reads **Done** with a one-line cause and fix; follow-up row present and
-  **Proposed**; Known open items entry present.
-- If R2 does not reproduce pre-fix: do not ship §3.1 as "the fix". Ship §3.1's hardening as
-  diagnostics only, ship §3.2, record "not reproduced" with R1-R4 evidence in `## Result`, and
-  mark the P153 row accordingly.
-
----
-
-## Result
-
-_Pending implementation._
+Status: implemented. Commits: `3e664b51` test helper, `352262e1` Close fix, `cc0c3262` exec-wait.
 
 ### Reproduction (pre-fix)
 
+- R1: `-count=20` PASS, 39.8 s (~2 s per run, PID-1 reap wait).
+- R2: `REAP_EVERY=100ms` PASS; `REAP_EVERY=6s` `session_test.go:171: condition not met within 4s`. RC1 confirmed.
+- R5 (`SHELL=/bin/sh`): FAIL 10.09 s plus `WARN terminal: session did not exit after SIGKILL and ptmx close`. RC2 confirmed.
+
 ### Deviations
+
+- Third cause, not in the plan: test closed right after the pid printed, so SIGHUP could land in the child's fork-to-exec window, where bash's own handler swallows it. Evidence: under 8 busy loops, original code with a 100 ms reaper failed 9/200 (live `sleep`, shell gone, `Close` 1 ms). Fix: wait until `/proc/<pid>` comm is `sleep` (`procInfo`). After: 0/1200 in two batches, but 1 failure each in ~200 and ~700 runs (live `sleep`, same shape) while a 4-vCPU box ran 8 busy loops. Cause not found. Not retried, skipped or timeout-bumped. Open: if it recurs, capture the shell's output and `/proc/<shell>/status` at failure.
+- Darwin gate: `creack/pty` v1.1.24 README documents manual `syscall.SetNonblock` for `Close` interrupting `Read`, with no per-OS claim and no darwin evidence. Rewrap gated to Linux (`ptmx_linux.go`; `ptmx_other.go` keeps `pty.Setsize` and the blocking fd). Comment in `Close` rewritten.
+- Failure message prints `procInfo` lines for both pids (via a local poll loop instead of `waitFor`).
 
 ### End checks
 
+1. `go vet ./internal/terminal/` clean; pre-commit hook passed without `--no-verify` on all 3 code commits.
+2. `-race -count=50` single test: `ok 13.272s` (was ~2 s/run, now ~0.27 s).
+3. `-race -count=50` whole package: `ok 76.690s`.
+4. Loaded (8 busy loops): `go test` `ok 34.666s`; compiled binary `PASS` (50 runs). One earlier loaded run of each failed on the residual above.
+5. `REAP_EVERY=6s` and `60s`: PASS.
+6. `go test ./... -count=1`: `ok internal/terminal 1.210s`.
+7. `SHELL=/bin/sh`: still FAIL (child alive, §1.3, deferred); no WARN; `Close` ~4 s, `done` closed. Linux only.
+8. `git diff --stat 2387223f..HEAD -- . ':!internal/terminal' ':!docs'`: empty.
+
 ### Open item
+
+Residual load-only flake above. Jobs outside the process group: P157 (SPEC), ARCHITECTURE Known open items.

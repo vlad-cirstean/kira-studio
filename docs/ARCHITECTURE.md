@@ -4266,6 +4266,7 @@ own secrets.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **Terminal `Close` does not reach background jobs outside the shell's process group (P153).** A shell that does not forward SIGHUP (dash, a `disown`ed bash job, zsh `NO_HUP`) leaves its jobs alive after the tab closes. Follow-up P157. Also: darwin keeps a blocking pty master (kqueue pollability unverified), so there `Close` cannot unblock a stuck reader and logs a WARN after 4 s.
 - **Todo progress is unobservable in headless `claude -p` (P146).** CLI 2.1.289 offers no TodoWrite, TaskCreate or TaskUpdate tool there, so run `todo` stays null. The parser handles both shapes from fixtures. Delete once a CLI version exposes one or the user drops the requirement.
 - **Settings leaf `ade.allAgentsFilter` is dead (P149).** Nothing writes or reads it in v2; the All sessions toggle keeps a local `running`/`stopped` ref (R19). Removing it changes the settings model, bindings and schema: SPEC row P155. Delete once removed.
 - **Held fix runs lose their resume spec across restart (P147).** `runOpts` live in memory; a held `back:<step>` run relaunches as a plain fresh attempt after `Recover()`. Closing it needs a run-row column (migration): SPEC row P156. Delete once the spec persists on the run row.
