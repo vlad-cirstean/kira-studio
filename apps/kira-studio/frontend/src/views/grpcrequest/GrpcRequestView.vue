@@ -33,6 +33,8 @@ import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { templateToken } from '../../theme/completion';
+import { INLINE_CHARS } from '../../workers/parse/client';
+import { useParseWorker } from '../../workers/parse/useParseWorker';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
@@ -253,9 +255,17 @@ function onResizeRequestPane(size: number): void {
   patchGrpcRequestTabState(props.tab.id, { requestPaneHeight: size });
 }
 
-function onBeautify(): void {
-  const { text, ok } = beautifyJson(props.tab.state.message, 'indented');
-  if (ok) patchGrpcRequestTabState(props.tab.id, { message: text });
+const parse = useParseWorker();
+async function onBeautify(): Promise<void> {
+  const source = props.tab.state.message;
+  const result =
+    source.length <= INLINE_CHARS
+      ? beautifyJson(source, 'indented')
+      : await parse.run('json.beautify', { text: source, mode: 'indented' }).catch(() => null);
+  // Null: the view unmounted mid-run. Otherwise the message may have moved on while the worker ran.
+  if (result?.ok && props.tab.state.message === source) {
+    patchGrpcRequestTabState(props.tab.id, { message: result.text });
+  }
 }
 
 let unregisterCommands: Array<() => void> = [];
