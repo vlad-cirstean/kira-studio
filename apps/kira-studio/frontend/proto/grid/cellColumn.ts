@@ -1,7 +1,7 @@
 import { categoryForTypeClass } from '../../src/theme/icons';
 import { alignmentFor } from '../../src/views/shared/page/columns';
 import { type CellContext, ColumnBase, type DrawCellInfo } from './cheetahTypes';
-import { GUTTER_FIELD, type ProtoCellView } from './data';
+import type { ProtoCellView } from './data';
 import type { ProtoState } from './state';
 import type { Palette } from './theme';
 
@@ -12,32 +12,6 @@ const NAV_RESERVE = 24;
 const ELLIPSIS = '…';
 
 export type NavKind = 'fk' | 'pk';
-
-/** One page row as the grid's field lookup sees it. Fields are prototype getters, so a record
- *  costs one object and a cell is decoded only when drawn. */
-export interface RowRecord {
-  readonly row: number;
-}
-
-export function createRecordClass(state: ProtoState): new (row: number) => RowRecord {
-  class Record implements RowRecord {
-    constructor(readonly row: number) {}
-  }
-  const proto = Record.prototype;
-  state.data.columns.forEach((column, index) => {
-    Object.defineProperty(proto, column.name, {
-      get(this: Record) {
-        return state.viewAt(this.row, index);
-      },
-    });
-  });
-  Object.defineProperty(proto, GUTTER_FIELD, {
-    get(this: Record) {
-      return String(state.rowNumberBase + this.row + 1);
-    },
-  });
-  return Record;
-}
 
 type CategoryColor = 'number' | 'keyword' | 'control' | null;
 

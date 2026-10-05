@@ -24,7 +24,7 @@ export default defineConfig(async (env) => {
     build: {
       outDir: 'dist-proto',
       rolldownOptions: {
-        input: { cheetah: page('cheetah') },
+        input: { cheetah: page('cheetah'), slick: page('slick'), empty: page('empty') },
       },
     },
   });

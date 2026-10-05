@@ -9,9 +9,10 @@ import {
   headerAwareMinWidth,
   initialWidthsByIndex,
 } from '../../src/views/shared/page/columns';
-import { CellColumn, createRecordClass, GutterColumn, type NavKind } from './cellColumn';
+import { CellColumn, GutterColumn, type NavKind } from './cellColumn';
 import { DataSource } from './cheetahTypes';
 import { createProtoData, GUTTER_FIELD, readParams } from './data';
+import { createRecordClass } from './records';
 import { createState, HEADER_ROWS, pageRowOf } from './state';
 import { buildTheme, readPalette } from './theme';
 
