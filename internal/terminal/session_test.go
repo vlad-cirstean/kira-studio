@@ -166,11 +166,37 @@ func TestSessionCloseKillsProcessGroup(t *testing.T) {
 	})
 
 	shellPID := sess.cmd.Process.Pid
+	// Different groups prove job control is on; a shell change that drops it would silently make
+	// this a single-group test.
+	shellPG, errS := syscall.Getpgid(shellPID)
+	childPG, errC := syscall.Getpgid(childPID)
+	if errS != nil || errC != nil || shellPG == childPG {
+		t.Fatalf("child must run in its own process group: shell pgid=%d (%v), child pgid=%d (%v)",
+			shellPG, errS, childPG, errC)
+	}
 	sess.Close()
 
-	waitFor(t, closeGracePeriod+2*time.Second, func() bool {
-		return syscall.Kill(shellPID, 0) != nil && syscall.Kill(childPID, 0) != nil
-	})
+	select {
+	case <-sess.done:
+	default:
+		t.Fatal("Close returned before the session exited; the SIGKILL/ptmx fallback must not be needed")
+	}
+	// kill(pid, 0) succeeds on a zombie; reaping an orphan is its reaper's job, not Close's.
+	deadline := time.Now().Add(closeGracePeriod + 2*time.Second)
+	for processAlive(shellPID) || processAlive(childPID) {
+		if time.Now().After(deadline) {
+			_, shellLine := procState(shellPID)
+			_, childLine := procState(childPID)
+			t.Fatalf("processes alive after Close:\n shell: %s\n child: %s", shellLine, childLine)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// processAlive reports whether pid is running; gone or zombie (dead, not yet reaped) is not alive.
+func processAlive(pid int) bool {
+	state, _ := procState(pid)
+	return state != "" && state != "Z" && state != "X"
 }
 
 func TestSessionCloseIsIdempotent(t *testing.T) {
