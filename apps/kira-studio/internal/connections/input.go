@@ -137,6 +137,10 @@ func (in Input) validateMode() error {
 			return ipcerr.BadRequest("The URI's password contains a character (/, ? or #) that " +
 				"makes it ambiguous — percent-encode special characters in the password.")
 		}
+		if key, found := uriHasCredentialQuery(*in.URI); found {
+			return ipcerr.BadRequest("The URI's \"" + key + "\" parameter holds a secret that cannot be " +
+				"stored safely — remove it from the URI.")
+		}
 	}
 	return nil
 }

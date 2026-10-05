@@ -24,6 +24,9 @@ func TestStripURIPassword(t *testing.T) {
 		{"empty username", "postgresql://:p@h/db", "postgresql://h/db", strPtr("p")},
 		{"percent-encoded password", "postgres://u:p%40x@h/db", "postgres://u@h/db", strPtr("p@x")},
 		{"not a uri", "not a uri", "not a uri", nil},
+		{"password query param", "postgres://u@h/db?password=s%2Bx&sslmode=require", "postgres://u@h/db?sslmode=require", strPtr("s+x")},
+		{"only query param removes the ?", "postgres://u@h/db?password=s3cret", "postgres://u@h/db", strPtr("s3cret")},
+		{"userinfo wins over query", "postgres://u:a@h/db?password=b&x=1", "postgres://u@h/db?x=1", strPtr("a")},
 		{"query and fragment untouched", "postgresql://u:p@h/db?a=b#f", "postgresql://u@h/db?a=b#f", strPtr("p")},
 	}
 	for _, tt := range tests {
@@ -56,6 +59,9 @@ func TestURIHasAmbiguousPassword(t *testing.T) {
 		{"raw slash in password", "postgres://u:pa/ss@h/db", true},
 		{"raw question mark in password", "postgres://u:pa?ss@h/db", true},
 		{"raw hash in password", "postgres://u:pa#ss@h/db", true},
+		{"IPv6 host, later @ in query", "postgres://[::1]:5432/db?application_name=me@corp", false},
+		{"userinfo plus IPv6 host, later @ in query", "postgres://user@[::1]:5432/db?options=a@b", false},
+		{"password plus host, later @ in query", "postgres://u:p@h:5432/db?options=a@b", false},
 		{"well-formed, no delimiter before the real @", "postgres://u:pass@h/db", false},
 		{"well-formed with query string", "postgres://u:pass@h/db?sslmode=require", false},
 		{"percent-encoded slash in password", "mysql://root:my%2Fpass@h/db", false},

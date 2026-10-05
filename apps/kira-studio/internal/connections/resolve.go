@@ -78,9 +78,11 @@ func resolveFromInput(in Input) resolved {
 		// still silently tested with in.Password, a stale echo of whatever this connection's
 		// secret happened to be before the edit (nil for a brand-new draft, so this only bit an
 		// edit in progress).
-		if _, pw := stripURIPassword(*uri); pw != nil {
+		stripped, pw := stripURIPassword(*uri)
+		if pw != nil {
 			password = pw
 		}
+		uri = &stripped
 		injected := injectURIPassword(*uri, password)
 		uri = &injected
 	}
