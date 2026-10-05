@@ -7,7 +7,8 @@ import { useGhSyncPlan, useGitHubSyncApply, useRefresh } from '../queries';
 import type { GhSyncResult, ReviewWindowTarget } from '../wire';
 
 // Marks this branch's fully reviewed files as viewed on its pull request, one way: nothing read from
-// GitHub changes the app's review state.
+// GitHub changes the app's review state. The plan reloads on window focus, mark, and popover open, never on
+// a board push: each load lists the PR's files through GitHub.
 const props = defineProps<{ target: ReviewWindowTarget }>();
 
 const plan = useGhSyncPlan(() => props.target.branchId);
@@ -81,7 +82,10 @@ async function refreshRepo(): Promise<void> {
 
 function onOpenChange(next: boolean): void {
   open.value = next;
-  if (next) result.value = null;
+  if (next) {
+    result.value = null;
+    void plan.refetch();
+  }
 }
 
 function short(sha: string): string {

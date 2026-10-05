@@ -417,7 +417,7 @@ export function useLaunchReviewAgent() {
   });
 }
 
-/** What a GitHub sync would do for the branch; always re-asked (viewed state changes on GitHub). */
+/** What a GitHub sync would do for the branch; re-asked on focus, mark and popover open, not on board pushes (each load pages the PR's files). */
 export function useGhSyncPlan(branchId: MaybeRefOrGetter<string>) {
   return useQuery({
     queryKey: ['adetask', 'ghSyncPlan', branchId] as const,
