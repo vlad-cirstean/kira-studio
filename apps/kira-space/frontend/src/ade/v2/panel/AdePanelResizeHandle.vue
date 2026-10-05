@@ -10,6 +10,8 @@ const props = defineProps<{
   value: number;
   min: number;
   max: number;
+  /** The panel sits left of the handle: dragging right widens it. */
+  invert?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +23,10 @@ const emit = defineEmits<{
 
 const handleEl = ref<HTMLElement | null>(null);
 const dragStartValue = ref(0);
+
+function sign(): number {
+  return props.invert ? 1 : -1;
+}
 
 function clamp(w: number): number {
   return Math.max(props.min, Math.min(props.max, w));
@@ -39,7 +45,7 @@ useDraggable(handleEl, {
     dragStartValue.value = props.value;
   },
   onMove: (position) => {
-    lastDrag = clamp(dragStartValue.value - position.x);
+    lastDrag = clamp(dragStartValue.value + sign() * position.x);
     emit('resize', lastDrag);
   },
   onEnd: () => {
@@ -50,7 +56,7 @@ useDraggable(handleEl, {
 function onKeydown(e: KeyboardEvent): void {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
   e.preventDefault();
-  const next = clamp(props.value + (e.key === 'ArrowLeft' ? 16 : -16));
+  const next = clamp(props.value + (e.key === 'ArrowLeft' ? -sign() : sign()) * 16);
   emit('resize', next);
   void commitDebounced(next);
 }

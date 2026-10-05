@@ -1,10 +1,13 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
 import { bootstrapShell } from '@workbench/bootstrapShell';
 import { queryClient } from '@workbench/state/queryClient';
+import { windowKey } from '@workbench/util/window';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { installAdeSignals } from './ade/queries';
 import { useAgentSessionsStore } from './ade/state/agentSessions';
+import { reviewTargetKey } from './ade/v2/queries';
+import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { control } from './bridge/control';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
@@ -51,6 +54,7 @@ async function mountShell(): Promise<void> {
   const tabsStore = useTabsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
+  const reviewWindowStore = useAdeReviewWindowStore(pinia);
 
   // P129 Part 3 §2.8 item 2: right after the stores are built, before mount() below, so no push
   // (`kira:adetask:*` channels/agent `Stop`) is missed between mount
@@ -101,18 +105,33 @@ async function mountShell(): Promise<void> {
     }
   }
 
+  // A review window (ephemeral, one branch) answers with its target; any other window gets null.
+  const reviewTarget = await queryClient.fetchQuery({
+    queryKey: reviewTargetKey(windowKey),
+    queryFn: () => control.adeTaskReviewWindowTarget({ windowKey }),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  if (reviewTarget) {
+    reviewWindowStore.target = reviewTarget;
+    workspaceStore.openReviewWorkspace(reviewTarget.codeRepoId);
+  }
+
   // C5 §6.1: hydrateTabs (state/tabs.ts) already derived workspaceStore.openRepos from the
   // restored tabs themselves — ensureWorkspaceShell's own doc comment calls for running it once per
   // restored repo right here, after hydrateTabs, since hydrateTabs itself never calls back into it
   // (avoiding a third link in that module pair's existing two-way call graph).
-  for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
+  if (!reviewTarget) for (const repoId of workspaceStore.openRepos) ensureWorkspaceShell(repoId);
   // No persisted "last active repo" survives a restart in this app (unlike the per-window mode
   // hydrated above) — falling forward onto the first restored repo, when there is one, means a
   // relaunch with open repositories lands on one of their own tabs rather than the empty GitStart
   // screen every time. `activateWorkspace` never forces the mode back to `git` (its own doc
   // comment, state/workspace.ts), so this still honours whatever mode `windowsEnsure` restored
   // above — a relaunch into `terminal`/`ade` stays there even with repositories open behind it.
-  if (workspaceStore.active === GENERAL_WORKSPACE && workspaceStore.openRepos.length > 0) {
+  if (
+    !reviewTarget &&
+    workspaceStore.active === GENERAL_WORKSPACE &&
+    workspaceStore.openRepos.length > 0
+  ) {
     workspaceStore.activateWorkspace(workspaceStore.openRepos[0] as string);
   }
 

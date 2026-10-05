@@ -8,6 +8,8 @@ import UpdateDialog from '@workbench/components/UpdateDialog.vue';
 import { workbenchHostKey } from '@workbench/host';
 import { terminalModuleKey } from '@workbench/terminal/module';
 import { onMounted, onUnmounted, provide } from 'vue';
+import AdeReviewWindow from './ade/v2/review/AdeReviewWindow.vue';
+import { useAdeReviewWindowStore } from './ade/v2/state/adeReviewWindow';
 import { control } from './bridge/control';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useLayoutStore } from './state/layout';
@@ -40,6 +42,7 @@ const layoutStore = useLayoutStore();
 const settingsStore = useSettingsStore();
 const tabsStore = useTabsStore();
 const appUpdateStore = useAppUpdateStore();
+const reviewWindow = useAdeReviewWindowStore();
 
 let unsubscribe: Array<() => void> = [];
 
@@ -64,7 +67,8 @@ onUnmounted(() => {
 <template>
   <!-- P104 §6.1: disable-hoverable-content matches the app's pointer-events: none tooltip. -->
   <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
-    <div class="h-full flex flex-col">
+    <AdeReviewWindow v-if="reviewWindow.target" />
+    <div v-else class="h-full flex flex-col">
       <TitleBar />
       <WorkbenchShell />
     </div>

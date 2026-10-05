@@ -206,6 +206,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Every boot calls TerminalService.AgentSessions (createAgentSessionsStore's own initAgentSessions);
   // no committed fixture will ever snapshot it.
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
+  // main.ts asks every window whether it is a review window; none of the specs' windows is one.
+  [IPC.adeTaskReviewWindowTarget]: 'null',
 });
 
 // `windowKey`/`tabId` are excluded outright — a per-window or per-tab id this app generates at

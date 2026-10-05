@@ -80,6 +80,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     useModeStore().setMode('git');
   }
 
+  // A review window shows one repo's diff tabs and nothing else: no pinned graph tab, no mode change.
+  function openReviewWorkspace(repoId: string): void {
+    if (!state.openRepos.includes(repoId)) {
+      state.openRepos = [...state.openRepos, repoId];
+    }
+    void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
+    activateWorkspace(repoId);
+  }
+
   // Closes every one of repoId's own tabs (its pinned graph tab included — closeWorkspaceTabs is
   // the one path that bypasses the pin guard, tearing down the whole workspace being a different
   // act from closing one of its tabs), drops it from the switcher, stops its index/watcher, and
@@ -102,7 +111,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     if (state.active === repoId) activateWorkspace(GENERAL_WORKSPACE);
   }
 
-  return { ...toRefs(state), activateWorkspace, openRepoWorkspace, closeRepoWorkspace };
+  return {
+    ...toRefs(state),
+    activateWorkspace,
+    openRepoWorkspace,
+    openReviewWorkspace,
+    closeRepoWorkspace,
+  };
 });
 
 // P128 §2.6: which workspace's own tabs the tab strip currently shows — the active repo (or

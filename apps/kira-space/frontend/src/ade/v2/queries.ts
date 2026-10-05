@@ -56,6 +56,8 @@ export const backlogKey = ['adetask', 'backlog'] as const;
 export const reposKey = ['adetask', 'repos'] as const;
 export const sessionsKey = ['adetask', 'sessions'] as const;
 const candidatesKey = ['adetask', 'candidates'] as const;
+export const reviewTargetKey = (windowKey: string) =>
+  ['adetask', 'reviewTarget', windowKey] as const;
 
 export function useBoard() {
   return useQuery({
