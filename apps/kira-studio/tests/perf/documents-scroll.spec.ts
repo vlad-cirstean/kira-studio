@@ -32,6 +32,7 @@ const FLICK_DY = Number(ENV.KIRA_PERF_FLICK_DY ?? 9600);
 const LADDER_START_DY = Number(ENV.KIRA_PERF_LADDER_DY ?? 1600);
 const LADDER_DECAY = Number(ENV.KIRA_PERF_LADDER_DECAY ?? 0.92);
 const SETTLE_MS = 500;
+const LIST = '[data-testid="document-list"] [data-testid="virtual-list"]';
 
 const CONNECTION_ID = 'conn-doc-perf';
 const SUMMARY = mongoConnectionSummary(CONNECTION_ID, 'Mongo Perf', 'red');
@@ -117,8 +118,8 @@ function readSnapshot(
 }
 
 async function installRecorder(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const list = document.querySelector<HTMLElement>('[data-testid="virtual-list"]');
+  await page.evaluate((sel) => {
+    const list = document.querySelector<HTMLElement>(sel);
     if (!list) throw new Error('virtual-list not found');
     interface Rec {
       frames: Array<{ t: number; uncoveredPx: number }>;
@@ -151,7 +152,7 @@ async function installRecorder(page: Page): Promise<void> {
       if (!rec.stop) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  });
+  }, LIST);
 }
 
 async function mark(page: Page, which: 'start' | 'end'): Promise<void> {
@@ -223,8 +224,8 @@ test('documents scroll', async ({ relaunch }) => {
   await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
     timeout: 15_000,
   });
-  await page.click('[data-testid="page-size-10000"]');
-  const list = page.locator('[data-testid="virtual-list"]');
+  await page.click('[data-testid="document-page-size-10000"]');
+  const list = page.locator(LIST);
   await expect
     .poll(() => list.evaluate((el) => el.scrollHeight), { timeout: 30_000 })
     .toBeGreaterThanOrEqual(Math.round(DOCS * 158));
