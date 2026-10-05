@@ -50,7 +50,15 @@ function onMenu(ev: MouseEvent): void {
       id: 'ade-review-code',
       label: created ? 'Review code' : 'Review code (create the branch first)',
       disabled: !created,
-      run: () => openReview.mutate({ branchId: id }),
+      run: () =>
+        openReview.mutate(
+          { branchId: id },
+          {
+            onError: (err) => {
+              ui.actionError[props.row.branch.taskId] = err instanceof Error ? err.message : String(err);
+            },
+          },
+        ),
     },
     ...(!items
       ? []
