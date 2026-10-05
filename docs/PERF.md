@@ -145,6 +145,24 @@ ms and max to 43 ms. The code did not regress; this host runs the render about 1
 the one P139 measured (p50 6-8 ms). The bounds became p50 <= 16 ms and max <= 80 ms. The 8 ms
 product budget is unchanged and stays unverified here.
 
+**P161 Documents list, fastest wheel flick (WebKit sandbox, `perf:documents:studio`).** 5 000
+documents, 160 px rows, 800 000 px list, 3 runs per case, run `load1` 1.1-1.5 (start gate <= 0.95),
+before and after back to back on the same host. Profile named two causes: two reka `Tooltip`
+instances per row (~51 ms of a 142 ms flick frame) and a fixed 8-row overscan (16 of 22 rendered rows
+off screen at 160 px). Fixes: one shared tooltip, overscan sized in px (320).
+
+| Case | fps | frame p50 ms | frame p95 ms | frame max ms | over 50 ms |
+|---|---|---|---|---|---|
+| ladder before | 23 | 41 | 68 | 77 | 12 of 52 |
+| ladder after | 38 | 25 | 39 | 41 | 0 of 52 |
+| flick before | 8 | 122 | 171 | 192 | 80 of 82 |
+| flick after | 19 | 52 | 66 | 85 | 41 of 80 |
+| flick-up before | 8 | 118 | 163 | 187 | 80 of 82 |
+| flick-up after | 20 | 47 | 63 | 74 | 26 of 80 |
+
+Target (flick p95 <= 50 ms, <= 10 % of frames over) not met: remaining cost is mounting a full new
+window of rows per frame (bare divs floor 21 ms). No uncovered viewport in any run.
+
 **macOS re-run (2026-08-24), scroll response — resolved.** The finding recorded here at the time —
 macOS's compositor saturating the e2e delta with a full frame period on every one of 20 steps,
 where the Xvfb container above hit it on only about half — motivated

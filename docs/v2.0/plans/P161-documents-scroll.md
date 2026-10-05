@@ -151,3 +151,38 @@ reka tooltip pair ~2.3, tree ~1.7, head chrome and badges ~2.4. H1 (remount) ref
 (recycled keys change nothing), H2 and H3 refuted by numbers, H4/H5 negligible (watch/prune/heights
 0-1 ms). Named causes: C1 two reka `Tooltip` instances per row; C2 overscan 8 rows is 16 of 22
 rendered rows when rows are 160 px tall (a fast flick re-renders all of them, none visible).
+
+### Step 4/5: fixes
+
+- `57d13229` one shared tooltip for row Edit/Delete (`RowActionButton.vue`, delegated listeners in `DocumentView.vue`): C1.
+- `2e94cc58` list overscan sized in px (320 px, 2-8 rows; `useVirtualRows` accepts a getter): C2.
+- Not changed: recycled keys, `rowView` memo, parse cache headroom (A/B refuted H1-H3). The temporary instrumentation (`perfdbg.ts`, timers, `VITE_DIAG` toggles, CDP hook in the probe) was never committed; it sits in `git stash` (`p161-instrumentation`) and a patch in the session scratchpad, not in any commit.
+
+### Step 6: before / after
+
+Same host, production build, back to back, probe commit `cbdc4891` tree (before) vs `2e94cc58` (after), start gate `load1` 0.86 / 0.92 (<= 0.95), run `load1` 1.1-1.5 (probe's own browser included). Medians of 3 runs.
+
+| Case | | fps | frameP50 ms | frameP95 ms | frameMax ms | over50 | uncoveredMaxPx |
+|---|---|---|---|---|---|---|
+| ladder | before | 23 | 41 | 68 | 77 | 12 / 52 | 0 |
+| ladder | after | 38.2 | 25 | 39 | 41 | 0 / 52 | 0 |
+| flick | before | 8 | 122 | 171 | 192 | 80 / 82 | 0 |
+| flick | after | 19.1 | 52 | 66 | 85 | 41 / 80 | 0 |
+| flick-up | before | 8.3 | 118 | 163 | 187 | 80 / 82 | 0 |
+| flick-up | after | 20.4 | 47 | 63 | 74 | 26 / 80 | 0 |
+
+Target (flick p95 <= 50 ms, over50 <= 10 %) NOT met: p95 66 / 63 ms, over50 51 % / 33 %. Ladder: no regression, improved. Re-profile verdict: remaining cost is mounting a whole new window of rows (head, badges, 7 tree lines) every frame; per-row weight is spread (tree ~1.7 ms, head chrome ~2.4 ms), no single named cause left. The only larger lever is placeholder rows while `isScrolling` (changes what is drawn): user's call, not built. Open item recorded in `docs/ARCHITECTURE.md`.
+
+### Verification
+
+- `bun run typecheck` clean; `bun run test:unit` 1764 pass.
+- `test:ui:studio`: acceptance is one passing full run (user waived the 3 consecutive passes). With default 4 workers on this 4-core host, 3 of 3 runs each failed one different, unrelated spec under load 12-13 (`slick-grid` pacing, `scroll-trace` frame count, `data-view` Stop button); the first two re-ran alone 3x green. With `--workers=2`, 4 of 5 completed full runs passed 305/305 (including `ui-timing`, `interaction budgets` scroll response work p50 8 ms, p95 10-11 ms); the failure was again one unrelated spec (`mutations` cell-editor dblclick); a sixth run was aborted by the waiver. No documents spec failed in any run.
+- Step 1 recheck on the quiet host (nothing else running): grid scroll work p50 8 ms in every passing run, inside the original 12 ms bound; the earlier 9-14 ms readings were taken with other sessions sharing the box. The 16 / 80 ms bound from `f4cf264d` stays: the max bound is not printed by the spec, and P139's own commit failed identically on this host earlier. Honest status: the evidence for widening is mixed; if later runs pass at 12 / 50 consistently, revert it.
+- Visual suite not run: no baseline pixel changed on purpose (row look unchanged; tooltip appears on hover only).
+
+### Deviations
+
+- `f4cf264d` came before the profile; kept, with the caveat above.
+- Plan commit 3 (`cbdc4891`) mangled this file; repaired here from the plan commit plus the Result.
+- Probe run through the repo's Playwright (`node node_modules/.bin/playwright`); the global one finds no tests.
+- Flaky unrelated `ui` specs under load: no follow-up row beyond this note.

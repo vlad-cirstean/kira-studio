@@ -178,6 +178,12 @@ historical prose.
   run only at `load1 <= 1.0` (`/proc/loadavg`); each run line prints `load1` (includes the probe's own browser, ~1.0 extra, so a reading up to ~2 during a run is normal; check the gate before starting).
   Output is `key=value` per run plus a median `summary` per case. RSS is Linux-only and sums every
   browser process under the test worker.
+- **`bun run perf:documents:studio` probes the Documents list scroll** (P161, `tests/perf/documents-scroll.spec.ts`,
+  same `perf` project). 5 000 Mongo documents, ~160 px expanded rows, real wheel input. Cases `ladder`
+  (momentum), `flick` (80 x 9 600 px), `flick-up`; `KIRA_PERF_CASES`, `KIRA_PERF_RUNS` as above. Prints
+  frame p50/p95/max, frames over 50 ms and rendered-band coverage per run. Same gate. Run through the
+  repo's own Playwright (`node node_modules/.bin/playwright`): the global `/opt/node22/bin/playwright`
+  reports "No tests found".
 - **The FSEvents watcher is `darwin && cgo`** (`apps/kira-space/internal/gitclient/watcher_fsevents_darwin.go`), so
   a Linux run exercises the `fsnotify` companion instead. Both satisfy the same seam and both are
   covered by `watcher_test.go`; only the darwin backend's own behaviour needs real hardware.

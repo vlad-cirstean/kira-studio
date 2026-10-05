@@ -4295,6 +4295,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   `@property` fallback, live only on WebKit builds without `margin-trim`, doubles every restyle.
   Real WKWebView is unmeasured. Delete once the Mac check in `docs/PERF.md` §3 settles it.
 
+- **Documents list: the fastest wheel flick still misses 50 ms frames (P161)**. A flick jumps the
+  window past every rendered row each frame, so each frame mounts a whole new window of 160 px
+  expanded rows (head, badges, tree lines). After P161's shared row tooltip and px overscan, the WebKit
+  sandbox measures flick frame p95 62-72 ms, 26-56 of 80 frames over 50 ms (before: p95 157-177, 78-82
+  over). Further cut needs lighter rows while scrolling (`isScrolling` placeholders), which changes
+  what is drawn: user call. Delete once decided and measured.
+
 - **A backgrounded `Bash` tool call cannot arm the `waiting` activity phase (agent-hooks rule, §4.8)**.
   `reduceAgentActivity`'s `wakeArmed` flag — the signal that turns a session's `Stop` into `waiting
   on monitor` instead of plain `idle` — is set only when a `PreToolUse`'s own `toolName` is `Monitor`
