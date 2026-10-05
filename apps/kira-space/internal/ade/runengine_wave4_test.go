@@ -257,6 +257,65 @@ func TestRunEngine_recover(t *testing.T) {
 	}
 }
 
+// A held fix run keeps its send-back spec across Recover and launches as a resume (P156).
+func TestRunEngine_recoverHeldFixRun(t *testing.T) {
+	ctx := context.Background()
+	e := newEngine(t, map[string][]string{"*": {"sleep", "done", "done"}})
+	e.repo("api")
+	e.workflow(flowYAML(agentStage("build", agentStep("impl", "")+agentStep("tests", "        on_failure: back:impl\n"))))
+	id := e.task("api")
+	e.start(id)
+	first := e.waitRun(id, "impl/api", model.AdeRunRunning)
+	waitUntil(t, "fake claude started", func() bool { _, err := os.Stat(filepath.Join(e.fake, "api.count")); return err == nil })
+	if err := e.board.StopRun(ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	claudeID := e.claudeID(first)
+	branch := first.BranchID
+	now := time.Now().UnixMilli()
+	seed := func(r model.AdeRun) {
+		if err := e.repos.AdeTasks.InsertRun(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seed(model.AdeRun{ID: "r-tests1", TaskID: id, StageID: "build", StepID: "tests", BranchID: branch, Attempt: 1,
+		State: model.AdeRunBack, Note: "x → back to impl (1 of 3)", StartedAt: &now, FinishedAt: &now})
+	spec := model.AdeRunLaunch{Note: "sent back by tests: x", ResumeID: claudeID, Prompt: "tests failed on feat/fix-login: x. Fix the implementation."}
+	seed(model.AdeRun{ID: "r-fix", TaskID: id, StageID: "build", StepID: "impl", BranchID: branch, Attempt: 2,
+		State: model.AdeRunPending, Loops: 1, Note: noteWaitingSetup, Launch: spec})
+	if err := e.repos.AdeTasks.UpsertSetup(model.AdeWorktreeSetup{BranchID: branch, State: model.AdeSetupRunning, StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := e.board.Recover(); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := e.repos.AdeTasks.GetRun("r-fix"); r.State != model.AdeRunPending || r.Note != noteSetupFailed || r.Launch != spec {
+		t.Fatalf("held fix run after Recover = %+v", r)
+	}
+	if err := e.board.RetrySetup(ctx, branch); err != nil {
+		t.Fatal(err)
+	}
+	final := e.waitRun(id, "tests/api", model.AdeRunDone)
+	if final.Attempt != 2 || final.Loops != 1 {
+		t.Fatalf("final tests run = %+v; want attempt 2 loops 1", final)
+	}
+	fix, _ := e.repos.AdeTasks.GetRun("r-fix")
+	if fix.State != model.AdeRunDone || fix.Launch != (model.AdeRunLaunch{}) {
+		t.Fatalf("fix run = %+v; want done, spec cleared", fix)
+	}
+	if args := e.fakeFile("api-2.args"); !strings.Contains(args, "--resume\n"+claudeID) || strings.Contains(args, "--session-id") {
+		t.Fatalf("fix run argv = %s", args)
+	}
+	if prompt := e.fakeFile("api-2.prompt"); !strings.Contains(prompt, spec.Prompt) ||
+		!strings.Contains(prompt, adeagent.FinishStepSuffix) || strings.Contains(prompt, "Step 1/2") {
+		t.Fatalf("fix prompt = %q", prompt)
+	}
+	if rec, _ := e.repos.AdeSessions.Get(fix.SessionID); rec == nil || rec.Resumes != claudeID {
+		t.Fatalf("fix session = %+v; want resumes %s", rec, claudeID)
+	}
+}
+
 // quotedAfter reads the single-quoted word that follows a quoted flag in a composed command.
 func quotedAfter(t *testing.T, command, flag string) string {
 	t.Helper()

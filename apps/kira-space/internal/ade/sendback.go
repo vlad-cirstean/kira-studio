@@ -13,31 +13,11 @@ import (
 
 const maxSendBackRounds = 3
 
-// runOpts are the per-run extras queueRun carries to launch. They live in memory: a run held behind
-// a setup across a restart launches as a fresh, plain attempt.
+// runOpts are the per-run extras queueRun carries to launch. Launch lives on the run row until the
+// run launches, so a run held behind a setup resumes the same way after a restart.
 type runOpts struct {
-	Loops int
-	// Note stays on the run while it runs (launch otherwise clears it).
-	Note string
-	// ResumeID, when set, continues that Claude session with Prompt as the message.
-	ResumeID string
-	Prompt   string
-	// Extra is added after a fresh run's composed prompt.
-	Extra string
-}
-
-func (b *TaskBoard) setRunOpts(runID string, o runOpts) {
-	b.runMu.Lock()
-	b.runOpts[runID] = o
-	b.runMu.Unlock()
-}
-
-func (b *TaskBoard) takeRunOpts(runID string) runOpts {
-	b.runMu.Lock()
-	defer b.runMu.Unlock()
-	o := b.runOpts[runID]
-	delete(b.runOpts, runID)
-	return o
+	Loops  int
+	Launch model.AdeRunLaunch
 }
 
 // sendBack is a decided send-back: the target step to run again on one branch.
@@ -91,12 +71,12 @@ func (b *TaskBoard) decideSendBack(run model.AdeRun, out outcome) (*sendBack, ou
 		out.note = fmt.Sprintf("cannot send back: %s did not run on %s", targetDef.Name, branchName)
 		return nil, out
 	}
-	opts := runOpts{Loops: round, Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}
+	opts := runOpts{Loops: round, Launch: model.AdeRunLaunch{Note: fmt.Sprintf("sent back by %s: %s", from.Name, reason)}}
 	line := fmt.Sprintf("%s failed on %s: %s. Fix the implementation.", from.Name, branchName, reason)
 	if id := b.claudeIDOfSession(prev.SessionID); id != "" {
-		opts.ResumeID, opts.Prompt = id, line
+		opts.Launch.ResumeID, opts.Launch.Prompt = id, line
 	} else {
-		opts.Extra = line
+		opts.Launch.Extra = line
 	}
 	out.state = model.AdeRunBack
 	out.note = fmt.Sprintf("%s → back to %s (%d of %d)", reason, targetDef.Name, round, maxSendBackRounds)

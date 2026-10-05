@@ -350,7 +350,7 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	}
 	run := model.AdeRun{
 		ID: b.newID(), TaskID: tc.task.ID, StageID: tc.stage.ID, StepID: plan[idx].Def.ID, BranchID: branchID,
-		Attempt: attempt, State: model.AdeRunPending, Loops: opts.Loops,
+		Attempt: attempt, State: model.AdeRunPending, Loops: opts.Loops, Launch: opts.Launch,
 	}
 	open := b.setupReady(sb, path, setups)
 	if !open {
@@ -361,9 +361,6 @@ func (b *TaskBoard) queueRun(ctx context.Context, tc *taskCtx, plan []stepView, 
 	}
 	if err := b.deps.Tasks.InsertRun(run); err != nil {
 		return model.AdeRun{}, err
-	}
-	if opts != (runOpts{Loops: opts.Loops}) {
-		b.setRunOpts(run.ID, opts)
 	}
 	if !open {
 		b.emitRuns(run)
@@ -393,28 +390,28 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 		return run, err
 	}
 	now := b.deps.Now().UnixMilli()
-	opts := b.takeRunOpts(run.ID)
-	note := opts.Note
+	spec := run.Launch
+	note := spec.Note
 	running := model.AdeRunRunning
-	patch := model.AdeRunPatch{State: &running, StartedAt: &now, Note: &note}
+	patch := model.AdeRunPatch{State: &running, StartedAt: &now, Note: &note, Launch: &model.AdeRunLaunch{}}
 	vars := b.runVarsFor(tc, sb, path)
 
 	var sessionID, prompt string
 	if tc.stage.Kind == "agent" {
 		sessionID = b.newID()
 		patch.SessionID = &sessionID
-		claudeID := cmpNonEmpty(opts.ResumeID, b.newID())
-		if opts.ResumeID != "" {
-			prompt = composeResumePrompt(opts.Prompt)
+		claudeID := cmpNonEmpty(spec.ResumeID, b.newID())
+		if spec.ResumeID != "" {
+			prompt = composeResumePrompt(spec.Prompt)
 		} else {
 			prompt = composePrompt(promptInput{
 				Title: vars.Task, JiraKey: tc.task.JiraKey, JiraURL: tc.task.JiraURL, Vars: vars,
-				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: opts.Extra,
+				Step: idx + 1, Of: len(plan), Def: def, Message: b.stepMessage(tc.task.ID, tc.stage.ID, def.ID), Extra: spec.Extra,
 			})
 		}
 		if err := b.deps.Sessions.InsertHeadless(model.AdeSession{
 			ID: sessionID, Mode: model.AdeSessionModeHeadless, TaskID: tc.task.ID, BranchID: sb.ID, StageID: tc.stage.ID,
-			StepID: def.ID, RunID: run.ID, Resumes: opts.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
+			StepID: def.ID, RunID: run.ID, Resumes: spec.ResumeID, ClaudeSessionID: claudeID, Cwd: path,
 			State: model.AdeSessionStateRunning, StartedAt: now, LastActiveAt: now,
 		}); err != nil {
 			return run, err
@@ -434,7 +431,7 @@ func (b *TaskBoard) launch(ctx context.Context, tc *taskCtx, plan []stepView, id
 		go func() {
 			defer b.wg.Done()
 			defer endRun()
-			b.superviseAgent(runCtx, updated, def, sessionID, opts.ResumeID, path, prompt, timeout)
+			b.superviseAgent(runCtx, updated, def, sessionID, spec.ResumeID, path, prompt, timeout)
 		}()
 	} else {
 		go func() {
@@ -757,7 +754,11 @@ func (b *TaskBoard) RetryRun(ctx context.Context, runID string) error {
 	if run.State != model.AdeRunFailed && run.State != model.AdeRunStuck {
 		return invalid("only a failed or stuck run can be retried")
 	}
-	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", runOpts{Loops: run.Loops})
+	opts := runOpts{Loops: run.Loops}
+	if run.StartedAt == nil { // stopped before launch: the retry keeps the held resume spec
+		opts.Launch = run.Launch
+	}
+	_, err = b.queueRun(ctx, tc, plan, idx, run.BranchID, run.Attempt+1, "", opts)
 	return err
 }
 

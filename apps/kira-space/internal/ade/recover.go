@@ -12,7 +12,7 @@ import (
 const noteInterrupted = "interrupted by restart"
 
 // Recover settles what the previous process life left behind (D7, R9): running runs become stuck,
-// running setups failed, session rows stopped, orphaned MCP configs go. Nothing resumes by itself.
+// running setups failed, session rows stopped, orphaned MCP configs go. Held (pending) runs keep their launch spec and launch when their gate opens. Nothing resumes by itself.
 // Call it once at boot, before Start and before any window exists.
 func (b *TaskBoard) Recover() error {
 	now := b.deps.Now().UnixMilli()
