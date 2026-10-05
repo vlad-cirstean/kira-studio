@@ -8,17 +8,17 @@ import (
 	"strings"
 )
 
-// procState returns the /proc state letter for pid and the raw stat line; "" when pid is gone.
-func procState(pid int) (state, line string) {
+// procInfo returns pid's command name, /proc state letter and raw stat line; all empty when pid is gone.
+func procInfo(pid int) (comm, state, line string) {
 	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
 	if err != nil {
-		return "", ""
+		return "", "", ""
 	}
 	line = strings.TrimSpace(string(b))
-	// comm may hold spaces and parens, so the state is the first field after the last ')'.
-	i := strings.LastIndexByte(line, ')')
-	if i < 0 || i+2 >= len(line) {
-		return "", line
+	// comm may hold spaces and parens, so it spans first '(' to last ')' and the state follows.
+	open, end := strings.IndexByte(line, '('), strings.LastIndexByte(line, ')')
+	if open < 0 || end < open || end+2 >= len(line) {
+		return "", "", line
 	}
-	return line[i+2 : i+3], line
+	return line[open+1 : end], line[end+2 : end+3], line
 }

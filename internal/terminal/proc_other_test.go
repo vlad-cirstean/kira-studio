@@ -4,16 +4,18 @@ package terminal
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
-// procState returns the ps state letter for pid and the raw ps output; "" when pid is gone.
-func procState(pid int) (state, line string) {
-	out, _ := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
+// procInfo returns pid's command name, ps state letter and raw ps output; all empty when pid is gone.
+func procInfo(pid int) (comm, state, line string) {
+	out, _ := exec.Command("ps", "-o", "stat=,comm=", "-p", strconv.Itoa(pid)).Output()
 	line = strings.TrimSpace(string(out))
-	if line == "" {
-		return "", ""
+	f := strings.Fields(line)
+	if len(f) < 2 {
+		return "", "", line
 	}
-	return line[:1], line
+	return filepath.Base(strings.Join(f[1:], " ")), f[0][:1], line
 }

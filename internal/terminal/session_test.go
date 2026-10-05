@@ -165,6 +165,13 @@ func TestSessionCloseKillsProcessGroup(t *testing.T) {
 		return true
 	})
 
+	// Close right after the fork can land SIGHUP in the child's pre-exec window, where the shell's
+	// own handler swallows it; wait until the child is really `sleep`.
+	waitFor(t, 5*time.Second, func() bool {
+		comm, _, _ := procInfo(childPID)
+		return comm == "sleep"
+	})
+
 	shellPID := sess.cmd.Process.Pid
 	// Different groups prove job control is on; a shell change that drops it would silently make
 	// this a single-group test.
@@ -185,8 +192,8 @@ func TestSessionCloseKillsProcessGroup(t *testing.T) {
 	deadline := time.Now().Add(closeGracePeriod + 2*time.Second)
 	for processAlive(shellPID) || processAlive(childPID) {
 		if time.Now().After(deadline) {
-			_, shellLine := procState(shellPID)
-			_, childLine := procState(childPID)
+			_, _, shellLine := procInfo(shellPID)
+			_, _, childLine := procInfo(childPID)
 			t.Fatalf("processes alive after Close:\n shell: %s\n child: %s", shellLine, childLine)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -195,7 +202,7 @@ func TestSessionCloseKillsProcessGroup(t *testing.T) {
 
 // processAlive reports whether pid is running; gone or zombie (dead, not yet reaped) is not alive.
 func processAlive(pid int) bool {
-	state, _ := procState(pid)
+	_, state, _ := procInfo(pid)
 	return state != "" && state != "Z" && state != "X"
 }
 
