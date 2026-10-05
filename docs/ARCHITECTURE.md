@@ -4262,12 +4262,18 @@ rest of the tier's CPU contention out of the way. `e2e-real` runs `workers: 2`, 
 per-test `KIRA_HOME` plus `WAILS_SERVER_PORT` gives each instance its own SQLite app storage and its
 own secrets.
 
+**Terminal `Close` hangs up the shell's process group only (P157).** Jobs the shell does not hang up
+(dash's background jobs, bash/zsh `disown`, `nohup`, `trap '' HUP`) outlive the tab, as in VS Code,
+tmux and kitty. A sweep of the session's groups cannot tell a disowned job from a dash job, so none
+exists. On Linux the session ends `exitDrain` (200 ms) after the shell exits, not when the last
+slave holder closes, so a survivor neither stalls `Close` nor keeps a shell-exited tab open.
+
 ## Known open items
 
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
-- **Terminal `Close` does not reach background jobs outside the shell's process group (P153).** A shell that does not forward SIGHUP (dash, a `disown`ed bash job, zsh `NO_HUP`) leaves its jobs alive after the tab closes. Follow-up P157. Also: darwin keeps a blocking pty master (kqueue pollability unverified), so there `Close` cannot unblock a stuck reader and logs a WARN after 4 s.
+- **Terminal on darwin: a surviving job still stalls `Close` and keeps a shell-exited tab open (P153, P157).** darwin keeps a blocking pty master (kqueue pollability unverified), so the `exitDrain` close cannot interrupt the pending read. `Close` logs a WARN after 4 s. Delete once darwin's master is pollable or checked on a Mac.
 - **An interactive `claude` turn is unobservable in the dev sandbox (P147, P149, P150).** No Claude account: a fresh TUI stops at the theme picker, then the login menu, so the folder-trust prompt, the initial ` -- ` message, `claude --resume` and a `Stop` hook fired by `claude` itself were never seen. The app side is observed: hook env reaches the launched process, and a `Stop` posted through the hook shim records the merge (`ade_branch_marks.recorded = 1`). Send-then-archive completing after the turn is unobserved too. The server-tag build also drops terminal output (`EmitTo` needs a native window). Delete once checked on an authenticated desktop build. The P150 review agent shares this: `--add-dir` resume, a paste into a `working` turn and the 10 s no-submit hint are unobserved (the fake `claude` only logged argv and stdin).
 - **GitHub viewed sync is unobserved against real GitHub (P150).** Sandbox has no authenticated `gh`; the smoke used a fake `gh` (argv log, JSON state). The GraphQL schema half is checked offline. Delete once one sync marks and one un-review unmarks a file on a real PR.
 - **Native close/hide wiring of review windows is unobserved (P150).** A server build has no native window; `closeDecision` has a test, the Wails hooks do not. Delete once checked on a desktop build.

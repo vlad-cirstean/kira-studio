@@ -3,7 +3,7 @@
 Plan for `docs/v2.0/SPEC.md`'s **P157** row. Planned on branch `v2.0-c2` at `335c2e8f`. Line numbers
 are at that commit.
 
-**Status: planned.**
+**Status: done.**
 
 **Discovery method, disclosed.** Worktree has no `.codegraph/` index. `codegraph_explore` ran
 against the main checkout's index (2 calls: `Session.Close`/`newSession`/`readLoop`/`waitExitCode`,
@@ -247,5 +247,30 @@ darwin unchanged). Process-group test pinned to bash/zsh. Plan link.
 
 ## Result
 
-_Placeholder: implementer fills Status, commits, R1-R3 decisive lines, deviations, end checks 1-6
-with numbers, darwin note, open items._
+**Status: done.** Plan option (a+) as written, no deviations.
+
+Commits: `62605c53` fix (readLoop waiter/closer, `exitDrain`, survivor tests); `134bfca2` test
+(shared `startJob`/`openShellSession`, per-shell forwarding subtests, `procStatus` diagnostics);
+docs commit follows.
+
+**Repro, before the fix.** R1: `SHELL=/bin/sh go test -run TestSessionCloseKillsProcessGroup`:
+`processes alive after Close`, 8.11 s, child `sleep` `S` ppid 1. R2: `TestSessionCloseLeavesUnhungJobs`
+failed 3 of 4 cases (`Close took 4.002s, want < 2s`; bash nohup passed); `TestSessionExitsWhenShellExitsLeavingJob`:
+`session did not end after its shell exited`. R3: after the fix both pass; R1 command passes (test pins its shell).
+
+**End checks.**
+1. `go vet ./internal/terminal/` clean (also `GOOS=darwin`); hook green on every commit.
+2. `go test -race -count=50 ./internal/terminal/`: ok for `SHELL=/bin/bash` (185.9 s), `/usr/bin/zsh` (154.8 s), `/bin/sh` (180.6 s). zsh is installed here, so no zsh subtest skipped; the tests skip only when the binary is absent.
+3. Loaded (8 busy loops, 4 vCPU, compiled `-race` binary, `-test.count=500`, `SHELL=/bin/bash`): `PASS`, `exit=0`. No failure, so no diagnostics to record. P153 residual not reproduced.
+4. Leftover `sleep 300` after the run: 0.
+5. `go test ./... -count=1`: all ok.
+6. `git diff --stat 335c2e8f..HEAD -- . ':!internal/terminal' ':!docs'`: empty.
+
+**Harness note.** A first loaded run launched under `nohup` failed ~300 of 500 iterations
+(`Close took 2.2s`, bash child alive with `SigIgn: 1`). Cause: `nohup` makes SIGHUP ignored in the
+test binary, and bash/dash and their jobs inherit it. Not a product bug; rerun under `setsid` (`SigIgn` 0) passed.
+
+**Darwin.** Untested. Master stays blocking, so the `exitDrain` close cannot interrupt the read;
+ARCHITECTURE keeps that as its own open item.
+
+**Open items.** Darwin entry only.
