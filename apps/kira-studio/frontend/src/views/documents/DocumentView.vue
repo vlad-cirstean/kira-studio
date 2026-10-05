@@ -49,6 +49,7 @@ import { rowMenu } from './menu';
 import { deleteDocument, saveDocumentEdit, saveNewDocument } from './mutations';
 import ProjectionMenu from './ProjectionMenu.vue';
 import { documentRow, fieldNamesOnPage, pageVersion, setVisibleWindow } from './page';
+import RowActionButton from './RowActionButton.vue';
 import {
   searchState as docSearchState,
   type Match,
@@ -485,12 +486,47 @@ const rowHeights = computed<number[]>(() => {
 // useVirtualRows composable -- rowHeights carries the same variable per-row height VirtualList's
 // own `rowHeights` prop did (a document row's collapsed head vs. expanded body).
 const scrollEl = ref<HTMLElement | null>(null);
+
 const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   count: () => rows.value.length,
   rowHeight: () => 26,
   rowHeights: () => rowHeights.value,
   scrollElement: scrollEl,
 });
+
+// One tooltip for every row's Edit/Delete (RowActionButton.vue): anchored to a fixed, invisible span
+// moved over the hovered or focused button, driven by delegated listeners on the list.
+interface RowTip {
+  label: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+const rowTip = ref<RowTip | null>(null);
+const rowTipStyle = computed(() => ({
+  left: `${rowTip.value?.left ?? 0}px`,
+  top: `${rowTip.value?.top ?? 0}px`,
+  width: `${rowTip.value?.width ?? 0}px`,
+  height: `${rowTip.value?.height ?? 0}px`,
+}));
+function tipSource(e: Event): HTMLElement | null {
+  return e.target instanceof Element ? e.target.closest<HTMLElement>('[data-tip]') : null;
+}
+function showRowTip(e: Event): void {
+  const el = tipSource(e);
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  rowTip.value = { label: el.dataset.tip ?? '', left: r.left, top: r.top, width: r.width, height: r.height };
+}
+function hideRowTip(e: PointerEvent | FocusEvent): void {
+  const el = tipSource(e);
+  if (el && !(e.relatedTarget instanceof Node && el.contains(e.relatedTarget))) rowTip.value = null;
+}
+function onListScroll(): void {
+  rowTip.value = null;
+  onScroll();
+}
 
 // P42 D39: VirtualList reported positions *within* `rows` (§ above) — while filtering, that array
 // is a non-contiguous subset of page-row indices, so the reported bounds are the page rows
@@ -989,8 +1025,18 @@ onUnmounted(() => {
         data-testid="virtual-list"
         role="listbox"
         aria-label="Documents"
-        @scroll="onScroll"
+        @scroll="onListScroll"
+        @pointerover="showRowTip"
+        @pointerout="hideRowTip"
+        @focusin="showRowTip"
+        @focusout="hideRowTip"
       >
+        <Tooltip :open="rowTip !== null" @update:open="(o) => { if (!o) rowTip = null; }">
+          <TooltipTrigger as-child>
+            <span aria-hidden="true" class="pointer-events-none fixed" :style="rowTipStyle"></span>
+          </TooltipTrigger>
+          <TooltipContent>{{ rowTip?.label }}</TooltipContent>
+        </Tooltip>
         <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
              it (id/body decode, body parse) only for the row the virtualizer is actually
              rendering. Guarded by `v-if="rowAt(rows[vi.index])"` (never false for a row the
@@ -1025,21 +1071,19 @@ onUnmounted(() => {
                 <span class="flex-1 min-w-0"></span>
                 <div class="flex shrink-0 items-center gap-1">
                   <Badge v-if="editingRow === rows[vi.index]" variant="warn">editing</Badge>
-                  <TooltipIconButton
+                  <RowActionButton
                     icon="edit"
                     :label="editGate.editable ? 'Edit' : editGate.label"
                     aria-label="Edit"
-                    disabled-trigger
                     :class="{ 'bg-field text-fg': editingRow === rows[vi.index] }"
                     :disabled="!editGate.editable"
                     data-testid="document-edit"
                     @click.stop="startEdit(rows[vi.index], rowAt(rows[vi.index])!.view.id, rowAt(rows[vi.index])!.body)"
                   />
-                  <TooltipIconButton
+                  <RowActionButton
                     icon="trash"
                     :label="deleteTitle"
                     aria-label="Delete"
-                    disabled-trigger
                     :disabled="!canDelete"
                     data-testid="document-delete"
                     @click.stop="onDeleteRow(rowAt(rows[vi.index])!.view.id)"
