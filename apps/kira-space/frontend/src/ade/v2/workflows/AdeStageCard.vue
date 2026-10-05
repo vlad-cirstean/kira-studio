@@ -97,7 +97,7 @@ function removeStep(i: number): void {
         <Textarea
           :id="n('prompt')"
           :model-value="stage.prompt"
-          placeholder="First message for the session"
+          placeholder="First message for the session (optional)"
           class="ml-8 min-h-11 w-auto resize-y bg-bg px-2 py-1.5 font-data text-kira-md leading-normal"
           data-testid="ade-wf-stage-prompt"
           @update:model-value="(v: string | number) => patch({ prompt: String(v) })"

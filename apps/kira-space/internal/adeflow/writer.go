@@ -464,7 +464,7 @@ func applyStage(m *yaml.Node, st adewire.Stage) {
 	case "user":
 		keep["session"] = true
 		setScalar(m, "session", kBool, fmt.Sprint(st.Session), st.Session, stageOrder)
-		if st.Session {
+		if st.Session && st.Prompt != "" {
 			keep["prompt"] = true
 			setScalar(m, "prompt", kBlock, st.Prompt, true, stageOrder)
 		}
