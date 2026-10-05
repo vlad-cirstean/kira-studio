@@ -239,4 +239,8 @@ export function defineKiraTheme(mod: MonacoModule): void {
       'textLink.activeForeground': cssVar('--kira-info', '#3794ff'),
     },
   });
+  // `colorize()` (AutocompleteField's filter overlay) paints with the *global* theme, which stays
+  // Monaco's default light `vs` until an editor mounts with `theme:` set — a filter input with no
+  // editor on screen rendered dark-on-dark text. Make Kira's theme the global one from definition.
+  mod.editor.setTheme(KIRA_EDITOR_THEME);
 }
