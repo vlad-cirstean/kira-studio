@@ -621,3 +621,43 @@ flick). Add a view by copying a probe and calling `measureFlick` over `FLICK_LAD
   scroll cost there. Read real footprint with `docs/v1.1/WEBVIEW-SCROLL-MEMORY.md` Appendix A.
 - Env knobs: `NDOCS` (documents), `NROWS`/`NCOLS` (console grid), `BODYKIND`/`NITEMS` (HTTP
   response), `NTABLES` (tree), `GRAPH_N` (git graph).
+
+## Grid prototype (P163) — `proto/grid/`
+
+Dev-only Cheetah Grid prototype beside SlickGrid baselines. Not in the shipped bundle; Go embeds only
+`frontend/dist`. Plan and verdict: `docs/v2.0/plans/P163-cheetah-grid-prototype.md`.
+
+- Pages: `cheetah.html`, `slick.html?variant=kira|stock`, `empty.html` (bare scroller control).
+  Query: `fixture=features` (NULL, empty, truncated, masked, FK rows), `w`/`h`, `rowHeight`, `zebra=1`,
+  `readonly=1`.
+- `bun run proto:dev:grid` serves them. `proto:build:grid` writes `dist-proto` (no debug hooks).
+  `proto:build:grid:hooks` writes `dist-proto-hooks` (`window.__kiraGridProto`, `window.cheetahGrid`,
+  trace HUD).
+- `bun run test:proto:studio` builds the hooks build and runs `tests/proto/` in Playwright WebKit.
+- `bun run perf:probe:proto` builds both and runs `tests/perf/proto-grid-scroll.spec.ts`. Frame cost
+  uses the release build, late data the hooks build. `GRID=cheetah,slick-stock,slick-kira` narrows.
+  `PERF_HEADED=1 xvfb-run -a bun run perf:probe:proto` runs headed WebKitGTK.
+- Compare against the app with `NCOLS=20 TRACE=1 bunx playwright test
+  --config=apps/kira-studio/playwright.perf.config.ts grid-scroll` at the same commit. Its
+  `PERF viewport` line is the size the proto probe copies.
+- Container numbers rank engines only. No GPU, DPR 1. Footprint needs the Mac.
+
+### Mac footprint run (user-run)
+
+Needs Xcode command line tools. Not run in the sandbox, `wkhost.swift` is uncompiled there.
+
+1. `bun run proto:build:grid && bun run proto:build:grid:hooks`, then
+   `bun run proto:preview:grid` (serves `dist-proto` on 127.0.0.1:9246).
+2. `swiftc -O -o /tmp/wkhost apps/kira-studio/frontend/proto/grid/mac/wkhost.swift`.
+3. Per page: `/tmp/wkhost <url> 90 apps/kira-studio/frontend/proto/grid/mac/driver.js 2> <name>.log`
+   for `proto/grid/empty.html`, `slick.html?variant=kira`, `slick.html?variant=stock`,
+   `cheetah.html`, all with `?w=1440&h=960&rowHeight=28` appended (use `&` after the variant).
+4. Per page and band (`MARK-idle`, `MARK-40px`, `MARK-100px`, `MARK-200px`): idle footprint, peak
+   `FOOTPRINT`, delta. Never `vmmap` for the series.
+5. Late data on a real trackpad: serve `dist-proto-hooks`
+   (`cd apps/kira-studio/frontend && bunx vite preview --config vite.proto.config.ts --outDir
+   dist-proto-hooks`), open `cheetah.html?fixture=features` in Safari, press Start trace, one hard
+   two-finger flick, Stop trace. The JSON is on the clipboard. Same on `slick.html?variant=kira`. In
+   the real app: `__kiraScrollTrace` (`docs/PERF.md` section 2.1a). Note perceived smoothness and
+   blank edges per page.
+
