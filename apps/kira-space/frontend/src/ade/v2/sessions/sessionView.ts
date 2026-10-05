@@ -51,9 +51,12 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
   const run = task?.runs.find((r) => r.id === s.runId) ?? null;
   const scope = branch ? `${repo} · ${branchName}` : s.branchId ? basename(s.cwd) : 'spec';
   const id = shortId(s.id);
-  const tabName = headless
-    ? `run · ${step}${repo ? ` · ${repo}` : ''}`
-    : `${repo || 'spec'} · claude ${id}${s.resumes ? ' (resumed)' : ''}`;
+  const review = s.purpose === 'review';
+  const tabName = review
+    ? 'Review agent'
+    : headless
+      ? `run · ${step}${repo ? ` · ${repo}` : ''}`
+      : `${repo || 'spec'} · claude ${id}${s.resumes ? ' (resumed)' : ''}`;
   return {
     session: s,
     kind: activityKind(s),
@@ -65,12 +68,16 @@ export function sessionView(s: Session, look: SessionLookup): SessionView {
     run,
     tabName,
     badge: headless ? 'claude -p' : 'TUI',
-    stoppedLabel: `${headless ? `run · ${step}` : 'TUI'} · ${scope} · ${id}`,
-    allLabel: headless
-      ? `claude -p · ${step}`
-      : s.branchId
-        ? 'TUI · interactive'
-        : 'TUI · spec session',
+    stoppedLabel: review
+      ? `TUI · review agent · ${id}`
+      : `${headless ? `run · ${step}` : 'TUI'} · ${scope} · ${id}`,
+    allLabel: review
+      ? 'TUI · review agent'
+      : headless
+        ? `claude -p · ${step}`
+        : s.branchId
+          ? 'TUI · interactive'
+          : 'TUI · spec session',
   };
 }
 

@@ -16,6 +16,8 @@ import {
 import { useAdeBoardUiStore } from './v2/state/adeBoardUi';
 import type { Board, LogPage, RunsChangedEvent } from './v2/wire';
 
+const reviewAgentPrefix = ['adetask', 'reviewAgent'] as const;
+
 /** Merges pushed runs into the cached board by id (unknown ones append to their task); the board
  *  push that follows reconciles. */
 function mergeRuns(board: Board, event: RunsChangedEvent): Board {
@@ -63,6 +65,7 @@ export function installAdeSignals(queryClient: QueryClient): void {
   });
   control.onAdeTaskSessions(() => {
     void queryClient.invalidateQueries({ queryKey: sessionsKey, exact: true });
+    void queryClient.invalidateQueries({ queryKey: reviewAgentPrefix });
   });
   control.onAdeTaskOpenSession((event) => {
     useAdeBoardUiStore().openSession(event);

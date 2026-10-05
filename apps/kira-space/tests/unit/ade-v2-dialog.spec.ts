@@ -357,6 +357,17 @@ describe('turn watcher', () => {
     expect(await watch.done).toBe('stop');
   });
 
+  test("onSubmit fires once, on the watch's own prompt submit", () => {
+    const w = createTurnWatcher();
+    let submits = 0;
+    w.watch('t1', { requireSubmit: true, onSubmit: () => submits++ });
+    w.onEvent(ev('Stop'));
+    expect(submits).toBe(0);
+    w.onEvent(ev('UserPromptSubmit'));
+    w.onEvent(ev('UserPromptSubmit'));
+    expect(submits).toBe(1);
+  });
+
   test('a launch counts its first Stop', async () => {
     const w = createTurnWatcher();
     const watch = w.watch('t1', { requireSubmit: false });

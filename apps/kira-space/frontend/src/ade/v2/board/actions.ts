@@ -73,7 +73,13 @@ function doneAction(p: TaskProgress): TaskAction {
 function userStageAction(i: TaskCellInput): TaskAction {
   const { progress: p, sessions } = i;
   const stage = p.stage;
-  const talking = sessions.some((s) => s.mode === 'tui' && s.state === 'running');
+  // The review agent is the stage's session only on the review stage.
+  const talking = sessions.some(
+    (s) =>
+      s.mode === 'tui' &&
+      s.state === 'running' &&
+      (s.purpose !== 'review' || stage?.id === 'review'),
+  );
   if (stage?.session && !talking) {
     return {
       kind: 'stage',

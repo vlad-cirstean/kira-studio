@@ -48,7 +48,17 @@ export async function openLaunch(
 
 /** Delivers one message; returns the launch for a new session, `null` for a `Send`. */
 export async function deliver(
+  deps: Pick<LaunchDeps, 'send'>,
+  target: Extract<DeliverTarget, { kind: 'send' }>,
+  onArmed: (terminalId: string, requireSubmit: boolean) => void,
+): Promise<null>;
+export async function deliver(
   deps: LaunchDeps,
+  target: DeliverTarget,
+  onArmed: (terminalId: string, requireSubmit: boolean) => void,
+): Promise<Launch | null>;
+export async function deliver(
+  deps: Pick<LaunchDeps, 'send'> | LaunchDeps,
   target: DeliverTarget,
   onArmed: (terminalId: string, requireSubmit: boolean) => void,
 ): Promise<Launch | null> {
@@ -57,11 +67,12 @@ export async function deliver(
     await deps.send({ sessionId: target.sessionId, message: target.message });
     return null;
   }
+  const full = deps as LaunchDeps;
   const launch =
     target.kind === 'start'
-      ? await deps.startBranch({ branchId: target.branchId, message: target.message })
-      : await deps.launchStage({ taskId: target.taskId, message: target.message });
+      ? await full.startBranch({ branchId: target.branchId, message: target.message })
+      : await full.launchStage({ taskId: target.taskId, message: target.message });
   onArmed(launch.terminalId, false);
-  await openLaunch(deps, launch);
+  await openLaunch(full, launch);
   return launch;
 }

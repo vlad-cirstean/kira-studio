@@ -3,21 +3,13 @@ import { computed } from 'vue';
 import AdeRepoTag from '../AdeRepoTag.vue';
 import { taskTitle } from '../board/labels';
 import { taskColor } from '../palette';
-import { useBoard, useRepos } from '../queries';
 import type { ReviewWindowTarget } from '../wire';
+import { useReviewContext } from './useReviewContext';
 
 const props = defineProps<{ target: ReviewWindowTarget }>();
 
-const board = useBoard();
-const repos = useRepos();
-
-const task = computed(() => board.data.value?.tasks.find((t) => t.id === props.target.taskId));
-const branch = computed(() => board.data.value?.branches.find((b) => b.id === props.target.branchId));
+const { task, branch, repoLabel } = useReviewContext(() => props.target);
 const title = computed(() => (task.value ? taskTitle(task.value, branch.value, '') : props.target.branch));
-const repoLabel = computed(() => {
-  const r = repos.data.value?.repos.find((x) => x.codeRepoId === props.target.codeRepoId);
-  return r ? r.nickname || r.name : props.target.codeRepoId;
-});
 const dirtyCount = computed(() => branch.value?.dirty.length ?? 0);
 </script>
 

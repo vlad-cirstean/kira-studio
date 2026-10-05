@@ -21,17 +21,22 @@ interface WatchEntry {
   submitted: boolean;
   liveSeen: boolean;
   resolve: (outcome: TurnOutcome) => void;
+  /** Called once, when this watch's own prompt submits. */
+  onSubmit?: () => void;
 }
 
 export function createTurnWatcher(): {
-  watch: (terminalId: string, opts: { requireSubmit: boolean }) => TurnWatch;
+  watch: (terminalId: string, opts: { requireSubmit: boolean; onSubmit?: () => void }) => TurnWatch;
   onEvent: (event: AgentEvent) => void;
   onLive: (terminalIds: readonly string[]) => void;
 } {
   const watches = new Map<number, WatchEntry>();
   let nextId = 0;
 
-  function watch(terminalId: string, opts: { requireSubmit: boolean }): TurnWatch {
+  function watch(
+    terminalId: string,
+    opts: { requireSubmit: boolean; onSubmit?: () => void },
+  ): TurnWatch {
     const id = nextId++;
     let resolveFn: (outcome: TurnOutcome) => void = () => {};
     const done = new Promise<TurnOutcome>((resolve) => {
@@ -42,6 +47,7 @@ export function createTurnWatcher(): {
       submitted: !opts.requireSubmit,
       liveSeen: false,
       resolve: resolveFn,
+      onSubmit: opts.onSubmit,
     });
     return {
       done,
@@ -55,6 +61,7 @@ export function createTurnWatcher(): {
     for (const [id, entry] of watches) {
       if (entry.terminalId !== event.terminalId) continue;
       if (event.event === 'UserPromptSubmit') {
+        if (!entry.submitted) entry.onSubmit?.();
         entry.submitted = true;
       } else if (event.event === 'Stop') {
         if (entry.submitted) {

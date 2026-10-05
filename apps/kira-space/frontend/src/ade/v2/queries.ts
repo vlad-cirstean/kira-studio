@@ -23,6 +23,7 @@ import type {
   PathArgs,
   RecordMergeArgs,
   RefreshArgs,
+  ReviewAgentLaunch,
   RunArgs,
   SaveWorkflowArgs,
   SaveWorkflowYamlArgs,
@@ -391,4 +392,20 @@ export function useArchiveTask() {
 
 export function useFocusSession() {
   return useMutation({ mutationFn: (args: FocusSessionArgs) => control.adeTaskFocusSession(args) });
+}
+
+/** The task's review agent and where it runs; a sessions push refetches it. */
+export function useReviewAgent(taskId: MaybeRefOrGetter<string>) {
+  return useQuery({
+    queryKey: ['adetask', 'reviewAgent', taskId] as const,
+    queryFn: () => control.adeTaskReviewAgent({ taskId: toValue(taskId) }),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
+export function useLaunchReviewAgent() {
+  return useMutation({
+    mutationFn: (args: TaskArgs): Promise<ReviewAgentLaunch> =>
+      control.adeTaskLaunchReviewAgent(args),
+  });
 }
