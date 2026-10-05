@@ -247,9 +247,9 @@ frames over 50 ms -99 %). This names the mechanism round 1 inferred:
 - Isolating the viewport, pane or host does not: those boxes start at or above the strip, so they
   are themselves the overlapping layer and the rows inside still paint per-row. Inferred, not
   observed (no layer-tree API in this WebKit).
-- It also explains why round 1's stock page never paid the penalty with the same CSS: stock's
-  default range keeps ~3 rows above the viewport instead of 560 px of runway, so far fewer rows
-  overlap the strip. Not separately measured.
+- It does not explain why round 1's stock page never pays the penalty with the same CSS. A stock
+  runway of 20 rows (`minRowBuffer: 20`) stays at 57.5 / 58.2 fps (R2.9), so runway depth is not
+  the difference. Open (R2.10).
 
 `content-visibility:auto` on rows: +5.5 fps, not competitive with the two layer fixes and it
 skips painting the runway (late-data risk), so not pursued. Cell `display:flex` costs nothing.
@@ -293,7 +293,7 @@ Overscan, `TRACE=1` (`__kiraScrollTrace` on, both axes changed together via scra
   `placeNavButtonsForRenderedCells` scan, `tagRenderedRows`). Nav buttons: 0 mounted (fixture has no
   FK/PK meta), not measured. Cell `display:flex`, hover rule: 0.
 
-### R2.5 Step 3: memory (WPE process RSS, interim)
+### R2.5 Step 3: memory (WPE process RSS)
 
 `RSS=1`: all WebKit processes' RSS sampled every 100 ms (`RssSampler`). Rise = flick peak minus
 pre-ladder value. Linux software compositing keeps layer backing stores in process memory, so RSS
@@ -307,8 +307,8 @@ sees them here; on macOS `ps` does not (IOSurface), use footprint.
 | both | 622->695, 623->707, 618->713 | 73 / 84 / 95 | 52.1 / 53.1 / 54.0 |
 | canvas isolate + no hover + no borders | 614->700, 613->702, 616->697 | 86 / 89 / 81 | 53.7 / 56.2 / 54.8 |
 | stock, all app factors (frozen, app CSS incl. header `will-change`) | 407->460, 407->449, 401->454 | 53 / 42 / 53 | 59.2 / 57.5 / 59.7 |
-| stock, same, header `will-change:auto` | 405->452, 395->451 | 47 / 56 | 61.5 / 60.6 |
-| stock plain | 381->453, 382->450 | 72 / 68 | 61.0 / 59.8 |
+| stock, same, header `will-change:auto` | 405->452, 395->451, 396->450 | 47 / 56 / 54 | 61.5 / 60.6 / 58.7 |
+| stock plain | 381->453, 382->450, 381->453 | 72 / 68 / 72 | 61.0 / 59.8 / 52.3 |
 
 - Either layer fix cuts scroll-time RSS growth from ~193 MB to ~86 MB (-55 %), every run. That is
   per-row layer backing store, gone. On a Retina Mac each row layer is backed at 2x, so the share of
@@ -392,3 +392,53 @@ Protocol, per hypothesis (H0 = nothing on, then H1, H2, H3, H4, then H2+H4):
 5. Remove the snippet (same call) before the next one. Reload between hypotheses if numbers drift.
 
 Report per hypothesis: layer count, footprint plateau, gap frames, frame p95.
+
+### R2.9 Headed WebKitGTK and stock controls
+
+Headed WebKitGTK (`PERF_HEADED=1`, `xvfb-run -a -s "-screen 0 1600x1000x24"`), 2 runs each:
+
+| Variant | fps | p95 ms | >50 ms | load1 |
+|---|---|---|---|---|
+| base | 59.5 / 59.8 | 20.2 / 19.0 | 1 / 0 | 0.94-0.99 |
+| header `will-change:auto` | 59.7 / 59.9 | 20.0 / 18.8 | 0 / 0 | 0.95 |
+| canvas `contain:layout paint` | 59.6 / 59.3 | 19.2 / 20.4 | 3 / 0 | 0.93-0.97 |
+
+Headed GTK is pinned at the 60 Hz cap for every variant, base included: it does not reproduce
+the penalty at all, so it can neither confirm nor refute cause 1. The finding rests on headless WPE
+only. Whether macOS WKWebView builds per-row layers here is exactly what the Layers-tab step in
+R2.8 answers.
+
+Stock, all app factors, deeper runway (headless), 2 runs each:
+
+| Variant | fps | p95 ms | >50 ms | load1 |
+|---|---|---|---|---|
+| `minRowBuffer: 20` | 57.5 / 58.2 | 22.6 / 21.6 | 0 / 0 | 0.92-0.97 |
+| `minRowBuffer: 20` + canvas `contain:layout paint` | 59.4 / 60.5 | 20.6 / 19.8 | 0 / 0 | 0.82-0.97 |
+
+### R2.10 Unexplained
+
+- Why stock SlickGrid with the app's full CSS (header `will-change` included), frozen gutter and a
+  20-row runway pays no per-row layer penalty, while the app does. Remaining structural
+  differences not yet bisected: `KiraSlickGrid` overrides (`createCssRules` custom-property
+  positioning, `bindAncestorScrollEvents`), the `.slick-grid-mount` wrapper, header furniture
+  (sort divs, badges, select zones, `headerCellAttrs` tooltips), the app's 0x0 `position: fixed`
+  tooltip anchor span after the mount, and the app's ancestor chain (reka splitter panels,
+  `overflow: hidden`). Round 1 already ruled out `--sg-l<i>` positioning and clip ancestors.
+- Why viewport/pane/host isolation does not help while canvas isolation does (R2.3 gives an
+  inference only).
+- Residual app-versus-stock memory: ~+35 MB scroll rise after the fix.
+- Round 1's ~10 fps unexplained gap: closed. Header `will-change:auto` + no borders reaches
+  56-59 fps, stock level.
+
+### R2.11 Left to try / not done
+
+- Mac verification of everything above (R2.8). Headless WPE is the only engine that shows the
+  penalty; the Mac Layers tab plus footprint decide whether fix 1 matters for the user.
+- Horizontal-scroll header repaint without header `will-change` (fix 2's risk): not measured.
+- A cheaper per-cell border construct: none found among the two tried.
+- Nav buttons (`placeNavButtonsForRenderedCells`) with real FK/PK meta: fixture has none, not
+  measured. `renderMs` p95 3 ms bounds all per-render JS in the measured fixture.
+- Frozen gutter scroll sync: not re-measured (round 1: +2.5 fps, 1 run, feature, not a candidate).
+- Bisecting the stock-versus-app difference in R2.10.
+- Late-data effect of overscan: not observable here (0 uncovered frames at every setting); only a
+  real trackpad flick on the Mac shows it.
