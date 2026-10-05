@@ -14,6 +14,7 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
+import { pumpChunks, textChunks } from './chunkedText';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
 import {
@@ -81,7 +82,11 @@ const pending = ref(true);
 const previewDoc = computed(() =>
   props.doc.length > PENDING_PREVIEW_CHARS ? props.doc.slice(0, PENDING_PREVIEW_CHARS) : props.doc,
 );
-let fillGeneration = 0;
+let fillCtrl: AbortController | null = null;
+const cancelFill = (): void => {
+  fillCtrl?.abort();
+  fillCtrl = null;
+};
 let filling = false;
 let lastAppliedDoc: string | null = null;
 let lastAppliedVersionId = -1;
@@ -434,7 +439,9 @@ function finishFill(m: TextModel, doc: string): void {
 async function fillModel(doc: string, onFirstContent?: () => void): Promise<void> {
   const target = model;
   if (!target) return;
-  const gen = ++fillGeneration;
+  cancelFill();
+  const ctrl = new AbortController();
+  fillCtrl = ctrl;
   filling = true;
   applyingExternal = true;
   lastAppliedVersionId = -1;
@@ -446,31 +453,29 @@ async function fillModel(doc: string, onFirstContent?: () => void): Promise<void
       return;
     }
     target.setValue('');
-    let pos = 0;
-    while (pos < doc.length) {
-      let end = Math.min(pos + FILL_CHUNK_CHARS, doc.length);
-      const nl = doc.indexOf('\n', end);
-      if (nl !== -1 && nl - end < FILL_CHUNK_CHARS) end = nl + 1;
-      const line = target.getLineCount();
-      const col = target.getLineMaxColumn(line);
-      target.applyEdits([
-        {
-          range: { startLineNumber: line, startColumn: col, endLineNumber: line, endColumn: col },
-          text: doc.slice(pos, end),
-        },
-      ]);
-      pos = end;
-      if (onFirstContent) {
-        onFirstContent();
-        onFirstContent = undefined;
-      }
-      if (pos >= doc.length) break;
-      await new Promise<void>((r) => requestAnimationFrame(() => r()));
-      if (gen !== fillGeneration || model !== target) return;
-    }
+    const done = await pumpChunks(
+      textChunks(doc, { chunkChars: FILL_CHUNK_CHARS, lineAligned: true }),
+      (chunk) => {
+        const line = target.getLineCount();
+        const col = target.getLineMaxColumn(line);
+        target.applyEdits([
+          {
+            range: { startLineNumber: line, startColumn: col, endLineNumber: line, endColumn: col },
+            text: chunk,
+          },
+        ]);
+        if (onFirstContent) {
+          onFirstContent();
+          onFirstContent = undefined;
+        }
+      },
+      { signal: ctrl.signal },
+    );
+    if (!done || model !== target) return;
     finishFill(target, doc);
   } finally {
-    if (gen === fillGeneration) {
+    if (fillCtrl === ctrl) {
+      fillCtrl = null;
       filling = false;
       applyingExternal = false;
     }
@@ -516,7 +521,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  fillGeneration++;
+  cancelFill();
   clearTimeout(lintTimer);
   decorations?.clear();
   decorations = null;
@@ -590,7 +595,7 @@ function applyExternalDoc(doc: string): void {
     // §4.7: the hard undo boundary around every editable external write — both
     // `pushStackElement()` calls are mandatory (one alone leaves the write mergeable on one side);
     // `setValue` would discard the whole undo stack.
-    fillGeneration++;
+    cancelFill();
     applyingExternal = true;
     model.pushStackElement();
     model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
