@@ -759,3 +759,30 @@ func (s *AdeTaskService) ReviewWindowTarget(ctx context.Context, args adewire.Wi
 	t, err := s.Engine.ReviewWindowTarget(ctx, args.WindowKey)
 	return t, adeTaskError(err)
 }
+
+// ReviewAgent returns the task's review agent session and, when it runs, the window hosting its terminal.
+func (s *AdeTaskService) ReviewAgent(_ context.Context, args adewire.TaskArgs) (adewire.ReviewAgentState, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ReviewAgentState{}, err
+	}
+	sess, err := s.Engine.ReviewAgent(args.TaskID)
+	if err != nil {
+		return adewire.ReviewAgentState{}, adeTaskError(err)
+	}
+	out := adewire.ReviewAgentState{Session: sess}
+	if sess != nil && sess.State == model.AdeSessionStateRunning && sess.TerminalID != "" && s.Registry != nil {
+		if key, ok := s.Registry.WindowOf(sess.TerminalID); ok {
+			out.HostWindowKey = key
+		}
+	}
+	return out, nil
+}
+
+// LaunchReviewAgent starts or resumes the task's review agent. E_INVALID when one already runs.
+func (s *AdeTaskService) LaunchReviewAgent(ctx context.Context, args adewire.TaskArgs) (adewire.ReviewAgentLaunch, error) {
+	if err := validateAdeTaskID(args.TaskID, "taskId"); err != nil {
+		return adewire.ReviewAgentLaunch{}, err
+	}
+	l, err := s.Engine.LaunchReviewAgent(ctx, args.TaskID)
+	return l, adeTaskError(err)
+}

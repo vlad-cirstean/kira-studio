@@ -131,6 +131,10 @@ func (b *TaskBoard) TakeOver(ctx context.Context, args adewire.TakeOverArgs) (ad
 	if err != nil {
 		return adewire.Launch{}, err
 	}
+	if rec.Purpose == model.AdeSessionPurposeReview {
+		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, "", nil)
+		return l, err
+	}
 	gatePath := ""
 	if rec.BranchID != "" {
 		sb, ok := tc.branch(rec.BranchID)
@@ -306,51 +310,19 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 		return adewire.Launch{}, invalid("the current stage has no interactive session")
 	}
 	stage := *tc.stage
+	if stage.ID == reviewStageID {
+		l, _, _, err := b.launchReviewAgent(ctx, tc, tr, args.Message, &stage)
+		return l, err
+	}
 	if open, err := b.runningTUI(func(s model.AdeSession) bool { return s.TaskID == tc.task.ID && s.StageID == stage.ID }); err != nil {
 		return adewire.Launch{}, err
 	} else if open != nil {
 		return adewire.Launch{}, invalid("a %s session is already running", stage.Name)
 	}
 
-	var lines []repoLine
-	var dirs []string
-	firstOwn := -1
-	for _, sb := range tc.branches {
-		nick := b.repoNick(tc, sb)
-		if sb.Kind == model.AdeBranchKindMine && sb.Name != "" {
-			path, err := b.launchGate(ctx, tc, sb)
-			if err != nil {
-				return adewire.Launch{}, err
-			}
-			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Worktree: path})
-			if firstOwn < 0 {
-				firstOwn = len(dirs)
-			}
-			dirs = append(dirs, path)
-			continue
-		}
-		rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
-		if err != nil {
-			return adewire.Launch{}, err
-		}
-		if rec == nil {
-			return adewire.Launch{}, invalid("code repo %s not found", sb.CodeRepoID)
-		}
-		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root})
-		dirs = append(dirs, rec.Root)
-	}
-	if len(dirs) == 0 {
-		return adewire.Launch{}, invalid("the task has no repo")
-	}
-	if firstOwn < 0 {
-		firstOwn = 0
-	}
-	cwd := dirs[firstOwn]
-	var extra []string
-	for i, d := range dirs {
-		if i != firstOwn && filepath.Clean(d) != filepath.Clean(cwd) {
-			extra = append(extra, d)
-		}
+	lines, cwd, extra, err := b.launchDirs(ctx, tc)
+	if err != nil {
+		return adewire.Launch{}, err
 	}
 	message := args.Message
 	if message == "" {
@@ -365,6 +337,50 @@ func (b *TaskBoard) LaunchStage(ctx context.Context, args adewire.LaunchStageArg
 		return adewire.Launch{}, err
 	}
 	return launchOf(res), nil
+}
+
+// launchDirs gathers the repos of a task-level session: the first writable branch's worktree is the
+// cwd (else the first repo root), every other worktree and read-only repo root joins via --add-dir.
+func (b *TaskBoard) launchDirs(ctx context.Context, tc *taskCtx) (lines []repoLine, cwd string, extra []string, err error) {
+	var dirs []string
+	firstOwn := -1
+	for _, sb := range tc.branches {
+		nick := b.repoNick(tc, sb)
+		if sb.Kind == model.AdeBranchKindMine && sb.Name != "" {
+			path, err := b.launchGate(ctx, tc, sb)
+			if err != nil {
+				return nil, "", nil, err
+			}
+			lines = append(lines, repoLine{Nick: nick, Branch: sb.Name, Base: sb.Base, Worktree: path})
+			if firstOwn < 0 {
+				firstOwn = len(dirs)
+			}
+			dirs = append(dirs, path)
+			continue
+		}
+		rec, err := b.deps.CodeRepos.Get(sb.CodeRepoID)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		if rec == nil {
+			return nil, "", nil, invalid("code repo %s not found", sb.CodeRepoID)
+		}
+		lines = append(lines, repoLine{Nick: nick, ReadOnlyRoot: rec.Root})
+		dirs = append(dirs, rec.Root)
+	}
+	if len(dirs) == 0 {
+		return nil, "", nil, invalid("the task has no repo")
+	}
+	if firstOwn < 0 {
+		firstOwn = 0
+	}
+	cwd = dirs[firstOwn]
+	for i, d := range dirs {
+		if i != firstOwn && filepath.Clean(d) != filepath.Clean(cwd) {
+			extra = append(extra, d)
+		}
+	}
+	return lines, cwd, extra, nil
 }
 
 // StartBranch opens an interactive session on one branch's worktree (R16).

@@ -73,6 +73,8 @@ func composeResumePrompt(line string) string {
 // repoLine is one repo of a launch message.
 type repoLine struct {
 	Nick, Branch, Worktree string
+	// Base is the branch's base ref, shown in the review message only.
+	Base string
 	// ReadOnlyRoot, when set, makes the line a read-only repo in that directory.
 	ReadOnlyRoot string
 }
@@ -99,21 +101,54 @@ func composeStageMessage(stage adewire.Stage, title, jiraKey, jiraURL, notes str
 	if l := jiraLine(jiraKey, jiraURL); l != "" {
 		lines = append(lines, l)
 	}
-	vars := runVars{Task: title, Jira: jiraKey}
-	var nicks, names, trees []string
 	for _, r := range repos {
 		lines = append(lines, r.String())
-		if r.ReadOnlyRoot == "" {
-			nicks, names, trees = append(nicks, r.Nick), append(names, r.Branch), append(trees, r.Worktree)
-		}
 	}
-	vars.Repo, vars.Branch, vars.Worktree = strings.Join(nicks, ", "), strings.Join(names, ", "), strings.Join(trees, ", ")
+	vars := repoVars(title, jiraKey, repos)
 	if notes != "" {
 		lines = append(lines, "- Notes: "+notes)
 	}
 	if stage.Prompt != "" {
 		lines = append(lines, substitute(stage.Prompt, vars, false))
 	}
+	return strings.Join(lines, "\n")
+}
+
+// repoVars is the stage prompt's variable set: every writable repo, joined with ", ".
+func repoVars(title, jiraKey string, repos []repoLine) runVars {
+	vars := runVars{Task: title, Jira: jiraKey}
+	var nicks, names, trees []string
+	for _, r := range repos {
+		if r.ReadOnlyRoot == "" {
+			nicks, names, trees = append(nicks, r.Nick), append(names, r.Branch), append(trees, r.Worktree)
+		}
+	}
+	vars.Repo, vars.Branch, vars.Worktree = strings.Join(nicks, ", "), strings.Join(names, ", "), strings.Join(trees, ", ")
+	return vars
+}
+
+const reviewNotesMax = 2000
+
+// composeReviewMessage is the first message of a task's review agent.
+func composeReviewMessage(title, jiraKey, jiraURL, notes string, repos []repoLine) string {
+	lines := []string{"Task: " + title}
+	if l := jiraLine(jiraKey, jiraURL); l != "" {
+		lines = append(lines, l)
+	}
+	if notes != "" {
+		if r := []rune(notes); len(r) > reviewNotesMax {
+			notes = string(r[:reviewNotesMax])
+		}
+		lines = append(lines, "- Notes: "+notes)
+	}
+	for _, r := range repos {
+		if r.ReadOnlyRoot != "" {
+			lines = append(lines, fmt.Sprintf("- %s: read only, in %s", r.Nick, r.ReadOnlyRoot))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s (base %s) worktree %s", r.Nick, r.Branch, r.Base, r.Worktree))
+	}
+	lines = append(lines, "I review these branches in Kira Space and will ask you questions about them. Answer from the code; change files only when I ask you to.")
 	return strings.Join(lines, "\n")
 }
 

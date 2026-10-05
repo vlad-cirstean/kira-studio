@@ -244,6 +244,10 @@ const spaceControl = {
     unwrap(AdeTaskService.ReviewWindowTarget(args)).then((r) =>
       trust<V2.ReviewWindowTarget | null>(r),
     ),
+  adeTaskReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentState> =>
+    unwrap(AdeTaskService.ReviewAgent(args)).then((r) => trust<V2.ReviewAgentState>(r)),
+  adeTaskLaunchReviewAgent: (args: V2.TaskArgs): Promise<V2.ReviewAgentLaunch> =>
+    unwrap(AdeTaskService.LaunchReviewAgent(args)).then((r) => trust<V2.ReviewAgentLaunch>(r)),
   adeTaskArchiveRisk: (args: V2.TaskArgs): Promise<V2.ArchiveRisk> =>
     unwrap(AdeTaskService.ArchiveRisk(args)).then((r) => trust<V2.ArchiveRisk>(r)),
   adeTaskArchiveTask: (args: V2.TaskArgs): Promise<void> =>

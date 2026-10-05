@@ -950,7 +950,7 @@ func (b *TaskBoard) Sessions(_ context.Context) (adewire.SessionsResult, error) 
 func toWireSession(s model.AdeSession) adewire.Session {
 	w := adewire.Session{
 		ID: s.ID, ClaudeSessionID: s.ClaudeSessionID, Mode: s.Mode, State: s.State, TerminalID: s.TerminalID,
-		TaskID: s.TaskID, BranchID: s.BranchID, StageID: s.StageID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes,
+		TaskID: s.TaskID, BranchID: s.BranchID, StageID: s.StageID, StepID: s.StepID, RunID: s.RunID, Resumes: s.Resumes, Purpose: s.Purpose,
 		Cwd: s.Cwd, StartedAt: s.StartedAt, LastActiveAt: s.LastActiveAt,
 	}
 	if s.Mode == model.AdeSessionModeHeadless {

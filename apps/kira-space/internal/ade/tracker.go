@@ -79,6 +79,7 @@ type pendingIntent struct {
 	Resume                                     bool
 	CreatedAt                                  time.Time
 	TaskID, BranchID, StageID, StepID, Resumes string
+	Purpose                                    string
 }
 
 // PrepareArgs is Prepare's own argument shape. TaskID is required: the row is keyed to the task,
@@ -92,6 +93,8 @@ type PrepareArgs struct {
 	// added to the base command, quoted.
 	TaskID, BranchID, StageID, StepID, Resumes string
 	ExtraArgs                                  []string
+	// Purpose is "" or model.AdeSessionPurposeReview for the task's review agent.
+	Purpose string
 }
 
 // PrepareResult is Prepare's own return shape. SessionID is the Claude session id (stable across
@@ -254,7 +257,7 @@ func (t *Tracker) Prepare(args PrepareArgs) (PrepareResult, error) {
 	intent := pendingIntent{
 		RecordID: recordID, ClaudeSessionID: claudeSessionID, Cwd: cwd, Command: command, Message: args.Message,
 		Resume: args.Resume != "", CreatedAt: now,
-		TaskID: args.TaskID, BranchID: args.BranchID, StageID: args.StageID, StepID: args.StepID, Resumes: args.Resumes,
+		TaskID: args.TaskID, BranchID: args.BranchID, StageID: args.StageID, StepID: args.StepID, Resumes: args.Resumes, Purpose: args.Purpose,
 	}
 
 	t.mu.Lock()
@@ -325,7 +328,7 @@ func (t *Tracker) Compose(terminalID, command string) (string, []string, error) 
 			State: model.AdeSessionStateRunning, TerminalID: terminalID,
 			StartedAt: now.UnixMilli(), LastActiveAt: now.UnixMilli(),
 			Mode: model.AdeSessionModeTUI, TaskID: intent.TaskID, BranchID: intent.BranchID,
-			StageID: intent.StageID, StepID: intent.StepID, Resumes: intent.Resumes,
+			StageID: intent.StageID, StepID: intent.StepID, Resumes: intent.Resumes, Purpose: intent.Purpose,
 		}
 		if err := t.deps.Store.InsertTUI(rec); err != nil {
 			return "", nil, fmt.Errorf("ade: compose: %w", err)
