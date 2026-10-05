@@ -137,4 +137,10 @@ fixtures. Migration `0013` deletes the stored row (precedent `0025`/`0028`/`0029
 
 ## Result
 
-Pending implementation: commits, check results, migration spot check outcome, deviations.
+Commits: `41730398` Go + migration `0013`, `bbc57241` frontend schema, fixtures, bindings; docs commit follows.
+
+Checks, all green: go build/vet/test; `lint:all` exit 0; `typecheck` exit 0; `test:unit` 1765 pass, 0 fail; `test:ui:space` 161 passed. Grep for `allAgentsFilter`: only §1 historical records plus this plan. Bindings regenerated, no match.
+
+Migration spot check: throwaway Go test (deleted) migrated a temp DB to v12, inserted `ade.allAgentsFilter`, applied all migrations: rows=0, version=13.
+
+Deviations: none.
