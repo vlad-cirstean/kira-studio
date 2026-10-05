@@ -53,6 +53,8 @@
         "@vscode/vsce": "3.9.2",
         "@vue/compiler-sfc": "3.5.42",
         "bun-types": "1.4.2",
+        "cheetah-grid": "2.2.0",
+        "cheetah-grid-playwright": "0.1.0",
         "flatbuffers": "25.9.23",
         "jscpd": "5.3.2",
         "knip": "6.37.0",
@@ -60,6 +62,7 @@
         "pg": "8.23.0",
         "testcontainers": "12.1.0",
         "typescript": "6.0.3",
+        "vue-cheetah-grid": "2.1.0",
       },
     },
     "apps/kira-space-vscode": {
@@ -797,6 +800,10 @@
     "cheerio": ["cheerio@1.2.0", "", { "dependencies": { "cheerio-select": "^2.1.0", "dom-serializer": "^2.0.0", "domhandler": "^5.0.3", "domutils": "^3.2.2", "encoding-sniffer": "^0.2.1", "htmlparser2": "^10.1.0", "parse5": "^7.3.0", "parse5-htmlparser2-tree-adapter": "^7.1.0", "parse5-parser-stream": "^7.1.2", "undici": "^7.19.0", "whatwg-mimetype": "^4.0.0" } }, "sha512-WDrybc/gKFpTYQutKIK6UvfcuxijIZfMfXaYm8NMsPQxSYvf+13fXUJ4rztGGbJcBQ/GF55gvrZ0Bc0bj/mqvg=="],
 
     "cheerio-select": ["cheerio-select@2.1.0", "", { "dependencies": { "boolbase": "^1.0.0", "css-select": "^5.1.0", "css-what": "^6.1.0", "domelementtype": "^2.3.0", "domhandler": "^5.0.3", "domutils": "^3.0.1" } }, "sha512-9v9kG0LvzrlcungtnJtpGNxY+fzECQKhK4EGJX2vByejiMX84MFNQw4UxPJl3bFbTMw+Dfs37XaIkCwTZfLh4g=="],
+
+    "cheetah-grid": ["cheetah-grid@2.2.0", "", {}, "sha512-0N92gBapMXrrDRSXdZ9FiOMPjs2KEeX8cAq+HIBm756p6xQj1NhSg/JY0GHk/XQIu++3qpsn0VGBP+KqswUD9w=="],
+
+    "cheetah-grid-playwright": ["cheetah-grid-playwright@0.1.0", "", { "peerDependencies": { "playwright-core": ">=1.40.0" } }, "sha512-RbdSsw1xxY43/8521jIjIefWmwu1kJjHtM63bHKIedQcsRH+RuAVvHONeNffmPTfjdPXANfxGmgoOx+9zjHt8w=="],
 
     "chownr": ["chownr@1.1.4", "", {}, "sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg=="],
 
@@ -1663,6 +1670,8 @@
     "vscode-uri": ["vscode-uri@3.2.0", "", {}, "sha512-m2gXo3bn0G1kT9InzMf07fTbqMbGtyckj3bH5ktLO+1Ssv+yiATZ4dhwaQv9UZWxJh6E9IFGnQyjgWVDWVBDrg=="],
 
     "vue": ["vue@3.5.42", "", { "dependencies": { "@vue/compiler-dom": "3.5.42", "@vue/compiler-sfc": "3.5.42", "@vue/runtime-dom": "3.5.42", "@vue/server-renderer": "3.5.42", "@vue/shared": "3.5.42" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-4RyHQTbQvOPs3MfvUO1Sg0YRrKNnA0mAVtvpd12Tg1fKDN7OHBUl1IqSn8zGJjK9nI3NkNp8cgTpVrSZC5TTcA=="],
+
+    "vue-cheetah-grid": ["vue-cheetah-grid@2.1.0", "", { "dependencies": { "cheetah-grid": "^2.1.0" }, "peerDependencies": { "vue": "^3.0.0" } }, "sha512-iNwMHkORc+KO1TOeij/yvOXGWZETGOdudfnCis/oC9zhqF1UpccMrI9HTlN4sgkGv5evNJwsYbPgLGoIoycYHg=="],
 
     "vue-demi": ["vue-demi@0.14.10", "", { "peerDependencies": { "@vue/composition-api": "^1.0.0-rc.1", "vue": "^3.0.0-0 || ^2.6.0" }, "optionalPeers": ["@vue/composition-api"], "bin": { "vue-demi-fix": "bin/vue-demi-fix.js", "vue-demi-switch": "bin/vue-demi-switch.js" } }, "sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg=="],
 
