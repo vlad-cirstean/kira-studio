@@ -2,7 +2,77 @@
 
 Durable record of the P149 closing audit (plan `P149-ade-v2-closing-audit.md`, R5). Base `B0` =
 `cee4112c`. Verdicts: `ok`, `ok (accepted: ref)`, `gap -> fixed <sha>`, `gap -> P15x`.
-Steps recorded: see the `## Progress` list at the end.
+Steps recorded: see the `## Samples (step 3)
+
+Live server-tag run (`KIRA_SPACE_HOME` temp, `WAILS_SERVER_HOST=127.0.0.1`), Playwright Chromium 1440x900.
+
+| Check | Observation | Verdict |
+|---|---|---|
+| Empty state | `No workflows yet. Workflows are YAML files in <home>/workflows.` | ok |
+| Import YAML (path field, R25) of `standard.yaml`, `bugfix.yaml`, `chore.yaml` | List rows: `Bugfix \| Triage > Fix > Release \| used by 0`, `Maintenance \| Update > Release`, `Standard feature \| Spec > Implement > Review > Release`; no error marker | ok |
+| YAML mode message | `valid - the form and the plan use this file` for all three | ok |
+| Form fidelity | bugfix: Triage user, Fix agent with 4 steps (`each repo`, auto/approval, `stop`/`retry 1`/`retry 2`, 30m/1h/1h/15m, send-back targets listed per earlier step), Release script. chore: Update agent (2 steps), Release script. standard: Spec user, Implement agent (`Plan from spec` once, 20m; `Implement` retry 1 2h; `Write tests`/`Make CI green` back:impl 1h; `Open PRs` approval 15m), Review user, Release script. Equal to the sample files | ok |
+| Indentation error | all three: `line 5: unexpected content here (check the indentation) (the last valid version stays in use)`, list row shows the error marker; revert returns `valid` | ok |
+| Plan uses last valid file | covered by `GO TestReader_lastValidSurvivesBreakage` plus the live `(the last valid version stays in use)` message; seeded tasks then counted `used by 1 / 11 / 6` | ok |
+| Stage progress segments | cards show one segment per stage; stage label per the task's `current_stage` snapshot. First seed lacked `current_stage_json`, so no progress rendered: seed artifact, not a defect (`ade_tasks.current_stage_json` is written by the run engine) | ok |
+| Folder watch | a sample copied into `<home>/workflows/` from the shell appeared in the list without reload | ok |
+
+## Mockup (step 4)
+
+Mockup served statically, app live (server build). Same viewport and scheme. Images stay in the
+scratchpad (`shots/{m,a}-*.png`), not committed. Measured with `getBoundingClientRect`, not by eye.
+
+Measurements (S1/S7): card radius `10px`, left edge `4px`, header `68px`, gap between cards `10px`,
+title clamp 2 lines (`titleH` 31 for a 100-character title), card width 600; ruler `Today, Tue 6, Wed 7,
+Thu 8, Fri 9`; `Load all items` shows `N more`, then `Show only the first 10 again` (10 cards
+collapsed, 18 after load all); plan header `Refresh all` plus a per-repo `just now - no changes`
+chip; backlog panel `519px` (520 minus a 1px border). Stage label cell widths 39-98px, below the
+~150px cap. Drag of a card to another day: no dialog, `plan_day` and position written (`2026-10-06,2`
+to `2026-10-05,0`).
+
+| # | Screen | Compared states | Verdict |
+|---|---|---|---|
+| S1 | Plan | tab bar and badges, capture, header chips, ruler, cards, `!`, branch rows (base marker `⑂`, `dev`/`▲env` chips), load all, history row, ripple, drag | match; `data`: fixture vs live data |
+| S2 | Task panel | header line (`Blocked`, title, actions, facts), Task tab, Notes tab full height, ripple | match; accepted: P146 B (Workflow block, extend-only estimate), app theme background |
+| S3 | Sessions tab | `Nothing running.`, `Finished / stopped` list with `Take over`, read-only log, TUI tab | match; accepted: R15 `Stop`, real xterm, Take over confirm (D3) |
+| S4 | Branch panel | `<- task`, header, actions, Details (Merged into, Deployed to), Changes, Sessions | match except one defect: stale-deploy note read `1 commit of this branch are missing`. gap -> fixed `351be864` |
+| S5 | Fix menu | right-click on stale/behind branch | accepted: R20 (shared context-menu primitive) |
+| S6 | Add popover | New task, Existing branch | match |
+| S7 | Backlog | list, panel, promote | match; panel 519px |
+| S8 | Needs you | kinds, footer, All sessions | match; accepted: rank order (SPEC2 §11), `Running`/`Stopped` labels (R19) |
+| S9 | Workflows | Form, YAML | match |
+| S10 | Repos | folders, repos, env rows | match |
+| S11 | Dialogs | Spec (`Spec · interactive Claude Code`), Start, Rebase, Re-merge (path `/root/wt/<repo>/_develop` for the home-based worktree root, SPEC2 shows `~/wt`), Archive risk, Take over confirm | match; accepted: `~` expands to the real home |
+
+## Findings
+
+- **F1 (gap -> P155):** settings leaf `ade.allAgentsFilter` (`active`/`older`, P129) has no writer and
+  no reader in v2 (`AdeAllSessions.vue:14` keeps a local ref with `running`/`stopped`, R19). Removing
+  the leaf touches `settings.go`, its model, bindings and the settings schema: a wire change, so R1
+  sends it to a row.
+- **F2 (gap -> fixed `351be864`):** `deploy.go` wrote `1 commit of this branch are missing`.
+  `missingNote` picks `is` for one. No dedicated test (unit-test bar: one-condition format).
+- **F3 (gap -> P156):** held fix runs lose `runOpts` across restart (accepted P147 A, needs a run-row
+  column and so a migration). Carried as a row because users can hit it.
+
+## Unobserved (step 5)
+
+Environment: `claude` 2.1.289, no Claude account in the sandbox (no credentials), so the interactive
+TUI cannot authenticate; `claude -p` works. Server tag build: the terminal emitter's `EmitTo(windowKey)`
+needs a native window, so terminal output is dropped in this build (the WebSocket carried
+`kira:agent:sessions` but no `kira:terminal` frame). A throwaway `EmitTo` fallback patch (never
+committed, reverted with `git checkout`) confirmed that but the TUI still showed nothing to type
+into, because `claude` itself waits at its own first screen.
+
+| # | Item | Observation | Outcome |
+|---|---|---|---|
+| 1 | TUI first run | In a pty (`pty_probe.py`), fresh worktree: `Let's get started. Choose the text style ...` theme picker; Enter leads to `Select login method` (Claude account / Console / 3rd-party). No folder-trust prompt reached because login comes first. The initial argv message is therefore not processed here | partly observed. Known open item narrowed: after login, trust prompt and the ` -- ` message need an authenticated sandbox |
+| 2 | `▶ Start` click | Dialog `Start Claude Code (interactive)`, body `Task: ... Repo: api - Branch: feat/csv-export - Worktree: /root/wt/acme-api/csv-export`; Send -> `StartBranch` -> Sessions tab selected with the TUI tab; `ade_sessions` row `tui / b_csv_api / running`; second `StartBranch` -> 422 `a session is already open on feat/csv-export` | observed, ok |
+| 3a | Stop hook ends turn -> `RecordMerge` | Right-click/panel `Re-merge into develop` -> dialog (`Merge feat/usage-billing into develop`, target `web-app / feat/usage-billing / new session`) -> Send opens a real `claude --session-id <id> --settings <hooks.json> -- <message>` process with `KIRA_AGENT_HOOK_TOKEN` and `KIRA_TERMINAL_ID` in its environment. Interactive `claude` cannot authenticate, so the Stop was produced by the same hook shim `claude` calls (`/tmp/kira-agent-*/hook`, POST to the unix socket with the process' env and a `Stop` JSON body) after a real `git merge` in the develop worktree. Result: `ade_branch_marks` gains `('b_bill_web','target','develop',<tip>,recorded=1)`. A first attempt killed the launched TUI process, then ran `claude -p --settings <hooks.json>` with its env: the merge ran for real (merge commit created) but no mark appeared; the TUI's terminal was already gone, cause not isolated further | observed through the shim (hook server, env, socket, event, `adeTurns`, `RecordMerge` real); not observed with claude's own firing of Stop. Known open item reworded, not deleted |
+| 3b | Archive with dirty worktree | Task panel `Archive` with `dirty.txt` uncommitted: dialog `Archive: work would be lost`, risk line `web-app: 1 uncommitted, 2 unmerged commits. Tell Claude what to do with it, or delete the worktrees anyway.`, button `Send to Claude, then archive`; Send closes the dialog, opens a TUI session on the branch, task stays unarchived (`archived_at` null) until the turn ends | observed up to the turn end; archive after the turn not observed (needs authenticated TUI). Stays in the open items |
+| 4 | Todo progress in `-p` | `claude -p --output-format stream-json --verbose` (2.1.289), prompt asking for a todo list: `init` tools hold no todo tool (`TodoWrite`/`TaskCreate`/`TaskUpdate` absent); the model searched with `ToolSearch`, found none and said so | observed: no todo tool; Known open item stays, question for the user repeated in `## Result` |
+
+## Progress` list at the end.
 
 **Silently dropped requirements:** none found (every SPEC2 item below has evidence).
 
@@ -215,3 +285,6 @@ Needs you P148 B (`UI needs`). No matrix row is unlanded.
 
 - [x] Step 1: baseline suites (UI/visual/Studio rows may still be filling)
 - [x] Step 2: SPEC2 + design §9 audit (static)
+- [x] Step 3: sample workflows in the app
+- [x] Step 4: 11-screen mockup comparison
+- [x] Step 5: unobserved items
