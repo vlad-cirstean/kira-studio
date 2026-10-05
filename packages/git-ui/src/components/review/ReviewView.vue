@@ -64,6 +64,8 @@ const props = defineProps<{
   viewState: ViewStateStore;
   host: HostKind;
   target?: ReviewTarget | null;
+  reviewFilter?: 'all' | 'needsReview';
+  onReviewMarked?: (path: string) => void;
   /** G-UX (item 13): the host's own connection state as of this webview's cold resolve — see
    *  `App.vue`'s own copy of this doc comment (`main.ts`'s `MountOptions.hostConnectionState`,
    *  including why this is named `hostConnectionState`, not `connectionState` — the latter
@@ -177,6 +179,7 @@ async function bootstrap(): Promise<void> {
   settingsState.value = new SettingsState(bridge, init.settings);
   review.value = new ReviewSessionState(bridge, init.capabilities);
   reviewFiles.value = new ReviewFilesState(bridge);
+  reviewFiles.value.onMarked = (path) => props.onReviewMarked?.(path);
   reviewComments.value = new ReviewCommentsState(bridge);
 
   unsubscribeTarget = bridge.on('review.target', (event) => {
@@ -194,7 +197,10 @@ async function bootstrap(): Promise<void> {
   });
 
   if (props.target) {
-    await applyTarget(props.target.repoId, props.target.branch);
+    const { repoId: targetRepo, branch, base, pane } = props.target;
+    const token = await applyTarget(targetRepo, branch);
+    if (base && token === targetSequence) await review.value?.setBase(base);
+    if (pane && token === targetSequence) review.value?.setPane(pane);
     return;
   }
   const list = await bridge.request('repo.list', {});
@@ -1122,6 +1128,7 @@ watch(
           :actions="filesActions"
           :list-mode="listMode"
           :filter="filter"
+          :review-filter="reviewFilter"
         />
 
         <ReviewCommentsPane

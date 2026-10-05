@@ -39,6 +39,11 @@ export interface MountOptions {
    *  learns which branch to review" (see `ReviewView.vue`'s own doc comment). `undefined`/`null`
    *  is the "no branch yet" state; ignored entirely for `view: "graph"`. */
   readonly target?: ReviewTarget | null;
+  /** Only meaningful when `view === "review"`: `needsReview` lists just the files that changed since
+   *  their last review behind a `Needs review | All` toggle; absent shows the plain list. */
+  readonly reviewFilter?: 'all' | 'needsReview';
+  /** Only meaningful when `view === "review"`: called with the path after each file-list mark. */
+  readonly onReviewMarked?: (path: string) => void;
   /** G10 D19: only meaningful when `view === "graph"` — the exact mirror of `target` above, for a
    *  palette command that fired while the graph webview was cold (`panelView.ts`'s own
    *  `#pendingUiAction`/bootstrap-island arm). `undefined`/`null` means no action is pending. G14
@@ -89,13 +94,24 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   performance.mark('kira:page-parsed');
   performance.measure('kira:page-parsed', undefined, 'kira:page-parsed');
 
-  const { view = 'graph', target, pendingUiAction, dateFormat, ...rest } = opts;
+  const {
+    view = 'graph',
+    target,
+    reviewFilter,
+    onReviewMarked,
+    pendingUiAction,
+    dateFormat,
+    ...rest
+  } = opts;
   // P131 Part 2 §3.5: MountRoot wraps whichever root this mounts in the one TooltipProvider every
   // Tooltip/TooltipTrigger/TooltipContent trio in this package needs — git-ui is its own Vue app,
   // so neither host's own <App.vue> TooltipProvider reaches it.
   const app: VueApp =
     view === 'review'
-      ? createApp(MountRoot, { root: ReviewView, rootProps: { ...rest, target } })
+      ? createApp(MountRoot, {
+          root: ReviewView,
+          rootProps: { ...rest, target, reviewFilter, onReviewMarked },
+        })
       : createApp(MountRoot, {
           root: AppRoot,
           rootProps: { ...rest, pendingUiAction, dateFormat },

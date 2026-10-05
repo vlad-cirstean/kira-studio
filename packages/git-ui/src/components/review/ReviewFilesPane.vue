@@ -21,7 +21,7 @@ import type { CommitStore } from '@kira/git-core';
 import type { ReviewDiffMode, ReviewFileStatus } from '@kira/git-ipc';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { ACTION_ICONS } from '../../icons/index.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
@@ -44,14 +44,40 @@ const props = defineProps<{
   // renders no toolbar of its own (show-toolbar="false") and so never emits an update to forward.
   listMode: FileListMode;
   filter: string;
+  /** Set by a host that wants the `Needs review | All` toggle; its value is the initial choice. */
+  reviewFilter?: 'all' | 'needsReview';
 }>();
+
+const showing = ref<'all' | 'needsReview'>(props.reviewFilter ?? 'all');
+const hasFilter = computed(() => props.reviewFilter !== undefined);
+
+function needsReview(status: ReviewFileStatus): boolean {
+  return status.kind !== 'full' || status.changedSinceReview;
+}
+
+const needsReviewCount = computed(
+  () => props.reviewFiles.files.value.filter((e) => needsReview(e.review)).length,
+);
 
 const diffModeOptions: readonly DiffModeOption[] = [
   { id: 'sinceReview', icon: ACTION_ICONS.diffSingle, label: 'Since review' },
   { id: 'range', icon: ACTION_ICONS.diffMultiple, label: 'Full range' },
 ];
 
-const files = computed(() => props.reviewFiles.files.value.map((entry) => entry.change));
+const shown = computed(() =>
+  hasFilter.value && showing.value === 'needsReview'
+    ? props.reviewFiles.files.value.filter((e) => needsReview(e.review))
+    : props.reviewFiles.files.value,
+);
+const files = computed(() => shown.value.map((entry) => entry.change));
+const nothingToReview = computed(
+  () =>
+    hasFilter.value &&
+    showing.value === 'needsReview' &&
+    !props.reviewFiles.loading.value &&
+    props.reviewFiles.files.value.length > 0 &&
+    files.value.length === 0,
+);
 
 const reviewStatesMap = computed<ReadonlyMap<string, ReviewFileStatus>>(() => {
   const map = new Map<string, ReviewFileStatus>();
@@ -134,7 +160,25 @@ function onToggleReviewed(path: string): void {
         Couldn't update that file's review status — {{ reviewFiles.markError.value }}
       </p>
 
+      <div v-if="hasFilter" class="kv:flex kv:items-center kv:py-0.5 kv:px-2 kv:border-b kv:border-panel-border kv:font-ui">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="kira"
+          :model-value="showing"
+          aria-label="Which files to list"
+          @update:model-value="(v) => v && (showing = v as 'all' | 'needsReview')"
+        >
+          <ToggleGroupItem value="needsReview">Needs review · {{ needsReviewCount }}</ToggleGroupItem>
+          <ToggleGroupItem value="all">All</ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <p v-if="nothingToReview" class="kv:m-0 kv:p-3 kv:text-muted-foreground">
+        Nothing changed since your last review.
+      </p>
+
       <FileTree
+        v-else
         class="kv-review-files-tree kv:flex-auto kv:min-h-0 kv:border-b kv:border-panel-border"
         :files="files"
         :selected-file="selectedIndex"

@@ -43,6 +43,10 @@ export interface ReviewExpansion {
 export interface ReviewTarget {
   readonly repoId: string;
   readonly branch: string;
+  /** Compared against instead of the detected base (resolution reason `override`). */
+  readonly base?: string;
+  /** Pane to open on; default is the Commits pane. */
+  readonly pane?: ReviewPane;
 }
 
 /** "The outcome or the count changed" (D39's mid-review `refsChanged` resolution) — compares the
