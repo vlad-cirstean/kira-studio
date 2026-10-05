@@ -33,6 +33,8 @@ import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColum
 import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
 import type { ConsoleTabRecord } from '../../state/tabDomain';
 import EngineIcon from '../../theme/EngineIcon.vue';
+import { INLINE_CHARS } from '../../workers/parse/client';
+import { useParseWorker } from '../../workers/parse/useParseWorker';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { lexOptionsFor, type SqlDialect, sqlDialectFor } from '../shared/sqlIdent';
@@ -49,6 +51,7 @@ import { type Match, pageSearchApi } from './search';
 import { sqlHoverSource } from './sqlHover';
 import { setNewResultSet, setText, useConsoleViewStore } from './state';
 
+const parse = useParseWorker();
 const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
@@ -427,7 +430,13 @@ function onFormat(): void {
   );
   const originalText = props.tab.state.text;
   void (async () => {
-    const result = await formatConsoleText(kind, originalText);
+    // Over the inline threshold the whole pass (split, per-statement sql-formatter) runs in the
+    // shared parse worker: a pasted multi-hundred-KB dump would otherwise block the main thread.
+    const result =
+      originalText.length <= INLINE_CHARS
+        ? await formatConsoleText(kind, originalText)
+        : await parse.run('console.format', { kind, text: originalText }).catch(() => null);
+    if (!result) return; // the view unmounted mid-run
     // P108 Part 11 F13: the first Format press awaits a dynamic import('sql-formatter') — a
     // keystroke typed before it resolves used to be silently overwritten by the formatted version
     // of the OLDER text underneath it. `result` was computed against `originalText`, which is no

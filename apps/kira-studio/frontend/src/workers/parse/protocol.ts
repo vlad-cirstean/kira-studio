@@ -1,4 +1,6 @@
+import type { ConnectionKind } from '@shared/domain/connection';
 import type { BeautifyMode, BeautifyResult } from '../../beautify';
+import type { FormatResult } from '../../views/console/format';
 
 export type PrettyFormat = 'json' | 'xml';
 
@@ -10,6 +12,7 @@ export interface PrettyResult {
 export interface ParseJobs {
   'body.format': { input: { body: string; wantText: boolean }; output: PrettyResult };
   'json.beautify': { input: { text: string; mode: BeautifyMode }; output: BeautifyResult };
+  'console.format': { input: { kind: ConnectionKind; text: string }; output: FormatResult };
   'xml.beautify': { input: { text: string; mode: BeautifyMode }; output: BeautifyResult };
 }
 

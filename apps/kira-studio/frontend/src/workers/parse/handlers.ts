@@ -1,4 +1,5 @@
 import { beautifyJson, beautifyXml } from '../../beautify';
+import { formatConsoleText } from '../../views/console/format';
 import type { JobInput, JobKind, JobOutput, PrettyResult } from './protocol';
 
 /** One parse per body: detects the format and, when asked, returns the pretty text from that same parse. */
@@ -21,6 +22,7 @@ export const handlers = {
   'body.format': ({ body, wantText }) => formatBody(body, wantText),
   'json.beautify': ({ text, mode }) => beautifyJson(text, mode),
   'xml.beautify': ({ text, mode }) => beautifyXml(text, mode),
+  'console.format': ({ kind, text }) => formatConsoleText(kind, text),
 } satisfies { [K in JobKind]: Handler<K> };
 
 /** Kinds whose handler is synchronous, so `parseInline` can run them in the caller's tick. */
