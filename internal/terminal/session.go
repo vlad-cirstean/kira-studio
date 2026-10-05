@@ -30,15 +30,19 @@ const readBufSize = 32 * 1024
 const closeGracePeriod = 2 * time.Second
 
 // closeKillWait bounds how long Close waits, after SIGKILL, for readLoop's blocked ptmx.Read to
-// actually return (F1/P108 Part 2). SIGKILL(-pid) can still leave Close waiting forever: a
-// job-control shell (`-i`) can put a child in its own process group, which Kill(-pid, …) misses,
-// and a job that ignores SIGHUP on its controlling terminal (nohup, `trap "" HUP`, zsh's NO_HUP)
-// keeps the slave pty open past both signals either way. Close's own callers —
+// actually return (F1/P108 Part 2). On Linux readLoop closes the master exitDrain after the shell
+// exits, so a surviving job no longer stalls Close; this bound remains for a shell that survives
+// SIGKILL and for darwin, where the blocking master cannot be interrupted. Close's own callers —
 // Registry.CloseAll/CloseWindow, in turn both apps' TerminalService.Shutdown (on the app-quit
 // teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang
 // on one stuck session, so this is a second, independent bound, not a substitute for the SIGKILL
 // escalation above it.
 const closeKillWait = 2 * time.Second
+
+// exitDrain is how long readLoop keeps reading output still buffered after the shell exits before
+// it closes the master. A job left holding the slave (disown, nohup, dash's background jobs) never
+// sends EIO, so without this the session would outlive its shell.
+const exitDrain = 200 * time.Millisecond
 
 // ErrDuplicateSession is Open's error when id is already live, or another Open for the same id is
 // still spawning — the registry rejects it before touching the PTY, per §4/§17.1's
@@ -98,8 +102,8 @@ func newSession(p OpenParams) (*Session, error) {
 	// hooks enabled, nothing for a plain terminal or a script).
 	cmd.Env = append(cmd.Env, p.Env...)
 	// Setsid: true makes this shell its own process-group leader — Close signals the whole group
-	// (syscall.Kill(-pid, …)), so a process the user started inside the terminal (an `npm run dev`)
-	// dies with the tab instead of outliving it. pty.StartWithSize already makes the pty this
+	// (syscall.Kill(-pid, …)), so a process the shell hangs up (an `npm run dev` under bash or zsh)
+	// dies with the tab. Jobs the shell does not hang up (dash, disown, nohup) outlive it. pty.StartWithSize already makes the pty this
 	// process's controlling terminal.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
@@ -128,11 +132,36 @@ func newSession(p OpenParams) (*Session, error) {
 }
 
 // readLoop is the one reader goroutine per session (§4 rule 1): an io.Reader loop over ptmx into
-// a readBufSize buffer, calling onData for every chunk read. On a read error (EOF, or EIO — what
-// Linux returns when the slave side closes) it waits the process, marks the session closed, closes
-// the master fd, calls onExit exactly once, and unregisters — in that order, so onData never runs
+// a readBufSize buffer, calling onData for every chunk read. The read ends on a read error (EOF, or
+// EIO — what Linux returns when the slave side closes) or when a closer goroutine closes the master
+// exitDrain after the shell exits, whichever is first. It then marks the session closed, closes the
+// master fd, calls onExit exactly once, and unregisters — in that order, so onData never runs
 // after onExit (§4 rule 4) and a later explicit Close is a no-op (§4 rule 2's idempotency).
 func (s *Session) readLoop() {
+	var (
+		code    int
+		waitErr error
+	)
+	exited := make(chan struct{})
+	readDone := make(chan struct{})
+	go func() {
+		code, waitErr = waitExitCode(s.cmd)
+		close(exited)
+	}()
+	go func() {
+		select {
+		case <-readDone:
+		case <-exited:
+			t := time.NewTimer(exitDrain)
+			defer t.Stop()
+			select {
+			case <-readDone:
+			case <-t.C:
+				_ = s.ptmx.Close()
+			}
+		}
+	}()
+
 	buf := make([]byte, readBufSize)
 	for {
 		n, err := s.ptmx.Read(buf)
@@ -146,7 +175,8 @@ func (s *Session) readLoop() {
 		}
 	}
 
-	code, waitErr := waitExitCode(s.cmd)
+	close(readDone)
+	<-exited
 
 	s.mu.Lock()
 	s.closed = true
@@ -158,7 +188,7 @@ func (s *Session) readLoop() {
 	s.unregister()
 }
 
-// waitExitCode calls cmd.Wait() exactly once (the reader goroutine's own call — see readLoop) and
+// waitExitCode calls cmd.Wait() exactly once (the session's waiter goroutine — see readLoop) and
 // extracts an exit code the way the rest of this codebase's process-running helpers do: 0 on a
 // clean exit, exec.ExitError's own code (−1 for a signal-terminated process, e.g. this package's
 // own SIGKILL) otherwise, and the raw error for anything else (Wait itself failing to start).
@@ -200,8 +230,9 @@ func (s *Session) Resize(cols, rows uint16) error {
 	return setWinsize(s.ptmx, &pty.Winsize{Rows: rows, Cols: cols})
 }
 
-// Close is idempotent and ordered (§4 rule 2): mark closed under the mutex → SIGHUP the whole
-// process group → wait up to closeGracePeriod for the reader goroutine to observe the exit and
+// Close is idempotent and ordered (§4 rule 2): mark closed under the mutex → SIGHUP the shell's
+// process group (jobs outside it are deliberately not signalled — the shell forwards the hangup or
+// not, as in real terminals) → wait up to closeGracePeriod for the reader goroutine to observe the exit and
 // call Wait() (the `done` channel) → SIGKILL the process group if it hasn't → wait up to
 // closeKillWait more, then close the master fd ourselves and wait one more closeKillWait bound
 // before giving up and logging (F1) — never blocking forever. Closing the fd first (before either
@@ -235,8 +266,7 @@ func (s *Session) Close() {
 	case <-time.After(closeKillWait):
 	}
 
-	// Still not done: a job-control shell's child can live in its own process group (missed by
-	// Kill(-pid, …)), or the pty's slave side can otherwise survive both signals. On Linux the
+	// Still not done: the shell survived SIGKILL, or readLoop is stuck in a blocked read. On Linux the
 	// master is non-blocking and netpoller-registered (pollablePtmx), so Close interrupts the
 	// pending Read. Elsewhere (darwin) the fd stays blocking, Close does not interrupt a blocked
 	// read(2), and the wait below is the bound: a logged, permanent leak of this one

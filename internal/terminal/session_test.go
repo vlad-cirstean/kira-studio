@@ -7,6 +7,7 @@ package terminal
 
 import (
 	"bytes"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -81,6 +82,54 @@ func openTestSession(t *testing.T, id, cwd string, cols, rows uint16) (*Registry
 	}
 	t.Cleanup(sess.Close)
 	return reg, sess, col
+}
+
+// openShellSession opens a session whose shell is the named binary on PATH; skips only when that
+// binary is absent from the machine.
+func openShellSession(t *testing.T, shell, id string) (*Session, *collector) {
+	t.Helper()
+	path, err := exec.LookPath(shell)
+	if err != nil {
+		t.Skipf("%s not installed", shell)
+	}
+	t.Setenv("SHELL", path)
+	_, sess, col := openTestSession(t, id, t.TempDir(), 80, 24)
+	return sess, col
+}
+
+// startJob types line, then echoes $!, waits for the job to be a live `sleep` and returns its pid.
+// Close right after the fork can land SIGHUP in the child's pre-exec window, where the shell's own
+// handler swallows it; hence the comm wait.
+func startJob(t *testing.T, sess *Session, col *collector, line string) int {
+	t.Helper()
+	if err := sess.Write([]byte(line + "\necho started-$!\n")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	var pid int
+	waitFor(t, 5*time.Second, func() bool {
+		text := col.text()
+		// LastIndex, not Index: the pty echoes the typed "echo started-$!" first.
+		idx := strings.LastIndex(text, "started-")
+		if idx < 0 {
+			return false
+		}
+		rest := text[idx+len("started-"):]
+		end := strings.IndexAny(rest, "\r\n")
+		if end < 0 {
+			return false
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(rest[:end]))
+		if err != nil || n == 0 {
+			return false
+		}
+		pid = n
+		return true
+	})
+	waitFor(t, 5*time.Second, func() bool {
+		comm, _, _ := procInfo(pid)
+		return comm == "sleep"
+	})
+	return pid
 }
 
 func TestSessionSpawnsAtCwd(t *testing.T) {
