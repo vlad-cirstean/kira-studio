@@ -161,6 +161,7 @@ historical prose.
   Anything needing a server builds one over its own temp `KIRA_SPACE_HOME` — never the fixed path.
   Never `KIRA_HOME` (Kira Studio's own env var) — the two apps' homes are fully separate as of
   P100, so setting the wrong one silently talks to the wrong app's storage, or none at all.
+- **A test binary panics if it resolves an app home with `KIRA_HOME`/`KIRA_SPACE_HOME` unset** (`kirapaths.Home`, non-`production` builds). A package whose tests reach one calls `testx.RunWithTempHomes` from `TestMain`.
 - **`bun run dev:space` runs Kira Space's own dev loop** (`cd apps/kira-space && wails3 task dev`)
   — a separate native window/process from `bun run dev:studio`'s Kira Studio, on its own Vite dev-server
   port (9246, beside Kira Studio's 9245) so both can run at once without colliding.

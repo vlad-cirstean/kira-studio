@@ -258,5 +258,24 @@ item for the orchestrator if no row exists by then.
 
 ## Result
 
-_Placeholder. Implementer fills: commits (hash + subject), §5 outputs (one decisive line each),
-anything newly flagged by the guard, deviations from this plan with reason._
+Commits:
+
+- `eb66defa` test: run gitrpc, gitsession, gitreview, ade, gitsock and terminal tests under temp homes
+- `30968939` fix(gitreview): lay out the store's own dir, not the default home
+- `4c78973f` test(kirapaths): fail a test binary that resolves an app home from $HOME
+- docs commit: DEV_ENVIRONMENT bullet, this Result, SPEC row
+
+Checks:
+
+1. `go build ./...`, `go vet ./...`, `bun run lint:go` (0 issues), `go build -tags production ./internal/kirapaths/` all clean.
+2. Probe A, `-race`, sentinel `HOME`: suite green, `find` printed nothing (not even `.bash_history`).
+3. Guard: gitrpc with empty `main_test.go` overlay panics `kirapaths: KIRA_SPACE_HOME unset in a test binary`; without overlay `ok`.
+4. Real home: waited for quiet, `rm -rf ~/.kira-space ~/.kira-studio`, `go test -count=1 ./...` green, both paths still absent.
+5. `grep KIRA_HOME` in kira-space tests: 2 comment hits only, no setter.
+
+Newly flagged by guard: none beyond the 4 packages.
+
+Deviations (orchestrator decisions):
+
+- Included `gitreview.Store.ensureOpen` -> `config.EnsureLayoutAt(filepath.Dir(s.path))` (own `fix` commit).
+- Added `testx.RunWithTempUserHome` plus `internal/terminal/main_test.go`: temp `HOME` so pty bash stops writing the real `~/.bash_history`.
