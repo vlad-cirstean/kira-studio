@@ -57,9 +57,16 @@ export function documentRow(tabId: string, row: number): DocumentRow | null {
 // DocNode tree per row the way `rowView`'s own `parseDocument` does — this still has to walk every
 // row (there is no smaller correct answer for "every field name on the page"), but it no longer
 // grows `rows.ts`'s `parseCache` to the size of the whole page in the process.
+//
+// P163: four computeds plus ProjectionMenu call this per page load, so the result is memoized per
+// page object (setPage freezes and replaces the page, so identity is the page version).
+const fieldNamesCache = new WeakMap<DocumentPage, string[]>();
+
 export function fieldNamesOnPage(tabId: string): string[] {
   const page = getPage(tabId);
   if (!page) return [];
+  const cached = fieldNamesCache.get(page);
+  if (cached) return cached;
   const names = new Set<string>();
   for (let row = 0; row < page.rowCount; row++) {
     const doc = documentRow(tabId, row);
@@ -75,5 +82,7 @@ export function fieldNamesOnPage(tabId: string): string[] {
       if (key !== '_id') names.add(key);
     }
   }
-  return [...names].sort();
+  const sorted = [...names].sort();
+  fieldNamesCache.set(page, sorted);
+  return sorted;
 }
