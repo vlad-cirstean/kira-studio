@@ -164,14 +164,14 @@ func (e *RepoEntry) GhSyncPlan(ctx context.Context, branch, base string, pr int,
 	out := GhSyncPlanResult{
 		Status: "ok", Account: account, HeadSha: files.HeadSha, LocalTip: rng.BranchTip, PrNodeID: files.NodeID,
 	}
-	out.Files, out.DropSynced = ghSyncFiles(files.Files, local, records, prOID, synced)
+	out.Files, out.DropSynced = ghSyncFiles(files.Files, files.Truncated, local, records, prOID, synced)
 	return out, nil
 }
 
 // ghSyncFiles decides every path: the PR's files first, then local or earlier-synced paths the PR
-// no longer lists.
+// no longer lists. A truncated PR listing omits files, so the rest stay untouched, ledger rows included.
 func ghSyncFiles(
-	prFiles []ghclient.PullFile, local map[string]ReviewFileStatus, records map[string]gitreview.FileRecord,
+	prFiles []ghclient.PullFile, truncated bool, local map[string]ReviewFileStatus, records map[string]gitreview.FileRecord,
 	prOID map[string]string, synced map[string]bool,
 ) (files []GhSyncFile, drop []string) {
 	files = []GhSyncFile{}
@@ -196,6 +196,9 @@ func ghSyncFiles(
 			InPr: true, PrViewed: f.Viewed, Synced: synced[f.Path], Kind: kind, Changed: st.ChangedSinceReview,
 			RecordOID: records[f.Path].BlobOID, PrOID: prOID[f.Path],
 		})
+	}
+	if truncated {
+		return files, drop
 	}
 	var rest []string
 	for p := range local {
