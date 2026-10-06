@@ -26,7 +26,11 @@ import { computed, ref, watch } from 'vue';
 import type { GraphViewState } from '../state/graphView.ts';
 import type { RepoState } from '../state/repo.ts';
 
-const props = defineProps<{ graphView: GraphViewState; repoState: RepoState }>();
+const props = defineProps<{
+  graphView: GraphViewState;
+  repoState: RepoState;
+  reportError: (err: unknown, prefix: string) => void;
+}>();
 
 const hasPendingChange = ref(false);
 
@@ -56,7 +60,11 @@ const tooltip = computed(() =>
 
 async function doRefresh(): Promise<void> {
   if (isBusy.value) return;
-  await props.graphView.refresh();
+  try {
+    await props.graphView.refresh();
+  } catch (err) {
+    props.reportError(err, "Couldn't refresh");
+  }
 }
 
 defineExpose({ refresh: doRefresh });

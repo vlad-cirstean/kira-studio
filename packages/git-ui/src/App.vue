@@ -885,6 +885,7 @@ function onCreateWorktree(seed?: WorktreeCreateSeed): void {
 // bindings object instead of two copies of the same 16 props/12 listeners. Read only from inside
 // the template's own `v-else-if="repoState"` guard, so `repoState.value` is always defined there.
 const toolbarBindings = computed(() => ({
+  reportError: reportAsyncError,
   graphView,
   repoState: repoState.value as RepoState,
   refsState,
@@ -1827,7 +1828,7 @@ onBeforeUnmount(() => {
               @stash-context-menu="handleStashContextMenu"
               @open-pull-request="handleGridOpenPullRequest"
             />
-            <LoadMoreButton :graph-view="graphView" :page-size="pageSize" />
+            <LoadMoreButton :graph-view="graphView" :page-size="pageSize" :report-error="reportAsyncError" />
             <span class="kv:sr-only" data-testid="chunk-source">{{
               graphView.lastChunkSource.value ?? ""
             }}</span>

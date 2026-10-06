@@ -17,6 +17,7 @@ import type { GraphViewState } from '../state/graphView.ts';
 const props = defineProps<{
   graphView: GraphViewState;
   pageSize: number;
+  reportError: (err: unknown, prefix: string) => void;
 }>();
 
 const formatter = new Intl.NumberFormat();
@@ -40,11 +41,8 @@ const buttonLabel = computed(() => {
 
 function handlePress(event: MouseEvent): void {
   if (isLoading.value) return;
-  if (event.altKey) {
-    void props.graphView.loadAll();
-  } else {
-    void props.graphView.loadMore();
-  }
+  const load = event.altKey ? props.graphView.loadAll() : props.graphView.loadMore();
+  load.catch((err: unknown) => props.reportError(err, "Couldn't load more history"));
 }
 
 function handleCancel(): void {

@@ -85,6 +85,8 @@ const props = defineProps<{
   /** P93 §4.4/§7: whether every non-checked-out branch group collapses by default — drives the
    *  collapse-toggle button's own `active` state, same convention as `searchOpen` above. */
   collapseBranches: boolean;
+  /** Routes a rejected refresh to the shared live region (`App.vue`'s `reportAsyncError`). */
+  reportError: (err: unknown, prefix: string) => void;
 }>();
 const emit = defineEmits<{
   /** `docs/plans/P9.md` W14: opens `StashDialog.vue`'s create mode — owned by `App.vue`, exactly
@@ -324,7 +326,12 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       class="kv:w-px kv:h-control-inline kv:self-center kv:mx-0.5 kv:bg-border-strong kv:shrink-0"
       aria-hidden="true"
     ></span>
-    <RefreshButton ref="refreshButtonRef" :graph-view="graphView" :repo-state="repoState" />
+    <RefreshButton
+      ref="refreshButtonRef"
+      :graph-view="graphView"
+      :repo-state="repoState"
+      :report-error="reportError"
+    />
 
     <template v-if="write && hasRemote">
       <span
