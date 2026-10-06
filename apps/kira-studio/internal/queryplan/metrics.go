@@ -54,13 +54,40 @@ func formatMetricScalar(v any) string {
 	}
 }
 
-// formatJSNumber mirrors JS's String(n) for a JSON-decoded number: an integer value never carries
-// a trailing ".0" the way Go's default float64 formatting would.
+// formatJSNumber ports Number.prototype.toString for a finite number: shortest round-trip digits,
+// fixed notation for 1e-6 <= |n| < 1e21, JS-shaped exponent form (`1e+21`, `1.5e-7`) otherwise.
 func formatJSNumber(n float64) string {
-	if n == float64(int64(n)) {
-		return strconv.FormatInt(int64(n), 10)
+	if n == 0 {
+		return "0"
 	}
-	return strconv.FormatFloat(n, 'g', -1, 64)
+	sign := ""
+	if n < 0 {
+		sign, n = "-", -n
+	}
+	// 'e' with precision -1 yields the shortest digits: "d.ddde±XX".
+	repr := strconv.FormatFloat(n, 'e', -1, 64)
+	mantissa, expText, _ := strings.Cut(repr, "e")
+	exp, _ := strconv.Atoi(expText)
+	digits := strings.Replace(mantissa, ".", "", 1)
+	k := len(digits)
+	point := exp + 1 // decimal point position relative to digits (ECMA-262 "n")
+	switch {
+	case k <= point && point <= 21:
+		return sign + digits + strings.Repeat("0", point-k)
+	case 0 < point && point <= 21:
+		return sign + digits[:point] + "." + digits[point:]
+	case -6 < point && point <= 0:
+		return sign + "0." + strings.Repeat("0", -point) + digits
+	}
+	e := point - 1
+	expSign := "+"
+	if e < 0 {
+		expSign, e = "-", -e
+	}
+	if k == 1 {
+		return sign + digits + "e" + expSign + strconv.Itoa(e)
+	}
+	return sign + digits[:1] + "." + digits[1:] + "e" + expSign + strconv.Itoa(e)
 }
 
 // collectMetrics ports every parser's own metricsFrom/tableMetrics loop: every key of raw not in

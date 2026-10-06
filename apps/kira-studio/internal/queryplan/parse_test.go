@@ -196,3 +196,18 @@ func TestParityFixtures(t *testing.T) {
 		})
 	}
 }
+
+// TestFormatJSNumberMatchesJSToString pins Number.prototype.toString's notation switches (P168
+// Part 6 F19); the TS plan parsers render untyped metrics through String(v).
+func TestFormatJSNumberMatchesJSToString(t *testing.T) {
+	cases := map[float64]string{
+		0: "0", 10: "10", -3: "-3", 1234567.5: "1234567.5", 0.00001: "0.00001", 0.000001: "0.000001",
+		1e-7: "1e-7", 1.5e-7: "1.5e-7", 2e20: "200000000000000000000", 1e21: "1e+21", 1.5e21: "1.5e+21",
+		123456789012345680000: "123456789012345680000", 0.5: "0.5", -1.25e-9: "-1.25e-9",
+	}
+	for in, want := range cases {
+		if got := formatJSNumber(in); got != want {
+			t.Errorf("formatJSNumber(%v) = %q, want %q", in, got, want)
+		}
+	}
+}
