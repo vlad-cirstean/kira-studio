@@ -154,6 +154,7 @@ func (e *RepoEntry) ResolveReviewBase(ctx context.Context, branch string, base *
 		candidates = gitreview.DefaultBaseCandidates
 	}
 
+	gen := e.cacheGeneration()
 	snapshot, err := e.Refs(ctx)
 	if err != nil {
 		return gitreview.BaseResolution{}, err
@@ -211,7 +212,9 @@ func (e *RepoEntry) ResolveReviewBase(ctx context.Context, branch string, base *
 		}, nil
 	}
 
-	e.RememberRangeCount(*resolvedBase, branch, count)
+	if e.cacheGeneration() == gen {
+		e.RememberRangeCount(*resolvedBase, branch, count)
+	}
 	n := count
 	return gitreview.BaseResolution{
 		Branch: branch, Base: resolvedBase, Reason: reason,

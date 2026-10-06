@@ -44,6 +44,7 @@ func (e *RepoEntry) Refs(ctx context.Context) (RefsResult, error) {
 // precedes a write must see git's own current state, not a value that predates a `git fetch
 // --prune` (or worse, resolve a target that no longer exists at all).
 func (e *RepoEntry) refsSnapshot(ctx context.Context) (RefsResult, error) {
+	gen := e.cacheGeneration()
 	headsRaw, err := e.runOne(ctx, porcelain.HeadsRefsArgs())
 	if err != nil {
 		return RefsResult{}, err
@@ -92,7 +93,9 @@ func (e *RepoEntry) refsSnapshot(ctx context.Context) (RefsResult, error) {
 	var head gitclient.HeadState
 	if headBranch != nil {
 		head = gitclient.HeadState{Kind: "branch", Name: headBranch.ShortName}
-		e.setHead(head)
+		if e.cacheGeneration() == gen {
+			e.setHead(head)
+		}
 	} else {
 		head, err = e.Head(ctx)
 		if err != nil {

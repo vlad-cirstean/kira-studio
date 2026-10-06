@@ -328,6 +328,7 @@ func (e *RepoEntry) Head(ctx context.Context) (gitclient.HeadState, error) {
 	}
 	e.headMu.Unlock()
 
+	gen := e.cacheGeneration()
 	var h gitclient.HeadState
 	err := e.Repo.Read(ctx, func(ctx context.Context) error {
 		var rerr error
@@ -337,7 +338,9 @@ func (e *RepoEntry) Head(ctx context.Context) (gitclient.HeadState, error) {
 	if err != nil {
 		return gitclient.HeadState{}, err
 	}
-	e.setHead(h)
+	if e.cacheGeneration() == gen {
+		e.setHead(h)
+	}
 	return h, nil
 }
 
