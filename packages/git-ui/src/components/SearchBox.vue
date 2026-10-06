@@ -115,6 +115,7 @@ const resultsModel = computed(() =>
     loaded: props.search.loaded.value,
     loadedRowCount: props.search.loadedRowCount.value,
     tail: props.search.tail.value,
+    tailError: props.search.tailError.value,
   }),
 );
 

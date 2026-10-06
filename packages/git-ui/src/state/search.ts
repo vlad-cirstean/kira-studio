@@ -14,9 +14,8 @@ export type SearchRunResult = ResultOf<'search.run'>;
  *  `TAIL_DEBOUNCE_MS` below (that one bounds how often a *process* spawns; this one bounds how
  *  long a single synchronous scan may hold the main thread). */
 const LOADED_SCAN_BUDGET_MS = 120;
-/** OQ3: loaded-hit cap. `matchCount` stays exact regardless (`LoadedScanResult.total` keeps
- *  counting past it) — this only bounds how many rows `SearchResults.vue` could ever render from
- *  the client-side half. */
+/** OQ3: loaded-hit cap. A scan that hit it is `truncated`, so `matchCount` reports inexact — this
+ *  bounds how many rows `SearchResults.vue` could ever render from the client-side half. */
 const LOADED_HIT_LIMIT = 500;
 /** OQ3: the wire's own default, restated here only so `#runTail`'s request literal has a name
  *  instead of a bare number — `rpcHandlers.ts`'s `DEFAULT_SEARCH_LIMIT` is the actual default
@@ -199,6 +198,10 @@ export class SearchState {
    *  this is `SearchResults.vue`'s own "results may be stale" hint instead. Cleared by the next
    *  successful tail request or by `setRepoId`. */
   readonly tailStale: ShallowRef<boolean> = shallowRef(false);
+  /** Message of the last `search.run` rejection (not a local cancel); `undefined` otherwise. The
+   *  unloaded history was never searched then, so `matchCount` is inexact and the results show a
+   *  notice. Cleared when the next tail run starts. */
+  readonly tailError: ShallowRef<string | undefined> = shallowRef(undefined);
   readonly commitHits: ComputedRef<readonly CommitHit[]>;
   readonly matchCount: ComputedRef<{ readonly n: number; readonly exact: boolean }>;
   readonly activeIndex: ShallowRef<number> = shallowRef(-1);
@@ -294,15 +297,16 @@ export class SearchState {
       // scanned to git's own end without its own cap truncating the wire payload. A skipped tail
       // (OQ1) does not itself make this inexact — that skip's own premise is "the store already
       // is the whole rev set" — but a tail that ran and was capped or time-boxed does.
-      const loadedExact = loaded === undefined || loaded.complete;
+      const loadedExact = loaded === undefined || (loaded.complete && !loaded.truncated);
       // G23 D6: an `unsupportedPattern` tail is NOT exact — it is silent about the whole
       // not-yet-walked tail (and therefore any body-only match), unlike `invalidPattern`, which
       // the client never sends a request for in the first place (compileQuery already refused
       // it, so there is nothing the tail could have missed).
       const tailExact =
-        tail === undefined ||
-        tail.kind === 'invalidPattern' ||
-        (tail.kind === 'ok' && !tail.truncated && tail.complete);
+        this.tailError.value === undefined &&
+        (tail === undefined ||
+          tail.kind === 'invalidPattern' ||
+          (tail.kind === 'ok' && !tail.truncated && tail.complete));
       return { n, exact: loadedExact && tailExact };
     });
     // G24 D7 point 4/D11: entering a scope that can show a ref hit is one of the few user acts
@@ -365,6 +369,7 @@ export class SearchState {
     this.#tailController?.abort();
     this.tail.value = undefined;
     this.tailStale.value = false;
+    this.tailError.value = undefined;
     this.searching.value = false;
     this.activeIndex.value = -1;
     // `loaded` is re-derived by the watcher above the moment `#graph`'s own state changes for the
@@ -449,6 +454,7 @@ export class SearchState {
       this.#tailController?.abort();
       this.tail.value = undefined;
       this.tailStale.value = false;
+      this.tailError.value = undefined;
       return;
     }
     this.#tailTimer = setTimeout(() => this.#runTail(), TAIL_DEBOUNCE_MS);
@@ -476,6 +482,7 @@ export class SearchState {
       this.wholeWord.value === query.wholeWord &&
       this.regex.value === query.regex;
     this.searching.value = true;
+    this.tailError.value = undefined;
     this.#bridge
       .request('search.run', { repoId, query }, controller.signal)
       .then((result) => {
@@ -485,9 +492,10 @@ export class SearchState {
       })
       .catch((error: unknown) => {
         if (error instanceof TransportError && error.code === 'cancelled') return;
-        // A thrown error here is unexpected (`search.run` cannot throw for a bad pattern — it
-        // answers `invalidPattern` as data) — surfacing nothing is preferable to crashing the
-        // panel over a search; the loaded half still stands on its own.
+        if (!stillCurrent()) return;
+        // `search.run` answers a bad pattern as data, so a rejection is a transport or git
+        // failure. The loaded half still stands; the notice says the rest was not searched.
+        this.tailError.value = error instanceof Error ? error.message : String(error);
       })
       .finally(() => {
         if (this.#tailController === controller) {
