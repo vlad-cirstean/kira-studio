@@ -160,8 +160,8 @@ export function rowsToInsert(
   return `${truncatedNote}INSERT INTO ${qualifiedName} (${columnList})\nVALUES\n${valueLines.join(',\n')};`;
 }
 
-/** TSV if `text` contains a tab character; one single value if it has neither a tab nor a newline;
- *  otherwise CSV (quoted-field aware).
+/** TSV if `text` contains a tab character; one single value if it has neither a tab nor a newline
+ *  or its CSV parse is ragged; otherwise CSV (quoted-field aware).
  *
  *  F5 (P108 Part 10): the "one single value" case is new. Before it, any clipboard text with no
  *  tab fell through to parseCsv regardless of source — a single cell copied from this app itself
@@ -176,7 +176,11 @@ export function parseDelimited(text: string): string[][] {
   if (!normalized.includes('\n')) {
     return [[normalized]];
   }
-  return parseCsv(normalized);
+  // Ragged CSV output means the text is prose or a snippet (JSON, code), not delimited data. A
+  // rectangular grid, single-column included, is what a same-app column copy produces.
+  const rows = parseCsv(normalized);
+  const width = rows[0]?.length ?? 0;
+  return rows.every((r) => r.length === width) ? rows : [[normalized]];
 }
 
 function parseCsv(text: string): string[][] {
@@ -215,7 +219,8 @@ function parseDelimitedText(text: string, delimiter: string): string[][] {
       i++;
       continue;
     }
-    if (c === '"') {
+    // RFC 4180: a quote opens a quoted section only at field start; mid-field it is literal (`12"`).
+    if (c === '"' && field === '') {
       inQuotes = true;
       i++;
       continue;

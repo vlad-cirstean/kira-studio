@@ -157,3 +157,28 @@ describe('disambiguateNames (F7)', () => {
     expect(JSON.parse(rowsToJson([row]))).toEqual([{ id: '1', id_2: '2' }]);
   });
 });
+
+// P168 Part 11 F14: a mid-field quote opened a quoted section and swallowed the rest of the
+// clipboard into one cell; multi-line non-tabular text went through the CSV branch and spilled
+// onto neighbouring rows.
+describe('mid-field quotes and non-tabular text (F14)', () => {
+  test('a quote inside an unquoted TSV field is literal', () => {
+    expect(parseDelimited('12" ruler\tfoo\nbar\tbaz\n')).toEqual([
+      ['12" ruler', 'foo'],
+      ['bar', 'baz'],
+    ]);
+  });
+
+  test('a quoted field still unwraps at field start', () => {
+    expect(parseDelimited('"a\tb"\tc\n')).toEqual([['a\tb', 'c']]);
+  });
+
+  test('a multi-line JSON snippet pastes as one value', () => {
+    const json = '{\n  "a": 1,\n  "b": "x, y"\n}';
+    expect(parseDelimited(json)).toEqual([[json]]);
+  });
+
+  test('a rectangular multi-line column without tabs still pastes as rows', () => {
+    expect(parseDelimited('a\nb\nc')).toEqual([['a'], ['b'], ['c']]);
+  });
+});

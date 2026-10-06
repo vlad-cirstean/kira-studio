@@ -156,6 +156,14 @@ describe('toShellText — non-wrapper/edge shapes never throw', () => {
   test('a bare top-level array is not an object — parseDocument returns null, no throw', () => {
     expect(parseDocument('[1,2,3]')).toBeNull();
   });
+
+  test('a $date beyond the JS Date range (int64 sentinel) stays wrapped in every format, no throw', () => {
+    const raw = '{"d":{"$date":{"$numberLong":"9223372036854775807"}}}';
+    expect(() => parseDocument(raw)).not.toThrow();
+    expect(toShellText(raw)).toContain('9223372036854775807');
+    expect(toRelaxedText(raw)).toContain('9223372036854775807');
+    expect(() => toPlainJson(raw)).not.toThrow(); // plain rounds int64 by design
+  });
 });
 
 describe("parseIdLabel — DocumentPage.ids' own EJSON text", () => {

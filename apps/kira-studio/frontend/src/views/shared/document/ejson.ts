@@ -74,21 +74,25 @@ function objectKeys(value: Record<string, unknown>): string[] {
 
 // One canonical millis value out of a $date wrapper: usually a nested {"$numberLong": "..."}
 // (what this app's own EJSON.stringify({relaxed:false}) always writes), tolerating a bare
-// ISO/millis string in case a document was written by some other tool.
+// ISO/millis string in case a document was written by some other tool. BSON dates are int64
+// millis but a JS Date holds only +-8.64e15; beyond that (a "never expires" sentinel) there is no
+// Date to build, so null keeps the wrapper verbatim instead of throwing in toISOString.
+const MAX_DATE_MILLIS = 8.64e15;
+// Relaxed EJSON uses ISO strings only for years 1970-9999.
+const MAX_RELAXED_DATE_MILLIS = 253_402_300_799_999;
+function inDateRange(n: number): number | null {
+  return Number.isFinite(n) && Math.abs(n) <= MAX_DATE_MILLIS ? n : null;
+}
 function dateMillis(value: unknown): number | null {
   if (
     isPlainObject(value) &&
     objectKeys(value).length === 1 &&
     typeof value.$numberLong === 'string'
   ) {
-    const n = Number(value.$numberLong);
-    return Number.isFinite(n) ? n : null;
+    return inDateRange(Number(value.$numberLong));
   }
-  if (typeof value === 'string') {
-    const n = Date.parse(value);
-    return Number.isFinite(n) ? n : null;
-  }
-  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return inDateRange(Date.parse(value));
+  if (typeof value === 'number') return inDateRange(value);
   return null;
 }
 
@@ -408,7 +412,9 @@ function canonicalToRelaxed(value: unknown): unknown {
   }
   if (keys.length === 1 && keys[0] === '$date') {
     const millis = dateMillis(value.$date);
-    if (millis !== null) return { $date: new Date(millis).toISOString() };
+    if (millis !== null && millis >= 0 && millis <= MAX_RELAXED_DATE_MILLIS) {
+      return { $date: new Date(millis).toISOString() };
+    }
   }
   const out: Record<string, unknown> = {};
   for (const k of keys) out[k] = canonicalToRelaxed(value[k]);
