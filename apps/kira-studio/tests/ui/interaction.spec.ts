@@ -1195,12 +1195,14 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await page.click('[data-testid="menu-item-filter-by-value"]');
   await expect(page.locator('.no-rows')).toBeVisible({ timeout: 10_000 });
 
-  // D3: a pending-change set is scoped to the page/query it was staged against — applying the
-  // filter above already reloaded the grid and dropped the staged NULL, so clearing the filter
-  // just reveals the real, unedited value again.
+  // Staged changes are keyed by primary key (P174): the filter reload above kept the staged NULL,
+  // and clearing the filter shows it again on its row. Revert it to restore the real value.
   await page.fill('[data-testid="filter-where-input"]', '');
   await page.press('[data-testid="filter-where-input"]', 'Enter');
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(3, { timeout: 10_000 });
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  await rightClick(gutterCell(page, 0));
+  await page.click('[data-testid="menu-item-revert-row"]');
   await expect(gridCell(page, 0, 'name')).not.toHaveClass(/pending-edit/);
   expect(await cellText(page, 0, 'name')).toBe(row0Name);
 
