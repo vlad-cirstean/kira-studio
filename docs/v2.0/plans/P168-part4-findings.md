@@ -6,11 +6,20 @@ change between them).
 
 ## Checks
 
-Pending (block 7).
+- `go vet ./apps/kira-studio/internal/adapters/...`: clean.
+- `go test -race -count=1 ./apps/kira-studio/internal/adapters/{mongo,redis,kafka,sqs,s3,awscfg}/...`
+  with Docker up (`TESTCONTAINERS_RYUK_DISABLED=true`): all five packages `ok`, run twice (plain
+  and `-v`). Verbose run: 210 top-level tests pass, 0 fail; only skips are the five
+  `*_AuthMatrix` tests, gated on `KIRA_TEST_MATRIX=1` by design. `awscfg` has no test files.
+- Real-container suites ran against `mongo:8.3`, `redis:8.10`, `confluentinc/cp-kafka:8.0.7`
+  (plain and SASL fixtures), `localstack/localstack:4` (sqs and s3). Every container, including
+  the reviewer's own probe containers, was removed afterwards (`docker ps -a` empty).
+- Probes: throwaway `zz_probe_test.go` files in `mongo`, `redis`, `kafka`, `s3`, each deleted
+  before the next commit; none was ever staged.
 
 ## Findings
 
-Ranked high, medium, low within the final list. IDs are stable once committed.
+IDs follow block order and are stable once committed; the severity ranking is in Summary.
 
 ### F1 (low) awscfg: URI with access key but no secret silently uses the ambient credential chain
 
@@ -73,8 +82,7 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
 
 - `apps/kira-studio/internal/adapters/mongo/literal.go:321-329` (`int32(f)` with no range check).
 - Probe: `ParseJSON5Literal("NumberInt(\"3000000000\")")` returns `int32(-2147483648)`, no error.
-  An insert or filter then stores or matches a wrong value. `NaN`/`Inf` inputs are rejected by
-  `ParseFloat`'s error path only for unparsable text, not for range.
+  An insert or filter then stores or matches a wrong value.
 - Fix: reject values outside `math.MinInt32..math.MaxInt32` (and non-integral values, if the
   shell truncation is not wanted) with the existing "invalid NumberInt" error.
 
@@ -202,8 +210,8 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   across runs (Go map iteration), and duplicate header names cannot be expressed.
 - Fix: count successful results (`results` carries per-record `Err`) and return them with the
   error (message names which records failed); keep header order by decoding the JSON object with
-  an ordered decoder (`internal/jsonx` already has ordered pairs) in `ParseHeaderJSON`
-  (`needs-other-part-file` not needed: `adapters/rowops.go` is Part 3, a Stream A one-hop file).
+  an ordered decoder in `ParseHeaderJSON` (`adapters/rowops.go:61`, Part 3, a Stream A one-hop
+  file the fixer may edit; sqs shares it).
 
 ### F15 (medium, design-decision) sqs browse on a read-only connection consumes messages
 
@@ -271,6 +279,34 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   SDK's checksum pass reads it forever. A directory fails later with a less clear error. Code-read.
 - Fix: refuse anything but a regular file (`!info.Mode().IsRegular()`) with `E_QUERY` before
   `os.Open`.
+
+### F20 (low) `shared/caps.ts` engine table contradicts the Go caps it documents
+
+- `packages/shared/caps.ts:124-135` (the per-kind table in the doc comment) against
+  `SA/{redis,kafka,sqs,s3,mongo}/caps.go`.
+- Drift: redis `exactCount` "no (DBSIZE)" vs Go `ExactCount: true` (per-key type-length counts);
+  redis cancel "CLIENT KILL" vs a permanent no-op `Cancel` (C9); kafka and sqs `definition` "no"
+  vs Go `Definition: true`; s3 `exactCount` "no" vs Go `ExactCount: true`; mongo tree
+  "collection (+ indexes)" vs a leaf collection (indexes moved to the definition view, P19 D5).
+  The comment calls itself "the map every later adapter is written against", so a reader trusts it.
+- Fix: update the table to the Go values (or replace it with a pointer to the `caps.go` files).
+  `needs-other-part-file: packages/shared/caps.ts (Part 13)`.
+
+### F21 (low) conformance suites miss the lifecycle cases where Part 4 engines actually fail
+
+- `SA/mongo/mongo_test.go:998-1079` covers Stop only while the op is executing server-side (the
+  test waits for `$currentOp` to show it first); `SA/redis/redis_test.go:631` only asserts that
+  `Cancel` returns false; no Part 4 suite cancels a `Connect` mid-dial or disconnects with an op
+  in flight.
+- Missing analogues of Part 3's lifecycle scenarios, each tied to a finding above: mongo Stop
+  between `getMore` batches (F3); redis Stop on a blocking console command and a slow command
+  past the read timeout (F9); `Connect` with a ctx cancelled while the broker/server is
+  unreachable or paused, for all five engines (Part 2's `abortInFlight` waits on it unbounded;
+  every engine passes ctx today, but nothing guards it). `testsupport.StartPausableProxy` fits
+  mongo, redis and kafka (`cfg.Host`/`cfg.Port`); sqs/s3 need the endpoint option pointed at the
+  proxy.
+- Fix: add those scenarios to the existing conformance files (exempt from the unit-test bar) when
+  fixing F3 and F9, plus one Connect-cancel scenario per engine.
 
 ## Coverage
 
@@ -372,4 +408,27 @@ Ranked high, medium, low within the final list. IDs are stable once committed.
   `Disconnect` only clears state; an op past `requireClient` finishes on a still-valid client.
   Caps match the unsupported stubs (`Describe`, `Definition`, `SchemaColumns`, `Execute`,
   `KeyTypes`); leaf `Children` returns `[]`.
-- Block 7 (tests, real-container runs): not reached.
+- Block 7 (tests, real-container runs): done. Suites run (see Checks). Read where a claim rests
+  on them: `mongo_test.go` cancel test (F21), `redis_test.go` cancel test, `kafka_test.go`
+  helpers and cancellation tests, `s3_test.go` download cancel tests, `sqs_test.go` cache test,
+  `read_test.go` (`TestAdvanceWindows`), `testsupport/{kafka,s3}.go` fixture shapes. Skimmed, not
+  read line by line: the remaining conformance scenarios (exempt from the unit-test bar; no
+  duplicate test names across the five packages, each scenario named for one capability) and the
+  internal unit tests (`literal_test` 28, `console_test` 13, `catalog_test`, sqs receipt-handle
+  boundary tests): each guards a parser, tokenizer, cursor boundary or timing rule that clears the
+  bar, so none is a pruning candidate. `awscfg` rightly has no test: two flat branches (URI vs
+  fields) and a five-step classification table, each branch one condition; `MapError` is
+  exercised through `s3/catalog_test.go` and `sqs/mutate_internal_test.go`. Caps mirror against
+  `packages/shared/caps.ts`: the TS file holds the type and a doc table only (no per-engine
+  literals); the table drift is F20.
+
+## Summary
+
+21 findings: 0 high, 6 medium, 15 low.
+Ranked, medium first: F2 parser recursion crash, F3 mongo Stop between batches, F4 empty-filter deletes, F9
+redis retries/timeouts, F15 sqs read-only receive (design-decision), F16 s3 ACL reset.
+Low: F1, F5, F6, F7, F8 (design-decision), F10, F11, F12, F13, F14, F17, F18, F19, F20, F21.
+`needs-other-part-file`: F12 (`internal/page/builder.go` Part 5,
+`frontend/src/views/stream/page.ts` Part 12), F20 (`packages/shared/caps.ts` Part 13).
+No unexplained coverage gap: all 45 production files read in full; the 27 test files run and
+read or skimmed as stated in block 7.
