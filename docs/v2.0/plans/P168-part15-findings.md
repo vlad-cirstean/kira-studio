@@ -16,6 +16,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 - Block 3 `gitpreflight`: done.
 - Block 4 `gitreview` store: done.
 - Block 5 `gitreview` logic: done (no findings).
+- Block 6 `gitsearch`: done.
 
 ## Findings
 
@@ -234,6 +235,60 @@ low.
 
 Fix: `io.ReadAll(io.LimitReader(r, int64(want)+1))`, and reject `want > MaxSnapshotBytes`.
 
+### F13 (low) Regex dialect diverges from JS for `\xHH`, `\u{…}`, `[\b]`, `[\S]`, so hit sets depend on what was loaded
+
+`apps/kira-space/internal/gitsearch/dialect.go` `translateEscape` (`passthroughEscapeChars` has
+no `x`; `\u{` branch in `translateUnicodeEscape`; `\S` in a class passed through; `\b` in a
+class passed through).
+
+The client matches loaded rows with JS `new RegExp(source, 'i'|'')` (no `u` flag,
+`packages/git-core/src/search/query.ts:79`); the server matches the tail with this translation,
+and `buildCommitHits` concatenates both (`doc.go:33-35` promises a hit never depends on which page
+was loaded). Probed (Go `Compile` vs bun `RegExp`):
+- `\x41` vs `"A"`: JS true, Go false (Go emits a literal `x41`; `"x41"`: JS false, Go true).
+- `\u{41}` vs `"A"`: JS false (Annex B: `u` repeated 41 times; `\u{3}` matches `"uuu"`), Go true.
+  `\u{1F600}` vs the emoji: JS false, Go true.
+- `[\b]` (JS: backspace): Go returns `ErrInvalidPattern` ("invalid escape sequence: `\b`").
+- `[\S]` vs NBSP: JS false, Go true (RE2's `\S` is ASCII-only; the out-of-class arm already
+  rewrites it, the in-class arm does not).
+The opt-in differential test (`KIRA_GIT_DIFFERENTIAL=1`, run here, green) misses these because its
+subjects never contain the code points involved and `\x` is not in `diffAtoms`.
+
+Fix: add `\xHH` (exactly two hex digits, else identity `x`) to the table; treat `\u{…}` as JS
+non-`u` does (identity `u` then the brace text as a quantifier or literal); in a class map `\b`
+to `\x{08}` and `\S` to a negated Unicode-whitespace set (or reject in-class `\S` as
+unsupported). Add `\x41`, `\u{3}`, `[\b]`, `[\S]` rows to `searchConformance.json`
+(`needs-other-part-file: packages/git-core/testdata/searchConformance.json (Part 18)`).
+
+### F14 (low) `Scan`'s time box cannot fire while git emits nothing
+
+`apps/kira-space/internal/gitsearch/scan.go:105`, `178`, `206-225`.
+
+The deadline is tested only after a parsed record, every 1024 records. `readScanChunk` blocks in
+`Read` with no deadline. `LogScanArgs` is a `--topo-order` walk: without a commit-graph, git
+computes the whole walk before printing the first record, and any slow pack or cold cache does the
+same. For that whole stall the scan holds one of the repository's four `Repo.Read` slots
+(`gitsession/search.go:59`) and `Complete=false` never comes back after 5 s as `DefaultScanBudget`
+promises; only a supersede or disconnect ends it.
+
+Fix: run a `time.AfterFunc(budget, …)` that closes the process, and have `scanRound` map a read
+error after that timer fired to the `Complete=false` result instead of an error.
+
+### F15 (low) `Scan` reports a protocol error ahead of git's own failure
+
+`apps/kira-space/internal/gitsearch/scan.go:122-129`.
+
+On EOF with an unterminated field or record, `Scan` returns "unterminated trailing field/record"
+after `Close`, never calling `Wait`, so git's exit status and stderr are discarded. Part 14 fixed
+the same ordering in `logsession.finishEOFLocked` (`gitclient/logsession/session.go:261-282`:
+"git's own failure (its stderr) outranks the partial record"). Scenario: git is killed (OOM,
+signal) or dies mid-flush on a corrupt object after writing a partial buffer; search answers an
+opaque framing error instead of the classified git failure the paging walk shows for the same
+repo.
+
+Fix: mirror `finishEOFLocked`: compute the protocol error, `Wait`, return `Classify`'s error if
+any, else the protocol error.
+
 ## §9 candidate outcomes
 
 - 1 (double `Close` panic): real but no concurrent caller today; reported as part of F10.
@@ -257,6 +312,10 @@ Fix: `io.ReadAll(io.LimitReader(r, int64(want)+1))`, and reject `want > MaxSnaps
   lines; deleted lines drop (comment becomes `removed`); ranges past EOF are clamped. A `-U0`
   caller would break the pure-insertion arm (old line `OldStart` would get the hunk's offset);
   none exists. Dropped.
+- 7 (`Scan` protocol-error paths skip `Wait`, mask stderr): `Close` kills and reaps
+  (`gitclient/runner.go` `killAndWait`), so no zombie; masking is real. Reported F15.
+- 8 (budget only between chunks): reported F14. The reader goroutine does not leak: `Close`
+  closes stdout, `Read` returns, and the channel has buffer 1.
 - 9 (tick after flush): reported F1 (mechanism differs: the late tick wins the last batch, so
   `flush` has nothing to wait on).
 - 10 (nil `Env`, scrub gaps): every production caller passes `BuildEnv` output
@@ -358,3 +417,17 @@ offset bookkeeping across multiple hunks, clamp with `newLineCount` 0. `resolve.
 prefers a local branch over a remote one with the same short name (a local branch literally named
 `origin/x`); git's own rev resolution prefers `refs/heads/` the same way, so the chosen base
 names the same object git would use. Not a finding. Nothing real in this block.
+
+### Block 6 `gitsearch`
+
+Reviewed: `scan.go`, `query.go`, `dialect.go`, `literal.go`, `matcher.go`, `doc.go`; tests read:
+`scan_test.go` helpers, `differential_test.go` setup. Caller `gitsession/search.go` (`searchGen`
+supersede, `Repo.Read`). Probes: Go `Compile` vs bun `RegExp` (F13); differential test run with
+`KIRA_GIT_DIFFERENTIAL=1` (500 x 4 x 200, green). Checked and clean: no user text reaches argv
+(`Options.Args` is `LogScanArgs(spec)`, which ends with `--` after Part 14's `WalkArgs` change and
+nothing is appended after it — §7 item 1 holds); lookaround and backreference rejection; whole-word
+wrap incl. top-level alternation; sha-prefix arm (4-40 hex, lower-cased); literal fold path and
+byte boundaries; `Total` exact past `Limit`; hits capped at 200; cancellation kills the child.
+Test isolation: `scan_test.go` spawns git with the real `HOME` (reads `~/.gitconfig`, writes
+nothing); `gitclient`'s `-c` overrides neutralise the config keys that could change parsed output,
+and P154's `RunWithTempHomes` only isolates app homes, not `HOME`. Not a leak under P154.
