@@ -1,8 +1,9 @@
 import type { ResultOf } from '@kira/git-ipc';
-import { type ShallowRef, shallowRef } from 'vue';
+import { type Ref, type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { FileListCursor, type FileListMode } from './fileListCursor.ts';
 import { createLatestRequest } from './latestRequest.ts';
+import { createAnnouncementRef } from './liveAnnouncements.ts';
 
 export type CommitDetail = ResultOf<'commit.detail'>;
 
@@ -43,7 +44,7 @@ export class DetailState {
    *  alongside the load-more/refresh announcements it already carries. A plain string, not a
    *  queue: a second announcement while the first is still being read simply replaces it, the
    *  same trade-off the existing live region already makes. */
-  readonly announcement: ShallowRef<string> = shallowRef('');
+  readonly announcement: Ref<string> = createAnnouncementRef();
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;

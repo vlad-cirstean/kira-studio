@@ -293,7 +293,7 @@ watch(graphView.generation, () => {
  *  lands, so there is nothing left to announce it to. */
 function reportAsyncError(err: unknown, prefix: string): void {
   if (err instanceof TransportError && err.code === 'transport-closed') return;
-  liveAnnouncement.value = `${prefix} — ${err instanceof Error ? err.message : String(err)}`;
+  announce(`${prefix} — ${err instanceof Error ? err.message : String(err)}`);
 }
 
 watch(graphView.loadedRows, () => {
@@ -525,13 +525,9 @@ const unsubscribeReconnect = bridge.onReconnect(() => {
   handleReconnect().catch((err: unknown) => reportAsyncError(err, "Couldn't reconnect"));
 });
 
-watch(detailState.announcement, (text) => {
-  liveAnnouncement.value = text;
-});
+watch(detailState.announcement, announce, { deep: true });
 
-watch(opsState.announcement, (text) => {
-  liveAnnouncement.value = text;
-});
+watch(opsState.announcement, announce, { deep: true });
 
 // P7 (item 2): re-fetches the open working-tree pane's own file list on the same signal the
 // strip's own count already reacts to (`OpsState.statusSummary`, refreshed on every
@@ -543,9 +539,7 @@ watch(opsState.statusSummary, () => {
 
 // `docs/plans/P11.md` W13/W14: `GraphViewState.revealSha`'s own progress text, forwarded into the
 // shared live region exactly like `detailState.announcement`/`opsState.announcement` above.
-watch(graphView.announcement, (text) => {
-  liveAnnouncement.value = text;
-});
+watch(graphView.announcement, announce, { deep: true });
 
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P11.md` W14: `SearchBox.vue`'s two emits, forwarded through `AppToolbar.vue`.
@@ -1037,6 +1031,14 @@ async function resolveConflictInEditor(path: string): Promise<void> {
 // just the total the store now holds.
 // ---------------------------------------------------------------------------------------
 const liveAnnouncement = ref('');
+// Clear first, set on the next tick: an unchanged string would not change the live region's DOM
+// text, so a repeated identical message (a retried failing fetch) would go unread.
+function announce(text: string): void {
+  liveAnnouncement.value = '';
+  void nextTick(() => {
+    liveAnnouncement.value = text;
+  });
+}
 let loadedRowsBeforeLoad = 0;
 // G-UX D10: captured together, at the moment `loading` *enters* `'refreshing'` — synchronous with
 // `GraphViewState` setting `autoRefreshing` (no `await` between the two), so this is reliable in
@@ -1058,10 +1060,8 @@ watch(graphView.loading, (state, previous) => {
   if (state !== 'idle') return;
   if (previous === 'loadingMore') {
     const added = graphView.loadedRows.value - loadedRowsBeforeLoad;
-    liveAnnouncement.value = composeLoadMoreAnnouncement(
-      added,
-      graphView.remaining.value,
-      graphView.exhausted.value,
+    announce(
+      composeLoadMoreAnnouncement(added, graphView.remaining.value, graphView.exhausted.value),
     );
   } else if (previous === 'refreshing') {
     if (refreshWasAuto) {
@@ -1072,7 +1072,7 @@ watch(graphView.loading, (state, previous) => {
         commitGridRef.value?.scrollToTopRow(autoRefreshViewportRow);
       }
     } else {
-      liveAnnouncement.value = composeRefreshAnnouncement(graphView.loadedRows.value);
+      announce(composeRefreshAnnouncement(graphView.loadedRows.value));
     }
   }
 });
@@ -1113,7 +1113,7 @@ function runUiAction(
     case 'revertSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runRevert([sha]);
-      else liveAnnouncement.value = 'Select a commit first.';
+      else announce('Select a commit first.');
       break;
     }
     case 'continueOperation':
@@ -1165,13 +1165,13 @@ function runUiAction(
     case 'resetSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runReset(sha, 'mixed');
-      else liveAnnouncement.value = 'Select a commit first.';
+      else announce('Select a commit first.');
       break;
     }
     case 'cherryPickSelected': {
       const sha = selection.sha.value;
       if (sha) void opsState.runCherryPick(sha);
-      else liveAnnouncement.value = 'Select a commit first.';
+      else announce('Select a commit first.');
       break;
     }
     // G26 D13: the palette's own route to "Restack this stack" — the CURRENT branch stands in for
@@ -1179,7 +1179,7 @@ function runUiAction(
     case 'restackStack': {
       const branch = refsState.currentBranchName.value;
       if (branch) stackDialogTarget.value = { mode: 'restack', branch };
-      else liveAnnouncement.value = 'Checkout a branch first.';
+      else announce('Checkout a branch first.');
       break;
     }
     // G26 D13/§7.3: alt+up/alt+down's own palette equivalents — resolve a target client-side
@@ -1195,7 +1195,7 @@ function runUiAction(
             ? parentOf(stackResult, branch)
             : childOf(stackResult, branch);
       if (target !== undefined) void opsState.runCheckout(target, 'switch');
-      else liveAnnouncement.value = 'No branch to navigate to.';
+      else announce('No branch to navigate to.');
       break;
     }
     // G-UX D9: the palette's own route to toggling the graph search row — the same assignment

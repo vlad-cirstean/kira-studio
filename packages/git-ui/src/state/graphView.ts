@@ -2,7 +2,7 @@ import type { CommitStore, LayoutChunk, RowPlan } from '@kira/git-core';
 import { identityRowPlan, projectLayoutInput } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { markRaw, type ShallowRef, shallowRef, watch } from 'vue';
+import { markRaw, type Ref, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import {
   createLayoutClient,
@@ -11,7 +11,7 @@ import {
 } from '../graph/layoutClient.ts';
 import { LayoutStore } from '../graph/layoutStore.ts';
 import type { GraphOrderState } from './graphOrder.ts';
-import { composeRevealSearchHitAnnouncement } from './liveAnnouncements.ts';
+import { composeRevealSearchHitAnnouncement, createAnnouncementRef } from './liveAnnouncements.ts';
 import { type ChunkSource, PackedStreamState } from './packedStream.ts';
 
 export type { ChunkSource };
@@ -83,7 +83,7 @@ export class GraphViewState {
   readonly generation: ShallowRef<number>;
   /** W13's `revealSha` own live-region text — `App.vue` forwards it into the shared region
    *  exactly as it already does for `DetailState.announcement`/`OpsState.announcement`. */
-  readonly announcement: ShallowRef<string> = shallowRef('');
+  readonly announcement: Ref<string> = createAnnouncementRef();
   /** True for exactly the duration of an auto-triggered `refresh()` — `App.vue`'s viewport
    *  capture/restore and its refresh announcement are both gated on this (D10): a background
    *  refresh must neither move the user's scroll position nor speak on every commit. */

@@ -29,7 +29,7 @@ import type {
   WorktreePrepareResult,
 } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
-import { type ShallowRef, shallowRef, triggerRef } from 'vue';
+import { type Ref, type ShallowRef, shallowRef, triggerRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
 import { createLatestRequest } from './latestRequest.ts';
@@ -47,6 +47,7 @@ import {
   composeStashAnnouncement,
   composeStashPushAnnouncement,
   composeUndoAnnouncement,
+  createAnnouncementRef,
   type StashPredictionMismatch,
 } from './liveAnnouncements.ts';
 import { createPendingSlot, type PendingSlot } from './pendingSlot.ts';
@@ -200,7 +201,7 @@ export class OpsState {
   readonly undoSlot: ShallowRef<UndoSlotSnapshot | null> = shallowRef(null);
   /** Set after every action, success or failure — `App.vue` forwards it to the one live region,
    *  the same way it already does for `DetailState.announcement` (P5 W11). */
-  readonly announcement: ShallowRef<string> = shallowRef('');
+  readonly announcement: Ref<string> = createAnnouncementRef();
 
   // P107 I2-23: each slot below backs one of the six confirm-dialog quadruples this class used to
   // hand-roll separately (`pendingSlot.ts`'s own doc comment) — `pendingX` stays the public ref a

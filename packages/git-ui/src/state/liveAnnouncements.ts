@@ -17,7 +17,25 @@ import type {
   ResetMode,
   StashEntry,
 } from '@kira/git-ipc';
+import { customRef, type Ref } from 'vue';
 import { originLabel, stashLabel } from '../components/stashListModel.ts';
+
+/** A string ref that notifies on every assignment, equal text included. Watch it with
+ *  `{ deep: true }` (which forces the callback): a repeated identical failure must still reach the
+ *  live region. */
+export function createAnnouncementRef(): Ref<string> {
+  let text = '';
+  return customRef<string>((track, trigger) => ({
+    get() {
+      track();
+      return text;
+    },
+    set(next) {
+      text = next;
+      trigger();
+    },
+  }));
+}
 
 const COUNT_FORMATTER = new Intl.NumberFormat();
 
