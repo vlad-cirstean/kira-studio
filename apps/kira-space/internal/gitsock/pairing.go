@@ -57,7 +57,9 @@ const (
 type PairingRequest struct {
 	RequestID  string
 	ClientID   string
-	Label      string
+	Label      string // client-reported.
+	PeerPID    int    // kernel-reported.
+	PeerExe    string // kernel-reported; "" when unresolved.
 	EnqueuedAt time.Time
 	ExpiresAt  time.Time
 }
@@ -142,14 +144,14 @@ func (b *Broker) InCooldown(clientID string) bool {
 	return ok && b.now().Before(until)
 }
 
-// Request enqueues (clientID, label) and blocks the calling goroutine until it is approved,
+// Request enqueues (clientID, label, peer) and blocks the calling goroutine until it is approved,
 // denied, or its deadline elapses. onEnqueued is called synchronously, before Request blocks, with
 // the request as minted (its RequestID and deadline) — the handshake uses it to send
 // "pairingRequired" with real values before waiting on the outcome.
 //
 // A cooldown check happens first and short-circuits with neither enqueueing nor emitting (D8): a
 // client mid-cooldown gets an immediate, silent "denied".
-func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)) PairingOutcome {
+func (b *Broker) Request(clientID, label string, peer Peer, onEnqueued func(PairingRequest)) PairingOutcome {
 	b.mu.Lock()
 	// F4(b)/F11: a handshake that already read hello but reaches Request only after Shutdown has
 	// already cleared the queue must not enqueue a fresh entry nobody will ever resolve. Aborted,
@@ -171,7 +173,7 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	now := b.now()
 	entry := &pendingEntry{
 		req: PairingRequest{
-			RequestID: uuid.NewString(), ClientID: clientID, Label: label,
+			RequestID: uuid.NewString(), ClientID: clientID, Label: label, PeerPID: peer.PID, PeerExe: peer.Exe,
 			EnqueuedAt: now, ExpiresAt: now.Add(pairingTimeout),
 		},
 		result: make(chan PairingOutcome, 1),

@@ -16,7 +16,11 @@ export type GitClient = z.infer<typeof gitClientSchema>;
 export const gitPairingRequestSchema = /*#__PURE__*/ z.object({
   requestId: z.string(),
   clientId: z.string(),
+  /** Client-reported, not verified. */
   label: z.string(),
+  /** Kernel-reported process behind the connection. `peerExe` is '' when unresolved. */
+  peerPid: z.number(),
+  peerExe: z.string(),
   expiresAtMs: z.number(),
 });
 export type GitPairingRequest = z.infer<typeof gitPairingRequestSchema>;

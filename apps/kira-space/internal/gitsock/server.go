@@ -200,8 +200,20 @@ func (s *Server) untrackConn(nc net.Conn) {
 // disconnected cleanly or was revoked — SPEC §6's disconnect teardown.
 func (s *Server) handleConn(nc net.Conn) {
 	defer nc.Close()
+	// The 0700 dir and 0600 socket already keep other users out; this is the kernel-checked
+	// backstop, and its pid names the real process in the pairing prompt. Fail closed.
+	pc, err := peerCred(nc)
+	if err != nil {
+		slog.Warn("gitsock: peer credentials", "scope", "gitsock", "err", err)
+		return
+	}
+	if pc.UID != os.Getuid() {
+		slog.Warn("gitsock: refused a connection from another user", "scope", "gitsock", "uid", pc.UID)
+		return
+	}
 	c := newConn(nc)
 	clientID, sessionID, label, ok := runHandshake(c, handshakeDeps{
+		Peer:           Peer{PID: pc.PID, Exe: peerExe(pc.PID)},
 		Clients:        s.deps.Clients,
 		Broker:         s.broker,
 		ServerVersion:  s.deps.ServerVersion,

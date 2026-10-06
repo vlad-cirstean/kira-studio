@@ -67,6 +67,8 @@ type handshakeDeps struct {
 	Broker        *Broker
 	ServerVersion string
 	Now           func() time.Time
+	// Peer is the kernel-reported process behind this connection, carried into a pairing request.
+	Peer Peer
 	// ClientsChanged notifies the Connected editors pane after a write to the trust store
 	// (a fresh pairing). Optional so handshake_test.go's fakes needn't supply it.
 	ClientsChanged func()
@@ -149,7 +151,7 @@ func runHandshake(c *conn, deps handshakeDeps) (clientID, sessionID, label strin
 	// sitting in the queue, presentable, until Approve mints a token nobody holds.
 	var requestID string
 	var watchDone chan struct{}
-	outcome := deps.Broker.Request(clientID, label, func(req PairingRequest) {
+	outcome := deps.Broker.Request(clientID, label, deps.Peer, func(req PairingRequest) {
 		requestID = req.RequestID
 		sendHandshake(c, handshakeResponse{
 			Kind: "pairingRequired", RequestID: req.RequestID,

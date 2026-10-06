@@ -66,7 +66,9 @@ func (s *GitClientsService) Revoke(args GitClientsIDArgs) error {
 type GitPairingRequest struct {
 	RequestID   string `json:"requestId"`
 	ClientID    string `json:"clientId"`
-	Label       string `json:"label"`
+	Label       string `json:"label"` // client-reported.
+	PeerPID     int    `json:"peerPid"`
+	PeerExe     string `json:"peerExe"` // kernel-reported; "" when unresolved.
 	ExpiresAtMs int64  `json:"expiresAtMs"`
 }
 
@@ -81,7 +83,8 @@ func toWireSnapshot(snap gitsock.PairingSnapshot) GitPairingSnapshot {
 	if snap.Pending != nil {
 		out.Pending = &GitPairingRequest{
 			RequestID: snap.Pending.RequestID, ClientID: snap.Pending.ClientID,
-			Label: snap.Pending.Label, ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
+			Label: snap.Pending.Label, PeerPID: snap.Pending.PeerPID, PeerExe: snap.Pending.PeerExe,
+			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 		}
 	}
 	return out

@@ -860,3 +860,37 @@ func TestServer_Close_ReturnsPromptlyWithASilentConnection(t *testing.T) {
 		t.Fatal("Close() did not return within 5s -- hung behind the silent, never-handshaked connection")
 	}
 }
+
+// TestIntegration_PairingRequestCarriesKernelReportedPeer guards the per-platform peer credential
+// plumbing: the queued request names this process (pid and executable), not whatever hello claims.
+func TestIntegration_PairingRequestCarriesKernelReportedPeer(t *testing.T) {
+	t.Parallel()
+	server, sockPath, _, _ := newIntegrationServer(t)
+	c := dialTestClient(t, sockPath)
+	c.sendRaw(helloFrame{
+		Kind: "hello", Protocol: gitrpc.Protocol, ContractVersion: gitrpc.ContractVersion,
+		Client: helloClient{ID: "peer-client", Label: "claims to be VS Code", PID: 1, AppVersion: "test"},
+	})
+
+	var req *PairingRequest
+	deadline := time.Now().Add(5 * time.Second)
+	for req == nil && time.Now().Before(deadline) {
+		req = server.Broker().Pending().Pending
+		time.Sleep(5 * time.Millisecond)
+	}
+	if req == nil {
+		t.Fatal("no pairing request queued")
+	}
+	if req.PeerPID != os.Getpid() {
+		t.Fatalf("PeerPID = %d, want %d (kernel-reported, not hello's pid 1)", req.PeerPID, os.Getpid())
+	}
+	want, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	want, _ = filepath.EvalSymlinks(want)
+	got, _ := filepath.EvalSymlinks(req.PeerExe)
+	if got != want {
+		t.Fatalf("PeerExe = %q, want %q", req.PeerExe, want)
+	}
+}

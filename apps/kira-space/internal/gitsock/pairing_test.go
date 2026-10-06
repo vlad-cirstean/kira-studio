@@ -64,7 +64,7 @@ func TestBroker_FIFOOrder_OnlyHeadPresented(t *testing.T) {
 		done := make(chan PairingOutcome, 1)
 		enqueued := make(chan PairingRequest, 1)
 		go func(id string) {
-			done <- b.Request(id, "label-"+id, func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(id, "label-"+id, Peer{}, func(req PairingRequest) { enqueued <- req })
 		}(id)
 		req := <-enqueued
 		reqIDs = append(reqIDs, req.RequestID)
@@ -127,15 +127,15 @@ func TestBroker_QueuedCountChangeIsEmittedEvenBehindAPresentedHead(t *testing.T)
 	defer unsub()
 
 	enqueuedA := make(chan PairingRequest, 1)
-	go func() { b.Request("a", "a", func(req PairingRequest) { enqueuedA <- req }) }()
+	go func() { b.Request("a", "a", Peer{}, func(req PairingRequest) { enqueuedA <- req }) }()
 	<-enqueuedA // a is now the presented head — Queued: 1.
 
 	enqueuedB := make(chan PairingRequest, 1)
-	go func() { b.Request("b", "b", func(req PairingRequest) { enqueuedB <- req }) }()
+	go func() { b.Request("b", "b", Peer{}, func(req PairingRequest) { enqueuedB <- req }) }()
 	<-enqueuedB // b queues behind a, never presented — Queued must still be reported as 2.
 
 	enqueuedC := make(chan PairingRequest, 1)
-	go func() { b.Request("c", "c", func(req PairingRequest) { enqueuedC <- req }) }()
+	go func() { b.Request("c", "c", Peer{}, func(req PairingRequest) { enqueuedC <- req }) }()
 	<-enqueuedC // c queues behind a and b — Queued: 3.
 
 	// onEnqueued runs before the emit, so wait for each emission rather than assuming it landed.
@@ -166,13 +166,13 @@ func TestBroker_DeadlineMeasuredFromEnqueue_NotPresentation(t *testing.T) {
 	// position, so both time out here.
 	enqueuedA := make(chan PairingRequest, 1)
 	doneA := make(chan PairingOutcome, 1)
-	go func() { doneA <- b.Request("a", "a", func(req PairingRequest) { enqueuedA <- req }) }()
+	go func() { doneA <- b.Request("a", "a", Peer{}, func(req PairingRequest) { enqueuedA <- req }) }()
 	<-enqueuedA
 
 	enqueuedB := make(chan PairingRequest, 1)
 	doneB := make(chan PairingOutcome, 1)
 	go func() {
-		doneB <- b.Request("b", "b", func(req PairingRequest) { enqueuedB <- req })
+		doneB <- b.Request("b", "b", Peer{}, func(req PairingRequest) { enqueuedB <- req })
 	}()
 	reqB := <-enqueuedB
 	if snap := b.Pending(); snap.Pending == nil || snap.Pending.ClientID != "a" || snap.Queued != 2 {
@@ -211,7 +211,7 @@ func TestBroker_RequestAfterShutdownIsAbortedImmediately(t *testing.T) {
 
 	done := make(chan PairingOutcome, 1)
 	go func() {
-		done <- b.Request("client-a", "label", nil)
+		done <- b.Request("client-a", "label", Peer{}, nil)
 	}()
 
 	select {
@@ -247,7 +247,7 @@ func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 	enqueued := make(chan PairingRequest, 1)
 	done := make(chan PairingOutcome, 1)
 	go func() {
-		done <- b.Request("client-1", "label", func(req PairingRequest) { enqueued <- req })
+		done <- b.Request("client-1", "label", Peer{}, func(req PairingRequest) { enqueued <- req })
 	}()
 	req := <-enqueued
 	b.Deny(req.RequestID)
@@ -259,7 +259,7 @@ func TestBroker_DenyOnly_SetsCooldown(t *testing.T) {
 	}
 
 	// A reconnect inside the cooldown is denied immediately, without enqueueing.
-	out := b.Request("client-1", "label", func(PairingRequest) {
+	out := b.Request("client-1", "label", Peer{}, func(PairingRequest) {
 		t.Fatal("a cooldown request must not be enqueued")
 	})
 	if out != PairingDenied {
@@ -280,7 +280,7 @@ func TestBroker_DoubleAnswer_ReportsAlreadyResolved(t *testing.T) {
 	enqueued := make(chan PairingRequest, 1)
 	done := make(chan PairingOutcome, 1)
 	go func() {
-		done <- b.Request("client-1", "label", func(req PairingRequest) { enqueued <- req })
+		done <- b.Request("client-1", "label", Peer{}, func(req PairingRequest) { enqueued <- req })
 	}()
 	req := <-enqueued
 	if got := b.Approve(req.RequestID); got != PairingActionResolved {
@@ -313,7 +313,7 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 		done := make(chan PairingOutcome, 1)
 		id := "client-" + string(rune('a'+i%26)) + string(rune('0'+i/26))
 		go func(id string) {
-			done <- b.Request(id, "label", func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(id, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
 		}(id)
 		<-enqueued
 		results = append(results, done)
@@ -322,7 +322,7 @@ func TestBroker_QueueBoundedAgainstUnlimitedEnqueue(t *testing.T) {
 		t.Fatalf("Queued = %d, want %d (the queue must be full at the cap)", snap.Queued, maxQueueLen)
 	}
 
-	out := b.Request("one-too-many", "label", func(PairingRequest) {
+	out := b.Request("one-too-many", "label", Peer{}, func(PairingRequest) {
 		t.Fatal("a request beyond maxQueueLen must not be enqueued")
 	})
 	if out != PairingAborted {
@@ -367,7 +367,7 @@ func TestBroker_DenyPurgesEveryOtherQueuedRequestFromTheSameClient(t *testing.T)
 		enqueued := make(chan PairingRequest, 1)
 		done := make(chan PairingOutcome, 1)
 		go func() {
-			done <- b.Request(clientID, "label", func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(clientID, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
 		}()
 		return <-enqueued, done
 	}
@@ -421,7 +421,7 @@ func TestBroker_ApproveAdmitsOnlyThePresentedRequest(t *testing.T) {
 		enqueued := make(chan PairingRequest, 1)
 		done := make(chan PairingOutcome, 1)
 		go func() {
-			done <- b.Request(clientID, "label", func(req PairingRequest) { enqueued <- req })
+			done <- b.Request(clientID, "label", Peer{}, func(req PairingRequest) { enqueued <- req })
 		}()
 		return <-enqueued, done
 	}
