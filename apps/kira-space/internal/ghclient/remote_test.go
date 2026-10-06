@@ -16,6 +16,9 @@ func TestParseRemote_DocumentedForms(t *testing.T) {
 		{"scp form", "git@github.com:owner/repo.git", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
 		{"scp form no .git", "git@github.com:owner/repo", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
 		{"git scheme", "git://github.com/owner/repo.git", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
+		{"https userinfo", "https://vlad@github.com/owner/repo.git", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
+		{"https token userinfo", "https://x-access-token:TOKEN@github.com/owner/repo", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
+		{"uppercase host", "https://GitHub.com/owner/repo", Repo{Host: "github.com", Owner: "owner", Name: "repo"}},
 		{"custom GHES host", "https://git.corp.example/owner/repo.git", Repo{Host: "git.corp.example", Owner: "owner", Name: "repo"}},
 	}
 	for _, c := range cases {

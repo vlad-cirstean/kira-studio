@@ -67,6 +67,9 @@ func parseURLForm(rest string) (Repo, bool) {
 		return Repo{}, false
 	}
 	host := rest[:slash]
+	if at := strings.LastIndexByte(host, '@'); at >= 0 {
+		host = host[at+1:]
+	}
 	if host == "" {
 		return Repo{}, false
 	}
@@ -135,5 +138,5 @@ func finishParse(host, path string) (Repo, bool) {
 	if name == "" {
 		return Repo{}, false
 	}
-	return Repo{Host: host, Owner: owner, Name: name}, true
+	return Repo{Host: strings.ToLower(host), Owner: owner, Name: name}, true
 }
