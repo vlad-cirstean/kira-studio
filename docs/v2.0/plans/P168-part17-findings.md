@@ -4,7 +4,7 @@ Plan: `P168-part17-git-rpc.md`. Base `30ec62f` (plan survey), HEAD reviewed `0bc
 (`p168-stream-b`). One Opus reviewer, report only. Paths repo-relative; `GR`/`GK`/`GV`/`IPC` as in
 the plan.
 
-Block status: 1, 2, 3 done.
+Block status: 1, 2, 3, 4 done.
 
 ## Block 1: error mapping
 
@@ -167,3 +167,56 @@ Block status: 1, 2, 3 done.
   `reset --keep` refusal as `DirtyWorktree` (Part 15 `61774dd`). Both modelled.
 - `repoSettings.set` maps every storage error to `E_BAD_REQUEST` (`settings.go:107-109`): an IO
   failure reads as a client mistake. Cosmetic, no consumer branches on it. Not reported.
+
+## Block 4: socket server
+
+### F7 (medium, DESIGN-DECISION) Pairing identity is wholly client-asserted, and one Approve admits every queued sibling with the same client id
+
+- `GK/handshake.go:111-159` takes `clientID` and `label` from `hello` unverified;
+  `GK/server.go:94-131` never reads the peer's credentials (no `SO_PEERCRED`/`LOCAL_PEERPID`
+  anywhere in the tree, `git grep`); `GK/pairing.go:243-259,273-289` (`answer`) resolves every
+  other queued request with the head's `clientID` as Approved and hands each the same token
+  (guarded by `pairing_test.go:421`).
+- The VS Code client id is `kira-vscode:<vscode.env.machineId>` (`connection.ts:113-124`) and the
+  label is `<appName> — <hostname>` (`:128-130`); both are derivable by any same-user process.
+- Scenario: a same-user process (the adversary the pairing gate exists for; the token in VS Code
+  `context.secrets` is otherwise out of its reach on a keychain-ACL platform) polls for the moment
+  VS Code opens a pairing request, or simply connects first, with `hello.client.id =
+  "kira-vscode:<machineId>"`. The user sees one genuine "Visual Studio Code — host" prompt (the
+  dialog shows only the head and a count, `PairingSnapshot`), approves it, and the impostor's
+  queued sibling receives the same token. From then on it holds every git write, and with F5 a
+  shell. The same spoofed id also lets it trigger a 60 s cooldown on the real editor by being
+  denied (`pairing.go:244-246`), and fill the 200-slot queue (`maxQueueLen`) so real requests abort.
+- Decision needed: what pairing binds to. Options: capture peer pid and executable from the
+  socket's peer credentials at accept, show them in the prompt, and resolve a sibling only when its
+  peer executable matches the head's (keeps F6's multi-window intent); or drop sibling fan-out and
+  let each window pair (cost: one prompt per window). `needs-other-part-file`: the pairing dialog
+  and `bridge/gitclients.go` projection (Part 22) if the prompt shows peer data.
+
+### Block 4 candidate fates and notes
+
+- §9 #8 (allocate-before-read, no post-handshake deadline): dropped. Pre-handshake reads are
+  bounded by the 10 s deadline (`handshake.go:84-86`); post-handshake reads need a paired token.
+  A same-user process that can open the 0600 socket in the 0700 home can equally SIGKILL the app,
+  so memory pressure from declared-length frames adds no capability. `writeFrame`/`readFrame`
+  (`frame.go`) cap at 8 MiB both ways, reject cap+1 before allocating, and `bufio` handles split
+  and coalesced reads (guarded by `frame_test.go`).
+- §9 #13 folded into F7.
+- §9 #14 dropped: `Server.Close` waits only on `handleConn` goroutines (`server.go:345`);
+  `rpcstream.Serve` returns on the closed conn without joining dispatched handlers
+  (`internal/rpcstream/session.go`, `Serve`/`handleRaw`), so a long `op.run`/`worktree.prepare`
+  (both `context.WithoutCancel`) cannot block `wg.Wait`. Side effect, not a hang: such a write keeps
+  running after `Close` and after `main.go:225` `gitRegistry.Close()` tears its entry down; the
+  entry's later reads return `ErrRepoTornDown` and the process exits. Shutdown semantics of a
+  detached op are Part 16/22 territory, not a Part 17 defect.
+- Revocation: DB write precedes conn close (`server.go:281-295`); post-admission re-check holds
+  (`server.go:225-234`; no delete path exists in `GitClientsRepo`, so `!found` after a verified
+  token cannot happen). A revoked client's in-flight detached write completes; acceptable.
+- Token at rest: `tokenauth` sha256(salt||token), 32-byte token, 16-byte salt, constant-time
+  compare, dummy pair on miss and on lookup error (`token.go`, `handshake.go:278-296`). No log line
+  carries a token.
+- Socket file: stale socket removed only after the flock is won (`server.go:95-107`), chmod 0600
+  after listen, parent 0700. `AcquireLock` is `LOCK_EX|LOCK_NB` on a 0600 file.
+- `Close` versus mid-handshake conns (G32 r3 #1), `trackConn` after close (F4(a)), broker
+  `Shutdown` racing `Request` (F4(b)), disconnect watcher (F12): each holds on a read of the code
+  and its cited test.
