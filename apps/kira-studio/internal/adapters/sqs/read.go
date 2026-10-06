@@ -177,12 +177,21 @@ func pushMessage(builder *page.StreamPageBuilder, m types.Message, handles *rece
 	if err != nil {
 		return err
 	}
+	// SQS rejects a body outside its Unicode set at send, so this never reports binary; it keeps one
+	// cell contract with Kafka.
+	var body *string
+	var bodyBinary bool
+	if m.Body != nil {
+		text, binary := page.BytesCell([]byte(*m.Body))
+		body, bodyBinary = &text, binary
+	}
 	builder.Push(page.StreamRow{
-		Key:       m.MessageId,
-		Headers:   headers,
-		Attrs:     string(attrsJSON),
-		Timestamp: timestamp,
-		Body:      m.Body,
+		Key:        m.MessageId,
+		Headers:    headers,
+		Attrs:      string(attrsJSON),
+		Timestamp:  timestamp,
+		Body:       body,
+		BodyBinary: bodyBinary,
 	})
 	if handles != nil && m.MessageId != nil && m.ReceiptHandle != nil {
 		handles.set(*m.MessageId, *m.ReceiptHandle, visibilityTimeout)

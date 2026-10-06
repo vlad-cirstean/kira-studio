@@ -728,6 +728,40 @@ func TestKafka_Read_AlreadyCancelledContext(t *testing.T) {
 	}
 }
 
+// P174: a key, value and header that are not valid UTF-8 arrive as base64 with the binary row marked,
+// never as replacement characters.
+func TestKafka_Read_BinaryPayloadsAreMarkedBase64(t *testing.T) {
+	f := testsupport.StartKafka(t)
+	a := connectedAdapter(t, f)
+
+	const topic = "binary-payload-topic"
+	testsupport.CreateTopic(t, f, topic)
+	raw := []byte{0xff, 0xfe, 0x00, 0x80}
+	rec := &kgo.Record{Topic: topic, Key: raw, Value: raw, Headers: []kgo.RecordHeader{{Key: "h", Value: raw}}}
+	if err := f.Client.ProduceSync(context.Background(), rec).FirstErr(); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	p, err := a.Read(context.Background(), offsetRead(topicPath(f, topic), 10), adapters.NewOpCtx("op-binary"))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	sp := p.(page.StreamPage)
+	if sp.RowCount != 1 {
+		t.Fatalf("RowCount = %d, want 1", sp.RowCount)
+	}
+	const want = "//4AgA==" // base64 of ff fe 00 80
+	if k := testsupport.StreamKeyAt(t, sp, 0); k == nil || *k != want || !page.IsBinary(sp.Keys, 0) {
+		t.Errorf("key = %v binary = %v, want %s binary", k, page.IsBinary(sp.Keys, 0), want)
+	}
+	if b := testsupport.StreamBodyAt(t, sp, 0); b == nil || *b != want || !page.IsBinary(sp.Bodies, 0) {
+		t.Errorf("body = %v binary = %v, want %s binary", b, page.IsBinary(sp.Bodies, 0), want)
+	}
+	if h := testsupport.StreamHeadersAt(t, sp, 0); h == nil || *h != `{"h":{"base64":"`+want+`"}}` {
+		t.Errorf("headers = %v, want h as {base64: %s}", h, want)
+	}
+}
+
 // 15b. NEW (§5.3): a mid-browse cancellation — the case scenario 15 alone cannot reach, since an
 // already-cancelled context never reaches PollRecords. P58e E3: kgo.Client.PollRecords returns a
 // Fetches, not an error, and injects a fake fetch carrying ctx.Err() on cancellation — a literal

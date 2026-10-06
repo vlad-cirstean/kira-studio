@@ -1,4 +1,4 @@
-import { cellText, isNull, isTruncated, type StreamPage } from '@shared/protocol/page';
+import { cellText, isBinary, isNull, isTruncated, type StreamPage } from '@shared/protocol/page';
 import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
 
 const store = createPageStore<StreamPage>();
@@ -22,6 +22,9 @@ export interface StreamRow {
   /** `null` is a Kafka tombstone: distinct from the empty string. */
   body: string | null;
   isTruncated: boolean;
+  /** Cell text is base64 of non-UTF-8 bytes (Kafka); never a decode of them. */
+  keyBinary: boolean;
+  bodyBinary: boolean;
 }
 
 export function streamRow(tabId: string, row: number): StreamRow | null {
@@ -40,6 +43,8 @@ export function streamRow(tabId: string, row: number): StreamRow | null {
       timestamp: isNull(page.timestamps, row) ? null : cached('timestamp', page.timestamps),
       body: isNull(page.bodies, row) ? null : cached('body', page.bodies),
       isTruncated: isTruncated(page.bodies, row),
+      keyBinary: isBinary(page.keys, row),
+      bodyBinary: isBinary(page.bodies, row),
     };
   });
 }

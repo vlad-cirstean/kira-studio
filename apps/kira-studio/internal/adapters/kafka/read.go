@@ -63,16 +63,22 @@ type readFingerprintParts struct {
 // headersToPlain is read.ts's headersToPlain, folded onto franz-go's flat, ordered
 // []RecordHeader ({Key string; Value []byte}) — closer to librdkafka's own [{k:v}] array than to
 // kafkajs's Record, so the repeated-key promotion (a second occurrence of a header name becomes a
-// []string) ports unchanged in intent (P58e E8). Each value passes through strings.ToValidUTF8:
+// []string) ports unchanged in intent (P58e E8). Each value passes through page.BytesCell:
 // raw broker bytes carry no encoding guarantee, unlike Node's Buffer.toString('utf8'), which
-// replaces invalid sequences invisibly.
+// replaces invalid sequences invisibly. A non-UTF-8 value becomes {"base64": "..."} (page.BytesCell's
+// encoding) instead of a replacement-character string.
 func headersToPlain(headers []kgo.RecordHeader) map[string]any {
 	out := map[string]any{}
 	for _, h := range headers {
 		// A nil header value stays JSON null, distinct from an empty one.
 		var value any
 		if h.Value != nil {
-			value = strings.ToValidUTF8(string(h.Value), "�")
+			text, binary := page.BytesCell(h.Value)
+			if binary {
+				value = map[string]string{"base64": text}
+			} else {
+				value = text
+			}
 		}
 		if existing, seen := out[h.Key]; !seen {
 			out[h.Key] = value
@@ -88,9 +94,10 @@ func headersToPlain(headers []kgo.RecordHeader) map[string]any {
 // buildStreamRow is read.ts:281-291's row construction, with P58e E8 applied.
 func buildStreamRow(rec *kgo.Record) (page.StreamRow, error) {
 	var key *string
+	var keyBinary bool
 	if rec.Key != nil {
-		k := strings.ToValidUTF8(string(rec.Key), "�")
-		key = &k
+		k, binary := page.BytesCell(rec.Key)
+		key, keyBinary = &k, binary
 	}
 	headersJSON, err := json.Marshal(headersToPlain(rec.Headers))
 	if err != nil {
@@ -114,11 +121,15 @@ func buildStreamRow(rec *kgo.Record) (page.StreamRow, error) {
 		timestamp = &t
 	}
 	var body *string
+	var bodyBinary bool
 	if rec.Value != nil {
-		v := strings.ToValidUTF8(string(rec.Value), "�")
-		body = &v
+		v, binary := page.BytesCell(rec.Value)
+		body, bodyBinary = &v, binary
 	}
-	return page.StreamRow{Key: key, Headers: string(headersJSON), Attrs: string(attrsJSON), Timestamp: timestamp, Body: body}, nil
+	return page.StreamRow{
+		Key: key, Headers: string(headersJSON), Attrs: string(attrsJSON), Timestamp: timestamp, Body: body,
+		KeyBinary: keyBinary, BodyBinary: bodyBinary,
+	}, nil
 }
 
 func position(windows []partitionWindow, hasMore bool, fingerprint string, pageSize int) page.PagePosition {

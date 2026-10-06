@@ -171,7 +171,13 @@ function onRowClick(i: number): void {
 // actually clicked, read-only — not just the body. A synthetic single-column ColumnDescriptor
 // stands in for the grid's real per-table columns, since a stream row has no catalog-described
 // schema at all (§8.9 has no column navigation for streams).
-function onCellClick(i: number, name: string, value: string | null, truncated = false): void {
+function onCellClick(
+  i: number,
+  name: string,
+  value: string | null,
+  truncated = false,
+  binary = false,
+): void {
   streamViewStore.selectRow(props.tab.id, i);
   const selected: SelectedCell = {
     tabId: props.tab.id,
@@ -180,7 +186,7 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
     columnIndex: 0,
     column: {
       name,
-      dataType: 'text',
+      dataType: binary ? 'base64' : 'text',
       typeClass: 'text',
       nullable: value === null,
       isPrimaryKey: false,
@@ -227,7 +233,7 @@ function onRowContextMenuFromEvent(e: MouseEvent): void {
 }
 function onKeyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
-  if (i !== null) onCellClick(i, 'key', rowAt(i)?.key ?? null);
+  if (i !== null) onCellClick(i, 'key', rowAt(i)?.key ?? null, false, rowAt(i)?.keyBinary);
 }
 function onTimestampCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
@@ -243,7 +249,7 @@ function onAttrsCellClickFromEvent(e: MouseEvent): void {
 }
 function onBodyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
-  if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
+  if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
 }
 // P105 §5.2(c): Enter/Space on a cell mirror clicking it.
 function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 'headers' | 'attrs' | 'body'): void {
@@ -252,8 +258,8 @@ function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 
   e.stopPropagation();
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i === null) return;
-  if (column === 'body') onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
-  else onCellClick(i, column, rowAt(i)?.[column] ?? null);
+  if (column === 'body') onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated, rowAt(i)?.bodyBinary);
+  else onCellClick(i, column, rowAt(i)?.[column] ?? null, false, column === 'key' && rowAt(i)?.keyBinary);
 }
 
 // P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
@@ -1166,6 +1172,7 @@ onUnmounted(() => {
                   @click="onKeyCellClickFromEvent"
                   @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
+                  <Badge v-if="rowAt(rowIndices[vi.index])?.keyBinary" class="mr-1" data-testid="stream-key-binary">base64</Badge>
                   {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
                 <div
@@ -1221,7 +1228,10 @@ onUnmounted(() => {
                     data-testid="stream-body-null"
                     >NULL</span
                   >
-                  <template v-else>{{ rowAt(rowIndices[vi.index])?.body }}</template>
+                  <template v-else>
+                    <Badge v-if="rowAt(rowIndices[vi.index])?.bodyBinary" class="mr-1" data-testid="stream-body-binary">base64</Badge>
+                    {{ rowAt(rowIndices[vi.index])?.body }}
+                  </template>
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
                       <span class="text-kira-xs text-muted-foreground">(truncated)</span>
