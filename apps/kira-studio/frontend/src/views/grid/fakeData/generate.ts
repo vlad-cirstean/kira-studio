@@ -17,7 +17,7 @@ export function canGenerateDataFor(caps: Caps | null, readOnly: boolean | undefi
   return !!caps?.tabular && !!caps?.canInsert && !readOnly;
 }
 
-// D2: the one dynamic import of fakerEntry.ts, memoised at module scope so a second run (or a
+// D2: the one dynamic import of fakerEntry.ts, memoised (a failed load is not kept) at module scope so a second run (or a
 // second Preview) pays nothing beyond the first — the whole reason fakerEntry.ts exists as its
 // own file is to give this import a clean, statically-analysable re-export to split on (P13's D2
 // precedent), rather than leaving Rollup to shape a chunk around an inline dynamic namespace.
@@ -28,7 +28,10 @@ async function loadFaker() {
   return mod.faker;
 }
 function getFaker(): Promise<Faker> {
-  if (!fakerPromise) fakerPromise = loadFaker();
+  fakerPromise ??= loadFaker().catch((e: unknown) => {
+    fakerPromise = null;
+    throw e;
+  });
   return fakerPromise;
 }
 

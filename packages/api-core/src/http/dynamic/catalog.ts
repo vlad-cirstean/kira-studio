@@ -254,6 +254,9 @@ async function loadGenerators(): Promise<(name: string) => string | null> {
 /** D2's callback, resolved once per session and reused thereafter — the same memoised-promise
  *  shape `views/grid/fakeData/generate.ts`'s `getFaker()` uses, for the same reason. */
 export function loadDynamicGenerator(): Promise<(name: string) => string | null> {
-  if (!generatorPromise) generatorPromise = loadGenerators();
+  generatorPromise ??= loadGenerators().catch((e: unknown) => {
+    generatorPromise = null;
+    throw e;
+  });
   return generatorPromise;
 }
