@@ -4555,3 +4555,5 @@ Performance:
   which changes kept values.
 
 - **ClickHouse console: a `Nullable` string equal to `ᴺᵁᴸᴸ` renders as NULL (P168 Part 3).** The `*Strings` JSON format prints NULL as that text. The table read path settles it exactly with an `isNull(col)` flag; arbitrary console SQL has no safe place for one. Non-Nullable columns are exact. Delete if the console moves to a typed format.
+
+- **Go and TS masks count Indic conjuncts differently (P168 Part 6).** `uniseg` v0.4.7 (latest) counts `क्ष` as 2 graphemes, ICU (Unicode 15.1, rule GB9c) as 1, so a Hindi name masks to a different bullet count in the grid preview than over MCP. The MCP render path (Go) is the boundary; the preview is advisory. No library fix exists.

@@ -98,11 +98,13 @@ function maskWord(word: string, keepHint: boolean): string {
   return first + BULLET.repeat(n - 1);
 }
 
-// NAME_WORD_SPLIT_RE mirrors Go's strings.Fields (unicode.IsSpace) rather than plain `\s`: JS's
-// `\s` does not match U+0085 (NEL), a character unicode.IsSpace does treat as whitespace, so a
-// name value containing one would split into a different word count in each language without
-// this — U+0085 added explicitly to close that gap.
-const NAME_WORD_SPLIT_RE = /[\s]+/;
+// GO_SPACE is Go's unicode.IsSpace set, spelled out: JS `\s` matches U+FEFF (Go does not) and
+// misses U+0085 (Go matches), so a name or number containing either would otherwise split or trim
+// differently here than in the Go render path.
+const GO_SPACE =
+  '[\\t\\n\\v\\f\\r \\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]';
+const NAME_WORD_SPLIT_RE = new RegExp(`${GO_SPACE}+`);
+const GO_TRIM_RE = new RegExp(`^${GO_SPACE}+|${GO_SPACE}+$`, 'g');
 
 // maskName keeps each whitespace-separated word's first grapheme (when keepHint) plus its own
 // grapheme length, destroying every other character. A value with no words at all (empty after
@@ -224,7 +226,7 @@ function pow10String(k: number): string {
 // decadeRange formats value's own fixed-power-of-ten bucket. ok is false when value does not parse
 // as a real number at all.
 function decadeRange(value: string): { range: string; ok: boolean } {
-  const trimmed = value.trim();
+  const trimmed = value.replace(GO_TRIM_RE, '');
   if (!NUMERIC_RE.test(trimmed)) return { range: '', ok: false };
   const v = Number(trimmed);
   if (!Number.isFinite(v)) return { range: '', ok: false };
@@ -255,7 +257,7 @@ const DATE_LEADING_YEAR_RE = /^\d{4}-\d{2}-\d{2}/;
 function destroyDigits(s: string): string {
   let out = '';
   for (const ch of s) {
-    out += /\d/.test(ch) ? BULLET : ch;
+    out += /\p{Nd}/u.test(ch) ? BULLET : ch;
   }
   return out;
 }
