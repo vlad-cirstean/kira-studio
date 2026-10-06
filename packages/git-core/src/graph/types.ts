@@ -59,7 +59,7 @@ export const PATCH_KIND = 3;
  *  than inventing a second one: `0xffffffff` is never a legitimate resolved row, lane, or kind
  *  value in any of the three fields, and a patch never sets `toRow` *back* to `UNRESOLVED_ROW`
  *  (resolution only ever moves forward), so the two meanings never collide. */
-export const PATCH_UNCHANGED = UNRESOLVED_ROW;
+export const PATCH_UNCHANGED = 0xffffffff;
 
 export interface LayoutChunk {
   readonly from: number;
