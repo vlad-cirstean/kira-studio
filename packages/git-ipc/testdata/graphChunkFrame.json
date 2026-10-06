@@ -1,6 +1,6 @@
 {
   "envelope": {
-    "repoId": "/tmp/TestFixtures_CaptureGraphChunkFrame1344021814/002",
+    "repoId": "/tmp/TestFixtures_CaptureGraphChunkFrame2683944756/002",
     "seq": 0,
     "from": 0,
     "to": 3,
@@ -13,17 +13,17 @@
     "to": 3,
     "shaWidthBytes": 20,
     "shas": [
-      "ebe51445b3735437e75d95073667f1bffdb31148",
-      "0fb9699981b6089bb5d758fe0ef204828e4e70eb",
-      "5eadf3f86c6c8604a208c310beb651b32cfd9a3f"
+      "3614f03c656d56388f56105d57c67ef7caa1af89",
+      "cb6bc9104954cc2013f17b733b8de0ef3f228639",
+      "92650dd78d709082363717a2a529b7728ff5c006"
     ],
     "parentOffsets": [0, 1, 2, 2],
     "parentShas": [
-      "0fb9699981b6089bb5d758fe0ef204828e4e70eb",
-      "5eadf3f86c6c8604a208c310beb651b32cfd9a3f"
+      "cb6bc9104954cc2013f17b733b8de0ef3f228639",
+      "92650dd78d709082363717a2a529b7728ff5c006"
     ],
     "identityIds": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
-    "times": [1791180882, 1791180882, 1791180882, 1791180882, 1791180882, 1791180882],
+    "times": [1791312080, 1791312080, 1791312080, 1791312080, 1791312080, 1791312080],
     "subjects": ["commit 2", "commit 1", "commit 0"],
     "subjectOffsets": [0, 8, 16, 24],
     "dictionaryBase": 0,
