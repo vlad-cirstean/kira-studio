@@ -33,8 +33,10 @@ export const usePageSearchFilterStore = defineStore('pageSearchFilter', () => {
   function matchedRowsOf(
     tabId: string,
     matches: ReadonlyArray<{ row: number }> | undefined,
+    scannedRows?: number[],
   ): number[] | null {
     if (!isSearchFiltering(tabId) || !matches) return null;
+    if (scannedRows) return scannedRows;
     const rows: number[] = [];
     let last = -1;
     for (const m of matches) {

@@ -141,7 +141,7 @@ function startSearch(autoScroll = true): void {
   // reset `previousIndex` away from whatever the *previous, completed* query left it at.
   props.api.searchState[props.tabId] = { matches: [], index: -1, pending: true, found: 0 };
   handle = thisHandle;
-  thisHandle.done.then(({ matches, found }) => {
+  thisHandle.done.then(({ matches, found, matchedRows }) => {
     if (handle !== thisHandle) return;
     scanning.value = false;
     // P43 iter3 D41/F36: a match the user navigated to mid-scan (D34) survives the scan
@@ -155,7 +155,7 @@ function startSearch(autoScroll = true): void {
     const navigatedIndex = props.api.searchState[props.tabId]?.index ?? -1;
     const navigated = navigatedIndex >= 0 && navigatedIndex < matches.length;
     const index = navigated ? navigatedIndex : matches.length > 0 ? 0 : -1;
-    props.api.searchState[props.tabId] = { matches, index, found };
+    props.api.searchState[props.tabId] = { matches, index, found, matchedRows };
     if (autoScroll && !navigated && matches.length > 0) emit('goToMatch', matches[0]);
   });
 }

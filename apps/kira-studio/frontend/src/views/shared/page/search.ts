@@ -24,7 +24,10 @@ export interface PageSearchApi<M extends { row: number }> {
    *  below returns null while it's set, so filtering never hides a row the scan hasn't reached
    *  yet). P5 C4/F6: `found` is the scan's true, uncapped match count — present whenever `matches`
    *  is (mid-scan and completed alike), `undefined` only for a tab with no search state at all. */
-  searchState: Record<string, { matches: M[]; index: number; pending?: boolean; found?: number }>;
+  searchState: Record<
+    string,
+    { matches: M[]; index: number; pending?: boolean; found?: number; matchedRows?: number[] }
+  >;
   matchedRows(tabId: string): number[] | null;
   pageVersion: { n: number };
   loadedRowCount(tabId: string): number;
@@ -62,7 +65,7 @@ function createSearchState<M extends { row: number }>(): {
   function matchedRows(tabId: string): number[] | null {
     const entry = searchState[tabId];
     if (entry?.pending) return null;
-    return usePageSearchFilterStore().matchedRowsOf(tabId, entry?.matches);
+    return usePageSearchFilterStore().matchedRowsOf(tabId, entry?.matches, entry?.matchedRows);
   }
 
   return { searchState, clearSearchState, matchedRows };

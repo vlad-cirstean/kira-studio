@@ -20,6 +20,9 @@ interface ScanResult<M> {
   /** The true, uncapped count — `matches.length` once `found <= MAX_SCAN_MATCHES`, `MAX_SCAN_MATCHES`
    *  otherwise (D4/F6). */
   found: number;
+  /** Ascending rows with at least one match, uncapped by `MAX_SCAN_MATCHES` — filter mode shows
+   *  every matching row even when `matches` was truncated. */
+  matchedRows: number[];
 }
 
 export interface SearchHandle<M> {
@@ -124,6 +127,7 @@ export function runChunkedScan<M>(
   let cancelled = false;
   const matches: M[] = [];
   let found = 0;
+  const matchedRows: number[] = [];
   const rowBuf: M[] = [];
 
   function appendCapped(into: M[], rowMatches: readonly M[]): void {
@@ -138,18 +142,19 @@ export function runChunkedScan<M>(
       let row = 0;
       function step(): void {
         if (cancelled) {
-          resolve({ matches, found });
+          resolve({ matches, found, matchedRows });
           return;
         }
         const chunkEnd = Math.min(totalRows, row + chunkRows);
         for (; row < chunkEnd; row++) {
           rowBuf.length = 0;
           scanRow(row, pattern, rowBuf);
+          if (rowBuf.length > 0) matchedRows.push(row);
           appendCapped(matches, rowBuf);
         }
         onProgress(found, row, totalRows, matches);
         if (row < totalRows) requestAnimationFrame(step);
-        else resolve({ matches, found });
+        else resolve({ matches, found, matchedRows });
       }
       requestAnimationFrame(step);
     }
@@ -160,7 +165,7 @@ export function runChunkedScan<M>(
     if (to > from) {
       requestAnimationFrame(() => {
         if (cancelled) {
-          resolve({ matches, found });
+          resolve({ matches, found, matchedRows });
           return;
         }
         const priorityMatches: M[] = [];
@@ -190,7 +195,7 @@ export function runChunkedScan<M>(
 // P48 F9: grid/documents/keyvalue/console's search.ts each repeated this same four-line early-out
 // for "no page yet, or an empty query" — a scan that never starts.
 export function emptyScan<M>(): SearchHandle<M> {
-  return { cancel() {}, done: Promise.resolve({ matches: [], found: 0 }) };
+  return { cancel() {}, done: Promise.resolve({ matches: [], found: 0, matchedRows: [] }) };
 }
 
 // P107 I2-14: grid/search.ts, documents/search.ts and shared/keyvalue/search.ts each wrapped

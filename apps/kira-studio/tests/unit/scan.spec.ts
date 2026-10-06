@@ -182,7 +182,7 @@ describe('runChunkedScan — frame semantics (P44 F45)', () => {
     const handle = runChunkedScan<RowMatch>(100, scanRow, QUERY, () => {});
     handle.cancel();
     await drain();
-    expect(await handle.done).toEqual({ matches: [], found: 0 });
+    expect(await handle.done).toEqual({ matches: [], found: 0, matchedRows: [] });
   });
 
   test('8. cancel mid-scan resolves with what was found so far', async () => {
@@ -259,6 +259,14 @@ describe('runChunkedScan — the match cap (P5 C4/F6)', () => {
     const rows = matches.map((m) => m.row);
     expect(rows).toEqual(Array.from({ length: 2500 }, (_, i) => i));
     for (let i = 1; i < rows.length; i++) expect(rows[i]).toBeGreaterThan(rows[i - 1] as number);
+  });
+
+  test('15. matchedRows stays uncapped so filter mode keeps every matching row', async () => {
+    const handle = runChunkedScan<RowMatch>(3, scanRow, QUERY, () => {}, { cap: 2 });
+    await drain();
+    const { matches, matchedRows } = await handle.done;
+    expect(matches).toHaveLength(2);
+    expect(matchedRows).toEqual([0, 1, 2]);
   });
 });
 
