@@ -1,6 +1,7 @@
 package gitsession
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -85,7 +86,7 @@ func TestUndoRun_HardResetUndoKeepsEditsMadeSince(t *testing.T) {
 	if undo.OK {
 		t.Fatal("hard-reset undo overwrote local edits")
 	}
-	if got, _ := os.ReadFile(filepath.Join(dir, "f.txt")); string(got) != string(edit) {
+	if got, _ := os.ReadFile(filepath.Join(dir, "f.txt")); !bytes.Equal(got, edit) {
 		t.Fatalf("f.txt = %q, want edits kept", got)
 	}
 	if head := strings.TrimSpace(runOutput(t, dir, "rev-parse", "HEAD")); head != prev {
