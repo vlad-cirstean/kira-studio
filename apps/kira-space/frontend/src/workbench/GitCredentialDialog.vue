@@ -79,7 +79,10 @@ function onCancel(): void {
 
       <div class="flex flex-col gap-1 px-3 py-2 overflow-auto">
         <p class="m-0 text-subtle" data-testid="git-credential-repo">
-          {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
+          {{
+            gitCredentialStore.active.label ??
+            codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name
+          }}
         </p>
         <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
         <p class="font-data whitespace-pre-wrap mb-0.5" data-testid="git-credential-prompt">

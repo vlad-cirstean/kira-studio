@@ -13,6 +13,7 @@ import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
+import { useGitCredentialStore } from './state/gitCredential';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
@@ -51,6 +52,7 @@ async function mountShell(): Promise<void> {
   const settingsStore = useSettingsStore(pinia);
   const codeReposStore = useCodeReposStore(pinia);
   const gitClientsStore = useGitClientsStore(pinia);
+  const gitCredentialStore = useGitCredentialStore(pinia);
   const tabsStore = useTabsStore(pinia);
   const terminalsStore = useTerminalsStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
@@ -90,6 +92,7 @@ async function mountShell(): Promise<void> {
   // never takes down the whole window the way it did bundled into the Promise.all above.
   const optional = await Promise.allSettled([
     gitClientsStore.hydrateGitClients(),
+    gitCredentialStore.hydrateRelayPrompts(),
     terminalsStore.hydrateTerminalDefaults(),
     keepAwakeStore.initKeepAwake(),
     // P129 Part 3 §2.8 item 1: the boot-time hydrate for the ade module's own agent-activity store

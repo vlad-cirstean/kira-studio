@@ -2,6 +2,7 @@ import * as AdeTaskService from '@bindings/adetaskservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
+import * as GitCredentialService from '@bindings/gitcredentialservice.js';
 import * as GitHubService from '@bindings/githubservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
@@ -17,6 +18,7 @@ import type { HeadState } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   GitClient,
+  GitCredentialPrompt,
   GitPairingActionResult,
   GitPairingSnapshot,
   GitVsixInstallResult,
@@ -74,6 +76,12 @@ const spaceControl = {
     unwrap(GitClientsService.Deny({ id })).then((r) => trust<GitPairingActionResult>(r)),
   onGitPairingChanged: (cb: (snap: GitPairingSnapshot) => void): (() => void) =>
     on(CHANNEL.gitPairing, cb),
+  gitCredentialPending: (): Promise<GitCredentialPrompt[]> =>
+    unwrap(GitCredentialService.Pending()).then((r) => trust<GitCredentialPrompt[]>(r ?? [])),
+  gitCredentialProvide: (requestId: string, secret: string | null): Promise<boolean> =>
+    unwrap(GitCredentialService.Provide({ requestId, secret })),
+  onGitCredentialChanged: (cb: (prompts: GitCredentialPrompt[]) => void): (() => void) =>
+    on(CHANNEL.gitCredential, cb),
   gitVsixStatus: (): Promise<GitVsixStatus> =>
     unwrap(GitClientsService.VsixStatus()).then((r) => trust<GitVsixStatus>(r)),
   gitVsixInstall: (): Promise<GitVsixInstallResult> =>

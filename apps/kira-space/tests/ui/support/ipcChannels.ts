@@ -57,6 +57,9 @@ export const IPC = {
   gitPairingApprove: 'kira:git:pairing:approve',
   gitPairingDeny: 'kira:git:pairing:deny',
   gitPairing: 'kira:git:pairing',
+  gitCredentialPending: 'kira:git:credential:pending',
+  gitCredentialProvide: 'kira:git:credential:provide',
+  gitCredential: 'kira:git:credential',
   gitVsixStatus: 'kira:git:vsix:status',
   gitVsixInstall: 'kira:git:vsix:install',
 

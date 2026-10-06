@@ -1,5 +1,8 @@
+import type { GitCredentialPrompt } from '@shared/domain/git';
+import { hydrateThenSubscribe } from '@workbench/state/hydrateThenSubscribe';
 import { defineStore } from 'pinia';
 import { reactive, toRaw, toRefs } from 'vue';
+import { control } from '../bridge/control';
 
 // P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D9) — the native counterpart to git's own
 // askpass prompt, relayed here for the first time now that the native mount can push a remote op
@@ -27,6 +30,11 @@ export interface PendingCredential {
   /** git's own text, rendered verbatim — never reformatted, never parsed. */
   readonly prompt: string;
   readonly masked: boolean;
+  /** Set for a prompt the Go relay holds (a VS Code client's or the ADE board's, P178): its
+   *  server-side request id. Such an entry has no code repo (`codeRepoId` ''). */
+  readonly relayId?: string;
+  /** Shown instead of the code repo's name: "<source> · <repo folder>". */
+  readonly label?: string;
   /** `null` for a dismissal — an absence the server would have to infer is explicitly not the
    *  wire's own contract. Closes over this request's id and this workspace's own transport. */
   readonly answer: (secret: string | null) => void;
@@ -74,5 +82,63 @@ export const useGitCredentialStore = defineStore('gitCredential', () => {
     }
   }
 
-  return { ...toRefs(state), enqueueCredentialRequest, answerCredential, dropCredentialRequests };
+  // Relay ids answered here; a snapshot already in flight must not re-add them. Pruned on each sync.
+  const answeredRelayIds = new Set<string>();
+
+  function relayEntry(prompt: GitCredentialPrompt): PendingCredential {
+    return {
+      codeRepoId: '',
+      relayId: prompt.requestId,
+      label: `${prompt.source} · ${prompt.repoLabel}`,
+      prompt: prompt.prompt,
+      masked: prompt.masked,
+      answer: (secret) => {
+        answeredRelayIds.add(prompt.requestId);
+        void control.gitCredentialProvide(prompt.requestId, secret).catch(() => {
+          /* the broker's own 120s bound already ended the wait — nothing to log or recover. */
+        });
+      },
+    };
+  }
+
+  /** Applies the relay's full snapshot: queues unseen prompts in order and drops the ones the
+   *  server withdrew (answered in another window, op cancelled, timed out). A dropped active entry
+   *  pumps the next. Idempotent. */
+  function syncRelayPrompts(list: readonly GitCredentialPrompt[]): void {
+    const live = new Set(list.map((p) => p.requestId));
+    for (const id of answeredRelayIds) if (!live.has(id)) answeredRelayIds.delete(id);
+    for (let i = queue.length - 1; i >= 0; i -= 1) {
+      const id = queue[i]?.relayId;
+      if (id !== undefined && !live.has(id)) queue.splice(i, 1);
+    }
+    const activeId = state.active?.relayId;
+    if (activeId !== undefined && !live.has(activeId)) state.active = queue.shift() ?? null;
+    const held = new Set<string>(answeredRelayIds);
+    if (state.active?.relayId) held.add(state.active.relayId);
+    for (const queued of queue) if (queued.relayId) held.add(queued.relayId);
+    for (const prompt of list) {
+      if (!held.has(prompt.requestId)) enqueueCredentialRequest(relayEntry(prompt));
+    }
+  }
+
+  let unsubscribeRelay: (() => void) | null = null;
+
+  async function hydrateRelayPrompts(): Promise<void> {
+    unsubscribeRelay?.();
+    unsubscribeRelay = null;
+    unsubscribeRelay = await hydrateThenSubscribe({
+      snapshot: () => control.gitCredentialPending(),
+      subscribe: (cb) => control.onGitCredentialChanged(cb),
+      apply: syncRelayPrompts,
+    });
+  }
+
+  return {
+    ...toRefs(state),
+    enqueueCredentialRequest,
+    answerCredential,
+    dropCredentialRequests,
+    syncRelayPrompts,
+    hydrateRelayPrompts,
+  };
 });

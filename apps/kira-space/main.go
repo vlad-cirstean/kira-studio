@@ -21,6 +21,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitcred"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
@@ -105,6 +106,7 @@ func main() {
 	}
 	logging.SetLevel(settings.Advanced.GitLogLevel)
 
+	credentialRelay := gitcred.New()
 	git := wireGit(repositories)
 	gitDiscovery, gitRunner, gitRegistry := git.discovery, git.runner, git.registry
 	askpassBroker, gitRouter, gitSock := git.askpassBroker, git.router, git.sock
@@ -131,6 +133,8 @@ func main() {
 		Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
 	}
 	detachGitPush := gitClientsSvc.AttachPush()
+	gitCredentialSvc := &bridge.GitCredentialService{Deps: deps, Relay: credentialRelay}
+	detachGitCredentialPush := gitCredentialSvc.AttachPush()
 	gitHubSvc := &bridge.GitHubService{Deps: deps, Browser: browserOpener}
 	linkSvc := &bridge.LinkService{Browser: browserOpener}
 	settingsSvc := &bridge.SettingsService{Deps: deps}
@@ -212,6 +216,7 @@ func main() {
 		shutdownTracker(adeTracker, agentHooks)
 		adeTaskBoard.Close()
 		detachGitPush()
+		detachGitCredentialPush()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -243,6 +248,7 @@ func main() {
 		Description: "A git client for macOS\n\nVersion " + buildinfo.Version,
 		Services: []application.Service{
 			application.NewService(gitClientsSvc),
+			application.NewService(gitCredentialSvc),
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(gitHubSvc),
 			application.NewService(linkSvc),
@@ -312,6 +318,17 @@ func main() {
 	// the ⇧⌘N menu command below ties to.
 	windowsSvc.OpenNewWindow = openNew
 	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
+	// P178 D4: a prompt raised away from any window. The user started that git op elsewhere and
+	// waits on it, so open a window when none exists, else bring one forward.
+	credentialRelay.SetOnAdded(func() {
+		if windows.Count() == 0 {
+			shell.ReopenWindows(winDeps)
+			return
+		}
+		if keys := windows.Keys(); len(keys) > 0 {
+			windows.Focus(keys[0])
+		}
+	})
 	// P116 G5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(keepAwakeSvc) })
 

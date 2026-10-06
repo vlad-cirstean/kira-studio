@@ -21,6 +21,10 @@ const (
 	ChannelGitClientsChanged = "kira:git:clients"
 )
 
+// ChannelGitCredential is P178's credential relay snapshot (every pending prompt a socket client
+// or the ADE board raised), broadcast to every window — ChannelGitPairing's own shape.
+const ChannelGitCredential = "kira:git:credential"
+
 // ChannelSettingsChanged/ChannelLayoutChanged are SettingsService.Set/LayoutService.Set's own
 // broadcasts — Kira Studio's own two channels of the same name, unchanged shape.
 const (

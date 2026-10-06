@@ -38,6 +38,8 @@ export const CHANNEL = {
   // G1 §3.6/D19: the pairing prompt's live queue snapshot and the Connected editors pane's list.
   gitPairing: 'kira:git:pairing',
   gitClientsChanged: 'kira:git:clients',
+  // P178: every pending credential prompt raised by a socket client or the ADE board.
+  gitCredential: 'kira:git:credential',
   // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
   // only) — grpcCall's own shape, restated for a payload that shares no field with it.
   codeSearch: 'kira:code:search',

@@ -14,8 +14,10 @@ import (
 // boundary: Prompt can itself carry a username the user just typed (probe P1's second prompt).
 type Request struct {
 	RepoID string
-	Prompt string
-	Masked bool
+	// RepoLabel is the repository's folder name, for a prompt shown away from the repo.
+	RepoLabel string
+	Prompt    string
+	Masked    bool
 	// Confirm (F19) is true for a yes/no confirmation prompt (OpenSSH's own
 	// SSH_ASKPASS_PROMPT=confirm — e.g. "Allow user@host to reset the passphrase?") rather than
 	// an ordinary masked/unmasked text prompt. A Prompter should render Yes/No for one of these,

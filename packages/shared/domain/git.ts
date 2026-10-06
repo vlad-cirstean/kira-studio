@@ -39,6 +39,17 @@ export const gitPairingActionResultSchema = /*#__PURE__*/ z.object({
 });
 export type GitPairingActionResult = z.infer<typeof gitPairingActionResultSchema>;
 
+// P178: one credential prompt a socket client (VS Code) or the ADE board raised, relayed to every
+// Kira Space window. `source` is the asking client's label; `repoLabel` the repository folder name.
+export const gitCredentialPromptSchema = /*#__PURE__*/ z.object({
+  requestId: z.string(),
+  source: z.string(),
+  repoLabel: z.string(),
+  prompt: z.string(),
+  masked: z.boolean(),
+});
+export type GitCredentialPrompt = z.infer<typeof gitCredentialPromptSchema>;
+
 // G10 D14: the Install VS Code Integration button's own domain — gitvsix.Status/Result's wire
 // projections. codeAvailable is advisory only (the pane's pre-click render); InstallVsCodeIntegration
 // re-resolves everything itself and is the sole authority. command is C3 §7.5's own addition —

@@ -41,6 +41,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitPairingPending: 'GitClientsService.PendingPairing',
   gitPairingApprove: 'GitClientsService.Approve',
   gitPairingDeny: 'GitClientsService.Deny',
+  gitCredentialPending: 'GitCredentialService.Pending',
+  gitCredentialProvide: 'GitCredentialService.Provide',
   gitVsixStatus: 'GitClientsService.VsixStatus',
   gitVsixInstall: 'GitClientsService.InstallVsCodeIntegration',
   tabsList: 'TabsService.List',
@@ -172,6 +174,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.opsRecent]: '[]',
   [IPC.opsCancel]: 'null',
   [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
+  [IPC.gitCredentialPending]: '[]',
+  [IPC.gitCredentialProvide]: 'false',
   [IPC.gitVsixStatus]: JSON.stringify({
     bundled: false,
     vsixPath: '',
