@@ -242,6 +242,15 @@ export function composeOpFailureAnnouncement(
   return line === undefined ? base : `${base} ${line}`;
 }
 
+/** Why auto-fetch stopped, in the same wording the failure announcements use. */
+export function composeAutoFetchStoppedText(kind: OpErrorKind): string {
+  return OP_ERROR_TEXT[kind];
+}
+
+export function composeAutoFetchStoppedAnnouncement(kind: OpErrorKind): string {
+  return `Auto-fetch stopped — ${OP_ERROR_TEXT[kind]}. Fetch to resume.`;
+}
+
 const MAX_DETAIL_LENGTH = 200;
 
 /** First non-empty line of a server message, capped, or undefined when there is none. */

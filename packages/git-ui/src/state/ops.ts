@@ -1,5 +1,6 @@
 import { canRunOp, classifyReset } from '@kira/git-core';
 import type {
+  AutoFetchStatus,
   CheckoutPreflight,
   CherryPickPreflight,
   HeadState,
@@ -36,6 +37,7 @@ import { createLatestRequest } from './latestRequest.ts';
 import {
   type CherryPickPredictionMismatch,
   composeAutoDetachAnnouncement,
+  composeAutoFetchStoppedAnnouncement,
   composeAutoStashAnnouncement,
   composeCheckoutAnnouncement,
   composeCherryPickAnnouncement,
@@ -198,6 +200,9 @@ export interface CherryPickRoute {
 export class OpsState {
   readonly busy: ShallowRef<boolean> = shallowRef(false);
   readonly statusSummary: ShallowRef<StatusSummary | undefined> = shallowRef(undefined);
+  /** P173: why background auto-fetch stopped; `null` while it runs. Fed by `status.get` (cold
+   *  start, reconnect) and the `autoFetch.changed` event. */
+  readonly autoFetch: ShallowRef<AutoFetchStatus | null> = shallowRef(null);
   readonly undoSlot: ShallowRef<UndoSlotSnapshot | null> = shallowRef(null);
   /** Set after every action, success or failure — `App.vue` forwards it to the one live region,
    *  the same way it already does for `DetailState.announcement` (P5 W11). */
@@ -298,6 +303,7 @@ export class OpsState {
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribeProgress: () => void;
   readonly #unsubscribeWorktreeProgress: () => void;
+  readonly #unsubscribeAutoFetch: () => void;
   /** F5: the server runs one goroutine per request, so two `refreshStatus`/`refreshUndo` calls in
    *  quick succession (two `repo.changed` events back to back) can reply out of order — each its
    *  own tracker, so a stale status reply can never be mistaken for a stale undo reply or vice
@@ -332,6 +338,10 @@ export class OpsState {
     this.#unsubscribeProgress = bridge.on('remote.progress', (event) => {
       if (this.#repo.repoId !== event.repoId) return;
       this.remoteProgress.value = event;
+    });
+    this.#unsubscribeAutoFetch = bridge.on('autoFetch.changed', (event) => {
+      if (this.#repo.repoId !== event.repoId) return;
+      this.#setAutoFetch(event.autoFetch);
     });
     this.#unsubscribeWorktreeProgress = bridge.on('worktree.progress', (event) => {
       if (this.#repo.repoId !== event.repoId) return;
@@ -372,6 +382,7 @@ export class OpsState {
     // failure. `this.#repo.repoId` is already the NEW repoId above, so each guard sees the mismatch and
     // its own `finally` clears `busy` the same way a real cancel would.
     this.#abandonPending();
+    this.autoFetch.value = null;
     if (repoId === undefined) {
       this.statusSummary.value = undefined;
       this.undoSlot.value = null;
@@ -407,8 +418,19 @@ export class OpsState {
       (signal) => this.#bridge.request('status.get', { repoId }, signal),
       () => this.#repo.repoId === repoId,
     );
-    if (outcome.status === 'ok') this.statusSummary.value = outcome.value;
-    else if (outcome.status === 'error') throw new Error(outcome.message);
+    if (outcome.status === 'ok') {
+      this.statusSummary.value = outcome.value;
+      this.#setAutoFetch(outcome.value.autoFetch ?? null);
+    } else if (outcome.status === 'error') throw new Error(outcome.message);
+  }
+
+  /** Announces only the running -> stopped transition, never a status refresh that repeats it. */
+  #setAutoFetch(next: AutoFetchStatus | null): void {
+    const was = this.autoFetch.value;
+    this.autoFetch.value = next;
+    if (next !== null && was === null) {
+      this.announcement.value = composeAutoFetchStoppedAnnouncement(next.kind);
+    }
   }
 
   async refreshUndo(): Promise<void> {
@@ -1940,6 +1962,7 @@ export class OpsState {
     this.#repo.dispose();
     this.#unsubscribeProgress();
     this.#unsubscribeWorktreeProgress();
+    this.#unsubscribeAutoFetch();
     this.#statusRequest.abort();
     this.#undoRequest.abort();
     this.#abandonPending();

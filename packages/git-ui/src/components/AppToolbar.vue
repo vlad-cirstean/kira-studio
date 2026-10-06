@@ -40,6 +40,7 @@ import { computed, ref } from 'vue';
 import type { MenuSection } from '../lib/menuModel.ts';
 import type { DetailActions } from '../state/detailActions.ts';
 import type { GraphViewState } from '../state/graphView.ts';
+import { composeAutoFetchStoppedText } from '../state/liveAnnouncements.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -164,6 +165,17 @@ const pushPullDisabled = computed(
     props.opsState.busy.value ||
     inConflict.value,
 );
+
+const autoFetchStopped = computed(() => props.opsState.autoFetch.value);
+const autoFetchTooltip = computed(() => {
+  const stopped = autoFetchStopped.value;
+  if (stopped === null) return '';
+  return `${composeAutoFetchStoppedText(stopped.kind)} — Fetch to resume.`;
+});
+
+async function onAutoFetchMarkerClick(): Promise<void> {
+  if (write.value && hasRemote.value && !fetchDisabled.value) await doFetch();
+}
 
 const isForcePushMenuOpen = ref(false);
 
@@ -402,6 +414,21 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
         </DropdownMenu>
       </div>
     </template>
+
+    <Tooltip v-if="autoFetchStopped !== null">
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira"
+          data-testid="autofetch-stopped"
+          @click="onAutoFetchMarkerClick"
+        >
+          <CodiconIcon name="warning" />
+          Auto-fetch stopped
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ autoFetchTooltip }}</TooltipContent>
+    </Tooltip>
 
     <template v-if="write">
       <span
