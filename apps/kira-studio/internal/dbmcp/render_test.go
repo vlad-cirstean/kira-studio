@@ -716,3 +716,31 @@ func TestRenderPageRefusesColumnlessKeyValuePage(t *testing.T) {
 		t.Fatalf("renderPage(hash keyvalue page, real field names) = %v, want no error", err)
 	}
 }
+
+func TestSetOpMovesMaskedColumn(t *testing.T) {
+	cols := []page.ColumnDescriptor{{Name: "name"}, {Name: "email"}}
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+	mk := &set
+	tests := []struct {
+		name, stmt string
+		refuse     bool
+	}{
+		{"swapped second branch", "SELECT name, email FROM t UNION ALL SELECT email, name FROM t", true},
+		{"intersect", "SELECT name, email FROM t INTERSECT SELECT email, name FROM t", true},
+		{"except", "SELECT name, email FROM t EXCEPT SELECT email, name FROM t", true},
+		{"third branch", "SELECT name, email FROM t UNION SELECT name, email FROM u UNION SELECT email, name FROM v", true},
+		{"parenthesised branch", "(SELECT name, email FROM t) UNION ALL (SELECT email, name FROM t)", true},
+		{"nested subquery", "SELECT name, email FROM (SELECT name, email FROM t UNION ALL SELECT email, name FROM t) s", true},
+		{"same position", "SELECT name, email FROM t UNION ALL SELECT name, email FROM u", false},
+		{"qualified same position", "SELECT t.name, t.email FROM t UNION SELECT u.name, u.email FROM u", false},
+		{"commas in function", "SELECT coalesce(name, 'x') AS name, email FROM t UNION SELECT name, email FROM u", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, hidden, _ := maskedColumnRenamedOrHidden(tc.stmt, mk, cols)
+			if hidden != tc.refuse {
+				t.Fatalf("refuse = %v, want %v", hidden, tc.refuse)
+			}
+		})
+	}
+}

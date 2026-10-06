@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -330,7 +331,7 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 			}
 			continue
 		}
-		if maskColumnRenamedViaAlias(statement, name) {
+		if maskColumnRenamedViaAlias(statement, name) || setOpMovesColumn(tokenizeSQL(statement), name) {
 			return name, true, true
 		}
 	}
@@ -361,6 +362,128 @@ func maskColumnRenamedViaAlias(statement, name string) bool {
 		}
 	}
 	return false
+}
+
+var setOpWords = map[string]bool{"union": true, "intersect": true, "except": true}
+
+// setOpMovesColumn reports whether a UNION/INTERSECT/EXCEPT in toks (at any paren depth) has
+// branches that project the bare column name at different ordinals. Set-operation results take the
+// first branch's column names, so a later branch selecting a masked column under another
+// position's name lands unmasked (`SELECT name, email ... UNION ALL SELECT email, name ...`).
+func setOpMovesColumn(toks []sqlToken, name string) bool {
+	branches := splitTopLevel(toks, func(t sqlToken) bool { return t.kind == 'w' && setOpWords[t.text] })
+	var ref []int
+	for i, b := range branches {
+		b = unwrapParens(b)
+		if len(branches) > 1 {
+			ords := bareProjectionOrdinals(b, name)
+			if i == 0 {
+				ref = ords
+			} else if !slices.Equal(ref, ords) {
+				return true
+			}
+		}
+		for _, inner := range parenGroups(b) {
+			if setOpMovesColumn(inner, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// splitTopLevel splits toks at paren-depth-0 tokens matching sep, dropping the separators.
+func splitTopLevel(toks []sqlToken, sep func(sqlToken) bool) [][]sqlToken {
+	var out [][]sqlToken
+	depth, start := 0, 0
+	for i, t := range toks {
+		switch {
+		case t.kind == 'p' && t.text == "(":
+			depth++
+		case t.kind == 'p' && t.text == ")":
+			depth--
+		case depth == 0 && sep(t):
+			out = append(out, toks[start:i])
+			start = i + 1
+		}
+	}
+	return append(out, toks[start:])
+}
+
+// unwrapParens strips parentheses that enclose the whole of toks.
+func unwrapParens(toks []sqlToken) []sqlToken {
+	for len(toks) >= 2 && tokIsPunct(toks, 0, "(") && tokIsPunct(toks, len(toks)-1, ")") {
+		g := parenGroups(toks)
+		if len(g) != 1 || len(g[0]) != len(toks)-2 {
+			break
+		}
+		toks = g[0]
+	}
+	return toks
+}
+
+// parenGroups returns the contents of each depth-0 parenthesised group in toks.
+func parenGroups(toks []sqlToken) [][]sqlToken {
+	var out [][]sqlToken
+	depth, start := 0, 0
+	for i, t := range toks {
+		switch {
+		case t.kind == 'p' && t.text == "(":
+			if depth == 0 {
+				start = i + 1
+			}
+			depth++
+		case t.kind == 'p' && t.text == ")" && depth > 0:
+			depth--
+			if depth == 0 {
+				out = append(out, toks[start:i])
+			}
+		}
+	}
+	return out
+}
+
+// bareProjectionOrdinals lists the ordinals of select-list items in one branch that are exactly
+// the column name, optionally qualified.
+func bareProjectionOrdinals(branch []sqlToken, name string) []int {
+	sel := -1
+	depth := 0
+	for i, t := range branch {
+		if t.kind == 'p' && t.text == "(" {
+			depth++
+		} else if t.kind == 'p' && t.text == ")" {
+			depth--
+		} else if depth == 0 && t.kind == 'w' && t.text == "select" {
+			sel = i
+			break
+		}
+	}
+	if sel < 0 {
+		return nil
+	}
+	list := branch[sel+1:]
+	for len(list) > 0 && tokIsWord(list, 0, "distinct", "all") {
+		list = list[1:]
+	}
+	end, depth := len(list), 0
+	for i, t := range list {
+		if t.kind == 'p' && t.text == "(" {
+			depth++
+		} else if t.kind == 'p' && t.text == ")" {
+			depth--
+		} else if depth == 0 && t.kind == 'w' && endsProjection[t.text] {
+			end = i
+			break
+		}
+	}
+	var ords []int
+	for i, item := range splitTopLevel(list[:end], func(t sqlToken) bool { return t.kind == 'p' && t.text == "," }) {
+		n := len(item)
+		if n > 0 && item[n-1].kind == 'w' && item[n-1].text == name && (n == 1 || (n == 3 && tokIsPunct(item, 1, "."))) {
+			ords = append(ords, i)
+		}
+	}
+	return ords
 }
 
 // projLevel is one paren depth of maskColumnRenamedViaAlias's scan: proj when inside a projection
