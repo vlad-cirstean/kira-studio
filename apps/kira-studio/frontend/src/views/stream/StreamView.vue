@@ -279,8 +279,7 @@ function onPoll(): void {
 // the user's own report — this computed and its text survive, just relocated inline into the
 // toolbar's first group (mirrors KeyValueView.vue's own prev/status/next arrangement) rather than
 // a separate row spanning the view's full width. Keeps the same `stream-status` testid/wording so
-// existing coverage (kafka.spec.ts's exact-count assertion, sqs.spec.ts's approximate-count one)
-// still holds.
+// existing coverage (sqs.frontend.spec.ts's approximate-count assertion) still holds.
 const statusLine = computed(() => {
   const r = rt.value;
   if (!r) return '';

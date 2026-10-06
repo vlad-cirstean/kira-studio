@@ -174,8 +174,8 @@ export const useSchemaColumnsStore = defineStore('schemaColumns', () => {
   }
 
   /** The raw cached relations for a container — read by ConsoleView.vue to feed
-   *  sqlCompletionSources' own `cached` parameter (D4) directly, in the shape lang-sql's
-   *  schemaCompletionSource actually wants (via namespaceFromCached), separately from
+   *  sqlCompletionSources' own `cached` parameter (D4) directly, in the shape the completion
+   *  source wants (via namespaceFromCached), separately from
    *  effectiveSchema's DdlSchema-shaped projection below (D6's lint/hover supply). A plain property
    *  lookup that returns [] on a miss — never a fetch (D5's own guard: nothing exported here can
    *  trigger one). */

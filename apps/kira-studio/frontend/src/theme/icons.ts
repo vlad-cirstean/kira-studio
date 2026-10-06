@@ -42,9 +42,8 @@ export type ColumnTypeCategory =
   | 'other';
 
 // Item (regression pass, task batch P46-7): this is a *fallback* guesser only — every one of
-// engine/adapters/{postgres,mysql-family,sqlite,clickhouse}/read.ts already has its own
-// authoritative typeClassFor(), used for real (cell-format eligibility) and exercised by
-// packages/db-fixtures/*.spec.ts against a live server; wherever a ColumnDescriptor carrying that verdict is
+// each Go adapter's typeClassFor() (internal/adapters/*) is authoritative, used for real
+// (cell-format eligibility) and exercised by internal/adapters/*/*_test.go against a live server; wherever a ColumnDescriptor carrying that verdict is
 // already in hand (the grid, its header tooltip, the cell editor, a console result), typeClassFor
 // below reads it directly instead of re-deriving one from the raw type string here. The one
 // caller left without a ColumnDescriptor — ColumnsSection.vue's Structure tab, which only ever
@@ -193,7 +192,7 @@ export function redisTypeLabel(type: string | null | undefined): string | undefi
   return type && REDIS_TYPE_ICON[type] ? type : undefined;
 }
 
-// Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse CodeMirror's own VS
+// Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse the VS
 // Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
 // Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user
 // asked for these to be "the exact same hues used in vscode", and tokens.css already carries that

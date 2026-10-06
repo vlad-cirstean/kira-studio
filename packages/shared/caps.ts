@@ -71,7 +71,7 @@ export interface Caps {
   transactions: boolean;
 
   // ---- lifecycle
-  cancel: boolean; // can forward a cancel to the server — ADDED (D4, D5)
+  cancel: boolean; // a cancel stops the in-flight op, server-side or by ctx — ADDED (D4, D5)
 
   /** P33: this engine's items are *files* — they can be streamed to and from a local path, and
    *  the UI may offer an OS file dialog for them. Orthogonal to canInsert/canUpdate: S3 is the
@@ -89,6 +89,7 @@ export interface Caps {
 
 // Crosses the engine<->main process boundary on connect (P2's ConnectInfo.caps addition) and
 // main<->renderer over kira:connection:state — validated like anything else at a trust boundary.
+// Per-engine values live in the Go adapters' `caps.go`, the source of truth.
 export const capsSchema = /*#__PURE__*/ z.object({
   tabular: z.boolean(),
   documents: z.boolean(),
@@ -115,22 +116,3 @@ export const capsSchema = /*#__PURE__*/ z.object({
   fileTransfer: z.boolean(),
   maxPageSize: z.number().int().positive().optional(),
 });
-
-/**
- * §5.1, filled in — the map every later adapter is written against. Only the postgres row is
- * implemented in P1; the rest is documentation, not code (do not create the other adapters'
- * cap literals here).
- *
- * | kind     | tree levels                                                              | defaultPageKind | pagination    | exactCount     | cancel mechanism                        | sql | definition | foreignKeys |
- * |----------|---------------------------------------------------------------------------|-----------------|---------------|----------------|------------------------------------------|-----|------------|-------------|
- * | postgres | database → schema → table/view/matview/function/sequence                 | tabular         | keyset        | yes            | pg_cancel_backend(pid), side connection | yes | yes        | yes         |
- * | mariadb  | database → table/view/routine                                            | tabular         | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes        | yes         |
- * | mysql    | database → table/view/routine (no sequence — MySQL has no SEQUENCE engine) | tabular       | keyset        | yes            | KILL QUERY <threadId>, side connection  | yes | yes        | yes         |
- * | sqlite   | database (PRAGMA database_list) → table/view (no sequence, no routine)   | tabular         | keyset (+rowid) | yes (~9ms/1M) | none — no sqlite3_interrupt, synchronous API | yes | yes    | yes         |
- * | clickhouse | database (system.databases) → table/view/matview (no sequence, no routine) | tabular    | offset only   | yes (system.tables.total_rows) | KILL QUERY WHERE query_id=…, 2nd HTTP request | yes | yes | no (no FK concept) |
- * | mongodb  | database → collection (+ indexes)                                        | document        | cursor        | estimate only  | cursor AbortSignal, killOp fallback     | yes | yes        | no          |
- * | redis    | db index → key namespace (split on ':')                                  | keyvalue        | cursor (SCAN) | no (DBSIZE)    | abort the SCAN loop; CLIENT KILL        | yes | no         | no          |
- * | kafka    | cluster → topics, consumer groups                                        | stream          | offsetWindow  | yes (end-begin)| stop consumer + AbortSignal             | no  | no         | no          |
- * | sqs      | region → queues                                                           | stream          | batch         | no (approx)    | SDK AbortSignal                          | no  | no         | no          |
- * | s3       | account → bucket → prefix/object (lazy, '/'-delimited)                   | keyvalue        | token         | no             | SDK AbortController                      | no  | no         | no          |
- */

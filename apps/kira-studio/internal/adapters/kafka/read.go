@@ -569,9 +569,8 @@ pollLoop:
 	return builder.Finish(position(windows, hasMore, fingerprint, req.PageSize)), nil
 }
 
-// countTopic is read.ts's countTopic (:323-337): exact via high/low watermark subtraction, summed
-// across every partition. Go's int64 removes the Number(BigInt(high)-BigInt(low)) narrowing the
-// TypeScript had to accept.
+// countTopic returns an upper bound from high/low watermarks, summed across every partition;
+// compaction and transaction markers leave offsets with no record.
 //
 // P21 round 2 functional finding 7: rawFilter used to be dropped on the floor entirely (the
 // caller always passed nil), so "N total" answered the high/low watermark across *every*

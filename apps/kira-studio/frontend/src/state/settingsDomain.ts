@@ -135,7 +135,7 @@ const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   keepAwakeWithAgents: z.boolean().default(false),
 });
 
-// `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
+// `.default(...)` on every new section is load-bearing: an older kira.db has a settings
 // row with no `data`/`cache`/`advanced`/`dbMcp` keys, and that row must still parse on
 // next launch.
 const settingsSchema = /*#__PURE__*/ z.object({
