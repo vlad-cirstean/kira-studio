@@ -33,6 +33,8 @@ export interface LayoutRange {
   readonly to: number;
 }
 
+const CORRUPTED_ANNOUNCEMENT = 'Graph history could not be read — the data stream was corrupted.';
+
 /**
  * The UI-side half of §5.4's cache/rehydration story (P3 W9), rebuilt for P4 W5 into the module
  * every component reads (docs/plans/P4.md W5). `store` is the client's own `CommitStore`, fed
@@ -530,12 +532,20 @@ export class GraphViewState {
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
     const range = await this.#packed.applyChunk(chunk, {
       onReset: () => this.#layoutClient.reset(),
-      onCorrupted: async () => {
-        // The re-open supersedes this call's own still-in-flight stream (W2's
-        // supersede-on-reopen rule), so nothing else from the corrupted sequence is applied
-        // after this point.
+      onCorrupted: () => {
+        // The re-open aborts this stream's own controller (`openStream`), so nothing else from
+        // the corrupted sequence is applied. It runs detached: awaited here, its failure would
+        // reject into the old stream's already-finished queue and never reach anyone.
         const repoId = this.#repoId;
-        if (repoId) await this.openStream(repoId, 0);
+        if (!repoId) return;
+        this.openStream(repoId, 0).catch((error: unknown) => {
+          if (error instanceof TransportError && error.code === 'cancelled') return;
+          console.error('graphView: re-open after a corrupted chunk failed', error);
+          this.announcement.value = CORRUPTED_ANNOUNCEMENT;
+        });
+      },
+      onUnrecoverable: () => {
+        this.announcement.value = CORRUPTED_ANNOUNCEMENT;
       },
     });
     if (!range) return; // corrupted — already re-opening from row 0, nothing to lay out

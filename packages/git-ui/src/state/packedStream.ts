@@ -24,7 +24,14 @@ export interface ApplyChunkHooks {
    *  re-open its stream from row 0, mirroring the one recovery both `graphView.ts` and
    *  `review.ts` need. */
   readonly onCorrupted: (error: unknown) => void | Promise<void>;
+  /** Called instead of `onCorrupted` once a re-open already failed the same way
+   *  (`MAX_CONSECUTIVE_CORRUPTIONS`): the server sends the same bad chunk every time, so another
+   *  re-walk only loops. The caller surfaces an error state. */
+  readonly onUnrecoverable: (error: unknown) => void;
 }
+
+/** Re-opens attempted for a corrupted chunk before giving up. */
+const MAX_CONSECUTIVE_CORRUPTIONS = 1;
 
 /**
  * The chunk-application core `GraphViewState` (P4) and `ReviewSessionState` (P7) both need,
@@ -50,6 +57,8 @@ export class PackedStreamState {
   readonly exhausted: ShallowRef<boolean> = shallowRef(false);
   readonly lastChunkSource: ShallowRef<ChunkSource | undefined> = shallowRef(undefined);
   readonly generation: ShallowRef<number> = shallowRef(0);
+  /** Corrupted chunks since the last good one; bounds the re-open loop. */
+  #corruptions = 0;
 
   constructor() {
     this.store = markRaw(new CommitStore());
@@ -59,6 +68,11 @@ export class PackedStreamState {
    *  on every `setTarget`/`setBase`, not only on a restart-at-zero chunk); `applyChunk` also
    *  calls this internally when it detects the restart-at-zero condition itself. */
   reset(): void {
+    this.#corruptions = 0;
+    this.#clear();
+  }
+
+  #clear(): void {
     this.store.clear();
     this.loadedRows.value = 0;
     this.remaining.value = 0;
@@ -73,7 +87,7 @@ export class PackedStreamState {
   ): Promise<AppliedChunkRange | undefined> {
     if (chunk.from === 0 && this.store.rowCount > 0) {
       hooks.onReset?.();
-      this.reset();
+      this.#clear();
     }
 
     try {
@@ -82,10 +96,17 @@ export class PackedStreamState {
       // A genuinely corrupted stream (§5.5's store asserts are the right place to catch this
       // and the wrong place to recover from it): log it and let the caller re-open from row 0
       // instead of leaving an unhandled rejection and a half-populated list on screen.
+      this.#corruptions++;
+      if (this.#corruptions > MAX_CONSECUTIVE_CORRUPTIONS) {
+        console.error('packedStream: appendPacked failed again, giving up', error);
+        hooks.onUnrecoverable(error);
+        return undefined;
+      }
       console.error('packedStream: appendPacked failed, re-opening from row 0', error);
       await hooks.onCorrupted(error);
       return undefined;
     }
+    this.#corruptions = 0;
 
     this.loadedRows.value = this.store.rowCount;
     this.remaining.value = chunk.remaining;

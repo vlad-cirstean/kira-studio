@@ -255,3 +255,29 @@ describe('GraphViewState — F1 repo switch mid-load', () => {
     graphView.dispose();
   });
 });
+
+// P168 Part 18 F8: a server that always sends the same bad chunk used to loop re-opens forever.
+describe('GraphViewState — corrupted chunk recovery is bounded', () => {
+  function corruptChunk(): GraphStreamChunk {
+    return {
+      ...chunkFor(REPO_A, '1'.repeat(40)),
+      commits: buildPackedChunk([{ sha: '1'.repeat(40), subject: 'bad' }], { dictionaryBase: 9 }),
+    };
+  }
+
+  test('re-opens once, then stops and announces', async () => {
+    const transport = new RaceTransport();
+    const graphView = new GraphViewState(new BridgeClient(transport), fakeLayoutClient());
+    const open = graphView.openStream(REPO_A);
+    await sleep();
+    transport.streamOpens[0]?.push(corruptChunk());
+    await sleep();
+    expect(transport.streamOpens).toHaveLength(2);
+    transport.streamOpens[1]?.push(corruptChunk());
+    await sleep();
+    expect(transport.streamOpens).toHaveLength(2);
+    expect(graphView.announcement.value).toContain('corrupted');
+    transport.streamOpens[1]?.end();
+    await open;
+  });
+});

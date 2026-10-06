@@ -398,15 +398,26 @@ export class ReviewSessionState {
     chunk: Parameters<PackedStreamState['applyChunk']>[0],
   ): Promise<void> {
     await this.#packed.applyChunk(chunk, {
-      onCorrupted: async () => {
+      onCorrupted: () => {
         if (this.repoId.value === repoId && this.branch.value === branch && this.#base === base) {
           // Distrust everything and restart from row 0 — the same recovery GraphViewState's own
           // onCorrupted uses, not the default (current loadedRows), since what's already applied
-          // is exactly what a corrupted chunk casts doubt on.
-          await this.#open(repoId, branch, base, 0);
+          // is exactly what a corrupted chunk casts doubt on. Detached so a failure of the
+          // re-open is not swallowed by this (finished) stream's queue.
+          this.#open(repoId, branch, base, 0).catch((error: unknown) => {
+            if (error instanceof TransportError && error.code === 'cancelled') return;
+            this.#failStream(repoId, branch, base, error);
+          });
         }
       },
+      onUnrecoverable: (error) => this.#failStream(repoId, branch, base, error),
     });
+  }
+
+  #failStream(repoId: string, branch: string, base: string, error: unknown): void {
+    if (this.repoId.value !== repoId || this.branch.value !== branch || this.#base !== base) return;
+    this.phase.value = 'error';
+    this.resolveError.value = error instanceof Error ? error.message : String(error);
   }
 
   async #checkForChange(): Promise<void> {
