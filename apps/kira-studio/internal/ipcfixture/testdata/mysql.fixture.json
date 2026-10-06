@@ -63,7 +63,8 @@
           "writable": true,
           "transactions": true,
           "cancel": true,
-          "fileTransfer": false
+          "fileTransfer": false,
+          "keyTypes": false
         }
       }
     },
