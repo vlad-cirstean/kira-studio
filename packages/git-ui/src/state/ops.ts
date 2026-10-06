@@ -28,6 +28,7 @@ import type {
   WorktreePrepareLine,
   WorktreePrepareResult,
 } from '@kira/git-ipc';
+import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef, triggerRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { stashLabel } from '../components/stashListModel.ts';
@@ -67,6 +68,8 @@ type StashPrediction = StashPopPreflight['prediction'];
  *  every line for up to `PrepareTimeout` (15 minutes) with no cap of its own, so a chatty script
  *  otherwise grows `worktreePrepareOutput` without bound. */
 const WORKTREE_PREPARE_OUTPUT_LIMIT = 500;
+
+const STASHED_NOTE = ' Your changes are stashed — see the stash list.';
 
 /** `StashDialog.vue`'s own pending state for the shared apply/pop confirmation (OQ7: one dialog,
  *  the verb and one sentence differing) — opened only when `preflight.stashPop`'s verdict is not
@@ -583,6 +586,8 @@ export class OpsState {
         ? composeCheckoutAnnouncement(preflight, target)
         : composeOpFailureAnnouncement('Checkout', result.error);
       landedOnBranch = result.ok && mode === 'switch';
+    } catch (error) {
+      this.#announceRejection('Checkout', error);
     } finally {
       this.busy.value = false;
     }
@@ -710,6 +715,8 @@ export class OpsState {
             ? composeRevertAnnouncement(shas, noCommit)
             : composeOpFailureAnnouncement('Revert', result.error),
       });
+    } catch (error) {
+      this.#announceRejection('Revert', error);
     } finally {
       this.busy.value = false;
     }
@@ -748,6 +755,7 @@ export class OpsState {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     this.busy.value = true;
+    let stashedFirst = false;
     try {
       const preflight = await this.#bridge.request('preflight.reset', { repoId, target, mode });
       if (preflight.verdict === 'blocked') {
@@ -780,6 +788,7 @@ export class OpsState {
           this.announcement.value = composeOpFailureAnnouncement('Stash', push.error);
           return;
         }
+        stashedFirst = true;
       }
       const result = await this.#bridge.request('op.run', {
         repoId,
@@ -795,7 +804,9 @@ export class OpsState {
       this.#applyResult(repoId, result);
       this.announcement.value = result.ok
         ? composeResetAnnouncement(route.mode, target)
-        : composeOpFailureAnnouncement('Reset', result.error);
+        : `${composeOpFailureAnnouncement('Reset', result.error)}${stashedFirst ? STASHED_NOTE : ''}`;
+    } catch (error) {
+      this.#announceRejection('Reset', error, stashedFirst ? STASHED_NOTE : '');
     } finally {
       this.busy.value = false;
     }
@@ -866,6 +877,8 @@ export class OpsState {
               : composeOpFailureAnnouncement('Cherry-pick', result.error);
         },
       });
+    } catch (error) {
+      this.#announceRejection('Cherry-pick', error);
     } finally {
       this.busy.value = false;
     }
@@ -928,8 +941,11 @@ export class OpsState {
     readonly paths: readonly string[];
   }): Promise<OpResult> {
     const repoId = this.#repo.repoId;
-    if (repoId === undefined) throw new Error('ops: no repo open');
-    if (this.busy.value) throw new Error('ops: another operation is already running');
+    if (repoId === undefined) return this.#failedResult('no repository is open');
+    if (this.busy.value) {
+      this.announcement.value = 'Stash failed — another operation is already running.';
+      return this.#failedResult('another operation is already running');
+    }
     this.busy.value = true;
     try {
       const before = await this.#bridge.request('stash.list', { repoId });
@@ -947,6 +963,9 @@ export class OpsState {
         ? composeStashPushAnnouncement(pushed)
         : composeOpFailureAnnouncement('Stash', result.error);
       return result;
+    } catch (error) {
+      this.#announceRejection('Stash', error);
+      return this.#failedResult(error instanceof Error ? error.message : String(error));
     } finally {
       this.busy.value = false;
     }
@@ -1011,6 +1030,9 @@ export class OpsState {
         this.#refs.currentBranchName.value ?? null,
       );
       return result;
+    } catch (error) {
+      this.#announceRejection(`Stash ${verb}`, error);
+      return undefined;
     } finally {
       this.busy.value = false;
     }
@@ -1191,6 +1213,9 @@ export class OpsState {
       this.#setWorktreePrepareOutput(result.output);
       this.worktreePrepareResult.value = result;
       return result;
+    } catch (error) {
+      this.#announceRejection('Worktree setup', error);
+      return undefined;
     } finally {
       this.activeWorktreePreparePath.value = undefined;
     }
@@ -1225,7 +1250,10 @@ export class OpsState {
    *  rewrites the very branches those buttons would act on. */
   async runRestack(branch: string): Promise<RestackResult | undefined> {
     if (this.#stack === undefined) return undefined;
-    if (this.busy.value) throw new Error('ops: another operation is already running');
+    if (this.busy.value) {
+      this.announcement.value = 'Restack failed — another operation is already running.';
+      return undefined;
+    }
     // F3: captured for the same reason `#applyResult`'s own doc comment gives every other
     // caller's identity guard — `#stack.runRestack` awaits real git work (one rebase per
     // branch), long enough for the active repo to have changed underneath it.
@@ -1252,6 +1280,9 @@ export class OpsState {
           : composeRestackAnnouncement(result.restacked, result.stoppedAt, result.remaining);
       }
       return result;
+    } catch (error) {
+      this.#announceRejection('Restack', error);
+      return undefined;
     } finally {
       this.busy.value = false;
     }
@@ -1340,7 +1371,13 @@ export class OpsState {
       return;
     }
 
-    const middle = await runMiddle();
+    let middle: CarryMiddleResult;
+    try {
+      middle = await runMiddle();
+    } catch (error) {
+      this.#announceRejection(actionLabel, error, STASHED_NOTE);
+      return;
+    }
     // Same identity guard as #applyResult's own (this write isn't routed through it, since
     // CarryMiddleResult isn't an OpResult) — a repo switch during runMiddle must not land its
     // head/inProgress on whatever repo is displayed now.
@@ -1351,7 +1388,7 @@ export class OpsState {
         this.statusSummary.value = { ...current, head: middle.head, inProgress: middle.inProgress };
     }
     if (!middle.ok) {
-      this.announcement.value = `${composeOpFailureAnnouncement(actionLabel, middle.error)} Your changes are stashed — see the stash list.`;
+      this.announcement.value = `${composeOpFailureAnnouncement(actionLabel, middle.error)}${STASHED_NOTE}`;
       return;
     }
 
@@ -1496,6 +1533,9 @@ export class OpsState {
         ? composeUndoAnnouncement(slot.label)
         : composeOpFailureAnnouncement('Undo', result.error);
       return result;
+    } catch (error) {
+      this.#announceRejection('Undo', error);
+      return undefined;
     } finally {
       this.busy.value = false;
     }
@@ -1562,6 +1602,14 @@ export class OpsState {
    * derived here from `strategy === 'rebase'` or from `source`.
    */
   async runPull(remote: string, branch: string, explicitStrategy?: PullStrategy): Promise<void> {
+    try {
+      await this.#runPull(remote, branch, explicitStrategy);
+    } catch (error) {
+      this.#announceRejection('Pull', error);
+    }
+  }
+
+  async #runPull(remote: string, branch: string, explicitStrategy?: PullStrategy): Promise<void> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PullPreflight = await this.#bridge.request('remote.pullPreflight', {
@@ -1651,6 +1699,14 @@ export class OpsState {
   /** Plain push is never gated (D52) — no confirm step here, only the upstream question a
    *  preflight already answers: §7.2's "offered, not silent" for `--set-upstream`. */
   async runPush(remote: string, branch: string): Promise<void> {
+    try {
+      await this.#runPush(remote, branch);
+    } catch (error) {
+      this.#announceRejection('Push', error);
+    }
+  }
+
+  async #runPush(remote: string, branch: string): Promise<void> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PushPreflight = await this.#bridge.request('remote.pushPreflight', {
@@ -1688,6 +1744,14 @@ export class OpsState {
    * dialog showed.
    */
   async runForcePush(remote: string, branch: string): Promise<void> {
+    try {
+      await this.#runForcePush(remote, branch);
+    } catch (error) {
+      this.#announceRejection('Force push', error);
+    }
+  }
+
+  async #runForcePush(remote: string, branch: string): Promise<void> {
     const repoId = this.#repo.repoId;
     if (repoId === undefined || this.busy.value) return;
     const preflight: PushPreflight = await this.#bridge.request('remote.pushPreflight', {
@@ -1760,6 +1824,9 @@ export class OpsState {
         ? (announceOk(result) ?? `${actionLabel} succeeded`)
         : composeOpFailureAnnouncement(actionLabel, result.error);
       return result;
+    } catch (error) {
+      this.#announceRejection(actionLabel, error);
+      return undefined;
     } finally {
       this.busy.value = false;
       this.activeRemoteOp.value = undefined;
@@ -1788,14 +1855,38 @@ export class OpsState {
         };
   }
 
+  /** A rejected request (reconnect race, socket drop, `E_GIT_UNAVAILABLE`) never reaches an
+   *  `OpResult`, so no failure path above announces it, and every caller treats these methods as
+   *  fire-and-forget. Announce instead of rethrowing; a local cancel stays silent. */
+  #announceRejection(action: string, error: unknown, suffix = ''): void {
+    if (error instanceof TransportError && error.code === 'cancelled') return;
+    const message = error instanceof Error ? error.message : String(error);
+    this.announcement.value = `${composeOpFailureAnnouncement(action, { kind: 'Unknown', message })}${suffix}`;
+  }
+
+  /** The `OpResult` a caller that reads `.ok` sees when no request completed. Never applied to
+   *  state (`#applyResult` is not called with it); `head`/`inProgress` echo what is displayed. */
+  #failedResult(message: string): OpResult {
+    return {
+      ok: false,
+      error: { kind: 'Unknown', message },
+      undo: this.undoSlot.value,
+      head: this.#refs.head.value ?? { kind: 'unborn', name: '' },
+      inProgress: this.statusSummary.value?.inProgress ?? null,
+    };
+  }
+
   async #runSimple(
     op: OpRequest,
     announceOk: (ok: true) => string | undefined,
     actionLabel: string,
   ): Promise<OpResult> {
     const repoId = this.#repo.repoId;
-    if (repoId === undefined) throw new Error('ops: no repo open');
-    if (this.busy.value) throw new Error('ops: another operation is already running');
+    if (repoId === undefined) return this.#failedResult('no repository is open');
+    if (this.busy.value) {
+      this.announcement.value = `${actionLabel} failed — another operation is already running.`;
+      return this.#failedResult('another operation is already running');
+    }
     this.busy.value = true;
     try {
       const result = await this.#bridge.request('op.run', { repoId, op });
@@ -1804,6 +1895,9 @@ export class OpsState {
         ? (announceOk(true) ?? `${actionLabel} succeeded`)
         : composeOpFailureAnnouncement(actionLabel, result.error);
       return result;
+    } catch (error) {
+      this.#announceRejection(actionLabel, error);
+      return this.#failedResult(error instanceof Error ? error.message : String(error));
     } finally {
       this.busy.value = false;
     }

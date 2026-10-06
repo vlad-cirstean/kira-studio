@@ -123,6 +123,76 @@ describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing
   });
 });
 
+// P168 Part 18 F14: a rejected request used to escape every op unannounced.
+describe('OpsState — rejected requests are announced, not thrown', () => {
+  function setUp(onRun: () => unknown) {
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const refs = new RefsState(bridge);
+    const ops = new OpsState(bridge, refs, new RepoSettingsState(bridge));
+    transport.onRequest = (method) => {
+      switch (method) {
+        case 'status.get':
+          return STATUS;
+        case 'undo.peek':
+          return { slot: null };
+        case 'remote.pullPreflight':
+          return {
+            strategy: 'merge',
+            source: 'default',
+            rebaseMerges: false,
+            upstream: 'origin/main',
+            ahead: 0,
+            behind: 1,
+            dirty: true,
+            routes: [],
+            blockers: ['dirtyNonFastForward'],
+          } satisfies PullPreflight;
+        case 'stash.list':
+          return { entries: [] };
+        case 'op.run':
+          return {
+            ok: true,
+            error: undefined,
+            undo: null,
+            head: { kind: 'branch', name: 'main' },
+            inProgress: null,
+          } satisfies OpResult;
+        case 'remote.run':
+          return onRun();
+        default:
+          throw new Error(`unscripted request: ${method}`);
+      }
+    };
+    ops.setRepoId(REPO);
+    return { ops };
+  }
+
+  test('a stash-carry pull whose remote.run rejects says the changes are stashed', async () => {
+    const { ops } = setUp(() => {
+      throw new Error('socket closed');
+    });
+    await sleep();
+    const run = ops.runPull('origin', 'main');
+    await sleep();
+    ops.resolvePullDialog(true);
+    await run;
+    expect(ops.announcement.value).toContain('Pull failed');
+    expect(ops.announcement.value).toContain('socket closed');
+    expect(ops.announcement.value).toContain('Your changes are stashed');
+    expect(ops.busy.value).toBe(false);
+  });
+
+  test('a plain failing fetch announces and resolves', async () => {
+    const { ops } = setUp(() => {
+      throw new Error('socket closed');
+    });
+    await sleep();
+    await ops.runFetch('origin');
+    expect(ops.announcement.value).toContain('Fetch failed');
+  });
+});
+
 describe('remoteFromUpstreamRef', () => {
   test('extracts the remote name from a remote-tracking upstream', () => {
     expect(remoteFromUpstreamRef('refs/remotes/origin/feature')).toBe('origin');

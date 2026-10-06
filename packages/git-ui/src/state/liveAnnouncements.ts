@@ -204,10 +204,36 @@ const OP_ERROR_TEXT: Record<OpErrorKind, string> = {
  *  didn't happen. A silent failure is the clipboard's own failure mode (§6.4), applied here. */
 export function composeOpFailureAnnouncement(
   action: string,
-  error: { readonly kind: OpErrorKind; readonly message: string } | undefined,
+  error:
+    | {
+        readonly kind: OpErrorKind;
+        readonly message: string;
+        readonly remoteMessage?: string | undefined;
+      }
+    | undefined,
 ): string {
   if (!error) return `${action} failed.`;
-  return `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
+  const base = `${action} failed — ${OP_ERROR_TEXT[error.kind]}.`;
+  const detail =
+    error.kind === 'HookRejected'
+      ? error.remoteMessage
+      : error.kind === 'Unknown'
+        ? error.message
+        : undefined;
+  const line = firstLine(detail);
+  return line === undefined ? base : `${base} ${line}`;
+}
+
+const MAX_DETAIL_LENGTH = 200;
+
+/** First non-empty line of a server message, capped, or undefined when there is none. */
+function firstLine(text: string | undefined): string | undefined {
+  const line = text
+    ?.split('\n')
+    .map((l) => l.trim())
+    .find((l) => l !== '');
+  if (line === undefined) return undefined;
+  return line.length > MAX_DETAIL_LENGTH ? `${line.slice(0, MAX_DETAIL_LENGTH)}…` : line;
 }
 
 /** `docs/plans/P9.md` W13: git's own `No local changes to save` no-op (probe 10) exits 0 with no
