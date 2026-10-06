@@ -30,8 +30,10 @@ func (b *BoundService) svc() *Service {
 	return &Service{Emit: b.Emit, Registry: b.Registry}
 }
 
-// Shutdown closes every live session — called from main.go's own teardown.
-func (b *BoundService) Shutdown() {
+// ShutdownBound closes every live session — main.go's own teardown. A package function, not a
+// method: Wails binds every exported method of the registered type, promoted ones included, and a
+// bound Shutdown would let any window close every terminal.
+func ShutdownBound(b *BoundService) {
 	b.Registry.CloseAll()
 }
 

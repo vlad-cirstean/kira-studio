@@ -207,11 +207,11 @@ func main() {
 		// "caffeinate is dead" as short as possible — Kira Studio's own bridge.StopKeepAwake, inlined
 		// here since this app's own KeepAwakeService has no agent-reason recompute to also stop.
 		keepAwakeCtl.Close()
-		// terminalSvc.Shutdown() first: every PTY dies, and each one's own exit fires
+		// terminal.ShutdownBound(terminalSvc.BoundService) first: every PTY dies, and each one's own exit fires
 		// Registry.OnChange (Reconcile marks its row stopped) while the DB is still open. Then
 		// shutdownTracker flushes whatever last-active time is still only in memory and stops the
 		// hooks listener.
-		terminalSvc.Shutdown()
+		terminal.ShutdownBound(terminalSvc.BoundService)
 		shutdownTracker(adeTracker, agentHooks)
 		adeTaskBoard.Close()
 		detachGitPush()

@@ -446,9 +446,9 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		connectionsSvc.Shutdown()
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
 		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
-		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.
+		// controller's release is independent of the PTY registry terminal.ShutdownBound(terminalSvc.BoundService) stops.
 		bridge.StopKeepAwake(keepAwakeSvc)
-		terminalSvc.Shutdown()
+		terminal.ShutdownBound(terminalSvc.BoundService)
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
