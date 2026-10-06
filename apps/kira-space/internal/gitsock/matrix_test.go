@@ -170,7 +170,7 @@ func TestMatrix_M1_StreamStalledOnCreditsBlocksOnlyItsOwnConnection(t *testing.T
 	go func() {
 		for {
 			clientA.armReadDeadline()
-			raw, err := readFrame(clientA.r)
+			raw, err := readFrame(clientA.r, maxFrameBytes)
 			if err != nil {
 				return
 			}
@@ -288,7 +288,7 @@ func TestMatrix_M2_SimultaneousRemoteRunsAdmitExactlyOne(t *testing.T) {
 		go func(i int) {
 			for {
 				clients[i].armReadDeadline()
-				raw, err := readFrame(clients[i].r)
+				raw, err := readFrame(clients[i].r, maxFrameBytes)
 				if err != nil {
 					return
 				}
@@ -443,7 +443,7 @@ func TestMatrix_M3_FullIndependence(t *testing.T) {
 		t.Fatalf("A's event = %+v, want repoId %s", ev, repoIDA)
 	}
 	_ = clientB.nc.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
-	if _, err := readFrame(clientB.r); err == nil {
+	if _, err := readFrame(clientB.r, maxFrameBytes); err == nil {
 		t.Fatal("B received something after a write to a DIFFERENT repository -- cross-repo leakage")
 	}
 	_ = clientB.nc.SetReadDeadline(time.Time{})

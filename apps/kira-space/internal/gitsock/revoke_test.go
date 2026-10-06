@@ -59,7 +59,7 @@ func TestRevoke_WhileIdle(t *testing.T) {
 		t.Fatal("revoked_at not set after Revoke returns (D8 clause 1)")
 	}
 	client.armReadDeadline()
-	if _, err := readFrame(client.r); err == nil {
+	if _, err := readFrame(client.r, maxFrameBytes); err == nil {
 		t.Fatal("expected the revoked connection's read to error (D8 clause 2)")
 	}
 
@@ -108,7 +108,7 @@ func TestRevoke_WhileHoldingAGraphWalk(t *testing.T) {
 		t.Fatalf("revoke: %v", err)
 	}
 	client.armReadDeadline()
-	if _, err := readFrame(client.r); err == nil {
+	if _, err := readFrame(client.r, maxFrameBytes); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
 
@@ -153,7 +153,7 @@ func TestRevoke_WhileHoldingAReviewSession(t *testing.T) {
 		t.Fatalf("revoke: %v", err)
 	}
 	client.armReadDeadline()
-	if _, err := readFrame(client.r); err == nil {
+	if _, err := readFrame(client.r, maxFrameBytes); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
 
@@ -401,7 +401,7 @@ func TestRevoke_TOCTOU_ClosesAConnectionAdmittedWithASinceRevokedToken(t *testin
 		t.Fatalf("reconnect with a still-valid-at-the-time token = %q, want ready (the race window is AFTER admission's own token check, not at it)", kind)
 	}
 	client2.armReadDeadline()
-	if _, err := readFrame(client2.r); err == nil {
+	if _, err := readFrame(client2.r, maxFrameBytes); err == nil {
 		t.Fatal("expected the connection admitted with a since-revoked token to be closed by the post-admission re-check, not served")
 	}
 }

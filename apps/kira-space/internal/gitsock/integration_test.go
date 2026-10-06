@@ -93,7 +93,7 @@ func (c *testClient) armReadDeadline() {
 func (c *testClient) readRaw(what string) []byte {
 	c.t.Helper()
 	c.armReadDeadline()
-	raw, err := readFrame(c.r)
+	raw, err := readFrame(c.r, maxFrameBytes)
 	_ = c.nc.SetReadDeadline(time.Time{})
 	if err != nil {
 		c.t.Fatalf("read %s: %v", what, err)
@@ -517,7 +517,7 @@ func TestIntegration_FullPairingAndRPCLifecycle(t *testing.T) {
 		t.Fatalf("revoke: %v", err)
 	}
 	client2.armReadDeadline()
-	if _, err := readFrame(bufio.NewReader(client2.nc)); err == nil {
+	if _, err := readFrame(bufio.NewReader(client2.nc), maxFrameBytes); err == nil {
 		t.Fatal("expected the revoked connection's read to error")
 	}
 
@@ -799,8 +799,8 @@ func TestServer_Close_ReturnsPromptlyWithAPendingPairingRequest(t *testing.T) {
 	go func() {
 		defer close(helloDone)
 		client.armReadDeadline()
-		_, _ = readFrame(client.r)
-		_, _ = readFrame(client.r)
+		_, _ = readFrame(client.r, maxFrameBytes)
+		_, _ = readFrame(client.r, maxFrameBytes)
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)

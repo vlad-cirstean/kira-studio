@@ -25,9 +25,9 @@ const (
 	nativeLabel    = "Kira Space"
 )
 
-// maxGitStreamFrameBytes reuses gitsock's own 8 MiB cap (gitsock/frame.go) — the graph-chunk blobs
-// crossing this stream are the same blobs, so there is no reason for a different limit.
-const maxGitStreamFrameBytes = 8 << 20
+// maxGitStreamFrameBytes is the twin of gitsock's maxFrameBytes (gitsock/frame.go, 32 MiB; separate
+// package, same value) — the graph-chunk blobs crossing this stream are the same blobs.
+const maxGitStreamFrameBytes = 32 << 20
 
 // newStreamConnID mints a per-connection gitsession.ConnID. There is no handshake here to mint one
 // for us (gitsock's own sessionId comes from runHandshake) — a fresh random id per ServeGitStream

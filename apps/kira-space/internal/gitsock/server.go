@@ -223,6 +223,7 @@ func (s *Server) handleConn(nc net.Conn) {
 	if !ok {
 		return
 	}
+	c.setLimit(maxFrameBytes)
 
 	s.addConn(clientID, nc)
 	defer s.removeConn(clientID, nc)

@@ -17,12 +17,12 @@ const maxLabelBytes = 200
 
 // maxClientIDBytes is F13's clamp on hello.Client.ID — unlike the label, this was unclamped, so a
 // same-user local process could reach the git_clients row and the pairing dialog with an id up to
-// the 8 MiB frame cap.
+// the hello read cap (handshakeMaxFrameBytes, 64 KiB).
 const maxClientIDBytes = 256
 
 // handshakeReadTimeout bounds only the first Receive() (F13): with no deadline, a same-user local
 // process that connects and sends nothing, or declares a large body and trickles it in, held a
-// goroutine, an fd and up to maxFrameBytes until Server.Close. Cleared right after that read —
+// goroutine, an fd and up to handshakeMaxFrameBytes until Server.Close. Cleared right after that read —
 // nothing else in the handshake reads from the client again except F12's own watcher, which sets
 // and clears its own deadline around its wait.
 const handshakeReadTimeout = 10 * time.Second

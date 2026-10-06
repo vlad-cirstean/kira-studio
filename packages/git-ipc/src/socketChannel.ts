@@ -44,7 +44,7 @@ import type { MessageChannelLike } from './rpc.ts';
 // (C10 S1), shared with streamChannel.ts, but this stays the socket channel's own public surface.
 export { MalformedBlobFrameError };
 
-export const MAX_FRAME_BYTES = 8 * 1024 * 1024; // D1: 8 MiB, matching gitsock's own cap.
+export const MAX_FRAME_BYTES = 32 * 1024 * 1024; // 32 MiB, matching gitsock's own cap.
 
 const FRAME_HEADER_LEN = 4;
 

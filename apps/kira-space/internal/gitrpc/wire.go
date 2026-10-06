@@ -162,7 +162,7 @@ func (commitsBlob) MarshalJSON() ([]byte, error) {
 // ---------------------------------------------------------------------------------------
 
 // MaxResultBytes is D2(b)'s own cap on commit.fileDiff/file.read's *encoded* result — comfortably
-// under gitsock's 8 MiB frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
+// under gitsock's frame cap, far above anything a 1 MiB patch (gitsession.MaxPatchBytes)
 // produces in practice (F9: ~2.5 MiB worst realistic case). Not measured against a real budget —
 // there is no decision this number would change.
 const MaxResultBytes = 6 << 20

@@ -78,7 +78,7 @@ func clientSend(t *testing.T, w net.Conn, v any) {
 
 func clientReceive(t *testing.T, r *bufio.Reader) handshakeResponse {
 	t.Helper()
-	raw, err := readFrame(r)
+	raw, err := readFrame(r, maxFrameBytes)
 	if err != nil {
 		t.Fatalf("read frame: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestHandshake_Row1_EmptyClientID_ClosesSilently(t *testing.T) {
 
 // TestHandshake_Row1_OversizedClientID_ClosesSilently is F13's regression guard: unlike the label
 // (maxLabelBytes), hello.Client.ID was unclamped and could otherwise reach the git_clients row and
-// the pairing dialog at up to the 8 MiB frame cap.
+// the pairing dialog at up to the hello read cap.
 func TestHandshake_Row1_OversizedClientID_ClosesSilently(t *testing.T) {
 	t.Parallel()
 	client, server := net.Pipe()

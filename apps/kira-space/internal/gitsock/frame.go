@@ -12,12 +12,17 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
-// maxFrameBytes is G1 D1's frame cap — 8 MiB, chosen because the largest G1 payload (a
-// RepoSummary) is a handful of short strings; a longer prefix is a hard connection error, not a
-// truncation.
-const maxFrameBytes = 8 << 20
+// maxFrameBytes is the post-handshake frame cap, 32 MiB: a pathological repository's graph chunk
+// or commit detail can be large. Twins: bridge maxGitStreamFrameBytes, git-ipc
+// MAX_FRAME_BYTES. A longer prefix is a hard connection error, not a truncation.
+const maxFrameBytes = 32 << 20
+
+// handshakeMaxFrameBytes caps reads before the handshake succeeds: the hello is a few hundred
+// bytes, and an unauthenticated peer must not make the server allocate maxFrameBytes.
+const handshakeMaxFrameBytes = 64 << 10
 
 var errFrameTooLarge = errors.New("gitsock: frame exceeds maxFrameBytes")
 
@@ -43,13 +48,13 @@ func writeFrame(w io.Writer, b []byte) error {
 // body byte is read; a prefix promising more than actually arrives surfaces as an error from
 // io.ReadFull (typically io.ErrUnexpectedEOF or io.EOF) rather than blocking — io.ReadFull returns
 // as soon as the underlying reader reports it can supply no more.
-func readFrame(r *bufio.Reader) ([]byte, error) {
+func readFrame(r *bufio.Reader, limit uint32) ([]byte, error) {
 	var hdr [frameHeaderLen]byte
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
 		return nil, err
 	}
 	n := binary.BigEndian.Uint32(hdr[:])
-	if n > maxFrameBytes {
+	if n > limit {
 		return nil, errFrameTooLarge
 	}
 	body := make([]byte, n)
@@ -65,15 +70,20 @@ func readFrame(r *bufio.Reader) ([]byte, error) {
 // once per accepted connection and carries over unchanged from the handshake into Serve, so a
 // frame boundary is never miscounted across that handoff.
 type conn struct {
-	nc net.Conn
-	r  *bufio.Reader
-	mu sync.Mutex // serializes Send; rpcstream's own session already funnels writes through one
+	nc    net.Conn
+	r     *bufio.Reader
+	limit atomic.Uint32 // read cap; handshakeMaxFrameBytes until the handshake succeeds
+	mu    sync.Mutex    // serializes Send; rpcstream's own session already funnels writes through one
 	// goroutine once Serve is running, but the handshake writes directly too, before that exists.
 }
 
 func newConn(nc net.Conn) *conn {
-	return &conn{nc: nc, r: bufio.NewReader(nc)}
+	c := &conn{nc: nc, r: bufio.NewReader(nc)}
+	c.limit.Store(handshakeMaxFrameBytes)
+	return c
 }
+
+func (c *conn) setLimit(n uint32) { c.limit.Store(n) }
 
 func (c *conn) Send(frame []byte) error {
 	c.mu.Lock()
@@ -82,5 +92,5 @@ func (c *conn) Send(frame []byte) error {
 }
 
 func (c *conn) Receive() ([]byte, error) {
-	return readFrame(c.r)
+	return readFrame(c.r, c.limit.Load())
 }

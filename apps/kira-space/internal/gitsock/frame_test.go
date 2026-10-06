@@ -15,7 +15,7 @@ func TestFrame_ZeroLengthBody(t *testing.T) {
 	if err := writeFrame(&buf, []byte{}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := readFrame(bufio.NewReader(&buf))
+	got, err := readFrame(bufio.NewReader(&buf), maxFrameBytes)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestFrame_OneByteUnderMax(t *testing.T) {
 	if err := writeFrame(&buf, body); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := readFrame(bufio.NewReader(&buf))
+	got, err := readFrame(bufio.NewReader(&buf), maxFrameBytes)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -52,16 +52,18 @@ func TestFrame_OneByteOverMax_WriteRefused(t *testing.T) {
 	}
 }
 
-func TestFrame_OneByteOverMax_ReadRefusedBeforeBody(t *testing.T) {
+func TestFrame_OneByteOverLimit_ReadRefusedBeforeBody(t *testing.T) {
 	t.Parallel()
-	var buf bytes.Buffer
-	var hdr [frameHeaderLen]byte
-	binary.BigEndian.PutUint32(hdr[:], maxFrameBytes+1)
-	buf.Write(hdr[:])
-	// Deliberately no body bytes follow — if readFrame tried to allocate/read the body before
-	// checking the cap, this would hang on io.ReadFull instead of erroring immediately.
-	if _, err := readFrame(bufio.NewReader(&buf)); err != errFrameTooLarge {
-		t.Fatalf("got %v, want errFrameTooLarge", err)
+	for _, limit := range []uint32{maxFrameBytes, handshakeMaxFrameBytes} {
+		var buf bytes.Buffer
+		var hdr [frameHeaderLen]byte
+		binary.BigEndian.PutUint32(hdr[:], limit+1)
+		buf.Write(hdr[:])
+		// Deliberately no body bytes follow — if readFrame tried to allocate/read the body before
+		// checking the cap, this would hang on io.ReadFull instead of erroring immediately.
+		if _, err := readFrame(bufio.NewReader(&buf), limit); err != errFrameTooLarge {
+			t.Fatalf("limit %d: got %v, want errFrameTooLarge", limit, err)
+		}
 	}
 }
 
@@ -76,7 +78,7 @@ func TestFrame_TruncatedNeverBlocksForever(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := readFrame(bufio.NewReader(&buf))
+		_, err := readFrame(bufio.NewReader(&buf), maxFrameBytes)
 		done <- err
 	}()
 	select {
@@ -99,11 +101,11 @@ func TestFrame_TwoFramesInOneWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := bufio.NewReader(&buf)
-	got1, err := readFrame(r)
+	got1, err := readFrame(r, maxFrameBytes)
 	if err != nil || string(got1) != "first" {
 		t.Fatalf("first frame: got %q, err %v", got1, err)
 	}
-	got2, err := readFrame(r)
+	got2, err := readFrame(r, maxFrameBytes)
 	if err != nil || string(got2) != "second" {
 		t.Fatalf("second frame: got %q, err %v", got2, err)
 	}
@@ -134,7 +136,7 @@ func TestFrame_SplitAcrossThreeReads(t *testing.T) {
 	}
 	// 15 total bytes (4-byte header + 11-byte body); a 5-byte step forces exactly three Reads.
 	r := bufio.NewReader(&stepReader{data: buf.Bytes(), step: 5})
-	got, err := readFrame(r)
+	got, err := readFrame(r, maxFrameBytes)
 	if err != nil || string(got) != "hello world" {
 		t.Fatalf("got %q, err %v", got, err)
 	}
