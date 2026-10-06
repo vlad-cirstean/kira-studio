@@ -427,7 +427,7 @@ function rowHasBadges(
 ): boolean {
   if (decoration.length > 0) return true;
   if (ctx.prsFor === undefined) return false;
-  const sha = ctx.store.commitAt(row).sha;
+  const sha = ctx.store.shaAt(row);
   return (ctx.prsFor(sha)?.length ?? 0) > 0;
 }
 
@@ -454,6 +454,38 @@ function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata 
   };
 }
 
+/** SlickGrid's row-height index rebuild calls `getItem` for every loaded row (to hand the item to
+ *  `rowHeightProvider`, which the default provider ignores). Materializing each commit there cost
+ *  hundreds of ms per rebuild on a large history, so the record is built on first field read —
+ *  formatters only ever read the rows actually rendered. */
+function lazyCommit(store: CommitStore, row: number): CommitRecord {
+  let record: CommitRecord | undefined;
+  const load = (): CommitRecord => {
+    record ??= store.commitAt(row);
+    return record;
+  };
+  return {
+    get sha() {
+      return load().sha;
+    },
+    get parents() {
+      return load().parents;
+    },
+    get author() {
+      return load().author;
+    },
+    get committer() {
+      return load().committer;
+    },
+    get subject() {
+      return load().subject;
+    },
+    get decoration() {
+      return load().decoration;
+    },
+  };
+}
+
 /**
  * §5.5's whole contract with the library, three methods: `getItem` calls `store.commitAt(row)`
  * fresh on every invocation — no cache, no memoization — because the only way to guarantee "the
@@ -471,7 +503,7 @@ export type CommitDataViewDeps = RowMetadataContext;
 export function createCommitDataView(deps: CommitDataViewDeps): CustomDataView<CommitRecord> {
   return {
     getLength: () => deps.plan().length,
-    getItem: (row: number) => deps.store.commitAt(deps.plan().storeRowAt(row)),
+    getItem: (row: number) => lazyCommit(deps.store, deps.plan().storeRowAt(row)),
     getItemMetadata: (row: number) => rowMetadata(deps, row),
   };
 }
