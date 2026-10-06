@@ -450,4 +450,37 @@ activation over VS Code). Both go to P180.
 
 ## Result
 
-(Implementer fills.)
+Landed on `p168-stream-b` (base `f6613bd`, P173 at contract 44), contract bumped 44 to 45.
+
+Commits (oldest first):
+
+- `51e0c86` require a trusted workspace; drop dead trust plumbing (step 1)
+- `3d4eef3` credential relay (`gitcred.Relay`) and Space prompt UI (step 2)
+- `9d2b0d8` socket clients' credential prompts open in Space only; contract 45 (step 3)
+- `40a6cd2` ADE credential prompts use the relay (step 4)
+- `96818b6` repository settings edited in Space only; `editRepoSettings` capability (step 5)
+- `acfe394` drop the unread per-repo log level; `LogOutputChannel` (step 6)
+- `8cae637` VS Code graph follows Space's date format (step 7)
+- `08db1f2` Space UI spec for the relay prompt (step 8)
+- `4ee0fe7` docs: record P178 decisions (step 9)
+- `f96971e` lint fixes (gocritic in `ade/board.go`, gocognit in `main`)
+
+Checks run, all green: `bun run typecheck`, `bun run lint` (23 pre-existing biome warnings),
+`bun run lint:go` (0 issues), `go build`/`go vet`/`go test -race ./...` under `apps/kira-space`,
+`bun test packages apps/kira-space-vscode/src` (854 pass), `bun run test:ui:space` (173 pass),
+`bun run test:webview` (64 pass), plan section 7 greps. `bun run lint:dead` reports only the 6
+duplicate-export hints already assigned to P179.
+
+Deviations:
+
+- ADE relay source label is the existing `boardConnLabel` ("Kira Space ade board"), not "Kira Space ade".
+- `gitcred.Relay` is built in `main.go` and required by `gitsock` and the ADE board; no nil fallback.
+- `GitCredentialService` also exposes the generated `AttachPush` binding (GitClientsService precedent).
+- Relay `Prompt` has no `confirm` flag, matching the native dialog.
+- `coerceSettings` stays in `extension.ts` (validates `workbench.tree.indent`; git-core tests cover it); the plan allowed dropping it.
+- `repoSettings.set` is refused with `E_READ_ONLY` on `git.sock` (native stream still serves it); the log-level setting test now uses `kiraSpace.graph.scope`/`pull.strategy`.
+- VS Code reconnect harness spec now uses the create-branch dialog (the settings gear is hidden); `fakeGraphHost` gained `withWrite`.
+- Golden graph frame sha values changed on regeneration, as in P173.
+- Date format is read at each `app.init`, not live-pushed; a Space change shows after the next init.
+
+Not run: real VS Code host, macOS (recorded as a Known open item, P180).
