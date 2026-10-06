@@ -2,9 +2,11 @@ package httpclient
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
 	"sync"
 
 	"golang.org/x/net/publicsuffix"
@@ -92,16 +94,71 @@ func JarCookies(rawURL string) ([]Cookie, error) {
 	return out, nil
 }
 
-// DeleteJarCookie removes one cookie from the shared jar for rawURL's host. cookiejar has no
-// delete API, so this is an expiring Set: SetCookies with the same name, MaxAge -1 — net/http's
-// own documented way to force an entry to expire immediately.
+// DeleteJarCookie removes every cookie named name that the jar would send to rawURL. cookiejar has
+// no delete API and no entry listing, only an expiring Set (SetCookies with MaxAge -1) that matches
+// an entry by exactly name, domain and path. A bare expiry would key on the URL's host and
+// directory, missing a cookie set with Path=/ or a parent Domain, so this expires the name under
+// every domain (host, then each parent down to the registrable domain) and path (/, and each
+// prefix of the URL path) a sent cookie could carry. Two same-name cookies that both match the URL
+// are removed together: the jar reports no domain or path, so one cannot be singled out.
 func DeleteJarCookie(rawURL, name string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return newError(CodeBadRequest, "invalid URL: "+err.Error(), err)
 	}
-	currentJar().SetCookies(u, []*http.Cookie{{Name: name, Value: "", MaxAge: -1}})
+	jar := currentJar()
+	for _, domain := range cookieDomainCandidates(u.Hostname()) {
+		for _, path := range cookiePathCandidates(u.Path) {
+			jar.SetCookies(u, []*http.Cookie{{Name: name, Domain: domain, Path: path, MaxAge: -1}})
+		}
+	}
 	return nil
+}
+
+// cookieDomainCandidates returns the Domain attributes to expire under: "" (host-only, which
+// shares an entry key with Domain=host) then each parent domain down to the registrable one. An IP
+// address or a public suffix has no parents.
+func cookieDomainCandidates(host string) []string {
+	out := []string{""}
+	if net.ParseIP(host) != nil {
+		return out
+	}
+	base, err := publicsuffix.EffectiveTLDPlusOne(host)
+	if err != nil {
+		return out
+	}
+	for d := host; d != base; {
+		_, rest, ok := strings.Cut(d, ".")
+		if !ok {
+			break
+		}
+		d = rest
+		out = append(out, d)
+	}
+	return out
+}
+
+// cookiePathCandidates returns "/" and every prefix of path at a slash boundary, with and without
+// the trailing slash, plus path itself: the Path attributes a cookie sent to path can carry.
+func cookiePathCandidates(path string) []string {
+	seen := map[string]bool{"/": true}
+	out := []string{"/"}
+	add := func(p string) {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	for i := 1; i < len(path); i++ {
+		if path[i] == '/' {
+			add(path[:i])
+			add(path[:i+1])
+		}
+	}
+	if strings.HasPrefix(path, "/") {
+		add(path)
+	}
+	return out
 }
 
 // ClearJar replaces the shared jar wholesale — cookiejar has no Clear.
