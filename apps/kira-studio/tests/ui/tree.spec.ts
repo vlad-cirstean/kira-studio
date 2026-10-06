@@ -204,6 +204,20 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await expect(wideTableRow).toHaveAttribute('data-kind', 'table');
   await expect(wideTableRow.locator('[data-testid="tree-twisty"]')).not.toBeVisible();
 
+  // WAI-ARIA tree keys: Left collapses an expanded row, Right expands it again, Down moves the
+  // selection to the next row, Up back.
+  await appRow.click();
+  await appRow.press('ArrowLeft');
+  await expect(appRow).toHaveAttribute('aria-expanded', 'false');
+  await expect(wideTableRow).toHaveCount(0);
+  await appRow.press('ArrowRight');
+  await expect(appRow).toHaveAttribute('aria-expanded', 'true');
+  await appRow.press('ArrowDown');
+  await expect(appRow).toHaveAttribute('aria-selected', 'false');
+  await expect(page.locator('[data-testid="tree-row"][aria-selected="true"]')).toHaveCount(1);
+  await page.keyboard.press('ArrowUp');
+  await expect(appRow).toHaveAttribute('aria-selected', 'true');
+
   // P19 D1-D3: every other listed kind (views, materialized views, sequences, functions)
   // collapses into its own per-kind folder below the ungrouped tables, collapsed by default.
   const viewsFolder = await findRow(page, `${APP_PATH}#view`);

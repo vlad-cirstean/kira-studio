@@ -5,7 +5,7 @@ import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { STICKY_ROW_CLASS, VIRTUAL_ROW_CLASS } from '@workbench/util/virtualRows';
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
@@ -68,6 +68,8 @@ watch(
     treeStore.pendingScrollKey = null;
     await revealKey(key);
   },
+  // A reveal requested while the panel was hidden leaves its key set; scroll once the tree mounts.
+  { immediate: true },
 );
 
 function onSelect(row: TreeRowVm): void {
@@ -150,6 +152,53 @@ function onBackgroundContextMenu(event: MouseEvent): void {
   contextMenuStore.openContextMenu(event, emptyBackgroundMenu());
 }
 
+async function selectAndFocus(row: TreeRowVm): Promise<void> {
+  treeStore.selectRow(row.key);
+  await revealKey(row.key);
+  await nextTick();
+  scrollEl.value?.querySelector<HTMLElement>('[role="treeitem"][tabindex="0"]')?.focus();
+}
+
+// WAI-ARIA tree pattern: Up/Down/Home/End move the selection, Right expands or enters the first
+// child, Left collapses or goes to the parent.
+function onArrowNavigation(e: KeyboardEvent): boolean {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+    return false;
+  }
+  const rows = treeStore.visibleRows;
+  const index = rows.findIndex((r) => r.key === treeStore.selected);
+  if (index === -1) return false;
+  const row = rows[index];
+  e.preventDefault();
+  let target: TreeRowVm | undefined;
+  switch (e.key) {
+    case 'ArrowUp':
+      target = rows[index - 1];
+      break;
+    case 'ArrowDown':
+      target = rows[index + 1];
+      break;
+    case 'Home':
+      target = rows[0];
+      break;
+    case 'End':
+      target = rows[rows.length - 1];
+      break;
+    case 'ArrowRight':
+      if (row.hasChildren && !row.expanded) onToggle(row);
+      else if (row.expanded && rows[index + 1] && rows[index + 1].depth > row.depth) {
+        target = rows[index + 1];
+      }
+      break;
+    default:
+      if (row.expanded && row.hasChildren) onToggle(row);
+      else target = rows.slice(0, index).findLast((r) => r.depth < row.depth);
+  }
+  if (target && target.key !== row.key) void selectAndFocus(target);
+  return true;
+}
+
 const TREE_SHORTCUTS = [
   'tree.open',
   'tree.copyName',
@@ -167,6 +216,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+  if (onArrowNavigation(e)) return;
   const id = shortcutFor(e, TREE_SHORTCUTS);
   if (!id) return;
   const row = treeStore.visibleRows.find((r) => r.key === treeStore.selected);

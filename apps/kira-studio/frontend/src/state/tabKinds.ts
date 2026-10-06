@@ -23,6 +23,7 @@ import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { useConnectionsStore } from './connections';
+import { useLayoutStore } from './layout';
 import { useSettingsStore } from './settings';
 import {
   type BrowseTabRecord,
@@ -115,7 +116,11 @@ function revealInProjectPanel(tab: TabRecord): MenuItem[] {
       label: 'Reveal in project panel',
       icon: 'target',
       run: () => {
-        if (tab.connectionId) void useTreeStore().revealPath(tab.connectionId, tab.path);
+        if (!tab.connectionId) return;
+        // A hidden panel has no mounted tree to scroll, so the reveal would silently do nothing.
+        const layoutStore = useLayoutStore();
+        if (!layoutStore.panel.project.visible) layoutStore.toggleProjectPanel();
+        void useTreeStore().revealPath(tab.connectionId, tab.path);
       },
     },
   ];
