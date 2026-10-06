@@ -86,43 +86,11 @@ func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, t
 		if len(types) == 0 {
 			return adapters.SingleStatusPage("OK", "text"), nil
 		}
-		dbTypes := make([]string, len(types))
-		columns := make([]page.ColumnDescriptor, len(types))
-		for i, t := range types {
-			dbTypes[i] = t.DatabaseTypeName()
-			columns[i] = page.ColumnDescriptor{
-				Name: t.Name(), DataType: dbTypes[i], TypeClass: typeClassForField(dbTypes[i]),
-				Nullable: true, IsPrimaryKey: false, Generated: false,
-			}
-		}
-
+		dbTypes, columns := consoleColumns(types)
 		builder := page.NewTabularPageBuilder(columns)
-		truncated := false
-		for sqlRows.Next() {
-			// Next just proved another row exists; stopping here makes truncated mean "more existed".
-			if limit.Reached(builder.RowCount(), builder.Bytes()) {
-				truncated = true
-				break
-			}
-			raw := make([]sql.RawBytes, len(types))
-			dest := make([]any, len(types))
-			for i := range raw {
-				dest[i] = &raw[i]
-			}
-			if err := sqlRows.Scan(dest...); err != nil {
-				return page.TabularPage{}, mapError(err)
-			}
-			cells := make([]*string, len(types))
-			for i, rb := range raw {
-				if rb == nil {
-					continue
-				}
-				text := cellText(rb, dbTypes[i])
-				cells[i] = &text
-			}
-			if err := builder.AppendRow(cells); err != nil {
-				return page.TabularPage{}, err
-			}
+		truncated, err := appendConsoleRows(sqlRows, builder, dbTypes, limit)
+		if err != nil {
+			return page.TabularPage{}, err
 		}
 		// Close before reading the error: it drains what the cap left on the wire.
 		sqlRows.Close()
@@ -131,6 +99,50 @@ func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, t
 		}
 		return builder.Finish(page.CappedPosition(builder.RowCount(), truncated)), nil
 	})
+}
+
+// consoleColumns maps a result's column types to page descriptors, plus each column's DB type name.
+func consoleColumns(types []*sql.ColumnType) ([]string, []page.ColumnDescriptor) {
+	dbTypes := make([]string, len(types))
+	columns := make([]page.ColumnDescriptor, len(types))
+	for i, t := range types {
+		dbTypes[i] = t.DatabaseTypeName()
+		columns[i] = page.ColumnDescriptor{
+			Name: t.Name(), DataType: dbTypes[i], TypeClass: typeClassForField(dbTypes[i]),
+			Nullable: true, IsPrimaryKey: false, Generated: false,
+		}
+	}
+	return dbTypes, columns
+}
+
+// appendConsoleRows streams rows into builder and stops at limit, reporting whether more existed.
+func appendConsoleRows(sqlRows *sql.Rows, builder *page.TabularPageBuilder, dbTypes []string, limit page.ResultCap) (bool, error) {
+	for sqlRows.Next() {
+		// Next just proved another row exists; stopping here makes truncated mean "more existed".
+		if limit.Reached(builder.RowCount(), builder.Bytes()) {
+			return true, nil
+		}
+		raw := make([]sql.RawBytes, len(dbTypes))
+		dest := make([]any, len(dbTypes))
+		for i := range raw {
+			dest[i] = &raw[i]
+		}
+		if err := sqlRows.Scan(dest...); err != nil {
+			return false, mapError(err)
+		}
+		cells := make([]*string, len(dbTypes))
+		for i, rb := range raw {
+			if rb == nil {
+				continue
+			}
+			text := cellText(rb, dbTypes[i])
+			cells[i] = &text
+		}
+		if err := builder.AppendRow(cells); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 // errTxCharacteristics is MySQL/MariaDB's "Transaction characteristics can't be changed while a
