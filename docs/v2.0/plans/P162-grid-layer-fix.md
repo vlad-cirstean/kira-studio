@@ -422,13 +422,12 @@ section 4 `kiraAB` helper, then:
 
 Compare gutter and header lag with it on and off.
 
-## Result: Mac report, border removal only
+## Result: Mac report, borders restored
 
 - Mac report after the border/header commits: white dotted cell borders, header and gutter lag.
-- White dotted borders: removing `.slick-cell` border rules left a stock border with no colour, so it
-  fell back to the text colour. Fix: `border-color: transparent`.
-- Everything else from that day reverted: header `will-change` and `contain: layout paint` on
-  `.grid-canvas` are back as shipped 10-05; no extra background fills (wrong colour on the Mac).
+- Transparent borders then made the cell lines vanish on the Mac (background leaks between cells).
+  Real borders are wanted: `.slick-cell` `border-right`/`border-bottom` restored as shipped 10-05.
+- Grid CSS now identical to 10-05 (`will-change` and `contain: layout paint` in place).
 - Sandbox, 20 columns: solid borders 51.4 fps, transparent 54.3, `border: 0` 54.5.
 - Gutter/header lag cause still open: Mac A/B `ab-canvas-off`; else JS pane sync, fix needs sticky
   header/gutter in one scroller.

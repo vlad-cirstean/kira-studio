@@ -226,7 +226,8 @@
 }
 
 .slick-grid-host .slick-cell {
-  border-color: transparent;
+  border-right: var(--kira-border-width) solid var(--kira-border);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
   color: var(--kira-fg);
   padding: 0 var(--kira-s-4);
   /* P22 iter2-pacing D7 item 2: slick.grid.css leaves `.slick-cell` at `display: block`, so cell
