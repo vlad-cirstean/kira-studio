@@ -6,6 +6,7 @@
 package postman
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -83,7 +84,17 @@ func Parse(r io.Reader) (*Tree, error) {
 	if len(tree.Variables) > 0 {
 		tree.Report.warnN(WarnVariablesImported, len(tree.Variables))
 	}
-	walkItems(doc["item"], RootParent, tree)
+	if raw := doc["item"]; len(raw) > 0 && raw[0] == '[' {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		if _, err := dec.Token(); err != nil { // opening '['
+			return nil, fmt.Errorf("postman: decode items: %w", err)
+		}
+		nodes, err := decodeItems(dec, 1)
+		if err != nil {
+			return nil, err
+		}
+		walkItems(nodes, RootParent, tree)
+	}
 	return tree, nil
 }
 
@@ -129,18 +140,115 @@ func checkSchemaVersion(info map[string]json.RawMessage) error {
 	return nil
 }
 
+// maxFolderDepth bounds folder nesting. Real collections nest a few folders; a deeper file is
+// refused before it costs anything, and the cap also bounds the recursion below.
+const maxFolderDepth = 64
+
+// itemNode is one decoded item[] entry. members holds every member except `item`; the nested
+// `item` array is decoded into children by the same single pass, never copied as raw bytes per
+// level (that re-copied the whole subtree at every depth: O(depth x size) allocation).
+type itemNode struct {
+	members   map[string]json.RawMessage
+	hasItem   bool
+	children  []itemNode
+	malformed bool // entry is not a JSON object
+}
+
+// decodeItems streams one item[] array (its '[' already consumed) in a single pass. depth is the
+// folder nesting of this array, 1 for the document's own.
+func decodeItems(dec *json.Decoder, depth int) ([]itemNode, error) {
+	if depth > maxFolderDepth {
+		return nil, fmt.Errorf("postman: folders are nested deeper than %d levels", maxFolderDepth)
+	}
+	nodes := []itemNode{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("postman: decode items: %w", err)
+		}
+		if d, ok := tok.(json.Delim); !ok || d != '{' {
+			if ok {
+				if err := skipNested(dec); err != nil {
+					return nil, err
+				}
+			}
+			nodes = append(nodes, itemNode{malformed: true})
+			continue
+		}
+		node := itemNode{members: map[string]json.RawMessage{}}
+		for dec.More() {
+			keyTok, err := dec.Token()
+			if err != nil {
+				return nil, fmt.Errorf("postman: decode items: %w", err)
+			}
+			key, _ := keyTok.(string)
+			if key != "item" {
+				var raw json.RawMessage
+				if err := dec.Decode(&raw); err != nil {
+					return nil, fmt.Errorf("postman: decode items: %w", err)
+				}
+				node.members[key] = raw
+				continue
+			}
+			node.hasItem, node.children = true, nil
+			valTok, err := dec.Token()
+			if err != nil {
+				return nil, fmt.Errorf("postman: decode items: %w", err)
+			}
+			d, isDelim := valTok.(json.Delim)
+			switch {
+			case isDelim && d == '[':
+				if node.children, err = decodeItems(dec, depth+1); err != nil {
+					return nil, err
+				}
+			case isDelim:
+				err = skipNested(dec)
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		if _, err := dec.Token(); err != nil { // closing '}'
+			return nil, fmt.Errorf("postman: decode items: %w", err)
+		}
+		nodes = append(nodes, node)
+	}
+	if _, err := dec.Token(); err != nil { // closing ']'
+		return nil, fmt.Errorf("postman: decode items: %w", err)
+	}
+	return nodes, nil
+}
+
+// skipNested consumes tokens up to the close of the container whose opener was just read.
+func skipNested(dec *json.Decoder) error {
+	for level := 1; level > 0; {
+		tok, err := dec.Token()
+		if err != nil {
+			return fmt.Errorf("postman: decode items: %w", err)
+		}
+		if d, ok := tok.(json.Delim); ok {
+			if d == '[' || d == '{' {
+				level++
+			} else {
+				level--
+			}
+		}
+	}
+	return nil
+}
+
 // walkItems is D3: depth-first, in document order, with sort_order the index within this parent's
 // own item[] array. The discriminator is structural, not a field (F1) — a folder has an `item`
 // member, a request has a `request` member.
-func walkItems(raw json.RawMessage, parent int, t *Tree) {
+func walkItems(nodes []itemNode, parent int, t *Tree) {
 	order := 0
-	for _, entry := range decodeArray(raw) {
-		obj := decodeObject(entry)
-		if obj == nil {
+	for _, node := range nodes {
+		obj := node.members
+		if node.malformed {
 			t.Report.warn(WarnMalformedItem)
 			continue
 		}
-		_, isFolder := obj["item"]
+		isFolder := node.hasItem
 		_, isRequest := obj["request"]
 		if !isFolder && !isRequest {
 			// Ill-formed both ways round: neither a folder nor a request. Dropping-and-reporting
@@ -151,7 +259,6 @@ func walkItems(raw json.RawMessage, parent int, t *Tree) {
 		}
 
 		origin := cloneOrigin(obj)
-		delete(origin, "item")
 		// F8: folder/item `auth` and a secret-typed folder/item `variable[]` entry's own value are
 		// both inert (never applied, D9) but were kept verbatim in origin — plaintext credentials
 		// sitting unencrypted in kira.sqlite's origin_json, re-emitted on every export regardless of
@@ -160,6 +267,10 @@ func walkItems(raw json.RawMessage, parent int, t *Tree) {
 		stripSensitiveOrigin(origin)
 		if raw, ok := origin["request"]; ok {
 			origin["request"] = stripRequestAuthOrigin(raw)
+		}
+		// A saved example repeats its request, auth included, in `originalRequest`.
+		if raw, ok := origin["response"]; ok {
+			origin["response"] = stripResponseAuthOrigin(raw)
 		}
 		name, hasName := decodeString(obj["name"])
 		idx := len(t.Items)
@@ -175,7 +286,7 @@ func walkItems(raw json.RawMessage, parent int, t *Tree) {
 			})
 			t.Report.Folders++
 			countInertMembers(obj, &t.Report)
-			walkItems(obj["item"], idx, t)
+			walkItems(node.children, idx, t)
 		} else {
 			request := importRequest(obj["request"], &t.Report)
 			if !hasName || strings.TrimSpace(name) == "" {
@@ -243,6 +354,35 @@ func stripRequestAuthOrigin(raw json.RawMessage) json.RawMessage {
 	clone := cloneOrigin(obj)
 	delete(clone, "auth")
 	return mustRaw(clone)
+}
+
+// stripResponseAuthOrigin removes `auth` from each saved example's `originalRequest`. raw is
+// returned byte for byte when nothing needed stripping.
+func stripResponseAuthOrigin(raw json.RawMessage) json.RawMessage {
+	arr := decodeArray(raw)
+	if arr == nil {
+		return raw
+	}
+	changed := false
+	for i, entry := range arr {
+		obj := decodeObject(entry)
+		orig, ok := obj["originalRequest"]
+		if !ok {
+			continue
+		}
+		stripped := stripRequestAuthOrigin(orig)
+		if bytes.Equal(stripped, orig) {
+			continue
+		}
+		clone := cloneOrigin(obj)
+		clone["originalRequest"] = stripped
+		arr[i] = mustRaw(clone)
+		changed = true
+	}
+	if !changed {
+		return raw
+	}
+	return mustRaw(arr)
 }
 
 // blankSecretVariableValues decodes raw as a Postman `variable[]` array and blanks the `value` of
