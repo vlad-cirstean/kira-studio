@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
@@ -1067,5 +1068,57 @@ func TestRunOp_AutoStashCheckout_SwitchFailureMentionsTheStash(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "stash@{0}") {
 		t.Fatalf("git stash list = %q, want a real stash entry", out)
+	}
+}
+
+// TestUndoRun_RechecksTipsInsideTheReplayWrite: a ref moved by another window after UndoRun's
+// preflight but before its write gate opens must refuse the undo, not be reset past.
+func TestUndoRun_RechecksTipsInsideTheReplayWrite(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	writeFile := func(name string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runGitQ(t, dir, "add", name)
+	}
+	writeFile("base.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "base")
+	runGitQ(t, dir, "checkout", "-q", "-b", "topic")
+	writeFile("topic.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "topic")
+	topicSha := strings.TrimSpace(runOutput(t, dir, "rev-parse", "topic"))
+	runGitQ(t, dir, "checkout", "-q", "main")
+
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+	picked, err := entry.RunOp(ctx, ConnID("c"), "test", OpRequest{Kind: "cherryPick", Sha: topicSha})
+	if err != nil || !picked.OK || picked.Undo == nil {
+		t.Fatalf("cherryPick = %+v, %v", picked, err)
+	}
+
+	var undo OpResult
+	var undoErr error
+	done := make(chan struct{})
+	if err := entry.Repo.Write(ctx, func(context.Context) error {
+		go func() {
+			defer close(done)
+			undo, undoErr = entry.UndoRun(ctx, "test", picked.Undo.ID)
+		}()
+		time.Sleep(300 * time.Millisecond)
+		writeFile("other.txt")
+		runGitQ(t, dir, "commit", "-q", "-m", "other window")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if undoErr != nil || undo.OK {
+		t.Fatalf("UndoRun = %+v, %v; want a refusal", undo, undoErr)
+	}
+	if got := runOutput(t, dir, "log", "-1", "--format=%s"); strings.TrimSpace(got) != "other window" {
+		t.Fatalf("HEAD subject = %q; the undo reset past the other commit", strings.TrimSpace(got))
 	}
 }

@@ -1126,8 +1126,23 @@ func (e *RepoEntry) runWriteArgv(ctx context.Context, argv []string) (*OpError, 
 // completed cleanly. A cancelled ctx or a genuine spawn failure comes back as a real Go error,
 // exactly like runWriteArgv's own single-argv contract.
 func (e *RepoEntry) runWriteArgvList(ctx context.Context, argvList [][]string) (opErr *OpError, failedAt int, err error) {
+	return e.runGuardedWriteArgvList(ctx, argvList, nil)
+}
+
+// runGuardedWriteArgvList is runWriteArgvList with a guard that runs first, inside the same write
+// acquisition. A non-nil guard result is returned as opErr with failedAt 0 and no argv runs; a
+// replay pinned to nothing at write time (reset --keep) needs its precondition checked here, not
+// before the gate.
+func (e *RepoEntry) runGuardedWriteArgvList(ctx context.Context, argvList [][]string, guard func(ctx context.Context) (*OpError, error)) (opErr *OpError, failedAt int, err error) {
 	failedAt = -1
 	err = e.Repo.Write(ctx, func(ctx context.Context) error {
+		if guard != nil {
+			gerr, err := guard(ctx)
+			if err != nil || gerr != nil {
+				opErr, failedAt = gerr, 0
+				return err
+			}
+		}
 		for i, argv := range argvList {
 			e.noteWrite(ctx, argv)
 			res, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
@@ -1338,12 +1353,19 @@ func (e *RepoEntry) resolveTips(ctx context.Context, refs []string) (map[string]
 	return tips, nil
 }
 
-// tipsMoved reports whether any ref in want no longer sits at its recorded tip.
+// tipsMoved reports whether any ref in want no longer sits at its recorded tip. It runs inside
+// Repo.Write's callback, so it spawns directly: Repo.Read would wait on the write it sits in.
 func (e *RepoEntry) tipsMoved(ctx context.Context, want map[string]string) (bool, error) {
 	for ref, sha := range want {
-		res, err := e.runAllowingExit(ctx, []string{"rev-parse", "--verify", "-q", "--end-of-options", ref}, 0, 1)
+		argv := []string{"rev-parse", "--verify", "-q", "--end-of-options", ref}
+		res, err := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
+			Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: true,
+		})
 		if err != nil {
-			return false, err
+			return false, gitclient.Classify(ctx, argv, res, err)
+		}
+		if res.ExitCode != 0 && res.ExitCode != 1 {
+			return false, gitclient.Classify(ctx, argv, res, nil)
 		}
 		if res.ExitCode != 0 || strings.TrimSpace(string(res.Stdout)) != sha {
 			return true, nil
@@ -1382,17 +1404,6 @@ func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result O
 		}
 		return OpResult{}, err
 	}
-	moved, err := e.tipsMoved(ctx, record.ExpectedTips)
-	if err != nil {
-		return OpResult{}, err
-	}
-	if moved {
-		return e.undoRunFailure(ctx, "Unknown", "The repository changed since this operation, so the undo was refused.")
-	}
-	if e.undo.Take(id) == nil {
-		return e.undoRunFailure(ctx, "NotFound", "This undo is no longer available.")
-	}
-
 	// G30 round-1 functional-correctness review, finding #5: RunOp drops the shared caches on
 	// EVERY write it attempts (D7's own defer, above) specifically because "the watcher's own
 	// debounced signal must not be the only thing that ever notices our own write" — UndoRun IS
@@ -1403,7 +1414,23 @@ func (e *RepoEntry) UndoRun(ctx context.Context, connLabel, id string) (result O
 	// second-line-of-defence exists at all).
 	defer e.invalidateAfterWrite()
 
-	opErr, _, werr := e.runWriteArgvList(ctx, record.Replay)
+	// Checked and Taken inside the write that replays: a ref moved by another window between an
+	// earlier check and the gate would otherwise be reset past. A transient check error leaves the
+	// record armed.
+	guard := func(ctx context.Context) (*OpError, error) {
+		moved, err := e.tipsMoved(ctx, record.ExpectedTips)
+		if err != nil {
+			return nil, err
+		}
+		if moved {
+			return &OpError{Kind: "Unknown", Message: "The repository changed since this operation, so the undo was refused."}, nil
+		}
+		if e.undo.Take(id) == nil {
+			return &OpError{Kind: "NotFound", Message: "This undo is no longer available."}, nil
+		}
+		return nil, nil
+	}
+	opErr, _, werr := e.runGuardedWriteArgvList(ctx, record.Replay, guard)
 	if werr != nil {
 		return OpResult{}, werr
 	}
