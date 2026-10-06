@@ -6,8 +6,8 @@ import (
 )
 
 // KeepAwakeService is Kira Studio's own titlebar-toggle half (internal/bridge/keepawake.go),
-// trimmed: no agent-aware Settings leaf (SetAgentAware), no agent-session-count tracking — this app
-// has no Claude Code hook integration in scope. Status/SetManual delegate entirely to
+// trimmed: no agent-aware Settings leaf (SetAgentAware), no agent-session-count tracking — agent
+// activity runs through agenthooks (P129), not this service. Status/SetManual delegate entirely to
 // internal/keepawake.Toggle, the shared manual-reason half both apps' own bound service wraps
 // (P116 H3).
 type KeepAwakeService struct {

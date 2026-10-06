@@ -41,7 +41,7 @@ import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
-// to the 13 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
+// to the 15 services apps/kira-space/main.go actually binds (Part 1's own service list, plus
 // LinkService added alongside this file — P100 Part 2 found repo/git/hostHandlers.ts's
 // link.openExternal handler had no Go counterpart here; see internal/bridge/link.go). No
 // apiControl.ts equivalent: this app has exactly one bound-call surface, not two composed halves.
