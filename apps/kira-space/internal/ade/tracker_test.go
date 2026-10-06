@@ -509,6 +509,8 @@ func TestTracker_PrepareRequiresTask(t *testing.T) {
 func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	tr, _, live, clock := newTestTracker(t)
 	repo := t.TempDir()
+	var stopped []string
+	tr.deps.OnStopped = func(id string) { stopped = append(stopped, id) }
 
 	fresh, err := tr.Prepare(PrepareArgs{TaskID: "t1", Cwd: repo})
 	if err != nil {
@@ -520,6 +522,9 @@ func TestTracker_AbortDeletesFreshAndStopsResumed(t *testing.T) {
 	tr.Abort(fresh.TerminalID)
 	if sessions, _ := listSessions(tr); len(sessions) != 0 {
 		t.Fatalf("sessions after aborting a fresh launch = %d, want 0", len(sessions))
+	}
+	if len(stopped) != 1 || stopped[0] != fresh.RecordID {
+		t.Fatalf("OnStopped after aborting a fresh launch = %v, want [%s]", stopped, fresh.RecordID)
 	}
 
 	first := composeAndSpawn(t, tr, live, PrepareArgs{TaskID: "t1", Cwd: repo})

@@ -426,18 +426,15 @@ func (t *Tracker) Abort(terminalID string) {
 	}
 	if err != nil {
 		slog.Warn("ade: abort", "scope", "ade", "recordId", recordID, "err", err)
-		return
-	}
-	if t.deps.OnChange != nil {
+	} else if t.deps.OnChange != nil {
 		t.deps.OnChange()
 	}
-	if !fresh {
-		t.mu.Lock()
-		onStopped := t.deps.OnStopped
-		t.mu.Unlock()
-		if onStopped != nil {
-			onStopped(recordID)
-		}
+	// Release per-session state (Take over binding, MCP config, token) even when the store write fails.
+	t.mu.Lock()
+	onStopped := t.deps.OnStopped
+	t.mu.Unlock()
+	if onStopped != nil {
+		onStopped(recordID)
 	}
 }
 
