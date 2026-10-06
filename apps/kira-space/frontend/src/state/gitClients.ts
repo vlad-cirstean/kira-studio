@@ -4,6 +4,7 @@ import type {
   GitVsixInstallResult,
   GitVsixStatus,
 } from '@shared/domain/git';
+import { hydrateThenSubscribe } from '@workbench/state/hydrateThenSubscribe';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -41,30 +42,30 @@ export const useGitClientsStore = defineStore('gitClients', () => {
   let unsubscribePairing: (() => void) | null = null;
   let unsubscribeClients: (() => void) | null = null;
 
-  // Subscribe before fetching: a push that lands during the fetch is newer than the snapshot, so
-  // the snapshot is applied only for a feed that has not pushed yet.
   async function hydrateGitClients(): Promise<void> {
-    let pairingPushed = false;
-    let clientsPushed = false;
     unsubscribePairing?.();
-    unsubscribePairing = control.onGitPairingChanged((snap) => {
-      pairingPushed = true;
-      applySnapshot(snap);
-    });
     unsubscribeClients?.();
-    unsubscribeClients = control.onGitClientsChanged((clients) => {
-      clientsPushed = true;
-      state.clients = clients;
-    });
-
-    const [clients, pending, vsix] = await Promise.all([
-      control.gitClientsList(),
-      control.gitPairingPending(),
-      control.gitVsixStatus(),
+    unsubscribePairing = null;
+    unsubscribeClients = null;
+    const [pairing, clients, vsix] = await Promise.all([
+      hydrateThenSubscribe({
+        snapshot: () => control.gitPairingPending(),
+        subscribe: (cb) => control.onGitPairingChanged(cb),
+        apply: applySnapshot,
+      }).catch((err) => err as Error),
+      hydrateThenSubscribe({
+        snapshot: () => control.gitClientsList(),
+        subscribe: (cb) => control.onGitClientsChanged(cb),
+        apply: (list) => {
+          state.clients = list;
+        },
+      }).catch((err) => err as Error),
+      control.gitVsixStatus().catch((err) => err as Error),
     ]);
-    if (!clientsPushed) state.clients = clients;
-    if (!pairingPushed) applySnapshot(pending);
-    state.vsix = vsix;
+    if (typeof pairing === 'function') unsubscribePairing = pairing;
+    if (typeof clients === 'function') unsubscribeClients = clients;
+    for (const r of [pairing, clients, vsix]) if (r instanceof Error) throw r;
+    state.vsix = vsix as GitVsixStatus;
   }
 
   // approve/deny let the emitted kira:git:pairing event drive the re-render (D9: an
