@@ -17,7 +17,7 @@
  * Alignment: a bounded scan of the first `HEAD_SCAN_LIMIT` loaded rows for the HEAD decoration —
  * the same `isHeadDecoration` single source of truth `graphColumn.ts`'s own formatter already
  * reads, so this can never disagree with which row the real graph bolds — then that row's lane
- * via `GraphViewState.layout`, positioned with the exact `laneX`/`graphColumnWidth` math
+ * via `GraphViewState.layout`, positioned with the exact `laneX` math
  * `rowSvg.ts`/`geometry.ts` use for the real graph column, so the two line up visually. The node
  * glyph itself reuses `rowSvg.ts`'s own stash shape (an unfilled dashed ring, lane-coloured) —
  * dashed reads as "not a real commit" the same way it already does for a stash entry.
@@ -32,7 +32,7 @@
  */
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { GEOMETRY, graphColumnWidth } from '../graph/geometry.ts';
+import { GEOMETRY } from '../graph/geometry.ts';
 import { laneClass } from '../graph/palette.ts';
 import { isHeadDecoration, laneX } from '../graph/rowSvg.ts';
 import type { GraphViewState } from '../state/graphView.ts';
@@ -41,6 +41,9 @@ import type { OpsState } from '../state/ops.ts';
 const props = defineProps<{
   graphView: GraphViewState;
   opsState: OpsState;
+  /** The grid's user-set graph column width, so the strip's label lines up with its message
+   *  column. */
+  graphWidth: number;
 }>();
 
 const emit = defineEmits<{
@@ -75,10 +78,15 @@ const headRow = computed<number | undefined>(() => {
   // re-scans — `store`/`layout` themselves are markRaw and never trigger this computed on their
   // own (GraphViewState's own doc comment on why only the scalars are reactive).
   void props.graphView.generation.value;
+  const currentPlan = props.graphView.plan.value;
   const limit = Math.min(props.graphView.loadedRows.value, HEAD_SCAN_LIMIT);
   const store = props.graphView.store;
   for (let row = 0; row < limit; row++) {
-    if (store.decorationAt(row).some(isHeadDecoration)) return row;
+    if (store.decorationAt(row).some(isHeadDecoration)) {
+      // `layout` is keyed by display row, not store row.
+      const displayRow = currentPlan.displayRowOf(row);
+      return displayRow >= 0 ? displayRow : undefined;
+    }
   }
   return undefined;
 });
@@ -86,7 +94,7 @@ const headRow = computed<number | undefined>(() => {
 const headLane = computed<number | undefined>(() => {
   void layoutTick.value;
   const row = headRow.value;
-  if (row === undefined) return undefined;
+  if (row === undefined || !props.graphView.layoutCurrent) return undefined;
   const layout = props.graphView.layout;
   if (row >= layout.rowCount) return undefined;
   return layout.laneOf(row);
@@ -95,16 +103,12 @@ const headLane = computed<number | undefined>(() => {
 const headColor = computed<number | undefined>(() => {
   void layoutTick.value;
   const row = headRow.value;
-  if (row === undefined) return undefined;
+  if (row === undefined || !props.graphView.layoutCurrent) return undefined;
   const layout = props.graphView.layout;
   if (row >= layout.rowCount) return undefined;
   return layout.colorOf(row);
 });
 
-/** Matches the real graph column's own width formula exactly (`geometry.ts`'s own doc comment on
- *  why `CommitGrid.vue`'s `setColumns` and this strip must never disagree about what a lane count
- *  spans). */
-const gutterWidth = computed(() => graphColumnWidth(props.graphView.laneCount.value));
 const nodeCx = computed(() => (headLane.value !== undefined ? laneX(headLane.value) : undefined));
 const laneClassName = computed(() =>
   headColor.value !== undefined ? laneClass(headColor.value) : undefined,
@@ -135,13 +139,13 @@ const tooltipText = computed(() => {
   >
     <div
       class="kv:shrink-0 kv:h-full kv:flex kv:items-center kv:overflow-visible"
-      :style="{ width: `${gutterWidth}px` }"
+      :style="{ width: `${graphWidth}px` }"
     >
       <svg
         v-if="nodeCx !== undefined"
         class="kv:overflow-visible"
         aria-hidden="true"
-        :width="gutterWidth"
+        :width="graphWidth"
         height="18"
       >
         <circle

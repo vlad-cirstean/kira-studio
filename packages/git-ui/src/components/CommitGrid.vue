@@ -339,7 +339,9 @@ function currentColumns(): Column<CommitRecord>[] {
       // gets no lane class, matching `graphColumn.ts`'s own already-established "no layout, no
       // colour" case, never a guessed one.
       colorOf: (row) =>
-        row < props.graphView.layout.rowCount ? props.graphView.layout.colorOf(row) : undefined,
+        props.graphView.layoutCurrent && row < props.graphView.layout.rowCount
+          ? props.graphView.layout.colorOf(row)
+          : undefined,
     },
     {
       // G24 D9: `undefined` (not an empty array) is "nothing resolved yet" vs. "resolved, no PR"
@@ -528,6 +530,7 @@ function handleForkStubClick(
   const cellNode = grid.getCellNode(displayRow, cell);
   if (!cellNode) return false;
   const offsetX = event.clientX - cellNode.getBoundingClientRect().left;
+  if (!props.graphView.layoutCurrent) return false;
   if (laneAt(offsetX) !== props.graphView.layout.laneOf(displayRow)) return false;
   moveSelection(parentDisplayRow);
   return true;

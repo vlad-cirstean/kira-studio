@@ -1813,6 +1813,7 @@ onBeforeUnmount(() => {
             <UncommittedChangesStrip
               :graph-view="graphView"
               :ops-state="opsState"
+              :graph-width="columnWidths.graph"
               @select="onSelectWorking"
             />
             <CommitGrid
