@@ -91,6 +91,12 @@ export class FrameDeliveryError extends Error {
 
 interface FrameDrainState {
   recvBuffer: Buffer;
+  /** Chunks of an incomplete frame, held apart so a large frame is joined once, when it is
+   *  complete, instead of re-copied on every `data` event. */
+  pending: Buffer[];
+  pendingBytes: number;
+  /** Bytes (header included) the frame at the start of `recvBuffer` needs; 0 while unknown. */
+  needed: number;
 }
 
 // A blob frame's body (BLOB_FRAME_DISCRIMINANT-prefixed) — `parseBlobFrameBody`'s own parse
@@ -138,6 +144,7 @@ function drainFrames(
   destroy: (err: Error) => void,
 ): void {
   for (;;) {
+    state.needed = 0;
     if (state.recvBuffer.byteLength < FRAME_HEADER_LEN) return;
     const declaredLength = state.recvBuffer.readUInt32BE(0);
     if (declaredLength > MAX_FRAME_BYTES) {
@@ -145,7 +152,10 @@ function drainFrames(
       return;
     }
     const frameEnd = FRAME_HEADER_LEN + declaredLength;
-    if (state.recvBuffer.byteLength < frameEnd) return;
+    if (state.recvBuffer.byteLength < frameEnd) {
+      state.needed = frameEnd;
+      return;
+    }
     const body = state.recvBuffer.subarray(FRAME_HEADER_LEN, frameEnd);
     state.recvBuffer = state.recvBuffer.subarray(frameEnd);
 
@@ -158,7 +168,12 @@ function drainFrames(
 }
 
 export function createSocketChannel(socket: Socket): SocketChannel {
-  const drainState: FrameDrainState = { recvBuffer: Buffer.alloc(0) };
+  const drainState: FrameDrainState = {
+    recvBuffer: Buffer.alloc(0),
+    pending: [],
+    pendingBytes: 0,
+    needed: 0,
+  };
   let currentHandler: ((message: unknown) => void) | null = null;
   const closeHandlers = new Set<(err?: Error) => void>();
 
@@ -188,10 +203,17 @@ export function createSocketChannel(socket: Socket): SocketChannel {
   }
 
   socket.on('data', (chunk: Buffer) => {
-    drainState.recvBuffer =
-      drainState.recvBuffer.byteLength === 0
-        ? chunk
-        : Buffer.concat([drainState.recvBuffer, chunk]);
+    if (drainState.recvBuffer.byteLength === 0 && drainState.pending.length === 0) {
+      drainState.recvBuffer = chunk;
+    } else {
+      drainState.pending.push(chunk);
+      drainState.pendingBytes += chunk.byteLength;
+      const have = drainState.recvBuffer.byteLength + drainState.pendingBytes;
+      if (drainState.needed > 0 && have < drainState.needed) return;
+      drainState.recvBuffer = Buffer.concat([drainState.recvBuffer, ...drainState.pending], have);
+      drainState.pending = [];
+      drainState.pendingBytes = 0;
+    }
     drainFrames(drainState, deliver, (err) => socket.destroy(err));
   });
   socket.on('close', () => fireClose());
