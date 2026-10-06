@@ -13,6 +13,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 
 - Block 1 `gitprepare`: done.
 - Block 2 `gitops`: done.
+- Block 3 `gitpreflight`: done.
 
 ## Findings
 
@@ -123,11 +124,66 @@ files would be overwritten by checkout:\n\t<path>`). A dirty path containing `al
 `repository not found`, `connection refused`, `fetch first`, `is not fully merged`,
 `conflicts in index` or `hook declined` (paths may contain spaces) is classified as that earlier
 kind. Example: dirty `docs/errors/already exists.md`, then switch: `AlreadyExists` instead of
-`DirtyWorktree`, so the UI offers the wrong remedy and the auto-stash offer for a dirty switch is
-not shown.
+`DirtyWorktree`, so the UI renders the remedy story of the wrong kind.
 
 Fix: drop lines that start with `\t` (git's path-list indent) before running the substring rows,
 or match each row on lines starting with `error:`/`fatal:`/`!`/`hint:` only.
+
+### F7 (medium) `DirtyPaths` drops a staged rename's source path; checkout preflight says clean, git refuses
+
+`apps/kira-space/internal/gitpreflight/status.go` `DirtyPaths` (the `"renamed"` arm emits only
+`e.Path`, never `e.OriginalPath`); consumers `gitsession/preflight.go:75` (checkout),
+`:223`, `:643` (stash pop), `:694`, `ops.go:403`, `stack.go:484`.
+
+Probe (git 2.43): commit `a`; branch `t` changes `a`; on `main`, `git mv a b`. Status v2:
+`2 R. … b\ta`. `git diff --name-only -z HEAD t` lists `a`. `ClassifyCheckout` gets
+`Dirty=[b]`, `Rewritten=[a]`: no overlap, verdict `cleanCarry`, no `autoStash`/`discard` route.
+`git switch --no-guess t` then fails: "Your local changes to the following files would be
+overwritten by checkout: a". The user is told the switch is safe and offered no stash route;
+the op returns `DirtyWorktree`. Same gap for `ClassifyStashPop` (`localOverwritePaths` misses a
+stash touching the rename source).
+
+Fix: in `DirtyPaths` (and `DirtySplit` for the staged side) also emit `OriginalPath` for
+`"renamed"` entries, `Tracked: true`. `cherryPickCommitPaths` already counts both names
+(`gitsession/preflight.go:433-435`); this aligns the dirty side.
+
+### F8 (medium) Undo replays carry no staleness guard; an undo after outside changes overwrites them
+
+`apps/kira-space/internal/gitops/tag.go:29-31` (`UndoTagArgs`), branch-delete replay built inline
+at `gitsession/ops.go:1010` (`update-ref refs/heads/<name> <sha>`), reset replay
+`gitsession/ops.go:852` (`ResetArgs(op.Mode, prevOID)`); slot `gitpreflight/undo.go`.
+
+The slot is cleared only by the next app write or teardown (`gitsession/entry.go:449`,
+`ops.go:1197,1243`), never by an outside change (terminal, another tool). `UndoRun` checks only
+that `RecoverySha` still exists (`ops.go:1284`). Scenarios:
+- Delete tag `v1` in the app; recreate `v1` at another commit in a terminal; click Undo:
+  `update-ref refs/tags/v1 <old>` silently moves the new tag. Same for a branch recreated after
+  delete: its new commits become unreachable.
+- `reset --hard` in the app (typed confirmation shown for the dirt it destroyed); keep editing
+  files; click Undo: replay is `reset --hard <prev>`, destroying the new edits with no
+  confirmation. `reset --keep <prev>` (the cherry-pick undo's own choice, `ops.go:902`) restores
+  the same commit and refuses instead of destroying.
+
+Fix: use the expected-old-value form for ref recreation (`update-ref <ref> <sha> ""`, which
+refuses if the ref now exists); replay a hard reset with `--keep`. `UndoTagArgs` is a Part 15
+file; the branch and reset replays are
+`needs-other-part-file: apps/kira-space/internal/gitsession/ops.go (Part 16)`.
+
+### F9 (low) `BuildStacks` memoizes a budget-limited result; order of names decides who is an orphan
+
+`apps/kira-space/internal/gitpreflight/stack.go` `resolveStackBase` (budget check stores
+`resolveBroken` in `memo`) and `BuildStacks` (fresh `budget` per candidate, shared `memo`).
+
+When a chain is longer than `MaxStackedBranches` (64) and the deepest branch sorts first, its walk
+exhausts the budget at the node 64 hops up and memoizes that node, plus every node between, as
+broken. Later candidates within 64 of the base hit the memo and inherit it. Probe (throwaway
+test, removed): a 70-branch chain named so depth `i` sorts before depth `i-1` gives 5 stacked and
+65 orphans; the branch at depth 6 is reported `parentMissing` though its parent exists. With
+names in the opposite order, 64 are stacked. `ClassifyRestack` then reports `parentMissing` for
+an intact branch.
+
+Fix: do not memoize a result caused by budget exhaustion (or memoize depth and compare), so each
+node's verdict is independent of which candidate reached it first.
 
 ## §9 candidate outcomes
 
@@ -151,6 +207,15 @@ or match each row on lines starting with `error:`/`fatal:`/`!`/`hint:` only.
   No harm. Dropped.
 - 14 (stash `-m` newline): probed, git collapses the newline into a space in the reflog
   (`stash list` shows `On main: line1 line2 x`). Parsing unaffected. Dropped.
+- 17 (`checkedOutElsewhere` first only): the loop breaks after the first blocked branch; the
+  verdict is still `blocked`, and a re-run reports the next one. UX only, no wrong outcome.
+  Dropped.
+- 18 (`ConfirmToken` trailing slash or `/`): `filepath.Base` strips trailing slashes; `/` is the
+  main worktree and is blocked first (`mainWorktree`); `prepareWorktreeRemove` re-derives the token
+  from the same fresh preflight. Dropped.
+- 19 (multi-sha revert verdict): by contract, prediction covers `Shas[0]` only and
+  `PredictedFor` names it on the wire (`gitpreflight/revert.go`), so the client can say so;
+  git's own sequencer stops at the conflicting sha and `isSequence` drives Abort. Dropped.
 
 ## Coverage
 
@@ -180,3 +245,19 @@ verbs (git writes full `pick`/`revert` for cherry-pick/revert sequences; CRLF tr
 `-m` values (option arguments, never options), `PullConfigArgs`/`BranchConfigRegexpArgs`
 `QuoteMeta` (F5 of P108 holds), auto-stash partial failure (`ops.go:1207`). No parser reads
 coloured output (§7 colour item holds).
+
+### Block 3 `gitpreflight`
+
+Reviewed: all 12 files. Callers read: `gitsession/preflight.go` (checkout, revert parents,
+`predictCherryPick`, `cherryPickCommitPaths`), `stack.go` (`RestackPreflight`,
+`resolveBranchBase`, `runRestackPlan`, `dirtyPathStrings`), `ops.go` undo captures and
+`UndoRun`, `status.go:77` cap. Probes: staged rename vs checkout (F7), stack budget (F9). Checked
+and clean: in-progress precedence (rebase > merge > cherry-pick > revert > sequencer todo >
+bisect > unmergedOnly), `am` gating (F3 of P108 holds), pull strategy precedence and boolean
+synonyms (F6 of P108 holds), `ResolveRebaseMerges`, protected-branch glob (`**` literal),
+`ClassifyPush`, reset destroys/typed confirmation, cherry-pick blockers, stash pop/branch,
+worktree add/remove, `DetectCycleFrom`, cycle detection inside `resolveStackBase`, F9 of P108
+(refless parent becomes orphan) holds, `UndoSlot.Take` id check (no race: one mutex). Root
+commit cherry-pick prediction folds to `unknown` (merge-tree on missing `sha^1` exits 128).
+A recorded `kirastackbase` that does not resolve as a commit falls back to merge-base, so a
+dash-leading config value never reaches `RebaseOntoArgs` (lead 12 base half).
