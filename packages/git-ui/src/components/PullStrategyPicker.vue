@@ -92,21 +92,29 @@ function close(): void {
   isOpen.value = false;
 }
 
+// Drops a slow preflight answer that no longer matches the current open/branch.
+let previewSeq = 0;
+
 async function onOpenChange(value: boolean): Promise<void> {
   isOpen.value = value;
   if (!value) return;
+  const seq = ++previewSeq;
   previewLoading.value = true;
   try {
     const pre = await props.ops.previewPullStrategy(props.branch);
-    if (pre) preview.value = { strategy: pre.strategy, source: pre.source };
+    if (seq === previewSeq && pre) preview.value = { strategy: pre.strategy, source: pre.source };
+  } catch {
+    // The preview is a hint only; without it the item shows no detail and Pull still works.
   } finally {
-    previewLoading.value = false;
+    if (seq === previewSeq) previewLoading.value = false;
   }
 }
 
 watch(
   () => props.branch,
   () => {
+    previewSeq++;
+    previewLoading.value = false;
     preview.value = undefined;
   },
 );

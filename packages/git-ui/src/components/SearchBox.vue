@@ -181,7 +181,13 @@ function selectOption(option: SearchOption): void {
   emit('select', option);
 }
 
+/** `RegExp`'s message embeds the whole compiled source (`/ab(/: Unterminated group`), which
+ *  changes on every keystroke and would re-announce the alert each time. Only the error kind stays. */
+const errorText = computed(() => props.search.error.value?.replace(/^\/[\s\S]*\/[a-z]*: /, ''));
+
 function onKeydown(event: KeyboardEvent): void {
+  // An IME composition's Enter/Escape commit or cancel the composition, not the search.
+  if (event.isComposing || event.keyCode === 229) return;
   const flat = resultsModel.value.flatOptions;
   if (event.key === 'ArrowDown' && dropdownVisible.value && flat.length > 0) {
     event.preventDefault();
@@ -319,7 +325,7 @@ defineExpose({ focus: () => searchInputEl.value?.$el.focus() });
         data-testid="search-error"
         class="kv:py-0.5 kv:px-1 kv:text-error kv:text-sm"
       >
-        {{ search.error.value }}
+        {{ errorText }}
       </div>
       <SearchResults
         v-else
