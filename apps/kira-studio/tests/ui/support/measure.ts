@@ -232,7 +232,9 @@ export function measureSustainedScroll(
       function uncoveredPx(): number {
         const rows = document.querySelectorAll<HTMLElement>('[data-testid="grid-row"]');
         const viewStart = el.scrollTop;
-        const viewEnd = viewStart + el.clientHeight;
+        // P182: the sticky header sits above the canvas inside the scroller; row offsets are canvas-relative.
+        const canvasTop = el.querySelector<HTMLElement>('.grid-canvas')?.offsetTop ?? 0;
+        const viewEnd = viewStart + el.clientHeight - canvasTop;
         if (rows.length === 0) return Math.max(0, viewEnd - viewStart);
         let mountedStart = Number.POSITIVE_INFINITY;
         let mountedEnd = Number.NEGATIVE_INFINITY;
