@@ -558,3 +558,46 @@ func TestRangeFiles_RenamedUnchangedKeepsReview(t *testing.T) {
 		t.Errorf("edited.txt = %+v, want none (content differs)", e)
 	}
 }
+
+// A file marked while over MaxSnapshotBytes stores LineCount 0; after it shrinks below the cap the
+// delta must measure the real count, not derive one from that zero (it went negative before).
+func TestMarkFile_RangedMarkAfterTooLargeFileShrinks(t *testing.T) {
+	t.Parallel()
+	dir, _ := buildFileDeltaFixture(t)
+	entry, _ := newIncrementalTestEntry(t, dir)
+	ctx := context.Background()
+
+	lines := func(n int) string {
+		var b strings.Builder
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&b, "line %06d padded to exactly one hundred bytes %s\n", i, strings.Repeat("x", 42))
+		}
+		return b.String()
+	}
+	big := lines(12000)
+	if len(big) <= gitreview.MaxSnapshotBytes {
+		t.Fatalf("fixture is %d bytes, want over %d", len(big), gitreview.MaxSnapshotBytes)
+	}
+	writeIncFile(t, dir, "a.txt", big)
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "grow a.txt past the cap")
+	rec, err := entry.MarkFile(ctx, "main", "a.txt", true, nil)
+	if err != nil || rec.ContentKind != gitreview.ContentTooLarge {
+		t.Fatalf("MarkFile = %+v, %v, want a tooLarge record", rec, err)
+	}
+
+	const shrunk = 8000
+	writeIncFile(t, dir, "a.txt", lines(shrunk))
+	runInc(t, dir, "add", "a.txt")
+	commitInc(t, dir, "shrink a.txt below the cap")
+	waitForRefsChangedInc(t, entry)
+
+	want := []gitreview.LineRange{{Start: 1, End: 10}}
+	rec, err = entry.MarkFile(ctx, "main", "a.txt", true, want)
+	if err != nil {
+		t.Fatalf("ranged MarkFile: %v", err)
+	}
+	if rec.LineCount != shrunk || rec.State != "partial" || len(rec.Ranges) != 1 || rec.Ranges[0] != want[0] {
+		t.Fatalf("record = %+v, want LineCount %d and partial range %v", rec, shrunk, want)
+	}
+}

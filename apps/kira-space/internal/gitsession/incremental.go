@@ -319,6 +319,13 @@ func (e *RepoEntry) readSnapshotSource(ctx context.Context, tip, path string) (g
 	return gitreview.ContentText, content, countLines(content), oid, nil
 }
 
+// measureCurrentLineCount is the line count of tip:path as MarkFile would snapshot it: 0 unless the
+// blob is readable text.
+func (e *RepoEntry) measureCurrentLineCount(ctx context.Context, tip, path string) (int, error) {
+	_, _, lineCount, _, err := e.readSnapshotSource(ctx, tip, path)
+	return lineCount, err
+}
+
 // sumHunkDelta is the running total D7's tier-1 arithmetic needs: a file's new line count equals
 // its old line count plus the sum of every hunk's own (NewLines - OldLines), since a diff covering
 // the WHOLE file accounts for every line that moved.
@@ -411,7 +418,13 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		// the noSnapshot path both already measure the real count directly; do the same here
 		// instead of estimating from hunks that were never parsed.
 		currentLineCount := rec.LineCount + sumHunkDelta(parsed.Hunks)
-		if body.Kind == porcelain.BodyTooLarge {
+		if rec.ContentKind != gitreview.ContentText {
+			// A non-text record stores LineCount 0, so hunk arithmetic over it is meaningless
+			// (negative, or 0 for a binary-to-text change): measure the current blob instead.
+			if currentLineCount, err = e.measureCurrentLineCount(ctx, tip, path); err != nil {
+				return deltaResult{}, err
+			}
+		} else if body.Kind == porcelain.BodyTooLarge {
 			_, currentContent, cerr := e.readCurrentContent(ctx, tip, path)
 			if cerr != nil {
 				return deltaResult{}, cerr
@@ -428,11 +441,15 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 	// pruned) both take the slow path — F4. A missing BRANCH is a different failure and cannot
 	// reach here: the tip was already resolved from the cached refs snapshot before this ran.
 	if rec.ContentKind != gitreview.ContentText {
+		measured, merr := e.measureCurrentLineCount(ctx, tip, path)
+		if merr != nil {
+			return deltaResult{}, merr
+		}
 		return deltaResult{
 			Source:           "snapshotUnavailable",
 			Body:             porcelain.FileDiffBody{Kind: porcelain.BodyEmpty, Reason: "identical"},
 			CurrentOID:       currentOID,
-			CurrentLineCount: rec.LineCount,
+			CurrentLineCount: measured,
 		}, nil
 	}
 
