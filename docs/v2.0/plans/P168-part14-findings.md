@@ -12,6 +12,7 @@ no Part 14 code change between them).
 ## Block status
 
 - Block 1 (spawn seam and gate): done.
+- Block 2 (askpass): done.
 
 ## Findings
 
@@ -44,6 +45,40 @@ not the full argv. A failure renders as `git --show-toplevel failed (notAReposit
 
 Fix: pass the same slice handed to `Spec.Args` (`append([]string{"rev-parse"}, args...)`).
 
+### F3 (low) `coreAskPass` caches a failed read as "no core.askPass" for the entry's life
+
+`apps/kira-space/internal/gitsession/remote.go:105-110` (Stream B one-hop caller, Part 16 file).
+`askPassChecked = true` is set whether or not the read succeeded. Any error from
+`runAllowingExit` (ctx cancelled while waiting on the `Repo.Read` gate or during the spawn,
+`ErrCancelled`, a transient spawn failure) leaves `askPassValue == ""` and marks it checked.
+
+Scenario: user has `core.askPass=/usr/local/bin/my-gui-askpass`. They start a fetch and hit Stop
+while a `Repo.Write` holds the gate, so the first `coreAskPass` read returns `ErrCancelled`. From
+then on `ShouldInterpose("")` is true for every remote op on that entry: Kira's shim is set as
+`GIT_ASKPASS`, which git prefers over `core.askPass`, so the user's helper is bypassed until the
+entry is evicted. D10's "never override a user's own core.askPass" is broken by a cancel.
+
+Fix: set `askPassChecked` only when `err == nil` (exit 0 or 1). On error return `""` uncached (the
+spawn that follows fails on the same ctx anyway).
+
+### F4 (low) `localsock.Serve` calls `wg.Add` concurrently with `Close`'s `wg.Wait`
+
+`internal/localsock/localsock.go:87-91,102-104`. `Serve` does `Accept` then `wg.Add(1)`. `Close`
+closes the listener then `wg.Wait()`. A connection accepted just before `Close` can reach
+`wg.Add(1)` after `Wait` has observed a zero counter. `sync.WaitGroup` requires a positive `Add`
+at zero to happen before `Wait`; here it does not.
+
+Scenario: at app shutdown (`main.go:227` `askpassBroker.Close()`) a helper connects in the same
+instant. `Wait` returns, `os.RemoveAll(Dir)` deletes the socket and shim, and `handleConn` keeps
+running past `Close`'s documented "waits for every in-flight one" contract (up to `b.timeout+5s`
+on an unanswered prompt). Same shape in `agenthooks`. Low impact: the handler only answers a
+prompt; no data loss.
+
+Fix: track the in-flight count under a mutex with a `closed` flag checked before `Add`, or do the
+`Add` before `Accept` returns control (for example `wg.Add(1)` before `Accept`, `wg.Done()` on
+Accept error).
+`needs-stream-A-file: internal/localsock/localsock.go`
+
 ## Coverage
 
 ### Block 1: spawn seam and gate
@@ -72,3 +107,28 @@ Verified, no finding:
 - `Classify` ctx first (F20 holds). `Discovery` skips cache on caller cancel (G31 #1 holds); no
   singleflight on a cold cache (concurrent callers each probe once, bounded by 5 s), not a defect.
 - `versionTriple` handles `2.43.0.windows.1`, `-rc1`, Apple suffix.
+
+### Block 2: askpass
+
+Reviewed in full: `PI/gitaskpass/{broker,helper,interpose,prompt,wire}.go`; callers
+`gitsession/remote.go` `repoPrompter`/`coreAskPass`/`withAskpass`, `gitops.CoreAskPassArgs`,
+`main.go:62-67,227,572`; callee `internal/localsock/localsock.go`.
+
+Verified, no finding:
+- Shim: every helper argv element single-quoted (`'\''` idiom); `"$1"` only. Shim 0700 inside
+  a `MkdirTemp` 0700 dir, socket 0600, dir removed on `Close`. A crash leaves the dir behind in
+  per-user `TMPDIR`; contents unusable without the live process (token in memory only).
+- Protocol: constant-time token compare; unknown op id fails closed; per-conn deadline
+  `timeout+5s`; ask bounded by op ctx and broker timeout; `WithOp` unregisters via `defer` on every
+  path. Pre-auth line read is unbounded but only same-uid can connect (0700 dir), so not a
+  boundary.
+- Helper: every error path exits 1 with nothing on stdout; F19 `none`/`confirm` holds; confirm
+  never prints the answer.
+- Token/op id exposure: both live in the env of remote-op children (hooks, credential helpers,
+  ssh). A long-lived child (credential-cache daemon) keeps the token but op ids are 16 random bytes,
+  registered only for the op's life. A hook during its own op can raise a prompt in Kira's UI, but
+  a hook is already arbitrary code as the user, so no new capability. No log, error or
+  `Error.Command` carries env or answers (grep of `slog` in `gitaskpass`, `remote.go`: none).
+- `ShouldInterpose`: inherited `SSH_ASKPASS` without `GIT_ASKPASS` is overridden (upstream D10
+  rule, by design). Staleness after a user edits `core.askPass` is the documented per-entry cache;
+  F3 covers the failure-caching defect only.
