@@ -11,7 +11,7 @@ Checks at HEAD: `go vet ./apps/kira-space/internal/gitsession/...` clean;
 
 - Block 1 lifecycle: done
 - Block 2 walk and reads: done
-- Block 3 ops and undo: pending
+- Block 3 ops and undo: done
 - Block 4 stack and worktree: pending
 - Block 5 remote and auto-fetch: pending
 - Block 6 review: pending
@@ -109,6 +109,104 @@ Fix: in `gitrpc`, wrap these results with `mapConnError` before `mapGitError` (o
 one shared mapper) so `ErrRepoNotHeld` and `ErrRepoTornDown` cross as `E_BAD_REQUEST` (or a dedicated
 code), `ErrStoreClosed` as a retryable code. Keep `catfile.ErrInvalidRev` as `E_BAD_REQUEST`.
 
+### F6 (medium): multi-argv op failing after its first write reports failure and drops its undo
+
+`GS/ops.go:1209-1249` (`RunOp`), producers `prepareBranchDelete` (`ops.go:458-499`),
+`prepareBranchCreate` (`ops.go:426-449`), `prepareBranchRename` (`ops.go:507-525`). Owner: Stream B
+(`GS`).
+
+`runWriteArgvList` stops at the first failing argv and reports `failedAt`. `RunOp` then treats any
+`opErr` as "not succeeded": `OK: false`, `record = nil`, `e.undo.Set(nil)`. Only the auto-stash case
+(`failedAt > 0 && autoStashApplied`) mentions that an earlier argv already wrote. Scenarios:
+
+- `branchDelete` of a stack parent: argv 0 `branch -d topic` succeeds, argv 1 `config
+  branch.child.kirastackparent …` fails (`.git/config.lock` held by an external git or IDE). Result:
+  `OK: false`, branch gone, children still name it, and no undo although
+  `captureBranchDeleteUndo` built a record that restores both. Recovery needs the reflog by hand.
+- `branchCreate` with `track` (candidate 7, real git 2.43 probe): `branch nb main` succeeds,
+  `branch --set-upstream-to=origin/nope nb` exits 128 ("the requested upstream branch 'origin/nope'
+  does not exist"). Result `OK: false` while `nb` exists (and with `checkout`, HEAD moved to it). A
+  retry then fails `AlreadyExists`.
+- `branchRename` with stack children: rename succeeds, a child fix-up fails; children keep the old
+  name, result says the rename failed.
+
+Fix: when `failedAt > 0`, the primary write landed. For an undoable kind, still `Set` the prepared
+undo record (its replay restores ref and config). Append one sentence naming what landed and what
+did not (generalise the auto-stash message: "Branch nb was created; setting its upstream failed.").
+Keep `OK: false`. Add a real-git test for the branch-delete-with-child case (inject the failure with a
+held `config.lock`).
+
+### F7 (medium): branch-delete undo replays `config --get-regexp` output line by line
+
+`GS/ops.go:1008-1022` (`captureBranchDeleteUndo`). Owner: Stream B (`GS`).
+
+The capture splits `config --get-regexp ^branch\.<name>\.` stdout on `\n` and replays each line as
+`config <key> <rest>`. Real git 2.43 probe: a multi-line value (`git branch --edit-description`
+writes one) prints its continuation lines raw:
+
+```
+branch.topic.description first line
+core.hooksPath /tmp/evil
+branch.topic.merge refs/heads/a
+branch.topic.merge refs/heads/b
+```
+
+Undo then writes `config core.hooksPath /tmp/evil`: any description line shaped `<section>.<key>
+<value>` becomes an arbitrary local config write (hooks path, `core.fsmonitor`, `alias.*`), and any
+other continuation line makes `git config` fail mid-replay after the ref was recreated. Multi-valued
+keys collapse: replaying `config branch.topic.merge a` then `config branch.topic.merge b` leaves only
+`b` (probe: `--get-all` prints `refs/heads/b`). Values are local config the user or a tool wrote, so
+this is integrity, not remote injection.
+
+Fix: capture with `config -z --get-regexp` (records `key\nvalue\0`), split on NUL then the first
+`\n`, and replay each as `config --add <key> <value>` (the section is gone after the delete, so
+`--add` reproduces multi-valued keys exactly). Add a real-git test with a multi-line description and
+a two-valued key.
+
+### F8 (low): `UndoRun` takes the record before validating it and replays argv one write each
+
+`GS/ops.go:1281-1321`. Owner: Stream B (`GS`).
+
+Candidate 6: `e.undo.Take(id)` runs before `session.Check`; any non-`ErrMissing` check error
+(cat-file circuit open after 3 spawn failures, F1's closed-session race, a transient spawn error)
+returns a Go error and the record is gone for good. Candidate 5: the replay loop calls `runWriteArgv`
+per argv, one `Repo.Write` each. Branch-delete undo is `update-ref` plus N `config` writes plus child
+pointers; another window's op can interleave between them, and a later argv failing leaves the ref
+recreated without its config. `RunOp` already uses `runWriteArgvList` for this reason (P108 F12).
+
+Fix: `Peek` and validate first, `Take` only once the check passed (compare id again on `Take`); or on
+a non-`ErrMissing` check error restore the record only if the slot is still empty. Replace the loop
+with one `runWriteArgvList(ctx, record.Replay)`.
+
+### F9 (low): post-write read-back error hides a completed write and loses its undo
+
+`GS/ops.go:1228-1249` (`RunOp`), `GS/ops.go:1323-1330` (`UndoRun`). Owner: Stream B (`GS`).
+
+Candidate 10. After a successful write, `statusAndInProgress` or `Head` failing returns
+`OpResult{}, err`. `e.undo.Set(record)` runs after both reads, so the undo record captured before the
+write is dropped (the slot was already cleared at `ops.go:1203`). The client sees `E_INTERNAL` (or a
+mapped git kind) for an op that did run. Part 14's stricter `ResolveHead` (`8462e1f`) widens this:
+`Head` spawns whenever the watcher bumped `cacheGen` between the write and the read-back (our own
+write triggers it), and now fails on any non-1 verify exit instead of reporting unborn.
+
+Fix: `e.undo.Set(record)` immediately after the write succeeds, before the read-back. On a read-back
+error after a write, return the `OpResult` with `OK` reflecting the write, `Head` from the last known
+value (`e.head` under `headMu`) and `InProgress` nil, logging the read error, rather than a Go error.
+
+### F10 (low): hard-reset undo refused by `reset --keep` classifies as `Unknown`
+
+`PI/gitops/errors.go:100-176` (`classifyOpErrorRules`). `needs-other-part-file:
+apps/kira-space/internal/gitops/errors.go (Part 15)` (Stream B, closed; editable by this fixer).
+
+Real git 2.43 probe: `reset --keep HEAD~1` with an edit to a file the reset touches prints
+`error: Entry 'f' not uptodate. Cannot merge.` / `fatal: Could not reset index file to revision
+'HEAD~1'.` (exit 128). No rule matches, so `UndoRun` reports `Kind: "Unknown"`. The message is the raw
+stderr, so the UI cannot say "your edits since the reset block this undo". `update-ref` refusing a
+recreated ref (`reference already exists`) maps to `AlreadyExists`, which is fine.
+
+Fix: add a row before the generic ones: `not uptodate. cannot merge` maps to `DirtyWorktree`. Extend
+`TestUndoRun_HardResetUndoKeepsEditsMadeSince` to assert `undo.Error.Kind`.
+
 ## §9 candidates
 
 1. Dropped. `Registry.acquire` after `Close` does build an untracked entry, but only reachable at
@@ -121,7 +219,12 @@ code), `ErrStoreClosed` as a retryable code. Keep `catfile.ErrInvalidRev` as `E_
 4. Dropped. `acquire` returns an entry still in `reg.entries` with refs ≥ 1; `expire` refuses
    refs ≠ 0, so only `Registry.Close` can tear it down between acquire and `Subscribe`. Quit-only, same
    reasoning as candidate 1.
+5. Reported as F8.
+6. Reported as F8.
+7. Reported as F6 (real git probe confirms the partial write).
+8. Reported as F7 (real git probe).
 9. Reported as F5.
+10. Reported as F9.
 12. Dropped. Every write to `autoFetch.timer` outside a tick (`startAutoFetch`) refuses while a timer
    is set, and a running tick's fired timer stays in the field until the tick itself reschedules,
    pauses or disables. No path arms a second timer. A setting flip 0 to positive racing a tick's
@@ -138,3 +241,6 @@ code), `ErrStoreClosed` as a retryable code. Keep `catfile.ErrInvalidRev` as `E_
 18. Reported as F3 (head writers). `ghState` fills (`snapshotPut`, `branchCachePut`, `githubRepo`) also
    lack a generation check, but a ref move does not change open-PR state and `.git/config` edits fire
    refsChanged again; dropped for those.
+22. Dropped. `undo_guard_test.go` runs real git (`initUndoGuardRepo`, `runGitQ`) and asserts the refs
+   and worktree after the refused replay, not argv shape. It does not assert `Error.Kind`; F10 adds
+   that.
