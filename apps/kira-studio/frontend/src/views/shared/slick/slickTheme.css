@@ -112,9 +112,31 @@
    with `.slick-header-columns` itself no longer individually repainted at all. Real-Mac WebKit
    confirmation (docs/PERF.md §2.1c) is still the final word on the user-visible flicker, same
    caveat as every other item in that postscript section — this is the concrete, measured mechanism
-   this sandbox's compositor can actually show, not a guess. */
+   this sandbox's compositor can actually show, not a guess. P182: the header is no longer
+   `scrollLeft`-positioned (it scrolls natively with the viewport); the rule stays per P162 D2 and
+   the tooltips containing-block dependency. */
 .slick-grid-host .slick-header-columns {
   will-change: transform;
+}
+
+/* P182 — the scrolling header lives inside the scroll viewport (KiraSlickGrid.setScroller). */
+.slick-grid-host .slick-header.ui-state-default.kira-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 2; /* above the canvas stacking context (contain: paint) */
+  overflow: clip; /* not hidden: a scroll container here would be scrolled again by scrollToX */
+  width: var(--sg-scroll-canvas-w);
+  min-width: 100%;
+}
+.slick-grid-host .kira-scroll-pane {
+  /* biome-ignore lint/complexity/noImportantStyles: SlickGrid writes inline top/height on every resizeCanvas */
+  top: 0 !important;
+  /* biome-ignore lint/complexity/noImportantStyles: same */
+  height: 100% !important;
+}
+.slick-grid-host .kira-scroll-viewport {
+  /* biome-ignore lint/complexity/noImportantStyles: same */
+  height: 100% !important;
 }
 
 /* P22 Pass B, visual-parity fix — GridRow.vue's own header cell (`.header-cell`, DataGrid.vue) is a

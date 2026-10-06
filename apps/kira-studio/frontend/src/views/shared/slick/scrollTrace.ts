@@ -251,9 +251,10 @@ function tick(rafT: number): void {
   const liveScrollTop = el?.scrollTop ?? 0;
   const clientHeight = el?.clientHeight ?? 0;
   const band = el ? measureMountedBand(el) : { top: 0, bottom: 0, rows: 0 };
+  const canvasTop = el?.querySelector<HTMLElement>('.grid-canvas')?.offsetTop ?? 0;
   const uncoveredPx = el
     ? Math.max(0, band.top - liveScrollTop) +
-      Math.max(0, liveScrollTop + clientHeight - band.bottom)
+      Math.max(0, liveScrollTop + clientHeight - canvasTop - band.bottom)
     : 0;
   const pxPerFrame = Math.abs(liveScrollTop - prevLiveScrollTop);
   prevLiveScrollTop = liveScrollTop;

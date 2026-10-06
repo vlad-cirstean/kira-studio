@@ -162,6 +162,13 @@ function ensureColumnRules(columnCount: number): void {
  * raw sign test on `vScrollDir` would not. **On a `slickgrid` version bump, re-check that
  * `render()` still calls `this.getRenderedRange()` and that its return shape is still
  * `{ top, bottom, leftPx, rightPx }`** — F4's own citation, `dist/esm/index.mjs`'s `render()`.
+ *
+ * P182 stage 1: `setScroller` reparents the scrolling `.slick-header` into the scroll viewport as a
+ * sticky strip, so header and rows share one native scroller. `getBoundingClientRect` on that
+ * viewport reports only the rows band, the box SlickGrid's `Utils.height`/`Utils.offset` reads
+ * assume. Re-check on a `slickgrid` bump: `setScroller` still picks `_headerScrollContainer` and
+ * `_viewportScrollContainerY`; viewport measurements still go through `Utils.height`/`Utils.offset`
+ * (`grep -n "_viewportScrollContainer[XY]" slick.grid.ts`).
  */
 // Column<T>'s own `field` type is a recursive PathsToStringProps<T> derived from T's shape —
 // RowHandle's own fields (row/pos/insertId) are not what `field` needs to hold (the app's
@@ -413,6 +420,30 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     if (this._options.rtl) super.removeCssRules();
   }
 
+  /** P182 stage 1 — see the class comment. `declare`d: runs inside `super()`. */
+  declare private shimmedViewport: HTMLDivElement | null;
+
+  protected override setScroller(): void {
+    super.setScroller();
+    if (this._options.rtl) return;
+    const header = this._headerScrollContainer;
+    const viewport = this._viewportScrollContainerY;
+    if (header.parentElement !== viewport) viewport.prepend(header);
+    header.classList.add('kira-sticky-header');
+    viewport.classList.add('kira-scroll-viewport');
+    viewport.parentElement?.classList.add('kira-scroll-pane');
+    if (this.shimmedViewport === viewport) return;
+    Object.defineProperty(viewport, 'getBoundingClientRect', {
+      configurable: true,
+      value: (): DOMRect => {
+        const r = Element.prototype.getBoundingClientRect.call(viewport);
+        const inset = Math.min(header.offsetHeight, r.height);
+        return new DOMRect(r.x, r.y + inset, r.width, r.height - inset);
+      },
+    });
+    this.shimmedViewport = viewport;
+  }
+
   protected override applyColumnWidths(): void {
     if (this._options.rtl) {
       super.applyColumnWidths();
@@ -420,6 +451,11 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
     }
     const frozen = this._options.frozenColumn;
     const style = this._container.style;
+    const hasFrozen = frozen !== undefined && frozen !== -1;
+    style.setProperty(
+      '--sg-scroll-canvas-w',
+      `${hasFrozen ? this.canvasWidthR : this.canvasWidth}px`,
+    );
     let x = 0;
     for (let i = 0; i < this.columns.length; i++) {
       const column = this.columns[i];
@@ -450,6 +486,8 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
       document.removeEventListener('scroll', this.ancestorScrollHandler, true);
       this.ancestorScrollHandler = null;
     }
+    if (this.shimmedViewport) Reflect.deleteProperty(this.shimmedViewport, 'getBoundingClientRect');
+    this.shimmedViewport = null;
     if (this.chaseHandle) cancelAnimationFrame(this.chaseHandle);
     this.chaseHandle = 0;
     this.chaseWanted = false;

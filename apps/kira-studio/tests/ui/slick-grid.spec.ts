@@ -3,7 +3,14 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { CLIPBOARD_SHIM } from './support/clipboard';
-import { cellNavButton, gridCell, gridRow, gridScroller, mutationsForScroll } from './support/grid';
+import {
+  cellNavButton,
+  gridCell,
+  gridRow,
+  gridScroller,
+  headerCell,
+  mutationsForScroll,
+} from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
@@ -1919,4 +1926,64 @@ test('P16 D3/D4 — a column min-width knows what its header renders, and oversc
   );
   await page.mouse.wheel(0, -400);
   await expect(scroller).toHaveJSProperty('scrollTop', 0);
+
+  // P182: the in-viewport header must not add a spurious vertical scroll to a table that fits.
+  const fits = await scroller.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(fits).toBe(0);
+});
+
+// P182 stage 1 — the scrolling header is a sticky child of the same scroller as the rows.
+test('P182 — header columns move with the body in the same task as a scrollLeft write, with no JS sync', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  await expect(headerCell(page, 'col5')).toBeVisible();
+  const viewport = rightViewport(page);
+  const offsets = await viewport.evaluate((el) => {
+    const left = (node: Element | null): number => node?.getBoundingClientRect().left ?? Number.NaN;
+    const header = el.querySelector('[data-testid="grid-header-cell"][data-column="col5"]');
+    const cell = el.querySelector(
+      '[data-testid="grid-row"][data-row="0"] [data-testid="grid-cell"][data-column="col5"]',
+    );
+    const before = left(header) - left(cell);
+    el.scrollLeft = 300;
+    // Same task: no scroll event has run yet, so only native scrolling of one scroller keeps them equal.
+    return { before, after: left(header) - left(cell), scrollLeft: el.scrollLeft };
+  });
+  expect(offsets.scrollLeft).toBe(300);
+  expect(Math.abs(offsets.before)).toBeLessThanOrEqual(1);
+  expect(Math.abs(offsets.after)).toBeLessThanOrEqual(1);
+});
+
+test('P182 — the last row is reachable by keyboard and by native scroll, and a short table does not scroll', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+  await connectAndOpenSpikeGrid(page);
+  const viewport = rightViewport(page);
+
+  await gridCell(page, 0, 'id').click();
+  await page.keyboard.press('Control+End');
+  const lastRow = gridRow(page, ROW_COUNT - 1);
+  await expect(lastRow).toBeVisible();
+  const band = await viewport.evaluate((el) => {
+    const rect = Element.prototype.getBoundingClientRect.call(el);
+    return { bottom: rect.bottom - (rect.height - el.clientHeight) };
+  });
+  const rowBox = await lastRow.boundingBox();
+  if (!rowBox) throw new Error('last row has no bounding box');
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(band.bottom + 1);
+
+  await viewport.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.evaluate(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+  );
+  const end = await viewport.evaluate((el) => ({
+    scrollTop: el.scrollTop,
+    max: el.scrollHeight - el.clientHeight,
+  }));
+  expect(Math.abs(end.scrollTop - end.max)).toBeLessThanOrEqual(1);
 });
