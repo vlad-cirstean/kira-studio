@@ -2,6 +2,7 @@
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import TooltipIconButton from '@theme/components/TooltipIconButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Empty, EmptyMedia, EmptyTitle } from '@theme/components/ui/empty';
 import {
@@ -10,6 +11,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
 import { useCookiesStore } from './cookies';
@@ -29,6 +31,7 @@ const props = defineProps<{
 
 const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
+const confirmDialogStore = useConfirmDialogStore();
 
 const filter = ref('');
 
@@ -65,11 +68,10 @@ async function onRemove(name: string): Promise<void> {
   await cookiesStore.deleteCookie(props.tabId, props.url, name);
 }
 async function onClearAll(): Promise<void> {
-  // P108 F7: clearCookies now empties every open tab's own list itself (Go's ClearJar is
-  // process-wide) — this only still gates on request mode being properly wired up, same as the
-  // other two actions.
   if (!props.tabId) return;
-  await cookiesStore.clearCookies();
+  // Go's jar is process-wide: this empties every host, not just this request's URL.
+  if (!(await confirmDialogStore.confirmDialog('Clear all cookies for every host?'))) return;
+  await cookiesStore.clearCookies(props.tabId);
 }
 async function onRetry(): Promise<void> {
   if (!props.tabId || !props.url) return;
@@ -129,8 +131,11 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
       >
         {{ filteredRequestCookies.length }} of {{ requestCookies.length }} cookies
       </span>
+      <Alert v-if="rt?.actionError" variant="destructive" data-testid="http-cookies-error">
+        <AlertDescription>{{ rt.actionError }}</AlertDescription>
+      </Alert>
       <div v-if="requestCookies.length > 0" class="flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5">
-        <div v-for="c in filteredRequestCookies" :key="c.name" class="flex text-kira-sm items-start justify-between gap-1">
+        <div v-for="(c, i) in filteredRequestCookies" :key="`${c.name}|${c.domain}|${c.path}|${i}`" class="flex text-kira-sm items-start justify-between gap-1">
           <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-muted-foreground shrink-0 min-w-40 font-data">{{ c.name }}</span>
             <span class="wrap-anywhere font-data">{{ c.value }}</span>

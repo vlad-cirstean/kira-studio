@@ -110,10 +110,37 @@ describe('cookies store ordering and lifecycle (P108 F7)', () => {
         clearCalls++;
       };
 
-    await cookiesStore.clearCookies();
+    await cookiesStore.clearCookies(tabA);
 
     expect(clearCalls).toBe(1);
     expect(cookiesStore.cookiesRuntime[tabA].cookies).toHaveLength(0);
     expect(cookiesStore.cookiesRuntime[tabB].cookies).toHaveLength(0);
+  });
+
+  // P168 Part 10 F18: a fetch in flight when clear/delete resolves must not repopulate the list.
+  test('a fetch in flight across clearCookies or deleteCookie does not resurrect cookies', async () => {
+    const tabId = openApiRequestTab();
+    const replies: ((v: HttpCookieWire[]) => void)[] = [];
+    (control as unknown as { httpCookies: typeof control.httpCookies }).httpCookies = () =>
+      new Promise((resolve) => {
+        replies.push(resolve);
+      });
+    (control as unknown as { httpClearCookies: typeof control.httpClearCookies }).httpClearCookies =
+      async () => {};
+    (control as unknown as { httpDeleteCookie: typeof control.httpDeleteCookie }).httpDeleteCookie =
+      async () => [];
+
+    const fetchA = cookiesStore.fetchCookiesNow(tabId, 'https://a.example.com');
+    await cookiesStore.clearCookies(tabId);
+    replies[0]?.([cookie('session', 'stale')]);
+    await fetchA;
+    expect(cookiesStore.cookiesRuntime[tabId].cookies).toEqual([]);
+    expect(cookiesStore.cookiesRuntime[tabId].loading).toBe(false);
+
+    const fetchB = cookiesStore.fetchCookiesNow(tabId, 'https://a.example.com');
+    await cookiesStore.deleteCookie(tabId, 'https://a.example.com', 'session');
+    replies[1]?.([cookie('session', 'stale')]);
+    await fetchB;
+    expect(cookiesStore.cookiesRuntime[tabId].cookies).toEqual([]);
   });
 });

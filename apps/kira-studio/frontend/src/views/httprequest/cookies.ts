@@ -14,6 +14,8 @@ import { control } from '../../bridge/control';
 interface CookiesRuntime {
   cookies: HttpCookieWire[];
   loading: boolean;
+  /** A failed Remove or Clear all; cleared by the next successful action or fetch. */
+  actionError: string | null;
   /** P108 F7: the last URL fetchCookiesNow was asked to fetch for this tab — clearCookies' own
    *  refetch-every-open-tab pass reads it back; nothing here is persisted (§3.1 still holds). */
   url: string;
@@ -34,7 +36,8 @@ export const useCookiesStore = defineStore('cookies', () => {
   });
 
   function ensure(tabId: string): CookiesRuntime {
-    if (!cookiesRuntime[tabId]) cookiesRuntime[tabId] = { cookies: [], loading: false, url: '' };
+    if (!cookiesRuntime[tabId])
+      cookiesRuntime[tabId] = { cookies: [], loading: false, actionError: null, url: '' };
     return cookiesRuntime[tabId];
   }
 
@@ -51,6 +54,7 @@ export const useCookiesStore = defineStore('cookies', () => {
     if (!findHttpRequestTab(tabId)) return;
     const rt = ensure(tabId);
     rt.url = url;
+    rt.actionError = null;
     const mySeq = (fetchSeq.get(tabId) ?? 0) + 1;
     fetchSeq.set(tabId, mySeq);
     rt.loading = true;
@@ -74,19 +78,44 @@ export const useCookiesStore = defineStore('cookies', () => {
   // library the view-level caller can use directly — one `useDebounceFn` instance per mounted view
   // needs no cross-tab keying at all.
 
+  /** Supersedes every in-flight fetch for `tabId`: an older reply landing after a delete or clear
+   *  would otherwise resurrect cookies the jar no longer holds. */
+  function supersede(tabId: string): void {
+    fetchSeq.set(tabId, (fetchSeq.get(tabId) ?? 0) + 1);
+    const rt = cookiesRuntime[tabId];
+    if (rt) rt.loading = false;
+  }
+
   async function deleteCookie(tabId: string, url: string, name: string): Promise<void> {
     const rt = ensure(tabId);
-    rt.cookies = await control.httpDeleteCookie(url, name);
+    try {
+      const cookies = await control.httpDeleteCookie(url, name);
+      if (!findHttpRequestTab(tabId)) return;
+      supersede(tabId);
+      rt.cookies = cookies;
+      rt.actionError = null;
+    } catch (err) {
+      if (findHttpRequestTab(tabId))
+        rt.actionError = err instanceof Error ? err.message : String(err);
+    }
   }
 
   /** P108 F7: `httpclient.ClearJar()` (Go) empties the *whole* process-wide jar, not just this
    *  tab's URL — every open tab's own cookies are gone too, not only the calling one's. Zeroing
    *  every tracked runtime's list directly (rather than an IPC refetch per tab) is exact: a clear
    *  cannot leave any URL with cookies left to report. */
-  async function clearCookies(): Promise<void> {
-    await control.httpClearCookies();
-    for (const rt of Object.values(cookiesRuntime)) {
+  async function clearCookies(tabId: string): Promise<void> {
+    try {
+      await control.httpClearCookies();
+    } catch (err) {
+      const rt = cookiesRuntime[tabId];
+      if (rt) rt.actionError = err instanceof Error ? err.message : String(err);
+      return;
+    }
+    for (const [id, rt] of Object.entries(cookiesRuntime)) {
+      supersede(id);
       rt.cookies = [];
+      rt.actionError = null;
     }
   }
 
