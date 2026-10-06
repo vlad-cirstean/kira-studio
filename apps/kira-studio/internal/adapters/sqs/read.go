@@ -182,7 +182,7 @@ func pushMessage(builder *page.StreamPageBuilder, m types.Message, handles *rece
 		Headers:   headers,
 		Attrs:     string(attrsJSON),
 		Timestamp: timestamp,
-		Body:      aws.ToString(m.Body),
+		Body:      m.Body,
 	})
 	if handles != nil && m.MessageId != nil && m.ReceiptHandle != nil {
 		handles.set(*m.MessageId, *m.ReceiptHandle, visibilityTimeout)

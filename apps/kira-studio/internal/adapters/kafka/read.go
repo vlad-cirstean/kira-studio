@@ -69,14 +69,17 @@ type readFingerprintParts struct {
 func headersToPlain(headers []kgo.RecordHeader) map[string]any {
 	out := map[string]any{}
 	for _, h := range headers {
-		value := strings.ToValidUTF8(string(h.Value), "�")
-		switch existing := out[h.Key].(type) {
-		case nil:
+		// A nil header value stays JSON null, distinct from an empty one.
+		var value any
+		if h.Value != nil {
+			value = strings.ToValidUTF8(string(h.Value), "�")
+		}
+		if existing, seen := out[h.Key]; !seen {
 			out[h.Key] = value
-		case string:
-			out[h.Key] = []string{existing, value}
-		case []string:
-			out[h.Key] = append(existing, value)
+		} else if list, ok := existing.([]any); ok {
+			out[h.Key] = append(list, value)
+		} else {
+			out[h.Key] = []any{existing, value}
 		}
 	}
 	return out
@@ -110,9 +113,10 @@ func buildStreamRow(rec *kgo.Record) (page.StreamRow, error) {
 		t := rec.Timestamp.UTC().Format("2006-01-02T15:04:05.000Z07:00")
 		timestamp = &t
 	}
-	body := ""
+	var body *string
 	if rec.Value != nil {
-		body = strings.ToValidUTF8(string(rec.Value), "�")
+		v := strings.ToValidUTF8(string(rec.Value), "�")
+		body = &v
 	}
 	return page.StreamRow{Key: key, Headers: string(headersJSON), Attrs: string(attrsJSON), Timestamp: timestamp, Body: body}, nil
 }

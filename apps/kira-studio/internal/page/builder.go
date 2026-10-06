@@ -322,7 +322,8 @@ type StreamRow struct {
 	Headers   string
 	Attrs     string
 	Timestamp *string
-	Body      string
+	// Body nil is a null cell (a Kafka tombstone), distinct from "".
+	Body *string
 }
 
 // StreamPageBuilder mirrors page.ts's StreamPageBuilder.
@@ -349,8 +350,7 @@ func (b *StreamPageBuilder) Push(row StreamRow) {
 	attrs := row.Attrs
 	b.attrs.appendValue(&attrs, i, MaxCellBytes)
 	b.timestamps.appendValue(row.Timestamp, i, MaxCellBytes)
-	body := row.Body
-	b.bodies.appendValue(&body, i, MaxCellBytes)
+	b.bodies.appendValue(row.Body, i, MaxCellBytes)
 	b.rowCount++
 }
 

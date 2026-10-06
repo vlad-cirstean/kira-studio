@@ -526,7 +526,7 @@ export interface StreamPageBuilder {
     headers: string;
     attrs: string;
     timestamp: string | null;
-    body: string;
+    body: string | null;
   }): void;
   finish(position: PagePosition): StreamPage;
 }

@@ -146,7 +146,8 @@ func TestRenderStreamPage(t *testing.T) {
 	b := page.NewStreamPageBuilder(nil)
 	key := "k1"
 	ts := "2024-01-01T00:00:00Z"
-	b.Push(page.StreamRow{Key: &key, Headers: "{}", Attrs: "{}", Timestamp: &ts, Body: "payload"})
+	payload := "payload"
+	b.Push(page.StreamRow{Key: &key, Headers: "{}", Attrs: "{}", Timestamp: &ts, Body: &payload})
 	pg := b.Finish(page.UnpagedPosition(1))
 
 	rendered := renderStreamPage(pg, 200)
@@ -309,7 +310,8 @@ func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
 	}
 
 	sb := page.NewStreamPageBuilder(nil)
-	sb.Push(page.StreamRow{Body: "payload"})
+	payload := "payload"
+	sb.Push(page.StreamRow{Body: &payload})
 	stream := sb.Finish(page.UnpagedPosition(1))
 	if _, err := renderPage(stream, 200, nil, &set, ""); err == nil {
 		t.Fatal("renderPage(StreamPage, rules exist) = nil error, want a refusal")
