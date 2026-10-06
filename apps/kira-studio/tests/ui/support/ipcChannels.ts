@@ -26,6 +26,7 @@ export const IPC = {
   viewRunAll: 'kira:menu:view-run-all',
   appFlushBeforeClose: 'kira:app:flush-before-close',
   appFlushed: 'kira:app:flushed',
+  windowFlushBeforeClose: 'kira:window:flush-before-close',
   windowFlushed: 'kira:window:flushed',
 
   filesChooseSave: 'kira:files:chooseSave',

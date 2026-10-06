@@ -47,6 +47,8 @@ function iconColorFor(entry: RecentTableEntry): string {
 }
 
 function openRecent(entry: RecentTableEntry): void {
+  // A tab for a deleted connection violates the tabs FK and fails every later save.
+  if (!connectionFor(entry)) return;
   if (entry.kind === 'data') tabsStore.openDataTab(entry.connectionId, entry.path);
   else if (entry.kind === 'document') tabsStore.openDocumentTab(entry.connectionId, entry.path);
   else if (entry.kind === 'keyvalue') tabsStore.openKeyValueTab(entry.connectionId, entry.path);

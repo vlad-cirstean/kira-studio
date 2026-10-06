@@ -4,6 +4,7 @@ import { expect, test } from './fixtures';
 import { modeTab } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 import {
   ORDER_ITEMS_PATH,
   orderItemsFixture,
@@ -177,6 +178,44 @@ test('mode switch — three mode tabs, an empty Http mode, and Studio state that
 // coverage), and (b) switching mode eventually reaches windowsSetMode, debounced rather than
 // synchronous (F20's own invariant — the mode click itself schedules no tabsSave, still proven
 // unchanged by the existing case above).
+test('a window-close flush saves pending tab state at once, then acks (P168 Part 13 F21)', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: CONTROL });
+  await createAndConnect(page);
+  await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
+  await expect(page.locator('[data-testid="data-grid"]')).toBeVisible();
+  const savesWith1000 = () =>
+    control
+      .log()
+      .filter(
+        (e) =>
+          e.channel === IPC.tabsSave &&
+          (e.args as { tabs: { state: { pageSize?: number } }[] }).tabs.some(
+            (t) => t.state.pageSize === 1000,
+          ),
+      ).length;
+  const savesBefore = savesWith1000();
+  await page.click('[data-testid="page-size-1000"]');
+  await expect(page.locator('[data-testid="page-size-1000"]')).toHaveClass(/on/);
+
+  // Inside the 1s debounce window: the flush must save without waiting for it.
+  await emitWailsEvent(page, IPC.windowFlushBeforeClose, {});
+  await expect.poll(() => control.log().some((e) => e.channel === IPC.windowFlushed)).toBe(true);
+  const log = control.log();
+  const ackAt = log.findIndex((e) => e.channel === IPC.windowFlushed);
+  const saveAt = log.findIndex(
+    (e, i) =>
+      i < ackAt &&
+      e.channel === IPC.tabsSave &&
+      (e.args as { tabs: { state: { pageSize?: number } }[] }).tabs.some(
+        (t) => t.state.pageSize === 1000,
+      ),
+  );
+  expect(saveAt).toBeGreaterThanOrEqual(0);
+  expect(savesWith1000()).toBe(savesBefore + 1);
+});
+
 test('a window boots into whatever mode windowsEnsure answers with (P22 D12)', async ({
   relaunch,
 }) => {
