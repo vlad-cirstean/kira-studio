@@ -1,4 +1,4 @@
-import { useElementByPoint, useMouse } from '@vueuse/core';
+import { useElementByPoint, useMouse, useRafFn } from '@vueuse/core';
 import { ref, watch } from 'vue';
 import type { DropTarget } from '../board/dropPlan';
 
@@ -17,7 +17,12 @@ export function usePlanDrag(onDrop: (taskId: string, target: DropTarget | null) 
   const draggedId = ref<string | null>(null);
   const target = ref<DropTarget | null>(null);
   const { x, y } = useMouse({ type: 'client' });
-  const { element } = useElementByPoint({ x, y });
+  // The hit-test loop runs only while a drag does, not for the Plan's whole life.
+  const { element, pause, resume } = useElementByPoint({
+    x,
+    y,
+    scheduler: (cb) => useRafFn(cb, { immediate: false }),
+  });
 
   watch(element, (el) => {
     if (draggedId.value) target.value = resolveTarget(el);
@@ -26,11 +31,13 @@ export function usePlanDrag(onDrop: (taskId: string, target: DropTarget | null) 
   function begin(taskId: string): void {
     draggedId.value = taskId;
     target.value = null;
+    resume();
   }
 
   function end(): void {
     const id = draggedId.value;
     const t = target.value;
+    pause();
     draggedId.value = null;
     target.value = null;
     if (id) onDrop(id, t);

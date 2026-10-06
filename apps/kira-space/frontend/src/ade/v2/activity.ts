@@ -36,7 +36,7 @@ const PHASE: Record<AgentActivity['phase'], Session['activity']> = {
  *  terminal id. A running TUI session with no hook seen yet reads `idle`. */
 export function withTuiActivity(
   sessions: readonly Session[],
-  activity: ReadonlyMap<string, AgentActivity>,
+  activity: ReadonlyMap<string, Pick<AgentActivity, 'phase'>>,
 ): Session[] {
   return sessions.map((s) => {
     if (s.mode !== 'tui' || s.state !== 'running') return s;

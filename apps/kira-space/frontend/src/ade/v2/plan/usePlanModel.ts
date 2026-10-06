@@ -1,3 +1,4 @@
+import type { AgentActivity } from '@shared/domain/agent';
 import { createSharedComposable, useIntervalFn } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
 import { useCodeReposStore } from '../../../state/coderepos';
@@ -251,9 +252,22 @@ function buildPlanModel() {
   );
   const today = computed(() => localIso(now.value));
   /** Sessions with the TUI activity the server does not report, merged in from the agent hooks. */
-  const sessions = computed(() =>
-    withTuiActivity(sessionsQuery.data.value?.sessions ?? [], agentStore.activity),
+  // Only the phase is read, but the agent store writes a new activity on every hook event. A key
+  // string compares by value, so `sessions` (and the model behind it) rebuilds on a phase change only.
+  const phaseKey = computed(() =>
+    (sessionsQuery.data.value?.sessions ?? [])
+      .filter((s) => s.mode === 'tui' && s.state === 'running')
+      .map((s) => `${s.terminalId}\t${agentStore.activity.get(s.terminalId)?.phase ?? ''}`)
+      .join('\n'),
   );
+  const sessions = computed(() => {
+    const phases = new Map<string, Pick<AgentActivity, 'phase'>>();
+    for (const line of phaseKey.value.split('\n')) {
+      const [terminalId, phase] = line.split('\t');
+      if (terminalId && phase) phases.set(terminalId, { phase: phase as AgentActivity['phase'] });
+    }
+    return withTuiActivity(sessionsQuery.data.value?.sessions ?? [], phases);
+  });
 
   function repoLabel(codeRepoId: string): string {
     const cfg = repos.data.value?.repos.find((r) => r.codeRepoId === codeRepoId);
@@ -326,7 +340,13 @@ function buildPlanModel() {
       if (card) cards.set(id, card);
     }
     // The panel opens tasks the Plan hides (first-10 cap, repo filter), so it builds them on demand.
-    const cardFor = (id: string): CardModel | null => cards.get(id) ?? buildCard(ctx, id);
+    const extra = new Map<string, CardModel | null>();
+    const cardFor = (id: string): CardModel | null => {
+      const shown = cards.get(id);
+      if (shown) return shown;
+      if (!extra.has(id)) extra.set(id, buildCard(ctx, id));
+      return extra.get(id) ?? null;
+    };
     return {
       board: b,
       view,
