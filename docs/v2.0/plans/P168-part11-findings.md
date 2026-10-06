@@ -260,3 +260,53 @@ real run) or "code-read". `DESIGN-DECISION` marks one needing a product call (no
 - `fakeData/*`: binary `0x` values decoded by `sqlmutate.go:95`; temporal formatting per dialect;
   numeric bounds from `typeBounds`; batches respect `AbortSignal`. `DataToolbar.vue` gating
   consistent with `canGenerateDataFor` and pending/mask lockouts.
+
+## Block 4: cell editor, clipboard and shared utilities
+
+### F14. medium. Paste parser corrupts text with a mid-field quote or multi-line non-tabular text (verified)
+
+- `apps/kira-studio/frontend/src/views/shared/clipboardFormats.ts:171-180,193-247`; caller
+  `views/grid/SlickGridHost.vue:1813`.
+- `parseDelimitedText` opens a quoted section on any `"`, not only at field start. Probe
+  (`bun`, scratchpad): `'12" ruler\tfoo\nbar\tbaz\n'` parses to one cell
+  `["12 ruler\tfoo\nbar\tbaz\n"]`; the quote is dropped and a 2x2 block collapses into one value
+  with embedded tabs and newlines.
+- No-tab multi-line text goes to the CSV branch. Pasting a JSON snippet into one `jsonb` cell:
+  `'{\n  "a": 1,\n  "b": "x, y"\n}'` parses to `[["{"],["  a: 1",""],["  b: x, y"],["}"]]`. The
+  paste stages `{` into the target cell and overwrites the same column on the next three rows (or
+  creates inserts past the page end), quotes stripped.
+- Scenario: user copies a value from a text editor and pastes into a cell; neighbouring rows get
+  staged edits they never asked for. Visible before Commit, but easy to miss off-screen.
+- Fix: open a quote only when `field === ''` (RFC 4180); a `"` inside an unquoted field is literal.
+  For no-tab text, use CSV only when the parse is rectangular with more than one field per row;
+  otherwise paste one value. Add both probes to `grid-clipboard-formats-safety.spec.ts`.
+
+### F15. low. Cell editor dock can stage a dirty buffer onto a different record after a page swap (code-read)
+
+- `apps/kira-studio/frontend/src/views/grid/SlickGridHost.vue:2466-2470` (closure stages by
+  `targetRow` into whatever page is current), `views/shared/celleditor/CellEditorView.vue:206-240`
+  (re-publication with a changed value stages the dirty buffer through `prevCell.onEdit`).
+- Scenario: user is typing in the dock for row 5 (record X), focus stays in the dock. A sibling
+  tab's commit reloads this tab (no pending yet, so no stale guard) and a row before 5 was
+  deleted. `setPage` republishes row 5 (now record Y) with a new value; the watch sees the buffer
+  dirty against the old value and calls `prevCell.onEdit(doc)`, staging X's new text onto Y.
+- Fix: capture the page in the closure (`const pageAtPublish = p`) and make `onEdit`/`onRevert`
+  no-ops when `getPage(props.tabId) !== pageAtPublish`; report "Edit not staged: the page
+  reloaded" via `setActionError` so the dropped buffer is not silent.
+
+### Block 4 notes (checked, nothing real)
+
+- `AutocompleteField.vue` `v-html`: `escapePlain` before Monaco loads, `paintOverlayHtml`
+  (`editor/paintSpans.ts:171-180`, Part 12) escapes every text run; class names are internal.
+  Paint generation counter drops stale paints.
+- `clipboardFormats.ts`: `tsvField`/`csvField` quoting, CSV-only formula guard (F5 P108 Part 10
+  intent), `rowsToInsert` dialect quoting and truncated-value NULL substitution hold.
+  `sqlIdent.ts` backslash handling per dialect correct.
+- `CellEditorView.vue`: blur, unmount and cell-switch staging guard against the cell actually
+  changing (F17 P108 Part 10); `readOnlyReasonFor` mirrors `onBeforeEditCell`. `binary.ts` decode
+  is fatal-UTF-8; hex prefix preserved.
+- `useEditBuffer.ts`, `useConnectionGate.ts` (Go `Connect` reports failures as state, not a throw),
+  `immediateMutation.ts` ("saved, but refresh failed" keeps the mutation result honest),
+  `viewOp.ts`, `typeGlossary.ts`, `targetPath.ts`, `eventCoords.ts`, `mongo*.ts`: no defect.
+- Native buttons in `DateTimePicker.vue`, `SavedListMenu.vue`, `DocumentRow.vue`,
+  `DocumentTree.vue` carry `type="button"`.
