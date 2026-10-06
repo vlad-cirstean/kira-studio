@@ -131,3 +131,12 @@ func TestIsUncommittedBlameSHA(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBlameLine_ContentLineOverOneMiB(t *testing.T) {
+	t.Parallel()
+	raw := "aaaa 1 1 1\nauthor Ann\nauthor-time 5\nsummary s\nfilename f\n\t" + strings.Repeat("x", 2<<20) + "\n"
+	line, err := porcelain.ParseBlameLine([]byte(raw))
+	if err != nil || line.Author != "Ann" || line.AuthorTimeSeconds != 5 {
+		t.Fatalf("line = %+v, err = %v", line, err)
+	}
+}

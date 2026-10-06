@@ -1,7 +1,6 @@
 package porcelain
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"strconv"
@@ -69,21 +68,37 @@ type BlameLine struct {
 // since none of them is anything the status bar renders, and a future git version's own new
 // attribute line must not break this parser.
 func ParseBlameLine(raw []byte) (BlameLine, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
-	scanner.Buffer(make([]byte, 0, 4096), 1<<20)
+	// No bufio.Scanner: the trailing content line is unbounded (a minified bundle) and unused.
+	rest := raw
+	next := func() (string, bool) {
+		if len(rest) == 0 {
+			return "", false
+		}
+		end := bytes.IndexByte(rest, '\n')
+		var text []byte
+		if end < 0 {
+			text, rest = rest, nil
+		} else {
+			text, rest = rest[:end], rest[end+1:]
+		}
+		return string(bytes.TrimSuffix(text, []byte{'\r'})), true
+	}
 
-	if !scanner.Scan() {
+	header, ok := next()
+	if !ok {
 		return BlameLine{}, fmt.Errorf("porcelain: blame: empty output")
 	}
-	header := scanner.Text()
 	sha, _, ok := cutFirstSpace(header)
 	if !ok || len(sha) == 0 {
 		return BlameLine{}, fmt.Errorf("porcelain: blame: malformed commit-info line %q", header)
 	}
 
 	line := BlameLine{SHA: sha}
-	for scanner.Scan() {
-		text := scanner.Text()
+	for {
+		text, more := next()
+		if !more {
+			break
+		}
 		if len(text) > 0 && text[0] == '\t' {
 			// The tab-prefixed content line — ends this hunk's record. Nothing follows it in a
 			// single-line (-L n,n) request.
@@ -105,9 +120,6 @@ func ParseBlameLine(raw []byte) (BlameLine, error) {
 			// Unrecognised attribute (author-mail, author-tz, committer*, previous, boundary,
 			// filename, or a future git version's own addition) — ignored, not an error.
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return BlameLine{}, fmt.Errorf("porcelain: blame: %w", err)
 	}
 	return BlameLine{}, fmt.Errorf("porcelain: blame: no content line found in %q", raw)
 }
