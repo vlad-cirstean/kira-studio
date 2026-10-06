@@ -17,6 +17,7 @@ no Part 15 file changed). Worktree `p168-stream-b`.
 - Block 4 `gitreview` store: done.
 - Block 5 `gitreview` logic: done (no findings).
 - Block 6 `gitsearch`: done.
+- Block 7 `gitstore` and mirror: done (no findings).
 
 ## Findings
 
@@ -336,6 +337,13 @@ any, else the protocol error.
   No harm. Dropped.
 - 14 (stash `-m` newline): probed, git collapses the newline into a space in the reflog
   (`stash list` shows `On main: line1 line2 x`). Parsing unaffected. Dropped.
+- 15 (`hexToBytes` panic, mixed `shaWidth`): `porcelain.ParseLogRecord` does not validate the
+  sha, but `%H`/`%P` are always hex from git, and the NUL framing cannot be shifted by commit
+  text: probed a commit object whose message contains NULs (written with
+  `hash-object --literally`); `git log --format=%s` truncates at the first NUL, and identity
+  fields are C strings too, so no crafted record can put non-hex bytes in field 0 while keeping
+  valid timestamps. A repository has one object format for all `log` output. Unreachable.
+  Dropped.
 - 17 (`checkedOutElsewhere` first only): the loop breaks after the first blocked branch; the
   verdict is still `blocked`, and a re-run reports the next one. UX only, no wrong outcome.
   Dropped.
@@ -431,3 +439,19 @@ byte boundaries; `Total` exact past `Limit`; hits capped at 200; cancellation ki
 Test isolation: `scan_test.go` spawns git with the real `HOME` (reads `~/.gitconfig`, writes
 nothing); `gitclient`'s `-c` overrides neutralise the config keys that could change parsed output,
 and P154's `RunWithTempHomes` only isolates app homes, not `HOME`. Not a leak under P154.
+
+### Block 7 `gitstore` and mirror
+
+Reviewed: `store.go`, `intern.go`, `sha.go`, `pack.go`, `encode.go`; caller
+`gitsession/walk.go:225-330` (`Append`, `PackSlice`, `marks` dictionary bases); mirror
+`packages/git-ipc/src/graphChunkCodec.ts` (`toWire`/`fromWire`, `readDecorationRef`,
+`copyColumn`) and `schema/gitwire.fbs` (Part 17, read). Probe: NUL in a commit message (lead 15).
+Checked and clean: field set and order match the schema; uint32 columns written little-endian and
+read through `Uint32Array` over a copied buffer (LE on every target); decoration kinds
+`branch|remoteBranch|tag|head|stash` match both sides, stash index in `name`, `head` without
+name; `refs` vector always present (schema `required`); `From`/`To` and chunk-relative rows;
+dictionary deltas (`ValuesFrom(base)` plus `marks[to]`) stay cumulative and consistent with what
+the client already holds; `Clear` resets the interner with the store; `clampTimestamp` clamps
+negatives to 0; `estimateChunkSize` is only the builder's initial capacity (flatbuffers grows), so
+an underestimate costs a copy, not correctness. No eviction is by design (a walk is bounded by
+what the client pages in). Nothing real in this block.
