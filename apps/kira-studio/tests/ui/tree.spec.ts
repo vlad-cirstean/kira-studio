@@ -16,7 +16,14 @@ import {
   postgresConnectionSummary,
   WIDE_TABLE_PATH,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu, treeContainer } from './support/tree';
+import {
+  connectionRow,
+  expandRow,
+  findRow,
+  openRowMenu,
+  settleFrames,
+  treeContainer,
+} from './support/tree';
 
 // Ported from tests/e2e/tree.spec.ts (P57 D16), against real captured tree shapes
 // (tests/ui/support/postgresFixture.ts, plus a newly captured `ANALYTICS_CHILDREN` for
@@ -397,14 +404,14 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   await expect(stickyRows).toHaveCount(0);
 
   // The connection and database pin as soon as they leave, in order, at top 0/H/2H.
   await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
     el.scrollIntoView({ block: 'start' }),
   );
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   await expect(stickyRows).toHaveCount(3);
   await expect(stickyRows.nth(0)).toHaveAttribute('data-path', '');
   await expect(stickyRows.nth(1)).toHaveAttribute('data-path', DB_PATH);
@@ -427,7 +434,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   const scrollportBottom = treeScrollBox.y + treeScrollBox.height;
   for (const row of await stickyRows.all()) {
     const box = await row.boundingBox();
@@ -437,12 +444,12 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
     el.scrollIntoView({ block: 'start' }),
   );
-  await page.waitForTimeout(100);
+  await settleFrames(page);
 
   // The band never exceeds the cap: scrolled into the (depth-3) Sequences folder, still exactly
   // three rows, and the folder itself is not among them.
   await sequenceRow.evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   await expect(stickyRows).toHaveCount(3);
   await expect(
     page.locator('[data-testid="tree-sticky-row"]', { hasText: 'Sequences' }),
@@ -464,7 +471,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await (await findRow(page, WIDE_TABLE_PATH)).evaluate((el) =>
     el.scrollIntoView({ block: 'start' }),
   );
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   // schema:app alone (fourteen tables, four folders, thirteen sequences) now outgrows
   // VirtualList's 8-row overscan on its own, so the real connection row (index 0) is fully
   // virtualized out at this depth — only its sticky counterpart remains. The invariant worth
@@ -481,7 +488,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
 
   // --- two-connection handoff (D4): scrolling from one connection's section into the next ----
   await page.click('[data-testid="add-connection"]');
@@ -503,7 +510,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   await expect(conn2Row).toBeVisible();
 
   // A freshly created, still-collapsed connection is only one row tall — nowhere near enough
@@ -575,7 +582,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop += 1;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   await expect(stickyRows.first()).toContainText('Tree DB 2');
 
   // One row shy of the boundary: the first connection is still pinned, its slot pushed to (or
@@ -584,7 +591,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el, h) => {
     el.scrollTop -= h;
   }, H);
-  await page.waitForTimeout(100);
+  await settleFrames(page);
   const firstStickyBeforeHandoff = stickyRows.first();
   await expect(firstStickyBeforeHandoff).toContainText('Tree DB');
   await expect(firstStickyBeforeHandoff).not.toContainText('Tree DB 2');
@@ -601,7 +608,7 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await treeScroll.evaluate((el) => {
     el.scrollTop = 0;
   });
-  await page.waitForTimeout(100);
+  await settleFrames(page);
 
   // --- disconnect: cached nodes still render; expanding any node (cached or not) reconnects
   // first rather than surfacing a disconnected error — the twisty is the primary way users

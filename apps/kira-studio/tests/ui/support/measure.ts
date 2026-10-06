@@ -15,6 +15,15 @@ export function percentile(values: number[], p: number): number {
   return sorted[idx];
 }
 
+/** Nearest-rank percentile: the smallest sample with at least p% of the samples at or below it.
+ *  `percentile` above indexes `floor(p/100 * n)`, which is the maximum for p95 at n = 20, so a
+ *  single GC pause or late frame (about 1 in 500 samples at idle) failed the gate. */
+export function percentileNearestRank(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)];
+}
+
 /**
  * Clicks `click`, then resolves at the first MutationObserver callback under `observe` for which
  * `until` holds, returning ms since the synchronous click dispatch. MutationObserver callbacks are

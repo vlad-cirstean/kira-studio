@@ -13,6 +13,7 @@ import {
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { closeAllTabs } from './support/tabs';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/leaks.spec.ts (P57 D16). P13's own regression spec for its leak sweep
@@ -112,15 +113,6 @@ async function waitForGrid(page: Page): Promise<void> {
   await expect
     .poll(async () => page.locator('[data-testid="grid-gutter-cell"]').count(), { timeout: 15_000 })
     .toBeGreaterThan(0);
-}
-
-async function closeAllTabs(page: Page): Promise<void> {
-  const firstTab = page.locator('[data-testid="tab"]').first();
-  await firstTab.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
-  await firstTab.click({ button: 'right' });
-  await page.click('[data-testid="menu-item-close-all"]');
-  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
 }
 
 const CONN_A = 'conn-leaks-a';

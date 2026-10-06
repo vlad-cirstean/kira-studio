@@ -145,6 +145,18 @@ export async function expandRow(page: Page, path: string): Promise<Locator> {
   return row;
 }
 
+// Two animation frames: a scroll event is dispatched in the frame after the scroll write, before
+// that frame's rAF callbacks, so once the second callback runs every event from an earlier write
+// has fired and layout is current. Replaces blind sleeps ahead of a click or a geometry read.
+export async function settleFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+}
+
 // A right-click on a row that Playwright still considers not-quite-in-view triggers its own
 // internal scroll-into-view as part of the click's actionability check — a scroll whose 'scroll'
 // event (caught, correctly, by the same window-level listener) can otherwise land asynchronously
@@ -154,7 +166,7 @@ export async function expandRow(page: Page, path: string): Promise<Locator> {
 export async function openRowMenu(page: Page, path: string): Promise<void> {
   const row = await findRow(page, path);
   await row.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
+  await settleFrames(page);
   await row.click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
 }

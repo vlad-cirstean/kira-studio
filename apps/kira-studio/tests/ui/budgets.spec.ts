@@ -11,6 +11,7 @@ import {
   measureScrollResponses,
   measureSustainedScroll,
   percentile,
+  percentileNearestRank,
 } from './support/measure';
 import {
   APP_CHILDREN,
@@ -294,11 +295,21 @@ const PORT: PortSnapshot[] = [
 // that both axes actually render this much buffer, not a re-statement of the app's own constant.
 const OVERSCAN_PX = 560;
 
+// The second largest and the max are printed so a failing run shows at once whether one outlier
+// set the p95.
 function logStats(label: string, values: number[]): void {
+  const sorted = [...values].sort((a, b) => a - b);
   const p50 = percentile(values, 50);
-  const p95 = percentile(values, 95);
-  console.log(`budgets.spec.ts ${label}: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`);
+  const p95 = percentileNearestRank(values, 95);
+  const max = sorted.at(-1) ?? 0;
+  const second = sorted.at(-2) ?? max;
+  console.log(
+    `budgets.spec.ts ${label}: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms 2nd=${second.toFixed(1)}ms max=${max.toFixed(1)}ms`,
+  );
 }
+
+// p95 gates collect enough samples that nearest-rank p95 excludes the two largest.
+const P95_SAMPLES = 40;
 
 // P22 iter2 D7's own velocity ladder: the original plan's realistic 40-100 px/frame band, a fling
 // peak, and WEBVIEW-SCROLL-MEMORY.md §5.4's own top rung, so the two documents' axes line up.
@@ -769,8 +780,10 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   if (renderedRows.length === 0) throw new Error('no grid rows rendered at scrollTop=0');
 
   const cellDeltas: number[] = [];
-  for (let i = 0; i < 20; i++) {
-    const row = renderedRows[i % renderedRows.length];
+  // Only the first ~20 rows stay mounted with the editor panel open; cycling further waits forever.
+  const cellRows = renderedRows.slice(0, 20);
+  for (let i = 0; i < P95_SAMPLES; i++) {
+    const row = cellRows[i % cellRows.length];
     const cellSelector = gridCellSelector(row, 'hash');
     const text = await page.locator(cellSelector).innerText();
     const delta = await measureClickToDom(page, {
@@ -781,7 +794,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     cellDeltas.push(delta);
   }
   logStats('cell -> editor', cellDeltas);
-  expect(percentile(cellDeltas, 95)).toBeLessThanOrEqual(50);
+  expect(percentileNearestRank(cellDeltas, 95)).toBeLessThanOrEqual(50);
 
   // --- 3. tab switch, p95 <= 300ms (WebKit sandbox bound; PERF.md §2.1) -----------------------------------------------------
   await openRowMenu(page, WIDE_TABLE_PATH);
@@ -826,7 +839,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   });
 
   const tabDeltas: number[] = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < P95_SAMPLES; i++) {
     const toWide = i % 2 === 0;
     const delta = await measureClickToDom(page, {
       // Synthetic el.click() never reaches the inner button that owns TabStrip.vue's @click.
@@ -844,7 +857,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
   // Not 50: a full DataView + SlickGrid remount is ~47 ms of Vue work on this 4 vCPU WebKit
   // sandbox, and its Tailwind `@property` fallback (live only here) slows every restyle. p95 was
   // 170-212 ms with the stylesheet fix alone. Real WKWebView is unmeasured; see PERF.md §2.1.
-  expect(percentile(tabDeltas, 95)).toBeLessThanOrEqual(300);
+  expect(percentileNearestRank(tabDeltas, 95)).toBeLessThanOrEqual(300);
   const headChurn = await page.evaluate(() => {
     const w = window as unknown as { __kiraHeadChurn: { count: number; stop: () => void } };
     w.__kiraHeadChurn.stop();
@@ -863,7 +876,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
 
   // --- 4. cached tree expand, p95 <= 50ms -----------------------------------------------------
   const expandDeltas: number[] = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < P95_SAMPLES; i++) {
     const row = await findRow(page, APP_PATH);
     await row.locator('[data-testid="tree-twisty"]').click(); // collapse — not measured
     await expect(
@@ -877,7 +890,7 @@ test('interaction budgets — scroll, cell→editor, cached tab switch, cached t
     expandDeltas.push(delta);
   }
   logStats('cached tree expand', expandDeltas);
-  expect(percentile(expandDeltas, 95)).toBeLessThanOrEqual(50);
+  expect(percentileNearestRank(expandDeltas, 95)).toBeLessThanOrEqual(50);
 
   // --- 5. console keystroke -> completion popup visible, p50 <= 50ms (P18 addendum D26) -------
   // APP_PATH (a schema), not DB_PATH (the bare database) — P60b: with no DDL document, a console's

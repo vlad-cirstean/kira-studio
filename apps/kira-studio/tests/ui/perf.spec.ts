@@ -3,6 +3,7 @@ import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
+import { percentile } from './support/measure';
 import {
   BIG_ROWS_META,
   BIG_ROWS_PATH,
@@ -12,6 +13,7 @@ import {
   DB_PATH,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { closeAllTabs } from './support/tabs';
 import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/perf.spec.ts (P57 D16). Its own header comment already called this file "a
@@ -59,24 +61,8 @@ import { expandRow, findRow, openRowMenu } from './support/tree';
 const CONNECTION_ID = 'conn-perf';
 const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Perf DB', 'grey');
 
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx];
-}
-
 async function retainedBytes(page: Page): Promise<number> {
   return page.evaluate(() => window.__kiraGridRetainedBytes?.() ?? -1);
-}
-
-// Same race openRowMenu() guards against, but against the tab strip's own scroll.
-async function closeAllTabs(page: Page): Promise<void> {
-  const firstTab = page.locator('[data-testid="tab"]').first();
-  await firstTab.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(400);
-  await firstTab.click({ button: 'right' });
-  await page.click('[data-testid="menu-item-close-all"]');
-  await expect(page.locator('[data-testid="tab"]')).toHaveCount(0);
 }
 
 const CONTROL: ControlSnapshot[] = [
@@ -186,9 +172,8 @@ test('perf tripwires — scroll frame time, DOM cell bound, retained bytes', asy
     })();
   });
 
-  const sorted = [...deltas].sort((a, b) => a - b);
-  const p50 = percentile(sorted, 50);
-  const p95 = percentile(sorted, 95);
+  const p50 = percentile(deltas, 50);
+  const p95 = percentile(deltas, 95);
   console.log(`perf.spec.ts scroll frame time: p50=${p50.toFixed(1)}ms p95=${p95.toFixed(1)}ms`);
   // Deliberately looser than budgets.spec.ts's 8 ms budget — this is a tripwire, not a benchmark,
   // and this reasoning is unaffected by tier: it catches "someone made the grid re-render every
