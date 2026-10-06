@@ -3,7 +3,7 @@
 Plan: `P168-part19-git-ui-components.md`. Base `1e2b327`; plan commit `d9d3b35`; HEAD reviewed
 `d9d3b35` (branch `p168-stream-b`). Reviewer reports only; fixes nothing.
 
-Status: blocks 1-6 done.
+Status: blocks 1-7 done.
 
 ## Checks (block 1, §1.1)
 
@@ -136,8 +136,9 @@ Status: blocks 1-6 done.
 - Severity: low. Code-read.
 - Where: `packages/git-ui/src/components/NoRepositoryPanel.vue:93-96` ("follows the folders open
   in this VS Code window… File → Open Folder"); `components/gitBlockedCopy.ts:46-53` ("set
-  kiraSpace.git.path", a VS Code setting id); `App.vue:1736`, `:1753` ("Kira Space isn't
-  reachable — …" for any bootstrap failure).
+  kiraSpace.git.path", a VS Code setting id); `App.vue:1736`, `:1753` and
+  `components/review/ReviewView.vue:813` ("Kira Space isn't reachable — …" for any bootstrap
+  failure).
 - Scenario: Space mounts the graph with `host: 'kira'` (`PF/views/repo/RepoGraphView.vue`).
   (a) The workspace record is gone or its root stops being a repository: `repo.list` returns no
   candidate (`PF/repo/git/hostHandlers.ts:224-228`) and the panel tells a Space user to use VS
@@ -426,6 +427,49 @@ Status: blocks 1-6 done.
   `undefined`) for the confirm dialogs (Checkout, Revert, Reset, Cherry-pick, Force push, Pull,
   Post-checkout pull, Stash pop).
 
+### F26. Review view's error phase offers no retry
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/review/ReviewView.vue:1015-1017` (`phase === 'error'`
+  renders only "Couldn't compare — <message>"); reached from `ReviewSessionState.#failStream`
+  (`state/review.ts:417-421`, including Part 18 F8's `onUnrecoverable`) and resolve failures.
+- Scenario: ADE review window or a review sidebar; `review.resolveBase` or the range stream fails
+  once (transport blip, corrupted chunk after its one re-open). The pane shows the error text and
+  nothing to act on; re-picking the same base in `BaseSelector` or pressing Back and choosing the
+  branch again works, but nothing says so.
+- Fix: add a Retry button that calls `applyTarget(repoId, branch)` with the current override base
+  restored (the same sequence `handleReconnect` runs).
+
+### F27. Base picker silently hides branches past 50 and says "No matching branches" while loading
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/review/BaseSelector.vue` (`sections` from
+  `buildRefListSections`, which caps each section at `REF_LIST_SECTION_CAP` = 50,
+  `components/refListModel.ts:58`; the template renders only `.visible` and never `hiddenCount`;
+  the empty-state div shows whenever both visible lists are empty).
+- Scenario: repo with 300 local branches; open the base picker: the first 50 by name show, with
+  no "N more" row, so a base like `release/2026` looks absent unless the user types a filter. In
+  a cold ADE window the picker can open before `refs.list` lands and reports "No matching
+  branches".
+- Fix: render `ShowMoreButton`/a "N more — type to filter" row from `hiddenCount`, and show
+  "Loading branches…" until `refsState` has loaded once.
+
+### F28. Comments pane: listbox semantics wrong, and Enter on Delete also opens the file
+
+- Severity: low. Code-read.
+- Where: `packages/git-ui/src/components/review/ReviewCommentsPane.vue:112-152` (`role="listbox"`
+  holding path header divs and `role="option"` rows that are each `tabindex="0"` with a fixed
+  `aria-selected="false"`; a `TooltipIconButton` Delete inside each option; option
+  `@keydown.enter` emits `select-comment`; the warning glyph has `aria-label` on a role-less
+  `span`).
+- Scenario: keyboard user in the Comments pane. Every comment is its own Tab stop (a listbox
+  should be one), non-option children break the listbox contract, the warning label is not
+  exposed, and pressing Enter on a comment's Delete button deletes it and also opens its file
+  (the keydown bubbles to the option's Enter handler; `@click.stop` stops only the click).
+- Fix: use a plain list (`role="list"`/`listitem`, or `ul`/`li`) with an explicit "Open"
+  button per comment, or keep the option rows but move Delete outside them and guard the Enter
+  handler with `event.target === event.currentTarget`; give the glyph `role="img"`.
+
 ## Candidate fates (§9)
 
 - 1 (lanes blank after layout lands): dropped. Probe passed for expand, toggle and refresh;
@@ -465,6 +509,7 @@ Status: blocks 1-6 done.
 - 13 (`linkify.ts`): dropped. Only `https?://` matches, segments become a `<button>` calling the
   host's `onOpenExternal` or inert text, never an `<a href>`; it runs in Vue-rendered
   `CommitMeta`, not a SlickGrid formatter, so listeners die with their nodes.
+- 14 (`ReviewCommentsPane` listbox children): reported as F28.
 - 16 (`crypto.subtle` outside a secure context): dropped. Every real origin is a secure context:
   `vscode-webview://` (VS Code), Wails' localhost origin (Space), `http://127.0.0.1` (Playwright
   harnesses) and `http://localhost` (Vite dev) are all potentially trustworthy.
@@ -529,4 +574,12 @@ holds; dispose checked in block 2.
   `CheckoutDialog`, `RevertDialog`, `CherryPickDialog`, `PullDialog`, `PostCheckoutPullDialog`,
   `BranchDialog`, `RenameRefDialog`, `StackDialog`, `WorktreeDialog` (beyond the result check and
   digest), `StashDialog` preview tokens, `PreflightPrediction`.
-- Blocks 7-8: not reached yet.
+- Block 7: done. Reviewed `ReviewView.vue` (setup, `applyTarget` token checks on every
+  post-await write in `handleReconnect`/`resumeSession`, bootstrap retry disposal, actions bundle,
+  document Escape handler with the instance-root guard, live region, content-state template),
+  `BaseSelector`, `ReviewFilesPane` (filter toggle, `nothingToReview`, `onToggleReviewed`),
+  `ReviewCommentsPane`. Skimmed with reason: `ReviewCommitRow.vue` (treeitem row with roving
+  tabindex; `revealInGraph` and `transport-closed` handling read, nothing new), the review row
+  keyboard cursor and `REVIEW_ROW_RENDER_CAP` (guarded by `review-commit-list-cap.spec.ts`, which
+  passed).
+- Block 8: not reached yet.
