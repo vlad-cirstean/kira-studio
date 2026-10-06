@@ -53,6 +53,7 @@ export class ReviewCommentsState {
     this.comments.value = [];
     this.loadError.value = undefined;
     this.confirmingClear.value = false;
+    this.pending.value = false;
     if (target) void this.#load();
   }
 
