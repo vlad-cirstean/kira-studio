@@ -23,7 +23,11 @@ import '@workbench/testing/unit/window';
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
-import type { TabularPage } from '../../../../packages/shared/protocol/page';
+import {
+  createTabularPageBuilder,
+  type TabularPage,
+  unpagedPosition,
+} from '../../../../packages/shared/protocol/page';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
@@ -36,6 +40,23 @@ const { createDisplayValueExtractor, pendingRowClasses } = await import(
 );
 
 const TAB = 'tab-staged-snapshot';
+
+// Staging is keyed by primary key, so the tab needs a loaded page that carries one: row n has id n.
+const { setPage } = await import('../../frontend/src/views/grid/page');
+{
+  const builder = createTabularPageBuilder([
+    {
+      name: 'id',
+      dataType: 'text',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: true,
+      generated: false,
+    },
+  ]);
+  for (let i = 0; i < 101; i++) builder.appendRow([String(i)]);
+  setPage(TAB, builder.finish(unpagedPosition(101)));
+}
 
 // createDisplayValueExtractor now resolves each columnOrder entry to a page-column index at build
 // time (fieldToPageCol), so it always dereferences page.columns even when every test case here
@@ -52,7 +73,7 @@ describe('rawPendingFor (finding 10)', () => {
     expect(snapshot).toBeDefined();
     expect(isReactive(snapshot)).toBe(false);
     expect(isReactive(snapshot?.edits)).toBe(false);
-    expect(snapshot?.edits.get(3)?.changes.name).toBe('edited');
+    expect(snapshot?.edits.get(JSON.stringify([['id', '3']]))?.changes.name).toBe('edited');
   });
 
   test('undefined for a tab with no pending state at all', () => {

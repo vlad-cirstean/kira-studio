@@ -108,6 +108,7 @@ const pendingCount = computed(() => {
   if (!p) return 0;
   return p.edits.size + p.deletes.size + p.inserts.length;
 });
+const offPageCount = computed(() => pendingChangesStore.offPageCount(props.tab.id));
 const committing = computed(() => pendingChangesStore.isCommitting(props.tab.id));
 const previewOpen = ref(false);
 const previewAnchorRef = ref<HTMLElement | null>(null);
@@ -155,14 +156,7 @@ function onStop(): void {
 function onGenerateData(): void {
   // M5 §6.4: the same lockout DataToolbar.vue's own Generate button applies — this is the
   // command-palette/keyboard-shortcut path to the identical action, and must not bypass it.
-  // F1 (P108 Part 10): also the same pending-changes lockout — Generate Data's own reload would
-  // clear this tab's staged edits, same as DataToolbar.vue's button.
-  if (
-    !canGenerateDataFor(caps.value, connRecord.value?.readOnly) ||
-    rt.value?.maskPreview ||
-    pendingChangesStore.hasPending(props.tab.id)
-  )
-    return;
+  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly) || rt.value?.maskPreview) return;
   fakeDataStore.openGenerateDataDialog(props.tab.id);
 }
 
@@ -259,6 +253,12 @@ function onCloseSearch(): void {
         <template v-if="tabHasPending">
           <Badge variant="warn" data-testid="pending-count-chip"
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</Badge
+          >
+          <span
+            v-if="offPageCount > 0"
+            class="text-kira-sm text-muted-foreground truncate"
+            data-testid="pending-off-page"
+            >{{ offPageCount }} staged change{{ offPageCount === 1 ? '' : 's' }} not on this page</span
           >
           <Popover :open="previewOpen" @update:open="previewOpen = $event">
             <div ref="previewAnchorRef" class="relative">
@@ -358,17 +358,6 @@ function onCloseSearch(): void {
             <CodiconIcon name="eye-closed" :size="16" />
             <AlertDescription>
               Values shown are masked for this preview — not the stored data. Editing is off while it's on.
-            </AlertDescription>
-          </Alert>
-          <!-- F1 (P108 Part 10): a sibling tab committed on this same table while this tab had
-               pending changes staged — the fan-out marked this page stale instead of reloading it,
-               to protect the staged edits. Commit or discard resolves it; Refresh then updates the
-               page and clears this. -->
-          <Alert v-if="rt?.pageStale" variant="note" data-testid="page-stale-strip">
-            <CodiconIcon name="sync" :size="16" />
-            <AlertDescription>
-              Another tab committed changes to this table. Commit or discard pending changes, then
-              refresh to see them.
             </AlertDescription>
           </Alert>
           <div class="flex-1 min-h-0 relative">

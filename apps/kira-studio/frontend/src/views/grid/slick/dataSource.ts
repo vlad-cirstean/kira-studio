@@ -64,7 +64,7 @@ export function createDisplayValueExtractor(
       const value = pending?.inserts.find((i) => i.id === item.insertId)?.values[field];
       return { text: value ?? '', isNull: value === null || value === undefined, truncated: false };
     }
-    const staged = pending?.edits.get(item.row)?.changes[field];
+    const staged = usePendingChangesStore().rawStagedValue(tabId, item.row, field);
     if (staged !== undefined) {
       return { text: staged ?? '', isNull: staged === null, truncated: false };
     }
@@ -94,9 +94,7 @@ export function pendingRowClasses(
   pageRowCount: number,
 ): string | undefined {
   if (row >= pageRowCount) return 'kira-row-inserted';
-  const p = usePendingChangesStore().rawPendingFor(tabId);
-  if (!p) return undefined;
-  if (p.deletes.has(row)) return 'kira-row-deleted pending-delete';
-  if (p.edits.has(row)) return 'kira-row-dirty';
-  return undefined;
+  const change = usePendingChangesStore().rawRowChange(tabId, row);
+  if (change === 'delete') return 'kira-row-deleted pending-delete';
+  return change === 'edit' ? 'kira-row-dirty' : undefined;
 }

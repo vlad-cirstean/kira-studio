@@ -10,27 +10,58 @@
 //
 // pendingChanges.ts transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
 // hence the dynamic import after @workbench/testing/unit/window's mock.module registration — the same pattern
-// grid-commit-composite-pk-guard.spec.ts and grid-staged-value-snapshot.spec.ts already use.
+// grid-staged-value-snapshot.spec.ts already use.
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';
+import {
+  createTabularPageBuilder,
+  unpagedPosition,
+} from '../../../../packages/shared/protocol/page';
 import { pinia } from '../../frontend/src/state/pinia';
 
 setActivePinia(pinia);
 
 const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
 const { isPendingDelete, stageDelete, stageEdit } = usePendingChangesStore();
+const { setPage } = await import('../../frontend/src/views/grid/page');
+
+// Staging is keyed by primary key: each tab needs a loaded page where row n has id n.
+function loadPage(tabId: string): void {
+  const builder = createTabularPageBuilder([
+    {
+      name: 'id',
+      dataType: 'text',
+      typeClass: 'text',
+      nullable: false,
+      isPrimaryKey: true,
+      generated: false,
+    },
+    {
+      name: 'name',
+      dataType: 'text',
+      typeClass: 'text',
+      nullable: true,
+      isPrimaryKey: false,
+      generated: false,
+    },
+  ]);
+  for (let i = 0; i < 5; i++) builder.appendRow([String(i), `n${i}`]);
+  setPage(tabId, builder.finish(unpagedPosition(5)));
+}
 
 describe('stageDelete (grid/pendingChanges.ts)', () => {
   test('1. marks a row for delete', () => {
     const tabId = 'stage-delete-tab-1';
+    loadPage(tabId);
     stageDelete(tabId, [3]);
     expect(isPendingDelete(tabId, 3)).toBe(true);
   });
 
   test('2. invoking it again on the same, already-deleted row leaves it deleted — never un-deletes (the reported toggle bug)', () => {
     const tabId = 'stage-delete-tab-2';
+    loadPage(tabId);
     stageDelete(tabId, [3]);
     expect(isPendingDelete(tabId, 3)).toBe(true);
 
@@ -43,6 +74,7 @@ describe('stageDelete (grid/pendingChanges.ts)', () => {
 
   test('3. marking a row with a pending edit for delete drops the edit (edits and deletes stay mutually exclusive)', () => {
     const tabId = 'stage-delete-tab-3';
+    loadPage(tabId);
     stageEdit(tabId, 1, 'name', 'new value');
     stageDelete(tabId, [1]);
     expect(isPendingDelete(tabId, 1)).toBe(true);
@@ -54,6 +86,7 @@ describe('stageDelete (grid/pendingChanges.ts)', () => {
 
   test('4. deleting a whole multi-row selection twice keeps every row deleted', () => {
     const tabId = 'stage-delete-tab-4';
+    loadPage(tabId);
     stageDelete(tabId, [0, 1, 2]);
     stageDelete(tabId, [0, 1, 2]);
     expect(isPendingDelete(tabId, 0)).toBe(true);

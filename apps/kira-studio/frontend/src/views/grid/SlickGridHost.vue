@@ -250,7 +250,7 @@ function rt() {
 // nothing below reads them from inside the render path (D0 is about that path specifically, not
 // about app logic in general) and every call site is already an event handler.
 function hasPrimaryKey(): boolean {
-  return getPage(props.tabId)?.columns.some((c) => c.isPrimaryKey) ?? false;
+  return pendingChangesStore.pageHasFullPrimaryKey(props.tabId);
 }
 function isWritable(): boolean {
   const t = tab();
@@ -409,7 +409,7 @@ function currentDialect() {
 }
 
 function isDeleted(row: number): boolean {
-  return !!pendingChangesStore.pendingFor(props.tabId)?.deletes.has(row);
+  return pendingChangesStore.isPendingDelete(props.tabId, row);
 }
 
 // C7/§5 D7 — rowsForColumnOps/columnValuesFor bound to this file's own displayRows/tabId/page/
@@ -928,17 +928,17 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
 function computeStagedHash(): Record<number, Record<string, string>> {
   const hash: Record<number, Record<string, string>> = {};
   if (!grid || !dataSource) return hash;
-  const p = pendingChangesStore.pendingFor(props.tabId);
-  if (!p || p.edits.size === 0) return hash;
+  const { edits } = pendingChangesStore.pendingOnPage(props.tabId);
+  if (edits.size === 0) return hash;
   const { start, end } = grid.lastRenderedRowBounds;
   if (end < start) return hash;
   const cls = classesFrom({ pendingEdit: true })[0] ?? 'pending-edit';
   for (let pos = start; pos <= end; pos++) {
     const pageRow = dataSource.getItem(pos).row;
-    const edit = p.edits.get(pageRow);
-    if (!edit) continue;
+    const changes = edits.get(pageRow);
+    if (!changes) continue;
     const row: Record<string, string> = {};
-    for (const column of Object.keys(edit.changes)) row[column] = cls;
+    for (const column of Object.keys(changes)) row[column] = cls;
     hash[pos] = row;
   }
   return hash;
@@ -2610,11 +2610,10 @@ let lastPendingRows = new Set<number>();
 // change, produce a different signature.
 watch(
   () => {
-    const p = pendingChangesStore.pendingFor(props.tabId);
-    if (!p) return '';
+    const { edits, deletes } = pendingChangesStore.pendingOnPage(props.tabId);
     let sig = '';
-    for (const [row, edit] of p.edits) sig += `e${row}:${JSON.stringify(edit.changes)};`;
-    for (const row of p.deletes) sig += `d${row};`;
+    for (const [row, changes] of edits) sig += `e${row}:${JSON.stringify(changes)};`;
+    for (const row of deletes) sig += `d${row};`;
     return sig;
   },
   () => {
@@ -2628,12 +2627,8 @@ watch(
     // happens to re-render it. Invalidate the union of this row's newly- and previously-staged
     // state (not just the new set — a discard's new set is empty) and re-render.
     if (!grid || !dataSource) return;
-    const p = pendingChangesStore.pendingFor(props.tabId);
-    const rows = new Set<number>();
-    if (p) {
-      for (const row of p.edits.keys()) rows.add(row);
-      for (const row of p.deletes) rows.add(row);
-    }
+    const { edits, deletes } = pendingChangesStore.pendingOnPage(props.tabId);
+    const rows = new Set<number>([...edits.keys(), ...deletes]);
     const touched = new Set<number>([...lastPendingRows, ...rows]);
     lastPendingRows = rows;
     if (touched.size === 0) return;

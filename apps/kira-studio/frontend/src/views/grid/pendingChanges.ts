@@ -1,17 +1,26 @@
 import type { MutationRowOp } from '@shared/domain/mutations';
 import type { MutateResponse } from '@shared/protocol/data-ops';
+import { cellText, isNull, type TabularPage } from '@shared/protocol/page';
 import { defineStore } from 'pinia';
 import { reactive, toRaw } from 'vue';
 import { data } from '../../bridge/data';
-import { cell, getPage } from './page';
+import { cell, getPage, pageVersion } from './page';
 
 // Renderer-only, in-memory, per tab (D3) — never persisted (not tabs.state_json, not settings,
-// not a new SQLite table). Closing a tab or reloading its page silently discards uncommitted
-// edits, exactly like closing a spreadsheet you never saved.
+// not a new SQLite table). Closing a tab discards uncommitted edits, exactly like closing a
+// spreadsheet you never saved. A staged edit or delete is keyed by its row's primary key, not its
+// page position, so it survives paging, sort, filter, projection and Refresh; a page that no
+// longer holds the row just shows nothing for it until the row comes back on a page.
+
+type RowKey = Record<string, string | null>;
 
 interface PendingEdit {
-  row: number; // page-relative row index (matches DataGrid.vue's `r`), never the gutter number
+  key: RowKey; // the row's primary key when it was staged — a PK-column edit still addresses the original row
   changes: Record<string, string | null>;
+}
+
+interface PendingDelete {
+  key: RowKey;
 }
 
 interface PendingInsert {
@@ -20,14 +29,28 @@ interface PendingInsert {
 }
 
 export interface TabPending {
-  edits: Map<number, PendingEdit>;
-  deletes: Set<number>;
+  edits: Map<string, PendingEdit>; // canonical row key (rowKeyId) -> edit
+  deletes: Map<string, PendingDelete>;
   inserts: PendingInsert[];
 }
 
+interface RowKeyEntry {
+  id: string;
+  key: RowKey;
+}
+
+// Row -> key memo and key -> row index, per loaded page object (a new page naturally drops both).
+// Non-reactive by design: the cell extractor reads them per cell during SlickGrid's own render.
+interface PageKeys {
+  pkSignature: string;
+  ids: (RowKeyEntry | null | undefined)[];
+  rowById?: Map<string, number>;
+}
+const pageKeys = new WeakMap<TabularPage, PageKeys>();
+const keyDecoder = new TextDecoder();
+
 // D8: delete, then update, then insert — mirrors the adapter's own execution order so the
 // *Preview command* panel shows exactly what mutate() will run.
-class UnaddressableRowError extends Error {}
 
 export const usePendingChangesStore = defineStore('pendingChanges', () => {
   const pendingState = reactive({} as Record<string, TabPending>);
@@ -35,7 +58,7 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
 
   function ensure(tabId: string): TabPending {
     if (!pendingState[tabId]) {
-      pendingState[tabId] = { edits: new Map(), deletes: new Set(), inserts: [] };
+      pendingState[tabId] = { edits: new Map(), deletes: new Map(), inserts: [] };
     }
     return pendingState[tabId];
   }
@@ -68,67 +91,172 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     delete pendingState[tabId];
   }
 
-  // P21 round 2 functional finding 2: state.ts (which already imports clearPending from here, so
-  // importing state.ts's own `runtime` back would be a cycle) registers an accessor for a tab's
-  // *full* primary-key column list (rt.meta.primaryKey, loaded once per tab via treeDescribe) —
-  // the same registry-inversion shape state/viewCommands.ts already uses to avoid the identical
-  // project/ <-> views/ cycle. null until state.ts has run (before any tab exists to stage a
-  // change against) or while a tab's meta hasn't loaded yet — primaryKeyOf falls back to its old,
-  // zero-columns-only check in that case, exactly as before this fix.
+  // state.ts registers an accessor for a tab's *full* primary-key column list (rt.meta.primaryKey,
+  // loaded once per tab via treeDescribe) — importing its `runtime` back from here would be a
+  // cycle, the same registry-inversion shape state/viewCommands.ts uses. null until state.ts has
+  // run or while a tab's meta hasn't loaded yet: a row is then addressable by whichever PK columns
+  // the page carries.
   let fullPrimaryKeyOf: ((tabId: string) => string[] | null) | null = null;
   function registerFullPrimaryKeyAccessor(fn: (tabId: string) => string[] | null): void {
     fullPrimaryKeyOf = fn;
   }
 
-  interface PrimaryKeyResult {
-    key: Record<string, string | null>;
-    // Non-empty when the current projection has *some* but not all of the object's PK columns —
-    // e.g. Hide column applied to one column of a composite key (legitimate, round 1's own bace7a2
-    // revert). AssertKeyIsPrimaryKey on the server refuses a key that isn't exactly the primary
-    // key with an opaque, table-agnostic error; buildPlan below turns this into round 1's own
-    // UnaddressableRowError instead, naming the hidden column(s).
-    missingColumns: string[];
-  }
-
-  // Row identity for staging (D5): every column in the current page with `isPrimaryKey === true`.
-  // `null` means the page has no primary key at all — the caller must not build an update/delete
-  // op for this row (the server would reject it with E_UNSUPPORTED anyway; this just avoids
-  // sending an op that can never succeed).
-  function primaryKeyOf(tabId: string, row: number): PrimaryKeyResult | null {
-    const page = getPage(tabId);
-    if (!page) return null;
-    const key: Record<string, string | null> = {};
+  function computeRowKey(
+    page: TabularPage,
+    full: string[] | null,
+    row: number,
+  ): RowKeyEntry | null {
+    const key: RowKey = {};
     for (let col = 0; col < page.columns.length; col++) {
       const descriptor = page.columns[col];
       if (!descriptor.isPrimaryKey) continue;
-      const view = cell(tabId, row, col);
-      key[descriptor.name] = view.isNull ? null : view.text;
+      const chunk = page.chunks[col];
+      key[descriptor.name] = isNull(chunk, row) ? null : cellText(chunk, row, keyDecoder);
     }
-    if (Object.keys(key).length === 0) return null;
-    const fullKey = fullPrimaryKeyOf?.(tabId) ?? null;
-    const missingColumns = fullKey?.filter((name) => !(name in key)) ?? [];
-    return { key, missingColumns };
+    const names = Object.keys(key).sort();
+    if (names.length === 0) return null;
+    // A partial key (Hide column on part of a composite key) cannot address the row.
+    if (full?.some((name) => !(name in key))) return null;
+    return { id: JSON.stringify(names.map((n) => [n, key[n]])), key };
+  }
+
+  function keysFor(
+    tabId: string,
+  ): { page: TabularPage; keys: PageKeys; full: string[] | null } | null {
+    const page = getPage(tabId);
+    if (!page) return null;
+    const full = fullPrimaryKeyOf?.(tabId) ?? null;
+    const pkSignature = full ? full.join('\u0000') : '';
+    let keys = pageKeys.get(page);
+    if (!keys || keys.pkSignature !== pkSignature) {
+      keys = { pkSignature, ids: new Array(page.rowCount) };
+      pageKeys.set(page, keys);
+    }
+    return { page, keys, full };
+  }
+
+  /** Row identity for staging: the table's full primary key, as read from the current page.
+   *  null when the page has no (complete) primary key — nothing can be staged against the row. */
+  function rowKeyOf(tabId: string, row: number): RowKeyEntry | null {
+    const ctx = keysFor(tabId);
+    if (!ctx || row < 0 || row >= ctx.page.rowCount) return null;
+    const cached = ctx.keys.ids[row];
+    if (cached !== undefined) return cached;
+    const entry = computeRowKey(ctx.page, ctx.full, row);
+    ctx.keys.ids[row] = entry;
+    return entry;
+  }
+
+  function rowsByKey(tabId: string): Map<string, number> {
+    const ctx = keysFor(tabId);
+    if (!ctx) return new Map();
+    if (!ctx.keys.rowById) {
+      const index = new Map<string, number>();
+      for (let row = 0; row < ctx.page.rowCount; row++) {
+        const entry = rowKeyOf(tabId, row);
+        if (entry) index.set(entry.id, row);
+      }
+      ctx.keys.rowById = index;
+    }
+    return ctx.keys.rowById;
+  }
+
+  /** Whether every primary-key column of the table is present in the current page, so a row can
+   *  be addressed. Before the table's meta loads this is "the page has some PK column". */
+  function pageHasFullPrimaryKey(tabId: string): boolean {
+    const page = getPage(tabId);
+    if (!page) return false;
+    const present = new Set(page.columns.filter((c) => c.isPrimaryKey).map((c) => c.name));
+    if (present.size === 0) return false;
+    const full = fullPrimaryKeyOf?.(tabId) ?? null;
+    return full ? full.every((name) => present.has(name)) : true;
   }
 
   function isPendingDelete(tabId: string, row: number): boolean {
-    return pendingState[tabId]?.deletes.has(row) ?? false;
+    const entry = rowKeyOf(tabId, row);
+    return !!entry && (pendingState[tabId]?.deletes.has(entry.id) ?? false);
   }
 
   function stagedValue(tabId: string, row: number, column: string): string | null | undefined {
-    return pendingState[tabId]?.edits.get(row)?.changes[column];
+    const entry = rowKeyOf(tabId, row);
+    return entry ? pendingState[tabId]?.edits.get(entry.id)?.changes[column] : undefined;
   }
 
+  // Non-reactive twins for dataSource.ts's per-cell/per-row hot path (see rawPendingFor above):
+  // pending state is read through toRaw, and a tab with nothing staged returns before any key work.
+  function rawStagedValue(tabId: string, row: number, column: string): string | null | undefined {
+    const p = rawPendingFor(tabId);
+    if (!p || p.edits.size === 0) return undefined;
+    const entry = rowKeyOf(tabId, row);
+    return entry ? p.edits.get(entry.id)?.changes[column] : undefined;
+  }
+
+  function rawRowChange(tabId: string, row: number): 'delete' | 'edit' | null {
+    const p = rawPendingFor(tabId);
+    if (!p || (p.edits.size === 0 && p.deletes.size === 0)) return null;
+    const entry = rowKeyOf(tabId, row);
+    if (!entry) return null;
+    if (p.deletes.has(entry.id)) return 'delete';
+    return p.edits.has(entry.id) ? 'edit' : null;
+  }
+
+  function hasRowChange(tabId: string, row: number): boolean {
+    const entry = rowKeyOf(tabId, row);
+    const p = pendingState[tabId];
+    return !!entry && !!p && (p.edits.has(entry.id) || p.deletes.has(entry.id));
+  }
+
+  /** Staged edits and deletes that sit on the current page, as page rows. Reactive on both the
+   *  staged set and the loaded page. */
+  function pendingOnPage(tabId: string): {
+    edits: Map<number, Record<string, string | null>>;
+    deletes: Set<number>;
+  } {
+    void pageVersion.n;
+    const edits = new Map<number, Record<string, string | null>>();
+    const deletes = new Set<number>();
+    const p = pendingState[tabId];
+    if (!p || (p.edits.size === 0 && p.deletes.size === 0)) return { edits, deletes };
+    const rowById = rowsByKey(tabId);
+    for (const [id, edit] of p.edits) {
+      const row = rowById.get(id);
+      if (row !== undefined) edits.set(row, edit.changes);
+    }
+    for (const id of p.deletes.keys()) {
+      const row = rowById.get(id);
+      if (row !== undefined) deletes.add(row);
+    }
+    return { edits, deletes };
+  }
+
+  /** Staged edits/deletes whose row is not on the current page. */
+  function offPageCount(tabId: string): number {
+    const p = pendingState[tabId];
+    if (!p) return 0;
+    const on = pendingOnPage(tabId);
+    return p.edits.size + p.deletes.size - on.edits.size - on.deletes.size;
+  }
+
+  function stageChange(tabId: string, row: number, column: string, value: string | null): void {
+    if (committingState[tabId]) return;
+    const entry = rowKeyOf(tabId, row);
+    if (!entry) return; // no complete primary key on this page: the row is not editable
+    const p = ensure(tabId);
+    if (p.deletes.has(entry.id)) return; // a row marked for delete is not independently editable
+    const existing = p.edits.get(entry.id);
+    p.edits.set(entry.id, {
+      key: entry.key,
+      changes: { ...(existing?.changes ?? {}), [column]: value },
+    });
+  }
+
+  // Every stage/discard function refuses while this tab's commit is in flight: a change staged
+  // against ops already on the wire would be dropped by the post-commit clearPending.
   // A plain <input> can't distinguish "clear to NULL" from "clear to empty string" — every inline
   // edit stages the typed text verbatim, `''` included. An explicit NULL affordance is not built
   // in this phase (P6+ nicety); a NULL value's own cell must be retyped, not blanked.
-  // Every stage/discard function below refuses while this tab's commit is in flight: a change
-  // staged against ops already on the wire would be dropped by the post-commit clearPending.
   function stageEdit(tabId: string, row: number, column: string, value: string): void {
-    if (committingState[tabId]) return;
-    const p = ensure(tabId);
-    if (p.deletes.has(row)) return; // a row marked for delete is not independently editable
-    const existing = p.edits.get(row);
-    p.edits.set(row, { row, changes: { ...(existing?.changes ?? {}), [column]: value } });
+    stageChange(tabId, row, column, value);
   }
 
   // The cell editor's Revert action (CellEditorView.vue's resetBuffer, via SelectedCell.onRevert) —
@@ -139,12 +267,13 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // edit is undone.
   function discardCellEdit(tabId: string, row: number, column: string): void {
     if (committingState[tabId]) return;
+    const entry = rowKeyOf(tabId, row);
     const p = pendingState[tabId];
-    const existing = p?.edits.get(row);
-    if (!existing || !(column in existing.changes)) return;
+    const existing = entry ? p?.edits.get(entry.id) : undefined;
+    if (!entry || !existing || !(column in existing.changes)) return;
     const { [column]: _discarded, ...rest } = existing.changes;
-    if (Object.keys(rest).length === 0) p?.edits.delete(row);
-    else p?.edits.set(row, { row, changes: rest });
+    if (Object.keys(rest).length === 0) p?.edits.delete(entry.id);
+    else p?.edits.set(entry.id, { key: existing.key, changes: rest });
   }
 
   // The row menu's "Revert row(s)" — un-stages a whole row's pending edit and/or pending delete in
@@ -153,20 +282,17 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // first checking which of those rows actually have something to revert.
   function discardRowChange(tabId: string, row: number): void {
     if (committingState[tabId]) return;
+    const entry = rowKeyOf(tabId, row);
     const p = pendingState[tabId];
-    if (!p) return;
-    p.edits.delete(row);
-    p.deletes.delete(row);
+    if (!entry || !p) return;
+    p.edits.delete(entry.id);
+    p.deletes.delete(entry.id);
   }
 
   // D4: the cell menu's "Set NULL" — sibling to stageEdit, skipping the inline <input> (which can
   // only ever produce a string) to stage an actual SQL NULL directly.
   function stageNull(tabId: string, row: number, column: string): void {
-    if (committingState[tabId]) return;
-    const p = ensure(tabId);
-    if (p.deletes.has(row)) return;
-    const existing = p.edits.get(row);
-    p.edits.set(row, { row, changes: { ...(existing?.changes ?? {}), [column]: null } });
+    stageChange(tabId, row, column, null);
   }
 
   // D6: "Duplicate row" — one addInsertRow + stageInsertValue per non-primary-key column, copied
@@ -213,10 +339,12 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
   // only way to undo a pending delete, for every pending-change kind this module has.
   function stageDelete(tabId: string, rows: number[]): void {
     if (committingState[tabId]) return;
-    const p = ensure(tabId);
     for (const row of rows) {
-      p.deletes.add(row);
-      p.edits.delete(row); // a row marked for delete is not independently editable (mirrors stageEdit)
+      const entry = rowKeyOf(tabId, row);
+      if (!entry) continue;
+      const p = ensure(tabId);
+      p.deletes.set(entry.id, { key: entry.key });
+      p.edits.delete(entry.id); // a row marked for delete is not independently editable (mirrors stageEdit)
     }
   }
 
@@ -243,50 +371,13 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     p.inserts = p.inserts.filter((i) => i.id !== insertId);
   }
 
-  // F2/P21 round 1: buildPlan used to drop an update/delete outright whenever primaryKeyOf
-  // returned null (no PK column left in the current projection — e.g. Hide column applied to the
-  // PK, or a saved/restored tab whose projection happens to exclude it) — silently, with the row
-  // still staged and no op ever sent. commitPending then saw ops.length === 0, returned null, and
-  // the caller (which only distinguishes success from a thrown rejection) reported success: no
-  // error, the pending badge cleared, nothing changed on the server. Thrown instead, so a staged
-  // change that cannot be addressed fails loudly, the same way any other commit failure already does.
-
-  // P21 round 2 functional finding 2: a *partial* key (some but not all of the object's PK columns
-  // missing from the current projection) is exactly as unaddressable as no key at all — a message
-  // naming the specific hidden column(s), where known, rather than the generic "it may be hidden"
-  // F2/P21 round 1 already covers for the total-loss case.
-  function unaddressableMessage(
-    action: 'delete' | 'edit',
-    result: PrimaryKeyResult | null,
-  ): string {
-    const missing = result?.missingColumns ?? [];
-    if (missing.length > 0) {
-      const plural = missing.length > 1;
-      return (
-        `A staged ${action} is missing the hidden primary-key column${plural ? 's' : ''} ` +
-        `${missing.join(', ')} — show ${plural ? 'them' : 'it'} before ${action === 'delete' ? 'deleting' : 'editing'} this row.`
-      );
-    }
-    return `A staged ${action} has no primary key in the current view (it may be hidden) — reload and try again.`;
-  }
-
   function buildPlan(tabId: string): MutationRowOp[] | null {
     const p = pendingState[tabId];
     if (!p) return null;
     const ops: MutationRowOp[] = [];
-    for (const row of p.deletes) {
-      const result = primaryKeyOf(tabId, row);
-      if (!result || result.missingColumns.length > 0) {
-        throw new UnaddressableRowError(unaddressableMessage('delete', result));
-      }
-      ops.push({ kind: 'delete', key: result.key });
-    }
+    for (const del of p.deletes.values()) ops.push({ kind: 'delete', key: del.key });
     for (const edit of p.edits.values()) {
-      const result = primaryKeyOf(tabId, edit.row);
-      if (!result || result.missingColumns.length > 0) {
-        throw new UnaddressableRowError(unaddressableMessage('edit', result));
-      }
-      ops.push({ kind: 'update', key: result.key, changes: edit.changes });
+      ops.push({ kind: 'update', key: edit.key, changes: edit.changes });
     }
     for (const insert of p.inserts) {
       ops.push({ kind: 'insert', values: insert.values });
@@ -349,8 +440,14 @@ export const usePendingChangesStore = defineStore('pendingChanges', () => {
     isCommitting,
     clearPending,
     registerFullPrimaryKeyAccessor,
+    pageHasFullPrimaryKey,
     isPendingDelete,
     stagedValue,
+    rawStagedValue,
+    rawRowChange,
+    hasRowChange,
+    pendingOnPage,
+    offPageCount,
     stageEdit,
     discardCellEdit,
     discardRowChange,

@@ -114,8 +114,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
  *  related record" is "open it there and select a cell in it".
  *
  *  `newTab: true`, same as navigateForeignKey: reusing an existing tab on the same target is
- *  unsafe — `load()` calls `clearPending(tabId)` unconditionally (state.ts), so re-filtering a
- *  tab that already holds staged edits would discard them silently. A new tab cannot do that.
+ *  unsafe — a filter change would re-scope the reused tab's page. A new tab cannot do that.
  *
  *  `await setFilter`, then request focus: `setFilter` resolves only after `load()` has called
  *  `setPage`, so by the time the request is made, the page in the store is the *filtered* one —
@@ -398,9 +397,8 @@ function snapshotsThunk(ctx: RowMenuContext): () => RowSnapshot[] {
 
 function hasPendingChange(ctx: RowMenuContext): boolean {
   const store = usePendingChangesStore();
-  const p = store.pendingFor(ctx.tabId);
-  if (!p || store.isCommitting(ctx.tabId)) return false;
-  return ctx.rows.some((row) => p.edits.has(row) || p.deletes.has(row));
+  if (store.isCommitting(ctx.tabId)) return false;
+  return ctx.rows.some((row) => store.hasRowChange(ctx.tabId, row));
 }
 
 // D6: Copy row(s) ▸ TSV/CSV/JSON/INSERT, Duplicate row(s), Revert row(s), Delete row(s) — all act
