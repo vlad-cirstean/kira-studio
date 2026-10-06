@@ -1,10 +1,14 @@
 package dbmcp
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestBindHTTPRefusesFallbackOnPortConflict guards F11: a DefaultPort conflict must refuse to
@@ -28,5 +32,35 @@ func TestBindHTTPRefusesFallbackOnPortConflict(t *testing.T) {
 	}
 	if s.listener != nil {
 		t.Fatal("s.listener was set despite bindHTTP returning an error — no fallback listener must be left behind")
+	}
+}
+
+// TestRequestCancellationReachesDetachedHandlerContext guards P168 Part 6 F2: go-sdk detaches the
+// tool handler's context from the HTTP request, so a client that goes away must still cancel it.
+func TestRequestCancellationReachesDetachedHandlerContext(t *testing.T) {
+	handlerCtx := make(chan context.Context, 1)
+	h := withRequestContext(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		detached := context.WithoutCancel(r.Context())
+		ctx, cancel := bindRequestCancellation(detached)
+		defer cancel()
+		handlerCtx <- ctx
+		<-ctx.Done()
+	}))
+
+	reqCtx, cancelReq := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/mcp", nil).WithContext(reqCtx))
+		close(done)
+	}()
+	ctx := <-handlerCtx
+	if ctx.Err() != nil {
+		t.Fatal("handler context cancelled before the request ended")
+	}
+	cancelReq()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler context not cancelled after the request context ended")
 	}
 }

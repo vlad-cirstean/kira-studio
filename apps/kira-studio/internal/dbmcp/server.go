@@ -243,6 +243,8 @@ func withPanicRecovery[In any](s *Server, name string, h func(context.Context, *
 				res, out, err = errResult("internal error handling this tool call")
 			}
 		}()
+		ctx, cancel := bindRequestCancellation(ctx)
+		defer cancel()
 		return h(ctx, req, in)
 	}
 }

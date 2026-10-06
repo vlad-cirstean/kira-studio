@@ -32,6 +32,32 @@ type httpState struct {
 	http     *http.Server
 }
 
+type requestContextKeyType struct{}
+
+var requestContextKey requestContextKeyType
+
+// withRequestContext stores the HTTP request's own context where tool handlers can read it back.
+// go-sdk v1.8.0 detaches the handler context from the request unless PropagateRequestCancellation
+// applies, and a client's cancel arrives on a separate stateless POST, so a disconnect or
+// client-side timeout otherwise never reaches the handler (P168 Part 6 F2). Context values survive
+// the detach.
+func withRequestContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestContextKey, r.Context())))
+	})
+}
+
+// bindRequestCancellation returns ctx cancelled when the HTTP request stored by
+// withRequestContext ends (client gone). Without a stored request context it is a plain child.
+func bindRequestCancellation(ctx context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+	if reqCtx, ok := ctx.Value(requestContextKey).(context.Context); ok {
+		stop := context.AfterFunc(reqCtx, cancel)
+		return ctx, func() { stop(); cancel() }
+	}
+	return ctx, cancel
+}
+
 // bindHTTP binds DefaultPort — never 0.0.0.0, always loopback only (§3.2) — mounts the auth-wrapped
 // Streamable HTTP handler, and records the bound listener. Does not start serving; call Serve for
 // that.
@@ -53,6 +79,8 @@ func (s *Server) bindHTTP() error {
 
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s.mcp }, &mcp.StreamableHTTPOptions{
 		Stateless: true,
+		// Only takes effect for protocol >= 2026-07-28; older clients rely on requestContextKey.
+		PropagateRequestCancellation: true,
 	})
 
 	verifier := s.tokenVerifier()
@@ -62,7 +90,7 @@ func (s *Server) bindHTTP() error {
 		// TokenInfo.Expiration (deliberately left empty, see tokenVerifier below) and produce its
 		// own flat "token missing expiration" body instead, so that check stays opted out here.
 		AllowMissingExpiration: true,
-	})(handler)
+	})(withRequestContext(handler))
 
 	// The go-sdk applies DNS-rebinding protection by default but explicitly does not apply
 	// cross-origin protection unless the caller wraps the handler itself: a browser tab on an
