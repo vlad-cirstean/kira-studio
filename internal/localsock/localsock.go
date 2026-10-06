@@ -15,6 +15,9 @@ import (
 	"sync"
 )
 
+// minTokenBytes rejects an empty or guessable token: an empty one would match a missing bearer header.
+const minTokenBytes = 16
+
 // Options configures Listen.
 type Options struct {
 	// DirPrefix is os.MkdirTemp's own pattern prefix (e.g. "kira-agent-", "kira-askpass-") — kept
@@ -40,13 +43,18 @@ type Listener struct {
 	// whatever they spawn, checked (constant-time) against every request this socket receives.
 	Token string
 
-	wg sync.WaitGroup
+	mu     sync.Mutex // guards closed and wg.Add against Close's wg.Wait
+	closed bool
+	wg     sync.WaitGroup
 }
 
 // Listen creates opts.DirPrefix's own 0700 temp directory, a unix socket named "s" inside it
 // (chmod 0600), and a fresh opts.TokenBytes-byte token. A failure at any step cleans up whatever
 // it already created.
 func Listen(opts Options) (*Listener, error) {
+	if opts.TokenBytes < minTokenBytes {
+		return nil, fmt.Errorf("localsock: TokenBytes %d below minimum %d", opts.TokenBytes, minTokenBytes)
+	}
 	// POSIX mkdtemp(3) creates the directory 0700 already; os.MkdirTemp is documented to use it —
 	// the security boundary both original callers relied on: no other OS user can read the shim,
 	// the token or reach the socket.
@@ -88,7 +96,14 @@ func (l *Listener) Serve(handle func(net.Conn)) {
 		if err != nil {
 			return
 		}
+		l.mu.Lock()
+		if l.closed {
+			l.mu.Unlock()
+			_ = conn.Close()
+			return
+		}
 		l.wg.Add(1)
+		l.mu.Unlock()
 		go func() {
 			defer l.wg.Done()
 			handle(conn)
@@ -100,6 +115,9 @@ func (l *Listener) Serve(handle func(net.Conn)) {
 // socket file along with whatever else the caller wrote beside it (a shim script, a generated
 // document).
 func (l *Listener) Close() error {
+	l.mu.Lock()
+	l.closed = true
+	l.mu.Unlock()
 	err := l.Listener.Close()
 	l.wg.Wait()
 	if rmErr := os.RemoveAll(l.Dir); err == nil {

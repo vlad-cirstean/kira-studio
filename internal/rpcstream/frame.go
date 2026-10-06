@@ -8,14 +8,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
-// wireError mirrors @kira/git-ipc's WireError (rpc.ts): code and message always, kind only for
-// a classified error that carries one (P1 produces none yet — gitclient.Error's own Kind is not
-// surfaced onto the wire until a caller needs it; mapGitError already folds it into ipcerr's plain
-// code/message).
+// wireError mirrors @kira/git-ipc's WireError (rpc.ts): code and message.
 type wireError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
-	Kind    string `json:"kind,omitempty"`
 }
 
 // frame is every member of rpc.ts's Frame union folded into one struct — a field not
